@@ -1,0 +1,69 @@
+{
+  "doc": "genesis/docs/superpowers/plans/2026-09-05-nachalah-supervised-activation-sprint-handoff.md",
+  "slug": "2026-09-05-nachalah-supervised-activation-sprint-handoff",
+  "method": "delivery-stations",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 9,
+  "items": [
+    {
+      "id": "nachalah-supervised-activation#1a",
+      "text": "Signed candidate authentication and compatibility refuse tampering, stale predecessor, wrong target, expiry and unsafe database formats; output cannot authorize process mutation. Probe: owning ark contract tests.",
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#1b",
+      "text": "Between elected-release verification and ark activation: acting node verifies notarized delegates-compute signed author, issuer, recipient, scope, validity and revocation; probe malicious grant and unauthorized author refusals with unchanged incumbent PID.",
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#1b-a",
+      "text": "Between signed candidate content and full grant authority: authenticate exact Commitment Create ActionHash, EntryHash and independently pinned author using signed Holochain record. Probe: independent signature and record substitution refusal tests. No activation authority.",
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#1b-b",
+      "text": "Between authenticated grant record and process stop: bind provider, recipient, candidate target scope and validity; obtain authenticated fresh grant status under an explicit stop-boundary rule. Refuse missing, stale, revoked or unavailable evidence with unchanged incumbent PID. DHT link absence is not fresh non-revocation.",
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#1",
+      "text": "1. Establish the activation contract and its refusal tests",
+      "line": 92,
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#2",
+      "text": "2. Implement durable staging and a targeted ark transition",
+      "line": 108,
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#3",
+      "text": "3. Prove readiness failure causes local rollback",
+      "line": 123,
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#4",
+      "text": "4. Rejoin the shared evidence path after service returns",
+      "line": 139,
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    },
+    {
+      "id": "nachalah-supervised-activation#5",
+      "text": "5. Rehearse the complete household ceremony twice",
+      "line": 153,
+      "state": "OPEN",
+      "class": "protocol-canonical"
+    }
+  ]
+}

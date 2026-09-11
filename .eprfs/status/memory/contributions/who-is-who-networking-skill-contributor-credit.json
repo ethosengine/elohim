@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "who-is-who-networking-skill-contributor-credit",
+  "claim": "CONTRIBUTORS already exists as genesis/data/presences (standing gradient, on-grain credit); opt-out→commons + who's-who skill remain.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/who-is-who-networking-skill-contributor-credit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/who-is-who-networking-skill-contributor-credit.md",
+        "cid": "bafkreiejh5i2rfnva2jfaummchg5n3uhdxj54o7drl3s4tljthgztuo2ne"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Who's-who networking skill + contributor credit",
+    "file": "who-is-who-networking-skill-contributor-credit.md",
+    "scopePath": ".claude/memory/who-is-who-networking-skill-contributor-credit.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_fresh_worktree_install_state_traps",
+  "claim": "A fresh sprint worktree fails gates on install-state, not code — deps, submodules, gitignored generated-ts, app dists; the mechanical fix list (2026-09-07)",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_fresh_worktree_install_state_traps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_fresh_worktree_install_state_traps.md",
+        "cid": "bafkreiat7r36ah7omyqvbq6opafmlusweqalhuffxohoxgoz5bvsg3d65m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project_fresh_worktree_install_state_traps",
+    "file": "project_fresh_worktree_install_state_traps.md",
+    "scopePath": ".claude/memory/project_fresh_worktree_install_state_traps.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

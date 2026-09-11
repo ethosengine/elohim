@@ -1,0 +1,74 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md",
+ "slug": "specs__2026-07-18-epr-rea-valueflow-fabric-design",
+ "method": "requirement-bullets",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 8,
+ "items": [
+  {
+   "text": "ProcessSpec: A (existing) \u2014 EPR content atom, CID; standing via Mishpat::Precedent lift. No new entry type",
+   "line": 214,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L214",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Intent: floor C (reconstructable from gap-items); graduation reuses existing DNA REA/proposal types \u2014 verify headroom + existing types before ANY mint (open verification item)",
+   "line": 215,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L215",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Commitment: A (existing) \u2014 Mishpat::Commitment, cid = entry_hash (never action_hash); Slice-2a graduation rails",
+   "line": 216,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L216",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "FlowEvent\u2192EconomicEvent: B2 via the D2 observation\u2194attestation split \u2014 granular stays sidecar/local (never DHT; ~3000-entry budget), crystallizes per recipe-declared graduation policy into existing EconomicEvent (bounded_by) or Attestation",
+   "line": 217,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L217",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Process instance: A2 \u2014 links anchored on the container EPR; no standalone entry type",
+   "line": 218,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L218",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Resource: no entity; state = fold (C, reconstructable)",
+   "line": 219,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L219",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fulfillment/Satisfaction: edges in hashed bytes + A2 links; not atoms",
+   "line": 220,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L220",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Address strategy: content-derived CID everywhere; agent_cid the only agent join key; no bare",
+   "line": 221,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-epr-rea-valueflow-fabric-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-epr-rea-valueflow-fabric-design.md#L221",
+   "class": "protocol-canonical"
+  }
+ ]
+}

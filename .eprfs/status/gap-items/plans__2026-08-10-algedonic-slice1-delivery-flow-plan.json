@@ -1,0 +1,226 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md",
+ "slug": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 27,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 43,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L43",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run to verify it fails \u2014 python3 .claude/scripts/_lib/tests/concern_routes_test.py \u2192 FAIL (file not found / no attribute)",
+   "line": 89,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L89",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L91",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run to verify pass \u2014 same command \u2192 concern_routes_test: PASS",
+   "line": 126,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L126",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit \u2014 git commit -m \"feat(sentinels): concern-route helper \u2014 the algedonic address book\" -- .claude/scripts/_lib/concern_routes.py .claude/scripts/_lib/tests/concern_routes_test.py",
+   "line": 127,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L127",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test \u2014 plain script, importlib-loads ci-harvest.py (hyphenated name: spec_from_file_location(\"ci_harvest\", SCRIPTS/\"ci-harvest.py\")). Feed a fixture console tail containing the exact banner run-dataplane-validation.sh prints on gate-skip (=== Dataplane Validation: DID NOT MEASURE ===) plus the habits fixture from Task 1; assert collect_build_findings (or the console-scan helper it calls \u2014 mirror the echo test's entry point) yields one finding with class == \"ci-no-measure\", category == \"NO_MEASURE\", concern == \"notary-authority\", and that its fingerprint equals fingerprint(job, \"NO_MEASURE\", \"dataplane-validation-did-not-measure\") \u2014 a FIXED identifier so repeat no-measures dedupe to ONE open finding (algedonic: pain is a held state, not a stream)",
+   "line": 141,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L141",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run to verify it fails",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L142",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement \u2014 in the console-scan path of collect_build_findings: detect the banner line; mint the finding with the fixed identifier above; resolve concern via route(\"ci-no-measure\", {\"active_concern\": active_concern(HABITS.read_text())}) where HABITS = REPO/\"genesis/manifests/habits.yaml\" (guard FileNotFoundError \u2192 context {}). In reconcile's new-entry dict add ({\"concern\": f[\"concern\"]} if f.get(\"concern\") else {}). For ordinary ci-failure findings, also attach concern when the failing line carries an @concern: tag (reuse _CONCERN_TAG via the Task-1 helper) \u2014 otherwise omit (honest absence)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L143",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run new test + the existing echo test (python3 .claude/scripts/_lib/tests/ci_harvest_echo_test.py) \u2014 both PASS (proves fingerprints and the console-scan budget are undisturbed)",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L144",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L145",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Failing test \u2014 build a minimal window that trips one predicate (mirror whichever fixture shape the existing tests use for _circuit_open; if none exists, construct the 8-poll ring with a stuck-Open circuit field per the predicate's field names read from the source). Call evaluate(window, context={\"concern\": \"saga-04-doorway-serves\"}); assert the finding dict carries concern, and that fingerprint() inputs are unchanged (same fp with and without context)",
+   "line": 159,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L159",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run \u2192 FAIL",
+   "line": 160,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L160",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement \u2014 thread context through evaluate \u2192 each predicate's finding dict gets concern = route(cls, context) when non-None. reconcile copies concern onto new entries (.get, additive)",
+   "line": 161,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L161",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run new + existing runtime tests \u2192 PASS",
+   "line": 162,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L162",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Failing test for the matcher:",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L177",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement the matcher \u2014 stdlib json + glob matching (translate globs with pathlib.PurePath.full_match on py\u22653.13, else a small re.compile(glob\u2192regex); check python3 --version in-container first and use the simplest that passes Step 1's fixtures). Union globs from every steps.*.inputs.sources array in the manifest \u2014 read from the manifest at run time, never hardcoded (the manifest is the single source the orchestrator itself walks)",
+   "line": 197,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L197",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Add the hook clause in .husky/pre-push.bash:",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L198",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Verify both directions \u2014 bash -n .husky/pre-push.bash (syntax), then a sourced-function harness that sets PUSH_TARGETS=\"refs/heads/dev\", CHANGED=\"\" and stubs git log -1 output via a wrapper function. Expected: bare [build:edge]+empty \u2192 denied; [build:edge] [edge:validate-only]+empty \u2192 allowed; [build:edge]+elohim/elohim-storage/src/lib.rs \u2192 allowed",
+   "line": 221,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L221",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 222,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L222",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Failing test \u2014 importlib-load habits-status.py, override a new module-level LEDGERS constant (added in Step 3; test sets m.LEDGERS = [fixture_path]) pointing at a fixture jsonl containing two entries: {\"fp\":\"abc123\",\"class\":\"ci-no-measure\",\"status\":\"open\",\"concern\":\"notary-authority\"} and {\"fp\":\"def456\",\"status\":\"open\"} (no concern \u2014 must not crash, must not count). Assert headline(...) contains pain: 1 open and full(...) contains abc123",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L236",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement \u2014 LEDGERS constant (ci-findings + runtime-findings absolute paths derived the same way the existing HABITS constant derives the repo root); def open_pain() \u2192 dict concern\u2192[fps] over lines where status==\"open\" and .get(\"concern\"); join in headline (top-red's first @concern: tag extracted from its check string with an inline copy of the @concern: regex \u2014 habits-status stays import-free) and per-habit in full. Missing/unreadable ledgers \u2192 empty dict (never a crash at session start)",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L238",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run test + python3 .claude/scripts/habits-status.py (live smoke \u2014 must render; a real pain line is a pass, not a failure) \u2192 PASS",
+   "line": 239,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L239",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Read rate-limit-exceeded.schema.json; write both schemas mirroring its envelope conventions byte-for-byte where shared (same $schema draft, same $id pattern, same signed_at format), differing only in the evidence block + kind constants above",
+   "line": 256,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L256",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Verify \u2014 pnpm run schema:test and pnpm run schema:validate from repo root \u2192 green (Expected: the suite picks up new files in feedback-signals/ the same way it validates the three existing ones; if it enumerates explicitly, add the two filenames wherever rate-limit-exceeded is listed)",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L257",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 258,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L258",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the capture (follow the naming + frontmatter conventions visible in genesis/data/timeline/backlog/; satisfy that dir's .epr-meta if the write hook demands fields): one-line items for \u2014 zome SIGNAL_KINDS whitelist extension + kind-gates in create_feedback_signal (evidence+bound_ref required); FloorClass::CounterEvidence routing + property-test extension; storage projection + emitters at the self-heal exhaustion sites (/admin/self-healing completion rides this); C15 algedonic-channel minting in the concern canon; app-manifest algedonicHandler field; .epr-meta authoring policy on elohim/epr/src/kind.rs + elohim/sdk/domains/*/manifest/. Each item cites algedonic-feedback-signal \u00a75 slice 2",
+   "line": 267,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L267",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Commit",
+   "line": 268,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-slice1-delivery-flow-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md#L268",
+   "class": "provisional"
+  }
+ ]
+}

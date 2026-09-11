@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_shift_drive_cure_not_stage",
+  "claim": "In a /shift you own the cure end-to-end — stabilize, then implement the confirmed fix; 'staged/gated' past diagnosis is timidity.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_shift_drive_cure_not_stage.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_shift_drive_cure_not_stage.md",
+        "cid": "bafkreiclxm2ufs3kiu7m2ygfsrvlqkwerfdbmtpryp6pbbhjlwtprcgqlq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Shift = drive the cure end-to-end, not stage it",
+    "file": "feedback_shift_drive_cure_not_stage.md",
+    "scopePath": ".claude/memory/feedback_shift_drive_cure_not_stage.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

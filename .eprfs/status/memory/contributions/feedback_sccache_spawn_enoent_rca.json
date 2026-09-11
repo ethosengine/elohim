@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "sccache-spawn-enoent-rca",
+  "claim": "Cargo intermittently fails to spawn sccache binary itself (~1.7%); grep: 'could not execute process .sccache rustc'.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sccache_spawn_enoent_rca.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sccache_spawn_enoent_rca.md",
+        "cid": "bafkreia3ulyv3ef5ef5bznem2c63cpvemnn5ldxkid7yblf63kufz7vwem"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "sccache spawn ENOENT RCA (sweettest)",
+    "file": "feedback_sccache_spawn_enoent_rca.md",
+    "scopePath": ".claude/memory/feedback_sccache_spawn_enoent_rca.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

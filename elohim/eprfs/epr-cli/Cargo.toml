@@ -18,6 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 eprfs-core = { path = "../eprfs-core" }
+eprfs-agent = { path = "../eprfs-agent" }
 eprfs-host = { path = "../eprfs-host" }
 eprfs-meta = { path = "../eprfs-meta" }
 elohim-epr-rea = { path = "../../epr-rea" }
@@ -27,6 +28,9 @@ elohim-epr = { path = "../../epr" }
 chrono = "0.4"
 cid = "0.11"
 glob = "0.3"
+# Advisory file locking for the recall executor's session continuation — a safe `flock`
+# wrapper, so the lock needs no `unsafe` block in this crate.
+rustix = { version = "1", features = ["fs"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
@@ -34,4 +38,7 @@ sha2 = "0.10"
 thiserror.workspace = true
 
 [dev-dependencies]
+# The index-parity harness pins the projector's expected bytes by digest, so a fixture that
+# silently changes fails loudly rather than re-baselining itself.
+sha2 = "0.10"
 tempfile = "3"

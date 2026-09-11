@@ -1,0 +1,66 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md",
+ "slug": "plans__2026-09-10-memory-kit-replacement-finish",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 7,
+ "items": [
+  {
+   "text": "Every threshold the kit hard-codes is a declared bound, the native epr flow report folds each bound into a witnessed outcome, the SessionStart headline is a projection of that fold, and the drift-signal hooks append structured observations instead of writing JSON state",
+   "line": 83,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L83",
+   "class": "provisional"
+  },
+  {
+   "text": "Document placement, gap extraction and env scope are native: epr flow report placement derives every file's placement state from epr-meta, cites and flows; epr flow project extracts checkbox stations from plans and specs without a gap-items directory; epr flow report scope and epr flow hold replace scope-reconcile and focus-baseline; delivery-gate.py and scope-reconcile consumers read native",
+   "line": 88,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L88",
+   "class": "provisional"
+  },
+  {
+   "text": "The package verifier absorbs the description-quality audits and the cite read-side parity is pinned: agent-audit/skill-audit checks live in package-projections.mjs verify reading their floors from declared middot rows, brit-epr's drift fingerprint is proven equal to the Python oracle over the corpus, the ten cite-gen --seal fixed-point digests are recorded as the writer parity baseline, and the epr flow concerns --stamp contract is written",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L92",
+   "class": "provisional"
+  },
+  {
+   "text": "The cite writer is native: epr flow cites seal|assign-id|describe|verify|stamp <doc> in epr-cli reproduces the recorded fixed-point digests byte-for-byte on the ten baseline docs, stamp implements the recorded contract and replaces cite-propagate.py --apply (72 edges pending today), hooks, commands and managed surfaces call the native verbs with the Python scripts as fallback only while the binary is absent, and the four cite scripts delete after a corpus dry run of cites-migrate.py reports zero pending",
+   "line": 94,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L94",
+   "class": "provisional"
+  },
+  {
+   "text": "Private memory entries are collective contributions and the memory analyzers live under the memory owner: every .claude/memory/*.md entry is imported as a contribution with git-author provenance and its original bytes pinned, MEMORY.md is projected by epr flow memory project --index under the declared byte bound, the PostToolUse hook is swapped, and memory-review, dedupe, coherence, cleanup and path-update relocate as declared foreign measures the report invokes",
+   "line": 98,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L98",
+   "class": "provisional"
+  },
+  {
+   "text": "The recall executor is native and corrections close by identity: epr flow memory recall carries budgets, receipts, method pins and session accounting; epr flow concerns --corrections lists unresolved corrections by identity with closure evidence; recall-ceremony.py and its libraries delete; the ceremony skill and packages name only native verbs",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L102",
+   "class": "provisional"
+  },
+  {
+   "text": "Parity is proven by observation and the artifact is cleared: two isolated readers answer the fixed fresh-start question set before and after against the same tree, the parity report shows every inventory row as native, relocated or retired with evidence, and .claude/scripts/memory-kit/ and .claude/memory-kit/ are removed with authored evidence relocated and pins verified",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-memory-kit-replacement-finish#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md#L106",
+   "class": "provisional"
+  }
+ ]
+}

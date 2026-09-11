@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "Principle P1 — elohim-storage as reconciliation controller",
+  "claim": "DHT is the manifest; elohim-storage is a k8s-style controller that eagerly reconciles — reject lazy acceptance for integrity-critical state.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_principle_p1_reconciliation_controller.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_principle_p1_reconciliation_controller.md",
+        "cid": "bafkreif5cqagqvt42ynrlpdsiy77nqm4dqvj772ux7tpqbwirqf2fmfc5i"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "P1 — storage as reconciliation controller",
+    "file": "project_principle_p1_reconciliation_controller.md",
+    "scopePath": ".claude/memory/project_principle_p1_reconciliation_controller.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

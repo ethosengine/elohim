@@ -1,0 +1,29 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md",
+ "slug": "specs__2026-05-25-stagespablob-substrate-correct-deploy",
+ "method": "requirement-bullets",
+ "count": 3,
+ "items": [
+  {
+   "text": "substrate-correct-deploy.feature \u2014 happy-path Z.D",
+   "line": 344,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-stagespablob-substrate-correct-deploy#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md#L344"
+  },
+  {
+   "text": "bounds-violation-rejection.feature \u2014 substrate refuses out-of-bounds republish",
+   "line": 345,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-stagespablob-substrate-correct-deploy#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md#L345"
+  },
+  {
+   "text": "reach-escalation-soft-warn.feature \u2014 \u00a73 ceremony",
+   "line": 346,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-stagespablob-substrate-correct-deploy#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md#L346"
+  }
+ ]
+}

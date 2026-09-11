@@ -1,0 +1,14 @@
+{
+  "doc": "genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md",
+  "slug": "plans__2026-06-08-epr-slice1-lens-complete-resolver-plan",
+  "method": "agent",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 4,
+  "items": [
+    {"text": "Task 1 — doorway: demote the universal claims-302. Default subview → ServeShell (was RedirectToMount); /epr/{id} always serves the shell. Don't touch sitemap or the legacy /lamad/resource alias-302. TDD inverts the classify claimed test.", "line": 59, "state": "OPEN", "id": "plans__2026-06-08-epr-slice1-lens-complete-resolver-plan#1", "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md#L59", "class": "protocol-canonical"},
+    {"text": "Task 2 — shell KEYSTONE: focal epr-composite renderer. Register an epr-composite renderer rendering the composite body (sections→items) as an accessible outline, item refs as /epr/{ref} links (eprToUniversalHref). data-testid root. Vitest. Without it, paths fall to the raw fallback post-demotion.", "line": 71, "state": "OPEN", "id": "plans__2026-06-08-epr-slice1-lens-complete-resolver-plan#2", "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md#L71", "class": "protocol-canonical"},
+    {"text": "Task 3 — shell: Open-in-{pillar} affordance in content-viewer when contentType is claimed (path→/lamad/path/{id}), plain cross-bundle href. Derive mount from contentType→pillar map (reuse bundle route context; minimal map + backlog capture if none). data-testid. Vitest.", "line": 83, "state": "OPEN", "id": "plans__2026-06-08-epr-slice1-lens-complete-resolver-plan#3", "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md#L83", "class": "protocol-canonical"},
+    {"text": "Task 4 — a2o: INVERT deep-link-delivery.feature:54 (the 302-to-mount scenario) → /epr/{claimed-path} renders the lens-complete viewer (focal composite outline + knowledge leg + Open-in-pillar affordance), no 302. Add selectors/steps; @regression; testid-sync. Opus authors narrative.", "line": 93, "state": "OPEN", "id": "plans__2026-06-08-epr-slice1-lens-complete-resolver-plan#4", "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-slice1-lens-complete-resolver-plan.md#L93", "class": "protocol-canonical"}
+  ]
+}

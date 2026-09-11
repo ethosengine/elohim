@@ -1,0 +1,36 @@
+{
+ "doc": "genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md",
+ "slug": "plans__2026-05-21-qahal-mvp-roadmap",
+ "method": "requirement-bullets",
+ "count": 4,
+ "items": [
+  {
+   "text": "Lamad DNA: ~73/~100 entry types (some headroom)",
+   "line": 265,
+   "state": "OPEN",
+   "id": "plans__2026-05-21-qahal-mvp-roadmap#1",
+   "cites": "genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md#L265"
+  },
+  {
+   "text": "Mishpat DNA: ~11/~100 entry types (substantial headroom \u2014 likely where Qahal lives, since governance pillar)",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-05-21-qahal-mvp-roadmap#2",
+   "cites": "genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md#L266"
+  },
+  {
+   "text": "Imagodei: 28/~100 (Qahal probably does not live here despite touching member identity)",
+   "line": 267,
+   "state": "OPEN",
+   "id": "plans__2026-05-21-qahal-mvp-roadmap#3",
+   "cites": "genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md#L267"
+  },
+  {
+   "text": "Working assumption: Qahal + QahalRubric + CommonsElohimGenesis land in mishpat DNA (governance pillar), not lamad or imagodei. Checkpoint B confirms",
+   "line": 268,
+   "state": "OPEN",
+   "id": "plans__2026-05-21-qahal-mvp-roadmap#4",
+   "cites": "genesis/docs/plans/2026-05-21-qahal-mvp-roadmap.md#L268"
+  }
+ ]
+}

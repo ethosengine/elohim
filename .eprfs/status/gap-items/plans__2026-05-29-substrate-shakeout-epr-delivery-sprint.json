@@ -1,0 +1,148 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md",
+ "slug": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint",
+ "method": "checkbox-tasks",
+ "count": 20,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L76"
+  },
+  {
+   "text": "Step 2: Run test to verify it fails",
+   "line": 100,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L100"
+  },
+  {
+   "text": "Step 3: Add the route arm in handle_db_request",
+   "line": 105,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L105"
+  },
+  {
+   "text": "Step 4: Register the route in build_manifest",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L144"
+  },
+  {
+   "text": "Step 5: Run test to verify it passes",
+   "line": 153,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L153"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 167,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L167"
+  },
+  {
+   "text": "Step 1: Write the failing/guard test",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L185"
+  },
+  {
+   "text": "Step 3: Implement the chooser + hoist the subscribe call",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L204"
+  },
+  {
+   "text": "Step 4: Run test to verify it passes",
+   "line": 217,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L217"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 227,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L227"
+  },
+  {
+   "text": "Step 3: Add the mapping",
+   "line": 265,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L265"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 287,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L287"
+  },
+  {
+   "text": "Step 1: Reproduce \u2014 capture the exact compile errors",
+   "line": 303,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L303"
+  },
+  {
+   "text": "Step 2: Fix each error, smallest change first",
+   "line": 312,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L312"
+  },
+  {
+   "text": "Step 3: Verify it compiles",
+   "line": 316,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L316"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 321,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L321"
+  },
+  {
+   "text": "Step 1: Write the failing sweettest",
+   "line": 342,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L342"
+  },
+  {
+   "text": "Step 2: Run to verify it fails",
+   "line": 360,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L360"
+  },
+  {
+   "text": "Step 3: Add the LinkType + anchor link + list fn",
+   "line": 365,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L365"
+  },
+  {
+   "text": "Step 3: Implement the reconciler",
+   "line": 450,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-substrate-shakeout-epr-delivery-sprint#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-substrate-shakeout-epr-delivery-sprint.md#L450"
+  }
+ ]
+}

@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md",
+ "slug": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#1",
+   "text": "Workstream A: harden Elohim SDK (@elohim/service + schemas + storage-client-ts + EPR/projection contract) as a clean documented tested surface; define what the SDK IS vs app-private",
+   "line": 91,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L91"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#2",
+   "text": "Workstream A: ship a STANDARD SDK-owned app-bootstrap (provideElohimApp(manifest)/bootstrapEprApp) giving DI providers + same-origin doorway resolution + SW/cache wiring for free; eliminates per-app hand-wiring that white-paged",
+   "line": 92,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L92"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#3",
+   "text": "Workstream A: audit every cross-pillar token+provider for provided-where-consumed across ALL bundle bootstraps (not just dev-server)",
+   "line": 94,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L94"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#4",
+   "text": "Workstream B: mature app-manifest.schema.json into the real contract (bundle identity, renderer, routes/url_path, projection scope doorway-agnostic, reach, entry_file, base_href, cache policy, SW policy)",
+   "line": 96,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L96"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#5",
+   "text": "Workstream B: wire build/seed/project pipeline + SDK bootstrap to be manifest-driven (no hand-coded slugs/scopes/doorwayIds \u2014 kill drift class from cascade layers 5-6); deliver ONE reference EPR-app conforming end-to-end zero hand-wiring",
+   "line": 98,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L98"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#6",
+   "text": "Workstream C: make warm doorway projection cache the reliable fast path, SW zip-unpack a true last-resort; fix warm.rs/warm_stream.rs returning {}, TieredBlobCache write-on-fetch TODO, EprRouter population robustness, apex-router cross-peer projection leg (adam-side in_scope_of)",
+   "line": 101,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L101"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#7",
+   "text": "Workstream C: define+measure delivery SLOs (warm-hit %, time-to-render, no-SW-fallback) verified by RENDER not HTML shell (avoid false-positive static-title match)",
+   "line": 103,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L103"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#8",
+   "text": "Workstream D: produce canonical boundary map (ownership/contract/test-coverage/is-this-SDK-core-or-app-private) for every component; remove leaky duplication (per-app DI bootstrap, doorwayUrl resolution, cache/SW wiring) into SDK primitives",
+   "line": 105,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L105"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#9",
+   "text": "Workstream E: evaluate splitting CI/repo into elohim-core (dna/storage/doorway/steward/epr/sdk/library/bridges) vs reference-apps (6 pillar EPR-apps) so core versions independently; decide + execute orchestrator/build-manifest reorg if taken",
+   "line": 109,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L109"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#10",
+   "text": "Done condition: a simulated third party builds+deploys an EPR-app against documented SDK + app-manifest with NO substrate code changes",
+   "line": 125,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L125"
+  },
+  {
+   "id": "specs__2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff#11",
+   "text": "Done condition: Landing + Lamad load as warm-cache fast hits (no apps-sw zip-unpack), verified by render, on alpha.elohim.host AND elohim.host; boundaries classified, contracts tested, duplication removed, split decided",
+   "line": 127,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-elohim-sdk-epr-app-boundaries-sprint-kickoff.md#L127"
+  }
+ ]
+}

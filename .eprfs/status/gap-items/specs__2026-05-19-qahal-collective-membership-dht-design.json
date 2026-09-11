@@ -1,0 +1,92 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md",
+ "slug": "specs__2026-05-19-qahal-collective-membership-dht-design",
+ "method": "agent-decomposition",
+ "count": 12,
+ "items": [
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#1",
+   "text": "Add Collective (Category A notarized) entry type to imagodei DNA: founder_agent_cid, charter (<=16KiB immutable), display_name (mutable), created_at_block_height, salt (16 bytes)",
+   "line": 66,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L66"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#2",
+   "text": "Add Membership (Category A notarized) entry type: person_cid, collective_cid, role: MembershipRole, sponsor_cid Option, joined_at_block_height",
+   "line": 89,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L89"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#3",
+   "text": "MembershipRole enum: Steward (authoritative) / Contributor / Observer (role derived via link kind, not separate entry)",
+   "line": 102,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L102"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#4",
+   "text": "CID-derived identity (no slugs): Collective.id over {founder, charter, block_height, salt}; Membership.id over {person, collective, role, joined_at, sponsor}",
+   "line": 46,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L46"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#5",
+   "text": "Link types: MemberOf / HasMember (role tag) / HasMembership (anchored, ordered) / StewardOf / CharterAnchor (well-known anchor for CID resolution)",
+   "line": 114,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L114"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#6",
+   "text": "Integrity validators (structural only, no get_links): charter non-empty<=16KiB, display_name<=256, salt 16 bytes, founder signature via must_get_action, update_collective changes only display_name (charter immutable), Steward role requires Some(sponsor_cid)",
+   "line": 126,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L126"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#7",
+   "text": "qahal_coordinator zome with 5 fns: create_collective (atomic founder Steward membership), update_collective (steward-gated), request_membership (Contributor/Observer self-join, Steward needs sponsor), attest_membership (steward counter-attestation), revoke_membership (steward + reason + signal)",
+   "line": 54,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L54"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#8",
+   "text": "Coordinator-side authority checks (link traversal): is-current-steward for update/attest/revoke; revoke emits ElohimContentSignal qahal:membership-revoked for projection audit log",
+   "line": 126,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L126"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#9",
+   "text": "Projection: diesel qahal_collectives + qahal_memberships tables fed by ElohimContentSignal handlers; /api/v1/collectives/{cid} read route + Viewer.collectives GraphQL resolver",
+   "line": 206,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L206"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#10",
+   "text": "VF-GraphQL mapping (Wave 3): Collective->Organization implements Agent; Membership->AgentRelationship; MembershipRole->AgentRelationshipRole labels; extension fields for salt/sponsor/joined-at; lossy VF->qahal only",
+   "line": 142,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L142"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#11",
+   "text": "Sweettest coverage for entry types + link kinds + integrity validators (substrate-first discipline)",
+   "line": 204,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L204"
+  },
+  {
+   "id": "specs__2026-05-19-qahal-collective-membership-dht-design#12",
+   "text": "Deferred open questions: quorum/threshold-N-of-M steward attestation; charter mutability (Norm spec); collective inheritance (HasParent/HasChild); access policy (open/invitation/application); cross-DNA placement; stewardship-handoff on key recovery (MembershipRenewal)",
+   "line": 172,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-19-qahal-collective-membership-dht-design.md#L172"
+  }
+ ]
+}

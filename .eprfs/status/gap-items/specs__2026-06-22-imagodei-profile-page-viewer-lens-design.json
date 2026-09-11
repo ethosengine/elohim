@@ -1,0 +1,125 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md",
+  "slug": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design",
+  "method": "agent-extracted",
+  "class": "protocol-canonical",
+  "note": "Agent-decomposed: the 12 net-new v1 deliverables (spec \u00a76); slices \u00a77 group these (Slices 1+2 ship together as the risk-closer; Slice 6 operator-gated). Open questions \u00a7end are operator decisions, not gap-items. | +legs 1+2 added in-arc (decision 2026-06-22); leg 3 severed to security-backlog.",
+  "items": [
+    {
+      "text": "get_consented_relationship_between \u2014 consent+bidirectional-filtered relationship read (C1 fix; the read the lens actually consumes)",
+      "line": 255,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L255",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Counterparty-consent write check in create_human_relationship/caller \u2014 a viewer cannot set the other party's consent flag (C1 fix)",
+      "line": 256,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L256",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "ViewerLens fold (elohim-facings/src/viewer_lens.rs + services/viewer_lens_facing.rs adapter) \u2014 computed-never-stored",
+      "line": 257,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L257",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "DisclosureTier::compute \u2014 relationship-class router + intimacy depth, local 6-rung ladder + intimacy->tier + reach->label mappings (M3 fix)",
+      "line": 258,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L258",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Standing::disclosure_demotion \u2014 net-new advisory demote-only helper, inert at cold-start (H2 fix; NOT with_lift)",
+      "line": 259,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L259",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Facet sensitivity label + class on imagodei core sections + domain manifests (reuse reach vocabulary as label; no new enum)",
+      "line": 260,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#6",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L260",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "GET /api/v1/identity/{id}/profile \u2014 viewer = authenticated session (never a ?viewer= param)",
+      "line": 261,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#7",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L261",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Service-layer validate_facet_disclosure write-gate (mirrors validate_project_epr_commitment Rule 1)",
+      "line": 262,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#8",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L262",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Raw-CRUD hardening: /db/humans/{id} drops reach-gated fields without viewer context",
+      "line": 263,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#9",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L263",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "profile_reach default flip migration (public -> self/private; born-private)",
+      "line": 264,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#10",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L264",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Pretty-handle minting UX over the existing routeClaim mechanism (/in/{name}, @name@doorway; hides CID complexity)",
+      "line": 265,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#11",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L265",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "PARTICIPATES_IN HTTP projection (surface the qahal collective-membership edge for domain-composite facets)",
+      "line": 266,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#12",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L266",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "LEG 1 (in-arc, decided 2026-06-22): notarize ConstitutionalFloor (A) + FacetDisclosureEvent (A2) as Mishpat DNA entries \u2014 DNA-validation-enforced disclosure floor (not service-trust)",
+      "line": 33,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#13",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L33",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "LEG 2 (in-arc, decided 2026-06-22): un-stub the claim-verification validator (email / dns-txt control of a presence)",
+      "line": 33,
+      "state": "OPEN",
+      "id": "specs__2026-06-22-imagodei-profile-page-viewer-lens-design#14",
+      "cites": "genesis/docs/superpowers/specs/2026-06-22-imagodei-profile-page-viewer-lens-design.md#L33",
+      "class": "protocol-canonical"
+    }
+  ],
+  "doc_requires_env": [
+    "household-nodes"
+  ],
+  "count": 14
+}

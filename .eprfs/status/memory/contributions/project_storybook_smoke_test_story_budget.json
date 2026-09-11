@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_storybook_smoke_test_story_budget",
+  "claim": "Smoke-Test Stories share a cumulative timeout budget — a fat matrix fails the WHOLE build; keep Library A+B to ~3-4 trimmed-fixture stories.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_storybook_smoke_test_story_budget.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_storybook_smoke_test_story_budget.md",
+        "cid": "bafkreifm34i4pbs55ceinefvinwse6pjdrz5xrldkcud2ybjbpnkz6ofam"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Storybook smoke-test story-budget",
+    "file": "project_storybook_smoke_test_story_budget.md",
+    "scopePath": ".claude/memory/project_storybook_smoke_test_story_budget.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

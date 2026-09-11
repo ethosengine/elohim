@@ -1,0 +1,120 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md",
+ "slug": "specs__2026-05-21-qahal-architecture-vision",
+ "method": "agent-decomposition",
+ "count": 16,
+ "items": [
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#1",
+   "text": "Qahal as ONE primitive with graduated capability surface (Commons/Engaged/Contributor/Steward/Commons-Elohim layers); no binary membership flag, continuous curve computed per-request",
+   "line": 136,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L136"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#2",
+   "text": "Two earned axes: Reach (outward content visibility, per-audience) + Standing (inward capability within a Qahal, per-Qahal); both computed not assigned, both revocable",
+   "line": 169,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L169"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#3",
+   "text": "Standing function: compute_standing(human, qahal, as_of) derived view (Category C) from lamad mastery attestations + affinity signals - feedback debits, weighted by rubric version + friction-gradient flattening -> Bloom-tiered capability surface",
+   "line": 182,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L182"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#4",
+   "text": "Bloom-graded mastery curve (Remember/Understand/Apply/Analyze/Evaluate/Create) mapped to capability surfaces; Steward = Bloom-Create = capacity to author the rubric (recursive)",
+   "line": 198,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L198"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#5",
+   "text": "Rubric as governable versioned EPR authored by stewards (not protocol); RubricUpdates link chain; specifies Bloom-tier mappings, attestation requirements, affinity weights, feedback debit rules, friction thresholds, commons-elohim defaults",
+   "line": 211,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L211"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#6",
+   "text": "Anti-colonization by construction: mastery-attested gate cannot be hijacked by a bad-faith insider (must become legible to collective values); rubric updates require Bloom-Create under prior rubric",
+   "line": 225,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L225"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#7",
+   "text": "Commons-elohim co-steward per Qahal: instantiated at genesis, structurally embedded (cannot be silenced), holds commons-share custody, speaks in councils, mediates disputes, witnesses standing, speaks for bioregion in natural collectives",
+   "line": 231,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L231"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#8",
+   "text": "Friction-gradient limitarianism: soft (diminishing standing returns + commons-share absorbs residual + curve flattening) + hard (protocol refuses concentration ops + council validation for centralizing rubric updates); recursive across wisdom layer",
+   "line": 246,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L246"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#9",
+   "text": "Standing decay as innate process (demurrage/stepping-back), cadence-archetype-tunable per rubric; past contributions honored in record, current standing honest about current participation",
+   "line": 257,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L257"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#10",
+   "text": "Substrate composition: Qahal = Layer-0 identity-anchor EPR; rubric coupled via QahalToRubric; commons-elohim via QahalToCommonsElohim (atomic); memberships as couplings; sub-Qahals via QahalToSubQahal; federation via shared commons-elohim (no new graph primitive)",
+   "line": 345,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L345"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#11",
+   "text": "Three-layer Qahal lifecycle (Layer0 Identity / Layer1 Specification / Layer2 Process) pay-as-you-grow; lifecycle_stage enum (Ideation/Specification/Active/Hibernating/Succession/EndOfLife); cradle-to-grave permanence (no delete, archival only)",
+   "line": 377,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L377"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#12",
+   "text": "Five truths per Qahal event (Who/What/When/Why on DHT, How on libp2p); all must resolve to substrate or interpretability has failed",
+   "line": 402,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L402"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#13",
+   "text": "Composition with all pillars: imagodei (lensed members) + lamad (attestation quizzes) + shefa (value cascades/Agreements/commons-share) + mishpat (governance EPRs) + elohim (commons-elohim/councils) + doorway (web2 projection)",
+   "line": 416,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L416"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#14",
+   "text": "MVP exit: median steward (Matthew + household + faith community + life-group + wisdom-commons federation) opens app, sees convergent Qahal homepage, takes lamad-attested quiz earning standing, witnesses capability expand, sees commons-elohim right-nav view; seed Dowell household + Bay Area Dawn Runners",
+   "line": 981,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L981"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#15",
+   "text": "MVP sprint sequence (0-5): vision consolidation / homepage UX (graphos) / substrate spine schema (schema-first) / substrate wire-up (Qahal+rubric+standing+commons-elohim stub) / frontend wire-up (Library B->backend) / genesis content+templates+a2o",
+   "line": 987,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L987"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-architecture-vision#16",
+   "text": "Carried-forward open questions: friction-gradient enforcement mix; commons-elohim runtime location; rubric versioning model; standing caching strategy; manifest tooling-tray composability; imagodei lens recursion; DNA placement (mishpat ~11/100 working assumption); bioregional non-human stakeholder; ephemeral merge contracts; layered arbitration-council convening",
+   "line": 1002,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-architecture-vision.md#L1002"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_clone_isolation_and_discovery_cost_findings_2026_09_07",
+  "claim": "Mesh 2026-09-07: role-keyed sync leaks clone content into base cells; feedback discovery scans all history — group-space + convergence hazard.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_clone_isolation_and_discovery_cost_findings_2026_09_07.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
+        "cid": "bafkreics5xbbuviywh2otqf6qtol6dyg674c2fzeve4qx74xqa2rqt2xte"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Clone isolation breaks at the projection plane; feedback discovery is O(N)",
+    "file": "project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
+    "scopePath": ".claude/memory/project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -11,12 +11,13 @@ use elohim_epr_rea::{
     atom_cid, AgentRef, Bound, Commitment, CommitmentState, FlowEvent, FlowRecord, FlowStore,
     Intent, Magnitude, PinnedRef, Process, ProcessSpec, ReaVerb, ResourceSpec, SidecarFlowStore,
 };
+use eprfs_core::BlobCid;
 use serde::{Deserialize, Serialize};
 
 use super::registry::{Recipe, Registry};
 use super::{
     body_cid, body_cid_of_file, cite_path, parse_frontmatter, producing_commit, rel_to_root,
-    repo_agent, repo_scope_atom, FlowResult, Labels, REPO_AGENT,
+    repo_agent, repo_scope_atom, FlowError, FlowResult, Labels, REPO_AGENT,
 };
 
 /// What the WIP fence's ceiling is denominated in. Shared with the stock that is judged against
@@ -220,11 +221,41 @@ fn derive_recipe(
         }
     }
 
-    // Plan plane, part 2: gap-items → Intents (+ Commitments for CLAIMED).
-    if let Some(stage) = recipe.stage("intent") {
-        for (_, abs) in stage_files(root, &stage.paths) {
-            derive_gap_items(root, &abs, deriv)?;
+    // Plan plane, part 2: the docs' OWN checkbox stations → Intents (+ Commitments for CLAIMED).
+    //
+    // The stations are read from the DOCUMENT, not from a decompose cache. `decompose.py` wrote
+    // `.claude/memory-kit/gap-items/<slug>.json` and this projector read it back; that indirection
+    // is what station two of the memory-kit replacement removes. A cache of a plan's checkboxes can
+    // disagree with the plan; the plan cannot disagree with itself.
+    //
+    // The three stages below are the doc classes the cache actually covered — `spec`, `plan` and
+    // `architecture-seed`. `manifesto`, `epic` and `scenario` are excluded deliberately: a
+    // manifesto's checkboxes are prose, not a work register, and a `.feature` is one artifact rather
+    // than a station list.
+    for stage_name in ["spec", "plan", "architecture-seed"] {
+        let Some(stage) = recipe.stage(stage_name) else {
+            continue;
+        };
+        for (rel, abs) in stage_files(root, &stage.paths) {
+            derive_doc_stations(&rel, &abs, deriv)?;
         }
+    }
+
+    // Plan plane, part 2b: the gap-items FALLBACK. The cache answers only for a doc that could not
+    // speak for itself — unreadable, or carrying no machine-extractable structure. Every other cache
+    // file is skipped, because the doc above already minted the same ids from the same stations.
+    //
+    // The FALLBACK STORE is read first from `.eprfs/status/gap-items/`, then from whatever the
+    // recipe's `intent` stage names (today `.claude/memory-kit/gap-items/`). First basename wins.
+    // That ordering is what lets the kit directory be RELOCATED rather than deleted: 61 documents /
+    // 649 stations in it were decomposed by an agent and exist nowhere in the documents' own bytes,
+    // so deleting the directory without moving them would delete recorded work.
+    let intent_paths = recipe
+        .stage("intent")
+        .map(|stage| stage.paths.clone())
+        .unwrap_or_default();
+    for abs in fallback_gap_files(root, &intent_paths) {
+        derive_gap_items(root, &abs, deriv)?;
     }
 
     // Observation frontier: each scenario → an unfulfilled a2o commitment.
@@ -722,6 +753,251 @@ fn derive_wip_fence(root: &Path, deriv: &mut Derivation) -> FlowResult<()> {
     Ok(())
 }
 
+/// The native home of the gap-items fallback store.
+///
+/// Under `.eprfs/status/` because that is where this crate's own durable records live: a fallback
+/// the projector depends on cannot sit inside a directory another station is going to delete.
+pub const FALLBACK_GAP_DIR: &str = ".eprfs/status/gap-items";
+
+/// Every fallback gap-items file, native home first, in basename precedence order.
+///
+/// A basename present in both homes is read ONCE, from the native home. That makes adoption
+/// idempotent and makes the kit path a strict fallback rather than a second opinion: after
+/// `--adopt-gap-items` the kit copy is inert even while it is still on disk, so station six removes
+/// a directory nothing reads instead of one the projector is quietly still depending on.
+pub fn fallback_gap_files(root: &Path, recipe_paths: &[String]) -> Vec<PathBuf> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out = Vec::new();
+    let native = root.join(FALLBACK_GAP_DIR);
+    if native.is_dir() {
+        let mut files: Vec<PathBuf> = std::fs::read_dir(&native)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.is_file() && p.extension().is_some_and(|e| e == "json"))
+            .collect();
+        files.sort();
+        for file in files {
+            if let Some(name) = file.file_name().map(|n| n.to_string_lossy().to_string()) {
+                if seen.insert(name) {
+                    out.push(file);
+                }
+            }
+        }
+    }
+    for (_, abs) in stage_files(root, recipe_paths) {
+        let Some(name) = abs.file_name().map(|n| n.to_string_lossy().to_string()) else {
+            continue;
+        };
+        if seen.insert(name) {
+            out.push(abs);
+        }
+    }
+    out
+}
+
+/// One adopted cache entry.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdoptedEntry {
+    /// The file name in both homes.
+    pub name: String,
+    /// Where it came from, repo-relative.
+    pub source: String,
+    /// The raw-codec CID of the adopted bytes. The copy is byte-identical, so this addresses BOTH
+    /// files — which is what makes the adoption verifiable rather than asserted.
+    pub cid: String,
+    /// The document whose stations these are.
+    pub doc: String,
+    pub items: usize,
+}
+
+/// The result of one adoption pass.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdoptSummary {
+    pub source_dir: String,
+    pub target_dir: String,
+    pub scanned: usize,
+    pub adopted: Vec<AdoptedEntry>,
+    /// Files skipped because their document no longer exists. These are NOT adopted: their stations
+    /// describe work on a document that is gone, and carrying them forward would keep a ledger of
+    /// promises about nothing.
+    pub orphans: Vec<String>,
+    /// Files skipped because the native home already holds that name.
+    pub already_present: Vec<String>,
+    /// Files that are not a gap-items record at all.
+    pub unreadable: Vec<String>,
+}
+
+impl AdoptSummary {
+    pub fn render(&self) {
+        println!(
+            "epr flow project --adopt-gap-items  {} → {}",
+            self.source_dir, self.target_dir
+        );
+        let stations: usize = self.adopted.iter().map(|e| e.items).sum();
+        println!(
+            "  adopted:        {:>4} file(s) / {stations} station(s)",
+            self.adopted.len()
+        );
+        println!(
+            "  already present:{:>4}   orphaned (doc gone, NOT adopted): {}   unreadable: {}",
+            self.already_present.len(),
+            self.orphans.len(),
+            self.unreadable.len()
+        );
+        println!("  scanned:        {:>4}", self.scanned);
+        if !self.orphans.is_empty() {
+            println!(
+                "  NOTE: an orphan's stations describe a document that no longer exists. They are \
+                 left where they are for the deletion station to account for, never silently carried."
+            );
+        }
+    }
+}
+
+/// Copy every cache entry whose document still exists into [`FALLBACK_GAP_DIR`], byte-identically.
+///
+/// One-shot and idempotent: a name already present in the native home is left alone, so a second run
+/// adopts nothing. The copy is byte-for-byte, so each file's raw CID is unchanged by the move and the
+/// recorded `cid` addresses the source and the copy at once — the adoption can be verified rather
+/// than taken on trust.
+pub fn adopt_gap_items(root: &Path, source: &Path) -> FlowResult<AdoptSummary> {
+    let target = root.join(FALLBACK_GAP_DIR);
+    let mut summary = AdoptSummary {
+        source_dir: rel_to_root(root, source),
+        target_dir: FALLBACK_GAP_DIR.to_string(),
+        scanned: 0,
+        adopted: Vec::new(),
+        orphans: Vec::new(),
+        already_present: Vec::new(),
+        unreadable: Vec::new(),
+    };
+    if !source.is_dir() {
+        return Err(FlowError::InvalidArguments(format!(
+            "--adopt-gap-items names no directory: {}",
+            source.display()
+        )));
+    }
+    let mut files: Vec<PathBuf> = std::fs::read_dir(source)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.is_file() && p.extension().is_some_and(|e| e == "json"))
+        .collect();
+    files.sort();
+
+    for file in files {
+        summary.scanned += 1;
+        let name = file
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let Ok(bytes) = std::fs::read(&file) else {
+            summary.unreadable.push(name);
+            continue;
+        };
+        let Ok(gap) = serde_json::from_slice::<GapFile>(&bytes) else {
+            summary.unreadable.push(name);
+            continue;
+        };
+        if gap.doc.is_empty() || !root.join(&gap.doc).is_file() {
+            summary.orphans.push(name);
+            continue;
+        }
+        let destination = target.join(&name);
+        if destination.exists() {
+            summary.already_present.push(name);
+            continue;
+        }
+        std::fs::create_dir_all(&target)?;
+        std::fs::write(&destination, &bytes)?;
+        summary.adopted.push(AdoptedEntry {
+            name,
+            source: rel_to_root(root, &file),
+            cid: BlobCid::compute_raw(&bytes).to_string(),
+            doc: gap.doc.clone(),
+            items: gap.items.len(),
+        });
+    }
+    Ok(summary)
+}
+
+/// One document's checkbox stations → Intents, plus a Commitment for each `CLAIMED` station.
+///
+/// The atom shapes are byte-identical to the ones the gap-items reader minted — same `gap:<state>`
+/// classification, same `tool:decompose` / `tool:decompose-claim` provider strings, same id spelling
+/// — so a station already projected from the cache dedupes against its native twin instead of
+/// doubling. That equality is the whole reason the ids are transcribed rather than improved.
+fn derive_doc_stations(rel: &str, abs: &Path, deriv: &mut Derivation) -> FlowResult<()> {
+    let Ok(text) = std::fs::read_to_string(abs) else {
+        return Ok(());
+    };
+    let slug = crate::flow::gaps::slug_for(Path::new(rel));
+    let decomposition = crate::flow::gaps::decompose(&slug, &text, Vec::new());
+    if decomposition.items.is_empty() {
+        return Ok(());
+    }
+    let Some(scope_cid) = body_cid_of_file(abs) else {
+        deriv.unresolvable += 1;
+        return Ok(());
+    };
+    deriv.label(&scope_cid, rel.to_string());
+    for item in &decomposition.items {
+        mint_station(&item.id, item.state.as_str(), &scope_cid, deriv)?;
+    }
+    Ok(())
+}
+
+/// Mint one station's Intent, and its claim Commitment when the box is ticked.
+///
+/// **CHECKED ≠ FULFILLED.** A ticked box mints an ACTIVE commitment awaiting evidence, never an
+/// event — the claim is the thing the verification gate then has something to test.
+fn mint_station(id: &str, state: &str, scope_cid: &Cid, deriv: &mut Derivation) -> FlowResult<()> {
+    let classified_as = vec![format!("gap:{}", state.to_lowercase()), id.to_string()];
+    let resource_spec = ResourceSpec {
+        classified_as,
+        quantity: None,
+    };
+    let intent = Intent {
+        action: ReaVerb::Produce,
+        resource_spec: resource_spec.clone(),
+        in_scope_of: *scope_cid,
+        raised_by: AgentRef("tool:decompose".to_string()),
+    };
+    let intent_cid = atom_cid(&intent)?;
+    deriv.stage_record(
+        FlowRecord::Intent(intent),
+        intent_cid,
+        format!("intent:{id}"),
+    );
+
+    if state.eq_ignore_ascii_case("CLAIMED") {
+        let commitment = Commitment {
+            action: ReaVerb::Produce,
+            provider: AgentRef("tool:decompose-claim".to_string()),
+            receiver: repo_agent(),
+            resource_spec,
+            in_scope_of: *scope_cid,
+            valid_from: None,
+            valid_until: None,
+            state: CommitmentState::Active,
+            satisfies: vec![intent_cid],
+            bound: None,
+        };
+        let commitment_cid = atom_cid(&commitment)?;
+        deriv.stage_record(
+            FlowRecord::Commitment(commitment),
+            commitment_cid,
+            format!("commitment:claim:{id}"),
+        );
+    }
+    Ok(())
+}
+
 fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResult<()> {
     let Ok(text) = std::fs::read_to_string(abs) else {
         return Ok(());
@@ -731,6 +1007,24 @@ fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResu
         Err(_) => return Ok(()), // not a gap-items file shape; skip quietly
     };
     let source_abs = root.join(&gap.doc);
+    // The cache answers only when the DOCUMENT DID NOT. A doc that yields stations has already
+    // spoken for itself, and reading the cache too would mint a second reading of the same
+    // stations whose `#N` ids could name stations the plan no longer has.
+    //
+    // Two states leave the cache as the only witness, and both are real: a doc that is unreadable
+    // or gone, and a doc with no machine-extractable structure at all. The second is the one that
+    // matters in practice — a prose spec an AGENT decomposed by hand has stations that exist
+    // nowhere in its own bytes, and dropping them would delete work from the ledger on the grounds
+    // that the plan is badly formatted.
+    if let Ok(text) = std::fs::read_to_string(&source_abs) {
+        let slug = crate::flow::gaps::slug_for(Path::new(&gap.doc));
+        if !crate::flow::gaps::decompose(&slug, &text, Vec::new())
+            .items
+            .is_empty()
+        {
+            return Ok(());
+        }
+    }
     let Some(scope_cid) = body_cid_of_file(&source_abs) else {
         deriv.unresolvable += 1;
         return Ok(());
@@ -738,47 +1032,7 @@ fn derive_gap_items(root: &Path, abs: &Path, deriv: &mut Derivation) -> FlowResu
     deriv.label(&scope_cid, gap.doc.clone());
 
     for item in &gap.items {
-        let classified_as = vec![
-            format!("gap:{}", item.state.to_lowercase()),
-            item.id.clone(),
-        ];
-        let resource_spec = ResourceSpec {
-            classified_as: classified_as.clone(),
-            quantity: None,
-        };
-        let intent = Intent {
-            action: ReaVerb::Produce,
-            resource_spec: resource_spec.clone(),
-            in_scope_of: scope_cid,
-            raised_by: AgentRef("tool:decompose".to_string()),
-        };
-        let intent_cid = atom_cid(&intent)?;
-        deriv.stage_record(
-            FlowRecord::Intent(intent),
-            intent_cid,
-            format!("intent:{}", item.id),
-        );
-
-        if item.state.eq_ignore_ascii_case("CLAIMED") {
-            let commitment = Commitment {
-                action: ReaVerb::Produce,
-                provider: AgentRef("tool:decompose-claim".to_string()),
-                receiver: repo_agent(),
-                resource_spec,
-                in_scope_of: scope_cid,
-                valid_from: None,
-                valid_until: None,
-                state: CommitmentState::Active,
-                satisfies: vec![intent_cid],
-                bound: None,
-            };
-            let commitment_cid = atom_cid(&commitment)?;
-            deriv.stage_record(
-                FlowRecord::Commitment(commitment),
-                commitment_cid,
-                format!("commitment:claim:{}", item.id),
-            );
-        }
+        mint_station(&item.id, &item.state, &scope_cid, deriv)?;
     }
     Ok(())
 }

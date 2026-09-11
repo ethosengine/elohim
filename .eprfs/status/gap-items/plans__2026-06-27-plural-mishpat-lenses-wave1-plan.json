@@ -1,0 +1,142 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md",
+ "slug": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 12,
+ "items": [
+  {
+   "text": "T1 \u2014 Lens payload schema + author-lens validator (teeth); sweettest; cid==entry_hash (gap #2)",
+   "line": 304,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L304",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T2 \u2014 \u22652 facing-lenses as folds (plural sensemaking, no collapse) (gap #1)",
+   "line": 305,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L305",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T3 \u2014 lenses A-class projection: migration + parse + signal-arm + anchor-preserving CRUD (gap #2 storage)",
+   "line": 306,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L306",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T4 \u2014 AffinityFold C-class table + integrity-recompute path (gap #3)",
+   "line": 307,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L307",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T5 \u2014 ContentionFold (controversy spread) C-class table (gap #4 score)",
+   "line": 308,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L308",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T6 \u2014 RegimeDriftTrigger classify_regime (joint predicate) + contention-breach manifest signal + wired emit (gap #4 breach)",
+   "line": 309,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L309",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T7 \u2014 Ballot B2 (private source-chain + attested tally); gaming-resistant inputs (gap #5)",
+   "line": 310,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L310",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T8 \u2014 Manual election (ratifies-election validator + elections A-class table) (gap #6)",
+   "line": 311,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L311",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T9 \u2014 Bounty stub (bounty-fresh-lens reusing Commitment + lens_bounties table) (gap #7)",
+   "line": 312,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L312",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T10 \u2014 LensSelector + forward index (slug-id SQL projection) + per-lens fail-closed degrade (gaps #8,#11)",
+   "line": 313,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L313",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T11 \u2014 ts-rs views (lens binding/affinity/contention) + export_bindings drift-free",
+   "line": 314,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L314",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "T12 \u2014 a2o qahal scenarios (plural/election/contention\u2192bounty) + Mishpat sweettest; live household render (gap #9)",
+   "line": 315,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-wave1-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-wave1-plan.md#L315",
+   "class": "protocol-canonical"
+  }
+ ]
+}

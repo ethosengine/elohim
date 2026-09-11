@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md",
+ "slug": "plans__2026-06-10-auth-wire-contract-completion-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "Write the five schemas per views/CONVENTIONS.md (10 rules), field-for-field with",
+   "line": 54,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L54",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Contract tests pinning the Rust structs to the schemas (investigate-first note above;",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L58",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Add to INTERFACE_FILES; pnpm run schema:codegen:ts; pre-push freshness gate passes",
+   "line": 60,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L60",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Reconcile @elohim/identity's hand-matched types to the generated interfaces \u2014 ONE source:",
+   "line": 62,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L62",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o + identity suites green (the consumers of those types). Commit (schema + tests + codegen",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L64",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Angular adapter: SessionTokenStore backed by localStorage with SSR platform guard",
+   "line": 72,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L72",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Preserve observable behavior: same AuthState signal shape, same localStorage keys",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L76",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Existing auth.service spec green + new tests for the adapter (SSR path included);",
+   "line": 79,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L79",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Verify in the dev loop: pnpm look http://localhost:4200/<auth-surface> renders login OK",
+   "line": 81,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L81",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Same adapter pattern (doorway-app is browser-only \u2014 no SSR guard needed; verify);",
+   "line": 88,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L88",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "doorway-app lint + test green (pnpm exec eslint src --ext .ts,.html). Commit",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L91",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Grep proof: no hand-written AuthResponse/MeResponse/AccountResponse interface",
+   "line": 95,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L95",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Update the two backlog entries (this plan's cites) to resolved-by: lines; re-run",
+   "line": 97,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-auth-wire-contract-completion-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-auth-wire-contract-completion-plan.md#L97",
+   "class": "protocol-canonical"
+  }
+ ]
+}

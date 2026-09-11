@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "Pace multi-agent sprints — don't run cargo tests concurrently across agents",
+  "claim": "Never run cargo test/build concurrently across agents — shared target-pool locks and PVC contention crash builds.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_multi_agent_pvc_pacing.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_multi_agent_pvc_pacing.md",
+        "cid": "bafkreiezqgf5vjp6yfccrk6nyfgsfq6ailx47clqmcmdizd7wqtrx3zwga"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Multi-agent pacing + PVC thresholds",
+    "file": "feedback_multi_agent_pvc_pacing.md",
+    "scopePath": ".claude/memory/feedback_multi_agent_pvc_pacing.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

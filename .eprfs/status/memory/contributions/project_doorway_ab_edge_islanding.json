@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_doorway_ab_edge_islanding",
+  "claim": "Two independent doorway edges over matthew/adam with no cross-edge coherence or divergence detection; e0352a7/8a2c65e glyphs were buildIds, not content CIDs.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_ab_edge_islanding.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_ab_edge_islanding.md",
+        "cid": "bafkreidhr5vat26fqa4se6g46m6bbv6mm3u3ytys2zcvynmuf4xaty77iq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway A/B edges are islands (alpha genesis pair)",
+    "file": "project_doorway_ab_edge_islanding.md",
+    "scopePath": ".claude/memory/project_doorway_ab_edge_islanding.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

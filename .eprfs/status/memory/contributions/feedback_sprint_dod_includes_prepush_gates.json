@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "sprint-dod-includes-prepush-gates",
+  "claim": "Task DoD must run the touched tree's gate clauses (lint/format:check/typecheck), not just unit tests; graphos sprint went 142-green with a red a2o gate.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sprint_dod_includes_prepush_gates.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sprint_dod_includes_prepush_gates.md",
+        "cid": "bafkreihexzarxfiggccks43w7kv336fsbxax2svs3k6gknmpdso4wbg7xi"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sprint DoD includes pre-push gates",
+    "file": "feedback_sprint_dod_includes_prepush_gates.md",
+    "scopePath": ".claude/memory/feedback_sprint_dod_includes_prepush_gates.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

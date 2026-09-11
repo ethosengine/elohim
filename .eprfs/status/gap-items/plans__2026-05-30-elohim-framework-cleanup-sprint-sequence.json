@@ -1,0 +1,57 @@
+{
+ "doc": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md",
+ "slug": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence",
+ "method": "agent-decomposition",
+ "count": 7,
+ "items": [
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#1",
+   "text": "Sprint 1: Classify & Map (Workstream D + the E split decision) \u2014 canonical system-boundary map (ownership/contract/test-coverage/is-this-SDK-core-or-app-private)",
+   "line": 25,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L25"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#2",
+   "text": "Sprint 2 (most urgent, Workstream C): Reliability - make the apps load; warm projection cache fast path, SW zip-unpack true fallback, render-verified on both doorways",
+   "line": 44,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L44"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#3",
+   "text": "Sprint 3 (Workstream A): Elohim SDK contract + standard app-bootstrap (provideElohimApp giving DI providers + doorway resolution + SW/cache wiring for free)",
+   "line": 79,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L79"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#4",
+   "text": "Sprint 4 (Workstream B): app-manifest formalization + one reference-app conforming end-to-end with no hand-wiring",
+   "line": 98,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L98"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#5",
+   "text": "Sprint 5 (Workstream E): pipeline/monorepo split execution (elohim-core vs reference-apps) if decided in Sprint 1",
+   "line": 116,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L116"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#6",
+   "text": "Baseline fixes SHIPPED 2026-05-30 PM (a4ca81d89 + 3e2baaa68): provide missing DI tokens + same-origin doorway in projected bundles \u2014 sprints start from working code",
+   "line": 161,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L161"
+  },
+  {
+   "id": "plans__2026-05-30-elohim-framework-cleanup-sprint-sequence#7",
+   "text": "Render-validated findings (2026-05-30 PM live browser post DI-fix deploy): the concrete gaps the sprint sequence addresses",
+   "line": 140,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-30-elohim-framework-cleanup-sprint-sequence.md#L140"
+  }
+ ]
+}

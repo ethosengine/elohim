@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md",
+ "slug": "plans__2026-05-29-close-the-gaps-sprint-kickoff",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#1",
+   "text": "Prior epic landed (Epic B reads): PeerCapacityView total/pledges/held readers LIVE",
+   "line": 13,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L13"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#2",
+   "text": "Prior epic landed (Wave 1 wire): BlobInventorySnapshot/Delta carry optional BlobHint (recipient_hub_id, epr_kind, size, tier) additive backward-compatible",
+   "line": 14,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L14"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#3",
+   "text": "Prior epic landed (Wave 2 hub identity): collectives.collective_cid+slug, collective_participations.member_cid; hub_resolver (agent->hub CID-canonical/slug-alias); hub_capacity_service; imagodei Collective/Membership post-commit signals + storage projection",
+   "line": 15,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L15"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#4",
+   "text": "Prior epic landed (Wave 3 prioritizer): broadcaster populates hints, receive arm scores advertised blobs against active replicates-dwelling commitments, HIGH-priority blobs feed bounded fetch (commitments shape what peers cache)",
+   "line": 16,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L16"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#5",
+   "text": "Gap 1 keystone PRODUCERS: replicates-dwelling commitment writer (pledge-creation flow + coordinator writing Mishpat::Commitment validated by replicates_dwelling_validator); likely brief p2p-design-gate confirmation",
+   "line": 22,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L22"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#6",
+   "text": "Gap 1: infrastructure:system-sample emitter + observation gossip (periodic probe -> observations row -> gossip via observation plane so peers see capacity); scout OBSERVATION_LOG_PROTOCOL_ID/IROH_OBSERVATION_ALPN before cross-peer half",
+   "line": 25,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L25"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#7",
+   "text": "Gap 2 T6 representation convergence: align humans.household_id/stewarded_nodes.household_id onto canonical Collective CID via slug<->CID alias; converge seed commitments recipient_dwelling_hub_id onto CID",
+   "line": 28,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L28"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#8",
+   "text": "Gap 2 T3 node->agent pledge mapping: hub-member pledge aggregation reads 0 (members are device node-ids, pledges key on agent CID); map device->agent via peer_identity_bindings/humans.agent_pub_key",
+   "line": 30,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L30"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#9",
+   "text": "Gap 3 Epic A surface: top-level posture view consuming component (ResilienceSnapshotView/NetworkPostureView/TopologyOverviewView); free/used clickable bar; peer/device card links with drill-down (Angular wiring, no new substrate)",
+   "line": 32,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L32"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#10",
+   "text": "Gap 4 remaining epics: Epic C doorway Role-2 resolver (own p2p-design-gate); Epic D account-management+recovery+key-rotation; Epic E <elohim-context-menu> into EprLinkComponent; Epic F delivery stats (blob-served); Epic G wisdom-input shape",
+   "line": 37,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L37"
+  },
+  {
+   "id": "plans__2026-05-29-close-the-gaps-sprint-kickoff#11",
+   "text": "Gap 5 deploy & verify: alpha DNA forced-reinstall for new imagodei Collective/Membership signals (DNA-hash drift); CI sweettest + a2o shake out prioritizer end-to-end",
+   "line": 44,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-close-the-gaps-sprint-kickoff.md#L44"
+  }
+ ]
+}

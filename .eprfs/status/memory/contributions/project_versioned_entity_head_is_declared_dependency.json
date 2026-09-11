@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "versioned-entity-head-is-declared-dependency",
+  "claim": "Which version applies is a DECLARED dependency (cid-pin=lockfile), not recency; versions are a DAG (fork/revert/merge); binding picks head, not the query layer.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_versioned_entity_head_is_declared_dependency.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_versioned_entity_head_is_declared_dependency.md",
+        "cid": "bafkreigqfbeaoh2dvodxfufcvnwcs3gb5ovhlhjqz65dw5cscueu65zbqi"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Versioned-entity HEAD is a declared dependency",
+    "file": "project_versioned_entity_head_is_declared_dependency.md",
+    "scopePath": ".claude/memory/project_versioned_entity_head_is_declared_dependency.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

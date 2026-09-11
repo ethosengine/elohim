@@ -1,0 +1,124 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md",
+ "slug": "plans__2026-08-02-seam-concern-contract-architecture-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 14,
+ "items": [
+  {
+   "text": "P0.1 Author the eight concern-class policies (C1\u2013C8) in .claude/epr-meta/policies.yaml, Precedent shape, versioned, each with statement / scope predicate / binding class / why / dispatch-agent",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L198",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P0.2 Add an invariant\u2192probe row per concern to the substrate trust-contract runbook, naming the live meter that watches it",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L199",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P0.3 Convert the inline heal-fills-never-moves rule in elohim/elohim-storage/src/.epr-meta to a binding of the C2 policy (bind-don't-redefine advisory disappears; placement-audit.py --epr-meta green)",
+   "line": 200,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L200",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P0.4 Brit-liftability gate for every artifact this plan creates: concern policies, seam-registry rows, and matrix snapshots have content-addressable bodies with declared-head identity and standing separated from content (id@version stand-in per the policy-registry spec; a fixture proves a policy body round-trips to a CIDv1 via the brit/eprfs address path without rewriting)",
+   "line": 201,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L201",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P1.1 Create crates/seam-contracts with Answer<T> (Present/Absent/Unreachable), the reason-labeled-outcome convention + conformance test, and the Arbitrated (permutation-invariance) and Quiescent (settled-state fixed point) property harnesses",
+   "line": 202,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L202",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P2.1 Implement the Liveness table harness (state-space enumeration; every non-terminal state has \u22651 enabled transition) over decide_head_action + admission predicates",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L204",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P2.2 Regression demonstration: harness FAILS against a reconstructed pre-wave-5 predicate fixture and PASSES current",
+   "line": 205,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L205",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P3.1 Author seam-registry.yaml for elohim-storage and the content_store zome (every pure decision predicate + the concern ids it answers + its contract-test citations)",
+   "line": 206,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L206",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P3.2 Census check wired into placement-audit.py --epr-meta: both directions verified; fixtures prove missing-registration and missing-contract-test each fail loud",
+   "line": 207,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L207",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P4.1 Register + evaluate the first two concrete validators (heal-fills-never-moves, bounded-work) per the policies.yaml transitional guidance; fixture diff triggers the class-ladder verdict",
+   "line": 208,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L208",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P4.2 Cascade: a policy version bump on a fixture yields one fingerprinted finding per stale-pinned bound point and dispatches via the sentinel pattern with measure-tier debounce",
+   "line": 209,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L209",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P4.3 Concern \u00d7 seam matrix generated by the census (rows C1\u2013C8, columns = registered points grouped by seam-map track; cells conformant/variant/unexamined/n-a); surfaced by placement-audit.py --epr-meta beside the Gap Ledger",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L210",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P4.4 Trajectory-crossed forecast: rank unexamined cells against the roadmap's next rungs; emit the forecasted-collision list at ceremony time",
+   "line": 211,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L211",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P4.5 Design-time birth rule: bind p2p-design-gate + the compose-gate so a new decision predicate / boundary answer type / sync message cannot be born unregistered \u2014 its design answers each concern class or declares n-a",
+   "line": 212,
+   "state": "OPEN",
+   "id": "plans__2026-08-02-seam-concern-contract-architecture-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md#L212",
+   "class": "protocol-canonical"
+  }
+ ]
+}

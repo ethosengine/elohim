@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md",
+ "slug": "plans__2026-09-05-concurrent-agent-attribution-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "Station 1: governance and flow evidence retain the exact actor claim address, with interleaved-worker and compatibility tests passing",
+   "line": 53,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L53",
+   "class": "process-meta"
+  },
+  {
+   "text": "Station 2: independent processes preserve actor and flow history under concurrent creation, append, duplicate claims and interrupted writes",
+   "line": 65,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L65",
+   "class": "process-meta"
+  },
+  {
+   "text": "Station 3: all actor, governance and flow entry points use the same explicit worker binding without stealing a parent or sibling claim",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L75",
+   "class": "process-meta"
+  },
+  {
+   "text": "Station 4: Claude, Codex and Gemini each preserve native governance and worker attribution in observed runtime lifecycle calls",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L92",
+   "class": "process-meta"
+  },
+  {
+   "text": "Station 5: the full three-harness story produces walkable resource use, fulfillment and a contestable historical attribution, with honest measurement and authority status",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L116",
+   "class": "process-meta"
+  },
+  {
+   "text": "Station 6: a fresh agent discovers relevant valueflows and explainable focus signals from context, with graph-to-evidence traversal and no manual identifier hunting",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-concurrent-agent-attribution-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-concurrent-agent-attribution-plan.md#L139",
+   "class": "process-meta"
+  }
+ ]
+}

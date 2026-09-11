@@ -1,0 +1,183 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md",
+ "slug": "plans__2026-05-10-iroh-http-blob-graduation",
+ "method": "checkbox-tasks",
+ "count": 25,
+ "items": [
+  {
+   "text": "Step 1.1: Failing test \u2014 Add to peer_blob_inventory.rs's test module:",
+   "line": 53,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L53"
+  },
+  {
+   "text": "Step 1.2: Implement the two lookups \u2014 Add to peer_blob_inventory.rs after lookup_hosts (line 192):",
+   "line": 112,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L112"
+  },
+  {
+   "text": "Step 1.3: Commit \u2014",
+   "line": 166,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L166"
+  },
+  {
+   "text": "Step 2.1: Failing test \u2014 Create /projects/elohim/elohim/elohim-storage/src/http_blob_router.rs with the test scaffold first:",
+   "line": 184,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L184"
+  },
+  {
+   "text": "Step 2.2: Implement choose_backend \u2014 Replace the todo!() body in http_blob_router.rs:",
+   "line": 407,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L407"
+  },
+  {
+   "text": "Step 2.3: Commit \u2014",
+   "line": 473,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L473"
+  },
+  {
+   "text": "Step 3.1: Failing test \u2014 Add a unit test to http.rs near other HttpServer builder tests (search for fn new(blob_store: and place after the existing tests for that block):",
+   "line": 491,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L491"
+  },
+  {
+   "text": "Step 3.2: Add fields to HttpServer \u2014 In http.rs between lines 203 and 204 (after fetch_blob_parallelism):",
+   "line": 530,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L530"
+  },
+  {
+   "text": "Step 3.3: Thread IrohBlobStore from main.rs \u2014 In /projects/elohim/elohim/elohim-storage/src/main.rs near line 1062, change:",
+   "line": 592,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L592"
+  },
+  {
+   "text": "Step 3.4: Commit \u2014",
+   "line": 627,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L627"
+  },
+  {
+   "text": "Step 4.1: Failing integration test \u2014 Create /projects/elohim/elohim/elohim-storage/tests/blob_backend_dispatch.rs:",
+   "line": 644,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L644"
+  },
+  {
+   "text": "Step 4.2: Add test-only accessors and a test entry point on HttpServer \u2014 Append to http.rs (within the impl HttpServer block):",
+   "line": 748,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L748"
+  },
+  {
+   "text": "Step 4.3: Insert router-driven dispatch at the top of handle_get_blob \u2014 In http.rs at line 1639, immediately after the if hash.is_empty() early-return (around line 1648) and before parse_content_address (line 1652), add the iroh-first attempt:",
+   "line": 813,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L813"
+  },
+  {
+   "text": "Step 4.4: Verify no regression in existing blob-handler tests \u2014",
+   "line": 940,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L940"
+  },
+  {
+   "text": "Step 4.5: Commit \u2014",
+   "line": 949,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L949"
+  },
+  {
+   "text": "Step 5.1: Failing test \u2014 In http.rs near other status tests, add:",
+   "line": 968,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L968"
+  },
+  {
+   "text": "Step 5.2: Wire counters into build_status_response \u2014 In http.rs near line 1236 where body[\"blobs\"] = serde_json::json!(stats.total_blobs); is set, change to:",
+   "line": 997,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L997"
+  },
+  {
+   "text": "Step 5.3: Commit \u2014",
+   "line": 1018,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1018"
+  },
+  {
+   "text": "Step 6.1: Inspection checklist \u2014 Confirm with grep that doorway never inspects the response body or rewrites the URL:",
+   "line": 1037,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1037"
+  },
+  {
+   "text": "Step 6.3: Document the verification \u2014 Append a short note to /projects/elohim/doorway/doorway-service/src/routes/storage_proxy.rs's top doc comment (the //! block at line 1):",
+   "line": 1055,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1055"
+  },
+  {
+   "text": "Step 6.4: Commit \u2014",
+   "line": 1077,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1077"
+  },
+  {
+   "text": "Step 7.1: Full storage test sweep \u2014",
+   "line": 1092,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1092"
+  },
+  {
+   "text": "Step 7.2: Doorway sweep \u2014",
+   "line": 1104,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1104"
+  },
+  {
+   "text": "Step 7.3: Manual smoke against a running storage node \u2014 Run elohim-storage with iroh enabled, seed a blob via IrohBlobStore, and probe with curl:",
+   "line": 1115,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1115"
+  },
+  {
+   "text": "Step 7.4: Final commit (if any pending) \u2014 None expected; Tasks 1\u20136 already commit incrementally",
+   "line": 1130,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-http-blob-graduation#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-http-blob-graduation.md#L1130"
+  }
+ ]
+}

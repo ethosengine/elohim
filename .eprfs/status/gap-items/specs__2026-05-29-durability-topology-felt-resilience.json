@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md",
+ "slug": "specs__2026-05-29-durability-topology-felt-resilience",
+ "method": "agent-decomposition",
+ "count": 9,
+ "items": [
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#1",
+   "text": "Three persistence axes graduate along self->dwelling->collective->commons intimacy gradient: Reach (permission) / Delivery (economics) / Persistence (durability) + Recovery (restore); same people across all",
+   "line": 17,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L17"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#2",
+   "text": "Asserted->Attested->Ambient durability: substrate = N independent replicas with notarized/auditable contract + reciprocity-imbalance signal on holder lapse (verifiable beats claimed)",
+   "line": 30,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L30"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#3",
+   "text": "Subsume 3 web2 reliability functions: cloud uptime->tiered replication contracts + RS quilt + demand re-replication; institutional protection->pooled collective/commons tier + dissolution; account recovery->graduated recovery + socially-derived security",
+   "line": 49,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L49"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#4",
+   "text": "Live felt-durability surfaces: progressive icon (EprRelationshipCard<-ResilienceService), connection chip (ConnectionIndicator), per-device triptych (DeviceTile), cluster page (MyCluster), peer topology (PeerTopology), per-EPR Network tab (resilience.rs), per-content badge (ResourceExplorer)",
+   "line": 61,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L61"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#5",
+   "text": "Deterministic floor (gates vs allocation): 7-check bounds_validator, donut clamp + constitutional_ratio_registry, inventory sha256 verification, replication state machine, placement_gaps projection, household_resilience protection_status; cluster_view Category-C reconstruct per-request not persisted",
+   "line": 77,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L77"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#6",
+   "text": "Gap 1 - connective tissue/discoverability: add nav links to /shefa/cluster + /shefa/peers; link EPR mentions to content-viewer Network tab; free/used clickable bar (text->bar); consuming component for ResilienceSnapshotView/NetworkPostureView/TopologyOverviewView",
+   "line": 90,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L90"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#7",
+   "text": "Gap 2 - committed/constitutional accounting: replace peer_capacity_service stub readers (free/used reads zero); wire replication_prioritizer (currently dead code) into drain_gap_queue/inventory subscriber; donut/pledge accounting -> pledged-vs-held with storage-premium visible",
+   "line": 98,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L98"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#8",
+   "text": "Gap 3 - join elohim ceiling to floor for topology: grow wisdom.rs input shape (accepts only constitution/framing/event_summary) so agents can reason over placement-gaps/resilience-snapshots/inventory advertisements; keep gates in Rust, .ts sense-and-respond only",
+   "line": 102,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L102"
+  },
+  {
+   "id": "specs__2026-05-29-durability-topology-felt-resilience#9",
+   "text": "Recovery (third face): graduated recovery (intimate quorum->community->governance->global witness, Shamir optional); KeyRotation + 5 RecoveryAuthority layers in imagodei; same intimacy tiers hold-data and restore-access",
+   "line": 111,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-durability-topology-felt-resilience.md#L111"
+  }
+ ]
+}

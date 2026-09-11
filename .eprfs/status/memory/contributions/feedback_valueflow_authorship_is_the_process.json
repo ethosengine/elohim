@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_valueflow_authorship_is_the_process",
+  "claim": "Authoring/connecting REA valueflows IS the protocol's process; verbs are designed friction, rest must be frictionless — bites every SDD/epic loop.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_valueflow_authorship_is_the_process.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_valueflow_authorship_is_the_process.md",
+        "cid": "bafkreib27shv53b5ajplkee2n4b7lk55yxoa5ewwd6mbuortjk4nvxjd4e"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Valueflow authorship IS the process",
+    "file": "feedback_valueflow_authorship_is_the_process.md",
+    "scopePath": ".claude/memory/feedback_valueflow_authorship_is_the_process.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

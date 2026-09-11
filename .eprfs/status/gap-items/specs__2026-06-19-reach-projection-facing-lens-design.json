@@ -1,0 +1,52 @@
+{
+    "doc": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md",
+    "slug": "specs__2026-06-19-reach-projection-facing-lens-design",
+    "method": "agent",
+    "class": "protocol-canonical",
+    "items": [
+        {
+            "text": "Proof-fold: fold_reciprocation (DB-free, online/offline/null-hub cases) \u2014 buildable now",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-reach-projection-facing-lens-design#1",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: load_edge_relation absent] wire load_edge_relation + GET /api/v1/peer-topology adapter + is_service_path arm",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-reach-projection-facing-lens-design#2",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "fold_net_diff + fold_edge_criticality (closes the None criticality gap)",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-reach-projection-facing-lens-design#3",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: reach-vocab drift, backlog 13] fold_reach_distribution over ReachRow",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-reach-projection-facing-lens-design#4",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "fold_resilience_cliffs made pure; migrate households_reciprocating off its separate query",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-reach-projection-facing-lens-design#5",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-reach-projection-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        }
+    ],
+    "doc_requires_env": [
+        "household-nodes"
+    ],
+    "count": 5
+}

@@ -151,6 +151,30 @@ fn intent_view(labels: &Labels, cid: &Cid, i: &Intent) -> IntentView {
 }
 
 pub fn walk(root: &Path, rel_path: &str) -> FlowResult<WalkResult> {
+    let store = SidecarFlowStore::open(root)?;
+    walk_with_records(root, rel_path, &store.records()?)
+}
+
+/// Read-only adapter: all existing walk algorithms see the caller's single snapshot.
+struct Snapshot<'a>(&'a [(Cid, FlowRecord)]);
+impl FlowStore for Snapshot<'_> {
+    fn append(&mut self, _record: FlowRecord) -> elohim_epr_rea::Result<Cid> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "read-only flow snapshot",
+        )
+        .into())
+    }
+    fn records(&self) -> elohim_epr_rea::Result<Vec<(Cid, FlowRecord)>> {
+        Ok(self.0.to_vec())
+    }
+}
+
+pub(crate) fn walk_with_records(
+    root: &Path,
+    rel_path: &str,
+    records: &[(Cid, FlowRecord)],
+) -> FlowResult<WalkResult> {
     let abs = if Path::new(rel_path).is_absolute() {
         std::path::PathBuf::from(rel_path)
     } else {
@@ -160,7 +184,7 @@ pub fn walk(root: &Path, rel_path: &str) -> FlowResult<WalkResult> {
     let cid =
         body_cid_of_file(&abs).ok_or_else(|| FlowError::UnknownResource(rel_path.to_string()))?;
 
-    let store = SidecarFlowStore::open(root)?;
+    let store = Snapshot(records);
     let labels = load_labels(root);
 
     let lineage: Lineage = store.walk_back(&cid)?;

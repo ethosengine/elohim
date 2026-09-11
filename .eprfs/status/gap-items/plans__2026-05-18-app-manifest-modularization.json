@@ -1,0 +1,358 @@
+{
+ "doc": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md",
+ "slug": "plans__2026-05-18-app-manifest-modularization",
+ "method": "checkbox-tasks",
+ "count": 50,
+ "items": [
+  {
+   "text": "Confirm lamad/manifest.json LOC is still ~1,923: wc -l /projects/elohim/elohim/sdk/domains/lamad/manifest.json",
+   "line": 15,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#1",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L15"
+  },
+  {
+   "text": "Confirm pnpm run lamad:codegen produces output today: run it, capture the generated files' state with git status app/elohim-app/src/app/lamad/generated/ genesis/seeder/src/generated/",
+   "line": 16,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#2",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L16"
+  },
+  {
+   "text": "Confirm the lamad codegen script at elohim/sdk/domains/lamad/scripts/codegen.mjs (568 LOC) is the only consumer of the manifest's direct structure (vs the schema validator which works at the schema layer)",
+   "line": 17,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#3",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L17"
+  },
+  {
+   "text": "Confirm the existing $ref pattern at lines 11, 135, 236, 276, 452 of lamad/manifest.json (metadataSchema refs to ./schemas/*.schema.json) is what we're generalizing",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#4",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L18"
+  },
+  {
+   "text": "Step 1: Read the current codegen.mjs structure",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#5",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L70"
+  },
+  {
+   "text": "Step 2: Add the resolveRefs helper just below the imports",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#6",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L76"
+  },
+  {
+   "text": "Step 3: Wire resolveRefs into the manifest load path",
+   "line": 111,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#7",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L111"
+  },
+  {
+   "text": "Step 4: Verify codegen still produces byte-identical output",
+   "line": 128,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#8",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L128"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#9",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L139"
+  },
+  {
+   "text": "Step 2: Inspect the verify branch",
+   "line": 170,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#10",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L170"
+  },
+  {
+   "text": "Step 3: Add a smoke assertion (no commit yet \u2014 bundle with T3)",
+   "line": 176,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#11",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L176"
+  },
+  {
+   "text": "Step 4: Verify the smoke log appears in both paths",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#12",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L186"
+  },
+  {
+   "text": "Step 5: Remove the smoke log",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#13",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L195"
+  },
+  {
+   "text": "Step 6: No commit for this task \u2014 proceed directly to T3",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#14",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L199"
+  },
+  {
+   "text": "Step 1: Capture the current concept block",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#15",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L213"
+  },
+  {
+   "text": "Step 2: Create the per-type directory and concept file",
+   "line": 223,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#16",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L223"
+  },
+  {
+   "text": "Step 3: Replace the inline block with a $ref in manifest.json",
+   "line": 251,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#17",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L251"
+  },
+  {
+   "text": "Step 4: Run codegen \u2014 verify byte-identical generated output",
+   "line": 261,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#18",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L261"
+  },
+  {
+   "text": "Step 5: Verify the manifest still validates against its schema",
+   "line": 272,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#19",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L272"
+  },
+  {
+   "text": "Step 6: Commit (bundles T1+T2+T3)",
+   "line": 282,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#20",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L282"
+  },
+  {
+   "text": "Step 1: Enumerate the remaining content types",
+   "line": 307,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#21",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L307"
+  },
+  {
+   "text": "Step 2: For each remaining content type, perform the same extraction",
+   "line": 317,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#22",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L317"
+  },
+  {
+   "text": "Step 3: Run codegen \u2014 verify byte-identical generated output",
+   "line": 326,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#23",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L326"
+  },
+  {
+   "text": "Step 4: Verify manifest still validates",
+   "line": 337,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#24",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L337"
+  },
+  {
+   "text": "Step 5: Verify manifest.json line count dropped substantially",
+   "line": 345,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#25",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L345"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 353,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#26",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L353"
+  },
+  {
+   "text": "Step 1: Locate the signalKinds block",
+   "line": 377,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#27",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L377"
+  },
+  {
+   "text": "Step 2: Extract to a new file",
+   "line": 385,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#28",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L385"
+  },
+  {
+   "text": "Step 3: Replace inline with $ref",
+   "line": 391,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#29",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L391"
+  },
+  {
+   "text": "Step 4: Verify codegen output unchanged",
+   "line": 401,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#30",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L401"
+  },
+  {
+   "text": "Step 1: Locate the projections block",
+   "line": 429,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#31",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L429"
+  },
+  {
+   "text": "Step 2: Extract to file",
+   "line": 435,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#32",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L435"
+  },
+  {
+   "text": "Step 1: Locate the graph block",
+   "line": 492,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#33",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L492"
+  },
+  {
+   "text": "Step 2: Extract",
+   "line": 498,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#34",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L498"
+  },
+  {
+   "text": "Step 4: Verify codegen + schema validation",
+   "line": 508,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#35",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L508"
+  },
+  {
+   "text": "Step 1: Enumerate remaining top-level keys",
+   "line": 537,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#36",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L537"
+  },
+  {
+   "text": "Step 2: For each non-scalar remaining block (rendering, writeThrough, observation_kinds, formats if it's substantive)",
+   "line": 547,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#37",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L547"
+  },
+  {
+   "text": "Step 3: Verify codegen + schema validation",
+   "line": 553,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#38",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L553"
+  },
+  {
+   "text": "Step 4: Verify final manifest.json shell line count",
+   "line": 563,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#39",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L563"
+  },
+  {
+   "text": "Step 1: Add a comment block to app-manifest.schema.json (in description)",
+   "line": 594,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#40",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L594"
+  },
+  {
+   "text": "Step 2: Add a section to elohim/sdk/CLAUDE.md",
+   "line": 604,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#41",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L604"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 627,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#42",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L627"
+  },
+  {
+   "text": "Step 1: Fresh codegen run",
+   "line": 645,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#43",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L645"
+  },
+  {
+   "text": "Step 2: Codegen verify flag (drift detector)",
+   "line": 653,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#44",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L653"
+  },
+  {
+   "text": "Step 3: Schema test suite",
+   "line": 662,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#45",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L662"
+  },
+  {
+   "text": "Step 4: Rust-side manifest registration tests",
+   "line": 670,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#46",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L670"
+  },
+  {
+   "text": "Step 5: Husky pre-push smoke",
+   "line": 678,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#47",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L678"
+  },
+  {
+   "text": "Step 6: Final LOC report",
+   "line": 686,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#48",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L686"
+  },
+  {
+   "text": "Step 7: No commit \u2014 this is verification only",
+   "line": 702,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#49",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L702"
+  },
+  {
+   "text": "Step 1-N: Repeat the T3-T8 procedure with shefa paths substituted",
+   "line": 718,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-app-manifest-modularization#50",
+   "cites": "genesis/docs/plans/2026-05-18-app-manifest-modularization.md#L718"
+  }
+ ]
+}

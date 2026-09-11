@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_iroh_dataplane_actual_state",
+  "claim": "Iroh dataplane: dual-stack live; convergence codepath gated ELOHIM_ADOPT_BEFORE_AUTHOR; ingest drain solved.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_iroh_dataplane_actual_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_iroh_dataplane_actual_state.md",
+        "cid": "bafkreieuull33dm35c4jezbigwugtdoxckrklo5xlqlnc3pcl3zfmb5aca"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "iroh dataplane actual state — merge-ready, dual-stack gap",
+    "file": "project_iroh_dataplane_actual_state.md",
+    "scopePath": ".claude/memory/project_iroh_dataplane_actual_state.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

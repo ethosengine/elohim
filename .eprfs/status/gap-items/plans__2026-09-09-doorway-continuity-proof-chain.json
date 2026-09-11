@@ -1,0 +1,74 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md",
+ "slug": "plans__2026-09-09-doorway-continuity-proof-chain",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 8,
+ "items": [
+  {
+   "text": "A developer stages the named household landing and manifesto prerequisites without unrelated writes, then measures the complete household failover feature against the current runtime",
+   "line": 27,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L27",
+   "class": "provisional"
+  },
+  {
+   "text": "A beacon contributes only its own shared DNS records while its doorway serves, withdraws after three consecutive non-serving probes, and rejoins after two consecutive serving probes without changing exclusive diagnostic names or siblings",
+   "line": 36,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L36",
+   "class": "provisional"
+  },
+  {
+   "text": "An apex-transition story distinguishes shared address membership from actual host-to-doorway selection, and its final assertion cannot pass without observing a shed, sibling delivery of the declared head, and recovery",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L54",
+   "class": "provisional"
+  },
+  {
+   "text": "A new agent can recover each station's current source, admitted run evidence, predecessor limits and remaining frontier using native flow context and ledger queries",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L63",
+   "class": "provisional"
+  },
+  {
+   "text": "A visitor opening the same packaged app through either household doorway reads real content through that serving doorway, without a rebuild or requests to the compiled production host",
+   "line": 84,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L84",
+   "class": "provisional"
+  },
+  {
+   "text": "An anonymous reader already using a household doorway follows a related public atom during that doorway's outage, reads it through a discovered sibling, and returns to the recovered original doorway on a bounded read probe",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L106",
+   "class": "provisional"
+  },
+  {
+   "text": "After one steward cancels a project-epr commitment on one household peer, every peer resolves that updated commitment from its own conductor and withdraws the projected route without a second cancellation or reseed",
+   "line": 157,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L157",
+   "class": "provisional"
+  },
+  {
+   "text": "A visitor receives a browser shell and its referenced assets from the same declared bundle through each doorway, including while a storage peer retains an older slug mapping",
+   "line": 191,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-doorway-continuity-proof-chain#8",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md#L191",
+   "class": "provisional"
+  }
+ ]
+}

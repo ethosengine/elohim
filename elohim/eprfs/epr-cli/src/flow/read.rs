@@ -85,9 +85,10 @@ pub fn is_strictly_newer(a: &str, b: &str) -> bool {
 }
 
 /// The `(action, occurred_at)` of the LATEST event associated with a commitment, ordered by
-/// `occurred_at` timestamp and tie-broken by sidecar append order — mirroring
-/// `saga-status.py`'s `index_flow_state`/`_sort_key` EXACTLY (same two-pass association scan,
-/// same tagged-list-then-stable-sort shape), so no two readers can disagree on "latest".
+/// `occurred_at` timestamp. Exact ties retain encounter order within each verb; because
+/// Produce timestamps are grouped before Dismiss timestamps, cross-verb ties favor Dismiss
+/// regardless of global sidecar append order. This follows `saga-status.py`'s
+/// `index_flow_state` tagged-list-then-stable-sort shape.
 /// Append order ALONE diverges under replay/backfill: a delayed report can append after a
 /// chronologically newer event and would then read as "latest" by position even though it is
 /// not by time.

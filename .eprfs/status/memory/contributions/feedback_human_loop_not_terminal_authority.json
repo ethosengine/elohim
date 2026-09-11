@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-human-loop-not-terminal-authority",
+  "claim": "Human-must-decide as a guaranteed floor is a capture vector; neither species is terminal, the method is; watch this training reflex in governance text",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_human_loop_not_terminal_authority.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_human_loop_not_terminal_authority.md",
+        "cid": "bafkreiaq2vyr57sghtdi53mjmr53suyupleedxgbf3gofhi3rlf5yiuqzq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback-human-loop-not-terminal-authority",
+    "file": "feedback_human_loop_not_terminal_authority.md",
+    "scopePath": ".claude/memory/feedback_human_loop_not_terminal_authority.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_epr_router_empties_on_poisoned_scope",
+  "claim": "One poisoned scope row empties EprRouter (Welcome at /, 404 /lamad): fail-closed collect + stale-binary array-wrap; resolvers degrade per-row (f38be2635).",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_epr_router_empties_on_poisoned_scope.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_epr_router_empties_on_poisoned_scope.md",
+        "cid": "bafkreih2tmakhadcpfdcep3zrmrnipqvw5r6aiqsmc673eqtkjuj53jhiq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "EprRouter empties on one poisoned scope row",
+    "file": "project_epr_router_empties_on_poisoned_scope.md",
+    "scopePath": ".claude/memory/project_epr_router_empties_on_poisoned_scope.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

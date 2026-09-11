@@ -1,0 +1,170 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md",
+ "slug": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 20,
+ "items": [
+  {
+   "text": "Step 1: Add the submodule (follows the existing elohim/<fork> pattern \u2014 elohim/brit, elohim/rakia, elohim/rust-ipfs). Avoid the elohim/holochain/ path (already the DNA+edgenode dir)",
+   "line": 50,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L50",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Pin to our 0.6.0 base and create the working branch",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L58",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Commit the submodule wiring (parent repo)",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L69",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Confirm the block is ABSENT at base (the precondition that makes the cherry-pick meaningful)",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L92",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Fetch the fix commit and cherry-pick it",
+   "line": 100,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L100",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Verify the block is now PRESENT",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L108",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Pin down what -go-pion-custom actually means. Determine whether the base image's custom is (a) only conductor-config (then vanilla holonix reproduces the binary) or (b) holo-host build patches/feature-flags beyond holonix",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L124",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Find or reconstruct the edgenode build recipe. holo-host's edgenode build source was NOT an obvious public repo (verdict research). Check: the edgenode README/scripts for a build reference; the holochain fork's flake.nix for a conductor/holochain package output; whether holochain binary + hc build cleanly from the fork with the go-pion feature",
+   "line": 135,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L135",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Confirm the heavy build runs in CI, not the dev container",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L152",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: cargo check the patched workflow crate (dev-container-scale, no full build)",
+   "line": 166,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L166",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Commit the patched branch (local; push to fork is operator-gated per Global Constraints)",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L174",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Implement the image build per Gate B's recipe (holonix build of the patched binary \u2192 edgenode image with the SAME conductor-config overlay). Keep tx5/go-pion feature explicit",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L186",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Build the image in CI; verify it links tx5 0.8.1 / go-pion (not iroh) and starts a conductor that loads the existing a6d4e805-built DNA with an UNCHANGED DnaHash",
+   "line": 187,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L187",
+   "class": "provisional"
+  },
+  {
+   "text": "Canary the image to ONE non-genesis pod; over a clean multi-hour window confirm the receipt-error rate (could not find url for peer) drops on that pod and its elohim_node_conductor_smaps_anon_bytes{class=\"other\"} slope falls from ~2 GB/h toward terrance's ~0.2 GB/h floor. This is the brake's proof. Held while alpha is degraded; the operator runs it. The live diagnostic (handoff \u00a73.1) already shows the amplifier concentrates in matthew/james/jessica \u2014 those are the canary targets",
+   "line": 192,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L192",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Add targeted instrumentation (per-send buffer size + a retained-count gauge, or a heaptrack-friendly allocation tag) at the holochain_p2p \u2192 kitsune2 send boundary. It's in the fork \u2014 no extra repos needed",
+   "line": 205,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L205",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Determine empirically whether the retained population lives at this layer or is handed down to kitsune2_transport_tx5 / tx5. This is the open question #5664 never resolved (the >128KB-discrete-mmap fingerprint = retained large buffers)",
+   "line": 206,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L206",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Fork tx5 + kitsune2 to ethosengine (operator-gated) OR vendor the two crates; [patch] the holochain workspace to the local checkouts",
+   "line": 214,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L214",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Instrument the per-send to_vec() / GoBufRef path; catch the retained buffer (heaptrack on a built conductor under sustained send traffic)",
+   "line": 215,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L215",
+   "class": "provisional"
+  },
+  {
+   "text": "Decide the repro host. The floor manifests only under sustained send traffic + heaptrack. If household-nodes (the live M/J/J mesh) can host an instrumented from-source conductor \u2192 catch it locally. If repro is cluster-gated \u2192 the realistic deliverable is a heaptrack-instrumented image handed to the operator for a canary when alpha returns \u2014 NOT a local catch. Name which it is; do not let \"debug\" silently become env-blocked work that can't close",
+   "line": 219,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L219",
+   "class": "provisional"
+  },
+  {
+   "text": "Once the floor's retained buffer is located, file/PR upstream: against holochain/tx5 or kitsune2 if it's below holochain_p2p, or attach to #5664 with the tx5/off-heap CGo evidence its iroh-only dumps lack (handoff \u00a73.1 rec 3). Outward-facing \u2014 operator sends. Our fork carries the fix in the meantime (the PATCH path becomes a real contribution)",
+   "line": 225,
+   "state": "OPEN",
+   "id": "plans__2026-06-17-conductor-leak-fork-patch-debug-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-17-conductor-leak-fork-patch-debug-plan.md#L225",
+   "class": "provisional"
+  }
+ ]
+}

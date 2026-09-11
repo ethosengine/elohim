@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_nachalah_allotment_epic",
+  "claim": "Nachalah allotment companion to crossing: HOLDING tiers, earned arcs, block governance, conductor rung-5.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_nachalah_allotment_epic.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_nachalah_allotment_epic.md",
+        "cid": "bafkreih6moxgldnpeyu2juezwhmikbidkbmue6s6rcwpgm4vflwnfcnkom"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Nachalah allotment epic",
+    "file": "project_nachalah_allotment_epic.md",
+    "scopePath": ".claude/memory/project_nachalah_allotment_epic.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

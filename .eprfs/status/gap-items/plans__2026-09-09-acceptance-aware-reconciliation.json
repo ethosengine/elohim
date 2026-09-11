@@ -1,0 +1,42 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md",
+ "slug": "plans__2026-09-09-acceptance-aware-reconciliation",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 4,
+ "items": [
+  {
+   "text": "A scoped independent acceptor can be appointed and can record evidence-pinned acceptance or requested changes without altering historical note bytes",
+   "line": 16,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-acceptance-aware-reconciliation#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md#L16",
+   "class": "provisional"
+  },
+  {
+   "text": "Native context exposes all scoped assertions with fulfillment, review, acceptance, conflicts, historical candidates and deterministic remaining-work presentation",
+   "line": 17,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-acceptance-aware-reconciliation#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md#L17",
+   "class": "provisional"
+  },
+  {
+   "text": "The memory ceremony and an executable devflow story distinguish technical completion from accepted experience using the native projection",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-acceptance-aware-reconciliation#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md#L18",
+   "class": "provisional"
+  },
+  {
+   "text": "Independent technical review and practical acceptance prove the CLI on isolated fixtures and the doorway chain, and a bounded ceremony readout preserves historical uncertainty",
+   "line": 19,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-acceptance-aware-reconciliation#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-acceptance-aware-reconciliation.md#L19",
+   "class": "provisional"
+  }
+ ]
+}

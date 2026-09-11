@@ -1,0 +1,82 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md",
+ "slug": "plans__2026-06-20-attestation-consolidation-residual-tails-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 9,
+ "items": [
+  {
+   "text": "Step 1: Reproduce the bug (characterize before fixing). Run grep -n '\"\\$ref\"' elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_attestation_kinds.rs \u2014 confirm the phantom kind (:8, :48). Confirm the 4 lamad subtypes are ABSENT. This is the regression anchor",
+   "line": 62,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L62",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Fix the codegen $ref resolver. In codegen-rs.mjs, where it reads const attestations = manifest['attestations'] || {}, detect a $ref and load+merge the referenced JSON relative to the manifest dir before Object.keys. Representative:",
+   "line": 64,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L64",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Regenerate + verify the allow-list. Run pnpm run schema:codegen:rs. Then assert: grep -c '\"\\$ref\"' \u2026/generated_attestation_kinds.rs is 0, and grep -E 'attestation:(mastery|content-quality|content-succession|custodian-commitment)' \u2026/generated_attestation_kinds.rs shows all 4. (Codegen may be non-idempotent on unrelated ordering \u2014 stage only the genuinely-changed lines / the regenerated file.)",
+   "line": 81,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L81",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: DNA rebuild + sweettest (the in-repo proof; live reinstall is operator-gated). Rebuild the elohim DNA (plain cargo + hc dna pack, WASM flag, serial). Add/extend a sweettest that calls issue_attestation for attestation:mastery (a lamad subtype) and asserts it COMMITS (F1 accepts) \u2014 and that an unknown kind still fails-closed. Run serial: cargo test \u2026 --test-threads=1. Expected: the 4 subtypes mint; unknown rejected",
+   "line": 83,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L83",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit (codegen-rs.mjs + the regenerated generated_attestation_kinds.rs + the sweettest). Message: fix(attestation): resolve $ref in attestation-kind codegen \u2014 register lamad's 4 subtypes (consolidation residual tail). Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>. In the commit body + the report, FLAG the operator DNA-reinstall decision (this changed the integrity-zome hash; live conductors need an operator-gated reinstall to pick it up)",
+   "line": 85,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L85",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Confirm they're dead. grep -rn \"content_attestations\" elohim/elohim-storage/src \u2014 confirm the only callers are the legacy arms (api/attestations.rs:105-186) and that the table is dropped (the migration). Confirm no live route the app depends on hits them (the unified routes replaced them per Phase-2a). If any live consumer is found, STOP and report (it would be a real regression, not dead code)",
+   "line": 99,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L99",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the failing routing assertion. A unit test asserting the legacy path now returns not-found / is absent from the dispatch (mirror the storage routing-test pattern), OR \u2014 if there's no routing-test harness \u2014 assert at the narrowest level and note the limitation",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L101",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Delete the legacy arms in api/attestations.rs:105-186 + their http.rs routing (if any). Keep the unified routes intact",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L103",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit (refactor(storage): delete dead legacy content_attestations HTTP arms (consolidation residual tail) + Co-Authored-By)",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-attestation-consolidation-residual-tails-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-attestation-consolidation-residual-tails-plan.md#L107",
+   "class": "protocol-canonical"
+  }
+ ]
+}

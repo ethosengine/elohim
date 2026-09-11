@@ -151,20 +151,47 @@ pub fn edge_verdict(root: &Path, edge: &IndexedEdge) -> Verdict {
     derive_verdict(edge, current.as_ref())
 }
 
+/// One sidecar slot that was WITHDRAWN by a `run:retraction` note, and is therefore absent from
+/// [`EdgeIndex::edges`].
+///
+/// Carried alongside the graph rather than silently subtracted from it. A reader who sees "3
+/// dangling" where yesterday there were "10" must be able to learn that seven were withdrawn and
+/// on what ground, or the withdrawal verb becomes a way to make concerns disappear.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WithdrawnEdge {
+    /// The withdrawn `DepEdge` record's CID — what `epr flow retract` named.
+    pub record: String,
+    pub from: String,
+    pub to: String,
+    /// The reason the retraction recorded.
+    pub reason: String,
+}
+
 /// The merged edge graph over both planes.
 #[derive(Debug, Default)]
 pub struct EdgeIndex {
     pub edges: Vec<IndexedEdge>,
+    /// Sidecar slots withdrawn by retraction, in `record` CID order. Never part of `edges`.
+    pub withdrawn: Vec<WithdrawnEdge>,
 }
 
 impl EdgeIndex {
     /// Merge the doc plane (`cites:` envelopes) and the sidecar plane (`store.edges()`)
     /// into one graph. A missing/unparseable recipe registry yields an empty doc plane
     /// (the sidecar plane still projects) — the index degrades, never errors, on it.
+    ///
+    /// **Retracted sidecar slots are excluded here, once.** Withdrawal is a property of the
+    /// RECORD, so the one place that turns records into edges is the one place that has to know
+    /// about it; every reader downstream (`context --concerns`, `memory recall open`, `walk`,
+    /// `status`, `reseal`) inherits the rule without learning it. The doc plane is untouched:
+    /// a `cites:` envelope lives inside a document's own hashed body, and withdrawing one is an
+    /// edit to that document, which is `epr flow cites`' plane and not this one's.
     pub fn build(root: &Path, store: &impl FlowStore) -> FlowResult<Self> {
         let mut edges = doc_plane(root);
-        edges.extend(sidecar_plane(store)?);
-        Ok(Self { edges })
+        let (sidecar, withdrawn) = sidecar_plane(store)?;
+        edges.extend(sidecar);
+        Ok(Self { edges, withdrawn })
     }
 
     /// Edges `from` this path — what it depends on.
@@ -180,10 +207,28 @@ impl EdgeIndex {
     }
 }
 
-/// Project the sidecar `DepEdge` records (latest-per-slot) into `IndexedEdge`s.
-fn sidecar_plane(store: &impl FlowStore) -> FlowResult<Vec<IndexedEdge>> {
+/// Project the sidecar `DepEdge` records (latest-per-slot) into `IndexedEdge`s, less the slots a
+/// `run:retraction` note withdrew.
+///
+/// Returns the withdrawn set alongside the projection rather than dropping it, so
+/// [`EdgeIndex::withdrawn`] can be reported. The withdrawal check runs against the record CID
+/// `store.edges()` yields — the STANDING record of each slot — which is exactly the record
+/// `epr flow retract` refuses to name unless it is standing, so the two ends of the rule agree by
+/// construction rather than by convention.
+fn sidecar_plane(store: &impl FlowStore) -> FlowResult<(Vec<IndexedEdge>, Vec<WithdrawnEdge>)> {
+    let retracted = super::retract::retracted(&store.records()?);
     let mut out = Vec::new();
-    for (_, edge) in store.edges()? {
+    let mut withdrawn = Vec::new();
+    for (record_cid, edge) in store.edges()? {
+        if let Some(reason) = retracted.get(&record_cid.to_string()) {
+            withdrawn.push(WithdrawnEdge {
+                record: record_cid.to_string(),
+                from: edge.from,
+                to: edge.to,
+                reason: reason.clone(),
+            });
+            continue;
+        }
         let held = edge
             .status
             .as_ref()
@@ -204,7 +249,8 @@ fn sidecar_plane(store: &impl FlowStore) -> FlowResult<Vec<IndexedEdge>> {
             target_exists: true,
         });
     }
-    Ok(out)
+    withdrawn.sort_by(|a, b| a.record.cmp(&b.record));
+    Ok((out, withdrawn))
 }
 
 /// Project the doc corpus's sealed `cites:` envelopes into `IndexedEdge`s. Only envelopes
@@ -282,12 +328,12 @@ fn cite_desc(entry: &str) -> Option<String> {
 /// Doc stages that carry frontmatter + `cites:` — the seal-aware corpus.
 const DOC_STAGES: &[&str] = &["manifesto", "epic", "architecture-seed", "spec", "plan"];
 
-fn load_registry(root: &Path) -> Option<Registry> {
+pub(super) fn load_registry(root: &Path) -> Option<Registry> {
     Registry::load(&default_recipes(root)).ok()
 }
 
 /// Every doc file under the doc stages, deduped, as `(rel, abs)` pairs.
-fn doc_corpus(root: &Path, registry: &Registry) -> Vec<(String, PathBuf)> {
+pub(super) fn doc_corpus(root: &Path, registry: &Registry) -> Vec<(String, PathBuf)> {
     let mut seen = std::collections::HashSet::new();
     let mut out = Vec::new();
     for recipe in &registry.recipes {

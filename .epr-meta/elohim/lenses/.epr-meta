@@ -1,0 +1,28 @@
+---
+epr-meta-version: 1
+covers: subtree
+purpose: Govern the relocated maintenance LENSES and the memory discipline they serve, near their executable implementations.
+rules:
+  - id: recall-algorithm-contract
+    class: inject
+    when: { write: "**/recall*" }
+    dedupe-of: .epr-meta/elohim/algorithms/recall-contract.json
+    why: >
+      Retrieval composition, scope, limits and fitness live in recall-contract.json, and the
+      executor that implements them is NATIVE — `epr flow memory recall`, in
+      elohim/eprfs/epr-cli/src/flow/memory/recall.rs. Do not re-add a Python recall executor
+      here: a second implementation of a pinned algorithm is a second method identity for the
+      same receipts. CLI session accounting is enforced locally; shell/MCP bypasses and total
+      model tokens remain outside this boundary. A new mechanism must not silently reuse a
+      pinned execution session.
+    retire-when: >
+      No lens under this directory reads or writes recall state. The native execution condition
+      was met on 2026-09-10 when the Python recall executor was deleted; this manifest moved here
+      with the surviving lenses on 2026-09-11 when `.claude/scripts/memory-kit/` was removed.
+---
+
+The algorithm is authored content, not a new protocol-wide EprKind. Its executor refuses
+unsupported compositions, bounds discovery/provider/read output and pins contract plus executable
+bytes per session. The local session counter is operational accounting, not another work queue.
+Dependency seals bind the artifact to its implementation and tests; they do not execute checks.
+Run `cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections` (the `just gate memory-ceremony` leg).

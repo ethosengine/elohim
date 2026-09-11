@@ -1,0 +1,82 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md",
+ "slug": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 9,
+ "items": [
+  {
+   "text": "Step 1: Write the failing transitive test",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L63",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run it \u2014 Expected PASS (recursion.rs already implements rollup; this proves composition, no production change)",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L102",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Characterize the current behavior (regression anchor). Read resilience_snapshot.rs:22-45. The two rows.len() as i32 sites (stewarding_count at :29, commitment_backed_count at :38) are the descent-erasure. Note the exact view fields they feed (ResilienceSnapshotView.stewardingCollectives etc.) \u2014 these byte-for-byte outputs MUST be preserved (write a golden assertion of the current numbers for a known fixture first)",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L129",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the failing test \u2014 counts preserved AND descent available",
+   "line": 131,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L131",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the build_stewarding_rollup helper + re-wire the builder. Add a small pure helper that maps the steward CIDs onto the diversity keyspace and rolls up:",
+   "line": 150,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L150",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: (Optional, if descent is exposed) add the view field. If the snapshot should surface the descent, add an optional coverageDeficit/shortfallSlots field (not-selected-field contract) + schema + codegen. If keeping this slice minimal (count-preserving, internal rollup only), DEFER the view exposure and note it \u2014 the regression win (counts route through the descent-preserving primitive) lands either way",
+   "line": 164,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Read distribution.rs, find its rows.len() site(s), and confirm the count is a DIVERSITY/coverage aggregate (not an unrelated tally). If it is not coverage-shaped, STOP and report \u2014 defer it like topology_overview.rs (note in the report)",
+   "line": 179,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L179",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the failing count-preserving + descent test (mirror Task 2 Step 2 against distribution.rs's fixture)",
+   "line": 181,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L181",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Re-express via the shared rollup helper (extract the Task-2 helper into a graph_views/shefa/coverage.rs shared fn if both callers use it \u2014 one mapping, two callers, per \u00a73.1 \"first callers\")",
+   "line": 183,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-recursive-coverage-rollup-shefa-callers-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-recursive-coverage-rollup-shefa-callers-plan.md#L183",
+   "class": "protocol-canonical"
+  }
+ ]
+}

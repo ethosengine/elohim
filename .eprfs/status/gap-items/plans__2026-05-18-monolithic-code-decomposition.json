@@ -1,0 +1,652 @@
+{
+ "doc": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md",
+ "slug": "plans__2026-05-18-monolithic-code-decomposition",
+ "method": "checkbox-tasks",
+ "count": 92,
+ "items": [
+  {
+   "text": "Plans 1 (manifests) and 2 (SDK boundary) should be complete before Phase A. If Plan 2 hasn't run, Phase A's work is much larger \u2014 note that adjustment in Phase A's intro",
+   "line": 15,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#1",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L15"
+  },
+  {
+   "text": "Capture the baseline DNA hash: cd /projects/elohim/elohim/holochain/dna/elohim && hc dna hash elohim.dna > /tmp/dna-hash-baseline.txt (requires hc CLI; if not installed, install per the Holochain docs)",
+   "line": 16,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#2",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L16"
+  },
+  {
+   "text": "Capture the ts-rs baseline: find /projects/elohim/elohim/sdk/storage-client-ts/src/generated -name '*.ts' | sort | xargs sha256sum | sort > /tmp/ts-rs-baseline.sha256",
+   "line": 17,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#3",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L17"
+  },
+  {
+   "text": "Capture the LOC baseline:",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#4",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L18"
+  },
+  {
+   "text": "Step 1: Confirm views.rs is now a shim",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#5",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L44"
+  },
+  {
+   "text": "Step 2: Survey what remains",
+   "line": 52,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#6",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L52"
+  },
+  {
+   "text": "Step 3: Classify each conversion function by domain",
+   "line": 60,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#7",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L60"
+  },
+  {
+   "text": "Step 1: Create the skeleton",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#8",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L70"
+  },
+  {
+   "text": "Step 2: Register the module in lib.rs",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#9",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L108"
+  },
+  {
+   "text": "Step 3: Build",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#10",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L116"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#11",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L122"
+  },
+  {
+   "text": "Step 1: Identify the helper functions for this domain in views.rs",
+   "line": 138,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#12",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L138"
+  },
+  {
+   "text": "Step 2: Move them to views_convert/<domain>.rs",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#13",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L142"
+  },
+  {
+   "text": "Step 3: Update views.rs to remove the moved functions; add a pub use views_convert::<domain>::*; re-export if any consumers import via crate::views::",
+   "line": 146,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#14",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L146"
+  },
+  {
+   "text": "Step 4: Build + ts-rs",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#15",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L148"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#16",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L158"
+  },
+  {
+   "text": "Step 1: Check final views.rs LOC",
+   "line": 169,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#17",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L169"
+  },
+  {
+   "text": "Step 2: If <50 LOC of only re-exports, consider deleting",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#18",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L177"
+  },
+  {
+   "text": "Step 3: Commit any final cleanup",
+   "line": 183,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#19",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L183"
+  },
+  {
+   "text": "Step 1: Capture the route inventory",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#20",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L224"
+  },
+  {
+   "text": "Step 2: Identify section boundaries",
+   "line": 232,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#21",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L232"
+  },
+  {
+   "text": "Step 3: Write the seam map to /tmp/http-seam-map.md",
+   "line": 242,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#22",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L242"
+  },
+  {
+   "text": "Step 1: Create directory structure",
+   "line": 253,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#23",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L253"
+  },
+  {
+   "text": "Step 2: Write http/mod.rs",
+   "line": 259,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#24",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L259"
+  },
+  {
+   "text": "Step 3: Write http/handlers/mod.rs",
+   "line": 279,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#25",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L279"
+  },
+  {
+   "text": "Step 4: Create empty stubs for each handler file + extractors.rs + error.rs + routes.rs",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#26",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L295"
+  },
+  {
+   "text": "Step 5: Rename existing http.rs to http_old.rs (transient)",
+   "line": 310,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#27",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L310"
+  },
+  {
+   "text": "Step 6: Make http/mod.rs re-export from http_old during migration",
+   "line": 323,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#28",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L323"
+  },
+  {
+   "text": "Step 7: Build",
+   "line": 332,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#29",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L332"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 340,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#30",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L340"
+  },
+  {
+   "text": "Step 1: Find HttpServer struct + impl in http_old.rs",
+   "line": 354,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#31",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L354"
+  },
+  {
+   "text": "Step 2: Move the struct definition + non-handler constructors to http/mod.rs",
+   "line": 362,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#32",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L362"
+  },
+  {
+   "text": "Step 3: Update http/mod.rs to remove the transitional re-export of HttpServer (now defined here)",
+   "line": 368,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#33",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L368"
+  },
+  {
+   "text": "Step 4: Build",
+   "line": 370,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#34",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L370"
+  },
+  {
+   "text": "Step 1: Identify blob/shard handlers",
+   "line": 391,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#35",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L391"
+  },
+  {
+   "text": "Step 2: Move each blob/shard handler to http/handlers/blob.rs",
+   "line": 397,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#36",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L397"
+  },
+  {
+   "text": "Step 4: Run blob-related tests if any exist",
+   "line": 430,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#37",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L430"
+  },
+  {
+   "text": "Step 1: Move build_manifest() (lines 8145+ in original) to http/routes.rs",
+   "line": 467,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#38",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L467"
+  },
+  {
+   "text": "Step 2: Verify http_old.rs is now empty (or near-empty)",
+   "line": 475,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#39",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L475"
+  },
+  {
+   "text": "Step 3: Remove the mod http_old; declaration from lib.rs",
+   "line": 489,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#40",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L489"
+  },
+  {
+   "text": "Step 4: Final LOC check",
+   "line": 491,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#41",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L491"
+  },
+  {
+   "text": "Step 5: Full workspace build + tests",
+   "line": 499,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#42",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L499"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 508,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#43",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L508"
+  },
+  {
+   "text": "Step 1: Map the impl block contents",
+   "line": 545,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#44",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L545"
+  },
+  {
+   "text": "Step 2: Group by concern",
+   "line": 553,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#45",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L553"
+  },
+  {
+   "text": "Step 3: No commit \u2014 research only",
+   "line": 564,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#46",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L564"
+  },
+  {
+   "text": "Step 1: Create the directory",
+   "line": 574,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#47",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L574"
+  },
+  {
+   "text": "Step 2: Write p2p/node/mod.rs (initially just declaring submodules)",
+   "line": 580,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#48",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L580"
+  },
+  {
+   "text": "Step 3: Move pub fn reach_gate_allows + mod reach_gate_tests to p2p/node/reach_gate.rs",
+   "line": 589,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#49",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L589"
+  },
+  {
+   "text": "Step 4: Wire node/ into p2p/mod.rs",
+   "line": 611,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#50",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L611"
+  },
+  {
+   "text": "Step 5: Update any consumer that calls crate::p2p::reach_gate_allows to use crate::p2p::node::reach_gate_allows OR add a re-export in p2p/mod.rs",
+   "line": 619,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#51",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L619"
+  },
+  {
+   "text": "Step 6: Build",
+   "line": 627,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#52",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L627"
+  },
+  {
+   "text": "Step 7: Run p2p tests",
+   "line": 633,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#53",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L633"
+  },
+  {
+   "text": "Step 1: Identify the methods in the grouping",
+   "line": 656,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#54",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L656"
+  },
+  {
+   "text": "Step 2: Move them to p2p/node/<group>.rs",
+   "line": 660,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#55",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L660"
+  },
+  {
+   "text": "Step 3: Build + test",
+   "line": 676,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#56",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L676"
+  },
+  {
+   "text": "Step 1: Check p2p/mod.rs LOC",
+   "line": 693,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#57",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L693"
+  },
+  {
+   "text": "Step 2: If any type definitions are heavy (DeliveryPeer + P2PConfig + P2PNode + PeerMetrics combined >1,500 LOC), consider extracting types to p2p/types.rs",
+   "line": 701,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#58",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L701"
+  },
+  {
+   "text": "Step 3: Run full p2p test suite",
+   "line": 705,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#59",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L705"
+  },
+  {
+   "text": "Step 4: Commit any final cleanup",
+   "line": 711,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#60",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L711"
+  },
+  {
+   "text": "Step 1: Capture baseline DNA hash",
+   "line": 784,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#61",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L784"
+  },
+  {
+   "text": "Step 2: Write the verification helper",
+   "line": 795,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#62",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L795"
+  },
+  {
+   "text": "Step 3: Verify the helper works against the baseline",
+   "line": 837,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#63",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L837"
+  },
+  {
+   "text": "Step 1: Read the exact line ranges",
+   "line": 865,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#64",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L865"
+  },
+  {
+   "text": "Step 2: Create the conversions/ subdirectory",
+   "line": 873,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#65",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L873"
+  },
+  {
+   "text": "Step 3: Write conversions/mod.rs",
+   "line": 879,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#66",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L879"
+  },
+  {
+   "text": "Step 4: Move lamad conversion helpers to conversions/lamad.rs",
+   "line": 888,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#67",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L888"
+  },
+  {
+   "text": "Step 5: Re-export from lib.rs to preserve the public surface",
+   "line": 894,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#68",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L894"
+  },
+  {
+   "text": "Step 6: Move avodah conversion helpers to conversions/avodah.rs",
+   "line": 906,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#69",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L906"
+  },
+  {
+   "text": "Step 7: Pack DNA + verify hash",
+   "line": 910,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#70",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L910"
+  },
+  {
+   "text": "Step 8: Run sweettest if available",
+   "line": 918,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#71",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L918"
+  },
+  {
+   "text": "Step 9: Commit",
+   "line": 926,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#72",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L926"
+  },
+  {
+   "text": "Step 1: Read the section",
+   "line": 948,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#73",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L948"
+  },
+  {
+   "text": "Step 2: Create bridges/ subdirectory + move",
+   "line": 950,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#74",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L950"
+  },
+  {
+   "text": "Step 3: Verify DNA hash + commit",
+   "line": 958,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#75",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L958"
+  },
+  {
+   "text": "Step 1: Identify the #[hdk_extern] functions in this range",
+   "line": 979,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#76",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L979"
+  },
+  {
+   "text": "Step 2: Move each section to its file",
+   "line": 987,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#77",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L987"
+  },
+  {
+   "text": "Step 3: Re-export from lib.rs",
+   "line": 991,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#78",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L991"
+  },
+  {
+   "text": "Step 4: Verify DNA hash + sweettest + commit",
+   "line": 1002,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#79",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1002"
+  },
+  {
+   "text": "Step 1: Identify the line range from the section-marker grep at plan-start",
+   "line": 1019,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#80",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1019"
+  },
+  {
+   "text": "Step 2: Move to the appropriate sibling-module directory",
+   "line": 1020,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#81",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1020"
+  },
+  {
+   "text": "Step 4: Verify DNA hash byte-identical",
+   "line": 1022,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#82",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1022"
+  },
+  {
+   "text": "Step 5: Run relevant sweettest scenarios",
+   "line": 1023,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#83",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1023"
+  },
+  {
+   "text": "Step 1: Check current lib.rs LOC",
+   "line": 1041,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#84",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1041"
+  },
+  {
+   "text": "Step 2: If anything substantive remains, classify it",
+   "line": 1049,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#85",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1049"
+  },
+  {
+   "text": "Step 3: Final DNA hash verification + full sweettest",
+   "line": 1055,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#86",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1055"
+  },
+  {
+   "text": "Step 1: LOC report",
+   "line": 1081,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#87",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1081"
+  },
+  {
+   "text": "Step 2: Full workspace build + test",
+   "line": 1100,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#88",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1100"
+  },
+  {
+   "text": "Step 3: DNA hash final verification",
+   "line": 1107,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#89",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1107"
+  },
+  {
+   "text": "Step 4: ts-rs output final verification",
+   "line": 1113,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#90",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1113"
+  },
+  {
+   "text": "Step 5: Re-measure compilation baseline",
+   "line": 1119,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#91",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1119"
+  },
+  {
+   "text": "Step 6: Update measurements doc",
+   "line": 1128,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-monolithic-code-decomposition#92",
+   "cites": "genesis/docs/plans/2026-05-18-monolithic-code-decomposition.md#L1128"
+  }
+ ]
+}

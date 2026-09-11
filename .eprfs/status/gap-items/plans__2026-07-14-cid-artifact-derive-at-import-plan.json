@@ -1,0 +1,28 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-14-cid-artifact-derive-at-import-plan.md",
+ "slug": "plans__2026-07-14-cid-artifact-derive-at-import-plan",
+ "method": "requirement-bullets",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 2,
+ "items": [
+  {
+   "text": "(a) Omit content/blobHash/blobCid from the *source* seed JSON entirely \u2014 the JSON is curation +",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-07-14-cid-artifact-derive-at-import-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-14-cid-artifact-derive-at-import-plan.md#L101",
+   "class": "provisional"
+  },
+  {
+   "text": "(b) Keep them as a build-generated projection (build:data style, \"DO NOT EDIT \u2014 regenerate\" marker)",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-07-14-cid-artifact-derive-at-import-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-14-cid-artifact-derive-at-import-plan.md#L104",
+   "class": "provisional"
+  }
+ ]
+}

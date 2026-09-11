@@ -1,0 +1,74 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md",
+ "slug": "plans__2026-09-09-native-network-lifecycle-sprint",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 8,
+ "items": [
+  {
+   "text": "A configured SDK caller retains failed or unacknowledged writes, receives an honest failure, and can retry without discarding a newer concurrent write",
+   "line": 26,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L26",
+   "class": "provisional"
+  },
+  {
+   "text": "Consenting remote custodians become eligible through authoritative existing bindings, then a cold reader reconstructs an artifact after losing its ingest peer",
+   "line": 42,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L42",
+   "class": "provisional"
+  },
+  {
+   "text": "An eligible custodian receives an owned peer's death witness while a fresh peer without custody standing is refused before witness bytes are sent",
+   "line": 53,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L53",
+   "class": "provisional"
+  },
+  {
+   "text": "A custodian renders the admitted witness and recovery produces one durable incident attestation despite replay",
+   "line": 60,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L60",
+   "class": "provisional"
+  },
+  {
+   "text": "A governed runtime activation either adopts the intended executable or restores the previous executable without losing identity, stored state or its outcome witness",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L66",
+   "class": "provisional"
+  },
+  {
+   "text": "Both transports derive trust from verified existing evidence and price scheduling without weakening integrity or starving public peers",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L76",
+   "class": "provisional"
+  },
+  {
+   "text": "Browser discovery, household continuity and independently selected WAN entrances deliver the same declared release through outage and recovery",
+   "line": 83,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L83",
+   "class": "provisional"
+  },
+  {
+   "text": "Declared device budgets are demonstrated under combined runtime load, recovery and competing interactive/archive traffic",
+   "line": 90,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-native-network-lifecycle-sprint#8",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-native-network-lifecycle-sprint.md#L90",
+   "class": "provisional"
+  }
+ ]
+}

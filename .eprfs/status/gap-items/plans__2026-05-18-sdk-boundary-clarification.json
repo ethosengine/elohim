@@ -1,0 +1,239 @@
+{
+ "doc": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md",
+ "slug": "plans__2026-05-18-sdk-boundary-clarification",
+ "method": "checkbox-tasks",
+ "count": 33,
+ "items": [
+  {
+   "text": "Workspace clean: git status --short shows nothing uncommitted",
+   "line": 15,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#1",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L15"
+  },
+  {
+   "text": "Baseline captured: /tmp/ts-rs-baseline-plan2.sha256 (356 .ts files; captured at session start)",
+   "line": 16,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#2",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L16"
+  },
+  {
+   "text": "T4 PILOT learnings landed in memory (see commit history for feedback_ts_rs_cross_crate_import_paths.md)",
+   "line": 17,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#3",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L17"
+  },
+  {
+   "text": "Disk healthy: df -h /projects shows \u226530 GB free (cargo cold builds need headroom)",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#4",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L18"
+  },
+  {
+   "text": "crates/ exclusion confirmed: grep -A5 'exclude' /projects/elohim/elohim/Cargo.toml \u2014 crates/* is excluded from the elohim workspace; this is deliberate (each crates/* crate uses direct version pins, not workspace = true)",
+   "line": 19,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#5",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L19"
+  },
+  {
+   "text": "Step 1: Verify prior SDK.T2 state",
+   "line": 72,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#6",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L72"
+  },
+  {
+   "text": "Step 2: Revert elohim-sdk Cargo.toml",
+   "line": 81,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#7",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L81"
+  },
+  {
+   "text": "Step 3: Delete the elohim-sdk views/ stubs",
+   "line": 85,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#8",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L85"
+  },
+  {
+   "text": "Step 4: Remove pub mod views; from elohim-sdk/src/lib.rs",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#9",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L91"
+  },
+  {
+   "text": "Step 5: Verify elohim-sdk builds clean post-revert",
+   "line": 95,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#10",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L95"
+  },
+  {
+   "text": "Step 6: Create elohim-views crate",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#11",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L103"
+  },
+  {
+   "text": "Step 7: Verify elohim-views builds",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#12",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L195"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 203,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#13",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L203"
+  },
+  {
+   "text": "Step 1: Add elohim-views to elohim-sdk Cargo.toml",
+   "line": 364,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#14",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L364"
+  },
+  {
+   "text": "Step 2: Add views re-export module to elohim-sdk/src/lib.rs",
+   "line": 372,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#15",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L372"
+  },
+  {
+   "text": "Step 3: Verify elohim-sdk builds",
+   "line": 387,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#16",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L387"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 393,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#17",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L393"
+  },
+  {
+   "text": "Step 1: Inspect current elohim-storage-client deps",
+   "line": 415,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#18",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L415"
+  },
+  {
+   "text": "Step 2: Add elohim-views, REMOVE elohim-storage (if present)",
+   "line": 422,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#19",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L422"
+  },
+  {
+   "text": "Step 3: Update imports in source files",
+   "line": 432,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#20",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L432"
+  },
+  {
+   "text": "Step 4: Build",
+   "line": 438,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#21",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L438"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 446,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#22",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L446"
+  },
+  {
+   "text": "Step 1: Inspect each Cargo.toml",
+   "line": 469,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#23",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L469"
+  },
+  {
+   "text": "Step 2: Add elohim-views path-dep to each",
+   "line": 476,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#24",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L476"
+  },
+  {
+   "text": "Step 3: Update imports",
+   "line": 490,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#25",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L490"
+  },
+  {
+   "text": "Step 4: Build both",
+   "line": 499,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#26",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L499"
+  },
+  {
+   "text": "Step 1: Install cargo-deny if not present",
+   "line": 528,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#27",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L528"
+  },
+  {
+   "text": "Step 2: Create deny.toml at repo root",
+   "line": 534,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#28",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L534"
+  },
+  {
+   "text": "Step 3: Run cargo-deny against the elohim workspace",
+   "line": 593,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#29",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L593"
+  },
+  {
+   "text": "Step 4: Add cargo-deny smoke to pre-push",
+   "line": 601,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#30",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L601"
+  },
+  {
+   "text": "Step 1: Update elohim/sdk/CLAUDE.md with the SDK Boundary section",
+   "line": 638,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#31",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L638"
+  },
+  {
+   "text": "Step 2: Update elohim/elohim-storage/CLAUDE.md to reflect the new architecture",
+   "line": 660,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#32",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L660"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 680,
+   "state": "OPEN",
+   "id": "plans__2026-05-18-sdk-boundary-clarification#33",
+   "cites": "genesis/docs/plans/2026-05-18-sdk-boundary-clarification.md#L680"
+  }
+ ]
+}

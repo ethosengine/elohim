@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_che_opgate_slice1_plan_ready_held",
+  "claim": "Che op-gate offline spine landed (fail-closed); all doorway deploys run DEV_MODE=true — no Che-facing enforce node; live-mesh legs held.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_che_opgate_slice1_plan_ready_held.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_che_opgate_slice1_plan_ready_held.md",
+        "cid": "bafkreig5p3ecfpbdki4oty5xxqbfqva67nbkaasyjqtlf2oydlgg6m6qei"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Che op-gate Slice-1 — offline spine landed, live legs held",
+    "file": "project_che_opgate_slice1_plan_ready_held.md",
+    "scopePath": ".claude/memory/project_che_opgate_slice1_plan_ready_held.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

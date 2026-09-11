@@ -1,0 +1,414 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md",
+ "slug": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup",
+ "method": "checkbox-tasks",
+ "count": 58,
+ "items": [
+  {
+   "text": "Step 1: Confirm zero instantiation of EntryTypes::Attestation (the bare variant) in elohim DNA",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L193"
+  },
+  {
+   "text": "Step 2: Confirm zero call to create_entry(&Attestation (the bare struct) in elohim DNA",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L199"
+  },
+  {
+   "text": "Step 3: Confirm cross-DNA bridge is the actual issuance path",
+   "line": 205,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L205"
+  },
+  {
+   "text": "Step 4: Stop and abort if any of steps 1\u20133 contradict the vestigial claim",
+   "line": 211,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L211"
+  },
+  {
+   "text": "Step 1: Find the exact line numbers",
+   "line": 220,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L220"
+  },
+  {
+   "text": "Step 2: Remove the pub struct Attestation { ... } block",
+   "line": 226,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L226"
+  },
+  {
+   "text": "Step 3: Remove the Attestation(Attestation) variant from the EntryTypes enum",
+   "line": 230,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L230"
+  },
+  {
+   "text": "Step 4: Remove any validate-handler arm for EntryTypes::Attestation(...)",
+   "line": 234,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L234"
+  },
+  {
+   "text": "Step 5: Compile-check (when EPR-Phase-4 has merged + PVC budget permits)",
+   "line": 240,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L240"
+  },
+  {
+   "text": "Step 6: Commit Stage A",
+   "line": 246,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L246"
+  },
+  {
+   "text": "Step 1: Read the two schema files to confirm field shape",
+   "line": 303,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L303"
+  },
+  {
+   "text": "Step 2: Edit both schemas to rename lamadEventType \u2192 elohimEventType",
+   "line": 311,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L311"
+  },
+  {
+   "text": "Step 3: Commit (intermediate, codegen will follow)",
+   "line": 322,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L322"
+  },
+  {
+   "text": "Step 1: Rename the EconomicEvent struct field",
+   "line": 337,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L337"
+  },
+  {
+   "text": "Step 2: Rename the LinkTypes variant",
+   "line": 348,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L348"
+  },
+  {
+   "text": "Step 3: Update coordinator zome handler references",
+   "line": 359,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L359"
+  },
+  {
+   "text": "Step 4: Update any LinkTypes::EventByLamadType references in the same file",
+   "line": 369,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L369"
+  },
+  {
+   "text": "Step 5: Compile-check (WAIT for PVC + EPR)",
+   "line": 377,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L377"
+  },
+  {
+   "text": "Step 1: Verify timestamp non-collision",
+   "line": 392,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L392"
+  },
+  {
+   "text": "Step 2: Write up.sql",
+   "line": 400,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L400"
+  },
+  {
+   "text": "Step 3: Write down.sql",
+   "line": 412,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L412"
+  },
+  {
+   "text": "Step 4: Verify migrations directory layout",
+   "line": 421,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L421"
+  },
+  {
+   "text": "Step 1: Rename the column reference in diesel_schema.rs",
+   "line": 435,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L435"
+  },
+  {
+   "text": "Step 2: Rename the struct fields in models.rs",
+   "line": 446,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L446"
+  },
+  {
+   "text": "Step 3: Rename the lamad_event_types module",
+   "line": 450,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L450"
+  },
+  {
+   "text": "Step 4: Update all lamad_event_types::X references to elohim_event_types::X",
+   "line": 454,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L454"
+  },
+  {
+   "text": "Step 1: Apply mechanical rename in each file",
+   "line": 477,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L477"
+  },
+  {
+   "text": "Step 2: Verify replacement covered all sites",
+   "line": 481,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L481"
+  },
+  {
+   "text": "Step 3: Compile-check storage (WAIT for PVC budget)",
+   "line": 489,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L489"
+  },
+  {
+   "text": "Step 1: Apply rename in shefa/types/src/lib.rs",
+   "line": 503,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L503"
+  },
+  {
+   "text": "Step 2: Compile-check shefa-types",
+   "line": 507,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L507"
+  },
+  {
+   "text": "Step 1: Run Rust-to-TS codegen",
+   "line": 527,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L527"
+  },
+  {
+   "text": "Step 2: Run JSON-Schema-to-TS codegen",
+   "line": 536,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L536"
+  },
+  {
+   "text": "Step 3: Verify field rename propagated",
+   "line": 545,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L545"
+  },
+  {
+   "text": "Step 1: Verify wire-types content",
+   "line": 563,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L563"
+  },
+  {
+   "text": "Step 2: Apply rename to wire-types files (if Step 1 found hits)",
+   "line": 571,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L571"
+  },
+  {
+   "text": "Step 3: Update SDK client (elohim/sdk/src/)",
+   "line": 575,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L575"
+  },
+  {
+   "text": "Step 1: Rename LamadEventType TS type alias to ElohimEventType",
+   "line": 585,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L585"
+  },
+  {
+   "text": "Step 2: Rename LamadEventTypes const container",
+   "line": 593,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L593"
+  },
+  {
+   "text": "Step 3: Rename lamadEventType field references",
+   "line": 601,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L601"
+  },
+  {
+   "text": "Step 4: Run Angular typecheck (WAIT for PVC + don't compete with EPR)",
+   "line": 609,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L609"
+  },
+  {
+   "text": "Step 1: Rename in each file via Edit with replace_all=true",
+   "line": 624,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L624"
+  },
+  {
+   "text": "Step 1: Apply rename across all doc files EXCEPT historical plans",
+   "line": 636,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L636"
+  },
+  {
+   "text": "Step 2: Manually verify the historical-plan exemption",
+   "line": 645,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L645"
+  },
+  {
+   "text": "Step 3: Update the parent delivery master",
+   "line": 655,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L655"
+  },
+  {
+   "text": "Step 1: Find the existing pre-push hook",
+   "line": 664,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L664"
+  },
+  {
+   "text": "Step 2: Add the drift check",
+   "line": 672,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L672"
+  },
+  {
+   "text": "Step 3: Verify hook runs",
+   "line": 693,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L693"
+  },
+  {
+   "text": "Step 1: Confirm git grep is clean",
+   "line": 705,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L705"
+  },
+  {
+   "text": "Step 2: Run Bands 1+2 of existing test suite serially (NOT in parallel with EPR agent)",
+   "line": 715,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L715"
+  },
+  {
+   "text": "Step 3: Commit the full Stage B as one PR-grade integrated commit",
+   "line": 735,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L735"
+  },
+  {
+   "text": "git grep -E \"lamad_event_type|lamadEventType\" -- ':!*.lock' ':!/target/' ':!/node_modules/' ':!genesis/docs/superpowers/plans/2026-05-02-*' returns empty",
+   "line": 779,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L779"
+  },
+  {
+   "text": "imagodei DNA's Attestation entry type is still authoritative (Option B path) OR has been migrated to elohim DNA (Option A path)",
+   "line": 780,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L780"
+  },
+  {
+   "text": "All Bands 1+2 tests pass on the renamed substrate",
+   "line": 781,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L781"
+  },
+  {
+   "text": "Pre-push hook drift check is wired and verified",
+   "line": 782,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L782"
+  },
+  {
+   "text": "No regression in EPR Phase 4 work (verify their tests still pass after rebase onto Wave 0)",
+   "line": 783,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L783"
+  },
+  {
+   "text": "Memory anchor project_elohim_event_type_field_rename.md created",
+   "line": 784,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L784"
+  },
+  {
+   "text": "Memory anchor project_attestation_dedupe_elohim_dna_canonical.md created (with reality-corrected direction)",
+   "line": 785,
+   "state": "OPEN",
+   "id": "plans__2026-05-11-tiered-quilt-wave-0-substrate-cleanup#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-wave-0-substrate-cleanup.md#L785"
+  }
+ ]
+}

@@ -1,0 +1,122 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md",
+ "slug": "specs__2026-06-04-household-formation-ceremony-design",
+ "method": "agent",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 14,
+ "items": [
+  {
+   "text": "imagodei::affirm_membership coordinator (token validation, single-use link, sponsor chain, StewardshipGrant atomic for minors, MembershipAffirmed signal) + sweettests",
+   "line": 280,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L280",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Action-gate extension at rea_commitment_service.rs:45 \u2014 custody-blob/delegates-compute/replicates-dwelling join create_via_conductor; resolve 3 wire-shape divergences",
+   "line": 281,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L281",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Projection wiring: dht_anchor_hash on collectives via CollectiveCreated/MembershipAffirmed signal handlers; apply deliverypeer-household-enrichment.patch",
+   "line": 283,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L283",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "seed-household-formation.ts stage-1 driver on the per-conductor harness (create \u2192 affirms \u2192 grants \u2192 per-agent custody reciprocals \u2192 optional delegates-compute)",
+   "line": 285,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L285",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Interim rung-1 fixture seeding with provenance markers (metadata_json fixture/retireAt) \u2014 and the HARD retirement gate on the ceremony-landing PR",
+   "line": 191,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L191",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "features/qahal/household-formation.feature spine (begin/affirm/sponsor/partial/replay/opt-out/explicit-delegation/one-device scenarios, @requires:household-nodes + @stage1-structural)",
+   "line": 286,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L286",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Five validation intents into features/resilience/household-reciprocity.feature (steady-state mesh, james-contributes-compute, member-offline continuity, reciprocity view, grandma-standard 2-of-3 recovery)",
+   "line": 236,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L236",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Retag human-resilience.feature household scenarios off @requires:shem \u2192 @requires:household-nodes (4 retags + 1 split + 1 keep); return love-map-negotiation.feature to live; persona reconciliation to canonical triad",
+   "line": 245,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L245",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "quiltPolicy qahal/household class (defaultTierFloor stocked, holdWarmMin, preferDestinations) + pledge-clamp tie to ceremony custody commitments",
+   "line": 287,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L287",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Stage-2: headless persona auth (/auth/service-login dev grant) + doorway thin ceremony proxy + conductor_writes wrappers (call_create_collective, call_affirm_membership)",
+   "line": 288,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L288",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Stage-3: seeder/CI service-agent with delegates-compute standing (scope run-formation-ceremony/seed-fixtures, bounds_validator-enforced) \u2014 X-API-Key displacement on this surface",
+   "line": 290,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L290",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Verification flags V1 (charter capacity for household character), V2 (StewardshipGrant writability vs Phase 2b stub scope), V3 (qahal domain manifest existence) \u2014 verify before plan assumes",
+   "line": 273,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L273",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "STAGE-2 SEAM (final review 2026-06-05): ReaCommitmentView.in_scope_of silently None for conductor-path rows \u2014 projection stores bare 'collective:<hash>' string, view tries serde_json parse and drops it (views_convert/shefa.rs:140). Fix before any scenario asserts household scope on the wire.",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "STAGE-2 SEAM (final review 2026-06-05): create_stewardship_grant non-idempotent \u2014 grant ids embed timestamps; CI re-runs mint duplicate grants (bounded noise, latest-wins). Deterministic grant id or probe-before-create when stewardship work resumes.",
+   "line": 96,
+   "state": "OPEN",
+   "id": "specs__2026-06-04-household-formation-ceremony-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-04-household-formation-ceremony-design.md#L96",
+   "class": "protocol-canonical"
+  }
+ ]
+}

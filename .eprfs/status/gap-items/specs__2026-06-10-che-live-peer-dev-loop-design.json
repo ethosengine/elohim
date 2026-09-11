@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md",
+ "slug": "specs__2026-06-10-che-live-peer-dev-loop-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "app/elohim-app/proxy.conf.alpha.mjs \u2014 alpha-target proxy config (landed with this spec)",
+   "line": 84,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L84",
+   "class": "process-meta"
+  },
+  {
+   "text": "app/elohim-app/package.json start:alpha script (landed with this spec)",
+   "line": 85,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L85",
+   "class": "process-meta"
+  },
+  {
+   "text": "Feasibility spike: local render pixel-equivalent + live data through proxy (2026-06-10)",
+   "line": 86,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L86",
+   "class": "process-meta"
+  },
+  {
+   "text": "Write guard or documented convention rail (Hygiene #2)",
+   "line": 87,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L87",
+   "class": "process-meta"
+  },
+  {
+   "text": "One verification pass of look --as <FixtureHuman> against localhost:4200 (Hygiene #4)",
+   "line": 88,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L88",
+   "class": "process-meta"
+  },
+  {
+   "text": "Propagate the loop into gospel surfaces: app/elohim-app/CLAUDE.md (Starting Development)",
+   "line": 89,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-live-peer-dev-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-live-peer-dev-loop-design.md#L89",
+   "class": "process-meta"
+  }
+ ]
+}

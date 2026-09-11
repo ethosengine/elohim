@@ -1,0 +1,8 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md",
+ "slug": "specs__2026-06-19-operational-weave-facing-lens-design",
+ "method": "none",
+ "class": "protocol-canonical",
+ "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
+ "items": []
+}

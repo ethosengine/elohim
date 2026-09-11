@@ -1,0 +1,42 @@
+{
+ "doc": "genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md",
+ "slug": "architecture__2026-06-04-qahal-epr-household-lattice-design",
+ "method": "agent",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 4,
+ "items": [
+  {
+   "text": "MAP.md integration: add the lattice seed to the D7 row + the Household Living Core walk (MAP already flagged one-seed stale vs tiered-quilt §4; fold both into the next MAP refresh)",
+   "line": 35,
+   "state": "OPEN",
+   "id": "architecture__2026-06-04-qahal-epr-household-lattice-design#1",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md#L35",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduate seed Draft → canonical after operator review (it claims the missing D7 household-scale slot in architecture/)",
+   "line": 4,
+   "state": "OPEN",
+   "id": "architecture__2026-06-04-qahal-epr-household-lattice-design#2",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md#L4",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Held theses captured to backlog (dwelling-first-class-entity, household-mobility-seams, capability-arc-stewardship-gradient, witnessed-records-reach-flywheel) — verify each is picked up by the roadmap ceremony, not lost",
+   "line": 176,
+   "state": "OPEN",
+   "id": "architecture__2026-06-04-qahal-epr-household-lattice-design#3",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md#L176",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Reach doctrine (intent-declared/observed-earned, effective=min) substrate naming pass when witnessed-records work starts — keep the formation spec's self-validating-household slice consistent with it",
+   "line": 115,
+   "state": "OPEN",
+   "id": "architecture__2026-06-04-qahal-epr-household-lattice-design#4",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-06-04-qahal-epr-household-lattice-design.md#L115",
+   "class": "protocol-canonical"
+  }
+ ]
+}

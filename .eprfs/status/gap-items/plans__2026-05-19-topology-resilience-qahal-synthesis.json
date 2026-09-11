@@ -1,0 +1,169 @@
+{
+ "doc": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md",
+ "slug": "plans__2026-05-19-topology-resilience-qahal-synthesis",
+ "method": "checkbox-tasks",
+ "count": 23,
+ "items": [
+  {
+   "text": "B1. Add Viewer.reciprocity to GraphQL schema + resolver; back with existing rea_commitments + rea_economic_events relations (existing surfaces \u2014 see Source-of-Truth Declaration above; no new storage)",
+   "line": 730,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#1",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L730"
+  },
+  {
+   "text": "B2. Create Angular route /shefa/reciprocity + component app/elohim-app/src/app/shefa/pages/reciprocity/",
+   "line": 731,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#2",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L731"
+  },
+  {
+   "text": "B3. Render committed-vs-delivered per household; classify by reach",
+   "line": 732,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#3",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L732"
+  },
+  {
+   "text": "B4. Lift @wip on the reciprocity scenarios in m1-matthew-terrance-delivery.feature",
+   "line": 733,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#4",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L733"
+  },
+  {
+   "text": "C1. Confirm EPR head responses carry both distribution and resilience (two-dimension coherence per memory 2026-05-03 coherence sub-pass)",
+   "line": 739,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#5",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L739"
+  },
+  {
+   "text": "C2. Resilience tooltip component on app/elohim-app/src/app/lamad/components/concept-card/ and content-viewer",
+   "line": 740,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#6",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L740"
+  },
+  {
+   "text": "C3. Tooltip text: count + qahal-lens prompt (\"your emergency circle is small\")",
+   "line": 741,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#7",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L741"
+  },
+  {
+   "text": "C4. Lift @wip on resilience-tooltip scenarios",
+   "line": 742,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#8",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L742"
+  },
+  {
+   "text": "D1. Join HumanRelationship.type into PeerHouseholdEdge (graph relation + resolver)",
+   "line": 748,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#9",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L748"
+  },
+  {
+   "text": "D2. Resilience computation: trust-circle depth + reciprocal-commitment count \u2192 at-risk|partial|protected (compute on viewer side or projector?)",
+   "line": 749,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#10",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L749"
+  },
+  {
+   "text": "D3. Re-render peer-household-card with relationship-type chip + resilience class",
+   "line": 750,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#11",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L750"
+  },
+  {
+   "text": "D4. Lift @wip on the human-resilience progression scenarios",
+   "line": 751,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#12",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L751"
+  },
+  {
+   "text": "E1. Add Collective type + resolver to GraphQL schema (members, stewards, activeNow, upcomingActivities, norms, contributionRecognition)",
+   "line": 757,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#13",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L757"
+  },
+  {
+   "text": "E2. Author a2o feature genesis/a2o/features/qahal/collective-view.feature \u2014 5-feature assertion per slide 45 (norms visible, AI coordinator, live co-presence, contribution reputation, smart matching)",
+   "line": 758,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#14",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L758"
+  },
+  {
+   "text": "E3. Create Angular route /qahal/collective/:id + component embodying slide-45 layout (identity strip / AI card / stats row / live pane / upcoming + right rail + norms callouts)",
+   "line": 759,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#15",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L759"
+  },
+  {
+   "text": "E4. Stewardship recognition: bridge governance-decisions \u2192 REA economic-events with signal_kind = governance-participation",
+   "line": 760,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#16",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L760"
+  },
+  {
+   "text": "E5. Smart-matching pull via elohim affinity service (existing reach-gate-is-elohim-mediated-matchmaking)",
+   "line": 761,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#17",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L761"
+  },
+  {
+   "text": "F1. Add Doorway GraphQL type + resolver: stewards, federation peers, projection coverage, public-surface state",
+   "line": 767,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#18",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L767"
+  },
+  {
+   "text": "F2. Create Angular route + component consuming the existing generated doorway-dashboard-view.ts",
+   "line": 768,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#19",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L768"
+  },
+  {
+   "text": "F3. Qahal overlay: who-can-reach-whom view of authority distribution",
+   "line": 769,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#20",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L769"
+  },
+  {
+   "text": "G1. Route /topology-overview (or fold into /shefa/peers as a zoomed-out tab)",
+   "line": 775,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#21",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L775"
+  },
+  {
+   "text": "G2. Render households, collectives, reciprocity flows using the existing topology-overview-view.ts",
+   "line": 776,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#22",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L776"
+  },
+  {
+   "text": "G3. Toggle: operational lens (sums/bytes) \u2194 qahal lens (relationships/affinity)",
+   "line": 777,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-topology-resilience-qahal-synthesis#23",
+   "cites": "genesis/docs/plans/2026-05-19-topology-resilience-qahal-synthesis.md#L777"
+  }
+ ]
+}

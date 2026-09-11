@@ -1,0 +1,92 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md",
+ "slug": "plans__2026-05-24-architecture-frontmatter-normalization-plan",
+ "method": "checkbox-tasks",
+ "count": 12,
+ "items": [
+  {
+   "text": "Step 1: For each of the 14 files, read the current frontmatter",
+   "line": 100,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L100"
+  },
+  {
+   "text": "Step 2: For each file, draft normalized frontmatter",
+   "line": 112,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L112"
+  },
+  {
+   "text": "Step 3: Apply edits via Edit tool",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L116"
+  },
+  {
+   "text": "Step 4: Validate each file's frontmatter parses",
+   "line": 120,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L120"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L151"
+  },
+  {
+   "text": "All 14 files have tier: architecture",
+   "line": 172,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L172"
+  },
+  {
+   "text": "All 14 files have realizes: (or marked N/A explicitly for substrate-foundational specs)",
+   "line": 173,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L173"
+  },
+  {
+   "text": "All 14 files have informed-by: (or marked N/A explicitly for ground-floor specs)",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L174"
+  },
+  {
+   "text": "All 14 files have informs: (operator may revise inferred content)",
+   "line": 175,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L175"
+  },
+  {
+   "text": "No legacy field names remain (narrative spine:, related:, related specs:)",
+   "line": 176,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L176"
+  },
+  {
+   "text": "Memory anchors, defers, authors, dates, status, pillar coupling are all preserved",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L177"
+  },
+  {
+   "text": "Body content is unchanged",
+   "line": 178,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-architecture-frontmatter-normalization-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-architecture-frontmatter-normalization-plan.md#L178"
+  }
+ ]
+}

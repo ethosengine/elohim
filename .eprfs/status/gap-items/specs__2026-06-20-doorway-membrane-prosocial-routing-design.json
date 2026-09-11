@@ -1,0 +1,74 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md",
+ "slug": "specs__2026-06-20-doorway-membrane-prosocial-routing-design",
+ "method": "requirement-bullets",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 8,
+ "items": [
+  {
+   "text": "1a \u00b7 Sustained headroom/load advertisement \u2014 Operational/A, reuse NodeHeartbeat",
+   "line": 228,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L228",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "1b \u00b7 Acute backpressure \u2014 Operational-C, transport-plane (libp2p gossip / SSE), never DHT",
+   "line": 236,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L236",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "2 \u00b7 Capability-aware serve-routing \u2014 *not a data entity*; selection logic consuming existing",
+   "line": 240,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L240",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "3 \u00b7 Help-given recognition \u2014 raw per-serve metering \u2192 Operational-C; aggregated recognition \u2192",
+   "line": 242,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L242",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "4 \u00b7 Shared defense-in-depth state \u2014 Operational-C (ban-table, counters, local reputation);",
+   "line": 245,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L245",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "5 \u00b7 Membrane policy layer \u2014 *not a data entity*; a request stage reusing existing admission /",
+   "line": 248,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L248",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "6 \u00b7 Toll receipt (design-only) \u2014 REUSE REA EconomicEvent (fiat is another resource flow);",
+   "line": 250,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L250",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "7 \u00b7 Commons-pool membership / opt-in hosting offer (design-only) \u2014 REUSE Mishpat::Commitment",
+   "line": 253,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-doorway-membrane-prosocial-routing-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-doorway-membrane-prosocial-routing-design.md#L253",
+   "class": "protocol-canonical"
+  }
+ ]
+}

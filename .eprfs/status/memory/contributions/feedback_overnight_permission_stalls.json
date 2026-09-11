@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "overnight-permission-stalls",
+  "claim": "An idle overnight session may be blocked on a permission prompt (auth paths), not done; check the transcript tail and never race a blocked session.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_overnight_permission_stalls.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_overnight_permission_stalls.md",
+        "cid": "bafkreic3ecu2g7inih2puupyreyj22e6nstlrdfhqklwfdj7g6pusny7xu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Overnight permission stalls",
+    "file": "feedback_overnight_permission_stalls.md",
+    "scopePath": ".claude/memory/feedback_overnight_permission_stalls.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

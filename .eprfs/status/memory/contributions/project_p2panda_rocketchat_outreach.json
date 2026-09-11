@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_p2panda_rocketchat_outreach",
+  "claim": "Outreach to p2panda/Rocketchat community on shared history + P2P substrate.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_p2panda_rocketchat_outreach.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_p2panda_rocketchat_outreach.md",
+        "cid": "bafkreifmwp3qgx74goqzuyhwnzndimuztn7s4nyrwpoj6yoypj4qf7rcfu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "p2panda Rocket.Chat intro post (first public dev outreach)",
+    "file": "project_p2panda_rocketchat_outreach.md",
+    "scopePath": ".claude/memory/project_p2panda_rocketchat_outreach.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

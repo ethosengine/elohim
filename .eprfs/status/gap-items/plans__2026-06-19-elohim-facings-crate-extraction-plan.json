@@ -1,0 +1,60 @@
+{
+  "doc": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md",
+  "slug": "plans__2026-06-19-elohim-facings-crate-extraction-plan",
+  "method": "agent",
+  "class": "provisional",
+  "items": [
+    {
+      "text": "Phase 0: capture byte-identical-JSON baseline — golden test over 3 representative snapshots (lit-card, unmeasured, intra-hub), record + commit sha256 + raw JSON; fix any non-determinism (sort before serialize)",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#1",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    },
+    {
+      "text": "Phase 1: scaffold elohim-facings PURE crate (Cargo.toml: elohim-views+serde+chrono+std, NO diesel/elohim-storage) + workspace member + deny.toml ban; gate = empty crate compiles, cargo deny passes, a deliberate `use diesel;` FAILS to compile",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#2",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    },
+    {
+      "text": "Phase 2: move pure primitives+folds — HolderRow{hub_id,agent_id,region}; bucket_by/distinct_count_by combinators; build_felt_status/floor_for_tier verbatim; rewrite intra_hub_peers as combinator composition; extract stewarding_hubs + regional_distribution (preserve null-hub→unknown); move the 10 felt_status_tests; gate = cargo test -p elohim-facings green",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#3",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    },
+    {
+      "text": "Phase 3: rewire household_resilience.rs snapshot()+compute() as thin adapters with UNCHANGED signatures calling elohim_facings::*; loaders stay storage-side (take &conn); gate = cargo build -p elohim-storage",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#4",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    },
+    {
+      "text": "Phase 4: VERIFY cutover — 33 tests/household_resilience green + 10 felt_status_tests green + schema_contract green + byte-identical JSON (same 3 sha256) + fmt/clippy(new crate)/cargo deny",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#5",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    },
+    {
+      "text": "Phase 5: land+handoff — CLAUDE.md notes (storage + new elohim-facings); commit on branch; flip facings gap-item #12 CLAIMED; hand off the 4 lens charters to parallel sessions",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-19-elohim-facings-crate-extraction-plan#6",
+      "cites": "genesis/docs/superpowers/plans/2026-06-19-elohim-facings-crate-extraction-plan.md#L52",
+      "class": "provisional"
+    }
+  ],
+  "doc_requires_env": [
+    "household-nodes"
+  ],
+  "count": 6
+}

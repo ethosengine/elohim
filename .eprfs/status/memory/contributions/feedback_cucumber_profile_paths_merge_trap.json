@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_cucumber_profile_paths_merge_trap",
+  "claim": "Cucumber profile paths MERGE with positionals — `cucumber-js -p local <files>` runs whole suite; scope via `--config <empty>` or `--name`.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_cucumber_profile_paths_merge_trap.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_cucumber_profile_paths_merge_trap.md",
+        "cid": "bafkreiheyboja2z4zlldy74kcbuqogevxgb627ro6yztppiav2cbnzf6fu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Cucumber profile paths MERGE with positionals",
+    "file": "feedback_cucumber_profile_paths_merge_trap.md",
+    "scopePath": ".claude/memory/feedback_cucumber_profile_paths_merge_trap.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

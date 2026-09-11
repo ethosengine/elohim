@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md",
+ "slug": "plans__2026-07-25-resiliency-saga-valueflow-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "T1 \u2014 Review + commit in-flight cures: ceremony founder election + deployments.json roster (839a2f9b8), doorway human_id preference (b20a739f1), capacity reporter + identity-fill darkness observability (9b97db750)",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L36",
+   "class": "provisional"
+  },
+  {
+   "text": "T2 \u2014 mishpat\u2192rea replication mirror (cid=entry_hash; Revoke cancels), replication_commitment fold in elohim-facings (provider_role tiering, never the humans.household_id join), three T15 stubs replaced, load_custodian_relation state filter (6eaaf4046)",
+   "line": 37,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L37",
+   "class": "provisional"
+  },
+  {
+   "text": "T3 \u2014 custody_facing observation loader feeding the ae7c695b8 typed folds: evidence from shard_locations.status, commitment standing from active custody-blob rows, shard\u2192blob via manifests; binding honesty rules (failure\u2192unknown-preserving-evidence; StockedWarm only by recorded pledge; PeerAsserted never reaches Stocked); elohim_custody_class_count{class} gauges (6eaaf4046)",
+   "line": 38,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L38",
+   "class": "provisional"
+  },
+  {
+   "text": "T4 \u2014 ten chapter features + label-aware Prometheus + runLook glue; born-red chapters 2/5/7/9/10 are the loop's work queue (89eb92c64)",
+   "line": 39,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L39",
+   "class": "provisional"
+  },
+  {
+   "text": "T5 \u2014 resiliency-saga recipe + epr flow fulfill (Produce on all-green, Dismiss on regression, generatedAt-idempotent, discharged-set skip) (a581fee74)",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L40",
+   "class": "provisional"
+  },
+  {
+   "text": "T6 \u2014 saga-status.py frontier reader (green/emit-due/regressed/red/pending-env/unprojected; <0.1s), session-start SAGA line, saga-sync.sh actuator, 8 backlog items for deliberate v1 exclusions (35abe6f38)",
+   "line": 41,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-25-resiliency-saga-valueflow-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-25-resiliency-saga-valueflow-plan.md#L41",
+   "class": "provisional"
+  }
+ ]
+}

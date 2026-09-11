@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_doorway_wedge_unbounded_mongo_await",
+  "claim": "Doorway-alpha SIGKILL crashloop root = blocking getaddrinfo in holochain_client connect parking tokio workers during DNS flaps; fixed via async DNS + watchdog.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_wedge_unbounded_mongo_await.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_wedge_unbounded_mongo_await.md",
+        "cid": "bafkreidrp2ij76vxpcnzakhymrfsc7rmb3zxcp6ersnsja3iu5cycb2iaa"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway wedge — blocking getaddrinfo parks tokio workers",
+    "file": "project_doorway_wedge_unbounded_mongo_await.md",
+    "scopePath": ".claude/memory/project_doorway_wedge_unbounded_mongo_await.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

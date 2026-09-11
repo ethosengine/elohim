@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_resilience_card_data_plumbing",
+  "claim": "Resilience card data plumbing: snapshot joins need substrate-owned humans (agent_pub_key); tier is content-declared floor not reach; card is data-starved.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_resilience_card_data_plumbing.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_resilience_card_data_plumbing.md",
+        "cid": "bafkreiaykddyeqmk7spgk6b6ttvtm6xbmonbpkreredxvcmo5x44xzqnfa"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Resilience-card data plumbing (umbrella)",
+    "file": "project_resilience_card_data_plumbing.md",
+    "scopePath": ".claude/memory/project_resilience_card_data_plumbing.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md",
+ "slug": "specs__2026-05-01-atproto-lexicon-projection-doorway-design",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#1",
+   "text": "LexiconProjectionAdapter trait: project_outbound(epr, target_lexicon)->Option<AtProtoRecord> and project_inbound(record)->Option<IngestSignal>; AtProtoRecord/IngestSignal opaque to the trait",
+   "line": 22,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L22"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#2",
+   "text": "ProjectionAttestation trait: attest(record, source, scope)->ProjectionClaim \u2014 doorway signs as relying party, peer never appears as AT Proto signer",
+   "line": 40,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L40"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#3",
+   "text": "Outbound projection: publish selected peer-native EPRs into AT Proto Firehose as lexicon records, doorway-signed with ProjectionClaim referencing source EPR content-handle; opt-in per EPR variant via federation manifest",
+   "line": 56,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L56"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#4",
+   "text": "Inbound ingest: subscribe to a Firehose slice, translate records to protocol ingest signals registered against doorway content registry; peers subscribe by manifest (inside-out, no push)",
+   "line": 64,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L64"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#5",
+   "text": "Inbound attribution: ingest signals carry original did:plc reference + doorway translation claim but do NOT import did:plc as peer-native identity; foreign standing, no constitutional-floor admission",
+   "line": 68,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L68"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#6",
+   "text": "Federation manifest declares which EPR variants project to which lexicons (manifest-driven routes); conservative defaults \u2014 outbound opt-in",
+   "line": 61,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L61"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#7",
+   "text": "Lexicon mapping v1 shortlist: org.dds.result.pca + org.dds.result.summary outbound; org.dds.module.polis + org.dds.module.sense inbound (concrete mappings are implementations)",
+   "line": 95,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L95"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#8",
+   "text": "Open: ProjectionClaim hash anchoring \u2014 content-addressed vs URI reference (probably content-addressed; defer to first impl)",
+   "line": 98,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L98"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#9",
+   "text": "Open: inbound Sybil hardening \u2014 per-publisher rate limits in federation manifest against ingest-amplification flooding",
+   "line": 100,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L100"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#10",
+   "text": "Open: multi-doorway dedup semantics when same EPR projected outbound by two operators with two ProjectionClaims",
+   "line": 97,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L97"
+  },
+  {
+   "id": "specs__2026-05-01-atproto-lexicon-projection-doorway-design#11",
+   "text": "Open: ActivityPub generalization \u2014 when trait surface generalizes from AtProtoRecord to LexiconRecord<L> parameterized over federation flavor",
+   "line": 99,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-atproto-lexicon-projection-doorway-design.md#L99"
+  }
+ ]
+}

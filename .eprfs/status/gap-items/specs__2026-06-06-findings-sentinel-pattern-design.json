@@ -1,0 +1,86 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md",
+ "slug": "specs__2026-06-06-findings-sentinel-pattern-design",
+ "method": "agent",
+ "class": "process-meta",
+ "note": "agent-decomposed 2026-06-06 same-day as landing",
+ "items": [
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#1",
+   "text": "Pattern definition: four layers + decomposition-at-close + scale posture (\u00a71)",
+   "line": 23,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L23"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#2",
+   "text": "Instantiation A as-built record: deprecation/security sentinel, full lifecycle proven (\u00a72)",
+   "line": 38,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L38"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#3",
+   "text": "ci-harvest.py: cursor-based idempotent Jenkins harvester \u2014 live-tested (11 findings first run, idempotent re-run, urgent-split, green-streak evidence, flock, review-hardened) (\u00a73.1)",
+   "line": 60,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L60"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#4",
+   "text": "SessionStart async harvest trigger wired in settings.json (jq-validated; first live fire = next session start) (\u00a73.1)",
+   "line": 94,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L94"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#5",
+   "text": "--wait post-push loop-closer mode (implemented; first live use pending next CI-triggering push) (\u00a73.1)",
+   "line": 94,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L94"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#6",
+   "text": "ci-failure-triage agent: museum gate, sub-analyst composition, two-phase disappearance closure, triaged_at_build recurrence stamp (\u00a73.2)",
+   "line": 100,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L100"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#7",
+   "text": "CI stasis home (operator revision): deterministic confirm-by-disappearance/reopen moved INTO ci-harvest (sandbox-verified); draining = agentic-developer floor/ceiling rails (pass-ratio floor, brainstorming-confidence ceiling); deprecation-stasis back to instantiation-A-only (\u00a73.3)",
+   "line": 118,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L118"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#8",
+   "text": "Remote routine (/schedule) for detached harvest cadence (\u00a75.1)",
+   "line": 130,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L130"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#9",
+   "text": "Skill rename deprecation-stasis \u2192 findings-stasis (\u00a75.2)",
+   "line": 131,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L131"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#10",
+   "text": "a2o sprint-report artifact harvest as third source (\u00a75.3)",
+   "line": 132,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L132"
+  },
+  {
+   "id": "specs__2026-06-06-findings-sentinel-pattern-design#11",
+   "text": "Third instantiation candidates: lint-debt, a2o drift \u2014 compose from \u00a71 (\u00a75.4)",
+   "line": 134,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-findings-sentinel-pattern-design.md#L134"
+  }
+ ]
+}

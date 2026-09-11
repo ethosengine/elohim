@@ -1,0 +1,442 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md",
+ "slug": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 54,
+ "items": [
+  {
+   "text": "Step 1: Read the existing PeerStatus attribution path",
+   "line": 61,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#1",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L61",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Add provenance comment to api/account.rs module doc",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#2",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L67",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Verify build still compiles after comment-only change",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#3",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L82",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#4",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L92",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#5",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L108",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run test to verify it fails",
+   "line": 135,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#6",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L135",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Add the trait and impl",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#7",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L145",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run test to verify it passes",
+   "line": 170,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#8",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L170",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 179,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#9",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L179",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Create the registry module",
+   "line": 196,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#10",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L196",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Wire the module into lib.rs",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#11",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L273",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Build the crate",
+   "line": 281,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#12",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L281",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Read the existing block once more before editing",
+   "line": 307,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#13",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L307",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Refactor the block",
+   "line": 311,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#14",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L311",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Build to verify the refactor compiles",
+   "line": 405,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#15",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L405",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Find the handle_api_request call sites",
+   "line": 433,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#16",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L433",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Update account::handle signature",
+   "line": 439,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#17",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L439",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Update handle_api_request signature",
+   "line": 457,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#18",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L457",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Update each handle_api_request call site",
+   "line": 478,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#19",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L478",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Build to verify the wiring compiles",
+   "line": 486,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#20",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L486",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 496,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#21",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L496",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing tests",
+   "line": 512,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#22",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L512",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run tests to verify they fail",
+   "line": 574,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#23",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L574",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement the gate + the two 503 helpers",
+   "line": 584,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#24",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L584",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run tests to verify they pass",
+   "line": 638,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#25",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L638",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement the mapping function",
+   "line": 737,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#26",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L737",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Read where AddPortalHostInputView is defined",
+   "line": 808,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#27",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L808",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Add the three input views and four output views",
+   "line": 814,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#28",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L814",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Build to verify the new types compile",
+   "line": 892,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#29",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L892",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Regenerate TypeScript bindings",
+   "line": 902,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#30",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L902",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Add the helper",
+   "line": 928,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#31",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L928",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Build to verify the helper compiles",
+   "line": 963,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#32",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L963",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 972,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#33",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L972",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Read the M4 self-revocation feature file to confirm body shape",
+   "line": 988,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#34",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L988",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Add a zome-input wrapper struct with serde",
+   "line": 997,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#35",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L997",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Add forward_self_revocation and wire the route",
+   "line": 1035,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#36",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1035",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Build to verify compilation",
+   "line": 1123,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#37",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1123",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Run unit tests to verify nothing regressed",
+   "line": 1135,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#38",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1135",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Replace the stub at the route arm",
+   "line": 1160,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#39",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1160",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Add zome-input wrappers",
+   "line": 1177,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#40",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1177",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Add the handler",
+   "line": 1198,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#41",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1198",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Build + test",
+   "line": 1260,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#42",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1260",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Add the remove-portal-host handler",
+   "line": 1405,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#43",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1405",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Delete zome_bridge_not_yet_wired and its module-level doc",
+   "line": 1462,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#44",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1462",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Delete the two stub unit tests",
+   "line": 1479,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#45",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1479",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Build + test the full suite",
+   "line": 1483,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#46",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1483",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Find every @phase11-pending tag",
+   "line": 1513,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#47",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1513",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Remove each tag",
+   "line": 1522,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#48",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1522",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Inspect the step definitions in case any assert the 503 message",
+   "line": 1538,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#49",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1538",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Verify the files parse as Gherkin",
+   "line": 1549,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#50",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1549",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Confirm the TypeScript bindings are committed",
+   "line": 1594,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#51",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1594",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Confirm the branch is clean",
+   "line": 1607,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#52",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1607",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Sanity-grep for leftover PHASE_11_PENDING",
+   "line": 1617,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#53",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1617",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Push (after sprint orchestrator confirms)",
+   "line": 1627,
+   "state": "OPEN",
+   "id": "plans__2026-04-26-storage-phase-11-zome-forwarding-bridge#54",
+   "cites": "genesis/docs/superpowers/plans/2026-04-26-storage-phase-11-zome-forwarding-bridge.md#L1627",
+   "class": "provisional"
+  }
+ ]
+}

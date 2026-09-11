@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_che_devworkspaces_direct_to_main",
+  "claim": "che-devworkspaces (CI/image infra) pushes straight to main, inert-by-default; elohim monorepo main is reviewed dev→main only — surface classifier blocks.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_che_devworkspaces_direct_to_main.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_che_devworkspaces_direct_to_main.md",
+        "cid": "bafkreic32a4snmuihbtlmhvvbmg6h77d3xmgugdlqkpp75a552t2jvi6ru"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Push policy — che-devworkspaces main yes, elohim main no",
+    "file": "feedback_che_devworkspaces_direct_to_main.md",
+    "scopePath": ".claude/memory/feedback_che_devworkspaces_direct_to_main.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

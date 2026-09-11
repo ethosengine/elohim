@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md",
+ "slug": "specs__2026-05-28-app-manifest-staged-intents-design",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#1",
+   "text": "vocabulary.stagedIntents section in app-manifest (mirrors contentTypes): per-entry description/intentSchema $ref/graduatesTo/actionableFrom[SessionLifecycleState]/resolutionMode/three-leg coupling",
+   "line": 66,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L66"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#2",
+   "text": "Three-leg coupling discipline on staged intents: knowledge leg (EPR relationship types graduated entry participates in), value leg (onGraduate REA action), governance leg (canonical-entry reach + signal types)",
+   "line": 117,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L117"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#3",
+   "text": "stagedIntents validation: required fields, intentSchema $ref resolves, actionableFrom validates against SessionLifecycleState enum, resolutionMode one-of-three, coupling validates against contentTypes three-leg sub-schema; does NOT verify graduatesTo entry exists",
+   "line": 125,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L125"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#4",
+   "text": "graduation top-level section: deterministicCeremony (required when section exists), negotiatedCeremony, framingCid (per-pillar elohim-role declaration), appraisalAgent (home/commons/neutral/custom), notarizeAppraisal (always/on-request/never)",
+   "line": 150,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L150"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#5",
+   "text": "SessionLifecycleState enum (Anonymous/OauthIdentified/PeerNativeSampling/PeerNativeMember) at sdk/schemas/v1/enums; generated artifacts; relationship to Capability Profile protocol-core Standings",
+   "line": 183,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L183"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#6",
+   "text": "app-manifest.schema.json updates: vocabulary.stagedIntents (sibling to contentTypes) + top-level graduation (sibling to rendering/gates) + new $defs + conditional validation + backward compat (both optional)",
+   "line": 220,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L220"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#7",
+   "text": "Per-pillar codegen extension: each scripts/codegen.mjs emits staged-intents.ts + graduation-policy.ts; distribution; empty-section behavior",
+   "line": 273,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L273"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#8",
+   "text": "Protocol-level codegen integration: new INTERFACE_FILES entries + SessionLifecycleState enum + schema-contract test",
+   "line": 352,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L352"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#9",
+   "text": "Per-pillar manifest examples: lamad (staged-mastery-intent), imagodei, qahal, shefa, mishpat (no staged intents), hypothetical third-party tikvah",
+   "line": 378,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L378"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#10",
+   "text": "Relationship to runtime CeremonyRegistry: ceremony strings are registry lookup keys; bridge composes deterministic-then-negotiated per resolutionMode",
+   "line": 533,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L533"
+  },
+  {
+   "id": "specs__2026-05-28-app-manifest-staged-intents-design#11",
+   "text": "Open design questions: coupling required on staged intents; ceremony ID namespacing convention; per-staged-intent consent-required flag; third-party pillar manifest authorization; cross-pillar staged intents; resolutionMode either semantics",
+   "line": 547,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-app-manifest-staged-intents-design.md#L547"
+  }
+ ]
+}

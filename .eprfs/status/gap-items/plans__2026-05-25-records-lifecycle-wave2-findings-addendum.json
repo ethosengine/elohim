@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md",
+ "slug": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum",
+ "method": "agent-decomposition",
+ "count": 9,
+ "items": [
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#1",
+   "text": "Meta-Pattern 1: D.12 needs extensions beyond FeedbackSignal aggregation (5 of 7 returns)",
+   "line": 15,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L15"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#2",
+   "text": "Meta-Pattern 2: D.20 friction-gradient direction + currency-conversion + non-transfer Event fees (4 of 7 returns)",
+   "line": 23,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L23"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#3",
+   "text": "Meta-Pattern 3: cross-peer probes + bilateral coordination (structurally critical, 2 of 7 returns)",
+   "line": 32,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L32"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#4",
+   "text": "Meta-Pattern 4: per-Attestation-subtype validator framework missing (3 of 7 returns)",
+   "line": 41,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L41"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#5",
+   "text": "Meta-Patterns 5-8: D.17 stagger discipline patterns; local-hardware dependency stratifies elohim-cognition access (Photos); cross-archetype vocabulary needs SDK-boundary canonical home (7 of 7); reputation concentration without value concentration",
+   "line": 51,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L51"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#6",
+   "text": "New substrate gap D.21-D.24: standing-probe federated request-response codec; bilateral coordination protocol; per-Attestation-subtype validator framework; local-hardware fallback for elohim cognition",
+   "line": 116,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L116"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#7",
+   "text": "New substrate gap D.25-D.28: reputation-decay/friction discipline; sealed-against-self provenance chain; Profile-Collective auto-creation invariant; apex-elohim council throughput + failover",
+   "line": 150,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L150"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#8",
+   "text": "New substrate gap D.29-D.32: bandwidth/network constraints as Commitment fields; SDK-boundary canonical manifest for cross-pillar vocabulary; webhook idempotency for bridge-stewardship-elohim; reach taxonomy refinement",
+   "line": 174,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L174"
+  },
+  {
+   "id": "plans__2026-05-25-records-lifecycle-wave2-findings-addendum#9",
+   "text": "13 D.x extensions (revisions to existing subsections) + Service X.rs planned-but-unimplemented inventory",
+   "line": 94,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-records-lifecycle-wave2-findings-addendum.md#L94"
+  }
+ ]
+}

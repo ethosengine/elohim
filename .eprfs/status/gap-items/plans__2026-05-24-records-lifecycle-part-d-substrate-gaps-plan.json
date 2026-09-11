@@ -1,0 +1,400 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md",
+ "slug": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan",
+ "method": "checkbox-tasks",
+ "count": 56,
+ "items": [
+  {
+   "text": "Step 1: Draft subsection D.10 in records-lifecycle-design.md after the existing D.9 stub",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L102"
+  },
+  {
+   "text": "Step 2: Operator review of D.10 content",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L103"
+  },
+  {
+   "text": "Step 3: Commit D.10: git commit -m \"spec(architecture): records-lifecycle D.10 \u2014 schema-first IoC governance (Gap 11)\"",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L104"
+  },
+  {
+   "text": "Step 1: Draft subsection D.11",
+   "line": 132,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L132"
+  },
+  {
+   "text": "Step 2: Operator review",
+   "line": 133,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L133"
+  },
+  {
+   "text": "Step 3: Commit D.11: git commit -m \"spec(architecture): records-lifecycle D.11 \u2014 substrate-floor validator backfill (Gap 12)\"",
+   "line": 134,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L134"
+  },
+  {
+   "text": "Step 1: Draft subsection D.13",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L158"
+  },
+  {
+   "text": "Step 3: Commit D.13: git commit -m \"spec(architecture): records-lifecycle D.13 \u2014 missing view schemas + enum reconciliation (Gap 14)\"",
+   "line": 160,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L160"
+  },
+  {
+   "text": "Step 1: Draft subsection D.5 (replace existing stub)",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L185"
+  },
+  {
+   "text": "Step 3: Commit D.5: git commit -m \"spec(architecture): records-lifecycle D.5 \u2014 Observation spec implementation prerequisite (Gap 6)\"",
+   "line": 187,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L187"
+  },
+  {
+   "text": "Wave A coherence pass: skim Part D D.5, D.10, D.11, D.13 for cross-references and consistency",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L193"
+  },
+  {
+   "text": "Step 1: Resolve operator decisions 1 and 2 interactively",
+   "line": 235,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L235"
+  },
+  {
+   "text": "Step 2: Draft subsection D.1 with decisions baked in",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L236"
+  },
+  {
+   "text": "Step 3: Operator review",
+   "line": 237,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L237"
+  },
+  {
+   "text": "Step 4: Commit D.1: git commit -m \"spec(architecture): records-lifecycle D.1 \u2014 subordination architecture (Gaps 1+2) + adjacency tables\"",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L238"
+  },
+  {
+   "text": "Step 1: Resolve operator decisions 3 and 4 (governed_by + data_quality landings)",
+   "line": 260,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L260"
+  },
+  {
+   "text": "Step 2: Draft subsection D.4 with decisions baked in + derived-view prerequisite explicit",
+   "line": 261,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L261"
+  },
+  {
+   "text": "Step 4: Commit D.4: git commit -m \"spec(architecture): records-lifecycle D.4 \u2014 EconomicResource consolidation (Gap 5) + derived-view prerequisite\"",
+   "line": 263,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L263"
+  },
+  {
+   "text": "Step 1: Resolve operator decisions 5 and 6",
+   "line": 288,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L288"
+  },
+  {
+   "text": "Step 2: Draft subsection D.12",
+   "line": 289,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L289"
+  },
+  {
+   "text": "Step 4: Commit D.12: git commit -m \"spec(architecture): records-lifecycle D.12 \u2014 checkpoint/snapshot/aggregate-subordination primitive (Gap 13)\"",
+   "line": 291,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L291"
+  },
+  {
+   "text": "Step 1: Resolve operator decisions 7 and 8",
+   "line": 327,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L327"
+  },
+  {
+   "text": "Step 2: Draft subsection D.2 with decisions baked in",
+   "line": 328,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L328"
+  },
+  {
+   "text": "Step 4: Commit D.2: git commit -m \"spec(architecture): records-lifecycle D.2 \u2014 surface re-elevation (Gap 3)\"",
+   "line": 330,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L330"
+  },
+  {
+   "text": "Step 1: Resolve operator decision 9",
+   "line": 354,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L354"
+  },
+  {
+   "text": "Step 2: Draft subsection D.3 with decision + cancellation flow",
+   "line": 355,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L355"
+  },
+  {
+   "text": "Step 4: Commit D.3: git commit -m \"spec(architecture): records-lifecycle D.3 \u2014 submerge canonical signal (Gap 4) + shelf_destination expansion + cancellation flow\"",
+   "line": 357,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L357"
+  },
+  {
+   "text": "Step 1: Draft subsection D.7",
+   "line": 380,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L380"
+  },
+  {
+   "text": "Step 3: Commit D.7: git commit -m \"spec(architecture): records-lifecycle D.7 \u2014 dissolution semantics (Gap 8) + custody Commitment lifecycle\"",
+   "line": 382,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L382"
+  },
+  {
+   "text": "Step 1: Draft subsection D.9",
+   "line": 401,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L401"
+  },
+  {
+   "text": "Step 3: Commit D.9: git commit -m \"spec(architecture): records-lifecycle D.9 \u2014 reach-mutation Events (Gap 10)\"",
+   "line": 403,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L403"
+  },
+  {
+   "text": "Step 1: Resolve operator decision 10",
+   "line": 433,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L433"
+  },
+  {
+   "text": "Step 2: Draft subsection D.6",
+   "line": 434,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L434"
+  },
+  {
+   "text": "Step 4: Commit D.6: git commit -m \"spec(architecture): records-lifecycle D.6 \u2014 elohim-authoring pattern (Gap 7) + graduation-evaluator architecture\"",
+   "line": 436,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L436"
+  },
+  {
+   "text": "Step 1: Draft subsection D.8",
+   "line": 457,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L457"
+  },
+  {
+   "text": "Step 3: Commit D.8: git commit -m \"spec(architecture): records-lifecycle D.8 \u2014 bridge pattern (Gap 9) as substrate-native Collectives + PII + KYC migration\"",
+   "line": 459,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L459"
+  },
+  {
+   "text": "Step 1: Draft subsection D.15",
+   "line": 474,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L474"
+  },
+  {
+   "text": "Step 2: Operator review (the social-graph zome ownership decision deserves attention)",
+   "line": 475,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L475"
+  },
+  {
+   "text": "Step 3: Commit D.15: git commit -m \"spec(architecture): records-lifecycle D.15 \u2014 cross-DNA coordination patterns (Gap 16)\"",
+   "line": 476,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L476"
+  },
+  {
+   "text": "Step 1: Draft subsection D.16",
+   "line": 492,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L492"
+  },
+  {
+   "text": "Step 3: Commit D.16: git commit -m \"spec(architecture): records-lifecycle D.16 \u2014 multi-oracle confirmation-class attestation (Gap 17)\"",
+   "line": 494,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L494"
+  },
+  {
+   "text": "Step 1: Draft subsection D.17",
+   "line": 509,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L509"
+  },
+  {
+   "text": "Step 3: Commit D.17: git commit -m \"spec(architecture): records-lifecycle D.17 \u2014 recurring Commitment scheduler stagger (Gap 18)\"",
+   "line": 511,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L511"
+  },
+  {
+   "text": "Step 1: Draft subsection D.18",
+   "line": 523,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L523"
+  },
+  {
+   "text": "Step 3: Commit D.18: git commit -m \"spec(architecture): records-lifecycle D.18 \u2014 FeedbackSignal signal_class field (Gap 19)\"",
+   "line": 525,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L525"
+  },
+  {
+   "text": "Step 1: Draft subsection D.19",
+   "line": 550,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L550"
+  },
+  {
+   "text": "Step 3: Commit D.19: git commit -m \"spec(architecture): records-lifecycle D.19 \u2014 agent-private EPR-mediated key recovery (Gap 20)\"",
+   "line": 552,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L552"
+  },
+  {
+   "text": "Step 1: Draft subsection D.20",
+   "line": 580,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L580"
+  },
+  {
+   "text": "Step 2: Operator review (apex-elohim council governance is substrate-shaping; careful review)",
+   "line": 581,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L581"
+  },
+  {
+   "text": "Step 3: Commit D.20: git commit -m \"spec(architecture): records-lifecycle D.20 \u2014 layered Commons + elohim-mediated Global Commons (Gap 21)\"",
+   "line": 582,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L582"
+  },
+  {
+   "text": "Step 1: Resolve operator decision 11",
+   "line": 632,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L632"
+  },
+  {
+   "text": "Step 2: Draft subsection D.14",
+   "line": 633,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L633"
+  },
+  {
+   "text": "Step 4: Commit D.14: git commit -m \"spec(architecture): records-lifecycle D.14 \u2014 standing-curve view + policy declaration (Gap 15)\"",
+   "line": 635,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L635"
+  },
+  {
+   "text": "Step 1: Skim each subsection D.1\u2013D.19 for coherence",
+   "line": 644,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L644"
+  },
+  {
+   "text": "Step 2: Fix any drift found inline",
+   "line": 657,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L657"
+  },
+  {
+   "text": "Step 3: Final commit: git commit -m \"spec(architecture): records-lifecycle Part D \u2014 coherence pass + Phase 3 complete\"",
+   "line": 659,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-d-substrate-gaps-plan#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-d-substrate-gaps-plan.md#L659"
+  }
+ ]
+}

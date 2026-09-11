@@ -1,0 +1,107 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md",
+ "slug": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design",
+ "method": "agent",
+ "class": "provisional",
+ "note": "agent-decomposed 2026-06-06 (\u00a71-\u00a710 prior session, CLAIMED per chrome-rails gospel; \u00a711 this session)",
+ "items": [
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#1",
+   "text": "Cross-bundle link sweep (21 sites) + capture-phase epr-link interceptor in elohim-core; EprNavService for programmatic nav (\u00a74)",
+   "line": 81,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L81"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#2",
+   "text": "Serving-context segment in protocol-omni \u2014 opt-in showEnvContext, trust-framed, prod-silent; debug-bar deleted (\u00a75)",
+   "line": 145,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L145"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#3",
+   "text": "Shared theme store in elohim-core on the exact ThemeService contract + <elohim-theme-toggle> on three opt-in surfaces (\u00a76)",
+   "line": 194,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L194"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#4",
+   "text": "<elohim-lang-picker> from the lit-localize registry; a11y stays UA-native (\u00a77)",
+   "line": 229,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L229"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#5",
+   "text": "\u00a78 a2o scenarios: cross-bundle footer nav, serving-context gating, chrome-preferences theme/RTL persistence (\u00a78)",
+   "line": 257,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L257"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#6",
+   "text": "\u00a79 captured follow-ups (person-level pref sync, settings-palette a11y, Angular i18n, ThemeService\u2192ThemeStore collapse, Library B stories, ServingContext substrate home, bundle-styling token artifact) \u2014 each needs its own design/landing",
+   "line": 279,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L279"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#7",
+   "text": "<elohim-hypercard-panel> blank-slate primitive in elohim-core: open/actions/panelLabel, action-select+close, fold-down inline-start positioning, non-modal dialog a11y, four gates, Library A stories (\u00a711.2) \u2014 landed 2026-06-06, wtr 555/555",
+   "line": 359,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L359"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#8",
+   "text": "Resilience tooltip direction fix (bottom:125% \u2192 below-icon, inline-start, RTL logical props, pointer-events:none) (\u00a711.3) \u2014 landed 2026-06-06",
+   "line": 384,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L384"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#9",
+   "text": "Icon-density interactive button (aria-haspopup/aria-expanded) + hypercard panel with context\u2192full in-place flip + actions input / actionSelect re-emit contract (\u00a711.3) \u2014 landed 2026-06-06, real-element unit tests 16/16",
+   "line": 384,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L384"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#10",
+   "text": "protocol-omni cssprop binding for hypercard chrome theming; neutral glyph stays non-interactive (\u00a711.4) \u2014 landed 2026-06-06, vitest 39/39",
+   "line": 403,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L403"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#11",
+   "text": "\u00a711.5 a2o: five omni-resilience scenarios in observable-distribution.feature incl. @regression tooltip-in-viewport anchor; steps wired, cucumber dry-run clean \u2014 live E2E run pending substrate",
+   "line": 410,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L410"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#12",
+   "text": "Epic E action wiring for the resilience hypercard (Steward this content / View network) once destinations exist (\u00a711.6.1)",
+   "line": 426,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L426"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#13",
+   "text": "Lit migration of elohim-resilience-snapshot (\u00a711.6.2)",
+   "line": 429,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L429"
+  },
+  {
+   "id": "specs__2026-06-05-omnibar-consolidation-epr-native-links-design#14",
+   "text": "Tooltip \u2192 hypercard convergence: one context body source for both stimuli (\u00a711.6.3)",
+   "line": 433,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-omnibar-consolidation-epr-native-links-design.md#L433"
+  }
+ ]
+}

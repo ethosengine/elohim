@@ -1,0 +1,73 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md",
+ "slug": "specs__2026-06-01-unified-memory-loop-design",
+ "method": "requirement-bullets",
+ "class": "process-meta",
+ "count": 8,
+ "items": [
+  {
+   "text": "Trigger (the convergence-residual handoff). The drain readout drives the deterministic",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L157",
+   "class": "process-meta"
+  },
+  {
+   "text": "Measure (unchanged). Once running, the ceremony is measured by rewrites-delivered +",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L164",
+   "class": "process-meta"
+  },
+  {
+   "text": "placement-audit.py --stasis reports a gospel-currency dimension; substrate-currency-audit.py",
+   "line": 222,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L222",
+   "class": "process-meta"
+  },
+  {
+   "text": "The unified loop runs in both readouts: drain (autopilot, whole-graph, converges) and",
+   "line": 224,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L224",
+   "class": "process-meta"
+  },
+  {
+   "text": "The loop's convergence report names the floored judgment dimensions and explicitly says",
+   "line": 226,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L226",
+   "class": "process-meta"
+  },
+  {
+   "text": "/memory-ceremony is unchanged in measure (rewrites + coherence-GREEN); the loop never",
+   "line": 228,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L228",
+   "class": "process-meta"
+  },
+  {
+   "text": "/converge and /hygiene-sweep resolve to the unified loop (alias or deprecation pointer);",
+   "line": 230,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L230",
+   "class": "process-meta"
+  },
+  {
+   "text": "2026-05-10-converge-skill-design.md carries a superseded_by: pointer to this spec for",
+   "line": 232,
+   "state": "OPEN",
+   "id": "specs__2026-06-01-unified-memory-loop-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md#L232",
+   "class": "process-meta"
+  }
+ ]
+}

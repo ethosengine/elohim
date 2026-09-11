@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-host-psu-power-interrupts-2026-09",
+  "claim": "Sept 2026 — the dev host loses power mid-session (PSU fault; 750 W replacement ordered 2026-09-07); every mesh, cargo gate, push and background agent dies at once, /tmp is wiped, /projects survives",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_host_psu_power_interrupts_2026_09.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_host_psu_power_interrupts_2026_09.md",
+        "cid": "bafkreidkmf7k2cfesjsjav63kofik2iwpc5kbgaefzksbv2eolvqhyv234"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "project-host-psu-power-interrupts-2026-09",
+    "file": "project_host_psu_power_interrupts_2026_09.md",
+    "scopePath": ".claude/memory/project_host_psu_power_interrupts_2026_09.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

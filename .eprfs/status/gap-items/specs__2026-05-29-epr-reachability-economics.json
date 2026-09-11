@@ -1,0 +1,92 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md",
+ "slug": "specs__2026-05-29-epr-reachability-economics",
+ "method": "agent-decomposition",
+ "count": 12,
+ "items": [
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#1",
+   "text": "Core unlock: reach (permission, earned at authoring) and delivery (economics, who pays to move bytes) are separate axes; commons = permissionlessly readable but not freely delivered (no free-rider collapse)",
+   "line": 17,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L17"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#2",
+   "text": "Heads (DHT, cheap) served per reach - doorway projects commons head-graph free; bytes (libp2p, expensive) served per reach AND delivery; frontier is a visible locked node (invitation not 404)",
+   "line": 31,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L31"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#3",
+   "text": "project-epr is a sponsorship/front-door primitive (steward funds free web2 delivery at a named address), NOT a sitemap; project the organizing skeleton, resolve the leaves; near-term: seed a small set of named entry points not per-content sitemap",
+   "line": 44,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L44"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#4",
+   "text": "Doorway two hats: Role 1 Projector (named front doors, project-epr lives here, BUILT) + Role 2 Resolver/finance-bridge (DHT provider records -> pull libp2p -> cache -> serve, reach enforced peer-side, NEXT EPIC needs own P2P design gate)",
+   "line": 69,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L69"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#5",
+   "text": "Two delivery currencies: money (visitor, compensatory micro-transaction split by donut ratios, pays toll but doesn't add availability) + in-kind (steward, generative custody-blob/replicates-* pledge that adds a replica); visitors pay rent, stewards grow commons; demand drives replication",
+   "line": 82,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L82"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#6",
+   "text": "Internalized externality: consumer pays true transparent cost of footprint they consume but don't steward, routed to those who bore it (vs web2 externalizing into ads/surveillance)",
+   "line": 104,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L104"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#7",
+   "text": "Participation gradient IS reachability gradient: anonymous visitor (heads + sponsored bytes/toll) / hosted participant (doorway runs conductor on your behalf, accrues standing, grandma path) / device steward (own node, free pulls of well-replicated content)",
+   "line": 112,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L112"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#8",
+   "text": "Thin-fediverse: doorways are commodity edges holding NO canonical data (only projection + cache + web2 service contract); anti-monopoly by data-locality inversion (nothing to capture, exit free); doorways = distributed Cloudflare on home hubs",
+   "line": 132,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L132"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#9",
+   "text": "Anycast-CDN endgame: elohim.host -> nearest doorway edge (anycast/GeoDNS) projects or resolves; origin = replicated P2P substrate (no single origin); content-addressing makes cache coherent (immutable bytes cached eternally, mutable heads kept fresh cheaply)",
+   "line": 149,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L149"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#10",
+   "text": "Addressing graduation: web2 DNS+anycast + did:web today -> substrate-native pkarr DHT records + did:peer at endgame (no flag-day); pkarr is on iroh Phase-11 gate list",
+   "line": 163,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L163"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#11",
+   "text": "Doorways/nodes as stewarded recoverable governable DHT assets: operate-doorway commitment carries succession role (recoverability hook, seeded); HARD GATE governable != seizable (inherit graduated consent-based anti-capture from account-recovery)",
+   "line": 171,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L171"
+  },
+  {
+   "id": "specs__2026-05-29-epr-reachability-economics#12",
+   "text": "Role-2 epic open questions: head-visibility purely reach-gated; beyond-frontier unit standing-based for participants vs monetary toll for visitors; frontier enforced peer-side not doorway; multi-party toll settlement shape; doorway governance design under governable!=seizable",
+   "line": 185,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-29-epr-reachability-economics.md#L185"
+  }
+ ]
+}

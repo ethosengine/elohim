@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "pin-reader-agents-to-older-opus",
+  "claim": "Opus 5 handles complexity well but writes less accessibly — pin blind-reader to a full model ID, not the floating `opus` alias.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_pin_reader_agents_to_older_opus.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_pin_reader_agents_to_older_opus.md",
+        "cid": "bafkreidt45y7rdsy4jipz5xuq5sb2bxmodqpsrlj3iipeiwd7zyz2xr3xu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Pin legibility-judging agents to an explicit Opus ID",
+    "file": "feedback_pin_reader_agents_to_older_opus.md",
+    "scopePath": ".claude/memory/feedback_pin_reader_agents_to_older_opus.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

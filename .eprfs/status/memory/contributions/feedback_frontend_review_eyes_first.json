@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "frontend-review-eyes-first",
+  "claim": "Render before code-reviewing frontend (pnpm look, graphos sheet); canonical = looking-at-frontend skill; can't-find ≠ never-implemented.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_frontend_review_eyes_first.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_frontend_review_eyes_first.md",
+        "cid": "bafkreid33z4pdgwa3mbtoepui54ek3xwkiylzrlxeighglywsovbpjgb7m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Frontend review = eyes first",
+    "file": "feedback_frontend_review_eyes_first.md",
+    "scopePath": ".claude/memory/feedback_frontend_review_eyes_first.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -1,0 +1,57 @@
+{
+ "doc": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md",
+ "slug": "plans__2026-05-19-doorway-stewardship-chain-design",
+ "method": "requirement-bullets",
+ "count": 7,
+ "items": [
+  {
+   "text": "db::attestations::current_hardware_custody(doorway_id) -> Option<Attestation> \u2014 returns the latest non-superseded",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#1",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L198"
+  },
+  {
+   "text": "db::attestations::current_steward_of_record(doorway_id) -> Option<Attestation> \u2014 same",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#2",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L199"
+  },
+  {
+   "text": "HTTP routes exposing these for doorway-service consumption (per the registry-driven manifest pattern)",
+   "line": 200,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#3",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L200"
+  },
+  {
+   "text": "If no active HardwareCustodyAttestation exists for this doorway's id \u2192 auto-issue one signed by STEWARD_AGENT_KEY, with the steward as primary custodian, succession quorum = STEWARD_AGENT_KEY alone (1-of-1 trivial quorum, must be expanded by the steward in normal operation)",
+   "line": 207,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#4",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L207"
+  },
+  {
+   "text": "Then issue StewardOfRecordAttestation referencing the custody attestation",
+   "line": 208,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#5",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L208"
+  },
+  {
+   "text": "Then issue OperateDoorwayCommitment with capabilities=[\"*\"], succession_role=primary, references both attestations",
+   "line": 209,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#6",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L209"
+  },
+  {
+   "text": "From the next boot onward, all three are queried from the DHT; bootstrap is no-op",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-doorway-stewardship-chain-design#7",
+   "cites": "genesis/docs/plans/2026-05-19-doorway-stewardship-chain-design.md#L210"
+  }
+ ]
+}

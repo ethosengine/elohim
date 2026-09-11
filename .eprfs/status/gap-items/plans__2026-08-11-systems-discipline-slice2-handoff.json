@@ -1,0 +1,130 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md",
+ "slug": "plans__2026-08-11-systems-discipline-slice2-handoff",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 15,
+ "items": [
+  {
+   "text": "Add a retire-when: field to the .epr-meta rule shape and to hook/sentinel",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L97",
+   "class": "provisional"
+  },
+  {
+   "text": "Backfill it for the highest-traffic intervenors first. A rule whose retire-condition",
+   "line": 99,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L99",
+   "class": "provisional"
+  },
+  {
+   "text": "Surface the count of intervenors lacking a retire condition. This is a Level,",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L102",
+   "class": "provisional"
+  },
+  {
+   "text": "A Stock shape: level, inflow rate, outflow rate \u2014 each carrying its own kind and",
+   "line": 120,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L120",
+   "class": "provisional"
+  },
+  {
+   "text": "Turnover time (survey \u00a73.9): stock \u00f7 outflow rate. This is the measure that",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L122",
+   "class": "provisional"
+  },
+  {
+   "text": "Report it honestly. Current readings make this concrete: 28d \u2192 generated 63,",
+   "line": 126,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L126",
+   "class": "provisional"
+  },
+  {
+   "text": "Make the window part of the measure's identity and its basis, not an argument",
+   "line": 141,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L141",
+   "class": "provisional"
+  },
+  {
+   "text": "Report more than one window, or justify the single one. Absorption here is bursty",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L143",
+   "class": "provisional"
+  },
+  {
+   "text": "Record a high-water mark alongside current evidence, so a later deferred-gate green",
+   "line": 156,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L156",
+   "class": "provisional"
+  },
+  {
+   "text": "measure-honesty-local's own evidence block is the natural first subject",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L158",
+   "class": "provisional"
+  },
+  {
+   "text": "Build it on top of B, once a stock has real inflow and outflow rates",
+   "line": 167,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L167",
+   "class": "provisional"
+  },
+  {
+   "text": "Annotate or correct \u00a76.2 with the rate-ratio reading and note which of its rows are",
+   "line": 182,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L182",
+   "class": "provisional"
+  },
+  {
+   "text": "measure-honesty-local gains checks for whichever of Q10-Q13 you closed, with",
+   "line": 256,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L256",
+   "class": "provisional"
+  },
+  {
+   "text": "A one-line delta in genesis/manifests/habits.yaml recording what this slice proved,",
+   "line": 258,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#14",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L258",
+   "class": "provisional"
+  },
+  {
+   "text": "If the dev-system stock model warrants its own habit, draft it \u2014 do not mint it",
+   "line": 260,
+   "state": "OPEN",
+   "id": "plans__2026-08-11-systems-discipline-slice2-handoff#15",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-systems-discipline-slice2-handoff.md#L260",
+   "class": "provisional"
+  }
+ ]
+}

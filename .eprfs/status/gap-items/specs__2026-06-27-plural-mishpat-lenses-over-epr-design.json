@@ -1,0 +1,122 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md",
+  "slug": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design",
+  "method": "agent-extracted",
+  "class": "protocol-canonical",
+  "doc_requires_env": null,
+  "count": 14,
+  "items": [
+    {
+      "text": "Wave 1: register >=2 facing-folds as lenses (the sensemaking half) over one EPR, proving plural win-win observation that never collapses (zero new DHT types). @requires:household-nodes",
+      "line": 189,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L189",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: implement mishpat::author_lens as a new Commitment coordinator-action (the deterministic-contract teeth half) binding a lens to an EPR CID; CID = entry_hash (never action_hash); hash-neutral hot-swap. @requires:household-nodes",
+      "line": 174,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L174",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: implement the affinity fold (T2, Category C, context-relative usage weight) with the integrity-recompute path against attested tallies; lens_affinity projection (no dht_anchor). @requires:household-nodes",
+      "line": 177,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L177",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: implement the contention fold (controversy agree/disagree spread, Reddit-style) and emit a signed SignalKind::ContentionBreach (analog DelayBreach) on threshold-crossing. @requires:household-nodes",
+      "line": 229,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L229",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: ballot/exercise as B2 (private source-chain entry + certify_tally Attestation reusing imagodei Attestation) so affinity/contention inputs are attested, not raw self-reported counts (gaming-resistance). @requires:household-nodes",
+      "line": 176,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L176",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: manual election path (convene_election / certify_election via Commitment-action ratifies-election); certified outcome notarized (A), ballots B2; collective-franchise authority. @requires:household-nodes",
+      "line": 179,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#6",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L179",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: bounty stub via mishpat::open_bounty reusing Mishpat::Commitment action bounty-fresh-lens, bounded_by the ContentionBreach, in_scope_of the EPR; fulfilled by an REA EconomicEvent. @requires:household-nodes",
+      "line": 180,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#7",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L180",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: per-lens fail-closed degradation (EprRouter-empties lesson) - one poisoned/invalid lens degrades its own row only; selection skips it, never aborts the EPR. @requires:household-nodes",
+      "line": 295,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#8",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L295",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 1: a2o scenarios under genesis/a2o/features/qahal/ (plural-observation no-collapse, election-on-conflict, contention->bounty) plus a Mishpat sweettest on the deterministic Commitment-contract firing on an EPR signal; verify on a live household-nodes render (CI-green != binding-correct). @requires:household-nodes",
+      "line": 302,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#9",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L302",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 2 (NET-NEW primitive): forward-index EPR CID -> all governing lenses as an A2 link; resolve open-question whether an existing scope/bounded_by link covers it (hash-neutral) or a new integrity LinkType is required (isolated DNA-move risk). @requires:household-nodes",
+      "line": 175,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#10",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L175",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 2 (NET-NEW primitive): telos-fitness selector - affinity-weighted contextual selection among lenses (B+C: one active per context, others warm and re-activating when context shifts). @requires:household-nodes",
+      "line": 282,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#11",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L282",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 3: automated ContentionBreach -> bounty -> shadow-evaluate (candidate lens observe-only) -> promote-on-evidence loop across collectives; cross-collective contention needs the cross-node mesh. @requires:alpha-cluster-6peer",
+      "line": 285,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#12",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L285",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Wave 4: recursive method-lens selection (which election/measurement mechanism is itself lens-plurality over the mishpat surface) with constitutional-floor termination hardened in the integrity zome (DNA-hash-touching = operator-gated). @requires:alpha-cluster-6peer",
+      "line": 287,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#13",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L287",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Future (dependency-blocked): a Hudson positional-rent justice lens reading rent-from-position over the EPR coupling graph (fold_edge_criticality / fold_net_diff exist) - needs AgentPeerBinding signing unblocked for economic attribution before it can be built. @requires:household-nodes",
+      "line": 317,
+      "state": "OPEN",
+      "id": "specs__2026-06-27-plural-mishpat-lenses-over-epr-design#14",
+      "cites": "genesis/docs/superpowers/specs/2026-06-27-plural-mishpat-lenses-over-epr-design.md#L317",
+      "class": "protocol-canonical"
+    }
+  ]
+}

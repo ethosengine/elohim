@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_atomic_wins_compound_velocity",
+  "claim": "Operator 2026-09-06 — velocity comes from atomic wins done the right way; never trade correctness for a one-off speedup.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_atomic_wins_compound_velocity.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_atomic_wins_compound_velocity.md",
+        "cid": "bafkreigke7mjmmtzze7imay2vgytvs5wvrlmdcq3pg6y4oahxigmizp2ma"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Careful \"how we SHOULD do it\" slices are atomic wins th…",
+    "file": "feedback_atomic_wins_compound_velocity.md",
+    "scopePath": ".claude/memory/feedback_atomic_wins_compound_velocity.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

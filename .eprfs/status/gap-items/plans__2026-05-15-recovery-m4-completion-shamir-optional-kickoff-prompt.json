@@ -1,0 +1,29 @@
+{
+ "doc": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md",
+ "slug": "plans__2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt",
+ "method": "requirement-bullets",
+ "count": 3,
+ "items": [
+  {
+   "text": "submit_intimate_witness Gate 1 (RecoveryRequest read)",
+   "line": 90,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt#1",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md#L90"
+  },
+  {
+   "text": "commit_key_rotation revocation-floor gate (KeyRevocation read)",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt#2",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md#L91"
+  },
+  {
+   "text": "Any other call sites the audit surfaces",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt#3",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-kickoff-prompt.md#L92"
+  }
+ ]
+}

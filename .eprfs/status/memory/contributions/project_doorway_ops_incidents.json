@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_doorway_ops_incidents",
+  "claim": "Doorway ops incidents: A/B edges are islands (no coherence); kitsune2 bootstrap gap made conductors DHT islands; blocking getaddrinfo parks tokio workers.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_ops_incidents.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_ops_incidents.md",
+        "cid": "bafkreiaegnqbu6js2vqn54a4lfqa2lihwevh3u2cfkeqef77b4epod6kte"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway ops incidents (umbrella)",
+    "file": "project_doorway_ops_incidents.md",
+    "scopePath": ".claude/memory/project_doorway_ops_incidents.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_sprint_cadence_local_batch_then_jenkins",
+  "claim": "Cadence target 2026-08-21 — sprint of 10 verified on the local mesh, then ONE Jenkins pass; Jenkins confirms a batch, it never discovers.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sprint_cadence_local_batch_then_jenkins.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sprint_cadence_local_batch_then_jenkins.md",
+        "cid": "bafkreiglriqtxns356lt24t65z5ed46rakkmd6ar4qs4a3nq3gmsb4ekzy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sprint cadence — batch locally, one Jenkins pass",
+    "file": "feedback_sprint_cadence_local_batch_then_jenkins.md",
+    "scopePath": ".claude/memory/feedback_sprint_cadence_local_batch_then_jenkins.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

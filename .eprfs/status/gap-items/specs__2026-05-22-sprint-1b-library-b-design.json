@@ -1,0 +1,106 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md",
+ "slug": "specs__2026-05-22-sprint-1b-library-b-design",
+ "method": "agent-decomposition",
+ "count": 14,
+ "items": [
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#1",
+   "text": "Composition strategy: shared composer render-qahal-homepage.ts (pure renderQahalHomepage(scene, opts)->TemplateResult assembling 4-column chrome) + thin per-scene story files (DRY)",
+   "line": 43,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L43"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#2",
+   "text": "Token-binding: shared _lib/qahal-decorator.ts exporting qahalLight/Dark/HighContrast decorators (single source of brand-binding truth across 19 stories)",
+   "line": 49,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L49"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#3",
+   "text": "Scene fixtures: typed bundles at fixtures/canonical/ + variations/ composing slices of 4 primitives modules into named scenes (rubric, member subset, stream, topology, co-steward observation, curated EPRs, external links)",
+   "line": 44,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L44"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#4",
+   "text": "Path migration: relocate 4 mock-data modules to fixtures/primitives/ with consumer import-path updates (only migration in 1B)",
+   "line": 143,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L143"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#5",
+   "text": "Type contracts: Scene shape (id/qahalArchetype/otherQahals/rubric/members/streamEvents/computeTopology/coStewardObservation/curatedEprs/externalLinks/pendingAcknowledgments) + RenderOpts (viewerTier/powerUserVisible/lens/activePanel/...)",
+   "line": 185,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L185"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#6",
+   "text": "Capability-gating discipline in composer: reads viewerTier against rubric.externalLinkVisibility; DOM-absent (not display:none) for child/legal_steward_protected; filtered+protected-tier-marker for elder/idd; same for powerUserVisible=false",
+   "line": 250,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L250"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#7",
+   "text": "19 story files: 4 canonical (Dowell/CofC/Hardins/Wisdom-Commons) + 7 variations + 2 user-toggles + 5 capability-gating + 1 playground",
+   "line": 264,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L264"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#8",
+   "text": "Canonical stories encode storyteller named moments verbatim (sick James + Sheila soup + Gertrude check-in; Brother Cal + Romans 12 + youth retreat; etc.) at viewerTier=steward/lens=standard/powerUser=false/panel=stream",
+   "line": 266,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L266"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#9",
+   "text": "Composer behavior tests (~25 cases): chrome assembly, external-link gating per tier, power-user gating, panel routing",
+   "line": 341,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L341"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#10",
+   "text": "Scene-fixture narrative-fidelity tests (1 per canonical) preventing canonical drift; variations get lighter typed-validity assertions",
+   "line": 353,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L353"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#11",
+   "text": "Decorator tests (~5 cases): each decorator emits wrapper div with expected --el-* tokens + per-element bindings; high-contrast overrides border+state-color tokens",
+   "line": 371,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L371"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#12",
+   "text": "Verification ladder: pnpm test (~50 new) + pnpm test-storybook (19 stories a11y-clean) + sidebar structure visible + recognition test (Dowell Tuesday-morning) + distinction test (protected-tier external-link absent) \u2014 last two operator-judgment Checkpoint F gate",
+   "line": 375,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L375"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#13",
+   "text": "Pillar-level README at designed/qahal/README.md explaining composer + decorator pattern for future authors",
+   "line": 393,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L393"
+  },
+  {
+   "id": "specs__2026-05-22-sprint-1b-library-b-design#14",
+   "text": "Out of scope / deferred: Che 0.0.0.0 binding; Storybook static-build PR CI hook; behavioral .feature scenarios (Sprint 5); real backend wiring (Sprint 2+); 6 remaining UX variations (value-scanner mining); new Lit primitives; Tier 3 substrate primitives",
+   "line": 395,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-sprint-1b-library-b-design.md#L395"
+  }
+ ]
+}

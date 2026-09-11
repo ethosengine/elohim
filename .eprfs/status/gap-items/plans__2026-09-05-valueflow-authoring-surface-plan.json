@@ -1,0 +1,100 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md",
+ "slug": "plans__2026-09-05-valueflow-authoring-surface-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 11,
+ "items": [
+  {
+   "text": "Task 1 deliverable: epr flow note --kind ruling and --kind verdict work end to end, the",
+   "line": 74,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L74",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 2 deliverable: one shared latest-event helper with fulfill calling it, plus a",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L103",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 3 deliverable: epr flow claim resolves all three --on forms, mints one commitment,",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L139",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 4 deliverable: epr flow fulfill --on discharges a gap-item commitment from a task",
+   "line": 169,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L169",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 5 deliverable: epr flow context <path|cid> renders identity, intents, commitments,",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L198",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 6 deliverable: context names the covering habit and the owning gate for a path, and",
+   "line": 230,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L230",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 7 deliverable: three inject rules land at the repository root and the task report",
+   "line": 260,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L260",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 8 deliverable: three native SkillPackages authored with hand-written governance blocks,",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L295",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 9 deliverable: the feature file lands with four scenarios and an honest @wip state if",
+   "line": 327,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L327",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 10 deliverable: just gate eprfs exits zero with the exit line quoted, the binary is",
+   "line": 351,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L351",
+   "class": "process-meta"
+  },
+  {
+   "text": "Task 11 deliverable: three landed epic tasks are claimed and fulfilled by an implementer",
+   "line": 399,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-valueflow-authoring-surface-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-valueflow-authoring-surface-plan.md#L399",
+   "class": "process-meta"
+  }
+ ]
+}

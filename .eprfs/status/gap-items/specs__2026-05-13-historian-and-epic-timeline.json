@@ -1,0 +1,92 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md",
+ "slug": "specs__2026-05-13-historian-and-epic-timeline",
+ "method": "agent-decomposition",
+ "count": 12,
+ "items": [
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#1",
+   "text": "Name the three temporal perspectives frame: History (past, historian) / Development (present, memory-kit+converge+shift) / Roadmap (future, converge->roadmap-walker) as views on one substrate (the epic-graph over time)",
+   "line": 21,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L21"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#2",
+   "text": "Epic-graph as substrate: git log --follow on epic.md is a first-class timeline data source; cross-references become a traversable graph; next epic computable from trajectory",
+   "line": 36,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L36"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#3",
+   "text": "Historian surface agent: archive indexing, pattern-signature extraction, continuous comparison during planning, surface annotation on match (context not notification); inverse of cleanup",
+   "line": 46,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L46"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#4",
+   "text": "Pattern signature schema per archived entry: trigger conditions / outcome class / decision frame / adjacent themes (resolved by MemPalace embeddings)",
+   "line": 54,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L54"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#5",
+   "text": "Vertical wisdom-compaction lifecycle: chat -> memory entries -> epic paragraphs -> manifesto principles; wisdom as the asymptote each tier reaches toward",
+   "line": 82,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L82"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#6",
+   "text": "Future primitive promote-to-epic: cluster of memory entries -> drafted epic paragraph, sources marked compacted-into-epic; lossy-by-design; needs its own design pass",
+   "line": 100,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L100"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#7",
+   "text": "Adopt MemPalace as historian substrate (wings/embeddings/temporal ER graph/sweep/search); resolves pattern-signature schema + cadence + per-agent scoping",
+   "line": 106,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L106"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#8",
+   "text": "Keep memory-kit distinct from MemPalace (present-slice markdown vs history-perspective binary store); adapter to run mempalace sweep on .claude/archive periodically",
+   "line": 136,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L136"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#9",
+   "text": "MemPalace pilot before commitment: install non-default location, create historian wing, sweep archive, sample pattern search against active plan, decide integration shape",
+   "line": 141,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L141"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#10",
+   "text": "Future tool epic-timeline: read-only chronological walk of epic-graph git history (reading the protocol arc)",
+   "line": 166,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L166"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#11",
+   "text": "Future tool roadmap-walker: project next epic from trajectory (separate tool or converge --horizon flag \u2014 open question 5)",
+   "line": 167,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L167"
+  },
+  {
+   "id": "specs__2026-05-13-historian-and-epic-timeline#12",
+   "text": "Open questions: epic-graph traversal model (commit-walk vs derived semantic graph); promote-to-epic operator gating; MemPalace storage location; embedding-model offline verification",
+   "line": 170,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-13-historian-and-epic-timeline.md#L170"
+  }
+ ]
+}

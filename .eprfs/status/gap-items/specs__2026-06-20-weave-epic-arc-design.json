@@ -1,0 +1,98 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md",
+ "slug": "specs__2026-06-20-weave-epic-arc-design",
+ "method": "agent",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 11,
+ "items": [
+  {
+   "text": "#0 operational-weave lens (Wave A): plan + land the existing charter's 4 slices. Already decomposed under specs__2026-06-19-operational-weave-facing-lens-design — this item is the pointer/sequencing edge, not a re-decomposition.",
+   "line": 67,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L67",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#1 Slice-0 (unblocked, DB-free): pure proof that CoverageRollup::rollup composes transitively at N=2 (region.covered == A ∪ B; descend() reaches both; trapped-deficit atom reachable via constituents). Uses only recursion.rs — no loaders/gauges/DHT/seed.",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L114",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#1 section-adds (Wave B): consume CoverageRollup in the lens (replace hand-written aggregate() with descent); add the operational WeaveView rollup as recursive-architecture §2.1's third caller; cure the rows.len() descent-erasure at graph_views/shefa/resilience_snapshot.rs:29,38. Depends on lens Slices 1-3 + recursive-architecture Wave 0/2 + the conductor-signal msgpack-decode fix.",
+   "line": 77,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L77",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#1 seed: one {\"kind\":\"council\",\"parentLayerCid\":<cid>} Collective charter value + MEMBER_OF edges to existing households (a seed-data row on the EXISTING imagodei Collective entry — zero schema change, no new entry type). cross-region councils @requires:shem; 2-level rollup runs on household-nodes.",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#2 Slice-0 (unblocked, DB-free): servable_tiers(measured: CustodianCapacityRow, pledge_floor: Option<Tier>) -> TierCapabilityView pure fold + per-tier classification asserts + TierCapabilityView shape + ts-rs codegen. Measured-only Category-C; zero new DHT/tables.",
+   "line": 163,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L163",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#2 earned-witnessed seam (DEFERRED follow-on): the storage-capability attestation (elohim-DNA Content subtype-string in infrastructure/manifest.json, NOT a new entry type) + witness emission + decay. Blocked on tiered-quilt Wave 4 (BreachScanner/draw-probe). Ship the measured fold with this seam stubbed.",
+   "line": 155,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L155",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#3 base (Wave A, lights alpha TODAY): the rea-economic commitment_backed slice folds real CI-wired seed-provide-rows data (commitmentBackedCollectives=1 on live alpha). Runs parallel to the lens, not after it.",
+   "line": 207,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L207",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#3 extension Slice-0 (Wave B): one deterministic closure → fulfiller emits a compute-fulfilled EconomicEvent (new ACTION on the EXISTING entry, output_cid carried) bounded_by an existing delegates-compute Commitment → the lens's realized_value_flow/mutual_compute fold stops being intent-only. Lands the rea-economic spec's two named non-goals; reward routes through the existing appreciation event (no new entity).",
+   "line": 209,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L209",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#3 dependency: wire the bounded_by-is-metadata_json-annotation emitter (not a column) for compute-fulfillment events so the lens can extract the commitment link. Output CID IS the proof (deterministic recompute → CID match) — optimistic-recompute verification, no new crypto.",
+   "line": 171,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L171",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#4 Slice-0 (unblocked, single-host): encrypt-then-RS-over-ciphertext round-trip in a new private_replica.rs — plaintext → random DEK encrypt → RS-encode ciphertext → drop ≤parity shards → reconstruct → decrypt → assert hashes to plaintext_cid; DEK sealed/unsealed via dryoc (the sealed_against_self test pattern). Proves the two-CID model end-to-end, no mesh/DHT/identity.",
+   "line": 257,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L257",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#4 live-path blockers (BLOCKED, complementary — gate live delivery only, not Slice-0): (a) an X25519 reader-key substrate resolvable from agent_cid (Holochain keys are ed25519; crypto_box_seal needs X25519; sealed_against_self takes the key as given but never sources it) — the real gating dependency for live wrapping; (b) the unresolved conductor-leak fix that real distribute_shards over a healthy mesh waits on (OOM site still OPEN, jemalloc canary prepped). Plus the ShardManifest field-add + the one new KeyEnvelope entry (per-reader sealed DEK, custodians get no key).",
+   "line": 248,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-weave-epic-arc-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md#L248",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-sync-state-contract",
+  "claim": "Sync-plane state durable: inventory gossip, Automerge gossip, DHT entries. Canonical channels alone move heads.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_sync_state_contract.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_sync_state_contract.md",
+        "cid": "bafkreia4jiintkmvdbyvxdhdxwb5vvitrbim5hngdtp6jo4amzinm2vj3e"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sync-state contract — epoch, position, caught-up",
+    "file": "project_sync_state_contract.md",
+    "scopePath": ".claude/memory/project_sync_state_contract.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

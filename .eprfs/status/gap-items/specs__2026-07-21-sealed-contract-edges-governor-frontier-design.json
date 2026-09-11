@@ -1,0 +1,98 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md",
+ "slug": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 11,
+ "items": [
+  {
+   "text": "Sidecar edge-record schema (dag-cbor: from/to/sealed_cid/governor/sealed_by/sealed_at/status) + the one-vocabulary mapping to the cite envelope; full-CID seal via eprfs cid (Python never encodes) (\u00a72)",
+   "line": 256,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L256",
+   "class": "process-meta"
+  },
+  {
+   "text": "Edge index: project doc cites: + sidecar records into one graph the epr-rea walk consumes (FlowStore/brit-graph adapter); staleness derivation body_cid(to) \u2260 sealed_cid (\u00a72)",
+   "line": 257,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L257",
+   "class": "process-meta"
+  },
+  {
+   "text": "epr flow seal <file> --on <upstream> + epr flow reseal + epr flow hold --reason --valid-from in epr-cli (mirror cite-gen --seal/--refresh UX) (\u00a72)",
+   "line": 258,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L258",
+   "class": "process-meta"
+  },
+  {
+   "text": "Governor vocabulary + the edge-governor-defaults@1 registry (.claude/epr-meta/governors.yaml, Precedent-shaped, id@version pins) + mechanical auto-derivation at seal time (workspace/codegen/view-schema/doc-doc detection; test:<id> always explicit) (\u00a73)",
+   "line": 259,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L259",
+   "class": "process-meta"
+  },
+  {
+   "text": "File-leave hook: PostToolUse resolver leg \u2014 recompute CID, partition forward edges by governor, stamp stale, surface frontier summary, offer seal one-liner for undeclared read-set deps; debounced via epr-meta advice store (\u00a74)",
+   "line": 260,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L260",
+   "class": "process-meta"
+  },
+  {
+   "text": "Dirty-set ledger .claude/data/edge-findings.jsonl (fp = sha256(from|to)[:12]) + sentinel dispatch directive on bound-exceeded/authority-crossed; suppression on already-filed (\u00a74)",
+   "line": 261,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L261",
+   "class": "process-meta"
+  },
+  {
+   "text": "Push-gate leg: red while cite-seal-class stale edges touching pushed paths are neither resealed nor held (BACK-hard) (\u00a74)",
+   "line": 262,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L262",
+   "class": "process-meta"
+  },
+  {
+   "text": "Triage tranche 1 \u2014 author + govern the input edges of every perpetually-UNSTABLE genesis stage; each stage red names its edge or is visibly held (\u00a75)",
+   "line": 263,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L263",
+   "class": "process-meta"
+  },
+  {
+   "text": "Triage tranche 2/3 \u2014 prose-contract edges from gospel surfaces; recipe validators: \u2192 governor citations (\u00a75)",
+   "line": 264,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L264",
+   "class": "process-meta"
+  },
+  {
+   "text": "Scoreboard + governance wiring: placement-audit.py edges: headline + memory-stasis-loop edges discipline (stasis = 0 stale) + memory-ceremony connection \u2014 librarian drives mechanical re-verify, ceremony menus contested edges, operator confirms holds (\u00a75)",
+   "line": 265,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L265",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation leg: push crystallizes the sealed edge-set into an Attestation (B2; granular seals stay sidecar); deviation \u2192 Mishpat::Commitment (cid = entry_hash); policy standing \u2192 Mishpat::Precedent \u2014 existing types only, verify headroom before ANY mint (\u00a76)",
+   "line": 266,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-sealed-contract-edges-governor-frontier-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-sealed-contract-edges-governor-frontier-design.md#L266",
+   "class": "process-meta"
+  }
+ ]
+}

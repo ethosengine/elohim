@@ -1,0 +1,77 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md",
+  "slug": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design",
+  "method": "agent",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 8,
+  "items": [
+    {
+      "text": "Slice 0a: add /epr/{cid}/raw raw-node surface \u2014 typed-relation neighborhood inspector (resource + anchored relations + provenance + CID). Doorway dispatch arm; Operational (C), no new entity.",
+      "line": 169,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L169",
+      "class": "protocol-canonical",
+      "note": "implemented in Slice 0 (raw surface / View-as-Content repoint); a2o E2E verifies on next CI"
+    },
+    {
+      "text": "Slice 0b: surface contentFormat at /epr/{id} resolution (doorway HEAD-fetch returns contentType only today, ~http.rs:1745) \u2014 expose the existing ContentNode.contentFormat field for focal-render dispatch.",
+      "line": 169,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L169",
+      "class": "protocol-canonical",
+      "note": "DEFERRED to Slice 1 \u2014 contentFormat-driven doorway dispatch isn't needed for the raw view (it fetches /db/content directly)"
+    },
+    {
+      "text": "Slice 0c: repoint 'View as Content' on claimed types from /epr/{id} (round-trips, captured epr-routing-complementary-captures.md:41) to /epr/{cid}/raw \u2014 kills the \u00a712.1 round-trip. path-overview.component.html affordance.",
+      "line": 170,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L170",
+      "class": "protocol-canonical",
+      "note": "implemented in Slice 0 (raw surface / View-as-Content repoint); a2o E2E verifies on next CI"
+    },
+    {
+      "text": "Slice 1a: focal-render dispatch in the resolver \u2014 contentFormat \u2192 renderer (video/html5-app/epr-composite/markdown/raw) as the offline floor, no doorway/claims dependency.",
+      "line": 174,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L174",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 1b: lens-complete /epr/{cid} \u2014 walk the bounded typed-relation closure (records-lifecycle vocab; ClusterClosure \u00a75.1) to surface the THREE existing legs (knowledge/value/governance) as always-present affordances; demote claims-302 to a leg-preserving context lens.",
+      "line": 174,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L174",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 2: the 4th leg (process) \u2014 new typed-relation class (A2, no new entry type) + epr_compose.rs compose-gate enforcement (symmetry with knowledge/value/governance); surface the process lens in the resolver. Substrate-LAW change (D1) \u2014 resolve the D7/D9 open sub-question on entry-type need first.",
+      "line": 176,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#6",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L176",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 3: CID-canonical addressing \u2014 slug\u2192CID edge alias + version-pinned (CID) vs latest-tracking (slug) link minting across the EPR-link surface. Corrects the 'three address formats undefined' anti-pattern.",
+      "line": 178,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#7",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L178",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 4: offline-floor hardening \u2014 focal render + pinned-leg graceful degradation with zero doorway (ties to acquisition dual-pin floor); the legs degrade to what's pinned when the closure can't be walked offline.",
+      "line": 180,
+      "state": "OPEN",
+      "id": "specs__2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design#8",
+      "cites": "genesis/docs/superpowers/specs/2026-06-07-lens-complete-epr-resolution-four-leg-coupling-design.md#L180",
+      "class": "protocol-canonical"
+    }
+  ]
+}

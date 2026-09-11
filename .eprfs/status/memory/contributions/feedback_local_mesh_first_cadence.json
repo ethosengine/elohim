@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_local_mesh_first_cadence",
+  "claim": "Prove on local mesh first (household-nodes is the stable floor) — fleet confirms, never discovers. Batch ~10, then one Jenkins pass; DoD runs gate.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_local_mesh_first_cadence.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_local_mesh_first_cadence.md",
+        "cid": "bafkreichq6zibue55bgnpuushh5eky6hvqj4trujam2ur2nfk7dzjhjrve"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Local-mesh-first cadence & verification (umbrella)",
+    "file": "feedback_local_mesh_first_cadence.md",
+    "scopePath": ".claude/memory/feedback_local_mesh_first_cadence.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

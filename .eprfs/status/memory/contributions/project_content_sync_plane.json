@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_content_sync_plane",
+  "claim": "Sync-plane: metadata-only gossip, Automerge lit, iroh dual-stack, ghost heads deadlocked, local seed never DHT-anchors.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_content_sync_plane.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_content_sync_plane.md",
+        "cid": "bafkreibr2idvoefpzosb7enfebbnejdtszmnl6iknqhj26puvb2mqwfjei"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Content sync / replication plane (umbrella)",
+    "file": "project_content_sync_plane.md",
+    "scopePath": ".claude/memory/project_content_sync_plane.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

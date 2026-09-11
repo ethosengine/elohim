@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_framing_guards",
+  "claim": "Guards: self-sovereign ≠ apex; justice = Mishpat/capability, not punishment; human-in-loop ≠ terminal; peer collectives are starved, not failing.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_framing_guards.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_framing_guards.md",
+        "cid": "bafkreicxvttihzlxw2wc2snvwrsy3lhbcmvrrpmxklq53hnrvwacvlfyse"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Framing & ontology guards (umbrella)",
+    "file": "feedback_framing_guards.md",
+    "scopePath": ".claude/memory/feedback_framing_guards.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

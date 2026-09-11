@@ -1,0 +1,120 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md",
+ "slug": "specs__2026-04-16-agentic-developer-loop-design",
+ "method": "agent-decomposition",
+ "count": 16,
+ "items": [
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#1",
+   "text": "/shift slash command exists at .claude/commands/shift.md and invokes the agentic-developer skill (Artifact table)",
+   "line": 68,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L68"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#2",
+   "text": "agentic-developer skill exists at .claude/skills/agentic-developer/SKILL.md encoding kickoff -> iterate -> close playbook",
+   "line": 69,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L69"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#3",
+   "text": "/generalize-permissions skill exists with deterministic allowlist clustering + safety taxonomy",
+   "line": 70,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L70"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#4",
+   "text": "Objective YAML schema exists at .claude/schemas/objective.schema.json and validates the Objective at kickoff",
+   "line": 75,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L75"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#5",
+   "text": "Pre-shift readiness check verifies tokens, live connections, measure-runs, palette-sanity, clean git before iteration 1; any failure aborts",
+   "line": 83,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L83"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#6",
+   "text": "Iteration anatomy: Ground/Observe/Verify/Act/Measure/Judge/Journal/Next steps with Opus orchestrating each",
+   "line": 117,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L117"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#7",
+   "text": "Haiku output schema (measurement/context/primary_failure/observed_anti_patterns/confidence) is the data-reduction contract; confidence:low triggers Sonnet",
+   "line": 128,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L128"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#8",
+   "text": "Sonnet delegation contract: pattern-match commands against palette before bash, return wanted_commands, never escalate directly",
+   "line": 156,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L156"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#9",
+   "text": "Stability gate: counter >= target.stability.consecutive (default 2) AND >=1 measurement from a fresh trigger before declaring done",
+   "line": 174,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L174"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#10",
+   "text": "Authority model L1 paths-allowlist (objective.scope.paths glob) refuses Edit/Write outside scope at tool-call time",
+   "line": 247,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L247"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#11",
+   "text": "Authority model L2 high-risk denylist (Jenkinsfile/.husky/lockfiles/package.json versions/.github/CLAUDE.md/objective/settings.json) triggers bail not autonomous edit",
+   "line": 251,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L251"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#12",
+   "text": "Authority model L3 measurement-oracle bail gate (P7): cannot edit Objective/measure/measured fixtures without bail+proposed-change",
+   "line": 265,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L265"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#13",
+   "text": "Palette two-tier: settings.json durable + settings.local.json shift-scoped (// shift:<id>) cleaned at close; union checked before bash",
+   "line": 269,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L269"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#14",
+   "text": "Retrospective TEMPLATE.md ships with sections for harvest; migration-bridge brit/rakia sections annotated temporary",
+   "line": 318,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L318"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#15",
+   "text": "Open: shift resumption (/shift resume <id>) decision \u2014 atomic vs resume-from-journal+answer",
+   "line": 332,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L332"
+  },
+  {
+   "id": "specs__2026-04-16-agentic-developer-loop-design#16",
+   "text": "Open: journal context-window strategy \u2014 trajectory-summary header vs full re-ground each iteration",
+   "line": 333,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#L333"
+  }
+ ]
+}

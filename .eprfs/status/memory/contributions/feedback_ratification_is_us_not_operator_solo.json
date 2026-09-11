@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-ratification-is-us-not-operator-solo",
+  "claim": "Governance ratification = deliberation by operator+agents (the pre-p2p community) completing at dev-merge acceptance — never a solo operator stamp",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_ratification_is_us_not_operator_solo.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_ratification_is_us_not_operator_solo.md",
+        "cid": "bafkreibsxqtyivmnjrdigi2sjeytz6b4od7k5xhtfdfyjnvdjm2ww6maku"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Ratification is peer acceptance at the branch rung, by us",
+    "file": "feedback_ratification_is_us_not_operator_solo.md",
+    "scopePath": ".claude/memory/feedback_ratification_is_us_not_operator_solo.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

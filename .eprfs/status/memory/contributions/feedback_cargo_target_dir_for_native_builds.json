@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "cargo-target-dir-for-native-builds",
+  "claim": "Native cargo builds need CARGO_TARGET_DIR per workspace; WASM stays default. Legacy target/ can balloon to 30G silently.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_cargo_target_dir_for_native_builds.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_cargo_target_dir_for_native_builds.md",
+        "cid": "bafkreifpa2jmdrovjpmn7kyh4wy3ilpa77ryywmi4abgve5s4dwqn6xcsa"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Set CARGO_TARGET_DIR for native builds",
+    "file": "feedback_cargo_target_dir_for_native_builds.md",
+    "scopePath": ".claude/memory/feedback_cargo_target_dir_for_native_builds.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

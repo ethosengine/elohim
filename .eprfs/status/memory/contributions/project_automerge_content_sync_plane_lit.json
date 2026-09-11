@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_automerge_content_sync_plane_lit",
+  "claim": "Automerge plane lit; iroh dual-stack; ghost declared heads deadlocked batch-3.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_automerge_content_sync_plane_lit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_automerge_content_sync_plane_lit.md",
+        "cid": "bafkreih5py3vfozhavrmiglrjflo7pjstrhxonx4gw7b53tk6kagljc4zy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Automerge content-sync plane LIT",
+    "file": "project_automerge_content_sync_plane_lit.md",
+    "scopePath": ".claude/memory/project_automerge_content_sync_plane_lit.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

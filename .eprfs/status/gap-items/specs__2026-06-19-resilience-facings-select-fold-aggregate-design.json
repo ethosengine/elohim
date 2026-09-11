@@ -1,0 +1,108 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md",
+  "slug": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design",
+  "method": "agent",
+  "class": "protocol-canonical",
+  "doc_requires_env": [
+    "household-nodes"
+  ],
+  "count": 12,
+  "items": [
+    {
+      "text": "Slice 1: Write a FAILING deterministic proof-gate test (the one resilience-card-self-cid-provide-loop-gate.md demands) — seed coherent rows (humans w/ agent_pub_key+household_id, shard_locations peer_id=agent_cid, manifest, rea_commitments active+provide, collectives w/ region) -> assert snapshot() returns distribution_state=measured + non-zero stewarding + commitment-backed + named collectives + regional buckets. Verify it FAILS today.",
+      "line": 209,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L209",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 1: Implement load_holder_relation() — ONE query collapsing Joins A (household_resilience.rs:72-79) + C (458-472), returning Vec<HolderRow{content_cid, agent_cid, household_id, region, online}>, joined on agent_cid (humans.agent_pub_key = shard_locations.peer_id), RETAINING the per-agent dimension (no premature HashSet collapse).",
+      "line": 101,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L101",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 1: Refactor households_stewarding + regional_distribution into PURE FOLDS over the holder-relation (build_felt_status pattern); delete the duplicate shard_locations join in compute_regional_distribution. No change to lit values; proof test stays green.",
+      "line": 113,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L113",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 1: Run proof test -> PASS; run existing felt_status_tests + schema_contract; cargo fmt + clippy -D warnings on the touched tree.",
+      "line": 209,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L209",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 2: Add intraHubPeers typed field to ResilienceSnapshotView (elohim-views) + its JSON schema (sdk/schemas/v1/views/) + schema_contract case. Per-household distinct-agent_cid count, folded from the retained dimension.",
+      "line": 215,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L215",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 2: Unit-test the intra-household fold (2 agents in one household holding content -> count 2; 1 -> 1; 0 -> 0) as a pure fold over a fixture holder-relation — the 'new lens = new fold' composability proof.",
+      "line": 215,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#6",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L215",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 2: Regenerate TS bindings (cargo test export_bindings from elohim-views) + pnpm run schema:codegen:ts; verify schema_contract + ts-rs codegen freshness green.",
+      "line": 215,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#7",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L215",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 3: Surface floor.wantsHouseholds as the SINGLE denominator across the top-line stewarding count and the gap line (kill the '0' vs '0 of 1' disagreement). Consistency test asserting both read the same denominator.",
+      "line": 219,
+      "state": "OPEN",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#8",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L219",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice 4 (follow-on): Register a SECOND facing (reach OR REA) against the materialized relation to prove the pipeline generalizes beyond resiliency.",
+      "line": 222,
+      "state": "OPEN",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#9",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L222",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "[OPERATOR/SECURITY-OWNED — NOT an autonomous fix] humans.agent_pub_key live population: settle the 2026-06-18 contradiction via the /auth/me discriminating probe after deploy+reseed; the boot-self-session fix bypasses TOFU/portal trust and is gated by the economic-attribution cross-signed-proof requirement (2026-06-15-coherent-transport-identity-resolver-design, blocked). Carries its own p2p-design-gate.",
+      "line": 224,
+      "state": "BLOCKED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#10",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L224",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "[OPERATOR-OWNED] T26 hub-tier determinism probe: confirm the household->hub aggregator composes folds deterministically (project_node_metrics_vs_hub_aggregation_boundary flags a per-node-vs-hub boundary) before banking it as the rollup tier; + deploy+reseed dev->alpha and the gated PUT /admin/seed/shard-manifest policy for stewardingCollectives.",
+      "line": 226,
+      "state": "BLOCKED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#11",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L226",
+      "class": "protocol-canonical"
+    },
+    {
+      "text": "Slice (framework migration, build-later): extract elohim-facings PURE crate (deny.toml no-diesel boundary); git mv the pure folds + felt_status_tests; snapshot/compute stay as thin storage adapters; gate cutover on byte-identical JSON + the 33+10 green tests",
+      "line": 331,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-19-resilience-facings-select-fold-aggregate-design#12",
+      "cites": "genesis/docs/superpowers/specs/2026-06-19-resilience-facings-select-fold-aggregate-design.md#L331",
+      "class": "protocol-canonical"
+    }
+  ]
+}

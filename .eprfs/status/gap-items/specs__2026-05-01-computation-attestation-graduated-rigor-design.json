@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md",
+ "slug": "specs__2026-05-01-computation-attestation-graduated-rigor-design",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#1",
+   "text": "ComputationAttestor trait: attest(scope, inputs, algorithm, output, agent)->Attestation and verify(&Attestation)->VerificationResult as an EPR variant",
+   "line": 24,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L24"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#2",
+   "text": "ProofTier trait: required_proof(context)->ProofClass \u2014 implementation-defined judgment weighing stakes/spread/consensus-deficit/provability; trait does not enumerate signals",
+   "line": 36,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L36"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#3",
+   "text": "AttestationProof trait: class()->ProofClass and verify(&Attestation)->VerificationResult; pluggable proof primitives",
+   "line": 43,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L43"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#4",
+   "text": "AttestationContext carries minimum observables (source_epr_id, algorithm_id, computer_agent_id, scope, optional input_merkle_root + output_hash); implementations derive standing/contestation/coupling from DHT+storage; no policy encoded",
+   "line": 49,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L49"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#5",
+   "text": "ProofClass opaque; concrete proof primitives plug in: agent-signature, deterministic re-execution, zkML, multi-attestor confirmation; provenance anchored to ELOHIM token SettlementBridge verify_provenance (consumed, not redefined)",
+   "line": 51,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L51"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#6",
+   "text": "Witness tier (default, lightest): computer-agent signs inputs+output; trust cheapens compute when standing present + uncontested",
+   "line": 57,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L57"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#7",
+   "text": "Audit tier: Merkle-rooted inputs, pinned algorithm+version, hashed output; anyone re-executes; triggered by consensus deficit or rising stakes",
+   "line": 59,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L59"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#8",
+   "text": "Proof tier: cryptographic (zkML); asymmetric verify; high-stakes + real-contestation + too-nondeterministic-to-re-execute; feasible for clustering/tally today, LLM is research horizon",
+   "line": 61,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L61"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#9",
+   "text": "Confirmation tier: Proof + multi-attestor + mishpat-quorum; used when constitutional floors (tending/standing-immune classes) are touched",
+   "line": 63,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L63"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#10",
+   "text": "Station judged at attestation by four signal categories: Stakes / Spread / Consensus-deficit / Provability; provability can ceiling but never floor a station; default Witness, rigor opt-in via demand",
+   "line": 65,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L65"
+  },
+  {
+   "id": "specs__2026-05-01-computation-attestation-graduated-rigor-design#11",
+   "text": "Open: required_proof returns single class vs tier-floor (voluntary over-attestation); manifest schema extension linking floor-proximity to Confirmation; InputSet accommodating prompts+system-context; relation to existing AttestationSignal EPR; per-evaluator-projection attestation granularity; operational polarization-marker definition",
+   "line": 95,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-01-computation-attestation-graduated-rigor-design.md#L95"
+  }
+ ]
+}

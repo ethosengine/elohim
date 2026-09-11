@@ -1,0 +1,540 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md",
+ "slug": "plans__2026-05-22-sprint-1b-library-b-pattern-stories",
+ "method": "checkbox-tasks",
+ "count": 76,
+ "items": [
+  {
+   "text": "Step 1.1: Add vitest include pattern for graphos specs",
+   "line": 59,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L59"
+  },
+  {
+   "text": "Step 1.2: Verify pickup with a single existing spec",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L82"
+  },
+  {
+   "text": "Step 1.3: Enumerate fixture-module consumers before moving",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L91"
+  },
+  {
+   "text": "Step 1.4: Create the primitives/ subdir and move the 4 modules",
+   "line": 103,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L103"
+  },
+  {
+   "text": "Step 1.5: Update import paths in all consumers",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L118"
+  },
+  {
+   "text": "Step 1.6: Commit",
+   "line": 135,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L135"
+  },
+  {
+   "text": "Step 2.1: Author types.ts",
+   "line": 163,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L163"
+  },
+  {
+   "text": "Step 2.2: Type-check passes",
+   "line": 288,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L288"
+  },
+  {
+   "text": "Step 2.3: Commit",
+   "line": 297,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L297"
+  },
+  {
+   "text": "Step 3.3: Implement qahal-decorator.ts",
+   "line": 389,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L389"
+  },
+  {
+   "text": "Step 3.4: Run tests to verify they pass",
+   "line": 568,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L568"
+  },
+  {
+   "text": "Step 3.5: Commit",
+   "line": 576,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L576"
+  },
+  {
+   "text": "Step 4.1: Write the failing chrome-assembly tests",
+   "line": 604,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L604"
+  },
+  {
+   "text": "Step 4.2: Run tests to verify they fail",
+   "line": 688,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L688"
+  },
+  {
+   "text": "Step 4.3: Implement the chrome skeleton in render-qahal-homepage.ts",
+   "line": 696,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L696"
+  },
+  {
+   "text": "Step 4.4: Run tests to verify chrome-assembly tests pass",
+   "line": 883,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L883"
+  },
+  {
+   "text": "Step 4.5: Commit",
+   "line": 891,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L891"
+  },
+  {
+   "text": "Step 5.1: Append capability-gating tests to the spec",
+   "line": 918,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L918"
+  },
+  {
+   "text": "Step 5.2: Run tests \u2014 all should pass with the existing implementation",
+   "line": 973,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L973"
+  },
+  {
+   "text": "Step 5.3: Commit",
+   "line": 981,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L981"
+  },
+  {
+   "text": "Step 6.1: Append panel-routing tests",
+   "line": 1005,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1005"
+  },
+  {
+   "text": "Step 6.2: Run tests",
+   "line": 1070,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1070"
+  },
+  {
+   "text": "Step 6.3: Commit",
+   "line": 1078,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1078"
+  },
+  {
+   "text": "Step 7.2: Run test \u2014 should fail (module not yet exists)",
+   "line": 1178,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1178"
+  },
+  {
+   "text": "Step 7.3: Author dowell-household-tuesday-morning.ts",
+   "line": 1186,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1186"
+  },
+  {
+   "text": "Step 7.4: Run tests \u2014 should pass",
+   "line": 1260,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1260"
+  },
+  {
+   "text": "Step 7.5: Commit",
+   "line": 1270,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1270"
+  },
+  {
+   "text": "Step 8.1: Write the narrative-fidelity spec",
+   "line": 1297,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1297"
+  },
+  {
+   "text": "Step 8.2: Run \u2014 should fail",
+   "line": 1342,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1342"
+  },
+  {
+   "text": "Step 8.3: Author the fixture",
+   "line": 1350,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1350"
+  },
+  {
+   "text": "Step 8.4: Run tests",
+   "line": 1411,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1411"
+  },
+  {
+   "text": "Step 8.5: Commit",
+   "line": 1419,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1419"
+  },
+  {
+   "text": "Step 9.1: Write the narrative-fidelity spec",
+   "line": 1436,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1436"
+  },
+  {
+   "text": "Step 9.2: Run \u2014 fail",
+   "line": 1471,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1471"
+  },
+  {
+   "text": "Step 9.3: Author the fixture",
+   "line": 1479,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1479"
+  },
+  {
+   "text": "Step 9.4: Run tests",
+   "line": 1530,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1530"
+  },
+  {
+   "text": "Step 9.5: Commit",
+   "line": 1538,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1538"
+  },
+  {
+   "text": "Step 10.1: Write the narrative-fidelity spec",
+   "line": 1555,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1555"
+  },
+  {
+   "text": "Step 10.2: Run \u2014 fail",
+   "line": 1591,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1591"
+  },
+  {
+   "text": "Step 10.3: Author the fixture",
+   "line": 1599,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1599"
+  },
+  {
+   "text": "Step 10.4: Run tests",
+   "line": 1656,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1656"
+  },
+  {
+   "text": "Step 10.5: Commit",
+   "line": 1664,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1664"
+  },
+  {
+   "text": "Step 11.1: Author the shared variation-spec template (reuse across all 7)",
+   "line": 1683,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1683"
+  },
+  {
+   "text": "Step 11.2: Author household-with-toddlers.ts",
+   "line": 1714,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1714"
+  },
+  {
+   "text": "Step 11.3: Author household-multi-generation.ts",
+   "line": 1737,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1737"
+  },
+  {
+   "text": "Step 11.4: Author household-single-parent.ts",
+   "line": 1752,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1752"
+  },
+  {
+   "text": "Step 11.5: Author congregation-doctrinal-tension.ts",
+   "line": 1768,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1768"
+  },
+  {
+   "text": "Step 11.6: Author congregation-newly-formed.ts",
+   "line": 1791,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1791"
+  },
+  {
+   "text": "Step 11.7: Author life-group-newly-formed.ts",
+   "line": 1807,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1807"
+  },
+  {
+   "text": "Step 11.8: Author wisdom-commons-reconciliation-recorded.ts",
+   "line": 1823,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1823"
+  },
+  {
+   "text": "Step 11.9: Author the 7 corresponding .spec.ts files using the template from 11.1",
+   "line": 1838,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1838"
+  },
+  {
+   "text": "Step 11.10: Run all variation tests",
+   "line": 1842,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1842"
+  },
+  {
+   "text": "Step 11.11: Commit",
+   "line": 1850,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1850"
+  },
+  {
+   "text": "Step 12.1: Author dowell-household.designed.stories.ts",
+   "line": 1876,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1876"
+  },
+  {
+   "text": "Step 12.2: Author cofc-congregation.designed.stories.ts",
+   "line": 1928,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1928"
+  },
+  {
+   "text": "Step 12.3: Author hardins-life-group.designed.stories.ts",
+   "line": 1971,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L1971"
+  },
+  {
+   "text": "Step 12.4: Author wisdom-commons.designed.stories.ts",
+   "line": 2013,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2013"
+  },
+  {
+   "text": "Step 12.6: Commit",
+   "line": 2067,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2067"
+  },
+  {
+   "text": "Step 13.1: Author the variation-story template (reuse pattern)",
+   "line": 2094,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#59",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2094"
+  },
+  {
+   "text": "Step 13.2: Author the 7 variation story files",
+   "line": 2128,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#60",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2128"
+  },
+  {
+   "text": "Step 13.3: Run smoke test",
+   "line": 2143,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#61",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2143"
+  },
+  {
+   "text": "Step 13.4: Commit",
+   "line": 2153,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#62",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2153"
+  },
+  {
+   "text": "Step 14.1: Author simple-user-view.designed.stories.ts",
+   "line": 2177,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#63",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2177"
+  },
+  {
+   "text": "Step 14.2: Author power-user-view.designed.stories.ts",
+   "line": 2221,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#64",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2221"
+  },
+  {
+   "text": "Step 14.3: Run smoke test",
+   "line": 2265,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#65",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2265"
+  },
+  {
+   "text": "Step 14.4: Commit",
+   "line": 2275,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#66",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2275"
+  },
+  {
+   "text": "Step 15.1: Template (substitute <TIER> and <DESCRIPTION> per file)",
+   "line": 2293,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#67",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2293"
+  },
+  {
+   "text": "Step 15.2: Author all 5 files using the table",
+   "line": 2323,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#68",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2323"
+  },
+  {
+   "text": "Step 15.3: Run smoke test",
+   "line": 2333,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#69",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2333"
+  },
+  {
+   "text": "Step 15.4: Commit",
+   "line": 2343,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#70",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2343"
+  },
+  {
+   "text": "Step 16.1: Author the playground",
+   "line": 2366,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#71",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2366"
+  },
+  {
+   "text": "Step 16.2: Run smoke test",
+   "line": 2489,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#72",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2489"
+  },
+  {
+   "text": "Step 16.3: Commit",
+   "line": 2499,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#73",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2499"
+  },
+  {
+   "text": "Step 17.1: Author the pillar README",
+   "line": 2515,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#74",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2515"
+  },
+  {
+   "text": "Step 17.4: Manual Checkpoint F verification (operator-judgment)",
+   "line": 2619,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#75",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2619"
+  },
+  {
+   "text": "Step 17.5: Commit",
+   "line": 2633,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1b-library-b-pattern-stories#76",
+   "cites": "genesis/docs/superpowers/plans/2026-05-22-sprint-1b-library-b-pattern-stories.md#L2633"
+  }
+ ]
+}

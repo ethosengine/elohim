@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "reviewer-issue-admissibility",
+  "claim": "Autonomous review loops deadlock on tree-unfixable complaints (history rewrites, TDD evidence) — reviewer prompts need an admissibility clause.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_reviewer_issue_admissibility.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_reviewer_issue_admissibility.md",
+        "cid": "bafkreidpib6ltxk6t5p6a66ej2fys4fkauhkqeypfeishvvi3vgaiexcxu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Reviewer issue admissibility",
+    "file": "feedback_reviewer_issue_admissibility.md",
+    "scopePath": ".claude/memory/feedback_reviewer_issue_admissibility.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

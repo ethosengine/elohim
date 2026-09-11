@@ -1,0 +1,370 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md",
+ "slug": "plans__2026-06-04-household-formation-ceremony-stage1",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 45,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test \u2014 append to seed-commitments.spec.ts:",
+   "line": 42,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L42",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run to verify it fails",
+   "line": 73,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L73",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement \u2014 in seed-commitments.ts: (a) add fixture?: string to the CustodyPair interface; (b) export defaultM1Pairs and extend it:",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L78",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run tests + typecheck",
+   "line": 120,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L120",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 125,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L125",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing sweettest \u2014 create qahal_formation_test.rs:",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L143",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the coordinators \u2014 append to qahal_coordinator.rs (after withdraw_membership_clean):",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L266",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Build the DNA, re-pack, run sweettests",
+   "line": 429,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L429",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 445,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L445",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing translation test \u2014 in holochain_app_signal.rs tests, find the existing CollectiveProjected translation test (~line 1075-1095) and add a sibling:",
+   "line": 466,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L466",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the carry \u2014",
+   "line": 495,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L495",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Write the failing projector test \u2014 in controller.rs tests, copy the existing CollectiveProjected controller test pattern (~1711, InMemoryDnaSignalStream::with_signals) into a new test:",
+   "line": 508,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L508",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Run to verify it fails",
+   "line": 552,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L552",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 6: Implement the projector household branch \u2014 in on_collective_projected, before building CreateCollectiveInput, parse the charter:",
+   "line": 559,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L559",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 623,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L623",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing test \u2014 in rea_commitment_service.rs's test module (or create one mirroring the file's existing test conventions; if the service has no test module, put the test in db/rea_commitments.rs's test module where an in-memory pool already exists):",
+   "line": 639,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L639",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run to verify current state \u2014 cargo nextest run --lib rea_commitment \u2014 this test PASSES today (custody-blob is diesel-direct). It is the regression guard for the gate change; commit it red-green as written",
+   "line": 663,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L663",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the gate \u2014 in db/rea_commitments.rs beside PROJECT_EPR_ACTION (:408):",
+   "line": 665,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L665",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Full storage gate",
+   "line": 694,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L694",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Verify it still applies (concurrent sessions touch these files)",
+   "line": 717,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L717",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Apply + run its tests",
+   "line": 724,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L724",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Full storage gate, then commit + remove the patch file (it has landed)",
+   "line": 732,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L732",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing builder tests",
+   "line": 752,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L752",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run to verify it fails \u2014 cd genesis/seeder && pnpm exec vitest run seed-household-formation \u2192 FAIL (module missing)",
+   "line": 795,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L795",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the seeder. Create seed-household-formation.ts. Structure (complete; the connect helper is copied VERBATIM from seed-conductor-identities.ts:126-238 \u2014 toAdminUrl, withTimeout, connectToConductor, both cell_info shapes \u2014 do not re-derive it):",
+   "line": 797,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L797",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Tests + typecheck",
+   "line": 1025,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#26",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1025",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Register the scripts \u2014 genesis/seeder/package.json, beside seed:commitments:",
+   "line": 1032,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#27",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1032",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add the stage \u2014 mirror the Seed Conductor Identities stage shape (~1694-1716) exactly:",
+   "line": 1053,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#28",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1053",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Lint check \u2014 Jenkinsfile is groovy; no local runner. Verify by eye: stage sits between the two existing seed stages, uses only existing helpers (runProbedSeeder), no inline logic beyond the calls (64KB CPS limit discipline)",
+   "line": 1074,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#29",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1074",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 1076,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#30",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1076",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Declare the class \u2014 in qahal/manifest.json vocabulary, after signals and before observations, insert:",
+   "line": 1092,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#31",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1092",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Wire the gate into qahal codegen \u2014 in qahal/scripts/codegen.mjs, mirror lamad's pattern (lamad codegen.mjs:22 + :444-449):",
+   "line": 1117,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#32",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Extend the root gate \u2014 root package.json line ~60:",
+   "line": 1130,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#33",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the formation feature",
+   "line": 1164,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#34",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the step definitions \u2014 steps/qahal-formation.steps.ts (auto-loaded by the steps//*.ts glob; copy the storageGet import/idiom from steps/resilience.steps.ts):",
+   "line": 1210,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#35",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1210",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Dry-run binding check",
+   "line": 1279,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#36",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1279",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Extend household-reciprocity.feature \u2014 append after the existing scenario:",
+   "line": 1286,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#37",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1286",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: The retags + persona reconciliation \u2014 in features/shefa/human-resilience.feature:",
+   "line": 1297,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#38",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1297",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 6: Run scope-reconcile to return love-map to live",
+   "line": 1306,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#39",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1306",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 7: Full a2o dry-run + commit",
+   "line": 1313,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#40",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1313",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Flip the test first \u2014 change the triad-fixture test to assert pairs has length 2 and NO james pairs; keep the provenance-builder test (the builder stays for any future explicit fixture use)",
+   "line": 1335,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#41",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1335",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run to verify it fails \u2014 pnpm exec vitest run seed-commitments \u2192 FAIL (6 pairs)",
+   "line": 1336,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#42",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1336",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Remove the 4 fixture pairs from defaultM1Pairs (delete the fixture block + the fixture const; keep the M1 pair and the fixture?: string capability)",
+   "line": 1337,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#43",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1337",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Tests pass \u2014 pnpm exec vitest run seed-commitments && pnpm typecheck \u2192 PASS",
+   "line": 1338,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#44",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1338",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Un-@wip the provenance scenario in household-formation.feature (ceremony rows now exist to assert against)",
+   "line": 1339,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-household-formation-ceremony-stage1#45",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-household-formation-ceremony-stage1.md#L1339",
+   "class": "protocol-canonical"
+  }
+ ]
+}

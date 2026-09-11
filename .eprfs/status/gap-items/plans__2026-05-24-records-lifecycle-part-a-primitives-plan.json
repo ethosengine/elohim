@@ -1,0 +1,141 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md",
+ "slug": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan",
+ "method": "checkbox-tasks",
+ "count": 19,
+ "items": [
+  {
+   "text": "Step 1: Absorb context",
+   "line": 111,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L111"
+  },
+  {
+   "text": "Step 2: Locate the stub",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L115"
+  },
+  {
+   "text": "Step 3: Write the 11 sub-sections",
+   "line": 123,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L123"
+  },
+  {
+   "text": "Step 4: Replace the stub via Edit",
+   "line": 127,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L127"
+  },
+  {
+   "text": "Step 5: Verify section structure",
+   "line": 131,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L131"
+  },
+  {
+   "text": "Step 6: Surface concerns",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L139"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 165,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L165"
+  },
+  {
+   "text": "\u00a71 \u2014 What it is: one clear paragraph, not multiple",
+   "line": 184,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L184"
+  },
+  {
+   "text": "\u00a72 \u2014 Hyperscale analog: concrete technology name, not \"like a database\"",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L185"
+  },
+  {
+   "text": "\u00a73 \u2014 Data flow: actor-by-actor, not vague",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L186"
+  },
+  {
+   "text": "\u00a74 \u2014 Physical storage: table with rows; storage shape named per row",
+   "line": 187,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L187"
+  },
+  {
+   "text": "\u00a75 \u2014 Gossip / sync: concrete sizes and latencies where possible",
+   "line": 188,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L188"
+  },
+  {
+   "text": "\u00a76 \u2014 Provenance: two lists (maintained vs degraded); ends with cost-shedding rationale",
+   "line": 189,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L189"
+  },
+  {
+   "text": "\u00a77 \u2014 Agentic IQ: specific elohim-agent specialization named; value-prop unlock connection",
+   "line": 190,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L190"
+  },
+  {
+   "text": "\u00a78 \u2014 Scale: three levels (household/hub/global); concrete numbers",
+   "line": 191,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L191"
+  },
+  {
+   "text": "\u00a79 \u2014 Limit-awareness: substrate mechanics, not aspirations",
+   "line": 192,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L192"
+  },
+  {
+   "text": "\u00a710 \u2014 Resilience: redundancy + partition + cold-archive + doorway",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L193"
+  },
+  {
+   "text": "\u00a711 \u2014 Dashboard: specific archetype + SQL shape if relevant",
+   "line": 194,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L194"
+  },
+  {
+   "text": "Concerns report: structured, substantive, honest",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-part-a-primitives-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-part-a-primitives-plan.md#L195"
+  }
+ ]
+}

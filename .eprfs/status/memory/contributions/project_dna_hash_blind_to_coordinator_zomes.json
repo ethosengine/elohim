@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "dna-hash-blind-to-coordinator-zomes",
+  "claim": "Holochain DNA hash covers only integrity zomes + modifiers — coordinator-only changes need the update_coordinators hot-swap path, not reinstall",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_dna_hash_blind_to_coordinator_zomes.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_dna_hash_blind_to_coordinator_zomes.md",
+        "cid": "bafkreicok3zxcdgfg34wixi7u2wdbfn7zs56w5mhsvtxxyxcizfzuat34m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "DNA hash blind to coordinator zomes",
+    "file": "project_dna_hash_blind_to_coordinator_zomes.md",
+    "scopePath": ".claude/memory/project_dna_hash_blind_to_coordinator_zomes.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

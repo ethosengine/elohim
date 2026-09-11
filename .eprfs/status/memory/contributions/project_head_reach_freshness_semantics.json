@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_head_reach_freshness_semantics",
+  "claim": "Reach (audience) ≠ content_head (version) ≠ replication (custody). Head = declared dependency, not recency; staleness graded by stakes.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_head_reach_freshness_semantics.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_head_reach_freshness_semantics.md",
+        "cid": "bafkreihiuzehumkvmr6dpwnsezxc3lvz3xk2cgnbhg4q5cdkahzfa64mmm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Reach / head / freshness semantics (umbrella)",
+    "file": "project_head_reach_freshness_semantics.md",
+    "scopePath": ".claude/memory/project_head_reach_freshness_semantics.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

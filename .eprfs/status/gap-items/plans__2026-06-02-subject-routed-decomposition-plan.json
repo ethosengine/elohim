@@ -1,0 +1,145 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md",
+ "slug": "plans__2026-06-02-subject-routed-decomposition-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "count": 17,
+ "items": [
+  {
+   "text": "Hand-author .claude/subject-routing.yaml (tracked, NOT gitignored \u2014 confirm it joins context-coverage.yaml on the tracked side; it lives at .claude/ root, so the memory-kit/ \"one hand-edited file\" rule is untouched). Encode: version, default_class: protocol-canonical, the discriminator (classify by deliverable-TARGET, never vocabulary), and the two classes + provisional:",
+   "line": 28,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L28",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: python3 -c \"import yaml; yaml.safe_load(open('.claude/subject-routing.yaml'))\" parses; git check-ignore .claude/subject-routing.yaml returns nothing (tracked)",
+   "line": 35,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L35",
+   "class": "process-meta"
+  },
+  {
+   "text": "Write .claude/scripts/_lib/subject_routing.py (pure-stdlib; imports _lib.frontmatter). Functions: load_routing(start_path) (walk UP from start_path merging every .claude/subject-routing.yaml + CLAUDE.md routing-block on the path \u2014 union classes, nearest-wins home-remaps; the mono-repo cascade); classify(frontmatter, targets) (apply the deliverable-TARGET discriminator \u2192 class | provisional); reconcile(provisional, residue_targets) (BACK-fire resolution); gate_check(frontmatter, targets) -> [Signal] (the fail-loud detectors) \u2014 covers spec \u00a78.2",
+   "line": 39,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L39",
+   "class": "process-meta"
+  },
+  {
+   "text": "Write .claude/scripts/_lib/tests/subject_routing.test.py (or alongside the existing _lib test convention): assert a known process-meta spec (only .claude/ targets) \u2192 process-meta; a product spec (app/+architecture/) \u2192 protocol-canonical; a domain: D4 spec whose targets are all .claude/ \u2192 gate_check fires vocab-vs-target-mismatch; a spec touching only a2o/scripts/ does NOT fire forced-a2o-leg; the cascade merges a sub-tree routing block over root",
+   "line": 40,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L40",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: the test file runs green (python3 .claude/scripts/_lib/tests/subject_routing.test.py exits 0)",
+   "line": 41,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L41",
+   "class": "process-meta"
+  },
+  {
+   "text": "Patch .claude/scripts/memory-kit/decompose.py to import _lib.subject_routing + _lib.frontmatter: parse the source spec's frontmatter, resolve its cascaded class:, stamp it['class'] onto every gap-item record, and run gate_check fail-loud (a domain: + all-.claude/ targets aborts with the mis-class message rather than silently defaulting). Default to protocol-canonical ONLY when frontmatter has no class: AND no mismatch signal \u2014 covers spec \u00a78.3",
+   "line": 45,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L45",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: re-decompose.py this plan's own spec \u2192 every gap-item JSON record now carries \"class\": \"process-meta\"; decompose a product spec (e.g. an app/ spec) \u2192 \"class\": \"protocol-canonical\"; decompose a deliberately-mis-tagged fixture (domain: D4 + .claude/ targets) \u2192 fail-loud, non-zero exit",
+   "line": 46,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L46",
+   "class": "process-meta"
+  },
+  {
+   "text": "Edit .claude/commands/brainstorm.md: insert Step 1c.0 \u2014 CLASSIFY-SUBJECT *before* the existing (1) MAP-PATH (call _lib.subject_routing for the cascaded class menu; answer \"whose experience / where does it land\"; branch \u2014 substrate classes \u2192 proceed into MAP-PATH; process classes \u2192 skip the D#+pillar lookup, name the process home + process_subdomain). Make Step 4 frontmatter class-conditional: class: always; domain:+informed-by:<architecture seed> only on a resolved substrate class; process_subdomain:+informed-by:<process gospel> for process; derived_from:<product seed> as the dogfood breadcrumb; class: provisional permitted for spikes \u2014 covers spec \u00a78.4",
+   "line": 50,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L50",
+   "class": "process-meta"
+  },
+  {
+   "text": "MAP.md \u00a71 \u2014 add Axis 0 \u00b7 Subject class above the D#+pillar axes (the two classes + the rule that D#/pillar apply only to the substrate branch; process work routes via subject-routing.yaml); flip map_has_meta_axis\u2192true; extend the Q1-canonical-organization citation from two axes to three \u2014 covers spec \u00a78.4 (MAP)",
+   "line": 55,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L55",
+   "class": "process-meta"
+  },
+  {
+   "text": "PLACEMENT.md \u2014 add the subject-class-axis section pointing at .claude/subject-routing.yaml (mirror the cluster-state.yaml env-axis pointer); resolve the \u00a712 dev-doc-home open issue as \"the gospel-diff target, not a new dir\" \u2014 covers spec \u00a78.5",
+   "line": 56,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L56",
+   "class": "process-meta"
+  },
+  {
+   "text": "compaction-loop \u00a75.2b \u2014 add the per-class fate-routing section (the existing \u00a75.2 table becomes the protocol-canonical branch; process-meta gets architecture/a2o NULL + gospel-diff/tool/history-LIVE legs); state the unifying keep/discard-by-reasoning-value principle + the process-meta history-leg-LIVE + stub-then-grade default + tool-design-rationale residue \u2014 covers spec \u00a78.6, \u00a78.8",
+   "line": 57,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L57",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: each surface references .claude/subject-routing.yaml; grep -l subject-routing.yaml finds MAP.md + PLACEMENT.md; the compaction-loop \u00a75.2b table has a process-meta column with NULL architecture/a2o legs",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L58",
+   "class": "process-meta"
+  },
+  {
+   "text": "Hand-stamp class: + retag the four SEMANTIC relocations (frontmatter only \u2014 no file moves; all stay in superpowers/specs/): scope-tree-reconciler-design (class: process-meta, process_subdomain: doc-lifecycle, drop domain: D4, informed-by:\u2192derived_from:); semantic-computable-links-design (process-meta/memory); spec-plan-compaction-loop-design (process-meta/doc-lifecycle, canonical_seed: \u2192 PLACEMENT.md); unified-memory-loop-design (process-meta/memory, re-anchor parent to .claude/ cadence docs) \u2014 covers spec \u00a78.10",
+   "line": 62,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L62",
+   "class": "process-meta"
+  },
+  {
+   "text": "Write the mandatory CURATE lesson genesis/docs/content/elohim-protocol/history/2026-06-02-d4-name-collision.md (type: history-gotcha): distill the relocation forensics (the 0-product-code-refs proof per spec; why the D4 seed name was magnetic; \"classify by deliverable-TARGET, not vocabulary\"); cite it from gate_signals.vocab-vs-target-mismatch \u2014 covers spec \u00a78.10 (CURATE) + \u00a74 (lossless: keep the forensic before the body retires)",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L63",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: re-decompose.py each relocated spec \u2192 gap-items now carry class: process-meta; memory-coherence-audit / spec-coherence-index no longer flag them as D4-product; the history lesson exists and is bidirectionally linked",
+   "line": 64,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L64",
+   "class": "process-meta"
+  },
+  {
+   "text": "Run a fresh /brainstorm on a NEW process topic end-to-end \u2192 it classifies process-meta, skips MAP-PATH, lands class: frontmatter; decompose.py stamps the gap-items process-meta; the gate_signals stay silent (correct classification). Then run it on a product topic \u2192 protocol-canonical, MAP-PATH runs, substrate legs live",
+   "line": 68,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L68",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check (loop closed): the FRONT classification and the BACK stamp agree for both a product and a process topic, with no gate_signals false-fire \u2014 the single class: field flows front\u2192back, making the decompose multi-flow instead of single-flow",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-subject-routed-decomposition-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-subject-routed-decomposition-plan.md#L69",
+   "class": "process-meta"
+  }
+ ]
+}

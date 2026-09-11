@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_compute_envelope_three_homes_k8s_bridge",
+  "claim": "deployments.json limits, Rakia ledger, prose ratification cannot read each other — capacity ask fires on stale envelope; cure: observe+ratify.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_compute_envelope_three_homes_k8s_bridge.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_compute_envelope_three_homes_k8s_bridge.md",
+        "cid": "bafkreiehnpl3clrd3uvrl7vnycac3qkzcwgbo6acypbqc7nav6jymu5voq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Compute envelope has three homes — the k8s-bridge slice",
+    "file": "project_compute_envelope_three_homes_k8s_bridge.md",
+    "scopePath": ".claude/memory/project_compute_envelope_three_homes_k8s_bridge.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

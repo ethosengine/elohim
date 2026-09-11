@@ -1,13 +1,11 @@
 //! `epr flow context <path|cid>` — the one screen a fresh agent otherwise re-derives by hand
 //! (spec §6, `genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md`).
 //!
-//! "What is open on this atom, what seals it, what governs it, what has been said about it" is
-//! a question every session asks and every session answers by grepping. Each of its parts was
-//! already derivable; none of them was in one place, and the cost of that was paid once per
-//! agent per atom. This verb is the assembly, not a new derivation: `walk` supplies the scoped
-//! intents, the undischarged commitments and the sealed edges; [`super::read`] supplies the
-//! notes and the latest-event rule; `explain`'s authority and cascade supply the governance
-//! line. Nothing here re-derives anything one of those already owns.
+//! Historical fields retain `walk`'s authored intents and REA discharge semantics.
+//! The `reconciliation` section derives fulfillment, technical review and acceptance
+//! independently from the same records snapshot. Human presentation uses that section
+//! so production never silently conceals missing acceptance or later contrary evidence.
+//! Seals, habits, gates and governance retain their existing authoritative readers.
 //!
 //! **`walk`'s `Produce` filter is NOT widened.** Notes are `Cite` events and are invisible to
 //! `walk` by construction, which is a stability promise its JSON consumers hold. Section 4 goes
@@ -126,6 +124,7 @@ pub struct Governance {
 #[derive(Debug, Serialize)]
 pub struct ContextResult {
     pub identity: Identity,
+    pub reconciliation: super::reconciliation::Reconciliation,
     pub intents: Vec<ContextIntent>,
     pub commitments: Vec<ContextCommitment>,
     pub notes: Vec<NoteView>,
@@ -159,7 +158,8 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
     // and unfulfilled-commitments derivations are the ones every other reader already trusts. A
     // bare address has no path, so the same two predicates are applied to the records directly.
     let walked = match &path {
-        Some(rel) => Some(walk::walk(root, rel)?),
+        Some(rel) if root.join(rel).exists() => Some(walk::walk_with_records(root, rel, &records)?),
+        Some(_) => None,
         None => None,
     };
 
@@ -251,7 +251,9 @@ pub fn context_with(root: &Path, target: &str, notes: usize) -> FlowResult<Conte
             .to_string()
     });
 
+    let reconciliation = super::reconciliation::reconcile(root, &cid, path.as_deref(), &records);
     Ok(ContextResult {
+        reconciliation,
         identity: Identity {
             path,
             cid: cid.to_string(),
@@ -388,7 +390,24 @@ fn resolve_target(
         canonical_root.join(target)
     };
     let confined = confine_under(&canonical_root, &abs)?;
+    let rel = rel_to_root(&canonical_root, &confined);
     let cid = body_cid_of_file(&confined)
+        .or_else(|| {
+            // Missing source: a witnessed label can locate historical scope, never bless it.
+            let labels: super::Labels =
+                std::fs::read_to_string(root.join(".eprfs/status/labels.json"))
+                    .ok()
+                    .and_then(|text| serde_json::from_str(&text).ok())
+                    .unwrap_or_default();
+            records.iter().rev().find_map(|(_, record)| {
+                let scope = match record {
+                    FlowRecord::Intent(i) => i.in_scope_of,
+                    FlowRecord::Commitment(c) => c.in_scope_of,
+                    _ => return None,
+                };
+                (labels.get(&scope.to_string()) == Some(&rel)).then_some(scope)
+            })
+        })
         .ok_or_else(|| FlowError::UnknownResource(target.to_string()))?;
     Ok((cid, Some(rel_to_root(&canonical_root, &confined))))
 }
@@ -544,9 +563,8 @@ fn governance_for(root: &Path, rel: &str) -> Option<Governance> {
 }
 
 impl ContextResult {
-    /// The human screen. Capped at 40 lines by construction: every list truncates at
-    /// [`RENDER_ROWS`] with an explicit "and N more" line, because a list that silently stops is
-    /// a list that lies about its length.
+    /// Human presentation of the same derived decisions exposed in JSON. Assertion
+    /// lists truncate explicitly; evidence issues remain visible for every shown assertion.
     pub fn render(&self) {
         let target = self
             .identity
@@ -562,32 +580,7 @@ impl ContextResult {
             println!("  note: {note}");
         }
 
-        println!("\n  INTENTS ({} open here)", self.intents.len());
-        for intent in self.intents.iter().take(RENDER_ROWS) {
-            println!(
-                "    ◇ {} [{}]",
-                intent.gap_id.as_deref().unwrap_or("(no gap id)"),
-                intent.state.as_deref().unwrap_or("?")
-            );
-        }
-        print_more(self.intents.len());
-
-        println!("\n  COMMITMENTS ({} undischarged)", self.commitments.len());
-        for commitment in self.commitments.iter().take(RENDER_ROWS) {
-            println!(
-                "    ✗ {} — {} [{}]",
-                commitment.gap_id.as_deref().unwrap_or("(no gap id)"),
-                commitment.provider,
-                commitment.state
-            );
-            if let Some(latest) = &commitment.latest_event {
-                println!(
-                    "        latest: {} at {}",
-                    latest.action, latest.occurred_at
-                );
-            }
-        }
-        print_more(self.commitments.len());
+        print!("{}", self.reconciliation.render_text(RENDER_ROWS));
 
         println!("\n  NOTES ({} shown, newest first)", self.notes.len());
         for note in &self.notes {
@@ -622,7 +615,7 @@ impl ContextResult {
                 }
                 print_more(seals.edges.len());
             }
-            None => println!("\n  SEALS (not computed — no path)"),
+            None => println!("\n  SEALS (not computed — source path unavailable)"),
         }
 
         if let Some(scope) = &self.habit_scope {

@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md",
+ "slug": "specs__2026-04-21-bootstrap-steward-authority-frame-design",
+ "method": "agent-decomposition",
+ "count": 9,
+ "items": [
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#1",
+   "text": "Validate frame (b): persistent bootstrap identity with graduated (non-exclusive) authority \u2014 the chosen approach over dissolution(a)/rotating(c)",
+   "line": 120,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L120"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#2",
+   "text": "Name the bootstrap steward as the initial constitutional-tier steward at DNA install time in bootstrap_steward.rs module docs",
+   "line": 129,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L129"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#3",
+   "text": "Keep code as-is: do NOT add integrity-zome validators gating on is_bootstrap_steward; gate on StewardshipGrant tier+scope instead",
+   "line": 133,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L133"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#4",
+   "text": "Document the scaffolding gap openly: until StewardshipGrant validation is wired, authority defaults to bootstrap pubkey by lack-of-alternative (temporary, must close before first non-alpha network)",
+   "line": 141,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L141"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#5",
+   "text": "Bootstrap-steward externs return identity only; capability checks must use the future steward-grant resolution layer",
+   "line": 149,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L149"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#6",
+   "text": "Propagate the identity-only / constitutional-tier docstring across all four ported modules (imagodei reference + mishpat + node-registry + lamad/content_store) for frame consistency",
+   "line": 175,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L175"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#7",
+   "text": "Deferred: implement StewardshipGrant-based validators in mishpat, node-registry, and lamad (per-DNA design exercise, with each DNA's feature sprints)",
+   "line": 178,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L178"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#8",
+   "text": "Deferred: cross-DNA constitutional-tier bootstrapping question (does imagodei constitutional steward hold mishpat constitutional? per-DNA sovereign stewardship chain) \u2014 wants its own memo",
+   "line": 185,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L185"
+  },
+  {
+   "id": "specs__2026-04-21-bootstrap-steward-authority-frame-design#9",
+   "text": "Sweettest: bootstrap-steward identifiable; second agent is not bootstrap steward; coordinator get_bootstrap_steward returns install-time pubkey (identity-contract assertions)",
+   "line": 192,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md#L192"
+  }
+ ]
+}

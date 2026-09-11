@@ -1,0 +1,42 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md",
+ "slug": "plans__2026-09-05-rung5-workspace-orchestration-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 4,
+ "items": [
+  {
+   "text": "Task 1 deliverable: a coordinator release packaged on a crossed peer declares the authoring cell's hashes, and rung-5 Station 9 stays green on a mesh with a lineage window open",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-rung5-workspace-orchestration-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md#L70",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 2 deliverable: hc-mesh.sh and the fixtures enrol every peer in a channel through the API; no step rewrites a runtime-config file; Stations 1\u20139 stay green",
+   "line": 85,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-rung5-workspace-orchestration-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md#L85",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 3 deliverable: the next edge render enrols the alpha peers; until it lands, the rendered output is proven byte-identical for every human without the field",
+   "line": 95,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-rung5-workspace-orchestration-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md#L95",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 4 deliverable: one receipt showing a workspace-minted release observed as admissible on alpha with no Jenkins act after Task 3's render; the manual steps a developer runs are five commands or fewer",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-09-05-rung5-workspace-orchestration-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md#L107",
+   "class": "protocol-canonical"
+  }
+ ]
+}

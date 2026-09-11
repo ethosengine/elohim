@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "sweettest-native-build-env",
+  "claim": "Sweettest needs RUSTFLAGS=\"\"; native Rust gates also need CARGO_TARGET_DIR set per workspace.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_sweettest_native_build_env.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_sweettest_native_build_env.md",
+        "cid": "bafkreigjlkq4n7v4rle6uyvu6bbeiuup2g32snv7gzafbdraiteocvypnm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sweettest native build env",
+    "file": "project_sweettest_native_build_env.md",
+    "scopePath": ".claude/memory/project_sweettest_native_build_env.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

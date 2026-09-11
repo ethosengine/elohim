@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_andrew_root_outreach_thread",
+  "claim": "Cold email to Andrew Root (Luther Sem) + Derek Tronsgard after the \"Can I Get an A.I.Men\" episode; AI-as-image-of-us vs Root's demonic read; sent 2026-07-23.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_andrew_root_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_andrew_root_outreach_thread.md",
+        "cid": "bafkreigmlrfpedule4szxe4wfcivnl4fct3fa2la7likwnbprxglgdijxq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Andrew Root / Derek Tronsgard outreach thread",
+    "file": "project_andrew_root_outreach_thread.md",
+    "scopePath": ".claude/memory/project_andrew_root_outreach_thread.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

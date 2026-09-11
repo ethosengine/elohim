@@ -1,0 +1,210 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md",
+ "slug": "plans__2026-06-26-live-distribute-shards-household-observation-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 25,
+ "items": [
+  {
+   "text": "Step 1: Start the seeded local stack. From app/elohim-app/:",
+   "line": 136,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L136",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Confirm the scenario precondition is REAL (2 households, active commons commitments)",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L145",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Snapshot the receiver counters BEFORE ingest (pick two non-ingesting nodes; matthew is",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L155",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Ingest BLOB-BACKED content and watch distribute_shards fire. Post a blob-backed item",
+   "line": 166,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L166",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Branch on what you observe (the decision tree \u2014 record the verdict, it selects Tasks 2\u20133):",
+   "line": 178,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L178",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit the Phase-0 evidence (a short note appended to .claude/data/dev-intent.jsonl",
+   "line": 188,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L188",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Capture /p2p/status counters AFTER the green run (the honest evidence the card is an",
+   "line": 215,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L215",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit (evidence note only; no code change if \u03b1):",
+   "line": 225,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L225",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Confirm the NULL with the existing diagnostic test as the spec. Read",
+   "line": 243,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L243",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Verify the seed path actually heals the M/J/J humans. Query each node:",
+   "line": 253,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L253",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Re-run Task 1 Step 2. Expected: stewardingCollectives \u2265 2 now lights",
+   "line": 264,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L264",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit the seeder/heal fix WITH the green scenario:",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L266",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Confirm the content was blob-backed. A markdown item has no blob_hash \u2192 no",
+   "line": 282,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L282",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Confirm peer-selection found contract-diverse households. If the log shows a",
+   "line": 286,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L286",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: If rows still absent with selection succeeding \u2192 the push-ack/custody leg is the break",
+   "line": 291,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L291",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Re-run Task 1. Commit precondition/seed fixes with the green scenario",
+   "line": 299,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L299",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Decide implement-vs-defer. The API-level observation (Task 1) is the priority; the",
+   "line": 311,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L311",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Apply the chosen path (defer = add @wip + backlog note; do not leave a silent",
+   "line": 318,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L318",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 321,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L321",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Record the green observation \u2014 append to .claude/data/dev-intent.jsonl a 3\u20134 sentence",
+   "line": 334,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L334",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run story-harvest to preserve the engineering constraints this leg proved \u2014 the",
+   "line": 339,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L339",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Run /close-loop to reconcile dev-intent \u2192 a2o scenario updates",
+   "line": 343,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L343",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Operator confirms A or B (default A). Do not build B speculatively",
+   "line": 364,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L364",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2 (if A): extend substrate-verify.sh Verify-Resilience-Signals assertion; commit",
+   "line": 365,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L365",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2 (if B): author genesis/scripts/ci/resilience-local-e2e.sh + the thin Jenkins stage call;",
+   "line": 366,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-live-distribute-shards-household-observation-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-live-distribute-shards-household-observation-plan.md#L366",
+   "class": "provisional"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_holochain_evolution_epic",
+  "claim": "hApp-lineage migration epic: spec §11 is hub; 2026-09-05 station 6 RED with PROVEN cause; Tasks 29-33 landed; mesh needs a rebuild.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_holochain_evolution_epic.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_holochain_evolution_epic.md",
+        "cid": "bafkreidh45ecgp5w7p7o2oklh42fi6qu6bae4ctshjtvqjfxs4dgjseloq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Holochain Evolution Epic — start at the hub",
+    "file": "project_holochain_evolution_epic.md",
+    "scopePath": ".claude/memory/project_holochain_evolution_epic.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

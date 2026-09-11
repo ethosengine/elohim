@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md",
+ "slug": "specs__2026-05-30-che-browser-feedback-foundation-design",
+ "method": "agent-decomposition",
+ "count": 9,
+ "items": [
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#1",
+   "text": "Wiring fix (approach A): install Playwright version-matched chromium to persistent PLAYWRIGHT_BROWSERS_PATH=/projects/.cache/ms-playwright (HOME is ephemeral); no change to world.ts",
+   "line": 51,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L51"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#2",
+   "text": "devfile.yaml env: PLAYWRIGHT_BROWSERS_PATH=/projects/.cache/ms-playwright for durability across workspace recreation",
+   "line": 163,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L163"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#3",
+   "text": "pnpm a2o:setup idempotent install script: playwright install chromium only when absent at the path; safe to re-run; ~1min/~170MB first run, no-op thereafter",
+   "line": 60,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L60"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#4",
+   "text": "look primitive genesis/a2o/scripts/look.ts (pnpm look <url> [--as FixtureHuman] [--doorway] [--wait-testid] [--out] [--viewport]) reusing PlaywrightDevice capture",
+   "line": 81,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L81"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#5",
+   "text": "look behavior: launch via world.ts call; fail-fast with exact remediation if browser missing; PlaywrightDevice.init capture wiring; optional fixture-human login; goto+wait+screenshot; exit 0 when ok",
+   "line": 104,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L104"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#6",
+   "text": "look output to reports/look/<latest|slug>/: shot.png (multimodal Read) + capture.json (url/finalUrl/title/ok/as/viewport/waitedFor/durationMs/console/pageErrors/failedRequests); gitignored; format fixed as L2 contract",
+   "line": 119,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L119"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#7",
+   "text": "Files touched: devfile.yaml env, package.json a2o:setup+look scripts, look.ts new, gitignore reports/look/, a2o/CLAUDE.md Tools entry; no change to world.ts/device classes/selectors/.feature",
+   "line": 159,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L159"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#8",
+   "text": "Verification: a2o:setup installs+re-run no-op; look against doorway-alpha produces ok-true shot; look --as Matthew --wait-testid proves auth path; one @browser cucumber renders locally not hangs; browser-missing fail-fast with exact command",
+   "line": 171,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L171"
+  },
+  {
+   "id": "specs__2026-05-30-che-browser-feedback-foundation-design#9",
+   "text": "Eventual migration (operator-owned, deferred): fold playwright install --with-deps chromium into che-devworkspaces udi-plus Dockerfile so per-workspace setup becomes no-op",
+   "line": 183,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-feedback-foundation-design.md#L183"
+  }
+ ]
+}

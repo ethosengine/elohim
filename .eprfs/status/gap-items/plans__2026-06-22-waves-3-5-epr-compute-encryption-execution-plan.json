@@ -1,0 +1,91 @@
+{
+  "doc": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md",
+  "slug": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan",
+  "method": "agent-decomposition",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 9,
+  "items": [
+    {
+      "text": "Wave 5.1 \u2014 private-replica encryption Slice-0 proof: NEW elohim/elohim-storage/src/services/private_replica.rs single-host round-trip (plaintext -> random DEK -> encrypt -> RS create_shards (reuse sharding.rs:249) -> drop a shard -> reconstruct ciphertext -> decrypt -> assert plaintext_cid byte-identical); DEK sealed/unsealed via dryoc crypto_box_seal/_open (reuse sealed_against_self.rs:32). DB-free, TDD. MUST NOT touch p2p/mod.rs:1492 content_reach TODO.",
+      "line": 73,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#1",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L73",
+      "class": "protocol-canonical",
+      "note": "LANDED+VERIFIED (e5ad3bcc3): private_replica.rs round-trip proof, 7 tests, red-team REAL. Live encryption HELD (X25519 substrate + conductor-leak + ordering-edge)."
+    },
+    {
+      "text": "Wave 4.1 \u2014 REA folds proof-gate: NEW elohim/elohim-facings/src/folds/rea.rs (+ folds/mod.rs reg). DB-free pure folds + tests: commitment_backed(rows), by_action(rows)->BTreeMap, mutual_compute(rows)->reciprocal delegates-compute pairs. Hand-built CommitmentRow fixtures; mirror operational_weave.rs fold style.",
+      "line": 88,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#2",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L88",
+      "class": "protocol-canonical",
+      "note": "LANDED+VERIFIED (ea31e0bf7): folds/rea.rs commitment_backed/by_action/mutual_compute, 10 tests, code-reviewer REAL/CLEAN, DB-free boundary held."
+    },
+    {
+      "text": "Wave 4.2 \u2014 MishpatCommitmentView + route: full new-view recipe \u2014 schema (sdk/schemas/v1/views/mishpat-commitment-view.schema.json) -> Rust struct (camelCase + derive TS) in elohim-views/infrastructure.rs -> schema_contract test -> codegen-ts.mjs INTERFACE_FILES -> codegen:ts + export_bindings -> storage adapter + declarative Route + test_manifest_builds path-coverage assertion (RED->GREEN; route-shadow trap is runtime-only).",
+      "line": 89,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#3",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L89",
+      "class": "protocol-canonical",
+      "note": "LANDED+VERIFIED (ea31e0bf7): MishpatCommitmentView full new-view recipe (mirror WeaveView c6805597d); schema_contract + test_manifest_builds green; route shadow-proof."
+    },
+    {
+      "text": "Wave 4.3 \u2014 mishpat->rea delegates-compute bridge + compute-fulfilled event: mirror existing content-provide bridge (mishpat_projection.rs/rea_commitment_service.rs); projection on action=delegates-compute (no new DHT entry); compute-fulfilled EconomicEvent bounded_by the commitment so mutual_compute reads observed not intent. TDD the projection mapping + bounded_by linkage.",
+      "line": 90,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#4",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L90",
+      "class": "protocol-canonical",
+      "note": "LANDED+VERIFIED (ea31e0bf7): delegates-compute bridge (cid=entry_hash) + compute-fulfilled bounded_by + observed_mutual_compute. red-team: dormant/unwired, projection-only Slice-0 OK. HELD security boundary (forgeable-without-attestation) RECORDED in record_compute_fulfilled_event doc \u2014 do NOT wire to economic consequence until counterparty cross-sign + party-match land."
+    },
+    {
+      "text": "Wave 3.0 \u2014 VERIFY resolver-plan Task 1 (claims-302 demotion) landed: doorway http.rs dispatch_epr_universal Default subview resolves to ServeShell (not RedirectToMount) for the universal /epr/{id} address. Ledger says landed; confirm before 3.1-3.4. If not landed, do it first (it gates the rest mattering).",
+      "line": 104,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#5",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L104",
+      "class": "protocol-canonical",
+      "note": "VERIFIED LANDED (prior session): claims-302 demoted; a2o deep-link-delivery.feature:54 asserts lens-complete render (not 302). Downstream 3.1/3.2 confirm."
+    },
+    {
+      "text": "Wave 3.1 \u2014 epr-composite renderer (KEYSTONE): NEW renderer under app/lamad/src/app/renderers/, registered in content-io.module.ts. Render composite body (sections->items) as navigable accessible outline; one /epr/{ref} link per item via eprToUniversalHref (never a literal); root data-testid; degrade on empty body. Vitest TDD.",
+      "line": 109,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#6",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L109",
+      "class": "protocol-canonical",
+      "note": "VERIFIED LANDED (4e9388c44): epr-composite renderer = PathViewerComponent, manifest-driven dispatch, 27 tests green, testid epr-composite-outline. Caveat: nested sub-sections not rendered (top-level sections->items only; defensible for the focal lens)."
+    },
+    {
+      "text": "Wave 3.2 \u2014 Open-in-pillar affordance: content-viewer.component.{ts,html}. When contentType is a CLAIMED pillar type, show an 'Open in {pillar}' cross-bundle href (never routerLink) to the pretty mount; derive mount from contentType->pillar map. data-testid. Vitest: claimed->present, unclaimed->absent.",
+      "line": 110,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#7",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L110",
+      "class": "protocol-canonical",
+      "note": "VERIFIED LANDED (HEAD): getOpenInPillar() + content-viewer affordance, 3 tests green (discriminate RED->GREEN re-proven), testid open-in-pillar; mapping reuses LAMAD_ROUTE_CLAIMS (no invented substrate)."
+    },
+    {
+      "text": "Wave 3.3 \u2014 populate epr_head.rs:148 relationships: fill the enrich=true path from existing EprRelationship head relations (mirror how attestation_requirements fills from query_direct_prerequisites). NOT the transitive ClusterClosure walk (design-only, acquisition #11 \u2014 HELD). Rust unit test: enrich=true returns head relations; enrich=false stays diesel-only vec![].",
+      "line": 111,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#8",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L111",
+      "class": "protocol-canonical",
+      "note": "LANDED+VERIFIED (c6b46299f): query_direct_relationships single-hop fills enrich=true path; enrich=false stays vec![]; NOT ClusterClosure (HELD)."
+    },
+    {
+      "text": "Wave 3.4 \u2014 a2o 302-inversion scenario: genesis/a2o/features/lamad/deep-link-delivery.feature + steps + selectors. Invert the old 302 assertion -> /epr/{claimed-path} renders lens-complete (composite outline + knowledge leg + Open-in-pillar affordance), no 302; @regression; testid-sync. tsc + eslint.",
+      "line": 112,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-22-waves-3-5-epr-compute-encryption-execution-plan#9",
+      "cites": "genesis/docs/superpowers/plans/2026-06-22-waves-3-5-epr-compute-encryption-execution-plan.md#L112",
+      "class": "protocol-canonical",
+      "note": "VERIFIED LANDED: deep-link-delivery.feature:54 @browser-only @regression inverted scenario asserts 'the lamad composite outline renders' + 'the Open in pillar lens is offered'. Live browser run alpha-held (degraded) -> operator."
+    }
+  ]
+}

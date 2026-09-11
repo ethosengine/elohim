@@ -1,0 +1,204 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md",
+ "slug": "plans__2026-05-07-iroh-parallel-stack",
+ "method": "checkbox-tasks",
+ "count": 28,
+ "items": [
+  {
+   "text": "Step 1: Add the iroh dependencies (committed 2bea677c)",
+   "line": 177,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-07-iroh-parallel-stack#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L177"
+  },
+  {
+   "text": "Step 2: Add p2p-iroh feature (committed 2bea677c)",
+   "line": 184,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-07-iroh-parallel-stack#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L184"
+  },
+  {
+   "text": "Step 3: Add justfile recipes (committed 2bea677c)",
+   "line": 196,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-07-iroh-parallel-stack#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L196"
+  },
+  {
+   "text": "Step 4: Verify build \u2014 clean fresh compile, 9m 16s, zero errors",
+   "line": 198,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-07-iroh-parallel-stack#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L198"
+  },
+  {
+   "text": "Step 5: Commit \u2014 feat(storage): add p2p-iroh feature + iroh-blobs/iroh deps (no code yet) (2bea677c)",
+   "line": 200,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-07-iroh-parallel-stack#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L200"
+  },
+  {
+   "text": "Step 1: Create module root",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L210"
+  },
+  {
+   "text": "Step 2: Mount in lib.rs",
+   "line": 227,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L227"
+  },
+  {
+   "text": "Step 3: Expose shared wire types",
+   "line": 234,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L234"
+  },
+  {
+   "text": "Step 4: Verify build",
+   "line": 242,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L242"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 248,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L248"
+  },
+  {
+   "text": "just build-iroh succeeds",
+   "line": 357,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L357"
+  },
+  {
+   "text": "just test-iroh -- p2p_iroh passes (config, identity, endpoint tests)",
+   "line": 358,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L358"
+  },
+  {
+   "text": "ELOHIM_TRANSPORT_BACKEND=iroh just run boots and shuts down cleanly",
+   "line": 359,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L359"
+  },
+  {
+   "text": "No changes to existing libp2p code paths",
+   "line": 361,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L361"
+  },
+  {
+   "text": "cargo test --features \"p2p p2p-iroh\" iroh_blob_roundtrip passes",
+   "line": 480,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L480"
+  },
+  {
+   "text": "cargo test --features \"p2p p2p-iroh\" iroh_node_lifecycle passes",
+   "line": 481,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L481"
+  },
+  {
+   "text": "ELOHIM_TRANSPORT_BACKEND=iroh just run boots, accepts blob inserts via IrohNode::add_bytes, can be queried for node_addr via debug API",
+   "line": 482,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L482"
+  },
+  {
+   "text": "just gate clean",
+   "line": 483,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L483"
+  },
+  {
+   "text": "README updated; cutover playbook references this phase",
+   "line": 484,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L484"
+  },
+  {
+   "text": "All Phases 1\u201310 acceptance criteria green",
+   "line": 586,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L586"
+  },
+  {
+   "text": "Parity-test harness runs every Phase 5\u20139 ALPN against both stacks for a week of nightly CI; zero divergences",
+   "line": 587,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L587"
+  },
+  {
+   "text": "Inventory delta convergence proven on a 6-peer alpha cluster (project_alpha_topology_bootstrap_pair.md) within target time",
+   "line": 588,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L588"
+  },
+  {
+   "text": "Production-shape stress test: 10k blob round-trips between two nodes via iroh, latency p99 \u2264 libp2p baseline",
+   "line": 589,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L589"
+  },
+  {
+   "text": "Recovery flow (project_socially_derived_security.md) end-to-end on iroh path passes",
+   "line": 590,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L590"
+  },
+  {
+   "text": "Genesis seeder rewritten to write to BLAKE3 store (Phase 11 task \u2014 not earlier)",
+   "line": 591,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L591"
+  },
+  {
+   "text": "HTTP routes graduated to BLAKE3 addressing (Phase 11 task \u2014 not earlier)",
+   "line": 592,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L592"
+  },
+  {
+   "text": "Rollback playbook tested: flip default back to libp2p, run smoke test, flip forward again",
+   "line": 593,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L593"
+  },
+  {
+   "text": "peer_blob_inventory SHA256 column drop migration written, tested, gated behind a follow-up release",
+   "line": 594,
+   "state": "OPEN",
+   "id": "plans__2026-05-07-iroh-parallel-stack#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md#L594"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_civic_ai_outreach_thread",
+  "claim": "Warm outreach to Audrey Tang (au@civic.ai) + Caroline Green (Oxford Ethics in AI), cc Nicky Case + Amber Hu — civic.ai '6-Pack of Care'/Kami ↔ Elohim commons.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_civic_ai_outreach_thread.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_civic_ai_outreach_thread.md",
+        "cid": "bafkreic6sphyqllwymn23naopg4ezhgrswvdaagwqofnb7pp4bds5vjjda"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "civic.ai outreach thread (Audrey Tang + Caroline Green)",
+    "file": "project_civic_ai_outreach_thread.md",
+    "scopePath": ".claude/memory/project_civic_ai_outreach_thread.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

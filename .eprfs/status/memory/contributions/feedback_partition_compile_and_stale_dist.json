@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-partition-compile-and-stale-dist",
+  "claim": "Commit partitions must respect COMPILE deps; local dist/ presence doesn't prove CI coverage.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_partition_compile_and_stale_dist.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_partition_compile_and_stale_dist.md",
+        "cid": "bafkreihf4nxfg3lct2tpmiredhmic3scqex4dkq3ij26ilac3jarze6qbq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Commit partitions respect compile deps",
+    "file": "feedback_partition_compile_and_stale_dist.md",
+    "scopePath": ".claude/memory/feedback_partition_compile_and_stale_dist.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

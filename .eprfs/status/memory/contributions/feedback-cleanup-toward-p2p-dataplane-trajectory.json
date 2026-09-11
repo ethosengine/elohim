@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-cleanup-toward-p2p-dataplane-trajectory",
+  "claim": "Per-host/per-row blob modeling is MVP scaffold toward the synced P2P dataplane — clean up drift as you go, never extend the scaffold.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback-cleanup-toward-p2p-dataplane-trajectory.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback-cleanup-toward-p2p-dataplane-trajectory.md",
+        "cid": "bafkreid2os5htv54asmlqsfum5lvd3646d7rsdgypwgbqemaselvp2zkpu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Per-host scaffold — clean up toward P2P dataplane",
+    "file": "feedback-cleanup-toward-p2p-dataplane-trajectory.md",
+    "scopePath": ".claude/memory/feedback-cleanup-toward-p2p-dataplane-trajectory.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

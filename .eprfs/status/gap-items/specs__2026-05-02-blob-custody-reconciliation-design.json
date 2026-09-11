@@ -1,0 +1,57 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md",
+ "slug": "specs__2026-05-02-blob-custody-reconciliation-design",
+ "method": "checkbox-tasks",
+ "count": 7,
+ "items": [
+  {
+   "text": "T12: migration applies cleanly; up/down round-trip; diesel schema compiles; models construct correctly",
+   "line": 329,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L329"
+  },
+  {
+   "text": "T13: snapshot/delta wire types round-trip via MessagePack; structural-verify rejects empty fields",
+   "line": 330,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L330"
+  },
+  {
+   "text": "T14: snapshot apply replaces per-peer set; delta apply respects sequence; gap-detect queues a snapshot request",
+   "line": 331,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L331"
+  },
+  {
+   "text": "T15: scheduler emits at archetype cadence; delta emitter collapses bursts within window; sequence is monotonic",
+   "line": 332,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L332"
+  },
+  {
+   "text": "T16: reconcile pass is idempotent; multi-trigger fires on each event source; act-on-own commitments path emits serve-blob on simulated fetch-success; signal-on-others' path emits placement-gap after grace; cooldown suppresses re-emission",
+   "line": 333,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L333"
+  },
+  {
+   "text": "T17: HTTP blob handler returns local hit on local presence; on local miss, iterates candidates from peer_blob_inventory, returns first hit, persists locally, emits serve-blob; returns 404 on all-miss; rejects bytes whose hash doesn't match",
+   "line": 334,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L334"
+  },
+  {
+   "text": "T18: parity sweep detects mismatch; broadcast scheduler corrects on next snapshot; regression test asserts post-sync filesystem-count == gossiped-count",
+   "line": 335,
+   "state": "OPEN",
+   "id": "specs__2026-05-02-blob-custody-reconciliation-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-05-02-blob-custody-reconciliation-design.md#L335"
+  }
+ ]
+}

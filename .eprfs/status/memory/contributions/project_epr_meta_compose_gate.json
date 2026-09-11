@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_epr_meta_compose_gate",
+  "claim": "PreToolUse hook gates Edit/Write via cascading .epr-meta manifests; new docs in governed dirs need frontmatter or are DENIED; malformed → ask.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_epr_meta_compose_gate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_epr_meta_compose_gate.md",
+        "cid": "bafkreihronh7z6okztciaoope57mdvdn242vl5fhrmqgrz63dhvp6dpqxe"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": ".epr-meta compose-gate LIVE — directory-local governance",
+    "file": "project_epr_meta_compose_gate.md",
+    "scopePath": ".claude/memory/project_epr_meta_compose_gate.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

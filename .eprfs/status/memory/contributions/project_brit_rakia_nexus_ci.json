@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_brit_rakia_nexus_ci",
+  "claim": "rakia+brit crates publish to Nexus cargo-internal; hosted repo is auth-required so cargo needs a read token; committed paths override hard-errors in CI.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_brit_rakia_nexus_ci.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_brit_rakia_nexus_ci.md",
+        "cid": "bafkreie6eaubbsbvabmmsyuqoqiubgoy4jsgwx7ojs6ecvk5ksn6kgv3j4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "brit/rakia Nexus CI wiring",
+    "file": "project_brit_rakia_nexus_ci.md",
+    "scopePath": ".claude/memory/project_brit_rakia_nexus_ci.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

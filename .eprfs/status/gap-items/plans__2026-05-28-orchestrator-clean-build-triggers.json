@@ -1,0 +1,491 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md",
+ "slug": "plans__2026-05-28-orchestrator-clean-build-triggers",
+ "method": "checkbox-tasks",
+ "count": 69,
+ "items": [
+  {
+   "text": "Step 1: Read the current gated block",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L58"
+  },
+  {
+   "text": "Step 2: Restructure \u2014 move tag reading out, keep [deploy-only] gated",
+   "line": 77,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L77"
+  },
+  {
+   "text": "Step 3: Verify the milestone(2) call still fires unconditionally",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L137"
+  },
+  {
+   "text": "Step 4: Add a CPS-scope sanity test",
+   "line": 141,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L141"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L185"
+  },
+  {
+   "text": "Step 1: Read the current schema",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L213"
+  },
+  {
+   "text": "Step 2: Add new optional pipeline-metadata properties",
+   "line": 219,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L219"
+  },
+  {
+   "text": "Step 3: Run schema validator on existing manifests",
+   "line": 253,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L253"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 259,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L259"
+  },
+  {
+   "text": "Step 1: Update elohim-holochain manifest",
+   "line": 305,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L305"
+  },
+  {
+   "text": "Step 2: Update elohim-edge manifest",
+   "line": 322,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L322"
+  },
+  {
+   "text": "Step 3: Update elohim manifest",
+   "line": 335,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L335"
+  },
+  {
+   "text": "Step 4: Update elohim-genesis manifest",
+   "line": 346,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L346"
+  },
+  {
+   "text": "Step 5: Update elohim-steward manifest",
+   "line": 357,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L357"
+  },
+  {
+   "text": "Step 6: Update elohim-sophia manifest",
+   "line": 368,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L368"
+  },
+  {
+   "text": "Step 7: Update elohim-epr manifest",
+   "line": 380,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L380"
+  },
+  {
+   "text": "Step 8: Update elohim-storybook manifest",
+   "line": 392,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L392"
+  },
+  {
+   "text": "Step 9: Update elohim-orchestrator manifest",
+   "line": 404,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L404"
+  },
+  {
+   "text": "Step 10: Leave graph-only manifests alone",
+   "line": 416,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L416"
+  },
+  {
+   "text": "Step 11: Validate all manifests",
+   "line": 420,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L420"
+  },
+  {
+   "text": "Step 12: Run schema codegen (if applicable)",
+   "line": 426,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L426"
+  },
+  {
+   "text": "Step 13: Commit",
+   "line": 430,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L430"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 453,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L453"
+  },
+  {
+   "text": "Step 2: Run test to verify it fails",
+   "line": 513,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L513"
+  },
+  {
+   "text": "Step 3: Write the minimal implementation",
+   "line": 519,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L519"
+  },
+  {
+   "text": "Step 4: Run test to verify it passes",
+   "line": 595,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L595"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 601,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L601"
+  },
+  {
+   "text": "Step 1: Extend composeGraph to carry pipeline metadata",
+   "line": 622,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L622"
+  },
+  {
+   "text": "Step 2: Add a registry accessor in walkBuildGraph's result",
+   "line": 626,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L626"
+  },
+  {
+   "text": "Step 3: Verify a Groovy linter or test exists",
+   "line": 652,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L652"
+  },
+  {
+   "text": "Step 1: Stash the pipelineRegistry from the build graph result",
+   "line": 683,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L683"
+  },
+  {
+   "text": "Step 2: Add a getPipelineMetadata helper near the top of Jenkinsfile",
+   "line": 696,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L696"
+  },
+  {
+   "text": "Step 3: Migrate getHealthEndpoints",
+   "line": 729,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L729"
+  },
+  {
+   "text": "Step 4: Migrate triggerPipeline at L794",
+   "line": 752,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L752"
+  },
+  {
+   "text": "Step 5: Migrate autoModeAnalyze",
+   "line": 763,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L763"
+  },
+  {
+   "text": "Step 6: Migrate applyBuildGraphRouting",
+   "line": 794,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L794"
+  },
+  {
+   "text": "Step 7: Migrate manualModeAnalyze",
+   "line": 842,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L842"
+  },
+  {
+   "text": "Step 8: Run CPS-scope test + manifest validation",
+   "line": 873,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L873"
+  },
+  {
+   "text": "Step 9: Commit",
+   "line": 879,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L879"
+  },
+  {
+   "text": "Step 1: Delete PIPELINES map and legacy functions from Jenkinsfile",
+   "line": 900,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L900"
+  },
+  {
+   "text": "Step 2: Delete the comparison matrix from build-graph.groovy",
+   "line": 967,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L967"
+  },
+  {
+   "text": "Step 3: Simplify loadPipelineBaselines to global-only",
+   "line": 995,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L995"
+  },
+  {
+   "text": "Step 4: Update params.MODE help text",
+   "line": 1018,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1018"
+  },
+  {
+   "text": "Step 5: Run CPS-scope test",
+   "line": 1022,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1022"
+  },
+  {
+   "text": "Step 1: Migrate preview.mjs",
+   "line": 1052,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1052"
+  },
+  {
+   "text": "Step 2: Extract commit-tag parser to a shared module",
+   "line": 1111,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1111"
+  },
+  {
+   "text": "Step 3: Migrate scripts/registry-cluster-drift.mjs",
+   "line": 1217,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1217"
+  },
+  {
+   "text": "Step 4: Migrate scripts/pipeline-trajectory.mjs",
+   "line": 1237,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1237"
+  },
+  {
+   "text": "Step 5: Migrate pipeline-results.mjs",
+   "line": 1241,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1241"
+  },
+  {
+   "text": "Step 6: Run all orchestrator tests",
+   "line": 1245,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1245"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 1251,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1251"
+  },
+  {
+   "text": "Step 1: Update generate-pipeline-list.mjs",
+   "line": 1274,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1274"
+  },
+  {
+   "text": "Step 2: Regenerate the artifact",
+   "line": 1306,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1306"
+  },
+  {
+   "text": "Step 3: Diff the result",
+   "line": 1310,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1310"
+  },
+  {
+   "text": "Step 4: Verify count-pipeline-failures.sh still works",
+   "line": 1316,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1316"
+  },
+  {
+   "text": "Step 1: Verify nothing still imports orchestrator-strategy.mjs",
+   "line": 1345,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1345"
+  },
+  {
+   "text": "Step 2: Rewrite orchestrator-strategy.test.mjs as orchestrator-integration.test.mjs",
+   "line": 1351,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1351"
+  },
+  {
+   "text": "Step 3: Update ci-ignore.mjs if needed",
+   "line": 1395,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1395"
+  },
+  {
+   "text": "Step 4: Delete the strategy module",
+   "line": 1405,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#59",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1405"
+  },
+  {
+   "text": "Step 5: Run all orchestrator tests",
+   "line": 1409,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#60",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1409"
+  },
+  {
+   "text": "Step 1: Audit .husky/pre-push",
+   "line": 1440,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#61",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1440"
+  },
+  {
+   "text": "Step 2: Update root CLAUDE.md",
+   "line": 1446,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#62",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1446"
+  },
+  {
+   "text": "Step 3: Update orchestrator README",
+   "line": 1450,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#63",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1450"
+  },
+  {
+   "text": "Step 4: Update memory entry",
+   "line": 1454,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#64",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1454"
+  },
+  {
+   "text": "Step 1: Push a no-op commit with [build:app] tag from a non-webhook trigger context",
+   "line": 1477,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#65",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1477"
+  },
+  {
+   "text": "Step 2: Push a real path change matching one pipeline's manifest sources",
+   "line": 1491,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#66",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1491"
+  },
+  {
+   "text": "Step 3: Push a Jenkinsfile-only change",
+   "line": 1495,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#67",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1495"
+  },
+  {
+   "text": "Step 4: Push a [build:all] tag",
+   "line": 1499,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#68",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1499"
+  },
+  {
+   "text": "Step 5: Document any issues found",
+   "line": 1505,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-orchestrator-clean-build-triggers#69",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-orchestrator-clean-build-triggers.md#L1505"
+  }
+ ]
+}

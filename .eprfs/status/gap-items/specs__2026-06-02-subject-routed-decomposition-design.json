@@ -1,0 +1,105 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md",
+ "slug": "specs__2026-06-02-subject-routed-decomposition-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "count": 12,
+ "items": [
+  {
+   "text": ".claude/subject-routing.yaml PARENT constitution at repo root \u2014 class \u2192 {write_location, decomposition_flow, discard_rule} + artifact_kind axis + gate_signals; tracked, hand-tuned; the repo-scope class registry (\u00a75.0/\u00a75.1)",
+   "line": 132,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L132",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/scripts/_lib/subject_routing.py \u2014 shared cascade-resolver + class-reconciler (both gates import it; _lib \u22652-caller discipline): walk up the tree merging routing parents (root + sub-tree .claude/subject-routing.yaml / CLAUDE.md blocks; union classes, nearest-wins home-remaps), reconcile provisional, run gate_signals. The one-repo\u2192mono-repo\u2192submodule scaling mechanism, optional by construction (\u00a75.0)",
+   "line": 133,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L133",
+   "class": "process-meta"
+  },
+  {
+   "text": "decompose.py \u2014 import _lib.subject_routing + _lib.frontmatter to read the cascaded class:, stamp it on gap-items, route per-class, fail-loud gate_signals \u2014 the hard prerequisite (\u00a75)",
+   "line": 134,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L134",
+   "class": "process-meta"
+  },
+  {
+   "text": "brainstorm.md Step 1c.0 CLASSIFY-SUBJECT gate (before MAP-PATH; calls _lib.subject_routing for the cascaded class menu) + Step-4 class-conditional frontmatter (class: always; domain:/informed-by: only on a resolved substrate class) (\u00a75)",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L135",
+   "class": "process-meta"
+  },
+  {
+   "text": "MAP.md Axis 0 (subject class) above D#+pillar; map_has_meta_axis\u2192true; extend the Q1 citation to three axes (\u00a75, \u00a71)",
+   "line": 136,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L136",
+   "class": "process-meta"
+  },
+  {
+   "text": "PLACEMENT.md subject-class-axis section pointing at .claude/subject-routing.yaml (mirror the cluster-state.yaml env-axis pointer); resolve the \u00a712 dev-doc-home open issue as \"the gospel-diff target, not a new dir\" (\u00a75, \u00a71)",
+   "line": 137,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L137",
+   "class": "process-meta"
+  },
+  {
+   "text": "compaction-loop \u00a75.2b \u2014 per-class fate routing (the \u00a75.2 table becomes the protocol-canonical branch); the unifying keep/discard-by-reasoning-value principle (\u00a73, \u00a74)",
+   "line": 138,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L138",
+   "class": "process-meta"
+  },
+  {
+   "text": "process-meta history/ leg LIVE + tool-design-rationale residue row + stub-then-grade default (\u00a73, \u00a74)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L139",
+   "class": "process-meta"
+  },
+  {
+   "text": "artifact_kind axis rows for run-output / brainstorm / kickoff / handoff with retention rules (comet/git, never a substrate seed) (\u00a72)",
+   "line": 140,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L140",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/subject-routing.yaml tracked-not-gitignored at repo root; no memory-kit/ amendment needed (root placement preserves its \"one hand-edited file\" rule \u2014 the adversary's bootstrap collision dissolves) (\u00a75.0/\u00a76)",
+   "line": 141,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L141",
+   "class": "process-meta"
+  },
+  {
+   "text": "The four SEMANTIC relocations + the mandatory history/ CURATE lesson \"The D4 name-collision\" (\u00a76)",
+   "line": 142,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L142",
+   "class": "process-meta"
+  },
+  {
+   "text": "Dual-target process-residue leg on protocol-canonical (CI/build \u2192 orchestrator/README.md) + dual-deliverable primary/secondary class (\u00a73, \u00a77)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-subject-routed-decomposition-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-subject-routed-decomposition-design.md#L143",
+   "class": "process-meta"
+  }
+ ]
+}

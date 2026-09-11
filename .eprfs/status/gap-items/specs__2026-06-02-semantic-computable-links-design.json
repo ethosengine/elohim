@@ -1,0 +1,105 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md",
+ "slug": "specs__2026-06-02-semantic-computable-links-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "count": 12,
+ "items": [
+  {
+   "text": "Doc id: <slug> frontmatter convention + deterministic slug allocation + collision guard (\u00a72)",
+   "line": 146,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L146",
+   "class": "process-meta"
+  },
+  {
+   "text": "cites: envelope schema (ref/desc/fingerprint) + back-compat parser for legacy path-strings (\u00a72)",
+   "line": 147,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L147",
+   "class": "process-meta"
+  },
+  {
+   "text": "Fingerprint definition \u2014 canonical content region to hash so a frontmatter edit doesn't trip STALE-CANDIDATE (\u00a72, open Q)",
+   "line": 148,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L148",
+   "class": "process-meta"
+  },
+  {
+   "text": "cite-gen.py \u2014 resolve target \u2192 emit envelope; --into <doc> (rewrite in place); --verify (gate mode) (\u00a74)",
+   "line": 149,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L149",
+   "class": "process-meta"
+  },
+  {
+   "text": "memory-coherence-audit.py cite_resolves() \u2192 slug-index resolve across live+held; emit HELD-CITE / STALE-CANDIDATE / CITE-FORMAT-CANDIDATE / DEAD-CITE (\u00a73)",
+   "line": 150,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L150",
+   "class": "process-meta"
+  },
+  {
+   "text": "Optional tool-managed status: field on the cite envelope (the epr-head edge hint) + the reverse index (target \u2192 every citer) as the compute surface (\u00a72, \u00a73.1)",
+   "line": 151,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L151",
+   "class": "process-meta"
+  },
+  {
+   "text": "Propagation pass \u2014 materialize the audit verdict as inline status: on each citer when a target goes held/stale/dead; remove it on recovery; triggered by a reconciler move, audit --apply, or the stasis loop; emitted as a reviewable commit (\u00a73.1)",
+   "line": 152,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L152",
+   "class": "process-meta"
+  },
+  {
+   "text": "decompose.py dissolution gate \u2014 block graduation until cite-gen --verify passes (\u00a75)",
+   "line": 153,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L153",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/skills/semantic-links/ template + wire it into the /brainstorm + compaction POST steps so new cites are born-correct (\u00a75)",
+   "line": 154,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L154",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/workflows/cites-migration.js \u2014 two-pass corpus migration (allocate slugs, rewrite cites) (\u00a76)",
+   "line": 155,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L155",
+   "class": "process-meta"
+  },
+  {
+   "text": "memory-stasis-loop.js \u2014 add cites_legacy scoreboard dimension + cites discipline; add cites: headline line in placement-audit.py (\u00a77)",
+   "line": 156,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L156",
+   "class": "process-meta"
+  },
+  {
+   "text": "Memory-team agent-def updates (librarian / historian / cartographer / storyteller) \u2014 convention, verdicts, held-safe, dissolution gate (\u00a78)",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-semantic-computable-links-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md#L157",
+   "class": "process-meta"
+  }
+ ]
+}

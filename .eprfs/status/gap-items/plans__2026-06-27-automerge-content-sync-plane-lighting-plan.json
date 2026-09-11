@@ -1,0 +1,212 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md",
+ "slug": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 25,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test. In the doc_store test module:",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L92",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run it and confirm it fails",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L104",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement. Add a Content variant to DocType (mirror existing variants), and a match arm in infer_doc_type before the default:",
+   "line": 113,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L113",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run it and confirm it passes. (same command as Step 2) \u2192 PASS",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L122",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L124",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test (producer-level integration; no libp2p). In projector.rs tests:",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L155",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement project_content_doc + the doc-id helper",
+   "line": 194,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L194",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Write the listener + spawn it. In projector.rs:",
+   "line": 225,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L225",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Wire it in main.rs (~:2611, next to with_sync_manager). BEFORE services moves into with_services, clone what the listener needs:",
+   "line": 258,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L258",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7: Add the module export. In src/sync/mod.rs: pub mod projector;",
+   "line": 274,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L274",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 8: Build the whole crate to confirm wiring compiles",
+   "line": 276,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L276",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 9: Commit",
+   "line": 285,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L285",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Add a guard test asserting the projection namespace",
+   "line": 301,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L301",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Promote the literal to a named const in projector.rs and use it in project_content_doc:",
+   "line": 313,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L313",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 324,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L324",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test. Build a slim two-node harness carrying only sync_protocol: request_response::Behaviour<SyncCodec> + identify (copy the SwarmBuilder tcp+noise+yamux from harness/mod.rs:132-180, swap the behaviour). Each node wraps a real production SyncManager over its own temp DocStore",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L344",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run it and confirm it fails (before the harness/driver exist, or because convergence doesn't happen yet)",
+   "line": 373,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L373",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement TestSyncNode + the sync driver until convergence happens. Wire the inbound SyncRequest handler to call the real handle_sync_request/apply_changes path (reuse, don't reimplement \u2014 point the test behaviour at the production handlers in p2p/mod.rs)",
+   "line": 382,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L382",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run it and confirm it passes. (same command) \u2192 PASS. Note wall-clock; if it relies on the 60s timer, switch to driving the round directly so the test is fast and deterministic",
+   "line": 384,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L384",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Baseline-sanity the existing merge test still passes",
+   "line": 386,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L386",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 394,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L394",
+   "class": "provisional"
+  },
+  {
+   "text": "Pre-push gates green on the touched crate:",
+   "line": 405,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L405",
+   "class": "provisional"
+  },
+  {
+   "text": "FLOOR verification (household-nodes, live stack): POST /db/content on one M/J/J node, then read the peer's DocStore directly (storage :8090, NOT through doorway): GET /sync/v1/elohim/docs lists node:{id}. (If the /sync/v1 read route isn't exposed on the storage surface yet, assert convergence via the integration test only and capture the read-route as the first browser-leg gap.)",
+   "line": 416,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L416",
+   "class": "provisional"
+  },
+  {
+   "text": "STRONGER verification (shem, cross-tenant \u2014 now ONLINE): author on one tenant's node, observe node:{id} + heads converge into a node under a *different* tenant (p2p/status Automerge-doc count increments). Proves the plane crosses the tenant boundary, not just the household LAN",
+   "line": 418,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L418",
+   "class": "provisional"
+  },
+  {
+   "text": "Story-harvest: per CLAUDE.md, after the spine is green invoke story-harvest to scaffold an a2o regression scenario for content-sync convergence (parameter-bearing discovery: the \"elohim\" namespace coupling, the 30s convergence deadline)",
+   "line": 420,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-automerge-content-sync-plane-lighting-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md#L420",
+   "class": "provisional"
+  }
+ ]
+}

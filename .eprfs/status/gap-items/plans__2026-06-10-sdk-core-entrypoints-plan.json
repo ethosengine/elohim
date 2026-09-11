@@ -1,0 +1,98 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md",
+ "slug": "plans__2026-06-10-sdk-core-entrypoints-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 11,
+ "items": [
+  {
+   "text": "Add a compact section \"Node-consumable core entrypoints\": each library that hosts",
+   "line": 46,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L46",
+   "class": "process-meta"
+  },
+  {
+   "text": "Note the two empirical failure modes (from arc 1.2) the pattern prevents, one line each",
+   "line": 51,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L51",
+   "class": "process-meta"
+  },
+  {
+   "text": "cite-gen.py --seal clean on the edited doc. Commit",
+   "line": 52,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L52",
+   "class": "process-meta"
+  },
+  {
+   "text": "Add \"type\": \"module\" + exports map: root \u2192 existing public-api path (verify what the",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L59",
+   "class": "process-meta"
+  },
+  {
+   "text": "src/core.ts exports ONLY framework-free modules: doorway-session-client (+ its types),",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L64",
+   "class": "process-meta"
+  },
+  {
+   "text": "Identity suite still green: cd app/elohim-library && pnpm exec vitest run --config",
+   "line": 68,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L68",
+   "class": "process-meta"
+  },
+  {
+   "text": "Replace the namespace.default ?? namespace interop and deep-module import with a plain",
+   "line": 79,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L79",
+   "class": "process-meta"
+  },
+  {
+   "text": "Re-verify all three pipelines (the 1.2 evidence set): pnpm typecheck (0),",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L82",
+   "class": "process-meta"
+  },
+  {
+   "text": "@elohim/rea-runtime: add \"type\": \"module\" + ./core export now (empty-or-minimal core",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L91",
+   "class": "process-meta"
+  },
+  {
+   "text": "Audit @elohim/service, @elohim/storage-client, elohim-core (Lit): which already have",
+   "line": 93,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L93",
+   "class": "process-meta"
+  },
+  {
+   "text": "Full gate: a2o suites + identity suite + pnpm run lint on touched packages. Commit",
+   "line": 97,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-sdk-core-entrypoints-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-sdk-core-entrypoints-plan.md#L97",
+   "class": "process-meta"
+  }
+ ]
+}

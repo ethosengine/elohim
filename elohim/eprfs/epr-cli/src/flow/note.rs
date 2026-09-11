@@ -56,10 +56,12 @@ use elohim_epr_rea::{
 };
 use serde::Serialize;
 
+use super::measures::{MeasureRef, Registry};
 use super::{
     body_cid_of_file, confine_under, head_commit_provenance, rel_to_root, repo_agent,
     repo_scope_atom, short_cid, FlowError, FlowResult,
 };
+use std::collections::BTreeMap;
 
 /// The unit every note is counted in.
 ///
@@ -76,6 +78,16 @@ pub(crate) const REASON_SLOT_PREFIX: &str = "reason:";
 
 /// Prefix on the optional consequence slot — the second half of a failed approach.
 pub(crate) const SWITCHED_TO_SLOT_PREFIX: &str = "switched-to:";
+
+/// Prefix on the optional slot naming the correction this note CLOSES.
+///
+/// Closure by identity, not by date. `epr flow concerns --corrections` reads unresolved corrections
+/// by asking which `run:correction` records have no LATER note carrying this slot with their exact
+/// CID — so "was this fixed" is answered by an explicit act naming what it closed, never by a
+/// filename's date or by a ceremony having run afterwards. Positioned AFTER `switched-to:` and
+/// BEFORE `verdict:`, so a note that closes nothing emits exactly the slot vector it emitted before
+/// this vocabulary existed and keeps its content address.
+pub(crate) const CLOSES_SLOT_PREFIX: &str = "closes:";
 
 /// Prefix on the optional audit-outcome slot — a `verdict` note's whole point.
 ///
@@ -96,6 +108,28 @@ const VERDICT_CHANGES_REQUESTED: &str = "changes-requested";
 /// slots positionally (tag, subject, reason, then the optional consequence), so a steward slot
 /// inserted anywhere earlier would renumber a vocabulary other legs already read.
 pub(crate) const STEWARD_SLOT_PREFIX: &str = "steward:";
+
+/// Prefix on the slot naming the pinned measure a STRUCTURED observation was taken under.
+///
+/// A structured observation is the one note kind that is read arithmetically rather than by a
+/// human, so its slots are a small closed vocabulary rather than prose: `measure:`, `value:`, an
+/// optional `unit:`, and zero or more `env:` pairs. They sit AFTER the authored `reason:` and
+/// BEFORE the trailing `verdict:`/`steward:`/attribution slots, which keeps every note that
+/// carries no measure emitting exactly the slot vector it emitted before this vocabulary existed
+/// — the additive discipline that preserves existing content addresses.
+pub(crate) const MEASURE_SLOT_PREFIX: &str = "measure:";
+
+/// Prefix on the slot carrying the observed magnitude, canonically formatted (see
+/// [`canonical_number`]) so `8` and `8.0` are one measurement with one address rather than two.
+pub(crate) const VALUE_SLOT_PREFIX: &str = "value:";
+
+/// Prefix on the optional slot naming the unit the value is counted in.
+pub(crate) const UNIT_SLOT_PREFIX: &str = "unit:";
+
+/// Prefix on each `k=v` environment slot. Emitted in sorted key order, because the environment is
+/// part of the memoization key and a key order that varied with argument order would mint two
+/// addresses for one measurement.
+pub(crate) const ENV_SLOT_PREFIX: &str = "env:";
 
 /// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
 /// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
@@ -126,6 +160,15 @@ pub enum NoteKind {
     /// other kind it carries a closed outcome value alongside its reason, because "was this
     /// accepted" must be readable without parsing prose.
     Verdict,
+    /// A sidecar slot is WITHDRAWN — the declaration it carried no longer stands, and every
+    /// reader should stop offering it (VSM System 3, the maintenance act).
+    ///
+    /// Deliberately NOT reachable from `epr flow note --kind`: a retraction is admissible only
+    /// against a `DepEdge`/cite-seal slot that is the standing record of its own slot, and that
+    /// eligibility check lives in [`super::retract`]. A kind that could be typed without the
+    /// check would let a caller "withdraw" a commitment, an intent or a fold — records whose
+    /// withdrawal has its own vocabulary — and the withdrawal would read as authoritative.
+    Retraction,
 }
 
 impl NoteKind {
@@ -137,6 +180,16 @@ impl NoteKind {
             "observation" => Ok(NoteKind::Observation),
             "ruling" => Ok(NoteKind::Ruling),
             "verdict" => Ok(NoteKind::Verdict),
+            // Named, not merely absent. The tag EXISTS in the record vocabulary, so a reader who
+            // finds `run:retraction` in the sidecar and reaches for `--kind retraction` must be
+            // told where the act lives rather than that the kind is unknown — an "unknown kind"
+            // refusal here would read as "retraction is not a thing", which is false.
+            "retraction" => Err(FlowError::InvalidArguments(
+                "retraction is not authored through `note` — it withdraws a sidecar dependency \
+                 slot and is admissible only against the standing DepEdge record of that slot: \
+                 `epr flow retract <edge-record-cid> --reason <text>`"
+                    .into(),
+            )),
             other => Err(FlowError::InvalidArguments(format!(
                 "unknown note kind `{other}` — the vocabulary is closed: \
                  failed-approach|correction|observation|ruling|verdict"
@@ -152,9 +205,17 @@ impl NoteKind {
             NoteKind::Observation => "run:observation",
             NoteKind::Ruling => "run:ruling",
             NoteKind::Verdict => "run:verdict",
+            NoteKind::Retraction => RETRACTION_TAG,
         }
     }
 }
+
+/// The slot-0 tag every retraction carries.
+///
+/// A `const` rather than a literal inside [`NoteKind::tag`] because two other modules read it:
+/// [`super::retract`] mints it and [`super::edges`] folds it into the sidecar plane's withdrawal
+/// set. A tag string that lived in three places would drift the day one of them was edited.
+pub(crate) const RETRACTION_TAG: &str = "run:retraction";
 
 /// Resolve `--verdict` against `--kind`, refusing both mismatches rather than defaulting either.
 ///
@@ -188,22 +249,52 @@ fn resolve_verdict(kind: NoteKind, verdict: Option<&str>) -> FlowResult<Option<S
     }
 }
 
+/// Resolve `--closes` against `--kind`, refusing a malformed CID and the one kind that cannot close.
+///
+/// A `failed-approach` records that something did NOT work; letting it close a correction would let
+/// "we tried and gave up" read as "the correction is resolved", which is exactly the inference the
+/// identity-based reading exists to prevent. Everything else in the vocabulary — an observation of
+/// the repair, a ruling, an audit verdict, or a follow-up correction — is a legitimate closure act.
+fn resolve_closes(kind: NoteKind, closes: Option<&str>) -> FlowResult<Option<String>> {
+    let Some(raw) = closes else {
+        return Ok(None);
+    };
+    let value = non_empty(raw, "--closes")?;
+    if kind == NoteKind::FailedApproach {
+        return Err(FlowError::InvalidArguments(
+            "--closes does not belong to --kind failed-approach — an approach that did not work \
+             closes nothing; record the repair as observation|correction|ruling|verdict"
+                .into(),
+        ));
+    }
+    value.parse::<Cid>().map_err(|_| {
+        FlowError::InvalidArguments(format!(
+            "--closes `{value}` is not a CID — a closure names the exact correction it discharges, \
+             and a prose reference closes nothing a reader can verify"
+        ))
+    })?;
+    Ok(Some(value.to_string()))
+}
+
 /// The positional `classified_as` slot vector for one note.
 ///
 /// One place builds it, so the record and every reader share a single definition of the order:
 /// tag, subject, `reason:`, optional `switched-to:`, optional `verdict:`, optional `steward:`
 /// LAST. The order is ADDITIVE — a note that carries no verdict emits the same vector it always
 /// did, which is what keeps every existing note's content address where it is.
+#[allow(clippy::too_many_arguments)]
 fn note_slots(
     kind: NoteKind,
     subject: &str,
     reason: &str,
     switched_to: Option<&str>,
+    closes: Option<&str>,
     verdict: Option<&str>,
     steward: Option<&str>,
 ) -> Vec<String> {
     let mut slots = Vec::with_capacity(
         3 + usize::from(switched_to.is_some())
+            + usize::from(closes.is_some())
             + usize::from(verdict.is_some())
             + usize::from(steward.is_some()),
     );
@@ -213,6 +304,9 @@ fn note_slots(
     if let Some(switched) = switched_to {
         slots.push(format!("{SWITCHED_TO_SLOT_PREFIX}{switched}"));
     }
+    if let Some(closed) = closes {
+        slots.push(format!("{CLOSES_SLOT_PREFIX}{closed}"));
+    }
     if let Some(value) = verdict {
         slots.push(format!("{VERDICT_SLOT_PREFIX}{value}"));
     }
@@ -220,6 +314,114 @@ fn note_slots(
         slots.push(format!("{STEWARD_SLOT_PREFIX}{steward}"));
     }
     slots
+}
+
+/// One structured measurement, resolved and validated before any store is opened.
+///
+/// This is the fold the native report reads. The kit's equivalent is a number written into a
+/// private JSON file by whichever script computed it; the difference that matters is not the
+/// storage medium but the *key*: a fold is addressed by `subject × measure@version × env`, so two
+/// runs of the same measure under different conditions are two distinct records rather than one
+/// overwritten file, and a report can say which one it read.
+#[derive(Debug, Clone)]
+pub struct Observation {
+    /// The pinned measure, already checked against the registry.
+    pub measure: MeasureRef,
+    /// The observed magnitude.
+    pub value: f64,
+    /// The unit, when the caller named one or the registry declared one.
+    pub unit: Option<String>,
+    /// The environment this measurement was taken under. A `BTreeMap` rather than a `Vec` because
+    /// the key order is part of the address and must not follow argument order.
+    pub env: BTreeMap<String, String>,
+}
+
+impl Observation {
+    /// The `classified_as` slots this observation contributes, in their fixed order.
+    fn slots(&self) -> Vec<String> {
+        let mut slots = Vec::with_capacity(2 + usize::from(self.unit.is_some()) + self.env.len());
+        slots.push(format!("{MEASURE_SLOT_PREFIX}{}", self.measure));
+        slots.push(format!(
+            "{VALUE_SLOT_PREFIX}{}",
+            canonical_number(self.value)
+        ));
+        if let Some(unit) = &self.unit {
+            slots.push(format!("{UNIT_SLOT_PREFIX}{unit}"));
+        }
+        for (key, value) in &self.env {
+            slots.push(format!("{ENV_SLOT_PREFIX}{key}={value}"));
+        }
+        slots
+    }
+
+    /// The reason text a structured observation carries when the caller authored none.
+    ///
+    /// Derived rather than defaulted to a constant: the reason is part of the record's address, so
+    /// deriving it from the very fields that key the fold means two identical measurements mint
+    /// one CID (the idempotence this leg promises) while two different ones never collide.
+    fn derived_reason(&self) -> String {
+        let mut reason = format!("{} = {}", self.measure, canonical_number(self.value));
+        if let Some(unit) = &self.unit {
+            reason.push(' ');
+            reason.push_str(unit);
+        }
+        reason
+    }
+}
+
+/// The canonical subject string naming the repository itself.
+///
+/// Some bounds are not about a file. Cleanup pressure, report-tier size and pending scope moves
+/// are properties of the whole tree, and forcing each to nominate a stand-in file would make the
+/// fold's key a lie about what was measured. `.` is the spelling every side already uses — the
+/// hooks bridge writes it, a registry row declares `subject: .`, and a person types it — so one
+/// constant keeps the three in agreement instead of three conventions that drift.
+pub const REPO_SUBJECT: &str = ".";
+
+/// Whether `on` names the repository root rather than something inside it.
+///
+/// Accepts `.`, `./`, the empty string, and an absolute path that canonicalizes to the root — the
+/// same claim spelled four ways. Relative spellings are matched literally rather than
+/// canonicalized, because `std::fs::canonicalize` resolves against the PROCESS cwd, not `root`,
+/// and a `--root` pointing elsewhere would otherwise silently agree with whatever directory the
+/// caller happened to be standing in.
+pub(crate) fn is_repo_root(root: &Path, on: &str) -> bool {
+    let trimmed = on.trim();
+    if matches!(trimmed, "" | "." | "./") {
+        return true;
+    }
+    if !Path::new(trimmed).is_absolute() {
+        return false;
+    }
+    match (std::fs::canonicalize(root), std::fs::canonicalize(trimmed)) {
+        (Ok(root), Ok(target)) => root == target,
+        _ => false,
+    }
+}
+
+/// Normalize a subject so every spelling of the repository root reads as one.
+///
+/// Applied on BOTH sides of the report's match — the fold's recorded subject and the bound's
+/// declared one — so a row spelling it `./` and a fold spelling it `.` are not two subjects.
+pub fn normalize_subject(subject: &str) -> &str {
+    match subject.trim() {
+        "" | "." | "./" => REPO_SUBJECT,
+        other => other,
+    }
+}
+
+/// Format a magnitude so that equal numbers have equal spellings.
+///
+/// Integral values render without a fractional part, everything else uses Rust's shortest
+/// round-tripping form. Without this, `--value 8` and `--value 8.0` would be two records claiming
+/// one measurement, and the dedupe promise would hold only for callers who happened to type the
+/// same way.
+pub(crate) fn canonical_number(value: f64) -> String {
+    if value == value.trunc() && value.abs() < 1e15 {
+        format!("{}", value as i64)
+    } else {
+        format!("{value}")
+    }
 }
 
 /// Who the caller says is acting, as the CLI shell resolved it.
@@ -252,6 +454,11 @@ pub struct NoteOutcome {
     pub resource: String,
     pub reason: String,
     pub switched_to: Option<String>,
+    /// The correction this note closes, present only when `--closes` named one. Omitted rather than
+    /// null so every pre-closure payload is byte-identical to the one it emitted before this field
+    /// existed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub closes: Option<String>,
     /// The audit outcome, present only on a `verdict` note. Omitted rather than null so every
     /// pre-verdict payload is byte-identical to the one it emitted before this field existed.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -262,11 +469,29 @@ pub struct NoteOutcome {
     /// `ActorClaim::definition_cid` already holds on the record side.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub actor: Option<String>,
+    /// Exact registered claim used for both validation and emission, absent for direct attribution.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub actor_claim: Option<String>,
     /// The git-signing human answerable for the tree, carried only when `actor` is present. On
     /// the author-attributed arm it would merely repeat the provider, and a field that sometimes
     /// restates another is a field readers learn to ignore.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub steward: Option<String>,
+    /// The pinned measure, present only on a structured observation. Omitted rather than null so
+    /// every pre-measure payload stays byte-identical to the one it emitted before this field
+    /// existed — the same additive discipline `verdict` and `actor` already hold.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub measure: Option<String>,
+    /// The observed magnitude, canonically formatted so the payload spells it the way the record
+    /// does.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// The unit the value is counted in.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unit: Option<String>,
+    /// The environment the measurement was taken under.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub env: BTreeMap<String, String>,
     /// Git HEAD's author date (RFC3339) — the tree the note was authored against.
     pub occurred_at: String,
     /// The atom CID of the `FlowRecord::Event`.
@@ -287,8 +512,23 @@ impl NoteOutcome {
         if let Some(switched) = &self.switched_to {
             println!("        switched to: {switched}");
         }
+        if let Some(closes) = &self.closes {
+            println!("        closes: {}", short_cid_str(closes));
+        }
         if let Some(verdict) = &self.verdict {
             println!("        verdict: {verdict}");
+        }
+        if let (Some(measure), Some(value)) = (&self.measure, &self.value) {
+            let unit = self
+                .unit
+                .as_ref()
+                .map(|u| format!(" {u}"))
+                .unwrap_or_default();
+            println!("        measure: {measure} = {value}{unit}");
+            if !self.env.is_empty() {
+                let env: Vec<String> = self.env.iter().map(|(k, v)| format!("{k}={v}")).collect();
+                println!("        env: {}", env.join(" "));
+            }
         }
         if let Some(actor) = &self.actor {
             println!("        actor: {actor}");
@@ -325,20 +565,217 @@ pub fn note(
     verdict: Option<&str>,
     actor: &NoteActor,
 ) -> FlowResult<NoteOutcome> {
+    note_with_options(
+        root,
+        on,
+        kind,
+        reason,
+        switched_to,
+        verdict,
+        actor,
+        &super::acceptance::AcceptanceOptions::default(),
+    )
+}
+
+/// Author a note with optional appointed acceptance metadata under the same append lock.
+#[allow(clippy::too_many_arguments)]
+pub fn note_with_options(
+    root: &Path,
+    on: &str,
+    kind: &str,
+    reason: &str,
+    switched_to: Option<&str>,
+    verdict: Option<&str>,
+    actor: &NoteActor,
+    options: &super::acceptance::AcceptanceOptions,
+) -> FlowResult<NoteOutcome> {
+    note_with_options_closing(
+        root,
+        on,
+        kind,
+        reason,
+        switched_to,
+        None,
+        verdict,
+        actor,
+        options,
+    )
+}
+
+/// The same append, with an explicit `--closes <correction-cid>` claim attached.
+///
+/// A separate entry point rather than a ninth parameter on [`note_with_options`]: every existing
+/// caller keeps its signature, and the one act that carries a closure names it at the call site
+/// instead of threading a `None` through the whole family.
+#[allow(clippy::too_many_arguments)]
+pub fn note_with_options_closing(
+    root: &Path,
+    on: &str,
+    kind: &str,
+    reason: &str,
+    switched_to: Option<&str>,
+    closes: Option<&str>,
+    verdict: Option<&str>,
+    actor: &NoteActor,
+    options: &super::acceptance::AcceptanceOptions,
+) -> FlowResult<NoteOutcome> {
+    note_with_options_guard(
+        root,
+        on,
+        NoteKind::parse(kind)?,
+        reason,
+        switched_to,
+        closes,
+        verdict,
+        actor,
+        options,
+        None,
+        |_| Ok(()),
+    )
+}
+
+/// `epr flow note --kind observation --measure <id@version> --subject <path-or-cid> --value <n>
+/// [--unit <u>] [--env k=v]…` — a STRUCTURED observation.
+///
+/// The same append as any other note, with one gate in front of it: the measure pin must be
+/// declared in the registry, and an undeclared pin is REFUSED naming the registry path. That
+/// refusal is the whole reason this arm exists rather than the caller writing a prose note that
+/// happens to contain a number. The kit's thresholds were unaddressable constants; a fold minted
+/// against an undeclared measure would be an unaddressable number — the same defect one layer up.
+///
+/// The subject IS the target: a measurement is *of* something, so there is no second `--on`.
+/// `--kind` is accepted for symmetry with the prose arms but must be `observation`; a correction
+/// or a verdict carrying a magnitude would be a record whose kind and content disagree.
+#[allow(clippy::too_many_arguments)]
+pub fn observe(
+    root: &Path,
+    kind: &str,
+    measure_raw: &str,
+    subject: &str,
+    value: f64,
+    unit: Option<&str>,
+    env: &BTreeMap<String, String>,
+    reason: Option<&str>,
+    actor: &NoteActor,
+    measures_path: &Path,
+) -> FlowResult<NoteOutcome> {
+    // Argument shape first, before the registry is read and long before the store is opened.
+    let kind_parsed = NoteKind::parse(kind)?;
+    if kind_parsed != NoteKind::Observation {
+        return Err(FlowError::InvalidArguments(format!(
+            "--measure belongs to --kind observation alone; got `{}` — \
+             a magnitude on any other kind is a record whose tag and body disagree",
+            kind_parsed.tag()
+        )));
+    }
+    if !value.is_finite() {
+        return Err(FlowError::InvalidArguments(
+            "--value must be a finite number — NaN and infinity are not measurements".into(),
+        ));
+    }
+    let measure = MeasureRef::parse(measure_raw, measures_path)?;
+
+    let registry = Registry::open(measures_path)?;
+    if !registry.declares(&measure) {
+        let pins = registry.measure_pins();
+        // A sample, not the whole registry: the refusal's job is to name WHERE the legal set lives
+        // so the caller can read it, and a thirty-row wall of ids buries that path in its own
+        // output. The path is the durable answer; the sample is only orientation.
+        let shown: Vec<String> = pins.iter().take(6).map(ToString::to_string).collect();
+        let declared = if pins.is_empty() {
+            "(the registry declares no measures)".to_string()
+        } else if pins.len() > shown.len() {
+            format!(
+                "e.g. {} … and {} more",
+                shown.join(", "),
+                pins.len() - shown.len()
+            )
+        } else {
+            shown.join(", ")
+        };
+        return Err(FlowError::InvalidArguments(format!(
+            "unknown measure `{measure}` — it is not declared in {}. Declared: {declared}",
+            measures_path.display(),
+        )));
+    }
+
+    // A caller-supplied unit wins; otherwise the registry's declared unit is adopted so a fold
+    // carries the unit its measure was declared in without every call site restating it.
+    let unit = unit
+        .map(|u| non_empty(u, "--unit").map(str::to_string))
+        .transpose()?
+        .or_else(|| registry.declared_unit(&measure));
+
+    let observation = Observation {
+        measure,
+        value,
+        unit,
+        env: env.clone(),
+    };
+    let reason = match reason {
+        Some(text) => non_empty(text, "--reason")?.to_string(),
+        None => observation.derived_reason(),
+    };
+
+    note_with_options_guard(
+        root,
+        subject,
+        kind_parsed,
+        &reason,
+        None,
+        None,
+        None,
+        actor,
+        &super::acceptance::AcceptanceOptions::default(),
+        Some(&observation),
+        |_| Ok(()),
+    )
+}
+
+/// A local composition may constrain the resolved attribution, but it cannot replace it.
+/// The guard and event/outcome consume one snapshot, retaining its exact actor-claim CID.
+#[allow(clippy::too_many_arguments)]
+fn note_with_options_guard(
+    root: &Path,
+    on: &str,
+    kind: NoteKind,
+    reason: &str,
+    switched_to: Option<&str>,
+    closes: Option<&str>,
+    verdict: Option<&str>,
+    actor: &NoteActor,
+    options: &super::acceptance::AcceptanceOptions,
+    observation: Option<&Observation>,
+    guard: impl FnOnce(&Attribution) -> FlowResult<()>,
+) -> FlowResult<NoteOutcome> {
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
-    // Argument shape first, so a malformed invocation never even opens the store.
-    let kind = NoteKind::parse(kind)?;
+    // Argument shape first, so a malformed invocation never even opens the store. The KIND is
+    // already parsed by the caller: every public entry point resolves it through the closed
+    // `NoteKind::parse`, and the one act whose kind is not typable (`retraction`) resolves it
+    // after its own eligibility check. Taking the enum here rather than a string is what makes
+    // "unreachable from `--kind`" a property of the type rather than of a spelling.
     let reason = non_empty(reason, "--reason")?;
     let switched_to = switched_to
         .map(|s| non_empty(s, "--switched-to"))
         .transpose()?;
     let verdict = resolve_verdict(kind, verdict)?;
+    let closes = resolve_closes(kind, closes)?;
     let named = named_identity(actor.as_ref.as_deref())?;
 
     let mut store = SidecarFlowStore::open(root)?.transaction()?;
     let records = store.records()?;
-    let (resource, label) = resolve_target(root, on, &records)?;
+    // The repository-root subject is admitted on the STRUCTURED arm only. Scoping it to
+    // `observation.is_some()` is what keeps every prose note's address exactly where it is: a
+    // `.`-targeted prose note has always been an `UnknownResource` refusal, and quietly making it
+    // resolve would mint records at an address the sidecar's history never used. A repository-wide
+    // MEASUREMENT is a different thing — it has no file to name, and `repo_scope_atom` is the
+    // resource the flow plane already scopes every commitment to.
+    let (resource, label) = if observation.is_some() && is_repo_root(root, on) {
+        (repo_scope_atom()?, REPO_SUBJECT.to_string())
+    } else {
+        resolve_target(root, on, &records)?
+    };
 
     // Provenance and clock come from the same single `git log -1`, and an unattributable note is
     // refused rather than dated with a placeholder (module doc).
@@ -350,11 +787,50 @@ pub fn note(
         ))
     })?;
 
-    let attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
+    let mut attribution = resolve_attribution(root, named, actor.session.as_deref(), &author);
+    if options.purpose.as_deref() == Some("acceptance") {
+        let (pin, identity) = actor
+            .session
+            .as_deref()
+            .and_then(|session| claimed_for_session(root, session))
+            .ok_or_else(|| {
+                FlowError::InvalidArguments(
+                    "acceptance requires a registered --session actor claim".into(),
+                )
+            })?;
+        if actor
+            .as_ref
+            .as_deref()
+            .is_some_and(|named| named.trim() != identity)
+        {
+            return Err(FlowError::InvalidArguments(
+                "acceptance --as differs from session actor claim".into(),
+            ));
+        }
+        attribution = Attribution {
+            claim_cid: Some(pin),
+            ..Attribution::claimed(identity, &author)
+        };
+    }
+
+    guard(&attribution)?;
 
     // Tag first, subject second, authored body after, verdict next, steward last — see
     // `note_slots`, `FlowEvent::classified_as` and `STEWARD_SLOT_PREFIX`.
-    let mut classified_as = note_slots(kind, &label, reason, switched_to, verdict.as_deref(), None);
+    let mut classified_as = note_slots(
+        kind,
+        &label,
+        reason,
+        switched_to,
+        closes.as_deref(),
+        verdict.as_deref(),
+        None,
+    );
+    // Additive: a note carrying no measure extends nothing here and keeps the address it always had.
+    if let Some(observation) = observation {
+        classified_as.extend(observation.slots());
+    }
+    classified_as.extend(options.slots(root, &records, &resource, kind.tag())?);
     attribution.append_slots(&mut classified_as);
 
     let event = FlowEvent {
@@ -379,6 +855,9 @@ pub fn note(
         occurred_at: occurred_at.clone(),
     };
 
+    if options.appoint.is_some() || options.purpose.is_some() {
+        super::acceptance::validate_record(root, &records, &event)?;
+    }
     let record = FlowRecord::Event(event);
     let record_cid = record.cid()?;
     let appended = !records.iter().any(|(cid, _)| cid == &record_cid);
@@ -389,8 +868,14 @@ pub fn note(
         resource: resource.to_string(),
         reason: reason.to_string(),
         switched_to: switched_to.map(str::to_string),
+        closes: closes.clone(),
         verdict: verdict.clone(),
+        measure: observation.map(|o| o.measure.to_string()),
+        value: observation.map(|o| canonical_number(o.value)),
+        unit: observation.and_then(|o| o.unit.clone()),
+        env: observation.map(|o| o.env.clone()).unwrap_or_default(),
         actor: attribution.actor.clone(),
+        actor_claim: attribution.claim_cid.map(|cid| cid.to_string()),
         steward: attribution.steward.clone(),
         occurred_at,
         record_cid: record_cid.to_string(),
@@ -402,6 +887,80 @@ pub fn note(
         store.append(record)?;
     }
     Ok(outcome)
+}
+
+/// Append one `run:retraction` note against an already-checked sidecar record.
+///
+/// The ONLY producer of [`NoteKind::Retraction`]. It performs no eligibility check of its own —
+/// [`super::retract`] owns that, because the check needs the record set folded into slots and
+/// this leg deliberately knows nothing about what a `DepEdge` is. Splitting it this way keeps the
+/// note plane a plane: it appends what it is told to append, and the admissibility question lives
+/// with the vocabulary it is about.
+///
+/// `on` is the retracted record's CID string, which [`resolve_target`] resolves through its
+/// known-atom arm — so the note's `resource` IS the withdrawn record's address, and a reader
+/// joining the two needs no heuristic.
+pub(crate) fn retraction(
+    root: &Path,
+    on: &str,
+    reason: &str,
+    actor: &NoteActor,
+) -> FlowResult<NoteOutcome> {
+    note_with_options_guard(
+        root,
+        on,
+        NoteKind::Retraction,
+        reason,
+        None,
+        None,
+        None,
+        actor,
+        &super::acceptance::AcceptanceOptions::default(),
+        None,
+        |_| Ok(()),
+    )
+}
+
+/// Native local act policy: require a registered session snapshot and optionally
+/// match an authored identity. This is claimed attribution, not authentication.
+pub(crate) fn note_for_session(
+    root: &Path,
+    on: &str,
+    kind: &str,
+    reason: &str,
+    session: &str,
+    expected_author: Option<&str>,
+) -> FlowResult<NoteOutcome> {
+    note_with_options_guard(
+        root,
+        on,
+        NoteKind::parse(kind)?,
+        reason,
+        None,
+        None,
+        None,
+        &NoteActor {
+            as_ref: None,
+            session: Some(session.into()),
+        },
+        &super::acceptance::AcceptanceOptions::default(),
+        None,
+        |attribution| {
+            if attribution.claim_cid.is_none() {
+                return Err(FlowError::InvalidArguments(
+                    "session has no registered actor claim".into(),
+                ));
+            }
+            if expected_author
+                .is_some_and(|expected| attribution.actor.as_deref() != Some(expected))
+            {
+                return Err(FlowError::InvalidArguments(
+                    "author differs from registered session claim".into(),
+                ));
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Reject a blank flag value, naming the flag. An empty `--reason` is the one refusal this leg
@@ -798,6 +1357,7 @@ mod tests {
             "genesis/plan.md",
             "the gate line is present and the diff conforms",
             Some("a different approach"),
+            None,
             Some("approved"),
             Some("author@example.test"),
         );
@@ -814,6 +1374,47 @@ mod tests {
         );
     }
 
+    /// The closure slot sits between `switched-to:` and `verdict:`, and a note that closes nothing
+    /// emits no slot for it at all — which is what keeps every existing note's address where it is.
+    #[test]
+    fn the_closes_slot_is_positional_and_additive_between_switched_to_and_verdict() {
+        assert_eq!(
+            note_slots(
+                NoteKind::Verdict,
+                "genesis/plan.md",
+                "the repair conforms",
+                Some("a different approach"),
+                Some("bafyreiabc"),
+                Some("approved"),
+                Some("author@example.test"),
+            ),
+            vec![
+                "run:verdict".to_string(),
+                "genesis/plan.md".to_string(),
+                "reason:the repair conforms".to_string(),
+                "switched-to:a different approach".to_string(),
+                "closes:bafyreiabc".to_string(),
+                "verdict:approved".to_string(),
+                "steward:author@example.test".to_string(),
+            ]
+        );
+    }
+
+    /// `--closes` is refused on the one kind that cannot discharge anything, and refused outright
+    /// when its target is not an address a reader can verify.
+    #[test]
+    fn a_closure_target_must_be_a_cid_and_never_a_failed_approach() {
+        let cid = super::super::body_cid("some correction").to_string();
+        assert_eq!(
+            resolve_closes(NoteKind::Observation, Some(&cid)).unwrap(),
+            Some(cid.clone())
+        );
+        assert_eq!(resolve_closes(NoteKind::Correction, None).unwrap(), None);
+        assert!(resolve_closes(NoteKind::FailedApproach, Some(&cid)).is_err());
+        assert!(resolve_closes(NoteKind::Observation, Some("2026-09-10")).is_err());
+        assert!(resolve_closes(NoteKind::Observation, Some("  ")).is_err());
+    }
+
     /// The additive discipline, pinned: with no verdict the slot vector is BYTE-IDENTICAL to
     /// the one the pre-verdict encoder emitted, so every existing note keeps its address.
     #[test]
@@ -824,6 +1425,7 @@ mod tests {
                 "genesis/plan.md",
                 "Tried Tsit5, the system is too stiff",
                 Some("Kvaerno5"),
+                None,
                 None,
                 None,
             ),
@@ -866,6 +1468,86 @@ mod tests {
         assert_eq!(
             cid.to_string(),
             "bafyreibzhpdchthmt3zlnhjjjsll6ji6p6fmhqlarcoymuhiprzof75jbq"
+        );
+    }
+    #[test]
+    fn guarded_note_emits_the_validated_actor_snapshot_after_session_switch() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "assertion.md"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let result = crate::process::build_command("git", &args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+        }
+        crate::actor::claim(root, "agent:investigator@fixture", "switching").unwrap();
+        let original = SidecarActorStore::open(root)
+            .unwrap()
+            .current_for("switching")
+            .unwrap()
+            .unwrap();
+        let outcome = note_with_options_guard(
+            root,
+            "assertion.md",
+            NoteKind::Observation,
+            "Validated before switch",
+            None,
+            None,
+            None,
+            &NoteActor {
+                as_ref: None,
+                session: Some("switching".into()),
+            },
+            &super::super::acceptance::AcceptanceOptions::default(),
+            None,
+            |resolved| {
+                assert_eq!(
+                    resolved.actor.as_deref(),
+                    Some("agent:investigator@fixture")
+                );
+                assert_eq!(resolved.claim_cid, Some(original.0));
+                // Deterministic interleaving at the old race: another persona registers
+                // after validation but before event construction and append.
+                crate::actor::claim(root, "agent:reviewer@fixture", "switching").unwrap();
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome.actor.as_deref(), Some("agent:investigator@fixture"));
+        assert_eq!(outcome.actor_claim, Some(original.0.to_string()));
+        let records = SidecarFlowStore::open(root).unwrap().records().unwrap();
+        let FlowRecord::Event(event) = &records[0].1 else {
+            panic!("event expected")
+        };
+        assert_eq!(event.provider.0, "agent:investigator@fixture");
+        assert!(event
+            .classified_as
+            .contains(&format!("actor-claim:{}", original.0)));
+        assert!(note_for_session(
+            root,
+            "assertion.md",
+            "observation",
+            "Wrong expected persona",
+            "switching",
+            Some("agent:investigator@fixture")
+        )
+        .is_err());
+        assert_eq!(
+            SidecarFlowStore::open(root)
+                .unwrap()
+                .records()
+                .unwrap()
+                .len(),
+            1
         );
     }
 }

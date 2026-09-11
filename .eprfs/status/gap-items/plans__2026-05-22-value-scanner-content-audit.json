@@ -1,0 +1,57 @@
+{
+ "doc": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md",
+ "slug": "plans__2026-05-22-value-scanner-content-audit",
+ "method": "agent-decomposition",
+ "count": 7,
+ "items": [
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#1",
+   "text": "Section 1 epic framing summary + Section 2 archetype directory inventory (the value-scanner corpus mapped)",
+   "line": 21,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L21"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#2",
+   "text": "Section 3 scenario statistics: counts of conceptual scenarios across the 21 life-stage archetypes (the ~1,700 value-scanner scenario corpus)",
+   "line": 76,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L76"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#3",
+   "text": "Section 4 sampled scenarios: representative scenarios examined for shape/quality",
+   "line": 166,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L166"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#4",
+   "text": "Section 5 mapping value-scanner content to the Qahal catalog (which value-scanner archetypes feed which Qahal stories)",
+   "line": 220,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L220"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#5",
+   "text": "Section 6 connection to .feature archaeology (how the value-scanner corpus relates to the 76-file a2o tree)",
+   "line": 275,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L275"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#6",
+   "text": "Section 7 reorganization proposal: how to restructure the value-scanner content directory",
+   "line": 315,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L315"
+  },
+  {
+   "id": "plans__2026-05-22-value-scanner-content-audit#7",
+   "text": "Section 8 operator decisions to flag: the open questions requiring operator sign-off before reorganization",
+   "line": 347,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-22-value-scanner-content-audit.md#L347"
+  }
+ ]
+}

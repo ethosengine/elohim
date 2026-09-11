@@ -1,0 +1,290 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md",
+ "slug": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 35,
+ "items": [
+  {
+   "text": "Step 1: Stand up the seeded local stack (from app/elohim-app/): pnpm run hc:start:seed",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L204",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: RESOLVE the performer claim [C8]. Log in and decode the JWT; find which claim equals the",
+   "line": 208,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L208",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Confirm the two-table reality [C1]. Verify delegates-compute \u2209 CONDUCTOR_SOFT_ACTIONS",
+   "line": 229,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L229",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Confirm the doorway insertion seam + the bounds API. Read server/http.rs ~3726-3765",
+   "line": 242,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L242",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit the Phase-0 evidence \u2014 append <PERFORMER_CLAIM>, the mishpat write fn name, the",
+   "line": 246,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L246",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing minimum-bounds guard test ([C4] \u2014 allowlist, not rank ladder):",
+   "line": 267,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L267",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run \u2192 FAIL. cd genesis/seeder && pnpm exec vitest run src/seed-delegates-compute.test.ts",
+   "line": 297,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L297",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the factory ([C4] SAFE_CEILINGS allowlist; [C8] recipient = <PERFORMER_CLAIM>",
+   "line": 299,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L299",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Add the CLI entry block (mirror seed-commitments.ts:399-429): read STORAGE_URL",
+   "line": 386,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L386",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Add package.json scripts:",
+   "line": 391,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L391",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing endpoint test (tests/seed_delegates_compute.rs): with the flag SET,",
+   "line": 428,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L428",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run \u2192 FAIL (CARGO_TARGET_DIR=/tmp/che-opgate-target cargo test --test seed_delegates_compute)",
+   "line": 433,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L433",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the gated handler (model on handle_seed_shard_manifest \u2014 flag check + 403):",
+   "line": 435,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L435",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Register the route in http.rs alongside the other /admin/seed/* routes (ingress-class,",
+   "line": 473,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L473",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing service test ([I8] real stubs MockCommitmentFetcher.seed(...) +",
+   "line": 502,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L502",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run \u2192 FAIL",
+   "line": 524,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L524",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Add the scoped diesel lookup [I1] (scope filter in SQL \u2014 avoids a newer differently-scoped",
+   "line": 526,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L526",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Implement the service ([C2]/[C3] performer bind is the service's OWN deny, not a",
+   "line": 550,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L550",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Register the endpoint (POST /api/v1/authorize-operation, .auth_required() per D6 \u2014",
+   "line": 592,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L592",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add the mode flag + startup refusals. OpGateMode \u2208 {Off, Observe, Enforce} from",
+   "line": 624,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L624",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the failing decision test. Extract the decision as a pure fn over",
+   "line": 628,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L628",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Implement. Insert in the Disposition::StorageProxy arm, after the /blob/ early-return,",
+   "line": 636,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L636",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Bring the stack up enforce + seeded (local M/J/J; matthew = ingest/custodian node;",
+   "line": 689,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L689",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Authorized drive \u2014 POST blob-backed content holding only a JWT ([I2] send a non-empty",
+   "line": 693,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L693",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Observe the card light through the governed path",
+   "line": 707,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L707",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Prove revocation denies the NEXT request (spec \u00a713) \u2014 revoke via the gated endpoint (Task 2),",
+   "line": 716,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L716",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Capture the observation \u2014 append to .claude/data/dev-intent.jsonl: the gate mode, the",
+   "line": 728,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L728",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the two-case scenario \u2014 (a) *authorized governed distribution* (active grant \u2192 POST",
+   "line": 742,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L742",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement the step-defs reusing the Wave-1.3 resilience.steps.ts ingest/assertion helpers",
+   "line": 745,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L745",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Run green on the local mesh (gate enforce):",
+   "line": 748,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L748",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run story-harvest to preserve the parameter-bearing constraints \u2014 the bounded-minimum",
+   "line": 751,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L751",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit scenario + step-defs together",
+   "line": 755,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L755",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Assert the coherent Che-facing posture in the repo: dev_mode OFF; DELEGATES_COMPUTE_OP_GATE=enforce;",
+   "line": 763,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L763",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: If the deploy path has no such coherence guard, add the startup assertion (refuse to boot",
+   "line": 768,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L768",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit the manifest/config coherence change (the next pipeline reconciles it)",
+   "line": 771,
+   "state": "OPEN",
+   "id": "plans__2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md#L771",
+   "class": "protocol-canonical"
+  }
+ ]
+}

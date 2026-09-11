@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md",
+ "slug": "plans__2026-09-09-purpose-preserving-memory-ceremony",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "A fresh entrant can recover the ceremony's intent, source-backed guiding context, scope, constraints and worthwhile finish from one entry without reconstructing the repository",
+   "line": 98,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L98",
+   "class": "provisional"
+  },
+  {
+   "text": "The entrant can choose an assertion from a source-grouped concern view, explain why it appeared, and open its purpose, claim, relevant passages, changes, contrary evidence and affected relationships progressively",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L106",
+   "class": "provisional"
+  },
+  {
+   "text": "The agent follows linked actions to inspect, compare, test a prerequisite, repair, request judgment or stop, and obtains a reviewed outcome tied to the original intent with per-edge reconciliation",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L116",
+   "class": "provisional"
+  },
+  {
+   "text": "After a deliberate context reset, a fresh agent resumes the same concern with intact intent, verified prior findings, unresolved questions and next justified action, revalidating changed evidence without repeating unchanged investigation",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L124",
+   "class": "provisional"
+  },
+  {
+   "text": "The agent changes to an authorized retrieval alternative within the same ceremony, retaining intent, navigation, evidence obligations, uncertainty and cumulative provenance without changing ceremony implementation",
+   "line": 132,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L132",
+   "class": "provisional"
+  },
+  {
+   "text": "An appointed fresh agent exercises the delivered entry, evidenced and contested concerns, interruption/resumption, alternative retrieval and reviewed completion, and records a warranted acceptance or changes-requested outcome on the exact produced scope",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-purpose-preserving-memory-ceremony#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md#L140",
+   "class": "provisional"
+  }
+ ]
+}

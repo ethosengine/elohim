@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "reach-enum-drift-reconciliation",
+  "claim": "Reach enum nomenclature drifted; scope-reconcile.py reconciles cluster-state ↔ deployments.json held/live.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_reach_enum_drift_reconciliation.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_reach_enum_drift_reconciliation.md",
+        "cid": "bafkreih3t2ha6s5jx5ajzw6gtmftnudmavemvbhzwyhr4jwglkeplujvye"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Reach reconciliation — canonical spec exists",
+    "file": "project_reach_enum_drift_reconciliation.md",
+    "scopePath": ".claude/memory/project_reach_enum_drift_reconciliation.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

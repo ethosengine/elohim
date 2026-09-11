@@ -1,0 +1,106 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md",
+ "slug": "specs__2026-05-16-graph-native-projection-substrate-design",
+ "method": "agent-decomposition",
+ "count": 14,
+ "items": [
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#1",
+   "text": "CozoDB embedded as elohim-storage dep (sqlite/sled backend, separate file); RUSTFLAGS= cargo build --release clean; graph-disabled config flag escape hatch",
+   "line": 491,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L491"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#2",
+   "text": "Core graph schema (relations epr_node/epr_edge/epr_lamad/epr_shefa/epr_qahal + universal indexes + traversal primitives neighborhood/path/reach_filtered/version_chain) created idempotently at startup",
+   "line": 102,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L102"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#3",
+   "text": "HNSW vector slot declared on epr_node.embedding <F32;768> (embedding pipeline deferred; near-zero cost unused)",
+   "line": 166,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L166"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#4",
+   "text": "Validity bitemporal type used throughout (updated_at, asserted_at) for first-class time-travel/version queries",
+   "line": 120,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L120"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#5",
+   "text": "Manifest extension contract: app-manifest.schema.json gains top-level graph section (edges/nodes/indexes/rules) + registration-time validator (unique types, valid refs, no core-rule shadowing, Datalog parses)",
+   "line": 200,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L200"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#6",
+   "text": "Projection pipeline: projector fans out to both diesel and CozoDB from same event source; per-target transactional, cross-target eventually-consistent; upsert-by-CID idempotent; forward-tolerance of missing edge targets",
+   "line": 276,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L276"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#7",
+   "text": "Backfill command projector::backfill_graph: walks epr_atoms in CID order, re-derives graph projection, CID-watermark checkpoint, idempotent; runs at first startup / schema migration / reconciliation divergence",
+   "line": 338,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L338"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#8",
+   "text": "Shefa manifest extension (headline): edges STEWARDS/VALUE_FLOW/MEMBER_OF/RECIPROCATES_WITH/OPERATES_DEVICE + rules household_topology/collective_topology/reciprocity_flow_to/value_flow_chain",
+   "line": 499,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L499"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#9",
+   "text": "Lamad manifest extension (rides along): edges PREREQUISITE/TEACHES/CONTAINS/REFERENCES/MASTERY_OF/SUPERSEDES + rules prerequisite_chain/mastery_frontier",
+   "line": 522,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L522"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#10",
+   "text": "9 view builders: 3 lamad (resolved_atom, navigation_context, atom_version_chain) + 6 shefa (peer_topology, reciprocity, cluster, resilience_snapshot, distribution, topology_overview); graph-backed composing Datalog + diesel",
+   "line": 573,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L573"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#11",
+   "text": "4 new REST view schemas + routes: resolved-atom, navigation-context, atom-version-chain, topology-overview; 5 existing schemas gain graph backing (wire shape unchanged)",
+   "line": 413,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L413"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#12",
+   "text": "GraphQL surface (server-side): async-graphql at POST /api/v1/graphql; codegen pass emits Apollo Federation v2 subgraph SDL; default+pillar resolvers; LearningNeighborhood + HouseholdTopology demo queries return expected shape",
+   "line": 433,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L433"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#13",
+   "text": "No regressions: existing storage tests pass; existing REST views unchanged in wire shape; no new DHT entry types; pre-push + orchestrator CI green",
+   "line": 584,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L584"
+  },
+  {
+   "id": "specs__2026-05-16-graph-native-projection-substrate-design#14",
+   "text": "Deferred: embedding pipeline (model/cadence/refresh); per-rule cost annotation; custom resolvers in domain manifests; graph projection observability; CozoDB query-optimization tooling; Angular Apollo Client wiring; @wip BDD lift (frontend follow-on)",
+   "line": 704,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-16-graph-native-projection-substrate-design.md#L704"
+  }
+ ]
+}

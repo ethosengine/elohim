@@ -1,0 +1,130 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md",
+ "slug": "specs__2026-06-10-che-network-agency-arc-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 15,
+ "items": [
+  {
+   "text": "Operator grants a scoped permission rule for fixture-auth flows against alpha",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L59",
+   "class": "process-meta"
+  },
+  {
+   "text": "Verify look --as Matthew end-to-end (closes the L3 open item; proves the write context)",
+   "line": 60,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L60",
+   "class": "process-meta"
+  },
+  {
+   "text": "Document the authorized-write etiquette in genesis/a2o/CLAUDE.md (what dev writes on",
+   "line": 61,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L61",
+   "class": "process-meta"
+  },
+  {
+   "text": "Spike: fetch deployed DNA artifacts; conductor network config \u2192 alpha bootstrap/signal;",
+   "line": 79,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L79",
+   "class": "process-meta"
+  },
+  {
+   "text": "Prove agency: the Che peer authors one DHT entry as itself and a household peer reads it",
+   "line": 81,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L81",
+   "class": "process-meta"
+  },
+  {
+   "text": "Document workspace-peer lifecycle (PVC key continuity, teardown etiquette, one-peer-per-workspace)",
+   "line": 82,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L82",
+   "class": "process-meta"
+  },
+  {
+   "text": "Define the first delegation instance: scope vocabulary for agent content-authorship",
+   "line": 99,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L99",
+   "class": "process-meta"
+  },
+  {
+   "text": "Mint + exercise one real grant on alpha: Matthew \u2192 agent, agent authors content within",
+   "line": 101,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L101",
+   "class": "process-meta"
+  },
+  {
+   "text": "Decide the provenance marker question: is an Attestation (\"agent-operated account\")",
+   "line": 103,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L103",
+   "class": "process-meta"
+  },
+  {
+   "text": "Retire Stage-A credentialed writes for routine agent work once C is exercised",
+   "line": 105,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L105",
+   "class": "process-meta"
+  },
+  {
+   "text": "Thread CONDUCTOR_BOOTSTRAP_URL / CONDUCTOR_SIGNAL_URL (or a generated conductor-config)",
+   "line": 172,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L172",
+   "class": "process-meta"
+  },
+  {
+   "text": "join-alpha sources the deployed .dna bundles (parity rail) \u2014 add a fetch path for",
+   "line": 175,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L175",
+   "class": "process-meta"
+  },
+  {
+   "text": "De-duplicate one seam: a2o local-stack.ts consumes hc-start.sh's surface (single",
+   "line": 177,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L177",
+   "class": "process-meta"
+  },
+  {
+   "text": "DoorwaySessionClient in @elohim/identity; a2o framework + look --as consume it",
+   "line": 199,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L199",
+   "class": "process-meta"
+  },
+  {
+   "text": "CommitmentService in @elohim/rea-runtime with the delegates-compute builder and",
+   "line": 201,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-che-network-agency-arc-design#15",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-che-network-agency-arc-design.md#L201",
+   "class": "process-meta"
+  }
+ ]
+}

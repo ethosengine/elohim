@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md",
+ "slug": "specs__2026-05-25-pillar-epr-decomposition-design",
+ "method": "agent-decomposition",
+ "note": "Hand-authored 2026-06-04 per decompose.py:176 (requirement-bullets had extracted \u00a76 code-block lines, not gaps). Items decompose the \u00a712 URL & Routing Contract amendment. The pre-\u00a712 MVP body largely LANDED via the 2026-05-29 substrate-shakeout sprint; its open remainder (cross-peer reconciler, apex leg, warm-cache fast path) is tracked in the sprint plan's own gap file.",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 10,
+ "items": [
+  {
+   "text": "Doorway SPA fallback: derive_app_subpath serves entry_file for extension-less (ROUTE) deep paths, gated by spa_fallback on the projection (serde default true for bundle EPRs)",
+   "line": 788,
+   "state": "CLAIMED",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L788",
+   "class": "protocol-canonical",
+   "claim_note": "implemented (leg A + fixer query-thread); CI/render verify pending \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Storage safety-net fallback: handle_app_request serves bundle index.html with X-SPA-Fallback:1 on ROUTE miss; ASSET miss stays 404 JSON (covers tauri-direct deep links)",
+   "line": 789,
+   "state": "CLAIMED",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L789",
+   "class": "protocol-canonical",
+   "claim_note": "implemented (leg B, 3 miss-sites + ?spaFallback honor); CI/render verify pending \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Shared ROUTE/ASSET discrimination rule with one test-vector table used by both doorway and storage implementations (two-layer drift guard)",
+   "line": 786,
+   "state": "CLAIMED",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L786",
+   "class": "protocol-canonical",
+   "claim_note": "implemented (shared fixture consumed by both crates, 15 vectors green both sides) \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Reserved-prefix rejection: validate_url_path rejects projections whose urlPath collides with /epr|/db|/api|/blob|/apps|/auth|/status|/health",
+   "line": 780,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L780",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Universal /epr/{id} doorway resolver: 302 to claimed mount (fragment-preserving) / shell render when reachable-unclaimed / designed gate when unreachable",
+   "line": 776,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L776",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "eprToRoute rewrite around BundleRouteContext claims: relative routes in-mount, ['/epr', id] otherwise; all '/lamad/path' literals removed from @elohim/service, epr-resolver.service.ts, and lamad content-viewer navigateToPath",
+   "line": 796,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-6",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L796",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "routeClaims in bundle EPR manifests ({contentType, template, fragments}) consumed by the doorway /epr resolver for type-driven 302s",
+   "line": 798,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-7",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L798",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Shell app epr/:id client route rendering the resource viewer with EPR fragment handling",
+   "line": 776,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-8",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L776",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Card-flip + pushState canonical local URL on EPR-link flips (mount URL if claimed in-bundle, else /epr/{id}); session/scroll preserved",
+   "line": 800,
+   "state": "OPEN",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-9",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L800",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o render-verified scenarios: cold shared path URL, deep step link, /epr resolves to mount, legacy doubled URL shows designed not-found, asset miss stays 404",
+   "line": 811,
+   "state": "CLAIMED",
+   "id": "specs__2026-05-25-pillar-epr-decomposition-design#12-10",
+   "cites": "genesis/docs/superpowers/specs/2026-05-25-pillar-epr-decomposition-design.md#L811",
+   "class": "protocol-canonical",
+   "claim_note": "scenarios authored + steps (4 of 5; /epr deferred to Slice 2); green pending local stack run \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  }
+ ]
+}

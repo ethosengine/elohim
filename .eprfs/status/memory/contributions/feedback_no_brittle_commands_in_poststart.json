@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-no-brittle-commands-in-poststart",
+  "claim": "Devfile postStart failures abort whole-workspace startup — new tooling goes under commands: (on demand); only can't-fail commands auto-run.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_no_brittle_commands_in_poststart.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_no_brittle_commands_in_poststart.md",
+        "cid": "bafkreicd6d2vpghkwkqqzfvuyzbxqyqqc5bikvomqmw5dnherlm7pv2tqq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "No brittle commands in devfile postStart",
+    "file": "feedback_no_brittle_commands_in_poststart.md",
+    "scopePath": ".claude/memory/feedback_no_brittle_commands_in_poststart.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -1,0 +1,113 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md",
+ "slug": "specs__2026-04-19-gate-challenge-and-indemnification-design",
+ "method": "agent-decomposition",
+ "count": 15,
+ "items": [
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#1",
+   "text": "Add GateDecisionChallenge as a new Category A (Notarized) entry type in mishpat integrity DNA (challenge_id CID, challenged_decision_cid, challenger_id, grounds, summary, evidence_refs, filed_at, reach)",
+   "line": 30,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L30"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#2",
+   "text": "ChallengeGrounds enum: factual-error | safety | policy | constitutional | indemnification-request, mapped to existing mishpat CHALLENGE_GROUNDS where overlap exists",
+   "line": 47,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L47"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#3",
+   "text": "Standing/challenge-rights validation: subject always; stewards over content-type; affected community members; protocol stewards on constitutional/safety; dangling challenged_decision_cid fails integrity validation",
+   "line": 56,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L56"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#4",
+   "text": "Challenge Reach gate: private-steward/community/public/protocol; escalate-only during review (cannot narrow)",
+   "line": 67,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L67"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#5",
+   "text": "Tiered review: app-steward (default) / qahal community / existential-boundary, severity-determined; reuse Discussion + Proposal/ProposalVote mishpat types",
+   "line": 82,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L82"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#6",
+   "text": "Add ChallengeOutcome as a second Category A (Notarized) mishpat entry type (verdict, reviewer_consensus, ConstitutionalReasoning reused, decided_at, indemnification_action co-committed)",
+   "line": 92,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L92"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#7",
+   "text": "ChallengeVerdict enum: upheld | dismissed | superseded; upheld REQUIRES Some(indemnification_action)",
+   "line": 108,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L108"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#8",
+   "text": "IndemnificationAction enum: ReputationDegrade / SubstanceAttestation / ReparationAttestation / ConstitutionalUpdate (non-exclusive, multiple per outcome)",
+   "line": 125,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L125"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#9",
+   "text": "Five-step upheld loop: outcome commits, GateDecisionAttestation stays immutable (additive link only), SubstanceAttestation on ElohimSubstance CID, ReparationAttestation to affected party, degraded-trust signal feeds future invocations",
+   "line": 160,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L160"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#10",
+   "text": "Reputation accumulation: observed from the outcome graph; dimensions (total/challenged/upheld/dismissed/severity_weighted/time_decay/substance_continuity); filter to phase: elohim-active",
+   "line": 179,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L179"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#11",
+   "text": "Substance-continuity policy: constitutional-descendant transfers reputation; full substance rotation resets by policy; rotation is notarized imagodei record (legible not erasure)",
+   "line": 198,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L198"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#12",
+   "text": "Reputation feeds trust-modulated inspection depth + peer-dispatch preference via elohim-strength vocabulary (appeals-sustained positive; upheld-challenge negative)",
+   "line": 203,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L203"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#13",
+   "text": "Coordinator zome fns mishpat::create_gate_decision_challenge and mishpat::create_challenge_outcome",
+   "line": 240,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L240"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#14",
+   "text": "Link types connecting GateDecisionAttestation -> ChallengeOutcome (pattern of IdToGateDecision/ElohimToGateDecisions) + elohim-storage projection tables for both new entry types",
+   "line": 242,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L242"
+  },
+  {
+   "id": "specs__2026-04-19-gate-challenge-and-indemnification-design#15",
+   "text": "HTTP routes for filing challenges and querying challenge status",
+   "line": 244,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md#L244"
+  }
+ ]
+}

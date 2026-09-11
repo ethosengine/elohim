@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "lint-autofix-string-scan-poison",
+  "claim": "Lint --fix rewrites runtime-critical: prefer-set-has, prefer-global-this, Array<T> in generated. Run AOT build.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_lint_autofix_string_scan_poison.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_lint_autofix_string_scan_poison.md",
+        "cid": "bafkreigz2tc3e4nyix3anzq6igor3bs2mjztlieifenwdmkyuhx3mjwhlu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Lint autofix string-scan poison",
+    "file": "feedback_lint_autofix_string_scan_poison.md",
+    "scopePath": ".claude/memory/feedback_lint_autofix_string_scan_poison.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

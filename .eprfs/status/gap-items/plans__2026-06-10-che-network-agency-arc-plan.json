@@ -1,0 +1,378 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md",
+ "slug": "plans__2026-06-10-che-network-agency-arc-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 46,
+ "items": [
+  {
+   "text": "Operator adds a permission rule allowing a2o fixture-auth flows against alpha (the",
+   "line": 70,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L70",
+   "class": "process-meta"
+  },
+  {
+   "text": "Record the grant + its intent in the journal/session notes (authorized-by line)",
+   "line": 73,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L73",
+   "class": "process-meta"
+  },
+  {
+   "text": "Run: cd genesis/a2o && pnpm look \"https://doorway-alpha.elohim.host/lamad\" --as Matthew --wait-testid <known-dashboard-testid> --out stage-a-verify",
+   "line": 79,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L79",
+   "class": "process-meta"
+  },
+  {
+   "text": "Read the screenshot; confirm an authenticated surface (not the login page);",
+   "line": 80,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L80",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check the box on the arc spec's Stage-A item + the L3 spec's Hygiene-#4 item; re-run",
+   "line": 83,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L83",
+   "class": "process-meta"
+  },
+  {
+   "text": "Add a short \"Authorized writes on shared alpha\" subsection under Tools: test-persona",
+   "line": 90,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L90",
+   "class": "process-meta"
+  },
+  {
+   "text": "Commit Phase 0 (docs + any look fix)",
+   "line": 93,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L93",
+   "class": "process-meta"
+  },
+  {
+   "text": "genesis/a2o/scripts/serve-reports.ts \u2014 zero-dep static server (dir index, png/json mime,",
+   "line": 102,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L102",
+   "class": "process-meta"
+  },
+  {
+   "text": "Document operator view in genesis/a2o/CLAUDE.md Tools (Che ui-playground endpoint)",
+   "line": 105,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L105",
+   "class": "process-meta"
+  },
+  {
+   "text": "Follow-up decision (with Stage C): publish look captures as ContentNodes with blob-backed",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L106",
+   "class": "process-meta"
+  },
+  {
+   "text": "Failing tests first (node-fetch/undici-agnostic transport injected): login, register,",
+   "line": 123,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L123",
+   "class": "process-meta"
+  },
+  {
+   "text": "Implement; framework-free (no Angular DI in the core class \u2014 Angular wraps it later)",
+   "line": 127,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L127",
+   "class": "process-meta"
+  },
+  {
+   "text": "pnpm --filter @elohim/identity test green; lint clean. Commit",
+   "line": 128,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L128",
+   "class": "process-meta"
+  },
+  {
+   "text": "DoorwayClient delegates its auth methods (login/register/logout/me/exchange) to",
+   "line": 135,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L135",
+   "class": "process-meta"
+  },
+  {
+   "text": "pnpm test:unit in a2o green; one @browser cucumber scenario with @auth passes",
+   "line": 138,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L138",
+   "class": "process-meta"
+  },
+  {
+   "text": "look --as re-verified through the migrated path (same command as Task 0.2). Commit",
+   "line": 140,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L140",
+   "class": "process-meta"
+  },
+  {
+   "text": "Backlog: migrate Angular auth.service.ts + doorway-app auth-state.service.ts onto",
+   "line": 144,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L144",
+   "class": "process-meta"
+  },
+  {
+   "text": "Backlog: doorway auth wire shapes into the view-schema contract system (today hand-authored",
+   "line": 146,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L146",
+   "class": "process-meta"
+  },
+  {
+   "text": "Investigate first (one step, journaled): how the pinned hc sandbox generate",
+   "line": 159,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L159",
+   "class": "process-meta"
+  },
+  {
+   "text": "Add NETWORK_PROFILE=isolated|join-alpha (default isolated \u2014 today's behavior,",
+   "line": 163,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L163",
+   "class": "process-meta"
+  },
+  {
+   "text": "Document the THREE profiles (isolated / live-data / join-alpha) in",
+   "line": 167,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L167",
+   "class": "process-meta"
+  },
+  {
+   "text": "Verify: NETWORK_PROFILE=isolated run is unchanged (existing smoke path); join-alpha",
+   "line": 170,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L170",
+   "class": "process-meta"
+  },
+  {
+   "text": "Investigate first: where the DNA pipeline archives .dna/.happ artifacts",
+   "line": 178,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L178",
+   "class": "process-meta"
+  },
+  {
+   "text": "Script: fetch the deployed bundle set to a cache dir; verify hashes (hc dna hash against",
+   "line": 182,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L182",
+   "class": "process-meta"
+  },
+  {
+   "text": "Verify: fetched-bundle hash list printed; isolated profile never touches the fetch path",
+   "line": 184,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L184",
+   "class": "process-meta"
+  },
+  {
+   "text": "Replace its re-implemented start/health/seed logic with: invoke hc-start.sh (or probe the",
+   "line": 191,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L191",
+   "class": "process-meta"
+  },
+  {
+   "text": "a2o pnpm test:api smoke passes against the stack it starts. Commit",
+   "line": 194,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L194",
+   "class": "process-meta"
+  },
+  {
+   "text": "Spike join: NETWORK_PROFILE=join-alpha pnpm hc:start:conductor \u2192 conductor up with",
+   "line": 205,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L205",
+   "class": "process-meta"
+  },
+  {
+   "text": "Prove agency: the Che agent authors one DHT entry (its own source chain \u2014 e.g. a",
+   "line": 209,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L209",
+   "class": "process-meta"
+  },
+  {
+   "text": "Lifecycle doc: app/elohim-app/CLAUDE.md join-alpha row gains: conductor data dir on",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L213",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check Stage-B boxes on the arc spec; re-decompose. Commit",
+   "line": 216,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L216",
+   "class": "process-meta"
+  },
+  {
+   "text": "Verify what Stage C consumes, quoting evidence: (a) delegates-compute commitment",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L224",
+   "class": "process-meta"
+  },
+  {
+   "text": "Decision gate: if bounds enforcement is not yet consumable, Stage C's full loop",
+   "line": 230,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L230",
+   "class": "process-meta"
+  },
+  {
+   "text": "Define the instance row: scope = content-authorship event class(es), bounds fields",
+   "line": 241,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L241",
+   "class": "process-meta"
+  },
+  {
+   "text": "pnpm run schema:test green. Commit",
+   "line": 244,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L244",
+   "class": "process-meta"
+  },
+  {
+   "text": "Failing tests: createCommitment (with a delegatesCompute(...) builder),",
+   "line": 250,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L250",
+   "class": "process-meta"
+  },
+  {
+   "text": "Implement over @elohim/storage-client wire types + /api/v1/commitments; note in-code:",
+   "line": 254,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L254",
+   "class": "process-meta"
+  },
+  {
+   "text": "pnpm --filter @elohim/rea-runtime test green. Commit",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L257",
+   "class": "process-meta"
+  },
+  {
+   "text": "Mint: Matthew (Stage-A session, Phase-0 grant) creates a delegates-compute",
+   "line": 263,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L263",
+   "class": "process-meta"
+  },
+  {
+   "text": "Exercise: the agent authors one content item within bounds; the act's EconomicEvent",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L266",
+   "class": "process-meta"
+  },
+  {
+   "text": "Doorway-plane scenario: a2o .feature (API or browser) \u2014 out-of-scope write rejected",
+   "line": 268,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L268",
+   "class": "process-meta"
+  },
+  {
+   "text": "Peer-plane scenario: sweettest \u2014 validation rejects an event citing a revoked/absent",
+   "line": 270,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L270",
+   "class": "process-meta"
+  },
+  {
+   "text": "Revoke: provider revokes; both planes now reject; journal the paired evidence. Commit",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L273",
+   "class": "process-meta"
+  },
+  {
+   "text": "Decide (journal a one-paragraph ADR in the arc spec): is performer-key visibility enough,",
+   "line": 278,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L278",
+   "class": "process-meta"
+  },
+  {
+   "text": "Update genesis/a2o/CLAUDE.md etiquette: routine agent writes go through the Stage-C",
+   "line": 281,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L281",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check Stage-C boxes on the arc spec; re-decompose spec + this plan; placement-audit.py",
+   "line": 283,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-che-network-agency-arc-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-che-network-agency-arc-plan.md#L283",
+   "class": "process-meta"
+  }
+ ]
+}

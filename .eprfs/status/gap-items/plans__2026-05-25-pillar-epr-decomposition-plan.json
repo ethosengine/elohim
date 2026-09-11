@@ -1,0 +1,1009 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md",
+ "slug": "plans__2026-05-25-pillar-epr-decomposition-plan",
+ "method": "checkbox-tasks",
+ "count": 143,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L115"
+  },
+  {
+   "text": "Step 2: Run test to verify it fails",
+   "line": 128,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L128"
+  },
+  {
+   "text": "Step 3: Add the constant",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L137"
+  },
+  {
+   "text": "Step 4: Run test to verify it passes",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L145"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 153,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L153"
+  },
+  {
+   "text": "Step 2: Wire the module into lib.rs and run test to see expected compilation failure",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L236"
+  },
+  {
+   "text": "Step 3: Implement the structs",
+   "line": 253,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L253"
+  },
+  {
+   "text": "Step 4: Run tests to verify they pass",
+   "line": 320,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L320"
+  },
+  {
+   "text": "Step 2: Verify generated files exist",
+   "line": 355,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L355"
+  },
+  {
+   "text": "Step 3: Verify generated content has camelCase",
+   "line": 363,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L363"
+  },
+  {
+   "text": "Step 4: Commit the generated files",
+   "line": 371,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L371"
+  },
+  {
+   "text": "Step 1: Look at the existing operator-binding schema as the canonical pattern",
+   "line": 385,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L385"
+  },
+  {
+   "text": "Step 2: Create the schema file",
+   "line": 393,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L393"
+  },
+  {
+   "text": "Step 3: Validate the schema is syntactically correct",
+   "line": 458,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L458"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 466,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L466"
+  },
+  {
+   "text": "Step 1: Find the existing schema contract pattern",
+   "line": 480,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L480"
+  },
+  {
+   "text": "Step 2: Add a parallel test for EprProjectionView",
+   "line": 488,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L488"
+  },
+  {
+   "text": "Step 1: Write the failing tests",
+   "line": 553,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L553"
+  },
+  {
+   "text": "Step 2: Run to verify failure",
+   "line": 630,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L630"
+  },
+  {
+   "text": "Step 3: Implement the validator",
+   "line": 638,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L638"
+  },
+  {
+   "text": "Step 2: Run to see failure",
+   "line": 814,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L814"
+  },
+  {
+   "text": "Step 3: Implement the resolvers",
+   "line": 822,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L822"
+  },
+  {
+   "text": "Step 4: Add a unit test for path_matches_prefix",
+   "line": 928,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L928"
+  },
+  {
+   "text": "Step 5: Run tests",
+   "line": 944,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L944"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 952,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L952"
+  },
+  {
+   "text": "Step 1: Locate the Commitment create/cancel handlers",
+   "line": 967,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L967"
+  },
+  {
+   "text": "Step 2: Add the new event variants",
+   "line": 975,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L975"
+  },
+  {
+   "text": "Step 3: Write the failing test",
+   "line": 1003,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1003"
+  },
+  {
+   "text": "Step 4: Run test",
+   "line": 1022,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1022"
+  },
+  {
+   "text": "Step 5: Wire emission from the Commitment create/cancel paths",
+   "line": 1030,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1030"
+  },
+  {
+   "text": "Step 6: Add integration test for emission",
+   "line": 1052,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1052"
+  },
+  {
+   "text": "Step 7: Run all events tests",
+   "line": 1070,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1070"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 1078,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1078"
+  },
+  {
+   "text": "Step 1: Create the Rust types",
+   "line": 1094,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1094"
+  },
+  {
+   "text": "Step 2: Create the JSON schema",
+   "line": 1150,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1150"
+  },
+  {
+   "text": "Step 3: Run tests + codegen",
+   "line": 1187,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1187"
+  },
+  {
+   "text": "Step 4: Add contract test",
+   "line": 1198,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1198"
+  },
+  {
+   "text": "Step 1: Find the content_formats section",
+   "line": 1238,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1238"
+  },
+  {
+   "text": "Step 2: Add the new format",
+   "line": 1244,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1244"
+  },
+  {
+   "text": "Step 3: Run manifest codegen",
+   "line": 1257,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1257"
+  },
+  {
+   "text": "Step 4: Verify",
+   "line": 1265,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1265"
+  },
+  {
+   "text": "Step 1: Read the operate-doorway seeder as the template",
+   "line": 1287,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1287"
+  },
+  {
+   "text": "Step 2: Write the body builder + happy-path test first",
+   "line": 1295,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1295"
+  },
+  {
+   "text": "Step 3: Run tests to verify failure",
+   "line": 1379,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1379"
+  },
+  {
+   "text": "Step 4: Implement seed-projections.ts",
+   "line": 1388,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1388"
+  },
+  {
+   "text": "Step 5: Run tests to verify they pass",
+   "line": 1618,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1618"
+  },
+  {
+   "text": "Step 1: Find where seed-operator-bindings is invoked",
+   "line": 1641,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1641"
+  },
+  {
+   "text": "Step 2: Add the projection seeding after operator bindings",
+   "line": 1647,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1647"
+  },
+  {
+   "text": "Step 3: Run a dry-run end-to-end seed locally",
+   "line": 1664,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1664"
+  },
+  {
+   "text": "Step 1: Look at how other content rows are seeded",
+   "line": 1689,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1689"
+  },
+  {
+   "text": "Step 2: Create the elements directory and registry seed",
+   "line": 1696,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1696"
+  },
+  {
+   "text": "Step 3: Verify the seed flows through the existing content seeder",
+   "line": 1738,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1738"
+  },
+  {
+   "text": "Step 1: Locate seeder integration test pattern",
+   "line": 1760,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1760"
+  },
+  {
+   "text": "Step 2: Add a Phase A end-to-end test",
+   "line": 1767,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1767"
+  },
+  {
+   "text": "Step 3: Run integration test against local dev stack",
+   "line": 1831,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1831"
+  },
+  {
+   "text": "Verify Phase A complete",
+   "line": 1852,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1852"
+  },
+  {
+   "text": "Commit Phase A summary tag (optional, for clean handoff)",
+   "line": 1863,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1863"
+  },
+  {
+   "text": "Step 2: Write the audit report",
+   "line": 1900,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1900"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 1938,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#59",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L1938"
+  },
+  {
+   "text": "Step 2: Run test to verify failure",
+   "line": 2031,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#60",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2031"
+  },
+  {
+   "text": "Step 3: Implement the Loader",
+   "line": 2040,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#61",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2040"
+  },
+  {
+   "text": "Step 4: Run tests, all should pass except possibly the CID-verification one which needs a real hash",
+   "line": 2125,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#62",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2125"
+  },
+  {
+   "text": "Step 5: Fix the CID-verification test with a real hash",
+   "line": 2131,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#63",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2131"
+  },
+  {
+   "text": "Step 3: Implement Session",
+   "line": 2208,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#64",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2208"
+  },
+  {
+   "text": "Step 4: Run tests",
+   "line": 2290,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#65",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2290"
+  },
+  {
+   "text": "Step 1: Write the contract",
+   "line": 2312,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#66",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2312"
+  },
+  {
+   "text": "Step 2: Commit (no test for pure type declarations)",
+   "line": 2352,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#67",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2352"
+  },
+  {
+   "text": "Step 1: Implement (small element, no test needed beyond manual story)",
+   "line": 2366,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#68",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2366"
+  },
+  {
+   "text": "Step 2: Add to register.ts",
+   "line": 2428,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#69",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2428"
+  },
+  {
+   "text": "Step 3: Add to index.ts exports",
+   "line": 2440,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#70",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2440"
+  },
+  {
+   "text": "Step 4: Verify build",
+   "line": 2446,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#71",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2446"
+  },
+  {
+   "text": "Step 1: Implement",
+   "line": 2472,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#72",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2472"
+  },
+  {
+   "text": "Step 2: Register + export + commit",
+   "line": 2524,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#73",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2524"
+  },
+  {
+   "text": "Step 1: Write tests for page-chrome",
+   "line": 2544,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#74",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2544"
+  },
+  {
+   "text": "Step 2: Run test (will fail)",
+   "line": 2591,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#75",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2591"
+  },
+  {
+   "text": "Step 3: Implement page-chrome",
+   "line": 2599,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#76",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2599"
+  },
+  {
+   "text": "Step 4: Implement default omnibar (minimal)",
+   "line": 2656,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#77",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2656"
+  },
+  {
+   "text": "Step 5: Register both + test passes",
+   "line": 2712,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#78",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2712"
+  },
+  {
+   "text": "Step 1: Tests first",
+   "line": 2753,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#79",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2753"
+  },
+  {
+   "text": "Step 2: Implement",
+   "line": 2804,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#80",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2804"
+  },
+  {
+   "text": "Step 3: Register + run tests",
+   "line": 2913,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#81",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2913"
+  },
+  {
+   "text": "Step 1: Write the tests covering: rendering variants, progressive loading, default click, right-click menu, unreachable preview",
+   "line": 2937,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#82",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L2937"
+  },
+  {
+   "text": "Step 3: Implement the element",
+   "line": 3011,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#83",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3011"
+  },
+  {
+   "text": "Step 4: Register + index export + run tests",
+   "line": 3147,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#84",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3147"
+  },
+  {
+   "text": "Step 1: Look at existing default story pattern",
+   "line": 3172,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#85",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3172"
+  },
+  {
+   "text": "Step 2: Author six default stories (one per: elohim-skeleton, elohim-mention-base, elohim-page-chrome, elohim-default-omnibar, elohim-context-menu, elohim-epr-link)",
+   "line": 3179,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#86",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3179"
+  },
+  {
+   "text": "Step 3: Verify Storybook builds",
+   "line": 3188,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#87",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3188"
+  },
+  {
+   "text": "Step 4: Commit each story as a separate commit (granular history)",
+   "line": 3198,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#88",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3198"
+  },
+  {
+   "text": "Step 1: Author six designed stories (parallel to Task B9 files)",
+   "line": 3215,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#89",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3215"
+  },
+  {
+   "text": "Step 2: Verify in Storybook UI",
+   "line": 3217,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#90",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3217"
+  },
+  {
+   "text": "Step 3: Commit each as a separate commit",
+   "line": 3219,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#91",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3219"
+  },
+  {
+   "text": "Step 2: Wire into projection/mod.rs",
+   "line": 3365,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#92",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3365"
+  },
+  {
+   "text": "Step 3: Run tests",
+   "line": 3373,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#93",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3373"
+  },
+  {
+   "text": "Step 1: Find where doorway makes its initial storage requests",
+   "line": 3396,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#94",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3396"
+  },
+  {
+   "text": "Step 2: Add an initial projection load",
+   "line": 3402,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#95",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3402"
+  },
+  {
+   "text": "Step 3: Build + run smoke test",
+   "line": 3422,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#96",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3422"
+  },
+  {
+   "text": "Step 1: Find the request entry point",
+   "line": 3444,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#97",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3444"
+  },
+  {
+   "text": "Step 2: Insert router consultation at request entry",
+   "line": 3450,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#98",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3450"
+  },
+  {
+   "text": "Step 3: Add integration test",
+   "line": 3497,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#99",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3497"
+  },
+  {
+   "text": "Step 4: Run + commit",
+   "line": 3519,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#100",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3519"
+  },
+  {
+   "text": "Step 1: Remove from config struct",
+   "line": 3537,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#101",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3537"
+  },
+  {
+   "text": "Step 2: Remove usages",
+   "line": 3545,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#102",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3545"
+  },
+  {
+   "text": "Step 3: Remove from k8s manifests",
+   "line": 3553,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#103",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3553"
+  },
+  {
+   "text": "Step 4: Build + commit",
+   "line": 3557,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#104",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3557"
+  },
+  {
+   "text": "Step 1: Extend the event-kind matcher",
+   "line": 3574,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#105",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3574"
+  },
+  {
+   "text": "Step 2: Add integration test (uses local SSE bus mock)",
+   "line": 3594,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#106",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3594"
+  },
+  {
+   "text": "Step 1: Write the test",
+   "line": 3613,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#107",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3613"
+  },
+  {
+   "text": "Step 2: Implement the route",
+   "line": 3628,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#108",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3628"
+  },
+  {
+   "text": "Step 3: Run test + commit",
+   "line": 3674,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#109",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3674"
+  },
+  {
+   "text": "Step 1: Look at app/elohim-app's config as the template",
+   "line": 3693,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#110",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3693"
+  },
+  {
+   "text": "Step 2: Add app/lamad to pnpm workspace",
+   "line": 3702,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#111",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3702"
+  },
+  {
+   "text": "Step 3: Create app/lamad/package.json",
+   "line": 3715,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#112",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3715"
+  },
+  {
+   "text": "Step 4: Create app/lamad/angular.json",
+   "line": 3719,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#113",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3719"
+  },
+  {
+   "text": "Step 5: Create app/lamad/tsconfig.json + tsconfig.app.json",
+   "line": 3723,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#114",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3723"
+  },
+  {
+   "text": "Step 6: pnpm install",
+   "line": 3727,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#115",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3727"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 3736,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#116",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3736"
+  },
+  {
+   "text": "Step 1: Use git mv for history preservation",
+   "line": 3752,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#117",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3752"
+  },
+  {
+   "text": "Step 2: Update imports inside the moved files",
+   "line": 3759,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#118",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3759"
+  },
+  {
+   "text": "Step 3: Create app/lamad/src/index.html with the correct base href",
+   "line": 3768,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#119",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3768"
+  },
+  {
+   "text": "Step 4: Create app/lamad/src/main.ts",
+   "line": 3789,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#120",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3789"
+  },
+  {
+   "text": "Step 5: Build lamad bundle",
+   "line": 3800,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#121",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3800"
+  },
+  {
+   "text": "Step 6: Wrap lamad's existing toolbar as the omnibar slot consumer",
+   "line": 3809,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#122",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3809"
+  },
+  {
+   "text": "Step 7: Commit (multiple commits \u2014 one per dependency group)",
+   "line": 3813,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#123",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3813"
+  },
+  {
+   "text": "Step 1: Delete the /lamad route block",
+   "line": 3827,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#124",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3827"
+  },
+  {
+   "text": "Step 2: Delete the old app/elohim-app/src/app/lamad/ directory",
+   "line": 3838,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#125",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3838"
+  },
+  {
+   "text": "Step 3: Build elohim-app",
+   "line": 3844,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#126",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3844"
+  },
+  {
+   "text": "Step 1: Grep to confirm wrapper is still needed",
+   "line": 3868,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#127",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3868"
+  },
+  {
+   "text": "Step 2: Replace the component with a thin wrapper around the Lit element",
+   "line": 3878,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#128",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3878"
+  },
+  {
+   "text": "Step 3: Verify build",
+   "line": 3895,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#129",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3895"
+  },
+  {
+   "text": "Step 1: Review the existing stageSpaBlob function",
+   "line": 3915,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#130",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3915"
+  },
+  {
+   "text": "Step 2: Refactor stageSpaBlob to accept a list of (bundle, slug) pairs",
+   "line": 3921,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#131",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3921"
+  },
+  {
+   "text": "Step 3: Add lamad build step before stageSpaBlobs",
+   "line": 3936,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#132",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3936"
+  },
+  {
+   "text": "Step 4: Local syntax check",
+   "line": 3951,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#133",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3951"
+  },
+  {
+   "text": "Step 1: Write the feature file (per spec \u00a79.6)",
+   "line": 3974,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#134",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3974"
+  },
+  {
+   "text": "Step 2: Implement step definitions",
+   "line": 3978,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#135",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L3978"
+  },
+  {
+   "text": "Step 3: Run a2o for this feature",
+   "line": 4000,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#136",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4000"
+  },
+  {
+   "text": "Step 1: Write the feature file",
+   "line": 4025,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#137",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4025"
+  },
+  {
+   "text": "Step 3: Run",
+   "line": 4037,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#138",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4037"
+  },
+  {
+   "text": "Run all Phase B tests",
+   "line": 4056,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#139",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4056"
+  },
+  {
+   "text": "Reseed a dev environment, verify 4 commitments + 1 registry",
+   "line": 4067,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#140",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4067"
+  },
+  {
+   "text": "Verify ROOT_APP_SLUG fully removed",
+   "line": 4080,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#141",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4080"
+  },
+  {
+   "text": "Manual dogfood smoke (operator-of-record signoff)",
+   "line": 4088,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#142",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4088"
+  },
+  {
+   "text": "Tag MVP complete",
+   "line": 4098,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-pillar-epr-decomposition-plan#143",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-pillar-epr-decomposition-plan.md#L4098"
+  }
+ ]
+}

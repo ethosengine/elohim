@@ -1,0 +1,29 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md",
+ "slug": "specs__2026-04-30-trust-compute-gradient-brainstorm",
+ "method": "requirement-bullets",
+ "count": 3,
+ "items": [
+  {
+   "text": "Stage 1: structural validators (Phase 2B/3 substrate)",
+   "line": 527,
+   "state": "OPEN",
+   "id": "specs__2026-04-30-trust-compute-gradient-brainstorm#1",
+   "cites": "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md#L527"
+  },
+  {
+   "text": "Stage 2: elohim-coordinated trust (Phase 3.5 lights up)",
+   "line": 528,
+   "state": "OPEN",
+   "id": "specs__2026-04-30-trust-compute-gradient-brainstorm#2",
+   "cites": "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md#L528"
+  },
+  {
+   "text": "Stage 3: full elohim enforcement (matures over years)",
+   "line": 529,
+   "state": "OPEN",
+   "id": "specs__2026-04-30-trust-compute-gradient-brainstorm#3",
+   "cites": "genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md#L529"
+  }
+ ]
+}

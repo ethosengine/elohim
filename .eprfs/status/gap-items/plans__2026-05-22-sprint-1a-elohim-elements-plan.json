@@ -1,0 +1,351 @@
+{
+ "doc": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md",
+ "slug": "plans__2026-05-22-sprint-1a-elohim-elements-plan",
+ "method": "checkbox-tasks",
+ "count": 49,
+ "items": [
+  {
+   "text": "Step 1: Read elohim-core package configuration",
+   "line": 219,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#1",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L219"
+  },
+  {
+   "text": "Step 2: Update app/elohim-elements/elohim-qahal/package.json",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#2",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L224"
+  },
+  {
+   "text": "Step 3: Create vite.config.ts (mirror elohim-core)",
+   "line": 278,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#3",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L278"
+  },
+  {
+   "text": "Step 4: Create custom-elements-manifest.config.mjs",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#4",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L295"
+  },
+  {
+   "text": "Step 5: Create tsconfig.json",
+   "line": 308,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#5",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L308"
+  },
+  {
+   "text": "Step 6: Create src/register.ts (initially empty; each task appends its element)",
+   "line": 319,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#6",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L319"
+  },
+  {
+   "text": "Step 7: Create src/index.ts (initially empty; each task appends its exports)",
+   "line": 327,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#7",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L327"
+  },
+  {
+   "text": "Step 8: Repeat steps 2-7 for app/elohim-elements/elohim-imagodei/",
+   "line": 335,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#8",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L335"
+  },
+  {
+   "text": "Step 9: Verify pnpm workspace install",
+   "line": 339,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#9",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L339"
+  },
+  {
+   "text": "Step 10: Verify build of empty packages succeeds",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#10",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L344"
+  },
+  {
+   "text": "Step 11: Commit",
+   "line": 349,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#11",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L349"
+  },
+  {
+   "text": "Step 1: Write the failing element test",
+   "line": 373,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#12",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L373"
+  },
+  {
+   "text": "Step 2: Run test, verify FAIL",
+   "line": 427,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#13",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L427"
+  },
+  {
+   "text": "Step 3: Implement the element",
+   "line": 432,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#14",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L432"
+  },
+  {
+   "text": "Step 4: Register the element",
+   "line": 494,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#15",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L494"
+  },
+  {
+   "text": "Step 5: Run test, verify PASS",
+   "line": 509,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#16",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L509"
+  },
+  {
+   "text": "Step 6: Write the manifest spec test",
+   "line": 514,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#17",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L514"
+  },
+  {
+   "text": "Step 7: Run build + manifest analyze + manifest test",
+   "line": 543,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#18",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L543"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 548,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#19",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L548"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 563,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#20",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L563"
+  },
+  {
+   "text": "Step 2: Run, verify FAIL",
+   "line": 596,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#21",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L596"
+  },
+  {
+   "text": "Step 3: Implement",
+   "line": 600,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#22",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L600"
+  },
+  {
+   "text": "Step 4: Register + export (same pattern as Task 1.1)",
+   "line": 645,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#23",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L645"
+  },
+  {
+   "text": "Step 6: Write manifest spec test (mirror Task 1.1)",
+   "line": 649,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#24",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L649"
+  },
+  {
+   "text": "Step 7: Build + manifest test pass",
+   "line": 651,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#25",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L651"
+  },
+  {
+   "text": "Step 1: Write failing test",
+   "line": 666,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#26",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L666"
+  },
+  {
+   "text": "Step 4-8: Register, export, test, manifest spec, commit (pattern as Task 1.1)",
+   "line": 753,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#27",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L753"
+  },
+  {
+   "text": "Step 2: FAIL",
+   "line": 792,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#28",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L792"
+  },
+  {
+   "text": "Step 4-8: Register, export, test, manifest, commit",
+   "line": 849,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#29",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L849"
+  },
+  {
+   "text": "Step 2-3: FAIL then implement",
+   "line": 882,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#30",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L882"
+  },
+  {
+   "text": "Step 1: Write the fixture module",
+   "line": 947,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#31",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L947"
+  },
+  {
+   "text": "Step 2: Commit",
+   "line": 987,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#32",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L987"
+  },
+  {
+   "text": "Step 4-8: Register, export, manifest spec, test, commit",
+   "line": 1279,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#33",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1279"
+  },
+  {
+   "text": "Step 4-8: Register, export, manifest, test, commit",
+   "line": 1365,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#34",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1365"
+  },
+  {
+   "text": "Step 1-3: Test FAIL, implement",
+   "line": 1450,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#35",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1450"
+  },
+  {
+   "text": "Step 1: Failing test (excerpt)",
+   "line": 1625,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#36",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1625"
+  },
+  {
+   "text": "Step 1: Failing test",
+   "line": 1741,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#37",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1741"
+  },
+  {
+   "text": "Step 2-3: Implement (renders the structured rubric using ASCII-style layout per spec Section 4.3)",
+   "line": 1763,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#38",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1763"
+  },
+  {
+   "text": "Step 2-3: Implement",
+   "line": 1810,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#39",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1810"
+  },
+  {
+   "text": "Step 1: Failing test (visual-stub-quality)",
+   "line": 1875,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#40",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1875"
+  },
+  {
+   "text": "Step 2-3: Implement (visual stub)",
+   "line": 1891,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#41",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1891"
+  },
+  {
+   "text": "Steps 1-8: as in Task 5.1, with shefa-specific properties (inflows, outflows, commonsShareBalance, agreementClauses) and content",
+   "line": 1955,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#42",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1955"
+  },
+  {
+   "text": "Steps 1-8: similar pattern to Task 3.1 (renders a list of items with click handlers, emits panel-changed event)",
+   "line": 1987,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#43",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L1987"
+  },
+  {
+   "text": "Step 1: Failing test (capability-gating-aware)",
+   "line": 2007,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#44",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2007"
+  },
+  {
+   "text": "Step 2-3: Implement (gating logic + offline-grey via navigator.onLine)",
+   "line": 2033,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#45",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2033"
+  },
+  {
+   "text": "Steps 1-8: simple pattern; reads power-user-enabled boolean prop (sourced from settings palette in Phase 7), renders the additional power-user panel list items when true, renders nothing when false",
+   "line": 2045,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#46",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2045"
+  },
+  {
+   "text": "Steps 1-8: standard pattern with properties for name, value, configurableBy, source",
+   "line": 2059,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#47",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2059"
+  },
+  {
+   "text": "Step 2-3: Implement composing the 13 settings + banner + protected-tier marker",
+   "line": 2127,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#48",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2127"
+  },
+  {
+   "text": "Steps 1-8: standard pattern. Visual stub with placeholder trace rendering + stub-note explaining the post-MVP introspection trace primitive",
+   "line": 2139,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-sprint-1a-elohim-elements-plan#49",
+   "cites": "genesis/docs/plans/2026-05-22-sprint-1a-elohim-elements-plan.md#L2139"
+  }
+ ]
+}

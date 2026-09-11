@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_ci_build_infra",
+  "claim": "CI substrate: ci-playwright on ci-builder; cache PVCs node-pinned; devspace node22 vs CI24 is structural; pull policy Always; Nexus needs read token.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_ci_build_infra.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_ci_build_infra.md",
+        "cid": "bafkreie2zptl32d67ynqhlywflertlrix22vsc6jdtba4tluhdxeygo56e"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "CI build infra — images, caches, registries (umbrella)",
+    "file": "project_ci_build_infra.md",
+    "scopePath": ".claude/memory/project_ci_build_infra.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

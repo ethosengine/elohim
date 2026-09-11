@@ -1,0 +1,64 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md",
+ "slug": "specs__2026-05-28-session-bridge-design",
+ "method": "requirement-bullets",
+ "count": 8,
+ "items": [
+  {
+   "text": "path-negotiation.service.ts \u2014 committing to a path version at a step",
+   "line": 577,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L577"
+  },
+  {
+   "text": "content-mastery.service.ts \u2014 recording mastery attainment",
+   "line": 578,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L578"
+  },
+  {
+   "text": "mastery-stats.service.ts \u2014 derived mastery aggregations",
+   "line": 579,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L579"
+  },
+  {
+   "text": "human-consent.service.ts \u2014 consent decisions",
+   "line": 580,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L580"
+  },
+  {
+   "text": "human-consent.service.ts calls bridge.stage(StagedConsentIntent { ... }) during anonymous/oauth phase; the consent graduates at incarnation time when the agent's source chain becomes addressable",
+   "line": 584,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L584"
+  },
+  {
+   "text": "content-mastery.service.ts calls bridge.stage(StagedMasteryIntent { ... }) during all states except member-of-target-context (where it writes directly to the agent's chain)",
+   "line": 585,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L585"
+  },
+  {
+   "text": "path-negotiation.service.ts similar \u2014 stage during pre-member states, write directly when member",
+   "line": 586,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L586"
+  },
+  {
+   "text": "mastery-stats.service.ts reads from the session-bridge intent pool when no member-context exists; reads from canonical projections when in member-context",
+   "line": 587,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-session-bridge-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-session-bridge-design.md#L587"
+  }
+ ]
+}

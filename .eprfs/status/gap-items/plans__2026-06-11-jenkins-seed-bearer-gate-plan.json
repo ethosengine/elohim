@@ -1,0 +1,130 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md",
+ "slug": "plans__2026-06-11-jenkins-seed-bearer-gate-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 15,
+ "items": [
+  {
+   "text": "Investigate first (journal one line): confirm extract_http_permission is reusable as-is",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L58",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "require_seed_authority(state, req) -> Result<(), Response>: returns 401 (no/invalid bearer)",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L64",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Call it at the top of handle_seed_blob and the mutating cache routes",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L67",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Tests: (a) dev-mode \u2192 blob upload 200 without auth (local-stack safety, prove FIRST);",
+   "line": 72,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L72",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Commit",
+   "line": 78,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L78",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision (journal): consume @elohim/identity DoorwaySessionClient (the next honest",
+   "line": 84,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L84",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "On seed start (non-dev target): authenticate with SEED_DOORWAY_IDENTIFIER /",
+   "line": 90,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L90",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Handle 401/403 from the gate with an actionable error (creds missing/expired/under-privileged",
+   "line": 95,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L95",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Seeder unit/typecheck/lint green; a dry local seed against the dev stack still works",
+   "line": 97,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L97",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Provision a jenkins-ci doorway account with Admin permission on alpha \u2014 via the admin",
+   "line": 107,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L107",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "genesis/Jenkinsfile: inject SEED_DOORWAY_IDENTIFIER/SEED_DOORWAY_PASSWORD into the seed",
+   "line": 111,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L111",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Manifest: ensure the alpha doorway has API_KEY_ADMIN/JWT secret configured so non-dev",
+   "line": 115,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L115",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Verify reachable end-to-end where possible without a live deploy: the genesis pipeline is",
+   "line": 118,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Update backlog/security-ci-substrate-authorization-grant-coherence.md: hole #2 \u2192 Stage A",
+   "line": 200,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L200",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Note (do NOT apply \u2014 operator/cluster-owned): hole #2's bearer-gate does not revert the",
+   "line": 202,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-jenkins-seed-bearer-gate-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-jenkins-seed-bearer-gate-plan.md#L202",
+   "class": "protocol-canonical"
+  }
+ ]
+}

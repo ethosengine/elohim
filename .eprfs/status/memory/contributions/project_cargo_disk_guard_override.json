@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_cargo_disk_guard_override",
+  "claim": "At the 85% disk hard-ceiling the PreToolUse hook DENIES heavy cargo; FORCE_HEAVY_GATES does not bypass it — free non-pool space or bump volume_hard_pct.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_cargo_disk_guard_override.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_cargo_disk_guard_override.md",
+        "cid": "bafkreihj6cq7yrpkg5zujar5vxqqy5e4gzo6lroer6myh3emwptv3dnsom"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Cargo disk-guard override",
+    "file": "project_cargo_disk_guard_override.md",
+    "scopePath": ".claude/memory/project_cargo_disk_guard_override.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

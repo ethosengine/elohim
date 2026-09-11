@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md",
+ "slug": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design",
+ "method": "requirement-bullets",
+ "count": 5,
+ "items": [
+  {
+   "text": "pnpm run hc:start:seed brings up local stack with 2+ simulated dwelling-hubs",
+   "line": 812,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md#L812"
+  },
+  {
+   "text": "curl http://localhost:8090/api/v1/peer/<peer_cid>/capacity | jq .ratioCompliance shows compliant=true",
+   "line": 813,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md#L813"
+  },
+  {
+   "text": "Manual replicates-dwelling author via CLI; PeerCapacityView reflects; mutuality_audit log shows Pending",
+   "line": 814,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md#L814"
+  },
+  {
+   "text": "Stop counterparty node; advance clock past grace_period; observe reciprocity-imbalance signal in stream",
+   "line": 815,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md#L815"
+  },
+  {
+   "text": "Author deliberately ratio-breaching commitment; observe 400 with ConstitutionalRatioBreach",
+   "line": 816,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-mutual-storage-replication-dwelling-hub-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-mutual-storage-replication-dwelling-hub-design.md#L816"
+  }
+ ]
+}

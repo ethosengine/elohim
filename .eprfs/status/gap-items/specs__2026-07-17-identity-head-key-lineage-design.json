@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md",
+ "slug": "specs__2026-07-17-identity-head-key-lineage-design",
+ "method": "agent-extracted",
+ "class": "protocol-canonical",
+ "note": "agent decomposition per /brainstorm post-step (2026-07-17); compose-don't-build — most substrate WIRED, core = chain-root + binds-identity + 3 re-pointings; reinstall (#8) scoped OUT as hard follow-on",
+ "items": [
+  {
+   "text": "Chain-root cid derivation over the key-lineage DAG: model KeyRotation edges (recovery_v2.rs) as a version_parent DAG with a stable root cid unchanged across rotation/recovery; root = the version_parent=[] genesis node",
+   "line": 61,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L61",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "binds-identity action discriminator on Mishpat::Commitment (DNA-hash-neutral coordinator hot-swap): declares chain head=key K, controllers={set}, controller-policy = self | Steward-set | RecoveryAuthority M-of-N; reuse RecoveryRequest/RecoveryAuthority for the human quorum",
+   "line": 65,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L65",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "rotate_identity_key coordinator fn: append a version node authorized by current controllers; sweettest proves controller-authorized rotation appends + unauthorized is refused",
+   "line": 82,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L82",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did:elohim assembly upgraded in place (DID bridge phase-2 hook): resolve real controller entries + lineage + verified transport ids instead of phase-1 self-only projection",
+   "line": 84,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L84",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "REA agent re-pointing (§4.1): populate rea_commitments.provider/receiver with a collective's chain-root cid when the party is a collective; reconcile SQLite collectives.id slug vs DHT content-CID via a dht_anchor_hash-style mirror column. No DNA work.",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L94",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Contributor attribution re-pointing (§4.2): re-anchor claimed_agent_id / ClaimedAgentToPresence on the identity_head chain-root cid so a claim resolves through the chain and survives rotation; presence↔EPR edges + recognition accrual already rotation-safe",
+   "line": 103,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L103",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Witnessed binding (§4.3): sign the existing AgentPeerBinding (replace STAGE1_SIGNATURE_SENTINEL) via a challenge/response over the transport channel cross-signed by the head key; signed binding adds a verified alsoKnownAs transport-id to the head. NOT frame-witness.",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Grandma-recovery a2o scenario (roadmap rung 2, @requires:household-nodes): human loses key -> community-recovery quorum authorizes rotate_identity_key -> attribution + REA standing + claims all resolve unbroken through the chain-root",
+   "line": 152,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L152",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "HARD FOLLOW-ON (scoped OUT of core, §4.4): DNA-reinstall key migration — cross-DNA out-of-band lineage record (post-install commitment by new key, cross-attested by old key's chain) + restored manifest lineage: field once HC unstable-migration stabilizes. Chicken-egg genesis + cross-DNA boundary; different axis from agent-key chain.",
+   "line": 131,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-identity-head-key-lineage-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-identity-head-key-lineage-design.md#L131",
+   "class": "protocol-canonical"
+  }
+ ]
+}

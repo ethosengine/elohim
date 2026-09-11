@@ -1,0 +1,127 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md",
+ "slug": "specs__2026-09-01-trust-priced-sync-edge-design",
+ "method": "agent-extracted",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "Honest handshake: sender presents steward agent key + credential CIDs \u2014 habit dataplane-convergence, station 1, OPEN.",
+   "line": 379,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L379",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Receiver verifies presented CIDs against its own conductor; `unverified` is the truthful default; `calculate_reach_ceiling` reads commitments \u2014 habit dataplane-convergence, station 1, OPEN.",
+   "line": 381,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L381",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Coordinator-only `get_relationship_by_action` on the imagodei/qahal coordinator (hot-swap, DNA-hash-neutral) \u2014 habit dataplane-convergence, station 1, OPEN.",
+   "line": 384,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L384",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "One class derivation shared by the libp2p arm and iroh `TrustService`, contract-tested equal \u2014 habit dataplane-convergence, station 1, OPEN.",
+   "line": 386,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L386",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "`EdgeBudget` predicate + `EdgeBudgetReason` + seam-registry row + floor/monotone tests \u2014 habit dataplane-convergence, station 2, OPEN.",
+   "line": 388,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L388",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Window opener, inflight patience, scheduler cap read the budget; metric `elohim_sync_edge_budget_total` \u2014 habit dataplane-convergence, station 2, OPEN.",
+   "line": 390,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L390",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Health scales a row down (timeout streak \u2192 smaller window, shorter patience), counted by reason \u2014 habit dataplane-convergence, station 2, OPEN.",
+   "line": 392,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L392",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Class-ordered provider candidates under `rotated_peer_index` and the iroh driver, with the weighted ring \u2014 habit dataplane-convergence, station 3, OPEN.",
+   "line": 394,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L394",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Weighted admission in the content and REA sweep legs \u2014 habit dataplane-convergence, station 3, OPEN.",
+   "line": 396,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L396",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "`PricingInput.edge` + `DeltaVerify` on memo hit over a trusted edge \u2014 habit dataplane-convergence, station 4, OPEN.",
+   "line": 398,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L398",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "`/p2p/status` projects the per-peer class \u2014 habit dataplane-convergence, station 2, OPEN.",
+   "line": 400,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L400",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "Fleet confirm: P7 \u2265 2 classes on alpha; susan-edge timeout rate falls \u2014 habit dataplane-convergence, station 5, OPEN.",
+   "line": 402,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L402",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  },
+  {
+   "text": "a2o `@concern:trust-priced-sync` scenarios 2\u20135 un-`@wip` as their stations land (the catch-up-order scenario is station 3's falsifier) \u2014 habit dataplane-convergence, OPEN.",
+   "line": 404,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-trust-priced-sync-edge-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-trust-priced-sync-edge-design.md#L404",
+   "class": "protocol-canonical",
+   "habit": "dataplane-convergence"
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md",
+  "slug": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design",
+  "method": "agent-decomposition",
+  "class": "protocol-canonical",
+  "domain": "D5",
+  "note": "agent-decomposed 2026-06-24 from the Phase-3 task table. XOR is the MVP strategy behind a PlacementStrategy seam (operator-directed: leave the intentional-placement door open). P3-1/P3-2 are the verified decision core (unit-testable, no network); P3-3..P3-6 light it up; P3-7 proves cross-peer; P3-8 is the deliberately-deferred intentional-placement door (tracked in backlog intentional-placement-strategy-beyond-xor.md).",
+  "count": 8,
+  "items": [
+    {
+      "text": "PlacementStrategy trait + PlacementCandidate {agent_cid, household_id, archetype, spare_bytes} (the seam) + XorDistanceStrategy MVP impl (sha256 both sides into 256-bit space, XOR, ascending, tie-break by agent_cid). Unit tests = the strategy contract: determinism, total order, len==min(n,len), no dupes, empty->empty, cross-peer agreement. LANDED 2026-06-24 in src/reconcile/placement.rs (8 tests green; full reconcile:: suite 108 pass, no regression). CLAIMED pending integrator/CI confirmation.",
+      "line": 52,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L52"
+    },
+    {
+      "text": "salvage_pass (new sibling of reconcile_pass, additive) + CommitmentAuthor trait + SalvageOutcome. Logic: per under-replicated custody-blob blob, if self opted-in AND not already provider AND self in strategy.rank(blob, pool, n) -> author custody-blob commitment (provider=self). Unit tests: authors-when-closest, no-op not-closest, no-op opted-out, no-op already-provider, no-op already-replicated, idempotent. LANDED 2026-06-24 in src/reconcile/custody.rs (5 tests green). CLAIMED pending integrator/CI.",
+      "line": 69,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L69"
+    },
+    {
+      "text": "salvage_capacity reality table (migration) + writer (apply_capacity/lookup/list_fresh) + model + diesel_schema block. LANDED 2026-06-24 (migrations/2026-06-24-013000_salvage_capacity, src/db/salvage_capacity.rs; 3 tests green). Note: the WIRE (SalvageCapacityAd) is P3-4. CLAIMED pending integrator/CI.",
+      "line": 100,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L100"
+    },
+    {
+      "text": "Capacity-ad gossip: SalvageCapacityAd wire (src/p2p/salvage_gossip.rs, rmp_serde + verify_structural; 4 tests green) + receive arm in p2p/mod.rs (decode->verify->apply_capacity) + subscribe in behaviour.rs + broadcast_salvage_capacity (opt-in + node/steward gated, piggybacks inventory tick, spare_bytes=0 placeholder). LANDED 2026-06-24. CLAIMED pending integrator/CI.",
+      "line": 100,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L100"
+    },
+    {
+      "text": "Production CommitmentAuthor (src/services/salvage_commitment_author.rs): notarizes custody-blob via conductor_writes::call_create_rea_commitment (content_store zome), deterministic idempotent id matching seeder shape, sync->async block_in_place+block_on bridge w/ Handle::try_current guard. LANDED 2026-06-24, compile-verified (not unit-testable w/o live conductor). CLAIMED pending live-stack/CI.",
+      "line": 45,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L45"
+    },
+    {
+      "text": "Wire salvage_pass into reconcile task: run_salvage_pass (services/salvage_commitment_author.rs) builds agent_cid pool from list_fresh + self, XorDistanceStrategy, calls salvage_pass; main.rs spawns opt-in/HcClient-gated, shutdown-aware salvage ticker. Config knobs added (config.rs + P2PConfig): salvage_capacity_enabled=false, salvage_target_replicas=2, salvage_recheck_seconds=300 + SALVAGE_* env reads. LANDED 2026-06-24, build --bins clean. NOTE: honored-count join still uses provider(agent_cid) vs peer_blob_inventory.peer_id(libp2p) like existing reconcile_pass (pre-existing namespace pattern, not resolved here); pool itself is agent_cid-clean. CLAIMED pending live-stack/CI.",
+      "line": 133,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#6",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L133"
+    },
+    {
+      "text": "a2o scenario (Jenkins multi-peer): seed an under-replicated custody-blob; bring an opt-in peer that is XOR-closest online; assert it authors a salvage commitment, fetches bytes, and the replica count rises. AUTHORED 2026-06-24: genesis/a2o/features/resilience/salvage-placement.feature (5 scenarios: heal, consent/opt-out, coordination-free/not-closest, idempotent, felt). @wip @requires:shem,multi-replica — runs on Jenkins multi-peer, not locally. CLAIMED (authored, unrun).",
+      "line": 134,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#7",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L134"
+    },
+    {
+      "text": "(DEFERRED / door-open) Intentional placement strategies behind the seam: household/failure-domain diversity FIRST (compose with peer_selection.rs), then affinity/standing/governance; resolve the deterministic-self-selection vs coordinated-authoring fork. Tracked in backlog intentional-placement-strategy-beyond-xor.md.",
+      "line": 116,
+      "state": "DEFERRED",
+      "id": "specs__2026-06-24-blob-custody-phase3-xor-salvage-placement-design#8",
+      "cites": "genesis/docs/superpowers/specs/2026-06-24-blob-custody-phase3-xor-salvage-placement-design.md#L116"
+    }
+  ]
+}

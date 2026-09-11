@@ -1,0 +1,185 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md",
+ "slug": "plans__2026-06-02-semantic-computable-links-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "count": 22,
+ "items": [
+  {
+   "text": ".claude/scripts/_lib/cite_graph.py (shared _lib, \u22652 callers): slugify(title); allocate_slug(title, index) (collision-guarded); fingerprint(path) = sha256 of the content-body (frontmatter stripped via _lib.frontmatter), short-prefixed; build_slug_index(roots) \u2192 {slug: path} across live (and later held/) trees; parse_cites(fm) \u2192 list of {ref|path, desc?, fingerprint?, status?} accepting BOTH the envelope form and a legacy path-string (back-compat); serialize_cites(entries). Covers spec gap-items 1, 2, 3",
+   "line": 27,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L27",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/scripts/_lib/tests/cite_graph_test.py: slugify is stable + collision-guarded; fingerprint is invariant under a frontmatter-only edit but changes on a body edit; slug-index round-trips; parse_cites accepts envelope AND legacy path-string; serialize\u2194parse idempotent",
+   "line": 28,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L28",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: python3 .claude/scripts/_lib/tests/cite_graph_test.py exits 0",
+   "line": 29,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L29",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/scripts/memory-kit/cite-gen.py (imports _lib.cite_graph): given a target (slug or path) \u2192 emit the envelope block (ref from the target's id:, desc auto from its title, fingerprint computed); --into <doc> rewrites that doc's cites: in place (path-strings \u2192 envelopes); --verify <doc> exits non-zero if any cite is non-envelope or unresolvable (the gate mode for P5). Covers gap-item 4",
+   "line": 33,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L33",
+   "class": "process-meta"
+  },
+  {
+   "text": "Tests: emit produces a parseable envelope; --into is idempotent (re-run = no-op); --verify passes on an envelope doc, fails on a legacy-only doc",
+   "line": 34,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L34",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: tests exit 0; cite-gen.py <a-real-spec-slug> prints a valid envelope",
+   "line": 35,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L35",
+   "class": "process-meta"
+  },
+  {
+   "text": "Patch .claude/scripts/memory-kit/memory-coherence-audit.py cite_resolves(): build the slug-index once; resolve a cite by ref across live + held/; emit HELD-CITE (in held/ \u2014 informational, NOT dead), DEAD-CITE (resolves nowhere), STALE-CANDIDATE (target fingerprint \u2260 cited), CITE-FORMAT-CANDIDATE (legacy path-string \u2014 migrate). Legacy path-strings still resolve via p.exists() (back-compat). Covers gap-item 5",
+   "line": 39,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L39",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/scripts/_lib/cite_graph.py += reverse_index(slug_index) (target \u2192 every citer) + propagate_status(target, verdict) \u2014 materialize/remove the optional inline status: field on each citing block (status: held \u2014 needs remote-compute on degradation; removed on recovery). Covers gap-items 6, 7",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L44",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/scripts/memory-kit/cite-propagate.py (or an audit --apply mode): for each target whose scope/fingerprint changed, stamp/clear status: on its citers; emit a reviewable summary (the commit is the link-health ledger). Triggered by a reconciler move, audit, or the stasis loop",
+   "line": 45,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L45",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: moving a fixture target to held/ then running propagate \u2192 its citers gain status: held; restoring it \u2192 status: removed. Healthy cites never carry the field",
+   "line": 46,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L46",
+   "class": "process-meta"
+  },
+  {
+   "text": "decompose.py (the BACK-fire) calls cite-gen --verify on a spec being dissolved/graduated: block graduation until every cites: is envelope-form and resolves. Soft-warn until P7 migration completes (legacy cites tolerated mid-migration), then hard. Covers gap-item 8",
+   "line": 50,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L50",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: a fully-migrated spec passes the gate; a legacy-cite spec warns (pre-migration) / blocks (post-migration)",
+   "line": 51,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L51",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/skills/semantic-links/SKILL.md \u2014 the canonical envelope format + the doc id: convention + how to author (run cite-gen, never hand-write slugs/fingerprints). Wire a one-line pointer into the /brainstorm + compaction POST steps (which already write cites:), so new cites are born content-addressed. Covers gap-item 9",
+   "line": 55,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L55",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: the skill is discoverable; the POST-step pointer references it",
+   "line": 56,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L56",
+   "class": "process-meta"
+  },
+  {
+   "text": ".claude/workflows/cites-migration.js (Workflow), two passes: (1) allocate id: <slug> to every doc lacking one (deterministic from title, collision-guarded); (2) fan out cite-gen --into <doc> over the corpus, path-strings \u2192 envelopes. Idempotent. Covers gap-item 10",
+   "line": 60,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L60",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: dry-run on a sample dir converts cites to envelopes losslessly; re-run = no-op; the audit's CITE-FORMAT-CANDIDATE count drops toward 0",
+   "line": 61,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L61",
+   "class": "process-meta"
+  },
+  {
+   "text": "memory-stasis-loop.js += cites_legacy scoreboard dimension (from the audit's CITE-FORMAT-CANDIDATE count) + a cites discipline (librarian goal: run cite-gen --into on a batch; lower cites_legacy\u21920). Add a cites: line to placement-audit.py --headline. Covers gap-item 11",
+   "line": 65,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L65",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: the loop's MEASURE step reports cites_legacy; the discipline is dispatchable",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L66",
+   "class": "process-meta"
+  },
+  {
+   "text": "Update librarian / historian / cartographer / storyteller agent defs: the envelope convention + cite-gen (never hand-write); the verdicts (HELD-CITE \u2260 DEAD-CITE; STALE-CANDIDATE; CITE-FORMAT-CANDIDATE); held/ moves are safe (don't \"fix\" a HELD-CITE by deleting the link); the dissolution gate. Per-agent emphasis per spec \u00a78. Covers gap-item 12. (Coordinate: .claude/agents/librarian.md had operator in-flight edits this session \u2014 rebase onto current.)",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L70",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: each agent def references the envelope + the verdicts",
+   "line": 71,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L71",
+   "class": "process-meta"
+  },
+  {
+   "text": "End-to-end: author a new doc \u2192 cite-gen makes a born-correct envelope cite \u2192 move the target to held/ \u2192 propagation stamps status: held on the citer \u2192 audit reports HELD-CITE (no false DEAD) \u2192 restore \u2192 status: clears. The citation graph is content-addressed, self-describing, and survives moves",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L75",
+   "class": "process-meta"
+  },
+  {
+   "text": "Check: the full cycle runs with no false dead-link; scope-tree-reconciler's held-tree moves (the next chain link) are now safe to build on top",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__2026-06-02-semantic-computable-links-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-02-semantic-computable-links-plan.md#L76",
+   "class": "process-meta"
+  }
+ ]
+}

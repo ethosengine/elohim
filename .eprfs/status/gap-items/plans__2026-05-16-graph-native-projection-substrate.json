@@ -1,0 +1,708 @@
+{
+ "doc": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md",
+ "slug": "plans__2026-05-16-graph-native-projection-substrate",
+ "method": "checkbox-tasks",
+ "count": 100,
+ "items": [
+  {
+   "text": "Step 1: Write failing smoke test",
+   "line": 88,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#1",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L88"
+  },
+  {
+   "text": "Step 2: Run test to verify failure",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#2",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L107"
+  },
+  {
+   "text": "Step 3: Add CozoDB to Cargo.toml under the graph-native feature",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#3",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L115"
+  },
+  {
+   "text": "Step 4: Implement GraphEngine skeleton",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#4",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L148"
+  },
+  {
+   "text": "Step 5: Run test to verify pass",
+   "line": 205,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#5",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L205"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#6",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L213"
+  },
+  {
+   "text": "Step 1: Write failing test for epr_node creation",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#7",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L228"
+  },
+  {
+   "text": "Step 3: Create schema module with epr_node",
+   "line": 261,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#8",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L261"
+  },
+  {
+   "text": "Step 4: Run test to verify pass",
+   "line": 289,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#9",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L289"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 297,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#10",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L297"
+  },
+  {
+   "text": "Step 1: Write failing test for edge upsert + forward-tolerance",
+   "line": 312,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#11",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L312"
+  },
+  {
+   "text": "Step 3: Add epr_edge to schema",
+   "line": 346,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#12",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L346"
+  },
+  {
+   "text": "Step 1: Write failing test for three-pillar relations",
+   "line": 387,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#13",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L387"
+  },
+  {
+   "text": "Step 3: Add pillar relations to schema",
+   "line": 429,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#14",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L429"
+  },
+  {
+   "text": "Step 1: Write failing test for index existence + use",
+   "line": 482,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#15",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L482"
+  },
+  {
+   "text": "Step 3: Add index declarations to schema",
+   "line": 512,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#16",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L512"
+  },
+  {
+   "text": "Step 1: Write failing test that asserts embedding column exists",
+   "line": 547,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#17",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L547"
+  },
+  {
+   "text": "Step 3: Replace epr_node :create with embedding-column form",
+   "line": 578,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#18",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L578"
+  },
+  {
+   "text": "Step 1: Write failing test for neighborhood primitive",
+   "line": 622,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#19",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L622"
+  },
+  {
+   "text": "Step 2: Run tests to verify failure",
+   "line": 674,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#20",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L674"
+  },
+  {
+   "text": "Step 3: Implement primitives module",
+   "line": 678,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#21",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L678"
+  },
+  {
+   "text": "Step 4: Run tests to verify pass",
+   "line": 735,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#22",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L735"
+  },
+  {
+   "text": "Step 1: Run full test suite",
+   "line": 750,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#23",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L750"
+  },
+  {
+   "text": "Step 3: Commit checkpoint",
+   "line": 764,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#24",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L764"
+  },
+  {
+   "text": "Step 1: Write failing test for project_node",
+   "line": 780,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#25",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L780"
+  },
+  {
+   "text": "Step 3: Implement GraphProjector",
+   "line": 843,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#26",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L843"
+  },
+  {
+   "text": "Step 1: Write failing test for edge projection with missing target",
+   "line": 981,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#27",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L981"
+  },
+  {
+   "text": "Step 2: Run test",
+   "line": 1013,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#28",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1013"
+  },
+  {
+   "text": "Step 3: Commit (regression coverage)",
+   "line": 1017,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#29",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1017"
+  },
+  {
+   "text": "Step 1: Write failing test for supersedence projection",
+   "line": 1032,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#30",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1032"
+  },
+  {
+   "text": "Step 3: Add method to GraphProjector",
+   "line": 1058,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#31",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1058"
+  },
+  {
+   "text": "Step 1: Read existing projector to find the seam",
+   "line": 1089,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#32",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1089"
+  },
+  {
+   "text": "Step 2: Write failing integration test",
+   "line": 1097,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#33",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1097"
+  },
+  {
+   "text": "Step 3: Run test to verify failure",
+   "line": 1124,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#34",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1124"
+  },
+  {
+   "text": "Step 4: Wire GraphProjector into the existing projection function",
+   "line": 1128,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#35",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1128"
+  },
+  {
+   "text": "Step 5: Run integration test",
+   "line": 1134,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#36",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1134"
+  },
+  {
+   "text": "Step 1: Write failing test for backfill",
+   "line": 1153,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#37",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1153"
+  },
+  {
+   "text": "Step 3: Implement backfill",
+   "line": 1176,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#38",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1176"
+  },
+  {
+   "text": "Step 1: Run all graph tests",
+   "line": 1271,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#39",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1271"
+  },
+  {
+   "text": "Step 1: Read existing schema structure",
+   "line": 1301,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#40",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1301"
+  },
+  {
+   "text": "Step 2: Write failing schema validation test",
+   "line": 1308,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#41",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1308"
+  },
+  {
+   "text": "Step 4: Add \"graph\" section to app-manifest.schema.json",
+   "line": 1357,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#42",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1357"
+  },
+  {
+   "text": "Step 1: Write failing test for validation rules",
+   "line": 1444,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#43",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1444"
+  },
+  {
+   "text": "Step 3: Implement registry module",
+   "line": 1492,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#44",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1492"
+  },
+  {
+   "text": "Step 1: Locate existing ManifestRegistry",
+   "line": 1609,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#45",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1609"
+  },
+  {
+   "text": "Step 2: Write failing test for application",
+   "line": 1615,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#46",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1615"
+  },
+  {
+   "text": "Step 4: Implement apply_graph_extension",
+   "line": 1647,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#47",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1647"
+  },
+  {
+   "text": "Step 5: Run tests to verify pass",
+   "line": 1705,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#48",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1705"
+  },
+  {
+   "text": "Step 1: Full test pass",
+   "line": 1720,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#49",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1720"
+  },
+  {
+   "text": "Step 2: Commit checkpoint",
+   "line": 1728,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#50",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1728"
+  },
+  {
+   "text": "Step 1: Write failing integration test for lamad registration",
+   "line": 1744,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#51",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1744"
+  },
+  {
+   "text": "Step 3: Add graph section to lamad manifest",
+   "line": 1774,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#52",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1774"
+  },
+  {
+   "text": "Step 1: Write failing integration test",
+   "line": 1833,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#53",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1833"
+  },
+  {
+   "text": "Step 3: Add graph section to shefa manifest",
+   "line": 1870,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#54",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1870"
+  },
+  {
+   "text": "Step 1: Schema validation pass",
+   "line": 1929,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#55",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1929"
+  },
+  {
+   "text": "Step 2: Manifest registration tests pass",
+   "line": 1936,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#56",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1936"
+  },
+  {
+   "text": "Step 1: Write schemas (refer to existing schemas for shape conventions per CONVENTIONS.md)",
+   "line": 1962,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#57",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L1962"
+  },
+  {
+   "text": "Step 2: Register in codegen-ts.mjs INTERFACE_FILES",
+   "line": 2119,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#58",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2119"
+  },
+  {
+   "text": "Step 3: Run codegen + verify TS interfaces emit",
+   "line": 2130,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#59",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2130"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 2137,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#60",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2137"
+  },
+  {
+   "text": "Step 1: Write failing tests for all 3 builders",
+   "line": 2155,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#61",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2155"
+  },
+  {
+   "text": "Step 3: Implement view builders + typed views",
+   "line": 2221,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#62",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2221"
+  },
+  {
+   "text": "Step 1: Locate existing view types",
+   "line": 2495,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#63",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2495"
+  },
+  {
+   "text": "Step 2: Write failing tests (one per builder)",
+   "line": 2501,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#64",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2501"
+  },
+  {
+   "text": "Step 3: Run tests to verify failure",
+   "line": 2510,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#65",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2510"
+  },
+  {
+   "text": "Step 4: Implement each builder",
+   "line": 2514,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#66",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2514"
+  },
+  {
+   "text": "Step 1: All view tests pass",
+   "line": 2548,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#67",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2548"
+  },
+  {
+   "text": "Step 2: Schema validation + codegen clean",
+   "line": 2555,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#68",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2555"
+  },
+  {
+   "text": "Step 1: Locate existing API router",
+   "line": 2578,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#69",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2578"
+  },
+  {
+   "text": "Step 2: Write failing integration test for the 4 routes",
+   "line": 2584,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#70",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2584"
+  },
+  {
+   "text": "Step 4: Add 4 route handlers",
+   "line": 2607,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#71",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2607"
+  },
+  {
+   "text": "Step 1: Locate existing handlers",
+   "line": 2642,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#72",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2642"
+  },
+  {
+   "text": "Step 2: For each handler, gate graph-backed code path behind the Cargo graph-native feature",
+   "line": 2648,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#73",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2648"
+  },
+  {
+   "text": "Step 3: CI matrix \u2014 both feature configurations",
+   "line": 2673,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#74",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2673"
+  },
+  {
+   "text": "Step 4: Run regression tests + new integration tests",
+   "line": 2677,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#75",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2677"
+  },
+  {
+   "text": "Step 1: All API tests pass",
+   "line": 2695,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#76",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2695"
+  },
+  {
+   "text": "Step 1: Write failing test for endpoint reachability",
+   "line": 2715,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#77",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2715"
+  },
+  {
+   "text": "Step 3: Add async-graphql dep + scaffold",
+   "line": 2730,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#78",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2730"
+  },
+  {
+   "text": "Step 1: Write failing test for SDL generation",
+   "line": 2817,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#79",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2817"
+  },
+  {
+   "text": "Step 3: Implement codegen",
+   "line": 2839,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#80",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L2839"
+  },
+  {
+   "text": "Step 1: Write failing test for Federation v2 SDL compliance",
+   "line": 3022,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#81",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3022"
+  },
+  {
+   "text": "Step 2: Run tests",
+   "line": 3046,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#82",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3046"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 3050,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#83",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3050"
+  },
+  {
+   "text": "Step 1: Write failing tests for both demonstration queries",
+   "line": 3064,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#84",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3064"
+  },
+  {
+   "text": "Step 2: Run tests to verify lamad passes; shefa is the second acceptance gate",
+   "line": 3131,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#85",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3131"
+  },
+  {
+   "text": "Step 3: Implement shefa demonstration query stub",
+   "line": 3135,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#86",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3135"
+  },
+  {
+   "text": "Step 1: All GraphQL tests pass",
+   "line": 3150,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#87",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3150"
+  },
+  {
+   "text": "Step 1: Add criterion dep + bench config",
+   "line": 3173,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#88",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3173"
+  },
+  {
+   "text": "Step 2: Write benchmark harness",
+   "line": 3184,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#89",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3184"
+  },
+  {
+   "text": "Step 3: Run benchmarks (1K + 10K only; 100K+ optional)",
+   "line": 3244,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#90",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3244"
+  },
+  {
+   "text": "Step 4: Document baselines in spec appendix",
+   "line": 3251,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#91",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3251"
+  },
+  {
+   "text": "Step 1: Write failing test asserting thin-build behavior",
+   "line": 3270,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#92",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3270"
+  },
+  {
+   "text": "Step 2: Verify thin build compiles",
+   "line": 3308,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#93",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3308"
+  },
+  {
+   "text": "Step 3: Run thin-build tests",
+   "line": 3316,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#94",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3316"
+  },
+  {
+   "text": "Step 4: Add CI matrix entry for thin-build",
+   "line": 3324,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#95",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3324"
+  },
+  {
+   "text": "Step 5: Measure binary size delta",
+   "line": 3339,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#96",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3339"
+  },
+  {
+   "text": "Step 1: Verify ALL 11 closing conditions from the spec",
+   "line": 3364,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#97",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3364"
+  },
+  {
+   "text": "Step 2: Push to dev and watch CI",
+   "line": 3383,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#98",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3383"
+  },
+  {
+   "text": "Step 3: Write sprint-result memory",
+   "line": 3391,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#99",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3391"
+  },
+  {
+   "text": "Step 4: Commit + push final",
+   "line": 3430,
+   "state": "OPEN",
+   "id": "plans__2026-05-16-graph-native-projection-substrate#100",
+   "cites": "genesis/docs/plans/2026-05-16-graph-native-projection-substrate.md#L3430"
+  }
+ ]
+}

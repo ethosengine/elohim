@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_new_path_dep_needs_dockerfile_copy",
+  "claim": "A new path-dep (even transitive) needs COPY+sed in BOTH edge Dockerfiles, workspace-field inline for storage, and manifest watch-path — else edge breaks at dev.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_new_path_dep_needs_dockerfile_copy.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_new_path_dep_needs_dockerfile_copy.md",
+        "cid": "bafkreihftbjpcbshqgoa7wibv5l4wyh4qepyolgkplwnoncbkthl72o3mu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "New path-dep needs Dockerfile COPY",
+    "file": "project_new_path_dep_needs_dockerfile_copy.md",
+    "scopePath": ".claude/memory/project_new_path_dep_needs_dockerfile_copy.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_sealed_decisions_must_not_outrun_evidence",
+  "claim": "Operator 2026-09-06 — read our Holochain usage as an outside skeptic; sealed decisions get a second-model read.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sealed_decisions_must_not_outrun_evidence.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sealed_decisions_must_not_outrun_evidence.md",
+        "cid": "bafkreidfx5ypwkxa74smh6ni6offqzkr3xrihronru5ps7pmtfwk5qlrl4"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Sealed decisions must not outrun evidence; review as outs…",
+    "file": "feedback_sealed_decisions_must_not_outrun_evidence.md",
+    "scopePath": ".claude/memory/feedback_sealed_decisions_must_not_outrun_evidence.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

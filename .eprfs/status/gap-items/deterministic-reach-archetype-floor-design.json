@@ -1,0 +1,95 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md",
+  "method": "agent",
+  "note": "Prose design spec; decomposed by agent per /brainstorm post-step. 11 bounded items; manifesto re-anchor (G1) is the e2e unblock and the locked first gap-item.",
+  "items": [
+    {
+      "id": "G1",
+      "title": "Heal: re-author the stale manifesto (and doctrine corpus) to commons on live, anchor-aware",
+      "cite": "Enforcement point 4 + Fixtures (doctrine→commons); Problem 'stale live data'",
+      "status": "OPEN",
+      "depends_on": [],
+      "note": "The e2e browser-cluster unblock. Re-author manifesto/constitution/confession/theology through the conductor so live reach == source commons (a SQLite rewrite is reverted by the reconciliation controller). Assert post-anchor anon readability, not just row presence. Verify the live 403→200 after."
+    },
+    {
+      "id": "G2",
+      "title": "Generate the canonical ordinal from reach.schema.json (schema-first)",
+      "cite": "Architecture: one generated ordinal; Decisions-locked 'schema-first single ordinal'",
+      "status": "OPEN",
+      "depends_on": [],
+      "note": "Extend schema:codegen:ts/:rs to GENERATE: Rust openness() in elohim/epr/src/reach.rs (now a generated artifact) + storage index constant; TS ordinal + predicates incl. anonymouslyServable. Byte-stable, ts-rs-compatible export path preserved. Foundation for all migrations."
+    },
+    {
+      "id": "G3",
+      "title": "Seeder: replace REACH_ORDER with generated ordinal + earnedReach resolver + validation",
+      "cite": "Enforcement point 1; Principle (max_openness + validation); Reconciliation with raise-only seeder",
+      "status": "OPEN",
+      "depends_on": ["G2"],
+      "note": "seed-sqlite.ts derives earnedReach(atom)=max_openness(private, minimumReach-advisory, authoredReach) via generated ordinal. Non-canonical reach = hard error. Base = earnedReach; account-package content[].reach treated as per-view (never mutates base)."
+    },
+    {
+      "id": "G4",
+      "title": "Reconcile archetype advisory with existing manifest governance.defaultReach/minimumReach",
+      "cite": "Meaning — archetype advisory (reconciled with existing manifest fields)",
+      "status": "OPEN",
+      "depends_on": ["G2"],
+      "note": "Use existing per-content-type minimumReach as the archetype advisory input (do NOT invent a parallel map). Audit values canonical + consistent with generated ordinal under inverted burden (short allowlist; doctrine commons, most archetypes advise nothing)."
+    },
+    {
+      "id": "G5",
+      "title": "Migrate runtime gate comparators to generated ordinal + fix polarity",
+      "cite": "Enforcement point 3; reimplementation table",
+      "status": "OPEN",
+      "depends_on": ["G2"],
+      "note": "primitives.rs lexicographic→generated index; epr_service.rs reach_level_index→generated index with unknown reach→MOST-RESTRICTIVE (fix the inverted default); doorway access_control.rs geographic vocabulary→generated ordinal. Ordinal+polarity only; no earned-dynamic semantics."
+    },
+    {
+      "id": "G6",
+      "title": "Migrate trust.service.ts invented 6-value enum to generated ordinal",
+      "cite": "reimplementation table (trust.service.ts invented enum, DEFAULT commons)",
+      "status": "OPEN",
+      "depends_on": ["G2"],
+      "note": "Replace private|invited|local|community|federated|commons (defaults open) with the generated TS ordinal/predicates. Default must be most-restrictive."
+    },
+    {
+      "id": "G7",
+      "title": "Build/CI drift gate (the compiler)",
+      "cite": "Enforcement point 2 (a–d)",
+      "status": "OPEN",
+      "depends_on": ["G2", "G3", "G4"],
+      "note": "Extend the pre-push codegen-freshness gate: (a) generated reach artifacts fresh vs schema; (b) every seed atom resolved reach == earnedReach; (c) any non-canonical reach value (seed or manifest) = hard fail; (d) bounded grep/lint guard against hand-rolled reach ordinals over the known sites."
+    },
+    {
+      "id": "G8",
+      "title": "Frictionless band: anonymouslyServable gating the doorway projection fast-path",
+      "cite": "Frictionless band; anonymouslyServable caveat",
+      "status": "OPEN",
+      "depends_on": ["G2", "G5"],
+      "note": "Wire anonymouslyServable = reach≥public as the gate for the projection/anon cache path; conservative commons-only until access_control.rs migration (G5) lands. Build gate asserts no atom below the anon-servable set is reachable via the no-access-control projection layer."
+    },
+    {
+      "id": "G9",
+      "title": "Fixture correction: A&E love-map invited→commons (+ doctrine/M&J values audited)",
+      "cite": "Fixtures (Adam & Eve → commons; the non-canonical invited)",
+      "status": "OPEN",
+      "depends_on": [],
+      "note": "Change love-map-adam-eve.json authored reach from non-canonical 'invited' to 'commons'. M&J stays intimate (unchanged); doctrine stays commons. This A&E fix doubles as the build-gate non-canonical regression fixture (G10)."
+    },
+    {
+      "id": "G10",
+      "title": "a2o reach-boundary scenarios (the goalposts)",
+      "cite": "a2o scenarios (the goalposts)",
+      "status": "OPEN",
+      "depends_on": ["G1", "G3", "G5", "G9"],
+      "note": "anon reads manifesto (commons, no 403); anon + non-related authed denied M&J body (intimate; title may list, body opaque); A&E anon-readable (commons); build-gate rejects a non-canonical reach value; projection/account-package pass does not change stored base reach (storage-layer assert)."
+    },
+    {
+      "id": "G11",
+      "title": "Heal pass for live reach=None atoms (re-author through conductor)",
+      "cite": "Enforcement point 4 (the reach=None atoms → earned reach)",
+      "status": "OPEN",
+      "depends_on": ["G3"],
+      "note": "Re-resolve earnedReach for the ~3354 live reach=None atoms (mostly→private) and re-author the violators through the conductor, anchor-aware. Distinct from G1 (doctrine) — this is the long tail."
+    }
+  ]
+}

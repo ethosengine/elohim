@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_doorway_main_route_needs_is_service_path",
+  "claim": "A new doorway 8080 GET route needs BOTH the match arm and is_service_path, else the EPR router shadows it to the SPA bundle; admission_exempt is orthogonal.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_main_route_needs_is_service_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_main_route_needs_is_service_path.md",
+        "cid": "bafkreigwgplzl5xjkm3ujylx5sbhrh4yykc5vzbeiaxp75fsetyez3r5du"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway main-listener route needs is_service_path",
+    "file": "project_doorway_main_route_needs_is_service_path.md",
+    "scopePath": ".claude/memory/project_doorway_main_route_needs_is_service_path.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

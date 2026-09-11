@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md",
+ "slug": "plans__2026-05-11-tiered-quilt-delivery-master",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#1",
+   "text": "\u00a71 Decisions-required gate: operator sign-off before Wave 0 dispatch (the decisions that gate the whole portfolio)",
+   "line": 56,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L56"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#2",
+   "text": "Wave 0 substrate cleanup: dedupe Attestation entry type (remove imagodei duplicate, elohim DNA copy is single source); migrate imagodei coordinator paths to call elohim DNA coordinator; land 10 elohim_event_type + 5 Attestation discriminators on a clean substrate",
+   "line": 85,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L85"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#3",
+   "text": "Wave 1 commitment factory + tier-state projection: 10 quilt-* elohim_event_type values; 5 new economic_events columns (tier_from/tier_to/shelf_destination_uri/driver_class/cost_class); quilt_tier_state table (Category C projections, no DHT entry-type change)",
+   "line": 136,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L136"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#4",
+   "text": "Wave 2 TierController + LocalDeviceDriver + heuristic classifier: StorageBackend trait (execute_transition/driver_class/advertise_cost_class) + TierController orchestration + heuristic tier classifier",
+   "line": 193,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L193"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#5",
+   "text": "Wave 3 ShelfRouter + ExternalArchiveDriver + quilt-s3-shim + sccache repoint: URI-scheme dispatch (peer-cellar/external-archive) two-phase commit; MinIO driver via aws-sdk-s3; S3 shim; repoint sccache to quilt",
+   "line": 242,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L242"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#6",
+   "text": "Wave 4 BreachScanner (absorbs Plan 2): Pass 1 observation gap (cheap, walks commitments+holdings, tier-breach below floor) + Pass 2 sampled direct draw probe",
+   "line": 345,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L345"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#7",
+   "text": "Wave 5 Restitutor (absorbs Plan 3): subscribes BreachWitnessed signal; deterministic arbitration argmin(blake3(breach_hash||peer_id||epoch))",
+   "line": 400,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L400"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#8",
+   "text": "Wave 6 HoldingsAttester + AccountingAggregator (absorbs Plan 4): periodic tier-holdings Attestation (archetype-tuned cadence) reading quilt_tier_state + economic_events; accounting aggregation",
+   "line": 477,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L477"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#9",
+   "text": "Wave 7 chaos demo + dogfood a2o (absorbs Plan 5): end-to-end chaos demonstration + a2o scenarios proving the tiered-quilt stewardship loop",
+   "line": 477,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L477"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#10",
+   "text": "Parallel tracks: A driver backlog, B app-manifest evolution, C doc+memory updates, D CI integration (run alongside waves not as waves)",
+   "line": 524,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L524"
+  },
+  {
+   "id": "plans__2026-05-11-tiered-quilt-delivery-master#11",
+   "text": "Acceptance gates between waves (\u00a75) + dependency graph (\u00a74) + risk register (\u00a76); all 8 sub-plan files not yet authored",
+   "line": 583,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md#L583"
+  }
+ ]
+}

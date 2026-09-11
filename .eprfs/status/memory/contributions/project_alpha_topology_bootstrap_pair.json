@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "Alpha cluster topology — 7 active peers, cast directive, bootstrap pair",
+  "claim": "7-peer alpha fabric (4 shem + 3 household); adam+matthew bootstrap pair; deployments.json `suspended` IS the roster — check before debugging peers.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_alpha_topology_bootstrap_pair.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_alpha_topology_bootstrap_pair.md",
+        "cid": "bafkreiehk2znmewuaujvoijzc4k72ff2senisoplvjf7xltfz3n5omkmzy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Alpha cluster — 7 active peers",
+    "file": "project_alpha_topology_bootstrap_pair.md",
+    "scopePath": ".claude/memory/project_alpha_topology_bootstrap_pair.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

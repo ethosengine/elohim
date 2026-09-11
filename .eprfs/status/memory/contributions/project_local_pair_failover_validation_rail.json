@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_local_pair_failover_validation_rail",
+  "claim": "Failover validation rail: homo-iroh warm recovery PASS 258s; MESH_PEER_TRANSPORTS for hc-mesh.sh.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_local_pair_failover_validation_rail.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_local_pair_failover_validation_rail.md",
+        "cid": "bafkreihbrwhwatx4sfafcqzcpyrhs7atutheo4wcl5v47jmfvy5vhsk6su"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Local pair-failover validation rail",
+    "file": "project_local_pair_failover_validation_rail.md",
+    "scopePath": ".claude/memory/project_local_pair_failover_validation_rail.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

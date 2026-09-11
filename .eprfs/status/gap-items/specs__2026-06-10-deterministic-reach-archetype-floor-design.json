@@ -1,0 +1,8 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md",
+ "slug": "specs__2026-06-10-deterministic-reach-archetype-floor-design",
+ "method": "none",
+ "class": "protocol-canonical",
+ "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
+ "items": []
+}

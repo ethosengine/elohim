@@ -1,0 +1,330 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md",
+ "slug": "plans__2026-05-10-iroh-pkarr-resolver",
+ "method": "checkbox-tasks",
+ "count": 46,
+ "items": [
+  {
+   "text": "Step 1.1: Add to [dependencies] in doorway/doorway-service/Cargo.toml (alphabetically, after lru would go in line // Utilities block; pkarr goes after chrono near line 81):",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L108"
+  },
+  {
+   "text": "Step 1.2: From the doorway-service directory:",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L118"
+  },
+  {
+   "text": "Step 1.3: Verify lockfile delta is small:",
+   "line": 123,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L123"
+  },
+  {
+   "text": "Step 1.4: Commit. From repo root:",
+   "line": 128,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L128"
+  },
+  {
+   "text": "Step 2.1: Create elohim/sdk/schemas/v1/manifests/discovery-resolvers.schema.json:",
+   "line": 150,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L150"
+  },
+  {
+   "text": "Step 2.2: Extend elohim/sdk/schemas/v1/views/dashboard-federation-peer.schema.json to include an optional discovery_resolvers field on each federation-peer entry. Add to the existing peer object's properties:",
+   "line": 200,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L200"
+  },
+  {
+   "text": "Step 2.3: Validate the new schema parses. From repo root:",
+   "line": 208,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L208"
+  },
+  {
+   "text": "Step 2.4: Regenerate TypeScript types:",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L213"
+  },
+  {
+   "text": "Step 2.5: Commit:",
+   "line": 218,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L218"
+  },
+  {
+   "text": "Step 3.1: Create doorway/doorway-service/src/services/pkarr_resolver.rs:",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L228"
+  },
+  {
+   "text": "Step 3.2: Add the module declaration to doorway/doorway-service/src/services/mod.rs. Find the existing pub mod federation; line and add immediately after:",
+   "line": 550,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L550"
+  },
+  {
+   "text": "Step 3.3: Build:",
+   "line": 554,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L554"
+  },
+  {
+   "text": "Step 3.4: Run unit tests:",
+   "line": 559,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L559"
+  },
+  {
+   "text": "Step 3.5: Commit:",
+   "line": 564,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L564"
+  },
+  {
+   "text": "Step 4.1: Locate the AppState struct definition:",
+   "line": 574,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L574"
+  },
+  {
+   "text": "Step 4.2: Add CLI/env args to doorway/doorway-service/src/config.rs's Args struct (place adjacent to the existing doorway_id block around line 119):",
+   "line": 579,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L579"
+  },
+  {
+   "text": "Step 4.3: In the HTTP router (doorway/doorway-service/src/server/http.rs), find the existing match arm chain (the one that dispatches /api/v1/federation/..., etc.) and add above the registry-fallback (per doorway/CLAUDE.md \"A dedicated match arm in http.rs is only needed when the route requires doorway-specific logic\"):",
+   "line": 595,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L595"
+  },
+  {
+   "text": "Step 4.4: Add a thin routes/pkarr_resolver.rs re-export so the route handlers live under routes:: (matching the rest of the project's organization). Create doorway/doorway-service/src/routes/pkarr_resolver.rs:",
+   "line": 634,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L634"
+  },
+  {
+   "text": "Step 4.5: Build:",
+   "line": 640,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L640"
+  },
+  {
+   "text": "Step 4.7: Commit:",
+   "line": 650,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L650"
+  },
+  {
+   "text": "Step 5.1: Create doorway/doorway-service/tests/pkarr_resolver_integration.rs:",
+   "line": 660,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L660"
+  },
+  {
+   "text": "Step 5.2: Run:",
+   "line": 735,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L735"
+  },
+  {
+   "text": "Step 5.3: Commit:",
+   "line": 740,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L740"
+  },
+  {
+   "text": "Step 6.1: In elohim/elohim-storage/src/p2p_iroh/config.rs, add:",
+   "line": 750,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L750"
+  },
+  {
+   "text": "Step 6.2: In elohim/elohim-storage/src/p2p_iroh/endpoint.rs, replace the if config.use_n0_discovery { builder = builder.discovery_n0(); } block with:",
+   "line": 804,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L804"
+  },
+  {
+   "text": "Step 6.3: Update test fixtures in parity_harness.rs and node.rs. The existing IrohConfig { ..., use_n0_discovery: false } literals get a sibling discovery_resolvers: vec![]. Search:",
+   "line": 818,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L818"
+  },
+  {
+   "text": "Step 6.5: Run iroh-side tests:",
+   "line": 828,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L828"
+  },
+  {
+   "text": "Step 6.6: Commit:",
+   "line": 833,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L833"
+  },
+  {
+   "text": "Step 7.1: Create elohim/elohim-storage/tests/iroh_pkarr_e2e.rs:",
+   "line": 843,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L843"
+  },
+  {
+   "text": "Step 7.2: Add to elohim/elohim-storage/Cargo.toml [dev-dependencies]:",
+   "line": 1003,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1003"
+  },
+  {
+   "text": "Step 7.3: Run:",
+   "line": 1010,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1010"
+  },
+  {
+   "text": "Step 7.4: Commit:",
+   "line": 1015,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1015"
+  },
+  {
+   "text": "Step 8.1: Per memory feedback_check_helm_chart_status_before_runbooks and feedback_verify_cluster_state_before_runbook: this work does NOT introduce a new helm chart and does NOT require any new operator. It is purely environment-variable wiring on the existing doorway deployment. Confirm by running (operator host with kubectl):",
+   "line": 1025,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1025"
+  },
+  {
+   "text": "Step 8.2: Create genesis/manifests/doorway-pkarr-resolver.yaml as a kustomize-style overlay patch (or a plain ConfigMap, depending on how doorway is currently deployed \u2014 verify in Task 8.1):",
+   "line": 1030,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1030"
+  },
+  {
+   "text": "Step 8.3: Extend devfile.yaml (workspace root). Find the components block that defines the doorway-service tool image and add to its env:",
+   "line": 1069,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1069"
+  },
+  {
+   "text": "Step 8.4: Extend doorway/doorway-service/docker-compose.dev.yml. There is no doorway service entry in the dev compose today (it only stands up nats + mongo); add a stub doorway service block at the bottom for operators who want a full local run:",
+   "line": 1077,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1077"
+  },
+  {
+   "text": "Step 8.5: Commit:",
+   "line": 1105,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1105"
+  },
+  {
+   "text": "Step 9.1: Add an optional RateLimiter field to PkarrResolverService keyed by source IP. Use the governor crate if it is already in the dep graph; otherwise a hand-rolled token bucket per IpAddr in a dashmap::DashMap (dashmap is already in doorway's deps per Cargo.toml line 89). Default: 10 PUT/min/IP. Configurable via --pkarr-put-rate-limit-per-ip-per-min",
+   "line": 1115,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1115"
+  },
+  {
+   "text": "Step 9.2: Unit test: 11th PUT from same IP within 60s returns 429",
+   "line": 1116,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1116"
+  },
+  {
+   "text": "Step 9.3: Commit. This task is OPTIONAL for gate #10 itself \u2014 the gate does not require rate limiting, but operators running a public resolver will want it before announcing the URL widely",
+   "line": 1117,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1117"
+  },
+  {
+   "text": "Step 10.1: Create genesis/manifests/RUNBOOK-pkarr-resolver-2026-05-10.md:",
+   "line": 1123,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1123"
+  },
+  {
+   "text": "Step 10.2: Commit:",
+   "line": 1213,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1213"
+  },
+  {
+   "text": "Step 11.1: Full doorway test suite:",
+   "line": 1221,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1221"
+  },
+  {
+   "text": "Step 11.2: Full storage iroh-feature test suite:",
+   "line": 1226,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1226"
+  },
+  {
+   "text": "Step 11.3: Schema codegen freshness check:",
+   "line": 1231,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1231"
+  },
+  {
+   "text": "Step 11.5: Final commit (only if any final-pass changes):",
+   "line": 1242,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-pkarr-resolver#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-pkarr-resolver.md#L1242"
+  }
+ ]
+}

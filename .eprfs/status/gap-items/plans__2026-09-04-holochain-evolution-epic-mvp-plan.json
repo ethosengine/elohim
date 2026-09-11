@@ -1,0 +1,274 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md",
+ "slug": "plans__2026-09-04-holochain-evolution-epic-mvp-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 33,
+ "items": [
+  {
+   "text": "Task 1 deliverable: export_records returns bounded, cursor-resumable pages of the agent's own signed actions with a chain digest, tested in sweettest, and is live on the mesh via a rung-5 coordinator-bundle release (cycle-time row recorded)",
+   "line": 86,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L86",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 2 deliverable: create_commitment accepts a well-formed migrates-lineage and sunsets-lineage payload with \u22651 verified signature and refuses malformed ones with a named field; sweettest green; shipped to the mesh's mishpat cell by rung-5 coordinator hot-swap",
+   "line": 180,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L180",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 3 deliverable: a happ-lineage manifest validates against the schema only when it carries migrateFrom, lineage and path.commitmentCid; the packager emits it; unit test green",
+   "line": 285,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L285",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 4 deliverable: verify accepts a happ-lineage release whose migrateFrom equals the installed hash and whose path evidence is active + unrevoked + quorum-met + same root, and refuses each failure with its named reason; DnaLineageMismatch unchanged for every other class; unit tests green",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L344",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 5 deliverable: install_lineage installs elohim@<hash12> beside elohim under the same agent key with the lineage property set, idempotently; verified against the household mesh with list_apps showing both apps for one key",
+   "line": 455,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L455",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 6 deliverable: every call_zome for a role routes to the role's AUTHORING app id via LineageRoles; node-registry is registry-backed; with no window open the mesh behaves byte-for-byte as before (just gate elohim-storage green, Act I mesh subset green)",
+   "line": 554,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L554",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 7 deliverable: applying a verified happ-lineage release on a mesh peer installs v2 beside v1 under the same key, carries every v1 record with a witness, flips the role to authoring-on-v2, and returns a CarryReceipt whose carried == v1_count and digest == v1_digest",
+   "line": 592,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L592",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 8 deliverable: GET /version on a dual-celled peer shows the role with both cells, which one authors, under one key; GET /admin/adoption names path not notarized / quorum unmet / root mismatch / lineage mismatch verbatim as the refusal reason strings the story quotes",
+   "line": 618,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L618",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 9 deliverable: carry_from on v2 pulls one bounded page from v1 across cells, re-creates own records natively (same entry hash), held-carries others, commits one witness per page, and returns cursor + digest; sweettest drives it to the end and matches the export digest; CI archives node-registry-v2.dna",
+   "line": 647,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L647",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 10 deliverable: just test mesh @concern:happ-lineage-migration --name '^Station 1' runs against a mesh where v1 is the baseline, the v2 candidate is minted from node-registry-v2.happ, and the harness can notarize/revoke commitments under the steward's key; the fixture converges the fleet to baseline before and after every run (rung 5's lesson, 8181d60a8)",
+   "line": 664,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L664",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 11 deliverable: Stations 1, 2, 3, 4, 5, 9, 10 pass on the household mesh in one run (cucumber-stations-mvp-r<N>.{log,json} under genesis/a2o/reports/release-ceremony/<date>/), the habit atom carries the receipt id, and the epic's \u00a711.2 board flips those rows green",
+   "line": 688,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L688",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 12 deliverable: a record jessica authors on v1 during the window is readable on james's v2 within one sweep interval, held with jessica's signature; the passport reports backward carry unavailable; Station 6 green",
+   "line": 702,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L702",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 13 deliverable: revoking the migration commitment inside its horizon returns every peer to v1 authoring, leaves v2 cells disabled and intact, re-authors james's window-time v2 record on v1 with the same entry hash, reports the rest as pending; Station 7 green",
+   "line": 714,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L714",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 14 deliverable: after fleet convergence and a notarized sunset, every peer seals close\u2192open in order, v1 stays readable, the harness's post-close write on v1 is accepted by the conductor but its carried proof is refused by v2 as \"after close\" on every peer, and a post-sunset revocation changes nothing; Station 8 green",
+   "line": 725,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L725",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 15 deliverable: a measured yes/no with the diff size, recorded in the epic \u00a79 and \u00a711",
+   "line": 733,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L733",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 16 deliverable: a commitment signed by an agent that is not on the earned roster is refused quorum_unmet on every peer; Station 10 arm 1 green",
+   "line": 748,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L748",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 17 deliverable: a path whose constitution_root differs from the installed role's is refused root_mismatch; Station 10 green",
+   "line": 757,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L757",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 18 deliverable: a neighbour's v1 record is carried into v2 as a held-carry with the courier's witness; default DNA hash unchanged",
+   "line": 766,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L766",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 19 deliverable: a revoked path is refused path_revoked on every peer, not only the author's; Station 7's revocation half green",
+   "line": 775,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L775",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 20 deliverable: a retried carry commits no duplicate entries or witnesses; the \"one witness per carried entry\" property holds under retry",
+   "line": 783,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L783",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 21 deliverable: a receiving peer's integrity validation rejects a lineage commitment whose signers are not on a roster that chains to the declared root; storage's verify_path roster check becomes a coherence check over a validated fact",
+   "line": 797,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L797",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 22 deliverable: no agent can revoke or activate a path it did not author or lawfully revoke; storage's lifecycle read becomes a verified fact",
+   "line": 806,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L806",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 23 deliverable: Station 8's \"every peer\" claim holds \u2014 a post-close v1 fact is refused by v2 regardless of which courier carries it",
+   "line": 815,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L815",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 24 deliverable: carrying N records costs O(N) record loads, not O(N\u00b2/64); default node-registry.dna hash unchanged",
+   "line": 827,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L827",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 25 deliverable: after-close validation is O(1) per witness once the close travels in the witness; hash-moving, lands with Tasks 21\u201323",
+   "line": 835,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L835",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 26 deliverable: a carry or re-adoption between lineage ends can never re-create a record as the wrong type; the type travels by name",
+   "line": 845,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L845",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 27 deliverable: a non-authoring peer discovers the sunset that names its migration; the sunset arm is live on the canary; Station 8 can seal there",
+   "line": 856,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L856",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 28 deliverable: on the mesh a multi-page carry's second and later pages report scanned \u226a the chain length (R1's metric), because the pin actually reaches the zome",
+   "line": 866,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L866",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 29 deliverable: on the household mesh a courier's held view of a neighbour reaches the neighbour's real chain head (the ten-station receipt goes 10/10); the page names which view answered",
+   "line": 877,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L877",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 30 deliverable: hc-mesh.sh blocks james lists the BlockSpan rows and the rejected node-registry ops that caused them; after unblock and a conductor restart, a node-registry gossip round completes and every peer's storage arc goes FULL on the household mesh (watcher receipt)",
+   "line": 888,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L888",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 31 deliverable: two consecutive ten-station runs on a fresh household mesh leave hc-mesh.sh blocks empty on all three peers, and a run against a peer with a closed base chain refuses by name at the pre-flight",
+   "line": 898,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L898",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 32 deliverable: on the household mesh a storage-restart after a sunset adds no action to the closed v1 chain, and a partitioned space is named in the passport within two probe samples",
+   "line": 909,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L909",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Task 33 deliverable: a crossing can name its v1; Station 8 seals a run-scoped chain; two consecutive ten-station runs on a fresh household mesh leave every peer's block list empty",
+   "line": 920,
+   "state": "OPEN",
+   "id": "plans__2026-09-04-holochain-evolution-epic-mvp-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-09-04-holochain-evolution-epic-mvp-plan.md#L920",
+   "class": "protocol-canonical"
+  }
+ ]
+}

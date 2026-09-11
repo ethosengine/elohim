@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "schema codegen produces oscillating Prettier diff",
+  "claim": "schema:codegen:ts has no idempotent fixed point — union line-wraps flip every run across 18 generated files; cosmetic, not real drift.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_codegen_prettier_oscillation.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_codegen_prettier_oscillation.md",
+        "cid": "bafkreihpqcaish4nekapphxypz5untdwdh7dkw2y2hq3pdi6bm7tuxoj6m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Schema codegen Prettier oscillation",
+    "file": "feedback_codegen_prettier_oscillation.md",
+    "scopePath": ".claude/memory/feedback_codegen_prettier_oscillation.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

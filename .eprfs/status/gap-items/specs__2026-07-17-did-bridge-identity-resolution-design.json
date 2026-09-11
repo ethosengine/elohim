@@ -1,0 +1,89 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md",
+ "slug": "specs__2026-07-17-did-bridge-identity-resolution-design",
+ "method": "agent-extracted",
+ "class": "protocol-canonical",
+ "note": "#1-6,#9 review-verified (d60e244db + 8bcf9d573 + gate c30096a6e). #7 CLAIMED 5e582a546 (11 unit tests incl. schema-conformance, independently re-run green; hunk-isolated commit). #8 CLAIMED bb414f4e2 (25 tests, two-gate confirmed, replaced legacy fabricated-key did.json). Verify leg for #7/#8 = live e2e resolution on next dev-merge deploy (@requires:household-nodes). #10 phase-2 identity-head design OPEN (p2p-design-gate mandatory)",
+ "items": [
+  {
+   "text": "Scaffold bridges/did workspace (Cargo.toml resolver=2 Apache-2.0, did-types / did-bridge / did-tests) mirroring the valueflows bridge pattern",
+   "line": 60,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L60",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did-types: DID 1.1 data model (DidDocument, VerificationMethod Multikey ed25519, five verification relationships, Service, alsoKnownAs, controller) \u2014 serde camelCase wire-faithful, no I/O",
+   "line": 65,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L65",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DidResolver trait + DidResolutionResult with standard DID 1.1 resolution/document metadata error semantics (notFound, invalidDid, methodNotSupported)",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L75",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did:key codec \u2014 AgentPubKey (39-byte holo hash) <-> did:key z-base58btc(0xed01+core32) round-trip, property-tested, loc bytes recomputed on reverse; fixture from real fleet agent keys",
+   "line": 96,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L96",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did:elohim method \u2014 self-certifying (id IS agent_cid), resolution assembles projection via an assembly contract (verification method from agent key, humans-projection profile service, doorway service entries, transport ids as alsoKnownAs); mock-store contract test",
+   "line": 105,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L105",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did:web resolver impl, feature-gated (fetch); needed as atproto foundation",
+   "line": 68,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L68",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "elohim-storage implements the did:elohim assembly contract (owns the joins: agent key, humans projection, doorway registrations, transport ids)",
+   "line": 117,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Doorway routes: GET /1.0/identifiers/{did} (universal-resolver-compatible) + GET /.well-known/did.json (doorway's own did:web) \u2014 match arm + is_service_path + unit test. Separate leg after crate green. @requires:household-nodes",
+   "line": 147,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L147",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Phase-1 DoD: bridges/did cargo build + nextest + clippy -D warnings + fmt --check green (RUSTFLAGS empty, pooled target dir)",
+   "line": 179,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L179",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Phase-2 identity head + agent-key lineage (controllers = self + community-recovery quorum, rotation-as-update, lineage DAG) \u2014 MUST route full p2p-design-gate before design; deferred follow-on",
+   "line": 167,
+   "state": "OPEN",
+   "id": "specs__2026-07-17-did-bridge-identity-resolution-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-17-did-bridge-identity-resolution-design.md#L167",
+   "class": "protocol-canonical"
+  }
+ ]
+}

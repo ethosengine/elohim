@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_trust_as_performance_primitive",
+  "claim": "Security and performance COMPOSE — the compute/trust gradient makes high-trust peer edges fast while commons browsing stays witnessed-safe.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_trust_as_performance_primitive.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_trust_as_performance_primitive.md",
+        "cid": "bafkreiax6pnl5472jvw35x76tgawghhnavfoxrtvpdvl6cchwjckon4w4y"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Trust: security AND performance — the compute/trust gradient",
+    "file": "project_trust_as_performance_primitive.md",
+    "scopePath": ".claude/memory/project_trust_as_performance_primitive.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

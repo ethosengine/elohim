@@ -1,0 +1,157 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md",
+ "slug": "plans__2026-06-20-storage-serve-routing-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 18,
+ "items": [
+  {
+   "text": "Step 1: grep the POST custodian_metrics ingest handler that sets input.custodian_id (api/custodians.rs, the upsert path near get_metrics_by_id) and the writers, to confirm whether custodian_metrics.custodian_id holds an agent_cid (uhCAk\u2026) or a separate custodian namespace",
+   "line": 53,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L53",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Record the verdict in the plan/ledger:",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L54",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add contract tests (if not already covered by the spine's tests) asserting the serve-routing-relevant behavior over hand-built Candidate vecs: (a) select_diverse returns \u2264 n and spreads households; (b) all-saturated (current_load >= 1.0) \u2192 empty (caller sheds); (c) capability floor filters. (Most exist from Wave 1 \u2014 add only what serve-routing specifically relies on, e.g. an explicit \"n=2 from 1 household backfills\" case if missing.)",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L66",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit path-limited (if any test added)",
+   "line": 68,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L68",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing test (in serve_routing.rs, #[cfg(test)]):",
+   "line": 81,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L81",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement ServeRow, MIN_CAP, and fold_candidates (pure map; capability_level.unwrap_or(MIN_CAP as i32) as u8 clamped to u8; household_id.unwrap_or_default(); current_load.unwrap_or(0.0); delivery_score.unwrap_or(1.0); attested_rtt_ms passthrough; bonded passthrough). NO diesel import in this fn",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L108",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run \u2192 PASS. Step 5: Commit path-limited",
+   "line": 109,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L109",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add under [dependencies]: elohim-peer-fabric = { path = \"../elohim-peer-fabric\", default-features = false, features = [\"serve-routing\"] } (default-features = false matters \u2014 the crate default enables all three role features; storage wants only serve-routing, which gates the score module)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit Cargo.toml (+ Cargo.lock if changed) path-limited",
+   "line": 119,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L119",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the DbPool-fixture test (template tests/peer_selection.rs:23-282 \u2014 test_util::test_pool, seed real column names): seed shard_locations (agent_cid-keyed) holding blob_hash on 3 nodes across 2 households + stewarded_nodes.capability_level + a humans household join + an active rea_commitments provide for one node; assert load_serve_rows(blob_hash) returns 3 rows with the right agent_cid/household_id/capability_level/bonded, and current_load/attested_rtt_ms/delivery_score as None (no columns yet)",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L129",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run (heavy) \u2192 FAIL. Step 3: Implement the join: shard_locations (candidate set via shard_manifests.content_id\u2192blob_hash per recon \u00a72, agent_cid-keyed) \u2192 stewarded_nodes/node_stewardship\u2192humans (household_id) \u2192 rea_commitments (bonded = active provide: provider=agent_cid AND action \u2208 {provide,replicates-content,replicates-commons,custody-blob} AND state=\"active\" AND finished=0). current_load/attested_rtt_ms/delivery_score \u2192 None (no source column this wave; T0 decided the future key)",
+   "line": 130,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run \u2192 PASS (in the T6 batch if disk-staged). Step 5: Commit path-limited",
+   "line": 131,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L131",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the DbPool integration test: seed the same fixture; assert select_serve_peers(blob_hash, 2) returns 2 agent_cids spread across the 2 households (diversity), the bonded/higher-capability peer ranks in; and an all-saturated fixture (current_load forced 1.0 once that's wired \u2014 for now assert the empty-set path via a no-eligible-peer fixture) \u2192 empty Vec (caller sheds). Use synthetic/neutral RTT (household = ~0, non-discriminating \u2014 do NOT assert latency ordering here; that's T7)",
+   "line": 141,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L141",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run (heavy) \u2192 FAIL. Step 3: Implement the thin adapter: let rows = load_serve_rows(conn, blob_hash); let cands = fold_candidates(&rows); score::select_diverse(&cands, MIN_CAP, n).into_iter().map(|s| s.agent_cid).collect()",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L142",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write/extend the integration test at the primary site (http.rs): the existing serve path now consults select_serve_peers for the candidate ordering; preserve the existing 8-peer connected-fallback as the degradation path when select_serve_peers returns empty (no eligible/known peers) \u2014 never regress availability",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L151",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run (heavy) \u2192 FAIL/compile. Step 3: Implement: replace the raw lookup_hosts(...).map(|r| r.peer_id) candidate construction with select_serve_peers(conn, blob_hash, N); for the shard_locations agent_cid-native path, the chosen agent_cids feed race_fetch after resolving to the transport id race_fetch expects (if race_fetch needs libp2p ids and the agent_cid\u2192libp2p direction is also unfed, keep the existing libp2p candidate list as the fallback ordering and apply score ordering only where the resolution is available \u2014 document the partial-coverage honestly). Keep the connected-fallback",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L152",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Author a @wip scenario asserting that, cross-WAN, serve-routing prefers the lower-measured-RTT capable peer (the latency signal only discriminates cross-WAN; household RTT \u2248 0 ties every peer, so this assertion is vacuous on household and MUST be env-gated). Mark held; do NOT run household",
+   "line": 161,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-06-20-storage-serve-routing-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L161",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Commit path-limited. (No cargo.)",
+   "line": 162,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-storage-serve-routing-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-storage-serve-routing-plan.md#L162",
+   "class": "protocol-canonical"
+  }
+ ]
+}

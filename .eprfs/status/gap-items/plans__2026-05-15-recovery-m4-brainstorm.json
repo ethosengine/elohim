@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md",
+ "slug": "plans__2026-05-15-recovery-m4-brainstorm",
+ "method": "agent-decomposition",
+ "count": 9,
+ "items": [
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#1",
+   "text": "D1: sibling RecoveryFlowProjector at services/recovery_flow_projector.rs (controller tracking Open->Quorum->Effective state machine) vs accumulator AttestationProjector; call site gains prefix-routing for recovery-request/key-revocation/identity-freeze signals",
+   "line": 10,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L10"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#2",
+   "text": "D1: attestation:revocation-vote + attestation:recovery-approval continue via AttestationProjector (vote-children land in attestations accumulator); only governance-action openers + key-revocation effective events go to the sibling; EPR W2D key_revocations writer co-located in RecoveryFlowProjector",
+   "line": 36,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L36"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#3",
+   "text": "D2: duality - existing revocation-attestation.schema.json (Category C operational) stands; slim signal carries actionHash + progress state (currentVotes/requiredVotes/thresholdReached), no inlined contentEnvelope; consumers read governance_actions table for threshold config",
+   "line": 56,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L56"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#4",
+   "text": "D2: EPR D3 committed to duality - IntegrityNotify pipeline reads slim signal, no contentEnvelope expected, no cross-sprint schema coordination needed",
+   "line": 88,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L88"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#5",
+   "text": "D3: retire feature/recovery-m4-fast-path-revocation branch outright (zero unique commits, strict ancestor of dev; a2o + sweettest scenarios already on dev); git branch -d (not -D) safety check",
+   "line": 94,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L94"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#6",
+   "text": "D4: manifest-declared Shamir custodian discovery (custodian CIDs on DHT at setup time, resolved to PeerId via peer_identity_bindings, dialed via ShamirShareCodec) vs peer-advertised; deterministic-without-elohim + grandma-standard (recovery must not fail if custodian offline)",
+   "line": 136,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L136"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#7",
+   "text": "D4 Stage 4a wiring: add shamir_share_protocol RequestResponse<ShamirShareCodec> to ElohimStorageBehaviour following trust_protocol pattern; dial by manifest PeerId not gossipsub scan; custodian_cid is replay-prevention not discovery",
+   "line": 168,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L168"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#8",
+   "text": "Open: D4 sub-question - is custodian identity committed in governance-action:recovery-request (recovery-time) or separate governance-action:shamir-custody-setup (onboarding); resolve as Stage 4b pre-condition",
+   "line": 185,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L185"
+  },
+  {
+   "id": "plans__2026-05-15-recovery-m4-brainstorm#9",
+   "text": "Open: D1 sub-question - confirm exact call site file+line of central signal dispatcher gaining the prefix-routing step (Stage 2 pre-condition)",
+   "line": 189,
+   "state": "OPEN",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md#L189"
+  }
+ ]
+}

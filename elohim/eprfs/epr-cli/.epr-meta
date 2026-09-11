@@ -1,0 +1,37 @@
+---
+epr-meta-version: 1
+id: native-reconciliation-governance
+purpose: >
+  The native CLI admits local evidence and derives context over shared repository bytes.
+  Acceptance-aware reconciliation serves agents choosing remaining work without promoting
+  implementation reports or technical approvals into independently accepted experience.
+  Its method and admission decisions are registered in seam-registry.yaml; local actor
+  claims establish accountable attribution, not cryptographic peer authority.
+rules:
+  - id: reconciliation-fitness-review
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any: ["reconciliation", "acceptance", "appoint"]
+    route-to: { dest: code-reviewer }
+    why: >
+      Changes to acceptance admission or remaining-work interpretation require independent
+      technical review and a separately appointed agent exercising native context against
+      the declared intent. Preserve evidence, uncertainty, scope and algorithm identity;
+      tests alone cannot establish fitness. Register changed decisions in seam-registry.yaml
+      and record observed limitations in the acceptance report. Generic stock fulfillment
+      remains a separate measure and cannot silently become experiential acceptance.
+    retire-when: >
+      when the authoring workflow attaches independent technical review and appointed
+      experiential acceptance to every change of these decision surfaces by construction
+---
+
+# Native context and acceptance
+
+One append-only local record supplies separate fulfillment, technical-review and acceptance
+facts. The reader is a rebuildable interpretation with a declared version, bounded scope and
+inspectable evidence. Reconciliation cannot erase adverse evidence or infer acceptance from
+matching labels. Revalidation and contested states preserve what another agent must investigate.
+
+This is a local proof of governance over bytes. Crossing the peer boundary requires independent
+receiver verification and earned authority; an appointment in this checkout cannot confer them.

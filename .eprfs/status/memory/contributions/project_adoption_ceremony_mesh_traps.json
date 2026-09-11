@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_adoption_ceremony_mesh_traps",
+  "claim": "Rung-5 adoption ceremony (local mesh 2026-09-02): preconditions, candidate shape, typed-refusal map. Use before release/election measures.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_adoption_ceremony_mesh_traps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_adoption_ceremony_mesh_traps.md",
+        "cid": "bafkreibds3lvbqvsg3vm7jk7cc77st24hxqfc5s4kjoy3wzgeotds3ll3a"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Rung-5 adoption ceremony: mesh traps + refusal map",
+    "file": "project_adoption_ceremony_mesh_traps.md",
+    "scopePath": ".claude/memory/project_adoption_ceremony_mesh_traps.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

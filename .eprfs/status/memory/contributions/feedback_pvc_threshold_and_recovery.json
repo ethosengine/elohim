@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "PVC threshold — act at 85%+, cargo-pool legacy-targets is the first reclamation",
+  "claim": "118G PVC: above 85% used, act — cargo-pool legacy-targets --clean --yes reclaims ~25-35G safely; check df <80% before dispatching any cargo-running agent.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_pvc_threshold_and_recovery.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_pvc_threshold_and_recovery.md",
+        "cid": "bafkreibuykr5xwp56ht2ag3n7vruqdkdlf7ujwsjkys6mhffwddp3t6jfm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "PVC threshold — act at 85%+; cargo-pool legacy-targets first",
+    "file": "feedback_pvc_threshold_and_recovery.md",
+    "scopePath": ".claude/memory/feedback_pvc_threshold_and_recovery.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

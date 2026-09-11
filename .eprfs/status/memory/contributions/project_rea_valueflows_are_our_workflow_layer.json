@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_rea_valueflows_are_our_workflow_layer",
+  "claim": "Saga + habits + commitment:claim over EPR recipes ARE our workflows — peer-native vs tickets; the gap is projective (nothing re-reads it mid-run).",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_rea_valueflows_are_our_workflow_layer.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_rea_valueflows_are_our_workflow_layer.md",
+        "cid": "bafkreigygsjw35xtkejm4y2rbgzsysqn2azvaw7om7aw2h43sklkqfofce"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "REA valueflows over EPRs are our workflow layer",
+    "file": "project_rea_valueflows_are_our_workflow_layer.md",
+    "scopePath": ".claude/memory/project_rea_valueflows_are_our_workflow_layer.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

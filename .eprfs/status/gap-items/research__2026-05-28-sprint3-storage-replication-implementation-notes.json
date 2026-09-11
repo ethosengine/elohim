@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md",
+ "slug": "research__2026-05-28-sprint3-storage-replication-implementation-notes",
+ "method": "checkbox-tasks",
+ "count": 5,
+ "items": [
+  {
+   "text": "pnpm run hc:start:seed brings up local stack with 2+ simulated dwelling-hubs",
+   "line": 93,
+   "state": "OPEN",
+   "id": "research__2026-05-28-sprint3-storage-replication-implementation-notes#1",
+   "cites": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md#L93"
+  },
+  {
+   "text": "curl http://localhost:8090/api/v1/peer/<peer_cid>/capacity \u2192 compliantWithDonut: true on a fresh peer",
+   "line": 94,
+   "state": "OPEN",
+   "id": "research__2026-05-28-sprint3-storage-replication-implementation-notes#2",
+   "cites": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md#L94"
+  },
+  {
+   "text": "Author a replicates-dwelling commitment via CLI; PeerCapacityView reflects pledge; mutuality_audit_log shows Pending",
+   "line": 95,
+   "state": "OPEN",
+   "id": "research__2026-05-28-sprint3-storage-replication-implementation-notes#3",
+   "cites": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md#L95"
+  },
+  {
+   "text": "Advance clock past grace_period; reciprocity-imbalance signal appears in stream (after conductor-bridge wiring)",
+   "line": 96,
+   "state": "OPEN",
+   "id": "research__2026-05-28-sprint3-storage-replication-implementation-notes#4",
+   "cites": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md#L96"
+  },
+  {
+   "text": "Author a ratio-breaching commitment; storage validator \u2192 400 with ConstitutionalRatioBreach",
+   "line": 97,
+   "state": "OPEN",
+   "id": "research__2026-05-28-sprint3-storage-replication-implementation-notes#5",
+   "cites": "genesis/docs/research/2026-05-28-sprint3-storage-replication-implementation-notes.md#L97"
+  }
+ ]
+}

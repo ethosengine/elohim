@@ -1,0 +1,309 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md",
+ "slug": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator",
+ "method": "checkbox-tasks",
+ "count": 43,
+ "items": [
+  {
+   "text": "Step 1: Author bounds-validation-result-view.schema.json",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L101"
+  },
+  {
+   "text": "Step 2: Author standing-score-view.schema.json",
+   "line": 148,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L148"
+  },
+  {
+   "text": "Step 4: Run; expect FAIL (red)",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L210"
+  },
+  {
+   "text": "Step 5: Author elohim/elohim-views/src/bounds.rs",
+   "line": 218,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L218"
+  },
+  {
+   "text": "Step 6: Author elohim/elohim-views/src/standing.rs",
+   "line": 269,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L269"
+  },
+  {
+   "text": "Step 7: Add to codegen-ts INTERFACE_FILES",
+   "line": 311,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L311"
+  },
+  {
+   "text": "Step 8: Run schema_contract + ts-rs export",
+   "line": 320,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L320"
+  },
+  {
+   "text": "Step 9: Commit",
+   "line": 330,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L330"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 354,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L354"
+  },
+  {
+   "text": "Step 2: Implement trait + production impl + mock",
+   "line": 398,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L398"
+  },
+  {
+   "text": "Step 3: Run; expect PASS",
+   "line": 474,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L474"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 482,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L482"
+  },
+  {
+   "text": "Step 1: Write failing test",
+   "line": 497,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L497"
+  },
+  {
+   "text": "Step 2: Implement trait + diesel impl + mock",
+   "line": 522,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L522"
+  },
+  {
+   "text": "Step 3: Add bounded_by column to economic_events (migration)",
+   "line": 611,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L611"
+  },
+  {
+   "text": "Step 4: Run tests + migration",
+   "line": 633,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L633"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 639,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L639"
+  },
+  {
+   "text": "Step 1: Write failing happy-path test",
+   "line": 656,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L656"
+  },
+  {
+   "text": "Step 2: Implement validate + EventForValidation",
+   "line": 708,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L708"
+  },
+  {
+   "text": "Step 3: Run; expect PASS for happy path",
+   "line": 929,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L929"
+  },
+  {
+   "text": "Step 1: Author 6 unit tests, one per ViolationKind",
+   "line": 950,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L950"
+  },
+  {
+   "text": "Step 2: Author red-team adversarial integration test file",
+   "line": 1035,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1035"
+  },
+  {
+   "text": "Step 3: Run all bounds_validator tests",
+   "line": 1166,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1166"
+  },
+  {
+   "text": "Step 1: Author handler",
+   "line": 1192,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1192"
+  },
+  {
+   "text": "Step 2: Refactor validate signature",
+   "line": 1253,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1253"
+  },
+  {
+   "text": "Step 3: Wire route in http.rs",
+   "line": 1257,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1257"
+  },
+  {
+   "text": "Step 4: Integration test via reqwest or hyper client",
+   "line": 1267,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1267"
+  },
+  {
+   "text": "Step 5: Run + commit",
+   "line": 1286,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1286"
+  },
+  {
+   "text": "Step 1: Declare weights in elohim manifest",
+   "line": 1304,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1304"
+  },
+  {
+   "text": "Step 2: Implement registry loader",
+   "line": 1321,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1321"
+  },
+  {
+   "text": "Step 3: Run tests + commit",
+   "line": 1371,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1371"
+  },
+  {
+   "text": "Step 1: Find existing project_signal function",
+   "line": 1387,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1387"
+  },
+  {
+   "text": "Step 2: Replace hardcoded weight lookup with registry call",
+   "line": 1391,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1391"
+  },
+  {
+   "text": "Step 3: Add integration test for each of the 3 new signal_kinds",
+   "line": 1409,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1409"
+  },
+  {
+   "text": "Step 4: Run + commit",
+   "line": 1462,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1462"
+  },
+  {
+   "text": "Step 1: Implement handler",
+   "line": 1480,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1480"
+  },
+  {
+   "text": "Step 2: Wire route + parse path/query",
+   "line": 1547,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1547"
+  },
+  {
+   "text": "Step 3: Smoke test + commit",
+   "line": 1551,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1551"
+  },
+  {
+   "text": "Step 1: Append close-out section to this plan",
+   "line": 1569,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1569"
+  },
+  {
+   "text": "Step 2: Update roadmap S2 marker",
+   "line": 1588,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1588"
+  },
+  {
+   "text": "Step 3: Create pattern memory",
+   "line": 1592,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1592"
+  },
+  {
+   "text": "Step 4: Add MEMORY.md entry",
+   "line": 1621,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1621"
+  },
+  {
+   "text": "Step 5: Commit + close",
+   "line": 1627,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint2-bounds-validator-standing-aggregator#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint2-bounds-validator-standing-aggregator.md#L1627"
+  }
+ ]
+}

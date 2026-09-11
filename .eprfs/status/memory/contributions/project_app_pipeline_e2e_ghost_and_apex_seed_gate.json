@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_app_pipeline_e2e_ghost_and_apex_seed_gate",
+  "claim": "E2E stage is Cypress ghost; @act:i held on fleet. Since 2026-08-25 doorway-B refuses app byte-seed with 403.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_app_pipeline_e2e_ghost_and_apex_seed_gate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_app_pipeline_e2e_ghost_and_apex_seed_gate.md",
+        "cid": "bafkreieepnojhcwj6h3ixrt5skbuuhpcixnhcpzctpzik5ekc7ro5224pq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "App pipeline E2E ghost, @act:i held, apex seed 403",
+    "file": "project_app_pipeline_e2e_ghost_and_apex_seed_gate.md",
+    "scopePath": ".claude/memory/project_app_pipeline_e2e_ghost_and_apex_seed_gate.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

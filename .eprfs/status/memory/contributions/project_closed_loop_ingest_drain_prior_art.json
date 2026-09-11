@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_closed_loop_ingest_drain_prior_art",
+  "claim": "Paced ingest drain solved TWICE; live kernel = drain_publish_queue + wait-for-drain; warm_stream is open-loop pacing — diagnose the hang before a 3rd scheme.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_closed_loop_ingest_drain_prior_art.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_closed_loop_ingest_drain_prior_art.md",
+        "cid": "bafkreiarl7zdi2bgahoe7edsw5guvdztpgnvyxp6a355wfpshytqtla5fu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Closed-loop ingest drain — prior art (solved twice)",
+    "file": "project_closed_loop_ingest_drain_prior_art.md",
+    "scopePath": ".claude/memory/project_closed_loop_ingest_drain_prior_art.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

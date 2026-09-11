@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_doorway_serving_path",
+  "claim": "Serving: new 8080 routes need is_service_path; poisoned scope row empties EprRouter; EPR GETs divert to SSR; SSR deploy = seed then restart.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_serving_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_serving_path.md",
+        "cid": "bafkreifxwy5smtdbukxk3zo4u6nnnnm73ytf3ij5a7wgnwhzthogfah3lm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway/EPR serving path + SSR (umbrella)",
+    "file": "project_doorway_serving_path.md",
+    "scopePath": ".claude/memory/project_doorway_serving_path.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

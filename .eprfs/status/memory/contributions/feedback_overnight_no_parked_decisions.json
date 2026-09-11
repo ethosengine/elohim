@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_overnight_no_parked_decisions",
+  "claim": "Operator 2026-09-06: in a granted overnight arc, reversible fleet flips are the shift's call — never park them for morning.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_overnight_no_parked_decisions.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_overnight_no_parked_decisions.md",
+        "cid": "bafkreigahomdrfwo6skd6jutjdc4vpvwpuev62mrz6rtfnpkxsx2lsbfxm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Overnight shifts decide, never park decisions",
+    "file": "feedback_overnight_no_parked_decisions.md",
+    "scopePath": ".claude/memory/feedback_overnight_no_parked_decisions.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

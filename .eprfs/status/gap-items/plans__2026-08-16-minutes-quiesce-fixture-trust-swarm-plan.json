@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md",
+ "slug": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan",
+ "method": "requirement-bullets",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "Entity: fixture trust grant \u2014 NOT a new entity: one stakes field on the existing",
+   "line": 218,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L218",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Entity: HeadSetSnapshot \u2014 already gated in the program plan: signed transient,",
+   "line": 223,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L223",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Entity: ShardManifest \u2014 Ephemeral (C): reconstructable from composite bytes +",
+   "line": 226,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L226",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Entity: fixture frontmatter declaration \u2014 doc-plane (genesis repo), consumed by",
+   "line": 231,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L231",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Head-plane cost: zero new heads. The sprint REDUCES per-item head-plane work",
+   "line": 233,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L233",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Anti-pattern check: no per-host authored trust (grant is deploy-minted through",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-08-16-minutes-quiesce-fixture-trust-swarm-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-16-minutes-quiesce-fixture-trust-swarm-plan.md#L236",
+   "class": "protocol-canonical"
+  }
+ ]
+}

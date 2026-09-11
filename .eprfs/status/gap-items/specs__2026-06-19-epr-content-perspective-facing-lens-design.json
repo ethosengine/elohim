@@ -1,0 +1,44 @@
+{
+    "doc": "genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md",
+    "slug": "specs__2026-06-19-epr-content-perspective-facing-lens-design",
+    "method": "agent",
+    "class": "protocol-canonical",
+    "items": [
+        {
+            "text": "Proof-fold: fold_legs (DB-free over existing epr_coupling rows \u2014 NOT data-blocked) + byte-identical /envelope cutover",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-epr-content-perspective-facing-lens-design#1",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: no process-leg data; compose-law unenforced] add process field to EprCouplingView + loader",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-epr-content-perspective-facing-lens-design#2",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "GET /api/v1/epr/{cid}/raw inspector (neighborhood_degree + reverse_part_of)",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-epr-content-perspective-facing-lens-design#3",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: ClusterClosure unbuilt] join flat leg-relation to bounded closure-walk (per-neighborhood)",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-epr-content-perspective-facing-lens-design#4",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-epr-content-perspective-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        }
+    ],
+    "doc_requires_env": [
+        "household-nodes"
+    ],
+    "count": 4
+}

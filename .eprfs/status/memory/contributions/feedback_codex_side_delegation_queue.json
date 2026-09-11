@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "agent-agnostic-backlog-delegation",
+  "claim": "Disjoint tasks in genesis/data/timeline/backlog (not session lists) let ANY agent — Claude, Codex, Gemini — claim them during CI waits.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_codex_side_delegation_queue.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_codex_side_delegation_queue.md",
+        "cid": "bafkreifeld4udiktt7vxgcih67am3p4gwvlootfpkotinstcndtssccvru"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Disjoint side-tasks go to the shared backlog",
+    "file": "feedback_codex_side_delegation_queue.md",
+    "scopePath": ".claude/memory/feedback_codex_side_delegation_queue.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

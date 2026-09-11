@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_worktree_push_bypasses_husky_gate",
+  "claim": "Whether a worktree push runs the husky gate depends on core.hooksPath — check `git config core.hooksPath` before assuming either way; verify green regardless.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_worktree_push_bypasses_husky_gate.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_worktree_push_bypasses_husky_gate.md",
+        "cid": "bafkreideh424uct7q6tuhwjut6cb4r7ast5hdhuxl3bejvb7j5pru4wg3a"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Worktree pushes and the husky gate — check hooksPath, don't assume",
+    "file": "feedback_worktree_push_bypasses_husky_gate.md",
+    "scopePath": ".claude/memory/feedback_worktree_push_bypasses_husky_gate.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

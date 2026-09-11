@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md",
+ "slug": "specs__2026-05-05-visual-validation-design",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "specs__2026-05-05-visual-validation-design#1",
+   "text": "captureVisualEvidence helper in common.steps.ts: screenshots every Playwright-mode scenario (pass or fail) to reports/screenshots/{featureSlug}/{scenarioSlug}--{human}.png",
+   "line": 210,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L210"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#2",
+   "text": "Before hook stores featureSlug/scenarioSlug on World; After hook reuses them; failure-mode writes sibling {scenarioSlug}--{human}.error.json (retires FAIL- screenshot naming)",
+   "line": 210,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L210"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#3",
+   "text": "E2EWorld gains featureSlug?/scenarioSlug? properties for hook-to-hook handoff",
+   "line": 211,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L211"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#4",
+   "text": "load-cucumber.ts ScenarioResult gains tags: string[] mapped from element.tags[].name",
+   "line": 212,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L212"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#5",
+   "text": "aggregate.ts computes summary.visualValidation 2x2 (validatedPassing/validatedRegressed/pendingPassing/pendingFailing) only in Playwright mode; profile allowlist detection",
+   "line": 213,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L213"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#6",
+   "text": "aggregate.ts emits visual-regression finding (tag + failed): source/severity:error/pillar/message/screenshotPath/suggestedObjective; scenario-failure findings gain screenshotPath",
+   "line": 153,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L153"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#7",
+   "text": "render-markdown.ts new ## Visual Validation section (2x2 table + bucket summary) + screenshot links in visual-regression/scenario-failure finding rows",
+   "line": 214,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L214"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#8",
+   "text": "sprint-report.schema.json: summary.visualValidation object (4 required ints, additionalProperties false) + visual-regression in Finding.source enum + optional Finding.screenshotPath",
+   "line": 215,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L215"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#9",
+   "text": "@elohim-visually-validated tag: manually authored in git, runtime no-op, stays until human removes; regression surfaces as finding (no auto-remove); pending-passing is review backlog",
+   "line": 100,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L100"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#10",
+   "text": "Tests in scripts/__tests__/: tags extraction, 2x2 bucket math, non-Playwright omission, visual-regression gating, screenshotPath population; + Playwright capture integration smoke",
+   "line": 219,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L219"
+  },
+  {
+   "id": "specs__2026-05-05-visual-validation-design#11",
+   "text": "Deferred follow-ups: agent-assisted review /shift skill update (prompt template + manifesto excerpts per pillar + PR-proposal flow); reference-image storage / pixel-drift detection",
+   "line": 243,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-05-visual-validation-design.md#L243"
+  }
+ ]
+}

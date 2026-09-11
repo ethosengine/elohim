@@ -1,0 +1,42 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-26-che-keyless-governed-peer-client-design.md",
+ "slug": "specs__2026-06-26-che-keyless-governed-peer-client-design",
+ "method": "requirement-bullets",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 4,
+ "items": [
+  {
+   "text": "The commitment already exists and is fully wired: delegates-compute.schema.json, the Mishpat",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-che-keyless-governed-peer-client-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-che-keyless-governed-peer-client-design.md#L157",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Two gaps to close (the only governance work):",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-che-keyless-governed-peer-client-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-che-keyless-governed-peer-client-design.md#L161",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Classification: the commitment is Notarized (A), exists (Mishpat::Commitment, cid=entry_hash)",
+   "line": 226,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-che-keyless-governed-peer-client-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-che-keyless-governed-peer-client-design.md#L226",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Anti-pattern check: \u2705 keys on entry_hash not action_hash; \u2705 no CID-as-FK",
+   "line": 229,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-che-keyless-governed-peer-client-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-che-keyless-governed-peer-client-design.md#L229",
+   "class": "protocol-canonical"
+  }
+ ]
+}

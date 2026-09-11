@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_ram_guard_oom_group_kill",
+  "claim": "memory.oom.group=1 makes one hot rustc restart the whole workspace; ram-guard sheds builds first — bites when a build dies with signal 15",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_ram_guard_oom_group_kill.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_ram_guard_oom_group_kill.md",
+        "cid": "bafkreigmm26vaeun2mf7sg2cy4vugpxmum62gr7ng64zx6f4xf3kimweca"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "RAM guard — workspace OOM is a group kill",
+    "file": "project_ram_guard_oom_group_kill.md",
+    "scopePath": ".claude/memory/project_ram_guard_oom_group_kill.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

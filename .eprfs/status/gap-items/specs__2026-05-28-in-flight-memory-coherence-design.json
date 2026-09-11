@@ -1,0 +1,36 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md",
+ "slug": "specs__2026-05-28-in-flight-memory-coherence-design",
+ "method": "requirement-bullets",
+ "count": 4,
+ "items": [
+  {
+   "text": "memory-coherence-audit.py runs clean stdlib, produces the JSON+MD report and cites-index.json; DEAD-CITE correctly flags a deliberately-broken cites: path; CITE-CANDIDATE surfaces an un-migrated entry",
+   "line": 91,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-in-flight-memory-coherence-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md#L91"
+  },
+  {
+   "text": "--changed mode: piping a path that matches a seeded entry's cites: emits the STALE-CANDIDATE for that entry; a non-matching path emits nothing",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-in-flight-memory-coherence-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md#L92"
+  },
+  {
+   "text": "memory-coherence-signal.py: with the index present, editing a cited path bumps the entry's counter; with the index absent, it no-ops without error; never blocks the tool call",
+   "line": 93,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-in-flight-memory-coherence-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md#L93"
+  },
+  {
+   "text": "Coherence: substrate-currency-audit.py shows 0 new path/process-status findings on the edited surfaces",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-05-28-in-flight-memory-coherence-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-28-in-flight-memory-coherence-design.md#L94"
+  }
+ ]
+}

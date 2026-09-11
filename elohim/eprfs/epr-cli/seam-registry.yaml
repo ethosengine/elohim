@@ -11,9 +11,11 @@
 # points minted BY the note leg (Task 1) and the stocks leg (Task 2). The crate's PRE-EXISTING
 # decision surface is NOT yet registered and is a declared backlog, not a silent omission:
 #
-#   - `project::derive_gap_items`' CLAIMED predicate (src/flow/project.rs) — decides which gap
-#     items become Commitments rather than bare Intents, on a case-insensitive textual state
-#     match. It is the sole gate between "a plan mentioned this" and "the repo promised this."
+#   - [REGISTERED 2026-09-10, station two] `project::derive_gap_items`' CLAIMED predicate
+#     (src/flow/project.rs) — the sole gate between "a plan mentioned this" and "the repo
+#     promised this." Registered as `project::derive_doc_stations / project::derive_gap_items`
+#     below, when the station-two move changed what its sibling decides (the DOCUMENT now speaks
+#     for its own stations; the cache answers only for a doc that could not).
 #   - `edges::edge_verdict` (src/flow/edges.rs) — the staleness verdict over sealed contract
 #     edges (Ok | Governed | Stale | Held | Dangling); a verdict-fn by any reading, and the one
 #     whose red routes real work.
@@ -637,4 +639,686 @@ decisionPoints:
         kind: integration
       - path: elohim/eprfs/epr-cli/tests/support/concurrent_flows.rs
         testName: concurrent_projection_preserves_record_and_semantic_deduplication
+        kind: integration
+
+  # Acceptance-aware local reconciliation; peer authority remains explicitly partial.
+
+  - name: acceptance::validate_record
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/acceptance.rs
+    summary: Admits scoped appointed acceptance only with exact actor, fulfillment, approved technical review
+      and content-pinned experiential report references; notes themselves never discharge stock.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Repository-local run notes and derived context; no DHT entity, publication or head
+        election.
+    - id: C1
+      status: partial
+      justification: Exact acceptor claim must differ from implementer claim. Local honor-system claims
+        do not prove independent human control.
+    - id: C2
+      status: answered
+      justification: Existing append-only records keep their CIDs; interpretation never rewrites history
+        or stock accounting.
+    - id: C3
+      status: partial
+      justification: Missing or changed evidence leads to explicit revalidation; no network dependency.
+        Large local ledgers remain a resource limit.
+    - id: C4
+      status: answered
+      justification: Unestablished acceptance, changed evidence and contested decisions remain visible instead
+        of defaulting to accepted.
+    - id: C5
+      status: partial
+      justification: Pinned local evidence is re-derived on read. Experiential fitness remains the appointed
+        reviewer judgment, not structural proof.
+    - id: C6a
+      status: partial
+      justification: One borrowed record snapshot per context request; bounded scope with deterministic
+        presentation. A hard byte/time budget for ledger loading is not established.
+    - id: C6b
+      status: answered
+      justification: Native note admission retains the flow transaction and exact-record deduplication;
+        reconciliation is read-only.
+    - id: C7
+      status: answered
+      justification: Human and JSON context expose the same derived acceptance state while preserving authored
+        historical facts.
+    - id: C8
+      status: partial
+      justification: Per-assertion reasons and evidence are returned with reader identity; no persistent
+        per-decision telemetry counter is introduced.
+    - id: C9
+      status: partial
+      justification: Exact actor claim and commitment CIDs preserve historical attribution. Cross-peer identity
+        lineage is outside this local proof.
+    - id: C10
+      status: answered
+      justification: Optional note metadata is additive, legacy verdicts remain technical review, and unknown
+        acceptance metadata is rejected.
+    - id: C11
+      status: partial
+      justification: The reader exposes scope and presentation limits. Externally imposed compute or memory
+        backpressure is not implemented here.
+    - id: C12
+      status: partial
+      justification: Acceptance requires the exact locally appointed actor claim on one commitment; appointment
+        authority is local accountable declaration, not peer-verified consent.
+    - id: C13
+      status: partial
+      justification: Local appointment names its limits; peer-boundary qualification requires receiver verification
+        and earned authority outside this slice.
+    - id: C14
+      status: answered
+      justification: Malformed admission fails visibly; conflicting and unverifiable accepted claims survive
+        as unresolved reader states.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/flow_acceptance.rs
+      testName: admission_pins_evidence_and_refuses_self_acceptance
+      kind: integration
+
+  - name: reconciliation::reconcile
+    kind: verdict-fn
+    sourceLocation:
+      file: src/flow/reconciliation.rs
+    summary: Derives scoped remaining work from separate fulfillment, technical review and appointed acceptance
+      facts, preserving adverse evidence and historical uncertainty.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Repository-local run notes and derived context; no DHT entity, publication or head
+        election.
+    - id: C1
+      status: partial
+      justification: Exact acceptor claim must differ from implementer claim. Local honor-system claims
+        do not prove independent human control.
+    - id: C2
+      status: answered
+      justification: Existing append-only records keep their CIDs; interpretation never rewrites history
+        or stock accounting.
+    - id: C3
+      status: partial
+      justification: Missing or changed evidence leads to explicit revalidation; no network dependency.
+        Large local ledgers remain a resource limit.
+    - id: C4
+      status: answered
+      justification: Unestablished acceptance, changed evidence and contested decisions remain visible instead
+        of defaulting to accepted.
+    - id: C5
+      status: partial
+      justification: Pinned local evidence is re-derived on read. Experiential fitness remains the appointed
+        reviewer judgment, not structural proof.
+    - id: C6a
+      status: partial
+      justification: One borrowed record snapshot per context request; bounded scope with deterministic
+        presentation. A hard byte/time budget for ledger loading is not established.
+    - id: C6b
+      status: answered
+      justification: Native note admission retains the flow transaction and exact-record deduplication;
+        reconciliation is read-only.
+    - id: C7
+      status: answered
+      justification: Human and JSON context expose the same derived acceptance state while preserving authored
+        historical facts.
+    - id: C8
+      status: partial
+      justification: Per-assertion reasons and evidence are returned with reader identity; no persistent
+        per-decision telemetry counter is introduced.
+    - id: C9
+      status: partial
+      justification: Exact actor claim and commitment CIDs preserve historical attribution. Cross-peer identity
+        lineage is outside this local proof.
+    - id: C10
+      status: answered
+      justification: Optional note metadata is additive, legacy verdicts remain technical review, and unknown
+        acceptance metadata is rejected.
+    - id: C11
+      status: partial
+      justification: The reader exposes scope and presentation limits. Externally imposed compute or memory
+        backpressure is not implemented here.
+    - id: C12
+      status: partial
+      justification: Acceptance requires the exact locally appointed actor claim on one commitment; appointment
+        authority is local accountable declaration, not peer-verified consent.
+    - id: C13
+      status: partial
+      justification: Local appointment names its limits; peer-boundary qualification requires receiver verification
+        and earned authority outside this slice.
+    - id: C14
+      status: answered
+      justification: Malformed admission fails visibly; conflicting and unverifiable accepted claims survive
+        as unresolved reader states.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/flow_reconciliation.rs
+      testName: production_and_review_remain_visible_without_inventing_acceptance
+      kind: integration
+
+  - name: concerns::concerns
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/concerns.rs
+    summary: Read-only scoped edge selection (stale/dangling by default, all states on explicit request) and source grouping; output
+      paging never establishes repair judgment or acceptance.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Ephemeral projection of existing native edge declarations; no new
+        authority or network head.
+    - id: C1
+      status: answered
+      justification: Selection confers no judgment or acceptance; each edge remains
+        unreviewed.
+    - id: C2
+      status: answered
+      justification: Native EdgeIndex latest-slot rules are reused unchanged; no new
+        persistent ordering.
+    - id: C3
+      status: answered
+      justification: Next page and consumer context locators support continued inspection;
+        unavailable sources are explicit.
+    - id: C4
+      status: answered
+      justification: Missing registry and unreadable source evidence remain explicit;
+        stale is never called evidence-ready.
+    - id: C5
+      status: partial
+      justification: Current evidence is recomputed through native CID/verdict interfaces;
+        substantive relationship still requires independent review.
+    - id: C6a
+      status: partial
+      justification: Output is bounded to 1-100 edges per request. Complete graph scanning
+        and source bytes are not resource bounded.
+    - id: C6b
+      status: answered
+      justification: Reading and paging never author or replay flow mutations.
+    - id: C7
+      status: answered
+      justification: Human and JSON rendering expose scope counts, selection rule, omissions
+        and next offset.
+    - id: C8
+      status: answered
+      justification: Reasons and coverage are derived per request without a competing
+        work queue or telemetry store.
+    - id: C9
+      status: answered
+      justification: Slots retain native plane/from/to and governor attributes; no identity
+        inferred from a page index or gap label.
+    - id: C10
+      status: answered
+      justification: Opt-in --concerns leaves ordinary context unchanged; offsets apply
+        to the current derived graph and are not durable identities.
+    - id: C11
+      status: partial
+      justification: Pages bound response rows only; memory or scan-time backpressure
+        remains unimplemented.
+    - id: C12
+      status: answered
+      justification: No authority mutation, reseal or hold is admitted by this reader.
+    - id: C13
+      status: partial
+      justification: Local edge inspection makes no peer qualification claim.
+    - id: C14
+      status: answered
+      justification: Dangling evidence and unreviewed drift remain unresolved with reasons.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/flow_concerns.rs
+      testName: scope_paging_preserves_slots_and_unknown_judgment_without_mutation
+      kind: integration
+
+  - name: context_sections::project_section
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/context_sections.rs
+    summary: Progressive section/character paging over the unchanged native context
+      projection, with explicit omission counts, continuation paths and full context
+      identity for stale-navigation detection.
+    concernIds:
+    - id: C0
+      status: answered
+      justification: Ephemeral projection of existing native edge declarations; no new
+        authority or network head.
+    - id: C1
+      status: answered
+      justification: Selection confers no judgment or acceptance; each edge remains
+        unreviewed.
+    - id: C2
+      status: answered
+      justification: Native EdgeIndex latest-slot rules are reused unchanged; no new
+        persistent ordering.
+    - id: C3
+      status: answered
+      justification: Next page and consumer context locators support continued inspection;
+        unavailable sources are explicit.
+    - id: C4
+      status: answered
+      justification: Missing registry and unreadable source evidence remain explicit;
+        stale is never called evidence-ready.
+    - id: C5
+      status: partial
+      justification: Current evidence is recomputed through native CID/verdict interfaces;
+        substantive relationship still requires independent review.
+    - id: C6a
+      status: partial
+      justification: Output pages cap entries and preview characters with a32KiB item
+        budget; underlying native context computation remains unbounded.
+    - id: C6b
+      status: answered
+      justification: Reading and paging never author or replay flow mutations.
+    - id: C7
+      status: answered
+      justification: Missing sections remain explicit; each summarized child names its
+        exact next section, and long strings expose character continuation.
+    - id: C8
+      status: answered
+      justification: Reasons and coverage are derived per request without a competing
+        work queue or telemetry store.
+    - id: C9
+      status: answered
+      justification: Slots retain native plane/from/to and governor attributes; no identity
+        inferred from a page index or gap label.
+    - id: C10
+      status: answered
+      justification: Optional --section preserves ordinary context; complete context
+        identity permits clients to refuse stale positional navigation.
+    - id: C11
+      status: partial
+      justification: Pages bound response rows only; memory or scan-time backpressure
+        remains unimplemented.
+    - id: C12
+      status: answered
+      justification: No authority mutation, reseal or hold is admitted by this reader.
+    - id: C13
+      status: partial
+      justification: Local edge inspection makes no peer qualification claim.
+    - id: C14
+      status: answered
+      justification: Dangling evidence and unreviewed drift remain unresolved with reasons.
+    contractTests:
+    - path: elohim/eprfs/epr-cli/tests/flow_context_sections.rs
+      testName: huge_context_opens_progressively_without_hiding_counts_or_evidence
+      kind: integration
+  - name: memory::execute
+    kind: verdict-fn
+    sourceLocation:
+      file: src/flow/memory/mod.rs
+      modulePath: elohim_epr_cli::flow::memory
+    summary: >
+      Local collective declaration, exact-version contribution, explicit context projection,
+      attributed feedback and repository reach rehearsal over existing files and REA notes.
+      Session claims establish local attribution only, not authentication. No memory database,
+      latest-version selection, network membership or publication is introduced.
+    concernIds:
+      - id: C0
+        status: partial
+        justification: Local rehearsal checks declared reach and source availability separately; network graduation remains unbound.
+      - id: C1
+        status: partial
+        justification: Contribution and projection cannot self-accept; local rehearsal requires independent technical verdict but establishes no experiential acceptance.
+      - id: C2
+        status: answered
+        justification: Exact raw BlobCid pins include source metadata. Concurrent contradictory versions survive explicit selection without last-writer authority.
+      - id: C4
+        status: partial
+        justification: Missing files, changed pins, refused policy and malformed contracts fail explicitly; transport and remote availability adapters are outside this slice.
+      - id: C6a
+        status: partial
+        justification: Input files, bytes, native sidecars and projection output have explicit limits; caller bounds total process time and cancellation.
+      - id: C6b
+        status: answered
+        justification: Concurrent identical contributions share existing transactional note deduplication; deterministic projection receipts preserve fixed inputs.
+      - id: C7
+        status: partial
+        justification: Feedback requires exact saved target bytes; output alone makes no retention claim. Retention owner must preserve consequential evidence.
+      - id: C8
+        status: partial
+        justification: Selection is explicit with unknown population count and declared omissions. Typed feedback preserves exact challenged passage through its pinned request; no provider ranking invented.
+      - id: C9
+        status: partial
+        justification: Contribution author must match registered local session claim, separate from repository and Git stewardship; peer key rotation remains outside local scope.
+      - id: C10
+        status: answered
+        justification: Strict typed contracts reject unknown fields and versions; collective, sources and projection method are pinned.
+      - id: C12
+        status: partial
+        justification: Local act policy and source reach checked at entry; registered claims remain honor-system attribution, not access credentials or peer authority.
+      - id: C13
+        status: partial
+        justification: Graduation is read-only repository rehearsal with independent review; no network stage or peer attestation inferred.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_memory.rs
+        testName: two_agents_replay_projection_feedback_and_independent_local_graduation
+        kind: integration
+
+  # ── station two of the memory-kit replacement (2026-09-10) ──────────────────────────────────
+  # Three surfaces registered at once, because they are one move: document placement, station
+  # extraction and substrate scope stop being read out of `.claude/memory-kit/` JSON and start
+  # being DERIVED from the tree. Each answers a question that used to be answered by a cache.
+  #
+  # This also DISCHARGES the honesty clause's first pending item: `derive_gap_items`' CLAIMED
+  # predicate is registered below, now that the predicate it gates has moved.
+
+  - name: gaps::decompose
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/flow/gaps.rs
+      modulePath: elohim_epr_cli::flow::gaps
+    summary: >
+      Decides which lines of a spec or plan are STATIONS and whether each is OPEN or CLAIMED —
+      the native port of `decompose.py`'s `checkbox-tasks` method. Heading-agnostic by
+      construction; the requirement-bullet arm is a fallback for docs with no checkboxes, and a
+      doc with neither yields `Method::None` rather than an empty station list.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          A ticked box confers only the scope it warrants. `- [x]` mints CLAIMED — a claim
+          awaiting the verification gate — never a fulfilment, so no checkbox can present itself
+          as evidence of done. Pinned by `a_ticked_station_is_claimed_not_done` and by
+          `a_checked_box_is_claimed_never_fulfilled`.
+      - id: C4
+        status: answered
+        justification: >
+          Three states are kept apart rather than collapsed onto one empty list: stations found
+          (`CheckboxTasks`), stations found only under a requirement heading
+          (`RequirementBullets`), and NO machine-extractable structure at all (`None`). The third
+          is what lets the caller distinguish "this plan has no remaining work" from "nobody has
+          decomposed this plan", which the kit rendered identically. Pinned by
+          `a_doc_with_no_structure_decomposes_to_nothing_rather_than_a_guess`.
+      - id: C6b
+        status: answered
+        justification: >
+          Extraction is a pure function of the document bytes, so re-running it is a fixed point
+          and the ids it mints are stable across runs — which is what lets `epr flow project`
+          dedupe a station against its already-projected twin instead of doubling it. Pinned by
+          `native_ids_and_states_equal_the_recorded_gap_items` over three real plans.
+      - id: C8
+        status: answered
+        justification: >
+          The two extraction arms order the meta filter differently, and the difference is the
+          kit's: the checkbox arm tests META with the `@requires:` tag attached, the bullet arm
+          strips first (station-two review, Minor e — the first implementation claimed parity and
+          had the checkbox ordering on both). Carried as a named `MetaOrder` at each call site so a
+          reader learns which arm is which from the call, not from the body. Pinned by
+          `the_two_arms_order_the_meta_filter_differently_because_the_kit_does`, whose fixture was
+          re-run against the kit's Python before being transcribed.
+      - id: C10
+        status: answered
+        justification: >
+          The extraction METHOD is pinned on the output (`Method`), not inferred by a reader from
+          the item shape, and the parity fixture asserts the method as well as the ids — so a doc
+          that silently fell back to the bullet arm is caught rather than passing on id numbering
+          alone. Pinned by `every_fixture_decomposed_through_the_checkbox_arm`.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_parity.rs
+        testName: native_ids_and_states_equal_the_recorded_gap_items
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_parity.rs
+        testName: the_recorded_counts_are_what_this_test_is_comparing
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_parity.rs
+        testName: every_fixture_decomposed_through_the_checkbox_arm
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_parity.rs
+        testName: a_ticked_station_is_claimed_not_done
+        kind: integration
+
+  - name: project::derive_doc_stations / project::derive_gap_items
+    kind: state-transition
+    sourceLocation:
+      file: src/flow/project.rs
+      modulePath: elohim_epr_cli::flow::project
+    summary: >
+      Decides WHICH SOURCE speaks for a document's stations — the document itself, or the
+      `gap-items/` cache. The document wins whenever it yields stations; the cache answers only
+      for a doc that could not speak (unreadable, or carrying no machine-extractable structure).
+      This is the surface the honesty clause named as pending; it is registered here because the
+      station-two move changed what it decides.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          MEASURED, not asserted (station-two review, Important 4): of 241 live gap-items records
+          with stations, 61 documents / 649 stations carry an agent-supplied method against a
+          document that still exists — their stations exist nowhere in the documents' own bytes and
+          reach the ledger only through this arm, and the store is TRACKED (a `**/.eprfs/` unanchored
+          ignore plus an anchored re-inclusion ladder for the root store alone) so it survives one
+          working tree — pinned by `the_relocated_store_is_tracked_and_every_other_sidecar_is_not`,
+          which runs `git check-ignore` on a nested sidecar, the root sidecar and the store.
+          A further 55 records / 1,378 stations are orphans
+          whose document is gone. The store is therefore RELOCATED rather than deleted:
+          `.eprfs/status/gap-items/` is its native home, read FIRST and one entry per name, with
+          `epr flow project --adopt-gap-items` copying every doc-present record there
+          byte-identically under its own raw CID. Orphans are reported and NOT adopted — stations
+          about a document that no longer exists are promises about nothing.
+
+          The two states in which the store is the only witness are distinguished from the state
+          in which it is a stale duplicate. An unreadable doc and a prose spec an agent
+          decomposed by hand both genuinely have stations that exist nowhere in their own bytes;
+          a doc with checkboxes does not, and reading the cache for it would mint a second
+          reading whose `#N` ids could name stations the plan no longer has. Pinned by
+          `flow_edges.rs`' valueflow fixture, whose `plans/epic.md` is prose and whose stations
+          therefore still come from `gap-items/epic.json`.
+      - id: C6b
+        status: answered
+        justification: >
+          The native and cache arms mint byte-identical atoms for the same station — same
+          `gap:<state>` classification, same `tool:decompose` / `tool:decompose-claim` provider
+          — so a station already projected from the cache dedupes against its native twin rather
+          than doubling. Both arms route through one `mint_station`, so the equality is
+          structural rather than maintained by hand.
+      - id: C5
+        status: answered
+        justification: >
+          The CLAIMED predicate is unchanged in substance: a textually CLAIMED station mints an
+          ACTIVE Commitment awaiting evidence, never an Event. The gate between "a plan mentioned
+          this" and "the repo promised this" stays exactly where it was; only the source of the
+          text moved.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_edges.rs
+        testName: a_claim_mints_exactly_one_commitment_and_the_second_is_refused_until_superseded
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_parity.rs
+        testName: native_ids_and_states_equal_the_recorded_gap_items
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_fallback.rs
+        testName: the_native_home_is_read_first_and_the_kit_path_second
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_fallback.rs
+        testName: adoption_copies_only_records_whose_document_still_exists
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_fallback.rs
+        testName: the_copy_is_byte_identical_so_its_cid_addresses_both_files
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_fallback.rs
+        testName: adoption_is_idempotent
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_gap_fallback.rs
+        testName: the_relocated_store_is_tracked_and_every_other_sidecar_is_not
+        kind: integration
+
+  - name: placement::budget_state
+    kind: verdict-fn
+    sourceLocation:
+      file: src/flow/placement.rs
+      modulePath: elohim_epr_cli::flow::placement
+    summary: >
+      The placement verdict over one document — eleven states (`ACTIVE`, `LINKED`,
+      `MEM-UNLINKED`, `NEEDS-TRIAGE`, `CLAIMED-ONLY`, `SETTLED`, `SUPERSEDED`,
+      `VERIFIED-STABLE`, `UNKNOWN-STATUS`, `REGRESSED`, `BLOCKED-BY-ENV`) plus the action that
+      advances it. Ported from `placement-audit.py`'s `budget_state`, and it decides what the
+      session headline calls debt.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          A `landed` status confers only the scope its evidence warrants: in an ACTIVE home
+          without `verified_by`/`landed_commit` it is `CLAIMED-ONLY`, not `VERIFIED-STABLE`.
+          An EMPTY evidence list is absence, not evidence — `verified_by: []` reaches the native
+          frontmatter parser as the non-empty string "[]", and reading that as evidence moved
+          documents out of the pressure queue and out of the over-claim count `delivery-gate.py`
+          steers on (station-two review, Important 2). Emptiness is decided on the PARSED items,
+          never on the literal spelling, so `[ ]` and `[,]` are empty too. Pinned by
+          `an_empty_evidence_list_is_absence_not_evidence`. The
+          same status in CANONICAL or HISTORY is `SETTLED`, because those homes ARE the verified
+          destination and queueing them would point the conveyor at documents already at rest.
+          Pinned by `a_landed_doc_without_evidence_is_a_claim_not_a_verification`.
+      - id: C4
+        status: answered
+        justification: >
+          Held-for-absent-capability (`BLOCKED-BY-ENV`) is kept distinct from broken
+          (`REGRESSED`) and from unclassified (`NEEDS-TRIAGE`/`UNKNOWN-STATUS`), and the
+          pressure/held/settled split counts held work as NOT pressure. A doc whose canvas is
+          missing is not a doc anyone failed to do. Pinned by
+          `the_balance_matches_the_pinned_histogram`.
+      - id: C8
+        status: answered
+        justification: >
+          Every verdict carries its own typed next action rather than leaving a reader to infer
+          one, and the balance sums to the file total by construction — asserted, not assumed —
+          so no state can hide by being unrepresented. Pinned by the sum assertion in
+          `the_balance_matches_the_pinned_histogram`.
+      - id: C2
+        status: answered
+        justification: >
+          The pressure-dir HOME outranks frontmatter: a doc parked in `_state/regression/` is
+          REGRESSED whatever its status claims. Placement is a declared position, never an
+          arrival-time or self-asserted authority. Pinned by
+          `the_pressure_dir_home_outranks_the_frontmatter`.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: the_balance_matches_the_pinned_histogram
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: the_kit_agrees_with_the_native_balance_where_python_is_available
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: a_landed_doc_without_evidence_is_a_claim_not_a_verification
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: the_pressure_dir_home_outranks_the_frontmatter
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: an_unmeasured_corpus_reports_unknown_rather_than_zero
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: an_empty_evidence_list_is_absence_not_evidence
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_placement.rs
+        testName: a_non_utf8_document_stays_in_the_ledger
+        kind: integration
+
+  - name: scope::scope_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/flow/scope.rs
+      modulePath: elohim_epr_cli::flow::scope
+    summary: >
+      Decides whether an artifact belongs on the plate or in `held/` — `Held` (every station
+      blocked), `Live` (at least one satisfiable station), `Ambiguous` (no scope information at
+      all). Its verdict is actuated by `epr flow hold --scope --apply` as a `git mv`, so a wrong
+      answer here moves files.
+    concernIds:
+      - id: C11
+        status: answered
+        justification: >
+          A destination collision is DERIVED with the move (`ScopeMove::conflict`), printed under it
+          by the same renderer the dry run uses, and refused before any `git mv` — never discovered
+          inside the writer. The first implementation checked `dst.exists()` inside `git_mv`, which
+          the dry run returns before reaching, so the operator learned of a refused move only
+          mid-apply (station-two review round two). Declaring the refusal at derivation time is what
+          makes the dry run the cheap half of the loop. Pinned by
+          `a_dry_run_surfaces_a_destination_collision`, which asserts on the SHIPPED renderer's
+          return value — not a copy of it — that the CONFLICT line NAMES the colliding path and sits
+          between its move and the summary. `render` returns a `String` for exactly that reason: the
+          first version of this test re-implemented the rendering, so deleting both
+          `render_conflict()` call sites left every test green. Mutation-checked: with the calls
+          removed the test FAILS (exit 101), with them restored it passes.
+      - id: C4
+        status: answered
+        justification: >
+          `Ambiguous` is a first-class third answer, not a degradation onto `Live`. A held doc
+          with no parseable scope information STAYS held and is reported for operator triage;
+          auto-publishing on the absence of a reason is how a doc escapes into a runner that
+          cannot run it. Pinned by `a_held_doc_returns_only_on_affirmative_evidence`.
+
+          REVISED 2026-09-10 (station-two review, Important 1): STATIONS ARE NOT SCOPE
+          INFORMATION. The first implementation took the station path whenever a document yielded
+          stations, which made every station of a scope-silent document trivially "not blocked" —
+          so the document read `Live` and the `Ambiguous` arm was unreachable for anything with
+          checkboxes. A held doc would have been proposed back onto the plate for the sole reason
+          that it has stations. The station path is now gated on scope information actually
+          existing (a doc-level `requires_env`, or a station carrying an `@requires:` tag). Pinned
+          from both directions by `stations_are_not_scope_information` and
+          `one_tagged_station_is_enough_scope_information_to_decide`.
+      - id: C5
+        status: answered
+        justification: >
+          Gap-granular rather than doc-granular: a doc is held whole only when EVERY station is
+          blocked, so a mixed plan's household-testable stations are not benched by one station's
+          absent canvas. The blocking capability names travel with the verdict, so the headline
+          states WHY rather than only how many. Pinned by
+          `a_uniformly_blocked_plan_is_held_and_a_mixed_one_is_not`.
+      - id: C12
+        status: partial
+        justification: >
+          An unknown capability is treated asymmetrically by artifact class: on a `.md` it is
+          vocab drift and conservatively blocks held→live escape; on a `.feature` it is ignored,
+          because a2o's `@requires:` namespace mixes hardware capabilities with fixture
+          preconditions. The asymmetry is deliberate and tested, but it rests on the file
+          extension rather than on a declared namespace, which is why this is `partial`. Pinned
+          by `an_unknown_cap_is_drift_on_a_doc_and_a_fixture_tag_on_a_feature`.
+      - id: C10
+        status: answered
+        justification: >
+          A `.feature` declaring `@act:<id>` is evaluated against THAT act's own lane-contract
+          file, additively unioned into live cluster-state and never replacing it — the pinned
+          method the mesh stage actually runs it under. Gating on the default lane's deliberate
+          withholding would be a false HELD. Pinned by
+          `a_feature_is_rescued_by_its_own_acts_lane_contract`.
+
+          The lane contracts are resolved from an ORDERED candidate list — the manifest's own
+          directory, then the repository's `genesis/manifests` — because a `--cluster-state` override
+          names one file and the lane contracts are its siblings. Pointed at an isolated copy, every
+          `@act:` rescue silently evaporated and three proposed moves became nine (station-two review
+          round two, measured). A directory holding the whole lane set is still used as the lane set;
+          the repository default answers only for lane files it does not have. Pinned by
+          `a_lane_file_missing_beside_an_override_is_found_at_the_repository_default`.
+    contractTests:
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_uniformly_blocked_plan_is_held_and_a_mixed_one_is_not
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_held_doc_returns_only_on_affirmative_evidence
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: stations_are_not_scope_information
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: one_tagged_station_is_enough_scope_information_to_decide
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_trailing_space_on_a_resource_key_does_not_move_a_capability
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_feature_is_rescued_by_its_own_acts_lane_contract
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: an_unknown_cap_is_drift_on_a_doc_and_a_fixture_tag_on_a_feature
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: the_kit_agrees_with_the_native_scope_reading
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: apply_moves_the_tree_writes_the_stop_and_refreshes_the_baseline
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_dry_run_surfaces_a_destination_collision
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: a_clean_move_set_renders_no_conflict_line
+        kind: integration
+      - path: elohim/eprfs/epr-cli/tests/flow_scope.rs
+        testName: apply_creates_the_baseline_parent_rather_than_failing_after_the_work
         kind: integration

@@ -1,0 +1,400 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md",
+ "slug": "plans__2026-05-23-multi-collective-collaboration-epr-plan",
+ "method": "checkbox-tasks",
+ "count": 56,
+ "items": [
+  {
+   "text": "Step 1: Create qahal.rs with enums and stub entry structs",
+   "line": 111,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L111"
+  },
+  {
+   "text": "Step 2: Run cargo check",
+   "line": 245,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L245"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 254,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L254"
+  },
+  {
+   "text": "Step 1: Add mod qahal; declaration near the top of lib.rs",
+   "line": 275,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L275"
+  },
+  {
+   "text": "Step 2: Extend EntryTypes enum (line ~887)",
+   "line": 284,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L284"
+  },
+  {
+   "text": "Step 3: Extend LinkTypes enum",
+   "line": 302,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L302"
+  },
+  {
+   "text": "Step 4: Add validation dispatch (around line 1085)",
+   "line": 322,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L322"
+  },
+  {
+   "text": "Step 5: Run cargo check",
+   "line": 332,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L332"
+  },
+  {
+   "text": "Step 6: Verify the DNA still packs",
+   "line": 341,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L341"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L350"
+  },
+  {
+   "text": "Step 1: Create the coordinator module skeleton",
+   "line": 372,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L372"
+  },
+  {
+   "text": "Step 2: Re-export coordinator module from lib.rs",
+   "line": 422,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L422"
+  },
+  {
+   "text": "Step 3: Run cargo check",
+   "line": 430,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L430"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 439,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L439"
+  },
+  {
+   "text": "Step 1: Write the failing sweettest",
+   "line": 458,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L458"
+  },
+  {
+   "text": "Step 3: Implement create_collective",
+   "line": 509,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L509"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 593,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L593"
+  },
+  {
+   "text": "Step 1: Write failing tests",
+   "line": 617,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L617"
+  },
+  {
+   "text": "Step 3: Implement the coordinator functions",
+   "line": 721,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L721"
+  },
+  {
+   "text": "Step 1: Write failing test",
+   "line": 949,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L949"
+  },
+  {
+   "text": "Step 2: Run test \u2014 confirm failure",
+   "line": 987,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L987"
+  },
+  {
+   "text": "Step 3: Implement withdraw_membership_clean",
+   "line": 996,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L996"
+  },
+  {
+   "text": "Step 4: Run test \u2014 confirm pass",
+   "line": 1042,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1042"
+  },
+  {
+   "text": "Step 1: Author all schema files",
+   "line": 1089,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1089"
+  },
+  {
+   "text": "Step 2: Run schema validation",
+   "line": 1379,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1379"
+  },
+  {
+   "text": "Step 3: Add new view schemas to codegen INTERFACE_FILES",
+   "line": 1388,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1388"
+  },
+  {
+   "text": "Step 1: Create the Rust qahal module",
+   "line": 1435,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1435"
+  },
+  {
+   "text": "Step 2: Re-export from lib.rs",
+   "line": 1617,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1617"
+  },
+  {
+   "text": "Step 3: Build and regenerate TS bindings",
+   "line": 1626,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1626"
+  },
+  {
+   "text": "Step 4: Verify codegen-ts.mjs produces matching interfaces",
+   "line": 1637,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1637"
+  },
+  {
+   "text": "Step 1: Add contract tests for each new view",
+   "line": 1668,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1668"
+  },
+  {
+   "text": "Step 1: Create service module",
+   "line": 1808,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1808"
+  },
+  {
+   "text": "Step 2: Register service in mod.rs",
+   "line": 1979,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1979"
+  },
+  {
+   "text": "Step 3: Build",
+   "line": 1987,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L1987"
+  },
+  {
+   "text": "Step 1: Add route handlers",
+   "line": 2020,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2020"
+  },
+  {
+   "text": "Step 2: Add handler methods",
+   "line": 2046,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2046"
+  },
+  {
+   "text": "Step 3: Wire QahalService into services struct",
+   "line": 2110,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2110"
+  },
+  {
+   "text": "Step 4: Build",
+   "line": 2114,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2114"
+  },
+  {
+   "text": "Step 1: Write contract tests",
+   "line": 2146,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2146"
+  },
+  {
+   "text": "Step 1: Write failing tests first",
+   "line": 2306,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2306"
+  },
+  {
+   "text": "Step 2: Write the share-routing module",
+   "line": 2419,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2419"
+  },
+  {
+   "text": "Step 3: Register module",
+   "line": 2522,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2522"
+  },
+  {
+   "text": "Step 1: Inspect existing EconomicEvent service",
+   "line": 2565,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2565"
+  },
+  {
+   "text": "Step 2: Add collab-scope detection + share-routing application",
+   "line": 2573,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2573"
+  },
+  {
+   "text": "Step 3: Add integration test",
+   "line": 2603,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2603"
+  },
+  {
+   "text": "Step 4: Run tests",
+   "line": 2633,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2633"
+  },
+  {
+   "text": "Step 1: Add Collective\u2192Organization mapping with member_kind extension",
+   "line": 2668,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2668"
+  },
+  {
+   "text": "Step 2: Add learning-ledger TranslationPoint entries",
+   "line": 2719,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2719"
+  },
+  {
+   "text": "Step 1: Write SDK methods",
+   "line": 2772,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2772"
+  },
+  {
+   "text": "Step 2: Wire into the main client",
+   "line": 2828,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2828"
+  },
+  {
+   "text": "Step 3: Build the SDK",
+   "line": 2841,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2841"
+  },
+  {
+   "text": "Step 1: Add a two-conductor sweettest",
+   "line": 2874,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L2874"
+  },
+  {
+   "text": "Step 1: Run all unit + integration tests",
+   "line": 3006,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L3006"
+  },
+  {
+   "text": "Step 3: Run fmt check",
+   "line": 3035,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L3035"
+  },
+  {
+   "text": "Step 4: Run schema pre-push validation",
+   "line": 3044,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L3044"
+  },
+  {
+   "text": "Step 5: Push to remote",
+   "line": 3054,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-multi-collective-collaboration-epr-plan#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-multi-collective-collaboration-epr-plan.md#L3054"
+  }
+ ]
+}

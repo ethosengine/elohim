@@ -1,0 +1,170 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md",
+ "slug": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 20,
+ "items": [
+  {
+   "text": "Add an additive, optional standing field to genesis/data/presences/presences.schema.json",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Confirm seed-presences.ts threads standing (top-level extraction, mirroring",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L120",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Backfill standing on the existing 127 presences (default inspirational for cited",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L122",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Author the elohim.host \"Inspired by\" cohort as presence *.md files",
+   "line": 125,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L125",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Author the prior-art technical-dependency cohort (Khan/Perseus, libp2p, iroh, Automerge,",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Validate via validate-presences.ts; confirm the humans-presences-sync triple stays",
+   "line": 132,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L132",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Seed through the front door and verify projection rows land",
+   "line": 134,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L134",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o scenario: genesis/a2o/features/<pillar>/contributor-presence-seeded.feature \u2014 a seeded",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L135",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "New fold elohim/elohim-facings/src/folds/contributor_reflexive.rs (DB-free mirror row over",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L139",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "ContributorReflexiveView (additive, ts-rs) in elohim/elohim-views/src/imagodei.rs;",
+   "line": 142,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L142",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Storage loader services/contributor_reflexive_facing.rs + one GET route with both the",
+   "line": 145,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L145",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defer the reach-back-prop-to-inspirers fold (a graph traversal over provenance edges, not a",
+   "line": 147,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L147",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Define a canonical commons receiver agent (agent_cid) \u2014 replace the commons-pool magic",
+   "line": 151,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L151",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Model opt-out as a relinquish action that emits a commons-redirect EconomicEvent",
+   "line": 153,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L153",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decide whether an opted-out marker is a separate record (preferred) or a new",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#15",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L157",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Do NOT route opt-out through FeedbackSignal (category mismatch \u2014 it signals about *another*",
+   "line": 159,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#16",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L159",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Layer-1 recognition stays untouched (opt-out declines *receipt*, never un-sees the person)",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#17",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L161",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Build the export path that serializes accrued recognition state back to presence frontmatter",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#18",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "This completes the \"import/export schema for migrating elohim protocol networks\" framing",
+   "line": 168,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#19",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L168",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A who-is-who skill = consult (query presences + traverse derived_from/",
+   "line": 171,
+   "state": "OPEN",
+   "id": "specs__2026-06-21-contributor-presence-bootstrap-whoswho-design#20",
+   "cites": "genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md#L171",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "workflow-long-cargo-orphan-lock",
+  "claim": "Bash timeout orphans cargo still holding .cargo-lock; let it finish (work lands on disk), keep one profile per gate phase, run_in_background for >10min cargo.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_workflow_long_cargo_orphan_lock.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_workflow_long_cargo_orphan_lock.md",
+        "cid": "bafkreiedc7klcs3osu6ajgh4kk47pk3pmmrvrdlvb7kx27osjfmpxr2fda"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Workflow long-cargo orphan lock",
+    "file": "feedback_workflow_long_cargo_orphan_lock.md",
+    "scopePath": ".claude/memory/feedback_workflow_long_cargo_orphan_lock.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

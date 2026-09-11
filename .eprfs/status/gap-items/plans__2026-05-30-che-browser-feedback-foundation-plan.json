@@ -1,0 +1,190 @@
+{
+ "doc": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md",
+ "slug": "plans__2026-05-30-che-browser-feedback-foundation-plan",
+ "method": "checkbox-tasks",
+ "count": 26,
+ "items": [
+  {
+   "text": "Step 1: Lock Playwright to one version, monorepo-wide (root package.json)",
+   "line": 41,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#1",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L41"
+  },
+  {
+   "text": "Step 2: Bump a2o's playwright dep to match (genesis/a2o/package.json:48)",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#2",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L54"
+  },
+  {
+   "text": "Step 3: Add a2o:setup and look scripts to genesis/a2o/package.json",
+   "line": 61,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#3",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L61"
+  },
+  {
+   "text": "Step 4: Add PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD to devfile.yaml",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#4",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L70"
+  },
+  {
+   "text": "Step 5: Re-resolve dependencies to the single version",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#5",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L82"
+  },
+  {
+   "text": "Step 6: Verify exactly one Playwright version resolves",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#6",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L91"
+  },
+  {
+   "text": "Step 7: Prune the stray browser builds (the de-dup)",
+   "line": 98,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#7",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L98"
+  },
+  {
+   "text": "Step 8: Ensure the kept chromium is the version-matched one (idempotent)",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#8",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L107"
+  },
+  {
+   "text": "Step 9: Verify a real headless launch from the a2o workspace (XDG default)",
+   "line": 114,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#9",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L114"
+  },
+  {
+   "text": "Step 10: Confirm the cache is lean and single-location",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#10",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L122"
+  },
+  {
+   "text": "Step 11: Commit",
+   "line": 131,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#11",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L131"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 157,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#12",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L157"
+  },
+  {
+   "text": "Step 3: Create look.ts with types + parseArgs only",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#13",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L210"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 269,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#14",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L269"
+  },
+  {
+   "text": "Step 1: Write the failing integration test (hermetic, file://)",
+   "line": 287,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#15",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L287"
+  },
+  {
+   "text": "Step 3: Implement runLook in look.ts",
+   "line": 328,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#16",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L328"
+  },
+  {
+   "text": "Step 1: Add the CLI main and run-if-main guard to look.ts",
+   "line": 486,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#17",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L486"
+  },
+  {
+   "text": "Step 2: Verify the CLI renders and prints paths",
+   "line": 521,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#18",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L521"
+  },
+  {
+   "text": "Step 3: Verify the browser-missing guard fails fast",
+   "line": 531,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#19",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L531"
+  },
+  {
+   "text": "Step 4: Confirm lint + typecheck are clean for the new file",
+   "line": 540,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#20",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L540"
+  },
+  {
+   "text": "Step 1: Render an authenticated surface as a fixture human",
+   "line": 563,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#21",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L563"
+  },
+  {
+   "text": "Step 2: Read the screenshot and confirm the authenticated state",
+   "line": 575,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#22",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L575"
+  },
+  {
+   "text": "Step 3: Commit (only if a fix was needed)",
+   "line": 580,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#23",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L580"
+  },
+  {
+   "text": "Step 1: Add a look entry to the Tools section of genesis/a2o/CLAUDE.md",
+   "line": 598,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#24",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L598"
+  },
+  {
+   "text": "Step 2: Verify the cucumber @browser consumer now runs locally in Che",
+   "line": 606,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#25",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L606"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 616,
+   "state": "OPEN",
+   "id": "plans__2026-05-30-che-browser-feedback-foundation-plan#26",
+   "cites": "genesis/docs/plans/2026-05-30-che-browser-feedback-foundation-plan.md#L616"
+  }
+ ]
+}

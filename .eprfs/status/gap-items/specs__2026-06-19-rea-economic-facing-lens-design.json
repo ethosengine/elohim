@@ -1,0 +1,52 @@
+{
+    "doc": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md",
+    "slug": "specs__2026-06-19-rea-economic-facing-lens-design",
+    "method": "agent",
+    "class": "protocol-canonical",
+    "items": [
+        {
+            "text": "Proof-fold: commitment_backed (lifts proven household_resilience logic) DB-free + coherent-seed adapter test",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-rea-economic-facing-lens-design#1",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "by_action fold + facing=rea dispatch arm",
+            "line": 76,
+            "state": "OPEN",
+            "id": "specs__2026-06-19-rea-economic-facing-lens-design#2",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: mishpat ledger unread-surfaced] MishpatCommitmentView + GET route + is_service_path arm",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-rea-economic-facing-lens-design#3",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: mishpat\u2192rea delegates-compute bridge absent] mutual_compute reciprocal-pairs fold",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-rea-economic-facing-lens-design#4",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        },
+        {
+            "text": "[blocked: economic_events.bounded_by seed absent] realized_value_flow committed-vs-realized",
+            "line": 76,
+            "state": "BLOCKED",
+            "id": "specs__2026-06-19-rea-economic-facing-lens-design#5",
+            "cites": "genesis/docs/superpowers/specs/2026-06-19-rea-economic-facing-lens-design.md#L76",
+            "class": "protocol-canonical"
+        }
+    ],
+    "doc_requires_env": [
+        "household-nodes"
+    ],
+    "count": 5
+}

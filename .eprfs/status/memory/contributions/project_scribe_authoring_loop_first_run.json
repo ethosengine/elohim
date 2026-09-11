@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "scribe-authoring-loop-first-run",
+  "claim": "scribe (writer) + dispatcher technical review + fresh blind-reader ran end-to-end on backlog rows 16/16a; storyteller conversion awaits sign-off.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_scribe_authoring_loop_first_run.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_scribe_authoring_loop_first_run.md",
+        "cid": "bafkreiggcng7kxln2dk6w6tjniljbvfetikixhinfmro63yim5hr2ysx7q"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Scribe authoring loop — first run complete",
+    "file": "project_scribe_authoring_loop_first_run.md",
+    "scopePath": ".claude/memory/project_scribe_authoring_loop_first_run.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

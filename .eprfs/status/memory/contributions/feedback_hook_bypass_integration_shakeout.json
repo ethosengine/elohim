@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "hook-bypass-integration-shakeout",
+  "claim": "The agent working ON the CI pipeline may push --no-verify during integration shakeout only if gates already ran green; CI becomes its verification surface.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_hook_bypass_integration_shakeout.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_hook_bypass_integration_shakeout.md",
+        "cid": "bafkreidhwxbaiimmqmc2j37dtzpjokk734kyegy7p5xnzgxenv6o5sgk5e"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Hook-bypass grant for CI-pipeline integration shakeout",
+    "file": "feedback_hook_bypass_integration_shakeout.md",
+    "scopePath": ".claude/memory/feedback_hook_bypass_integration_shakeout.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

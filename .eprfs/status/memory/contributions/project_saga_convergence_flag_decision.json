@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-saga-convergence-flag-decision",
+  "claim": "The both-sides-missing exit ships dormant (flag default-OFF); an operator env-flip enacts it, then converged-on-A → recording ×2 → saga 11/11.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_saga_convergence_flag_decision.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_saga_convergence_flag_decision.md",
+        "cid": "bafkreihvpfrfwmclx57vejuwj6vwdmxwxe32t56q3pstssw7ev5bwuvx4e"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Saga convergence gated on ELOHIM_ADOPT_BEFORE_AUTHOR flip",
+    "file": "project_saga_convergence_flag_decision.md",
+    "scopePath": ".claude/memory/project_saga_convergence_flag_decision.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

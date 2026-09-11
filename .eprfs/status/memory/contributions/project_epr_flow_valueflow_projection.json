@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-epr-flow-valueflow-projection",
+  "claim": "epr flow project/walk/status + seal/reseal/hold over recipes.yaml + .eprfs sidecars — dev valueflow projected from the filesystem; walk is seal-aware.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_epr_flow_valueflow_projection.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_epr_flow_valueflow_projection.md",
+        "cid": "bafkreih4mm3rmzvioyt3s37q7bpcgoy4y4wcm7wvc6usoeeily6dhelgfu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "epr flow — developer valueflow projected from the repo",
+    "file": "project_epr_flow_valueflow_projection.md",
+    "scopePath": ".claude/memory/project_epr_flow_valueflow_projection.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,351 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md",
+ "slug": "plans__2026-05-25-cross-pillar-import-cleanup",
+ "method": "checkbox-tasks",
+ "count": 49,
+ "items": [
+  {
+   "text": "Substrate baseline landed. Z.D Phase 1 schemas (REA compute-commitment + delegates-compute) are on dev (commits b2380b899, 7f66391b6, bf2efd191). The new SDK can absorb the REA primitive from day one \u2014 confirmed",
+   "line": 42,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L42"
+  },
+  {
+   "text": "Lamad standalone is currently healthy. pnpm --filter lamad build and pnpm --filter lamad test both green. As of integration of design/peer-oauth-portal (commits a224c3e79..e18c4cb48), lamad shows: build clean (warnings only \u2014 sass deprecation + NG8107), 2775 tests across 98 files all green, 126 cross-pillar import lines (228 @app/elohim, 28 @app/imagodei, 11 @app/shefa, 9 @app/qahal)",
+   "line": 43,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L43"
+  },
+  {
+   "text": "Pre-existing test debt audited. The peer-OAuth-portal integration surfaced two test files that were obsolete after landed refactors (epr-link spec post-Lit-wrapper refactor 10516614e; app.routes spec post-lamad-bundle-split effc26e04). Before each Wave 2 slice dispatches, the slice agent runs grep -rln \"ngOnChanges\\|loadChildren.*lamad\" app/<consumer-bundle>/src --include=\"*.spec.ts\" and similar audits for the symbols it's migrating \u2014 obsolete specs surface BEFORE they block the pre-push gate",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L44"
+  },
+  {
+   "text": "Pnpm lockfile is clean. pnpm install --lockfile-only produces no diff. (When a Wave 2 slice scaffolds a new Angular library, it MUST re-run lockfile reconciliation; the workspace add was caught during peer-OAuth-portal integration and is captured in Slice 2.7's runbook.)",
+   "line": 45,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L45"
+  },
+  {
+   "text": "Step 1: Re-read the B0 audit",
+   "line": 111,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L111"
+  },
+  {
+   "text": "Step 2: Enumerate every cross-pillar import",
+   "line": 114,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L114"
+  },
+  {
+   "text": "Step 3: Classify each import",
+   "line": 123,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L123"
+  },
+  {
+   "text": "Step 4: Write the manifest",
+   "line": 141,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L141"
+  },
+  {
+   "text": "Step 5: Surface library structure questions for the operator",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L151"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L158"
+  },
+  {
+   "text": "Identify the canonical implementation (usually the one in app/elohim-app/src/app/elohim/services/)",
+   "line": 191,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L191"
+  },
+  {
+   "text": "Copy it AND its *.spec.ts to app/elohim-library/projects/elohim-service/src/lib/ (test-spec co-migration \u2014 surfaced as a gotcha during peer-OAuth-portal integration where two specs were orphaned by their components' refactors and only the pre-push gate caught them)",
+   "line": 192,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L192"
+  },
+  {
+   "text": "Adapt imports: any @app/* cross-references inside the service body need their own L migration recursively",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L193"
+  },
+  {
+   "text": "Add re-export to public-api.ts",
+   "line": 194,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L194"
+  },
+  {
+   "text": "Find all consumers via grep: grep -rln \"@app/elohim/services/<name>\" app/",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L195"
+  },
+  {
+   "text": "Rewrite imports in each consumer",
+   "line": 196,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L196"
+  },
+  {
+   "text": "Verify build: pnpm --filter elohim-library typecheck && pnpm --filter lamad build && pnpm --filter elohim-app build",
+   "line": 197,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L197"
+  },
+  {
+   "text": "Delete original source location AND the original *.spec.ts (no duplicate spec; the library copy is authoritative)",
+   "line": 198,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L198"
+  },
+  {
+   "text": "Commit per service: feat(elohim-service): migrate <Service> from elohim-app pillar (Slice 2.1)",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L199"
+  },
+  {
+   "text": "Verify @elohim/service's public-api.ts exports every symbol lamad imports",
+   "line": 202,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L202"
+  },
+  {
+   "text": "Run pnpm --filter elohim-library test \u2014 full library test suite",
+   "line": 203,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L203"
+  },
+  {
+   "text": "Commit the Slice 2.1 milestone",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L204"
+  },
+  {
+   "text": "Read the Angular component to understand props, events, behavior",
+   "line": 226,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L226"
+  },
+  {
+   "text": "Identify the [Capability Profile](../specs/2026-05-20-capability-profile-element-contract-design.md) contract (which lenses it supports)",
+   "line": 227,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L227"
+  },
+  {
+   "text": "Author the Lit element with capability profile JSDoc + the three precondition gates (a11y, i18n, ua-prefs)",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L228"
+  },
+  {
+   "text": "Author Library A default stories (Unstyled + CustomTheme + every claimed lens)",
+   "line": 229,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L229"
+  },
+  {
+   "text": "Author Library B designed stories (Elohim brand binding)",
+   "line": 230,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L230"
+  },
+  {
+   "text": "Author spec covering: prop binding, event dispatch, accessibility tree, customization via CSS custom properties",
+   "line": 231,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L231"
+  },
+  {
+   "text": "Update consumers in lamad / elohim-app to use <elohim-<name>> (with CUSTOM_ELEMENTS_SCHEMA + thin Angular wrapper if needed, like EprLinkComponent pattern)",
+   "line": 232,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L232"
+  },
+  {
+   "text": "Delete original Angular component",
+   "line": 233,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L233"
+  },
+  {
+   "text": "Commit per component",
+   "line": 234,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L234"
+  },
+  {
+   "text": "Verify storybook builds: pnpm --filter graphos build",
+   "line": 237,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L237"
+  },
+  {
+   "text": "Commit the Slice 2.2 milestone",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L238"
+  },
+  {
+   "text": "Identify the doorway HTTP route that serves equivalent data (or surface to add one)",
+   "line": 324,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L324"
+  },
+  {
+   "text": "Replace direct service call with EprResolverService.resolve() + projection adapter",
+   "line": 325,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L325"
+  },
+  {
+   "text": "Update tests",
+   "line": 326,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L326"
+  },
+  {
+   "text": "Commit per call site",
+   "line": 327,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L327"
+  },
+  {
+   "text": "Replace with <elohim-epr-link> Lit element + capability profile lens",
+   "line": 329,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L329"
+  },
+  {
+   "text": "Step 1: Verify each Wave 2 slice landed cleanly",
+   "line": 386,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L386"
+  },
+  {
+   "text": "Step 2: Remove cross-pillar aliases from app/lamad/tsconfig.json",
+   "line": 394,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L394"
+  },
+  {
+   "text": "Step 3: Verify app/lamad builds STANDALONE",
+   "line": 409,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L409"
+  },
+  {
+   "text": "Step 4: Verify app/elohim-app still builds (bidirectional check)",
+   "line": 417,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L417"
+  },
+  {
+   "text": "Step 6: Update canon docs that reference cross-pillar imports",
+   "line": 432,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L432"
+  },
+  {
+   "text": "Step 7: Commit the cutover milestone",
+   "line": 436,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L436"
+  },
+  {
+   "text": "Step 8: Push",
+   "line": 459,
+   "state": "OPEN",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L459"
+  },
+  {
+   "text": "Placeholder scan: No \"TBD\" or \"TODO.\" Every task names specific files and commands",
+   "line": 539,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L539"
+  },
+  {
+   "text": "Type consistency: @elohim/service, elohim-core, @elohim/identity, @elohim/rea-runtime, @elohim/storage-client library names used consistently throughout",
+   "line": 540,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L540"
+  },
+  {
+   "text": "Parallelism real: File scopes documented as disjoint; coordination points (public-api.ts per library) named",
+   "line": 541,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L541"
+  },
+  {
+   "text": "Open question coverage: The library-structure question (new lib vs fold) named explicitly in Slice 2.3 + 2.4 with default choice + escalation path",
+   "line": 542,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-25-cross-pillar-import-cleanup#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-25-cross-pillar-import-cleanup.md#L542"
+  }
+ ]
+}

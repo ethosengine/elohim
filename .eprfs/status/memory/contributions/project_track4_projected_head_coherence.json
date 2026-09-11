@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_track4_projected_head_coherence",
+  "claim": "Track 4: doorway projects heads for every content tier; coherence wire is the reach declaration.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_track4_projected_head_coherence.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_track4_projected_head_coherence.md",
+        "cid": "bafkreibu3o2zy4cnbizqgws2q6bfqdnl5dprgggqlwecelewuvpr6g7wvi"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Track-4 projected-head coherence arc",
+    "file": "project_track4_projected_head_coherence.md",
+    "scopePath": ".claude/memory/project_track4_projected_head_coherence.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

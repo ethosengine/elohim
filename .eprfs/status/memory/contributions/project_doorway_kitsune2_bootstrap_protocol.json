@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "doorway-kitsune2-bootstrap-protocol",
+  "claim": "HC 0.6 conductors speak kitsune2 bootstrap (PUT /bootstrap/{space}/{agent}); doorway served only kitsune1 until 2026-06-12, leaving conductors DHT islands.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_kitsune2_bootstrap_protocol.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_kitsune2_bootstrap_protocol.md",
+        "cid": "bafkreieawjoz3jqgoujypdq34efltvb3ckypehmgfijpxxl5p7i2h72kxa"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway kitsune2 bootstrap protocol (HC 0.6)",
+    "file": "project_doorway_kitsune2_bootstrap_protocol.md",
+    "scopePath": ".claude/memory/project_doorway_kitsune2_bootstrap_protocol.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

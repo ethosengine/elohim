@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_lamad_local_dev_serve_traps",
+  "claim": "Rendering app/lamad locally needs --serve-path /lamad/ and DOORWAY_TARGET=localhost:8888 (mesh doorway); anonymous alpha content reads are reach-gated.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_lamad_local_dev_serve_traps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_lamad_local_dev_serve_traps.md",
+        "cid": "bafkreianha66zrr4zj5nktnu33b5zlvrsoixouk3l33a7yg3dcxjyfkg6q"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Lamad local dev-serve traps",
+    "file": "project_lamad_local_dev_serve_traps.md",
+    "scopePath": ".claude/memory/project_lamad_local_dev_serve_traps.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

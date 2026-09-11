@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_dna_hash_depends_on_build_path",
+  "claim": "Cargo metadata includes package paths: identical source in different worktrees changes DNA hashes — check before hash comparisons or coordinator hot-swap.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_dna_hash_depends_on_build_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_dna_hash_depends_on_build_path.md",
+        "cid": "bafkreihjb27qxozbipj26dcdkjcwaiosxfjsveg22isknxywc4c6ybe33y"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "DNA hash depends on the absolute build path, not only source",
+    "file": "project_dna_hash_depends_on_build_path.md",
+    "scopePath": ".claude/memory/project_dna_hash_depends_on_build_path.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

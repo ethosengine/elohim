@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_serde_wall_escapable_via_hsb_057",
+  "claim": "Dep-advisory remediation is gated by TWO separate things — Nexus can't fetch uncached artifacts, and holo_hash =0.6.0 pins serde =1.0.219; don't conflate them.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_serde_wall_escapable_via_hsb_057.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_serde_wall_escapable_via_hsb_057.md",
+        "cid": "bafkreihckqc5ti566iev6vkvh64kkvohcfr36l5mbuwyupv6nn6p2r24ce"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Two independent gates on the dep-advisory campaign",
+    "file": "project_serde_wall_escapable_via_hsb_057.md",
+    "scopePath": ".claude/memory/project_serde_wall_escapable_via_hsb_057.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

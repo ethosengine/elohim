@@ -1,0 +1,50 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md",
+ "slug": "specs__2026-05-30-che-browser-completion-oracle-design",
+ "method": "requirement-bullets",
+ "count": 6,
+ "items": [
+  {
+   "text": "Opt-in, zero schema change. At kickoff the interview gains one question: *\"Is this shift",
+   "line": 72,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L72"
+  },
+  {
+   "text": "When the gate is on, \"done\" requires BOTH:",
+   "line": 75,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L75"
+  },
+  {
+   "text": "the numeric objective.measure stable per target.stability (\u22652 consecutive, \u22651 fresh), AND",
+   "line": 76,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L76"
+  },
+  {
+   "text": "validatedRegressed == 0 over the in-scope @elohim-visually-validated scenarios, two",
+   "line": 77,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L77"
+  },
+  {
+   "text": "When the gate is off, behavior is byte-identical to today \u2014 validatedRegressed stays an",
+   "line": 80,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L80"
+  },
+  {
+   "text": "A validatedRegressed > 0 at done-candidate blocks \"done\"; the failing tagged scenario's",
+   "line": 83,
+   "state": "OPEN",
+   "id": "specs__2026-05-30-che-browser-completion-oracle-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-05-30-che-browser-completion-oracle-design.md#L83"
+  }
+ ]
+}

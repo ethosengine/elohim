@@ -1,0 +1,218 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md",
+ "slug": "plans__2026-05-28-rea-compute-substrate-native-roadmap",
+ "method": "checkbox-tasks",
+ "count": 30,
+ "items": [
+  {
+   "text": "Step 1: Add to inventory_gossip.rs test module before existing fixtures:",
+   "line": 125,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L125"
+  },
+  {
+   "text": "Step 2: Replace every \"a\".repeat(64) / \"b\".repeat(64) / \"c\".repeat(64) in inventory_gossip.rs:140-225 with sha256_wire('a') / sha256_wire('b') / sha256_wire('c')",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L137"
+  },
+  {
+   "text": "Step 3: Run existing tests \u2014 they should now FAIL on the bare-hex predicate:",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L139"
+  },
+  {
+   "text": "Step 4: Commit the test-update-only change (failing tests):",
+   "line": 147,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L147"
+  },
+  {
+   "text": "Step 1: Replace lines 131-134 of inventory_gossip.rs:",
+   "line": 156,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L156"
+  },
+  {
+   "text": "Step 2: Run unit tests; expect PASS:",
+   "line": 173,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L173"
+  },
+  {
+   "text": "Step 3: Add the negative-case regression tests inside the existing test module:",
+   "line": 179,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L179"
+  },
+  {
+   "text": "Step 4: Run; expect PASS:",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L213"
+  },
+  {
+   "text": "Step 5: Commit:",
+   "line": 219,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L219"
+  },
+  {
+   "text": "Step 1: Add to inventory_gossip.rs after the INVENTORY_TOPIC constant:",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L228"
+  },
+  {
+   "text": "Step 2: Add unit tests for the newtype:",
+   "line": 285,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L285"
+  },
+  {
+   "text": "Step 3: Run; expect PASS:",
+   "line": 318,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L318"
+  },
+  {
+   "text": "Step 4: Commit:",
+   "line": 324,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L324"
+  },
+  {
+   "text": "Step 1: Change BlobInventorySnapshot.hashes: Vec<String> \u2192 Vec<BlobAddress> and BlobInventoryDelta.{added,removed}: Vec<String> \u2192 Vec<BlobAddress> in inventory_gossip.rs:29-55. Drop the now-redundant is_blob_hash_shaped loop from both verify_structural impls (the newtype guarantees it; keep the non-empty/peer-id/signature checks). Adjust the VerifyError::InvalidHashFormat test usage \u2014 that error variant now fires at deserialization time, not verify_structural",
+   "line": 333,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L333"
+  },
+  {
+   "text": "Step 2: Update LocalInventory trait in inventory_broadcaster.rs:21-23:",
+   "line": 335,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L335"
+  },
+  {
+   "text": "Step 3: Update StaticInventory::new, StoreAdapter::current_hashes (in http.rs:2296-2301), and the mock impls in inventory_broadcaster.rs::tests to return Vec<BlobAddress>. StoreAdapter constructs via:",
+   "line": 343,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L343"
+  },
+  {
+   "text": "Step 4: Update receive-arm in p2p/mod.rs:5092-5160 \u2014 apply_snapshot and apply_delta now take &[BlobAddress]; convert to &[&str] for the DB layer:",
+   "line": 358,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L358"
+  },
+  {
+   "text": "Step 5: Update integration test fixtures \u2014 iroh_gossip_parity.rs:36-43 (local wire-shape copy: change Vec<String> \u2192 Vec<BlobAddress> and import from production module; the \"local copy because production is libp2p-gated\" rationale at line 31-34 no longer applies once Stage-2 is in \u2014 drop the copy entirely and import directly), and iroh_gossip_dual_publish_inventory.rs:67-72, 142-147 (use BlobAddress::new(sha256_wire('a')).unwrap())",
+   "line": 373,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L373"
+  },
+  {
+   "text": "Step 6: Run full crate tests:",
+   "line": 375,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L375"
+  },
+  {
+   "text": "Step 7: Commit:",
+   "line": 383,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L383"
+  },
+  {
+   "text": "Step 1: Append to inventory_broadcaster.rs::tests module:",
+   "line": 392,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L392"
+  },
+  {
+   "text": "Step 2: Run; expect PASS:",
+   "line": 426,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L426"
+  },
+  {
+   "text": "Step 1: Append a ## Verifier-fix close-out section to genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md. Include: commit SHAs, link to research note, observation on alpha /api/v1/commitments?action=project-epr (after orchestrator cycle deploys the fix and Genesis seeder runs cleanly), trajectory frame (\"This was Stage-1 of the REA-compute-substrate roadmap; next sprint is Z.D end-to-end\")",
+   "line": 450,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L450"
+  },
+  {
+   "text": "Step 2: Update .claude/memory/feedback_structural_verify_canonical_wire_shape.md:",
+   "line": 452,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L452"
+  },
+  {
+   "text": "Step 3: Create .claude/memory/project_canonical_wire_shape_newtype_pattern.md and add an entry to .claude/memory/MEMORY.md:",
+   "line": 457,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L457"
+  },
+  {
+   "text": "Step 4: Commit close-out + memory updates:",
+   "line": 483,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L483"
+  },
+  {
+   "text": "Step 1: Push (pre-push gate runs full quality stage; ~30-90 min):",
+   "line": 495,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L495"
+  },
+  {
+   "text": "Step 2: Watch orchestrator + Edge pipeline via ci-observer agent. Once storage image redeploys to alpha, the inventory gossip should start propagating. Re-probe:",
+   "line": 501,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L501"
+  },
+  {
+   "text": "Step 3: Watch kubectl logs -n elohim deploy/storage-alpha-* (operator-run) for Inventory snapshot applied debug lines \u2014 confirms the verifier-pass path is now exercised",
+   "line": 510,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L510"
+  },
+  {
+   "text": "Step 4: Mark Sprint 0 complete in this roadmap (change S0 \u25a3 \u2192 S0 \u2713) and proceed to Sprint 1",
+   "line": 512,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-rea-compute-substrate-native-roadmap#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-rea-compute-substrate-native-roadmap.md#L512"
+  }
+ ]
+}

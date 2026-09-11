@@ -1,0 +1,694 @@
+{
+ "doc": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md",
+ "slug": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan",
+ "method": "checkbox-tasks",
+ "count": 98,
+ "items": [
+  {
+   "text": "Step 1: Grep every reader site",
+   "line": 88,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#1",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L88"
+  },
+  {
+   "text": "Step 2: Record sites in genesis/docs/plans/2026-05-15-recovery-m4-stage1-audit.md",
+   "line": 96,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#2",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L96"
+  },
+  {
+   "text": "Step 3: Commit the audit",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#3",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L102"
+  },
+  {
+   "text": "Step 1: Write the failing unit test",
+   "line": 117,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#4",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L117"
+  },
+  {
+   "text": "Step 3: Wire the module into lib.rs",
+   "line": 175,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#5",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L175"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 190,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#6",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L190"
+  },
+  {
+   "text": "Step 1: Write the failing SweetTest assertion",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#7",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L204"
+  },
+  {
+   "text": "Step 2: Rewrite Gate 1 to cross-DNA Content decode",
+   "line": 217,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#8",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L217"
+  },
+  {
+   "text": "Step 1: Write failing SweetTest",
+   "line": 293,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#9",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L293"
+  },
+  {
+   "text": "Step 2: Rewrite the revocation-floor gate",
+   "line": 305,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#10",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L305"
+  },
+  {
+   "text": "Step 4: Confirm recovery_m3 + attestation_coordinator still pass",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#11",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L350"
+  },
+  {
+   "text": "Step 1: Re-grep",
+   "line": 372,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#12",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L372"
+  },
+  {
+   "text": "Step 2: SweetTest each newly migrated gate",
+   "line": 380,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#13",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L380"
+  },
+  {
+   "text": "Step 3: Run them and verify failure \u2192 fix \u2192 pass cycle per site",
+   "line": 384,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#14",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L384"
+  },
+  {
+   "text": "Step 4: Final grep \u2014 zero legacy readers",
+   "line": 392,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#15",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L392"
+  },
+  {
+   "text": "Step 1: Write up.sql",
+   "line": 417,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#16",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L417"
+  },
+  {
+   "text": "Step 2: Write down.sql",
+   "line": 469,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#17",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L469"
+  },
+  {
+   "text": "Step 3: Verify timestamp doesn't collide",
+   "line": 481,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#18",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L481"
+  },
+  {
+   "text": "Step 4: Compile-check",
+   "line": 489,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#19",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L489"
+  },
+  {
+   "text": "Step 1: Write failing CRUD unit tests",
+   "line": 515,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#20",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L515"
+  },
+  {
+   "text": "Step 2: Add models in db/models.rs",
+   "line": 602,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#21",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L602"
+  },
+  {
+   "text": "Step 3: Update db/schema.rs",
+   "line": 646,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#22",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L646"
+  },
+  {
+   "text": "Step 4: Wire modules into db/mod.rs",
+   "line": 688,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#23",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L688"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 704,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#24",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L704"
+  },
+  {
+   "text": "Step 1: Write the failing test for the Open-state branch",
+   "line": 719,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#25",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L719"
+  },
+  {
+   "text": "Step 2: Run \u2014 must pass",
+   "line": 872,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#26",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L872"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 880,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#27",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L880"
+  },
+  {
+   "text": "Step 1: Write failing tests for each branch",
+   "line": 894,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#28",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L894"
+  },
+  {
+   "text": "Step 2: Implement the four branches",
+   "line": 908,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#29",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L908"
+  },
+  {
+   "text": "Step 3: Run tests",
+   "line": 916,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#30",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L916"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 924,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#31",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L924"
+  },
+  {
+   "text": "Step 1: Write the failing routing test",
+   "line": 939,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#32",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L939"
+  },
+  {
+   "text": "Step 2: Run \u2014 must FAIL first",
+   "line": 1060,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#33",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1060"
+  },
+  {
+   "text": "Step 3: Iterate to green",
+   "line": 1068,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#34",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1068"
+  },
+  {
+   "text": "Step 1: Add the subscription method",
+   "line": 1086,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#35",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1086"
+  },
+  {
+   "text": "Step 2: Compile-check",
+   "line": 1130,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#36",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1130"
+  },
+  {
+   "text": "Step 1: Append subscription block",
+   "line": 1152,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#37",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1152"
+  },
+  {
+   "text": "Step 3: Boot the node and verify the log line",
+   "line": 1205,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#38",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1205"
+  },
+  {
+   "text": "Step 1: Write a failing SweetTest",
+   "line": 1227,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#39",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1227"
+  },
+  {
+   "text": "Step 2: Rewrite create_recovery_request (lib.rs:2112)",
+   "line": 1277,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#40",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1277"
+  },
+  {
+   "text": "Step 3: Re-run SweetTest",
+   "line": 1311,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#41",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1311"
+  },
+  {
+   "text": "Step 4: Run a full regression",
+   "line": 1319,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#42",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1319"
+  },
+  {
+   "text": "Step 1: Write failing SweetTests",
+   "line": 1342,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#43",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1342"
+  },
+  {
+   "text": "Step 2: Apply the bridge pattern from Task 13 to each function",
+   "line": 1356,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#44",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1356"
+  },
+  {
+   "text": "Step 3: Re-run SweetTests",
+   "line": 1364,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#45",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1364"
+  },
+  {
+   "text": "Step 4: Verify legacy entry types have no remaining creators",
+   "line": 1372,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#46",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1372"
+  },
+  {
+   "text": "Step 1: Delete the TODO block",
+   "line": 1395,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#47",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1395"
+  },
+  {
+   "text": "Step 2: Check whether legacy entry types are still referenced anywhere",
+   "line": 1399,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#48",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1399"
+  },
+  {
+   "text": "Step 3: If unreferenced, remove from integrity zome",
+   "line": 1406,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#49",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1406"
+  },
+  {
+   "text": "Step 4: Build the WASM DNA \u2014 clean",
+   "line": 1412,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#50",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1412"
+  },
+  {
+   "text": "Step 1: Add the entry",
+   "line": 1434,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#51",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1434"
+  },
+  {
+   "text": "Step 2: Run manifest schema validation",
+   "line": 1445,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#52",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1445"
+  },
+  {
+   "text": "Step 3: Regenerate domain types",
+   "line": 1453,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#53",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1453"
+  },
+  {
+   "text": "Step 1: Grep every emit_signal for the four signal kinds",
+   "line": 1478,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#54",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1478"
+  },
+  {
+   "text": "Step 2: Diff each emission payload against the schema",
+   "line": 1486,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#55",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1486"
+  },
+  {
+   "text": "Step 3: Fix any genuine drift",
+   "line": 1496,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#56",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1496"
+  },
+  {
+   "text": "Step 4: Re-run schema validation",
+   "line": 1500,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#57",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1500"
+  },
+  {
+   "text": "Step 5: Commit (only if drift was found)",
+   "line": 1509,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#58",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1509"
+  },
+  {
+   "text": "Step 1: Write the failing integration test",
+   "line": 1529,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#59",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1529"
+  },
+  {
+   "text": "Step 2: Implement the test against the existing SweetTest harness",
+   "line": 1562,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#60",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1562"
+  },
+  {
+   "text": "Step 3: Run \u2014 must pass",
+   "line": 1566,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#61",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1566"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 1591,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#62",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1591"
+  },
+  {
+   "text": "Step 2: Add field + import to behaviour.rs",
+   "line": 1617,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#63",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1617"
+  },
+  {
+   "text": "Step 3: Remove the TODO in shamir_transport.rs",
+   "line": 1664,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#64",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1664"
+  },
+  {
+   "text": "Step 4: Compile",
+   "line": 1668,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#65",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1668"
+  },
+  {
+   "text": "Step 5: Commit (intermediate \u2014 mod.rs match arm follows in Task 20)",
+   "line": 1676,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#66",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1676"
+  },
+  {
+   "text": "Step 1: Write the failing test (continued)",
+   "line": 1690,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#67",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1690"
+  },
+  {
+   "text": "Step 2: Add the match arm",
+   "line": 1694,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#68",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1694"
+  },
+  {
+   "text": "Step 3: Stub share_custodian_responder::respond",
+   "line": 1779,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#69",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1779"
+  },
+  {
+   "text": "Step 1: Write failing test",
+   "line": 1806,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#70",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1806"
+  },
+  {
+   "text": "Step 1: Declare the manifest entry",
+   "line": 1898,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#71",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1898"
+  },
+  {
+   "text": "Step 2: Add create_shamir_custody_setup extern",
+   "line": 1909,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#72",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1909"
+  },
+  {
+   "text": "Step 3: SweetTest",
+   "line": 1913,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#73",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1913"
+  },
+  {
+   "text": "Step 4: Run manifest validation + codegen",
+   "line": 1923,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#74",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1923"
+  },
+  {
+   "text": "Step 1: Grep every site that mentions Shamir in the recovery completion path",
+   "line": 1946,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#75",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1946"
+  },
+  {
+   "text": "Step 2: Trace each site",
+   "line": 1954,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#76",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1954"
+  },
+  {
+   "text": "Step 3: Refactor gating sites",
+   "line": 1958,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#77",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1958"
+  },
+  {
+   "text": "Step 4: Write the cross-mode integration test",
+   "line": 1962,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#78",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1962"
+  },
+  {
+   "text": "Step 5: Run all three",
+   "line": 1992,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#79",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L1992"
+  },
+  {
+   "text": "Step 1: Grep for seed/share/shamir/custodian leakage in the UI layer",
+   "line": 2014,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#80",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2014"
+  },
+  {
+   "text": "Step 2: Verify the grandma-standard contracts",
+   "line": 2022,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#81",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2022"
+  },
+  {
+   "text": "Step 3: Document any UI gaps",
+   "line": 2029,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#82",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2029"
+  },
+  {
+   "text": "Step 2: Resolve any missing step defs",
+   "line": 2057,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#83",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2057"
+  },
+  {
+   "text": "Step 3: Remove the @wip marker",
+   "line": 2061,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#84",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2061"
+  },
+  {
+   "text": "Step 4: Re-run, confirm green",
+   "line": 2065,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#85",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2065"
+  },
+  {
+   "text": "Step 1: Author the feature file",
+   "line": 2087,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#86",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2087"
+  },
+  {
+   "text": "Step 2: Run cucumber",
+   "line": 2138,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#87",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2138"
+  },
+  {
+   "text": "Step 3: Implement step defs",
+   "line": 2146,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#88",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2146"
+  },
+  {
+   "text": "Step 4: Run cucumber \u2014 all green",
+   "line": 2152,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#89",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2152"
+  },
+  {
+   "text": "Step 1: Confirm zero unique commits (defensive re-check)",
+   "line": 2176,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#90",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2176"
+  },
+  {
+   "text": "Step 2: Delete the local branch (-d, not -D)",
+   "line": 2184,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#91",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2184"
+  },
+  {
+   "text": "Step 3: Delete the remote branch",
+   "line": 2193,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#92",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2193"
+  },
+  {
+   "text": "Step 4: Verify",
+   "line": 2200,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#93",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2200"
+  },
+  {
+   "text": "Step 5: Note in commit log (no commit needed)",
+   "line": 2208,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#94",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2208"
+  },
+  {
+   "text": "Step 3: Run schema validation + codegen freshness",
+   "line": 2235,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#95",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2235"
+  },
+  {
+   "text": "Step 4: Confirm zero TODO markers remain",
+   "line": 2246,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#96",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2246"
+  },
+  {
+   "text": "Step 5: Push and watch orchestrator dev",
+   "line": 2254,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#97",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2254"
+  },
+  {
+   "text": "Step 6: Mark the sprint memory",
+   "line": 2262,
+   "state": "OPEN",
+   "id": "plans__2026-05-15-recovery-m4-completion-shamir-optional-plan#98",
+   "cites": "genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md#L2262"
+  }
+ ]
+}

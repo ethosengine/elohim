@@ -1,0 +1,120 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md",
+ "slug": "specs__2026-04-22-recovery-protocol-phase-2-revised-design",
+ "method": "agent-decomposition",
+ "count": 16,
+ "items": [
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#1",
+   "text": "Add KeyRotation DHT entry type (human/new/superseded pubkeys, recovery_request_hash, authority: RecoveryAuthority, rotated_at)",
+   "line": 97,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L97"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#2",
+   "text": "RecoveryAuthority enum with 5 variants: IntimateQuorum + CryptographicQuorum IMPLEMENTED; CommunityConsensus/GovernanceAct/NetworkWitness stub-rejected",
+   "line": 111,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L111"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#3",
+   "text": "NetworkWitnessPurpose enum (Rescue implemented; Dissolution stub-reserved)",
+   "line": 146,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L146"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#4",
+   "text": "validate_key_rotation rules 1-7: request resolves, pubkeys match, no-op guard, superseded is current agent, freeze-floor baseline, implemented-variant gate, variant-specific checks",
+   "line": 157,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L157"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#5",
+   "text": "Modernize RecoveryRequest struct: AgentPubKey-based with proposed_authority discriminator + request_nonce; replace legacy String-id fields wholesale",
+   "line": 176,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L176"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#6",
+   "text": "Link types: keep HumanToCurrentAgent/KeyRotationSupersededBy/AgentToKeyRotation; delete SeedCommitment links; add RecoveryRequestToHumanityWitness + RecoveryRequestToKeyStewardship; rename to HumanToRecoveryRequest",
+   "line": 202,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L202"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#7",
+   "text": "M1-cleanup: delete RecoverySeedCommitment/HeldRecoveryShare/MyRecoveryAuthorization entry types + link types + storage projections + views + JSON schemas + contract tests",
+   "line": 219,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L219"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#8",
+   "text": "M2: IntimateQuorum + CryptographicQuorum happy paths in validator; stub-reject other three; IdentityFreeze.frozen_at_layer halts same-or-lower-layer rotations",
+   "line": 375,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L375"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#9",
+   "text": "M3: coordinator fns create_recovery_request / commit_key_rotation (freeze-floor pre-commit gate via get_links) / submit_intimate_witness + post-commit signals + doorway libp2p invitation on recovery.invitation.{request_hash}",
+   "line": 376,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L376"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#10",
+   "text": "M4: fast-path revocation flows (self-revoke, contact-vote via RevocationVote, atomic-with-rotation) on existing KeyRevocation",
+   "line": 377,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L377"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#11",
+   "text": "M5: defender specialist manifest + elohim-agent rule 4; anomaly->freeze->counter-challenge; disclosure-tier hooks; frontend RecoveryCoordinatorService endpoints + holder prompt UI + defender-visible status + hosted-cell handoff",
+   "line": 378,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L378"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#12",
+   "text": "M6: anti-lockout audit + red-team scenario suite in genesis/a2o/features/auth/recovery/anti-lockout/; every failure mode has a community-mediated restoration path; shem cross-node full acceptance",
+   "line": 379,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L379"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#13",
+   "text": "Defender specialist manifest (imagodei-defender-specialist): triggers, input context, output permissions (may author IdentityAnomaly/Freeze/self-HumanityWitness/Challenge; MAY NOT author KeyRotation/KeyRevocation), disclosure tier",
+   "line": 324,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L324"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#14",
+   "text": "Dissolution stub: NetworkWitnessPurpose::Dissolution variant defined; validator rejects with reserved-for-constitutional-governance message; cradle-to-grave shape reserved",
+   "line": 294,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L294"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#15",
+   "text": "Anti-lockout audit gate: 12 scenarios, (1-6,9-12) get gherkin features, (7,8) get design-doc entries; audit FAILS if any new feature introduces a failure mode without a restoration path",
+   "line": 413,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L413"
+  },
+  {
+   "id": "specs__2026-04-22-recovery-protocol-phase-2-revised-design#16",
+   "text": "Deferred variants flows: CommunityConsensus (Phase 2b intimacy-weighted challenge UX), GovernanceAct (qahal/mishpat cross-DNA resolution), NetworkWitness (elohim constitutional governance design)",
+   "line": 48,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md#L48"
+  }
+ ]
+}

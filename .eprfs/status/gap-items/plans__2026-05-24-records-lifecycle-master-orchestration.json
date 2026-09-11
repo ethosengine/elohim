@@ -1,0 +1,141 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md",
+ "slug": "plans__2026-05-24-records-lifecycle-master-orchestration",
+ "method": "checkbox-tasks",
+ "count": 19,
+ "items": [
+  {
+   "text": "Step 1.1: Dispatch 7 Opus agents against the primitives plan",
+   "line": 55,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L55"
+  },
+  {
+   "text": "Step 1.2: Dispatch 7 Opus agents against the applications plan",
+   "line": 76,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L76"
+  },
+  {
+   "text": "Step 1.3: Dispatch 1 Sonnet agent against frontmatter normalization plan",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L91"
+  },
+  {
+   "text": "Step 2.1: Read every concerns report",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L107"
+  },
+  {
+   "text": "Step 2.2: Update the gap list",
+   "line": 119,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L119"
+  },
+  {
+   "text": "Step 2.3: Categorize chokepoints",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L129"
+  },
+  {
+   "text": "Step 2.4: Surface anti-pattern violations",
+   "line": 138,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L138"
+  },
+  {
+   "text": "Step 3.1: Rewrite Part D plan",
+   "line": 146,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L146"
+  },
+  {
+   "text": "Step 3.2: Execute Part D plan inline",
+   "line": 150,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L150"
+  },
+  {
+   "text": "Step 4.1: Add Part C placeholders",
+   "line": 156,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L156"
+  },
+  {
+   "text": "Step 4.2: Single commit checkpoint",
+   "line": 165,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L165"
+  },
+  {
+   "text": "All 7 primitive walkthroughs land in records-lifecycle Part A, matching EPR depth, with concerns reports surfaced",
+   "line": 176,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L176"
+  },
+  {
+   "text": "All 7 application archetypes upgraded from composition-draft to full-draft, matching Mint/Monarch depth, with concerns reports surfaced",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L177"
+  },
+  {
+   "text": "All 14 migrated architecture-tier specs have normalized frontmatter",
+   "line": 178,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L178"
+  },
+  {
+   "text": "Findings synthesis produced a revised gap list reflecting deep architectural composition (not just the brainstorming inventory)",
+   "line": 179,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L179"
+  },
+  {
+   "text": "Part D plan is rewritten informed by findings, then executed inline",
+   "line": 180,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L180"
+  },
+  {
+   "text": "Part C contains placeholders pointing to dev-work measurement",
+   "line": 181,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L181"
+  },
+  {
+   "text": "Single coherent commit captures the spec completion",
+   "line": 182,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L182"
+  },
+  {
+   "text": "No stale references anywhere in the repo",
+   "line": 183,
+   "state": "OPEN",
+   "id": "plans__2026-05-24-records-lifecycle-master-orchestration#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-24-records-lifecycle-master-orchestration.md#L183"
+  }
+ ]
+}

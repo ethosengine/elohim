@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_prod_main_lag_vs_alpha_dev",
+  "claim": "A UI bug on one doorway host but not another is per-host deploy lag, not code; two catchError-swallowed legs (edge container + spa-blob) leave a host stale.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_prod_main_lag_vs_alpha_dev.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_prod_main_lag_vs_alpha_dev.md",
+        "cid": "bafkreia7utx5vqghpdm6tmkzhahp2oy6n7rvmlf3rits2w2m7nqxfgpfhq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Per-host doorway deploy lag (elohim.host = dev alpha-b)",
+    "file": "project_prod_main_lag_vs_alpha_dev.md",
+    "scopePath": ".claude/memory/project_prod_main_lag_vs_alpha_dev.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

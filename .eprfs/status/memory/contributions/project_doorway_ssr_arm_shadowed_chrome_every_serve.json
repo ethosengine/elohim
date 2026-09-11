@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "doorway-ssr-arm-shadowed-chrome-every-serve",
+  "claim": "EPR-matched GETs divert to serve_ssr_route on SsrRoute disposition (shed → chrome-carrying bundle + x-ssr-skipped); page-borne wiring goes on BOTH serve paths",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md",
+        "cid": "bafkreic6vwpmf75lxv2za7qndchnhmcshkjx3vkfet3aodxs2cmdw4blja"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "EPR dispatch routes into SSR; chrome on every serve",
+    "file": "project_doorway_ssr_arm_shadowed_chrome_every_serve.md",
+    "scopePath": ".claude/memory/project_doorway_ssr_arm_shadowed_chrome_every_serve.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,0 +1,18 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-governed-retrieval-execution.md",
+ "slug": "plans__2026-09-09-governed-retrieval-execution",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 1,
+ "items": [
+  {
+   "text": "An agent discovers candidate sources by subject/category, reads bounded evidence, and continues for an explicit question with cumulative execution accounting under the same pinned algorithm",
+   "line": 16,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-governed-retrieval-execution#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-governed-retrieval-execution.md#L16",
+   "class": "provisional"
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+{
+  "doc": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md",
+  "slug": "plans__2026-06-07-epr-slice0-raw-node-surface-plan",
+  "method": "agent",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 6,
+  "items": [
+    {
+      "text": "Task 1 \u2014 Doorway: /epr/{id}/raw forces ServeShell (never 302). Parse the path tail; raw suffix short-circuits to ServeShell before the claimed-mount lookup. TDD on classify_epr_universal.",
+      "line": 48,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#1",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L48",
+      "class": "protocol-canonical",
+      "note": "implemented + locally gate-green; a2o E2E verifies on next CI"
+    },
+    {
+      "text": "Task 2 \u2014 Doorway: add content_format to HeadFacts (tolerant, additive). Surface existing ContentNode.contentFormat at /epr resolution; rail for Slice 1, used by the raw view. Deserialization test.",
+      "line": 59,
+      "state": "OPEN",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#2",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L59",
+      "class": "protocol-canonical",
+      "note": "DEFERRED to Slice 1 (contentFormat on HeadFacts is a format-driven-dispatch rail, unused by the raw view)"
+    },
+    {
+      "text": "Task 3 \u2014 Storage: confirm/raise the raw-node read (resource + relatedNodeIds + provenance). FIRST check existing endpoints suffice; only add thinnest read (prefer extending /db/content/{id}) if provenance unreachable. Full neighborhood closure is Slice 1.",
+      "line": 69,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#3",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L69",
+      "class": "protocol-canonical",
+      "note": "no-op: /db/content/{id} already returns id/contentType/contentFormat/blobHash/dhtAnchorHash/createdBy/metadata \u2014 no storage change"
+    },
+    {
+      "text": "Task 4 \u2014 App (shell): /epr/:id/raw raw-node viewer component (data-testid=epr-raw-node). Renders EPR as atom: CID, contentType, contentFormat, blob, relatedNodeIds as /epr links, provenance. No pillar chrome. Vitest spec.",
+      "line": 83,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#4",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L83",
+      "class": "protocol-canonical",
+      "note": "implemented + locally gate-green; a2o E2E verifies on next CI"
+    },
+    {
+      "text": "Task 5 \u2014 App (lamad): repoint View-as-Content from /epr/{id} (round-trips) to /epr/{id}/raw. Cross-bundle plain href/EprNavService, never routerLink. path-overview.component.html.",
+      "line": 96,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#5",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L96",
+      "class": "protocol-canonical",
+      "note": "implemented + locally gate-green; a2o E2E verifies on next CI"
+    },
+    {
+      "text": "Task 6 \u2014 a2o @regression: /epr/{path-id}/raw renders the raw-node view (not a 302 to mount); View-as-Content lands on /raw. Guards the captured contradiction. Opus authors narrative.",
+      "line": 107,
+      "state": "CLAIMED",
+      "id": "plans__2026-06-07-epr-slice0-raw-node-surface-plan#6",
+      "cites": "genesis/docs/superpowers/plans/2026-06-07-epr-slice0-raw-node-surface-plan.md#L107",
+      "class": "protocol-canonical",
+      "note": "implemented + locally gate-green; a2o E2E verifies on next CI"
+    }
+  ]
+}

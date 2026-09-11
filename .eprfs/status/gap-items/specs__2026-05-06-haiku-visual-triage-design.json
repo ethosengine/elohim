@@ -1,0 +1,78 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md",
+ "slug": "specs__2026-05-06-haiku-visual-triage-design",
+ "method": "agent-decomposition",
+ "count": 10,
+ "items": [
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#1",
+   "text": "Add optional visual_triage field to haiku-output.schema.json (oneOf null | object with image_state enum, feature_identifiable bool, evidence_one_line <=160, screenshot_artifact_ref) \u2014 populated only when caller passes a screenshot ref",
+   "line": 47,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L47"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#2",
+   "text": "image_state closed enum semantics: blank | loading | error_overlay | partial_render | feature_visible | unreadable (partial_render stronger evidence than blank that app is alive)",
+   "line": 73,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L73"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#3",
+   "text": "feature_identifiable requires image_state==feature_visible AND content matches scenario feature label; wrong-feature => false (routing failure, tier-1 stop)",
+   "line": 86,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L86"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#4",
+   "text": "evidence_one_line discipline: strict observational only, <=160 chars single-clause, no judgment/UX/inference language",
+   "line": 96,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L96"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#5",
+   "text": "ci-observer.md visual-triage mode section after Validate mode: dispatch contract, image_state enum, discipline rules; add feature_identifiable + evidence_one_line to What-you-DO-report",
+   "line": 162,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L162"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#6",
+   "text": "feedback_haiku_observe_only_no_specifics.md memory footnote noting the visual-triage exception (closed-taxonomy + bounded one-liner = same discipline shape)",
+   "line": 163,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L163"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#7",
+   "text": "Orchestrator dispatch decision tree: tier-1 blank/error/partial -> infra action; feature_visible+identifiable -> tier-2; tier-2 complete -> optional tier-3 stewardship",
+   "line": 41,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L41"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#8",
+   "text": "Subsequent (visual-validation sprint): update agentic-developer/SKILL.md integration-mode section with tier-1->2->3 dispatch tree",
+   "line": 167,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L167"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#9",
+   "text": "Subsequent: add visual_triage logic to orchestrator screenshot-finding handling \u2014 every visual-regression + caller-flagged pendingPassing goes through tier-1 first",
+   "line": 168,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L168"
+  },
+  {
+   "id": "specs__2026-05-06-haiku-visual-triage-design#10",
+   "text": "Validation: cost-per-screenshot drops >=3x vs all-Sonnet on 50-screenshot sweep; tier-1 outputs stable across N runs; blank/partial/feature_visible three-way empirically discriminating on real screenshots",
+   "line": 214,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md#L214"
+  }
+ ]
+}

@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md",
+ "slug": "plans__2026-05-28-session-bridge-implementation",
+ "method": "requirement-bullets",
+ "count": 5,
+ "items": [
+  {
+   "text": "app/elohim-app/src/app/elohim/services/index.ts:10-11 \u2014 re-exports LocalSourceChainService from @elohim/service",
+   "line": 343,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-session-bridge-implementation#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md#L343"
+  },
+  {
+   "text": "app/elohim-library/projects/elohim-service/src/public-api.ts:32 \u2014 exports LocalSourceChainService to the library public API",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-session-bridge-implementation#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md#L344"
+  },
+  {
+   "text": "app/elohim-library/projects/elohim-service/src/index.ts:160 \u2014 same, secondary export",
+   "line": 345,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-session-bridge-implementation#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md#L345"
+  },
+  {
+   "text": "B-CONSUMERS \u2014 migrate 4 deferred consumers (injecting VisitorSessionService from @elohim/identity); depends on B-PILLAR-LAMAD + B-PILLAR-IMAGODEI",
+   "line": 870,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-session-bridge-implementation#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md#L870"
+  },
+  {
+   "text": "B-DELETE \u2014 delete LocalSourceChainService; depends on B-CONSUMERS",
+   "line": 871,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-session-bridge-implementation#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-session-bridge-implementation.md#L871"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "tiered-quilt-unblock-state",
+  "claim": "Attestation consolidation (wave-0) LANDED — don't re-plan it; remaining = Stage-B rename + tier-substrate waves (unblocks weave-epic-arc #2).",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_tiered_quilt_unblock_state.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_tiered_quilt_unblock_state.md",
+        "cid": "bafkreidebd3lrcwhz7xosdngze2gkqed6brwb4z7prgqrp4eqofdbbsvxy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Tiered-quilt unblock state",
+    "file": "project_tiered_quilt_unblock_state.md",
+    "scopePath": ".claude/memory/project_tiered_quilt_unblock_state.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

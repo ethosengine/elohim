@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "user_operator_resource_reality_and_thesis",
+  "claim": "One developer with a full-time day job funding tooling out of pocket — never assume institutional resources or compare us as the well-funded party.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/user_operator_resource_reality_and_thesis.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/user_operator_resource_reality_and_thesis.md",
+        "cid": "bafkreigjgpe7xxso36r7yjp5wuurzvxp33swwzpbsfn6qmgcfy3dn4vtju"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "One dev, a day job, out-of-pocket — and that IS the proof",
+    "file": "user_operator_resource_reality_and_thesis.md",
+    "scopePath": ".claude/memory/user_operator_resource_reality_and_thesis.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "user",
+    "indexed": true
+  }
+}

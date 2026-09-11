@@ -57,7 +57,7 @@ const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 /// are already named by the decision, and what is in question here is the thing
 /// that read them. Hashing is memoized, so a one-shot `govern` process pays it
 /// once (~60ms on the debug build, less on release).
-fn evaluator_identity() -> Value {
+pub(crate) fn evaluator_identity() -> Value {
     static IDENTITY: OnceLock<Value> = OnceLock::new();
     IDENTITY
         .get_or_init(|| {

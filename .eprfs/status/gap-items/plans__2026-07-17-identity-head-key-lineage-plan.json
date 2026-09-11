@@ -1,0 +1,132 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md",
+ "slug": "plans__2026-07-17-identity-head-key-lineage-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 15,
+ "items": [
+  {
+   "text": "A0 (Wave D RED first). Author the grandma-recovery a2o scenario as a RED before any code:",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L54",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A1 \u2014 chain-root identifier (degenerate slice of #1). Add identity_root_cid(agent) -> Cid:",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L58",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A2 \u2014 REA re-point (#5). When an economic party is a collective, populate",
+   "line": 62,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L62",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A3 \u2014 contributor re-point (#6). Re-anchor claimed_agent_id / ClaimedAgentToPresence on the",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L67",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "B1 \u2014 version_parent DAG (#1 full). Model KeyRotation (recovery_v2.rs) edges as a",
+   "line": 79,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L79",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "B2 \u2014 binds-identity discriminator (#2). New Mishpat::Commitment action discriminator",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L82",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "B3 \u2014 rotate_identity_key coordinator fn (#3). Append a version node authorized by the current",
+   "line": 87,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L87",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "C1 \u2014 did:elohim assembly upgrade (#4). ElohimIdentityStore now resolves real controller",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L97",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "C2 \u2014 sign the AgentPeerBinding (#7). Replace STAGE1_SIGNATURE_SENTINEL with a real",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L101",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "C-gate: storage cargo test --lib + bridges/did conformance suite green; a resolved",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L106",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D1 \u2014 grandma-recovery a2o GREEN. The A0 RED now passes end-to-end: key loss \u2192 community-recovery",
+   "line": 110,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L110",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Waves A\u2013D green; the grandma-recovery a2o scenario passes \u00d72 fresh runs",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L116",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DNA-hash neutrality confirmed for Wave B (no re-key on deploy)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "did:elohim resolves real controllers + lineage + verified transport ids (phase-1 self-only retired)",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#9 (DNA-reinstall migration) remains a captured hard follow-on \u2014 NOT closed here",
+   "line": 119,
+   "state": "OPEN",
+   "id": "plans__2026-07-17-identity-head-key-lineage-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-07-17-identity-head-key-lineage-plan.md#L119",
+   "class": "protocol-canonical"
+  }
+ ]
+}

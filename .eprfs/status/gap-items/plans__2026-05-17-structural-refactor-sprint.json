@@ -1,0 +1,281 @@
+{
+ "doc": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md",
+ "slug": "plans__2026-05-17-structural-refactor-sprint",
+ "method": "checkbox-tasks",
+ "count": 39,
+ "items": [
+  {
+   "text": "Confirm http.rs is still ~10k LOC (re-run wc -l elohim/elohim-storage/src/http.rs)",
+   "line": 112,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#1",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L112"
+  },
+  {
+   "text": "Identify the natural decomposition seams (read the file; look for // ============ Auth ============ style separators)",
+   "line": 113,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#2",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L113"
+  },
+  {
+   "text": "Decide on the sibling-module structure: typically http/{mod,routes,handlers,middleware,error,extractors}.rs or by-domain (http/{lamad,shefa,qahal,imagodei,doorway_proxy}.rs)",
+   "line": 114,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#3",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L114"
+  },
+  {
+   "text": "Verify the existing test suite covers the route surfaces being moved",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#4",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L115"
+  },
+  {
+   "text": "Operator sign-off on the chosen seam structure before subagent dispatch",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#5",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L116"
+  },
+  {
+   "text": "Confirm lib.rs is still ~12k LOC",
+   "line": 153,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#6",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L153"
+  },
+  {
+   "text": "Identify the natural decomposition seams (HDK functions for content CRUD vs validators vs queries vs index entries)",
+   "line": 154,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#7",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L154"
+  },
+  {
+   "text": "Decide module structure: probably by entry-type ({content,relationship,attestation,reach,validators}.rs)",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#8",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L155"
+  },
+  {
+   "text": "Verify the integrity zome (separate crate) doesn't import from content_store internals in ways the split would break",
+   "line": 156,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#9",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L156"
+  },
+  {
+   "text": "Confirm sweettest coverage is solid before moving things",
+   "line": 157,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#10",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L157"
+  },
+  {
+   "text": "Operator sign-off on the chosen seam structure",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#11",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L158"
+  },
+  {
+   "text": "Read the existing graph_views/lamad/ and graph_views/shefa/ modules \u2014 they ARE the pattern this phase generalizes",
+   "line": 182,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#12",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L182"
+  },
+  {
+   "text": "Identify which view types in views.rs are candidates for migration (probably all of them eventually; do it in domain-batches)",
+   "line": 183,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#13",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L183"
+  },
+  {
+   "text": "Decide the target module structure: probably views/{shared,lamad,shefa,qahal,imagodei,infrastructure}.rs mirroring the existing graph_views/",
+   "line": 184,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#14",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L184"
+  },
+  {
+   "text": "Verify the ts-rs codegen pipeline still produces correct TypeScript output after each migration batch \u2014 this is the critical contract surface",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#15",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L185"
+  },
+  {
+   "text": "Operator sign-off",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#16",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L186"
+  },
+  {
+   "text": "Read the existing crates/elohim-sdk/ to see what's already extracted",
+   "line": 214,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#17",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L214"
+  },
+  {
+   "text": "Identify the types in views.rs that belong in elohim-sdk (anything ts-rs-exported and consumed by an external crate)",
+   "line": 215,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#18",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L215"
+  },
+  {
+   "text": "Identify the storage-internal types that should NOT be in the SDK (e.g. Diesel models, internal error types, P2P transport details)",
+   "line": 216,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#19",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L216"
+  },
+  {
+   "text": "Design the dependency: elohim-sdk declares the wire contract; elohim-storage depends on elohim-sdk and implements it; consumers (doorway-service, steward/node, crates/elohim-storage-client) depend on elohim-sdk only",
+   "line": 217,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#20",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L217"
+  },
+  {
+   "text": "Verify [[project_elohim_dna_as_sdk_boundary]] memory entry stays valid (boundary should fail at compile time if leaks occur)",
+   "line": 218,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#21",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L218"
+  },
+  {
+   "text": "Operator sign-off on the boundary cuts",
+   "line": 219,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#22",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L219"
+  },
+  {
+   "text": "Grep for compute_cid, verify_signature, parse_epr_head, Cid::from_* across the workspace",
+   "line": 245,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#23",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L245"
+  },
+  {
+   "text": "Identify the canonical implementation (probably in elohim/epr/) and the duplicate/divergent implementations",
+   "line": 246,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#24",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L246"
+  },
+  {
+   "text": "Design the crate's public API",
+   "line": 247,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#25",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L247"
+  },
+  {
+   "text": "Audit which schema-validation code lives where today",
+   "line": 272,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#26",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L272"
+  },
+  {
+   "text": "Decide what's Rust vs what's Node/TS (Node-side stays as-is; this crate is Rust)",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#27",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L273"
+  },
+  {
+   "text": "Design API surface",
+   "line": 274,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#28",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L274"
+  },
+  {
+   "text": "Inventory the sweettest helpers + persona seeders",
+   "line": 294,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#29",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L294"
+  },
+  {
+   "text": "Decide whether the crate should be its own workspace member OR a [dev-dependencies] crate in a subdirectory of an existing crate",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#30",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L295"
+  },
+  {
+   "text": "Identify candidate subsystems:",
+   "line": 313,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#31",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L313"
+  },
+  {
+   "text": "Decide default features for each consumer (steward-node, doorway-service, elohim-node, etc.)",
+   "line": 319,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#32",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L319"
+  },
+  {
+   "text": "Verify each subsystem's API can be gated cleanly without breaking consumers",
+   "line": 320,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#33",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L320"
+  },
+  {
+   "text": "Operator sign-off on the default-feature set",
+   "line": 321,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#34",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L321"
+  },
+  {
+   "text": "Plan 1's measurements show clear remaining compile-pressure value from this unification (don't do it if the previous phases already brought PVC pressure under control)",
+   "line": 348,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#35",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L348"
+  },
+  {
+   "text": "Cross-workspace Cargo.lock diff analysis: how far do versions diverge today?",
+   "line": 349,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#36",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L349"
+  },
+  {
+   "text": "Identify Holochain pinned-version requirements that may not be compatible with the elohim/ workspace's deps",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#37",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L350"
+  },
+  {
+   "text": "Decide which currently-excluded crates are worth unifying \u2014 probably elohim-cache-core (small, clean) first; elohim-storage second; holochain last (or never, if its pinning constraints are fundamentally incompatible)",
+   "line": 351,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#38",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L351"
+  },
+  {
+   "text": "Operator sign-off REQUIRED \u2014 this is the highest-risk phase",
+   "line": 352,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-structural-refactor-sprint#39",
+   "cites": "genesis/docs/plans/2026-05-17-structural-refactor-sprint.md#L352"
+  }
+ ]
+}

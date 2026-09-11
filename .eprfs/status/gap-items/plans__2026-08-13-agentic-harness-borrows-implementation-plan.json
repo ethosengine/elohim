@@ -1,0 +1,388 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md",
+ "slug": "plans__2026-08-13-agentic-harness-borrows-implementation-plan",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 47,
+ "items": [
+  {
+   "text": "Step 1: Read the two idioms before writing. run()'s dispatch table and parse_global",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L118",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Add the dispatch arm in mod.rs's match sub alongside \"seal\"/\"hold\", and",
+   "line": 126,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L126",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Implement note.rs. Two phases:",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L140",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Unit tests over a fixture flows.jsonl in",
+   "line": 150,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L150",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: seam-registry.yaml for epr-cli \u2014 FIRST registry for this crate. Create",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L158",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 6: Gate \u2014 the eprfs workspace clauses, exactly as pre-push runs them",
+   "line": 171,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L171",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 7: Name the CI home at birth. elohim/eprfs/ is watched by",
+   "line": 183,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L183",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 8: Commit (path-limited; shared worktree; --no-verify; do NOT push)",
+   "line": 193,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L193",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Add the dispatch arm + usage line in mod.rs (same hand-rolled table as Task 1):",
+   "line": 232,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L232",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Implement stocks.rs \u2014 READ-ONLY. Open the sidecar and fold; append nothing",
+   "line": 241,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L241",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: --check exit semantics. Exit 0 when every declared stock has",
+   "line": 252,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L252",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Two-window fixture tests in elohim/eprfs/epr-cli/tests/flow_stocks.rs:",
+   "line": 260,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L260",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: Register the equilibrium verdict in elohim/eprfs/epr-cli/seam-registry.yaml",
+   "line": 268,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L268",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 6: Gate + verify against the live sidecar (read-only, safe on the shared worktree):",
+   "line": 274,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L274",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 289,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L289",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Write .claude/hooks/run-projection.py with --event {prompt,session}, thin by",
+   "line": 328,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L328",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Cache, because this runs on every turn. Derive into a cache file under",
+   "line": 334,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L334",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Cap the block at \u226420 lines, ending with the write-path teaching footer \u2014 one",
+   "line": 341,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L341",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Register with an HONEST timeout in .claude/settings.json \u2014 a new",
+   "line": 346,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L346",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: .epr-meta registration WITH retire-when:. Add the emitter's row to",
+   "line": 359,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L359",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 6: Verify it lands. Start a fresh session (or /clear) and confirm the block appears",
+   "line": 374,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L374",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Prepare the park. declarative-desired-state (habits.yaml:521-537) is unwired,",
+   "line": 400,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L400",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Compose the admission of dev-system-equilibrium as status: unwired,",
+   "line": 408,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L408",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Print the exact diff and STOP. Present: the two blocks, the resulting habit count",
+   "line": 423,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L423",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4 (operator only): apply, then verify the renderer agrees",
+   "line": 428,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L428",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Edit the SkillPackage source. In",
+   "line": 456,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L456",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Keep the two gates that are genuinely the operator's \u2014 untouched, and say so in",
+   "line": 464,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L464",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Replant \u2014 atomic, with rollback",
+   "line": 470,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L470",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Verify the fidelity gates are green",
+   "line": 478,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L478",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: Commit source + regenerated projections together",
+   "line": 489,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L489",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Read the projection path end to end \u2014 projectMcpProfile",
+   "line": 523,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L523",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Add a runtime-settings field to the McpProfilePackage schema-in-practice \u2014 a small",
+   "line": 530,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L530",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Choose N from the measurement, not a round number. The measured root is 42,327",
+   "line": 536,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L536",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Regenerate + verify",
+   "line": 543,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L543",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: Commit source + generated file together (same .husky/pre-push.bash:191-199 rule)",
+   "line": 553,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L553",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Record 6b as a held follow-up (a backlog row under",
+   "line": 557,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L557",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Carry the mechanism evidence into that row, so the follow-up starts grounded",
+   "line": 562,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L562",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Do not start 6b in this plan. If a Step here starts editing root gospel text, stop",
+   "line": 574,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L574",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Append a dated amendment section after \u00a77 (the file is 96 lines; \u00a77 \"The shortest",
+   "line": 593,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L593",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: State the claim and its boundary. The amendment says: System 2 exists, in a form",
+   "line": 599,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L599",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 3: Cite survey \u00a74.3 (genesis/research/context-engineering-primary-sources-cross-pollination-2026-08-13.md,",
+   "line": 608,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L608",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Doc-only \u2014 no code, no gate beyond the .epr-meta write rules. Commit",
+   "line": 613,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L613",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 1: Write the a2o scenarios from Specs A and B's decomposition sections \u2014 the",
+   "line": 628,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L628",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 2: Any .feature written here enters the blind-reader revision loop required by",
+   "line": 637,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L637",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 4: Re-run epr flow stocks --check after all Tasks land and record the exit \u2014 the",
+   "line": 667,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L667",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 5: The deliverable \u2014 a one-line delta in habits.yaml (composed here, applied by the",
+   "line": 670,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L670",
+   "class": "process-meta"
+  },
+  {
+   "text": "Step 6: Decompose-flip + ledger read",
+   "line": 674,
+   "state": "OPEN",
+   "id": "plans__2026-08-13-agentic-harness-borrows-implementation-plan#47",
+   "cites": "genesis/docs/superpowers/plans/2026-08-13-agentic-harness-borrows-implementation-plan.md#L674",
+   "class": "process-meta"
+  }
+ ]
+}

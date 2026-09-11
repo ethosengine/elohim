@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "package-first-projection-drift-direction",
+  "claim": "project --write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md; if runtime is newer, fold runtime→package first or content is lost.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_package_first_projection_drift_direction.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_package_first_projection_drift_direction.md",
+        "cid": "bafkreihy3gxy6oh3ihvs5kwzcwjeb3ypjkgecc246s3hg7xzs42aqcl7ba"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Projection-drift gate: read the diff before projecting",
+    "file": "feedback_package_first_projection_drift_direction.md",
+    "scopePath": ".claude/memory/feedback_package_first_projection_drift_direction.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

@@ -1,0 +1,198 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md",
+ "slug": "plans__2026-06-29-p2p-dataplane-validation-suite-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 22,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test \u2014 feed aggregate-by-concern.spec.ts a synthetic cucumber JSON with 2 scenarios tagged @concern:content-sync (1 pass, 1 fail) + 1 @concern:peer-mesh (pass); assert byConcern['content-sync'] == {passed:1, failed:1} and byConcern['peer-mesh'].passed == 1",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L69",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run \u2192 FAIL (pnpm --filter @elohim/a2o test aggregate-by-concern \u2014 no byConcern yet)",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L70",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Implement the byConcern rollup in aggregate.ts (parse @concern: from each scenario's tags; bucket pass/fail/pending) + the MD/JSON emit in build-sprint-report.ts",
+   "line": 71,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L71",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run \u2192 PASS",
+   "line": 72,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L72",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit feat(a2o): per-concern dataplane validation rollup in the sprint-report",
+   "line": 73,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L73",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write surfaces.ts typed against the grounded surface fields (peerCount/caughtUp/divergentAnchor/projection.writer; sync total/heads; blob status; epr nav-context; arc-policy; inventory-parity; doorway M1\u2013M5 + storage p2p_*/reconcile_*/dedup_*)",
+   "line": 94,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L94",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the step defs delegating to surfaces.ts; requirePlaywright-free (pure HTTP) so they run in API mode",
+   "line": 95,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L95",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Smoke a trivial @concern:peer-mesh scenario locally against E2E_DOORWAY_ALPHA \u2192 green. Commit feat(a2o): dataplane surface-query step library",
+   "line": 96,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L96",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "peer-mesh: scenarios \u2014 mesh connected (peerCount >= 2, caughtUp true) on alpha-A AND elohim.host; divergentAnchor within tolerance.",
+   "line": 105,
+   "state": "OPEN",
+   "requires_env": [
+    "multi-node"
+   ],
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L105",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "content-sync: author a content node on peer A via POST /db/content (test-persona, non-bulk), then assert node:{id} is present (heads non-empty) on peer B's /sync/v1/elohim/docs within a deadline. (household); a variant for cross-tenant. Compose the producer/convergence facts from the content-sync-plane plan",
+   "line": 106,
+   "state": "OPEN",
+   "requires_env": [
+    "multi-node",
+    "shem"
+   ],
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L106",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Run against alpha; expect GREEN (these are live). Commit. These prove the suite mechanism works on known-good concerns before the red ones",
+   "line": 107,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L107",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "blob-replication (RED now): author/seed an EPR+blob on peer A; assert the blob is byte-present on peer B (GET /blob/{hash} 200 AND /db/content/{id}.blobHash non-null on B) within a convergence deadline. This FAILS today (elohim.host blobHash:null) \u2192 the suite makes the gap CI-visible",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L116",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "epr-projection-fallback (RED now): Then resolving \"/\" on peer \"elohim.host\" does NOT return App-not-found \u2014 instead returns the SPA (peer-fallback served) OR an EPR-head-aware syncing status ({ eprHead, blob: { state: syncing|ready, bytes: x, of: y } }). FAILS today",
+   "line": 117,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Run against alpha+elohim.host; CONFIRM RED (the proof has teeth). Commit test(a2o): blob-replication + epr-projection-fallback dataplane concerns (red-first)",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Capture the fix as its own work (NOT this plan's scope to bloat): the storage peer-fallback + status surface + blob byte-replication is a separate implementation plan. Backlog dataplane-peer-fallback-and-blob-replication.md (domain D5) \u2014 the scenarios here are its acceptance gate",
+   "line": 119,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L119",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Create genesis/a2o/features/dataplane/federation-deploy.feature: for the landing EPR, assert GET / returns 200 (not App-not-found) AND blobHash non-null on every federation doorway (alpha-A + elohim.host/alpha-B). FAILS today on elohim.host. This is the assertion that makes the per-host CI blob-upload shortcut un-shippable.",
+   "line": 123,
+   "state": "OPEN",
+   "requires_env": [
+    "multi-node"
+   ],
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L123",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Commit",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L124",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Add a rule (per elohim-epr-metafile skill) scoped to the EPR/blob resolution path (http.rs app-resolution, sharding.rs, epr/): flag any edit that returns a hard App not found / NotFound for a known-EPR-head, missing-blob case without a peer-fallback (race_fetch) branch or an EPR-head-aware syncing-status return. Lightest signal that drives the directory toward the canonical \"peers are the store; doorway projects with fallback\" behavior \u2014 yells (PreToolUse) when an agent reintroduces the shortcut",
+   "line": 133,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L133",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Commit feat(epr-meta): code-gate the peer-fallback invariant on the storage resolution path",
+   "line": 134,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L134",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Jenkins: add a Dataplane Validation stage that runs cucumber-js --tags '@dataplane and not @wip' against deployed peers (alpha + shem), emitting sprint-report-dataplane.{json,md}. Home: the edge Jenkinsfile (post-deploy, after Verify Holochain Health) \u2014 bash body in scripts/ci/*.sh (CPS size-limit gotcha), advisory catchError\u2192UNSTABLE only until one green run, then gating. Predict dispatch with graph-walker; validate no over-build",
+   "line": 138,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L138",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Agentic-loop consumption: document (in genesis/a2o/features/dataplane/README.md + the agentic-developer measure section) that the loop reads sprint-report-dataplane.json.byConcern as a per-concern measure surface \u2014 a concern flipping \u274c\u2192\u2705 is forward progress; \u274c is a named candidate. (Mirrors the ci-findings ledger pattern; no new ledger \u2014 the per-concern block IS the surface.)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L139",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "@concern:blob-durability + @concern:keyspace-coverage + @concern:reconcile-inventory: these are largely the deterministic P-PROOFS integration tests + the resilience-dimensions a2o layer. Do NOT re-author \u2014 add thin dataplane/ feature wrappers (or tag the existing features/resilience/* scenarios with the @concern: vocabulary) so they appear in the per-concern matrix alongside the live concerns. Verify P-PROOFS status via ci-investigator (CLAIMED vs landed) rather than rebuilding",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-06-29-p2p-dataplane-validation-suite-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-29-p2p-dataplane-validation-suite-plan.md#L144",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "MemPalace — wired historian + librarian substrate",
+  "claim": "ChromaDB+SQLite memory substrate wired 2026-05-14, image-baked; 4 wings/12,866 drawers; MCP scoped per-subagent keeps 30 tool schemas out of parent context.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/reference_mempalace.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/reference_mempalace.md",
+        "cid": "bafkreicusbo4i5hndqbgv4cvi37az4nzgeqwxs7aysf3vako3z2ouiyg4i"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "MemPalace — wired substrate",
+    "file": "reference_mempalace.md",
+    "scopePath": ".claude/memory/reference_mempalace.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "reference",
+    "indexed": false
+  }
+}

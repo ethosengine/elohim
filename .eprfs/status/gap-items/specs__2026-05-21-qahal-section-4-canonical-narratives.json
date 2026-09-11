@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md",
+ "slug": "specs__2026-05-21-qahal-section-4-canonical-narratives",
+ "method": "agent-decomposition",
+ "count": 13,
+ "items": [
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#1",
+   "text": "Household scale: commons-elohim composes a remembered-week stream from family-chosen patterns (care given, sleep lost), one-sentence non-pushy right-nav witness, no notifications",
+   "line": 5,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L5"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#2",
+   "text": "Household scale: member ring with household-only standing rings computed from a household-authored lamad-attested care rubric; standing-visible-only-when-active profile honored",
+   "line": 15,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L15"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#3",
+   "text": "Household scale: care acknowledgment flows a tiny REA shefa event into the care-economy ledger; cross-hub elohim-to-elohim quiet conversation (Gertrude check-in) gated by recovery-share relationship",
+   "line": 21,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L21"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#4",
+   "text": "Congregation scale: plural-stewardship (4 elders, no upward institutional parent); versioned rubric EPR signed by elders + ratified by congregational consent; Bloom's-curve standing specific to the congregation",
+   "line": 27,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L27"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#5",
+   "text": "Congregation scale: friction-gradient limitarianism notices elder accumulation and writes a gentle line into elders' shared view (lean-toward-one-voice prompt)",
+   "line": 43,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L43"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#6",
+   "text": "Life-group scale: sub-Qahal nesting first-class; rubric inherits from parent congregation + small local customization anchored upward; standing partially derived from parent-congregation standing (hard rule)",
+   "line": 47,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L47"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#7",
+   "text": "Life-group scale: prayers carried as cryptographically signed group attestations (we-held-this-together), encrypted to the group, not published/searched; cohesion-threshold witness from commons-elohim",
+   "line": 56,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L56"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#8",
+   "text": "Life-group scale: friction-gradient hosting-rotation prompt (hosted 23 of 24 Tuesdays -> invite another household)",
+   "line": 61,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L61"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#9",
+   "text": "Federation scale: wisdom-commons federation Qahal as peer-Qahal (no institutional parent, no authority to bind/discipline); shared rubric TEMPLATE each congregation may adopt/adapt/decline; upward anchor by choice only",
+   "line": 67,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L67"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#10",
+   "text": "Federation scale: REA wisdom-exchange events (offered not commanded); member ring of congregations-not-individuals with federation-template standing",
+   "line": 73,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L73"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#11",
+   "text": "Federation scale: concern surface (structured object) + voluntary peer-council convening (no court, no binding authority) producing a witness (peer testimony) + REA reconciliation event; commons-elohim witnesses openly per federation agreement",
+   "line": 77,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L77"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#12",
+   "text": "Federation scale: friction-gradient ensures no single elder authored the council witness, rubric honored, no congregation gained authority over another (horizontal-not-down)",
+   "line": 85,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L85"
+  },
+  {
+   "id": "specs__2026-05-21-qahal-section-4-canonical-narratives#13",
+   "text": "Cross-scale invariant: one Qahal primitive renders differently because rubric/standing/reach/commons-elohim-vantage shift with the collective; holons compose without flattening",
+   "line": 3,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-05-21-qahal-section-4-canonical-narratives.md#L3"
+  }
+ ]
+}

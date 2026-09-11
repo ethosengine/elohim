@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_stale_record_feeds_memory_ceremony",
+  "claim": "Record stale gospel/memory claims via `epr flow note --kind correction`; ceremony Phase 0 reads them — bites when a claim is found stale.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_stale_record_feeds_memory_ceremony.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_stale_record_feeds_memory_ceremony.md",
+        "cid": "bafkreiamqkkcyingf5n4zfgujtxqh5ffinntccbbxeo652hzx6qlrtbkuu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Stale record feeds the memory-ceremony",
+    "file": "feedback_stale_record_feeds_memory_ceremony.md",
+    "scopePath": ".claude/memory/feedback_stale_record_feeds_memory_ceremony.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

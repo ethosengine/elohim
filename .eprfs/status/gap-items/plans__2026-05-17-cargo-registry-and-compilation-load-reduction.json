@@ -1,0 +1,379 @@
+{
+ "doc": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md",
+ "slug": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction",
+ "method": "checkbox-tasks",
+ "count": 53,
+ "items": [
+  {
+   "text": "Step 1: Check the sccache config",
+   "line": 43,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#1",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L43"
+  },
+  {
+   "text": "Step 2: Capture pre-repave stats",
+   "line": 55,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#2",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L55"
+  },
+  {
+   "text": "Step 1: Force-rewrite cache entries on a substantial build",
+   "line": 68,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#3",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L68"
+  },
+  {
+   "text": "Step 2: Confirm fresh entries are flowing during the build",
+   "line": 80,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#4",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L80"
+  },
+  {
+   "text": "Step 3: Verify read-back works",
+   "line": 89,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#5",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L89"
+  },
+  {
+   "text": "Step 1: Write the memory",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#6",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L106"
+  },
+  {
+   "text": "Step 2: Index in MEMORY.md",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#7",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L139"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#8",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L145"
+  },
+  {
+   "text": "Step 1: Create the config file",
+   "line": 171,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#9",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L171"
+  },
+  {
+   "text": "Step 2: Verify the config is picked up by cargo",
+   "line": 197,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#10",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L197"
+  },
+  {
+   "text": "Step 3: Commit the config",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#11",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L213"
+  },
+  {
+   "text": "Step 1: Locate CARGO_HOME",
+   "line": 240,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#12",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L240"
+  },
+  {
+   "text": "Step 2: Write credentials.toml",
+   "line": 249,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#13",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L249"
+  },
+  {
+   "text": "Step 3: Verify auth works",
+   "line": 262,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#14",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L262"
+  },
+  {
+   "text": "Step 1: Clear any local registry cache",
+   "line": 276,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#15",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L276"
+  },
+  {
+   "text": "Step 2: Run a fresh fetch via the proxy",
+   "line": 285,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#16",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L285"
+  },
+  {
+   "text": "Step 3: Confirm the network path goes through Nexus",
+   "line": 293,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#17",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L293"
+  },
+  {
+   "text": "Step 1: Create the doc",
+   "line": 306,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#18",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L306"
+  },
+  {
+   "text": "Step 2: Commit",
+   "line": 409,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#19",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L409"
+  },
+  {
+   "text": "Step 1: Read the current Cargo.toml",
+   "line": 433,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#20",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L433"
+  },
+  {
+   "text": "Step 2: Add required publish metadata",
+   "line": 441,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#21",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L441"
+  },
+  {
+   "text": "Step 3: Verify manifest parses and tests pass",
+   "line": 463,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#22",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L463"
+  },
+  {
+   "text": "Step 4: Dry-run packaging",
+   "line": 472,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#23",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L472"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 480,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#24",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L480"
+  },
+  {
+   "text": "Step 1: Final dry-run",
+   "line": 500,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#25",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L500"
+  },
+  {
+   "text": "Step 2: Real publish",
+   "line": 508,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#26",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L508"
+  },
+  {
+   "text": "Step 3: Verify the published crate is fetchable",
+   "line": 518,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#27",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L518"
+  },
+  {
+   "text": "Step 4: Verify cargo can resolve it from a clean context",
+   "line": 526,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#28",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L526"
+  },
+  {
+   "text": "Step 1: Find all path-deps on elohim-epr",
+   "line": 551,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#29",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L551"
+  },
+  {
+   "text": "Step 2: Pick the switch target",
+   "line": 557,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#30",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L557"
+  },
+  {
+   "text": "Step 3: Edit the dep",
+   "line": 568,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#31",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L568"
+  },
+  {
+   "text": "Step 4: Build the consumer",
+   "line": 584,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#32",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L584"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 600,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#33",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L600"
+  },
+  {
+   "text": "Step 1: Extract unique deps per member",
+   "line": 625,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#34",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L625"
+  },
+  {
+   "text": "Step 2: Find deps used by 2+ members",
+   "line": 636,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#35",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L636"
+  },
+  {
+   "text": "Step 1: Determine target versions",
+   "line": 653,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#36",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L653"
+  },
+  {
+   "text": "Step 2: Edit elohim/Cargo.toml's [workspace.dependencies]",
+   "line": 657,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#37",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L657"
+  },
+  {
+   "text": "Step 3: Switch each member to workspace deps",
+   "line": 695,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#38",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L695"
+  },
+  {
+   "text": "Step 4: Verify each member builds",
+   "line": 720,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#39",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L720"
+  },
+  {
+   "text": "Step 5: Verify dep tree got smaller",
+   "line": 728,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#40",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L728"
+  },
+  {
+   "text": "Step 6: Run tests",
+   "line": 736,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#41",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L736"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 744,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#42",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L744"
+  },
+  {
+   "text": "Step 1: Capture duplicates report",
+   "line": 774,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#43",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L774"
+  },
+  {
+   "text": "Step 2: Identify actionable cases",
+   "line": 782,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#44",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L782"
+  },
+  {
+   "text": "Step 1: Bump the version",
+   "line": 807,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#45",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L807"
+  },
+  {
+   "text": "Step 2: Update Cargo.lock",
+   "line": 816,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#46",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L816"
+  },
+  {
+   "text": "Step 3: Verify workspace builds",
+   "line": 822,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#47",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L822"
+  },
+  {
+   "text": "Step 4: Verify dupes count is lower",
+   "line": 830,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#48",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L830"
+  },
+  {
+   "text": "Step 5: Commit each round",
+   "line": 838,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#49",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L838"
+  },
+  {
+   "text": "Step 1: Cold build (no cache)",
+   "line": 868,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#50",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L868"
+  },
+  {
+   "text": "Step 2: Warm-cache build",
+   "line": 878,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#51",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L878"
+  },
+  {
+   "text": "Step 3: target/ size",
+   "line": 889,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#52",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L889"
+  },
+  {
+   "text": "Step 4: Write the measurements doc",
+   "line": 896,
+   "state": "OPEN",
+   "id": "plans__2026-05-17-cargo-registry-and-compilation-load-reduction#53",
+   "cites": "genesis/docs/plans/2026-05-17-cargo-registry-and-compilation-load-reduction.md#L896"
+  }
+ ]
+}

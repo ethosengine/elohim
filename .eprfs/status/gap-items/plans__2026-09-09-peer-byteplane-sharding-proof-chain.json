@@ -1,0 +1,58 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md",
+ "slug": "plans__2026-09-09-peer-byteplane-sharding-proof-chain",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 6,
+ "items": [
+  {
+   "text": "A real shard from a 68 MiB RS-4-7 artifact crosses both permanent peer transports within an explicit bounded frame budget, with byte identity and oversize refusal verified",
+   "line": 18,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L18",
+   "class": "provisional"
+  },
+  {
+   "text": "After real acknowledged shard placement, a cold surviving storage peer reconstructs an identical RS artifact while the ingest holder is unavailable, without using doorway or a complete local copy",
+   "line": 28,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L28",
+   "class": "provisional"
+  },
+  {
+   "text": "Peers transfer artifacts larger than one admitted frame using bounded chunk or stream work, preserving custody and integrity across interruption and retry",
+   "line": 40,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L40",
+   "class": "provisional"
+  },
+  {
+   "text": "Archive replication yields to interactive pantry and stock reads under each peer's declared runtime budget, with throttling distinguished from unavailability",
+   "line": 47,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L47",
+   "class": "provisional"
+  },
+  {
+   "text": "Real-time voice and video retain their declared latency and jitter budgets under competing archive traffic when the network supports QoS, with honest fallback on networks that do not",
+   "line": 57,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L57",
+   "class": "provisional"
+  },
+  {
+   "text": "A connected ingest peer can resolve the other consenting peers' current custody scope, availability and transport identity before assigning them real shards",
+   "line": 80,
+   "state": "OPEN",
+   "id": "plans__2026-09-09-peer-byteplane-sharding-proof-chain#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-09-peer-byteplane-sharding-proof-chain.md#L80",
+   "class": "provisional"
+  }
+ ]
+}

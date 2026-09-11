@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_delegate_narrow_tasks_to_cheaper_tiers",
+  "claim": "Delegate narrow, crisply-defined tasks to Opus/Sonnet; keep top-tier fleets for orchestration and judgment to avoid session limit burn.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_delegate_narrow_tasks_to_cheaper_tiers.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_delegate_narrow_tasks_to_cheaper_tiers.md",
+        "cid": "bafkreib7dmttqwvf7ucpknhm5nzzgkzkhnnboibxocyehlujh2slnfleza"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Delegate narrow tasks to Opus/Sonnet; top-tier fleets burn the limit",
+    "file": "feedback_delegate_narrow_tasks_to_cheaper_tiers.md",
+    "scopePath": ".claude/memory/feedback_delegate_narrow_tasks_to_cheaper_tiers.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

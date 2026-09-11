@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "container-cargo-environment-quirks",
+  "claim": "No nextest here (plain cargo test, unpiped exit codes); /projects target dirs ENOENT → use /tmp; WASM-warmed slot corrupts native builds; explicit cd per gate.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_container_cargo_environment_quirks.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_container_cargo_environment_quirks.md",
+        "cid": "bafkreiclqkfcz2aavth75ecxoj23x6g2rt4a7zgvjxspr5kbtgxebfg45m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Container cargo quirks",
+    "file": "project_container_cargo_environment_quirks.md",
+    "scopePath": ".claude/memory/project_container_cargo_environment_quirks.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

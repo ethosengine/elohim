@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_elohim_app_local_build_verification_gaps",
+  "claim": "In-container gates miss strictTemplates AOT errors (tsc/JIT) — verify with a direct `ng build`; buffer bundle error = install-state, not code.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_elohim_app_local_build_verification_gaps.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_elohim_app_local_build_verification_gaps.md",
+        "cid": "bafkreihvbu7lz2vgfh4xldbk4s5fnp3oijjllmrdracwiqxy5u7e777gcu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "elohim-app local build verification gaps",
+    "file": "project_elohim_app_local_build_verification_gaps.md",
+    "scopePath": ".claude/memory/project_elohim_app_local_build_verification_gaps.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

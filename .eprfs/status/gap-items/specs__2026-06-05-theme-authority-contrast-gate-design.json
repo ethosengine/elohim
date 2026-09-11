@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md",
+ "slug": "specs__2026-06-05-theme-authority-contrast-gate-design",
+ "method": "agent",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "tokens.scss: body[data-theme] override blocks -> :root[data-theme]; color-scheme asserted in all four theme scopes; mint --lamad-on-accent #ffffff + --lamad-accent-emphasis #4f46e5",
+   "line": 135,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L135",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "ThemeStore.applyToDocument + Angular ThemeService twin: dual-write data-theme + theme-* class to documentElement (authority) AND body (compat); twin parity specs in both suites",
+   "line": 146,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L146",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "_chrome-binding.scss: correct false resolution-model comment; add omnibar-fg/tray-fg/search-fg/banner pairings; bubble+badge -> accent-emphasis/on-accent; search-border -> border-hover",
+   "line": 153,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L153",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "elohim-navigator.ts: route hardcoded CanvasText through published cssprops (ctx-switcher, search-input fg, tray-item fg); theme-correct tray hover mix; fix banner-warning/error color-mix no-op; opacity 0.6 -> 0.75 on identifier/tagline",
+   "line": 166,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L166",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "elohim-default-omnibar.ts: mint @cssprop --elohim-omnibar-fg (host color: var(--elohim-omnibar-fg, inherit)) so binding can pair text with surface",
+   "line": 166,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L166",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "lamad styles.scss imports base.scss (kills 8px UA body margin); runbook gains 4.X bundle-styling checklist row",
+   "line": 181,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L181",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "testing/theme-contrast.ts: themeFixture (system-light/dark via color-scheme; tokens-light/dark injecting REAL tokens+binding text + documentElement[data-theme]) \u2014 colorjs.io devDep",
+   "line": 196,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L196",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "assertThemeContrast: flattened shadow-tree walk, fg opacity-stack + ancestor bg Porter-Duff composite, WCAG 1.4.3/1.4.11 by computed font; assertThemeReactivity: computed surface differs across data-theme; axeScanStrict: violations + color-contrast incompletes both empty",
+   "line": 209,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L209",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Retrofit gate onto all 18 theme-claiming elements; chrome five fixed in-branch; long-tail triage fix-or-file (no green cell unearned; claims shrink rather than skip)",
+   "line": 222,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L222",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Pre-registered long-tail fixes: button ghost fg on light Canvas, graduated-feedback CanvasText-on-fixed-hex, reaction-bar warning-color Canvas-on-Canvas, GrayText active affordances, navigator CustomTheme story phantom cssprops",
+   "line": 233,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L233",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "chrome-preferences.feature: +'Chrome follows the theme toggle' (pins C1) + 'Dark-mode chrome is readable' (pins C2/C3/C4), @wip @browser-only",
+   "line": 264,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L264",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Gospel amendment: elohim-elements CLAUDE.md three gates -> four + store-contract line html-authority; lamad CLAUDE.md bundle rails += base.scss (cite-sealed edits)",
+   "line": 274,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L274",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Backlog updates: bundle-styling-token-contract.md on-accent item resolved-with-evidence (white fails on #6366f1); file text-muted dark failure, capabilityContract write-back, SSR early-theme script",
+   "line": 282,
+   "state": "OPEN",
+   "id": "specs__2026-06-05-theme-authority-contrast-gate-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-05-theme-authority-contrast-gate-design.md#L282",
+   "class": "protocol-canonical"
+  }
+ ]
+}

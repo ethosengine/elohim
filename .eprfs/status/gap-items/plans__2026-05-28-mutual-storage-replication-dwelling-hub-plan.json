@@ -1,0 +1,547 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md",
+ "slug": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan",
+ "method": "checkbox-tasks",
+ "count": 77,
+ "items": [
+  {
+   "text": "Step 1: Add DNA constants",
+   "line": 168,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L168"
+  },
+  {
+   "text": "Step 2: Build the DNA WASM (sanity check)",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L195"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L204"
+  },
+  {
+   "text": "Step 1: Author replicates-dwelling.schema.json",
+   "line": 223,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L223"
+  },
+  {
+   "text": "Step 2: Author Rust ts-rs payload type",
+   "line": 276,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L276"
+  },
+  {
+   "text": "Step 3: Register in lib.rs",
+   "line": 332,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L332"
+  },
+  {
+   "text": "Step 4: Add to codegen-ts INTERFACE_FILES",
+   "line": 336,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L336"
+  },
+  {
+   "text": "Step 5: Add schema contract test",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L344"
+  },
+  {
+   "text": "Step 6: Run + codegen",
+   "line": 426,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L426"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 437,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L437"
+  },
+  {
+   "text": "Step 1: Author peer-capacity-view.schema.json",
+   "line": 466,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L466"
+  },
+  {
+   "text": "Step 2: Author hub-capacity-view.schema.json",
+   "line": 472,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L472"
+  },
+  {
+   "text": "Step 3: Author Rust ts-rs view modules",
+   "line": 476,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L476"
+  },
+  {
+   "text": "Step 4: Register modules",
+   "line": 485,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L485"
+  },
+  {
+   "text": "Step 5: Add to codegen-ts INTERFACE_FILES",
+   "line": 489,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L489"
+  },
+  {
+   "text": "Step 6: Schema contract tests + source-of-truth declaration",
+   "line": 496,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L496"
+  },
+  {
+   "text": "Step 7: Run + codegen + commit",
+   "line": 531,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L531"
+  },
+  {
+   "text": "Step 1: Extend distribution-summary.schema.json",
+   "line": 568,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L568"
+  },
+  {
+   "text": "Step 2: Extend distribution-details.schema.json",
+   "line": 584,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L584"
+  },
+  {
+   "text": "Step 3: Extend replica-peer.schema.json",
+   "line": 621,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L621"
+  },
+  {
+   "text": "Step 4: Extend household-resilience-view.schema.json",
+   "line": 643,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L643"
+  },
+  {
+   "text": "Step 5: Update Rust ts-rs view types",
+   "line": 663,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L663"
+  },
+  {
+   "text": "Step 6: Schema contract tests",
+   "line": 677,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L677"
+  },
+  {
+   "text": "Step 1: Extend app-manifest schema with constitutionalRatios block",
+   "line": 745,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L745"
+  },
+  {
+   "text": "Step 2: Declare constitutionalRatios in elohim manifest",
+   "line": 767,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L767"
+  },
+  {
+   "text": "Step 3: Declare reciprocity-imbalance signal_kind",
+   "line": 782,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L782"
+  },
+  {
+   "text": "Step 4: Validate",
+   "line": 797,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L797"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 806,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L806"
+  },
+  {
+   "text": "Step 1: Author the registry",
+   "line": 823,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L823"
+  },
+  {
+   "text": "Step 2: Register module",
+   "line": 975,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L975"
+  },
+  {
+   "text": "Step 3: Run + commit",
+   "line": 979,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L979"
+  },
+  {
+   "text": "Step 1: Extend ViolationKind enum",
+   "line": 998,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L998"
+  },
+  {
+   "text": "Step 2: Extend schema enum",
+   "line": 1018,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1018"
+  },
+  {
+   "text": "Step 3: Validate + codegen + commit",
+   "line": 1022,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1022"
+  },
+  {
+   "text": "Step 1: Author the service",
+   "line": 1050,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1050"
+  },
+  {
+   "text": "Step 1: Add new action branch",
+   "line": 1361,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1361"
+  },
+  {
+   "text": "Step 2: Implement validate_replicates_dwelling",
+   "line": 1369,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1369"
+  },
+  {
+   "text": "Step 3: Add tests to the existing tests module",
+   "line": 1436,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1436"
+  },
+  {
+   "text": "Step 4: Build + test + commit",
+   "line": 1526,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1526"
+  },
+  {
+   "text": "Step 1: Locate validate_commitment_entry",
+   "line": 1549,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1549"
+  },
+  {
+   "text": "Step 2: Extend the validator",
+   "line": 1555,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1555"
+  },
+  {
+   "text": "Step 3: Add tests to the existing integrity tests module",
+   "line": 1593,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1593"
+  },
+  {
+   "text": "Step 1: Author the migration up.sql",
+   "line": 1670,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1670"
+  },
+  {
+   "text": "Step 2: Author down.sql",
+   "line": 1697,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1697"
+  },
+  {
+   "text": "Step 3: Update diesel_schema.rs",
+   "line": 1706,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1706"
+  },
+  {
+   "text": "Step 4: Add diesel model",
+   "line": 1728,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1728"
+  },
+  {
+   "text": "Step 5: Author CRUD helper",
+   "line": 1764,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1764"
+  },
+  {
+   "text": "Step 6: Register module",
+   "line": 1812,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1812"
+  },
+  {
+   "text": "Step 7: Compile + commit",
+   "line": 1816,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L1816"
+  },
+  {
+   "text": "Step 2: Register module + integration test stub",
+   "line": 2228,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2228"
+  },
+  {
+   "text": "Step 2: Add HubCapacityAggregate to elohim-views/src/hub_capacity.rs",
+   "line": 2378,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2378"
+  },
+  {
+   "text": "Step 3: Register module + integration test stub",
+   "line": 2382,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2382"
+  },
+  {
+   "text": "Step 4: Run + commit",
+   "line": 2409,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2409"
+  },
+  {
+   "text": "Step 1: Extend distribution_view computation",
+   "line": 2431,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2431"
+  },
+  {
+   "text": "Step 2: Extend household_resilience",
+   "line": 2459,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2459"
+  },
+  {
+   "text": "Step 3: Author integration test",
+   "line": 2480,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2480"
+  },
+  {
+   "text": "Step 2: Register module + run + commit",
+   "line": 2656,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2656"
+  },
+  {
+   "text": "Step 1: Author api/peer_capacity.rs",
+   "line": 2680,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2680"
+  },
+  {
+   "text": "Step 2: Author api/hub_capacity.rs",
+   "line": 2723,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#59",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2723"
+  },
+  {
+   "text": "Step 3: Author api/diagnostics_mutuality.rs",
+   "line": 2767,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#60",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2767"
+  },
+  {
+   "text": "Step 4: Wire dispatch in api/mod.rs",
+   "line": 2859,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#61",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2859"
+  },
+  {
+   "text": "Step 5: Compile + commit",
+   "line": 2888,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#62",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2888"
+  },
+  {
+   "text": "Step 1: Author the sweettest",
+   "line": 2913,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#63",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L2913"
+  },
+  {
+   "text": "Step 2: Run + commit",
+   "line": 3016,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#64",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3016"
+  },
+  {
+   "text": "Step 1: Author household-resiliency-handshake.feature",
+   "line": 3037,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#65",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3037"
+  },
+  {
+   "text": "Step 2: Author constitutional-ratio-enforcement.feature",
+   "line": 3065,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#66",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3065"
+  },
+  {
+   "text": "Step 3: Author disaster-burst-resilience.feature (forward-looking, @wip)",
+   "line": 3097,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#67",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3097"
+  },
+  {
+   "text": "Step 4: Validate Gherkin + commit",
+   "line": 3119,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#68",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3119"
+  },
+  {
+   "text": "Step 1: Author Sprint 3 implementation notes",
+   "line": 3143,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#69",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3143"
+  },
+  {
+   "text": "pnpm run hc:start:seed brings up local stack with 2+ simulated dwelling-hubs",
+   "line": 3192,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#70",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3192"
+  },
+  {
+   "text": "curl http://localhost:8090/api/v1/peer/<peer_cid>/capacity shows compliantWithDonut on a fresh peer",
+   "line": 3193,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#71",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3193"
+  },
+  {
+   "text": "Author commitment via CLI; PeerCapacityView reflects; mutuality_audit_log shows Pending",
+   "line": 3194,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#72",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3194"
+  },
+  {
+   "text": "Advance clock past grace_period; reciprocity-imbalance signal in stream",
+   "line": 3195,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#73",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3195"
+  },
+  {
+   "text": "Author ratio-breaching commitment; 400 with ConstitutionalRatioBreach",
+   "line": 3196,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#74",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3196"
+  },
+  {
+   "text": "Step 2: Update parent roadmap",
+   "line": 3199,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#75",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3199"
+  },
+  {
+   "text": "Step 3: Create pattern memory",
+   "line": 3209,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#76",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3209"
+  },
+  {
+   "text": "Step 4: Add MEMORY.md entry",
+   "line": 3251,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-mutual-storage-replication-dwelling-hub-plan#77",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-mutual-storage-replication-dwelling-hub-plan.md#L3251"
+  }
+ ]
+}

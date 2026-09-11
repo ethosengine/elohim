@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md",
+ "slug": "specs__2026-05-10-converge-skill-design",
+ "method": "requirement-bullets",
+ "count": 5,
+ "items": [
+  {
+   "text": "Phase 1 scan correctly identifies themes from a fresh memory-kit sweep",
+   "line": 204,
+   "state": "OPEN",
+   "id": "specs__2026-05-10-converge-skill-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md#L204"
+  },
+  {
+   "text": "Phase 2 produces actionable per-theme proposals with citations on every claim",
+   "line": 205,
+   "state": "OPEN",
+   "id": "specs__2026-05-10-converge-skill-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md#L205"
+  },
+  {
+   "text": "Phase 3 apply preserves plan structure; idempotent; reversible from git",
+   "line": 206,
+   "state": "OPEN",
+   "id": "specs__2026-05-10-converge-skill-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md#L206"
+  },
+  {
+   "text": "Running it on the current corpus produces at least one usable proposal for the iroh theme (the most-active current cluster)",
+   "line": 207,
+   "state": "OPEN",
+   "id": "specs__2026-05-10-converge-skill-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md#L207"
+  },
+  {
+   "text": "Operator can read a per-theme proposal in <5 minutes and decide which edits to accept",
+   "line": 208,
+   "state": "OPEN",
+   "id": "specs__2026-05-10-converge-skill-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md#L208"
+  }
+ ]
+}

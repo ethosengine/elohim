@@ -1,0 +1,330 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md",
+ "slug": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy",
+ "method": "checkbox-tasks",
+ "count": 46,
+ "items": [
+  {
+   "text": "Step 1: Write the failing zome unit test",
+   "line": 130,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L130"
+  },
+  {
+   "text": "Step 2: Implement CreateCommitmentInput + create_commitment + validate_commitment_payload",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L174"
+  },
+  {
+   "text": "Step 3: Run zome tests; expect PASS",
+   "line": 264,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L264"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 270,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L270"
+  },
+  {
+   "text": "Step 1: Inspect existing entry types",
+   "line": 287,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L287"
+  },
+  {
+   "text": "Step 2: If Commitment entry type exists, confirm it accepts action + payload_json + signed_at fields",
+   "line": 293,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L293"
+  },
+  {
+   "text": "Step 3: Validate at integrity layer (defense in depth)",
+   "line": 314,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L314"
+  },
+  {
+   "text": "Step 4: Build the DNA WASM",
+   "line": 332,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L332"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 340,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L340"
+  },
+  {
+   "text": "Step 1: Write failing test",
+   "line": 356,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L356"
+  },
+  {
+   "text": "Step 2: Implement validator",
+   "line": 389,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L389"
+  },
+  {
+   "text": "Step 3: Author the schema (deferred \u2014 Sprint 1 may use existing acknowledges-reach-change.schema.json)",
+   "line": 413,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L413"
+  },
+  {
+   "text": "Step 4: Test + commit",
+   "line": 417,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L417"
+  },
+  {
+   "text": "Step 3: Wire into existing EconomicEvent creation flow",
+   "line": 528,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L528"
+  },
+  {
+   "text": "Step 4: Run + commit",
+   "line": 545,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L545"
+  },
+  {
+   "text": "Step 1: Find existing EconomicEvent integrity validator",
+   "line": 562,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L562"
+  },
+  {
+   "text": "Step 2: Add action-discriminator dispatch in integrity validator",
+   "line": 568,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L568"
+  },
+  {
+   "text": "Step 3: Build WASM + commit",
+   "line": 587,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L587"
+  },
+  {
+   "text": "Step 1: Write failing integration test",
+   "line": 607,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L607"
+  },
+  {
+   "text": "Step 2: Implement validate_republish_epr",
+   "line": 696,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L696"
+  },
+  {
+   "text": "Step 3: Run tests + commit",
+   "line": 769,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L769"
+  },
+  {
+   "text": "Step 1: Locate put_epr handler entry point + extension point",
+   "line": 786,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L786"
+  },
+  {
+   "text": "Step 2: Extend EprPublishInput view to include an optional event field",
+   "line": 792,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L792"
+  },
+  {
+   "text": "Step 3: Add validation call in put_epr",
+   "line": 816,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L816"
+  },
+  {
+   "text": "Step 4: Smoke test + commit",
+   "line": 849,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L849"
+  },
+  {
+   "text": "Step 1: Author the script",
+   "line": 866,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L866"
+  },
+  {
+   "text": "Step 2: Test in dry-run mode",
+   "line": 917,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L917"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 925,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L925"
+  },
+  {
+   "text": "Step 2: Commit",
+   "line": 1005,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1005"
+  },
+  {
+   "text": "Step 2: Test against local dev stack",
+   "line": 1112,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1112"
+  },
+  {
+   "text": "Step 1: Find current stageSpaBlob invocation in Jenkinsfile",
+   "line": 1142,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1142"
+  },
+  {
+   "text": "Step 2: Replace invocation",
+   "line": 1148,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1148"
+  },
+  {
+   "text": "Step 1: Confirm no other PATCH callers",
+   "line": 1190,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1190"
+  },
+  {
+   "text": "Step 2: Delete the old script",
+   "line": 1198,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1198"
+  },
+  {
+   "text": "Step 1: Find existing handle_event match",
+   "line": 1219,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1219"
+  },
+  {
+   "text": "Step 2: Add the new arm",
+   "line": 1225,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1225"
+  },
+  {
+   "text": "Step 1: Author with unit tests",
+   "line": 1273,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1273"
+  },
+  {
+   "text": "Step 2: Run + commit",
+   "line": 1322,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1322"
+  },
+  {
+   "text": "Step 1: Author the sweettest",
+   "line": 1339,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1339"
+  },
+  {
+   "text": "Step 1: Author substrate-correct-deploy.feature",
+   "line": 1432,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1432"
+  },
+  {
+   "text": "Step 2: Author bounds-violation-rejection.feature",
+   "line": 1460,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1460"
+  },
+  {
+   "text": "Step 3: Author reach-escalation-soft-warn.feature",
+   "line": 1489,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1489"
+  },
+  {
+   "text": "Step 1: Author Sprint 1 implementation notes",
+   "line": 1531,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1531"
+  },
+  {
+   "text": "Step 2: Update parent roadmap",
+   "line": 1535,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1535"
+  },
+  {
+   "text": "Step 3: Update REA compute-commitment primitive memory",
+   "line": 1539,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1539"
+  },
+  {
+   "text": "Step 4: Create pattern memory",
+   "line": 1543,
+   "state": "OPEN",
+   "id": "plans__2026-05-28-sprint1-zd-substrate-correct-deploy#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-sprint1-zd-substrate-correct-deploy.md#L1543"
+  }
+ ]
+}

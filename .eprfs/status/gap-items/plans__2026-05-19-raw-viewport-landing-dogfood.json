@@ -1,0 +1,512 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md",
+ "slug": "plans__2026-05-19-raw-viewport-landing-dogfood",
+ "method": "checkbox-tasks",
+ "count": 72,
+ "items": [
+  {
+   "text": "Step 1: Create isolated worktree for this work",
+   "line": 59,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L59"
+  },
+  {
+   "text": "Step 2: Confirm current state of Focus Mode",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L69"
+  },
+  {
+   "text": "Step 3: Confirm REA commitments write API is shipping",
+   "line": 81,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L81"
+  },
+  {
+   "text": "Step 4: Confirm the html5-app render pattern works for an existing ContentNode",
+   "line": 90,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L90"
+  },
+  {
+   "text": "Step 1: Write the spec file",
+   "line": 106,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L106"
+  },
+  {
+   "text": "Step 1: Write the component",
+   "line": 196,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L196"
+  },
+  {
+   "text": "Step 2: Write the template",
+   "line": 253,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L253"
+  },
+  {
+   "text": "Step 3: Write the styles",
+   "line": 298,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L298"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 386,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L386"
+  },
+  {
+   "text": "Step 1: Locate the routes file",
+   "line": 756,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L756"
+  },
+  {
+   "text": "Step 2: Read the existing routes",
+   "line": 765,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L765"
+  },
+  {
+   "text": "Step 3: Add the new route",
+   "line": 769,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L769"
+  },
+  {
+   "text": "Step 4: Build to verify the route compiles",
+   "line": 783,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L783"
+  },
+  {
+   "text": "Step 1: Read the current state",
+   "line": 812,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L812"
+  },
+  {
+   "text": "Step 2: Remove isFocusedView from the TS file",
+   "line": 816,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L816"
+  },
+  {
+   "text": "Step 3: Remove isFocusedView from the template",
+   "line": 823,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L823"
+  },
+  {
+   "text": "Step 4: Update the spec",
+   "line": 830,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L830"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 846,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L846"
+  },
+  {
+   "text": "Step 1: Remove focused-view fields from the TS file",
+   "line": 871,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L871"
+  },
+  {
+   "text": "Step 2: Remove focused-view markup from the template",
+   "line": 892,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L892"
+  },
+  {
+   "text": "Step 3: Remove focused-view styles from the CSS",
+   "line": 915,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L915"
+  },
+  {
+   "text": "Step 5: Delete the focused-view-toggle component",
+   "line": 938,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L938"
+  },
+  {
+   "text": "Step 6: Verify nothing else references the deleted component",
+   "line": 945,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L945"
+  },
+  {
+   "text": "Step 9: Commit",
+   "line": 974,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L974"
+  },
+  {
+   "text": "Step 1: Add the import",
+   "line": 998,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L998"
+  },
+  {
+   "text": "Step 2: Add the element to the template",
+   "line": 1008,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1008"
+  },
+  {
+   "text": "Step 3: Build to verify",
+   "line": 1020,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1020"
+  },
+  {
+   "text": "Step 4: Smoke-test the dev server",
+   "line": 1030,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1030"
+  },
+  {
+   "text": "Step 1: Compute the bundle hash placeholder",
+   "line": 1061,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1061"
+  },
+  {
+   "text": "Step 2: Write the seed file",
+   "line": 1065,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1065"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 1119,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1119"
+  },
+  {
+   "text": "Step 1: Locate the existing blob-upload pattern",
+   "line": 1139,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1139"
+  },
+  {
+   "text": "Step 2: Write the seed script",
+   "line": 1148,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1148"
+  },
+  {
+   "text": "Step 3: Add JSZip if not already installed",
+   "line": 1268,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1268"
+  },
+  {
+   "text": "Step 4: Build the elohim-app browser bundle",
+   "line": 1278,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1278"
+  },
+  {
+   "text": "Step 5: Start the local storage stack",
+   "line": 1288,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1288"
+  },
+  {
+   "text": "Step 7: Verify the bundle serves",
+   "line": 1306,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1306"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 1315,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1315"
+  },
+  {
+   "text": "Step 1: Locate the seeder content list",
+   "line": 1337,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1337"
+  },
+  {
+   "text": "Step 2: Add elohim-host-landing to that surface",
+   "line": 1346,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1346"
+  },
+  {
+   "text": "Step 4: Verify the ContentNode is queryable",
+   "line": 1364,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1364"
+  },
+  {
+   "text": "Step 5: Verify the bundle serves via the app path",
+   "line": 1373,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1373"
+  },
+  {
+   "text": "Step 6: Commit (only if any file changed)",
+   "line": 1389,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1389"
+  },
+  {
+   "text": "Step 1: Write the script",
+   "line": 1409,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1409"
+  },
+  {
+   "text": "Step 3: Verify the commitment is queryable",
+   "line": 1516,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1516"
+  },
+  {
+   "text": "Step 4: Verify idempotency",
+   "line": 1526,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1526"
+  },
+  {
+   "text": "Step 1: Locate the doorway env source",
+   "line": 1557,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1557"
+  },
+  {
+   "text": "Step 2: Add the env var",
+   "line": 1566,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1566"
+  },
+  {
+   "text": "Step 3: Verify the value can be read by the doorway",
+   "line": 1580,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#49",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1580"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 1584,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#50",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1584"
+  },
+  {
+   "text": "Step 1: Read the current ingress",
+   "line": 1607,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#51",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1607"
+  },
+  {
+   "text": "Step 2: Replace the catch-all rule",
+   "line": 1611,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#52",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1611"
+  },
+  {
+   "text": "Step 1: Write the feature",
+   "line": 1694,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#53",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1694"
+  },
+  {
+   "text": "Step 2: Run cucumber to confirm the new feature is discovered with stubs",
+   "line": 1739,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#54",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1739"
+  },
+  {
+   "text": "Step 1: Locate the existing step-definition conventions",
+   "line": 1770,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#55",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1770"
+  },
+  {
+   "text": "Step 2: Write the step definitions",
+   "line": 1779,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#56",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1779"
+  },
+  {
+   "text": "Step 3: Typecheck",
+   "line": 1889,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#57",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1889"
+  },
+  {
+   "text": "Step 1: Deploy the branch to alpha",
+   "line": 1930,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#58",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1930"
+  },
+  {
+   "text": "Vitest: protocol-signal-badge + raw-content-viewport specs pass",
+   "line": 1948,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#59",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1948"
+  },
+  {
+   "text": "Vitest: content-viewer + path-navigator specs pass after Focus Mode removal",
+   "line": 1949,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#60",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1949"
+  },
+  {
+   "text": "elohim-app build succeeds",
+   "line": 1950,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#61",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1950"
+  },
+  {
+   "text": "Seed bundle script runs locally; produces matching local/remote sha256",
+   "line": 1951,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#62",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1951"
+  },
+  {
+   "text": "/apps/elohim-host-landing/index.html returns 200 from doorway",
+   "line": 1952,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#63",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1952"
+  },
+  {
+   "text": "/api/v1/commitments?provider=matthew returns the scoped commitment",
+   "line": 1953,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#64",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1953"
+  },
+  {
+   "text": "a2o scenarios pass: @landing-dogfood and not @browser-only",
+   "line": 1954,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#65",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1954"
+  },
+  {
+   "text": "On alpha after deploy: curl -L https://alpha.elohim.host/ lands on the html5-app bundle",
+   "line": 1955,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#66",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1955"
+  },
+  {
+   "text": "Browser visit to https://alpha.elohim.host/ shows the protocol-signal badge bottom-right; clicking expands the panel",
+   "line": 1956,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#67",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1956"
+  },
+  {
+   "text": "Step 2: Wait for CI to go green",
+   "line": 1971,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#68",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1971"
+  },
+  {
+   "text": "Step 4: Visit the live URL",
+   "line": 1990,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#69",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1990"
+  },
+  {
+   "text": "Step 5: Curl-test the redirect chain",
+   "line": 1997,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#70",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L1997"
+  },
+  {
+   "text": "Step 6: Capture the operator screenshot (optional but recommended)",
+   "line": 2006,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#71",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L2006"
+  },
+  {
+   "text": "Step 7: Merge",
+   "line": 2010,
+   "state": "OPEN",
+   "id": "plans__2026-05-19-raw-viewport-landing-dogfood#72",
+   "cites": "genesis/docs/superpowers/plans/2026-05-19-raw-viewport-landing-dogfood.md#L2010"
+  }
+ ]
+}

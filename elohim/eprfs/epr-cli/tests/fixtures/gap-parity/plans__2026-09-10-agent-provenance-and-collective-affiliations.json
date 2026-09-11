@@ -1,0 +1,42 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-10-agent-provenance-and-collective-affiliations.md",
+ "slug": "plans__2026-09-10-agent-provenance-and-collective-affiliations",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 4,
+ "items": [
+  {
+   "text": "A persona claim can carry an ed25519 public key and a detached signature over its canonical claim bytes; epr actor current --json reports the key, whether the signature verifies, and the claim's did:key; an unsigned claim remains a valid honor-system claim and nothing at this floor blocks on a signature",
+   "line": 119,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-agent-provenance-and-collective-affiliations#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-agent-provenance-and-collective-affiliations.md#L119",
+   "class": "provisional"
+  },
+  {
+   "text": "A claim references an identity chain of layer heads; hard, given and ephemeral are minted from what the session can pin, tuning and contextual are accepted when supplied and otherwise absent; the memory contribution's author is the identity head (chain head excluding the ephemeral layer) and its provenance is the ephemeral head; epr actor current --json walks the chain and reports every layer's pin and proof state, never defaulting an absent layer; the model descriptor is normalized from a controlled vocabulary so two spellings of one model mint one hard head",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-agent-provenance-and-collective-affiliations#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-agent-provenance-and-collective-affiliations.md#L137",
+   "class": "provisional"
+  },
+  {
+   "text": ".epr-meta/collective.json declares no steward; stewards derive from affiliation records shaped one to one as the Qahal Membership pre-image; a directory may declare a child collective whose parent pins the enclosing one; a session's actor claim binds its collective of record; source rules speak locality, not reach; graduate requires an approving verdict from a Steward affiliate who is not the contribution's author",
+   "line": 170,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-agent-provenance-and-collective-affiliations#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-agent-provenance-and-collective-affiliations.md#L170",
+   "class": "provisional"
+  },
+  {
+   "text": "The crossing story is written and held: a signed local contribution graduates into a wider space with its CID unchanged and its holders changed, the elohim witness is recorded, and the DID document for the contributing identity head resolves with its steward as controller; the equilibrium habit carries one evidence delta and remains RED",
+   "line": 207,
+   "state": "OPEN",
+   "id": "plans__2026-09-10-agent-provenance-and-collective-affiliations#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-10-agent-provenance-and-collective-affiliations.md#L207",
+   "class": "provisional"
+  }
+ ]
+}

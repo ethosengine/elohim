@@ -1,0 +1,50 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md",
+ "slug": "specs__2026-06-01-verification-result-index-design",
+ "method": "agent-decomposition",
+ "count": 6,
+ "items": [
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#1",
+   "text": "system-state-index.json keyed by system/gap-id -> {state: done|regression|claimed|blocked, evidence, checked_at_commit}",
+   "line": 28,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L28"
+  },
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#2",
+   "text": "ci-investigator (and CI) WRITE verification results into the index \u2014 the grader never the claimant",
+   "line": 29,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L29"
+  },
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#3",
+   "text": "placement-audit.py READS the index: CLAIMED gap with passing result -> DONE; with failing result -> REGRESSION",
+   "line": 30,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L30"
+  },
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#4",
+   "text": "A regression result must cascade-warm the cited docs (the feedback graph) per PLACEMENT.md",
+   "line": 31,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L31"
+  },
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#5",
+   "text": "Index is append/update-only with provenance; never hand-edited to assert done (a claim cannot grade itself)",
+   "line": 32,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L32"
+  },
+  {
+   "id": "specs__2026-06-01-verification-result-index-design#6",
+   "text": "Non-goals: not a new state vocabulary (reuse PLACEMENT four states); not a CI system (consumes CI/ci-investigator output)",
+   "line": 34,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-verification-result-index-design.md#L34"
+  }
+ ]
+}

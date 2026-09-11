@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_household_space_partition_blocks_and_round_deadline",
+  "claim": "0.7: one rejected op blocks author's cell forever → storageArc null on every peer, no authorities; bites when ONE space reds.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_household_space_partition_blocks_and_round_deadline.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_household_space_partition_blocks_and_round_deadline.md",
+        "cid": "bafkreihlzufm37b2sbcmdgnbqylq5cnd2wafzmun35nr6udx3fhmf2n7qm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Household space partition blocks",
+    "file": "project_household_space_partition_blocks_and_round_deadline.md",
+    "scopePath": ".claude/memory/project_household_space_partition_blocks_and_round_deadline.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

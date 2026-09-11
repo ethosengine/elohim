@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_full_arc_authority_disables_network_get",
+  "claim": "On a full-arc fleet every zome get/get_links is local-only — a link miss means gossip failed, not that the data is absent.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_full_arc_authority_disables_network_get.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_full_arc_authority_disables_network_get.md",
+        "cid": "bafkreibsphqmbz4t5oa6ay4cx27jaav6xss4hfgciic2xrmvtvobg7fnsq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Full-arc authority disables every network get",
+    "file": "project_full_arc_authority_disables_network_get.md",
+    "scopePath": ".claude/memory/project_full_arc_authority_disables_network_get.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

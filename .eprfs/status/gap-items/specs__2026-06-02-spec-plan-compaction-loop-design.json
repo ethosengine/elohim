@@ -1,0 +1,90 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md",
+ "slug": "specs__2026-06-02-spec-plan-compaction-loop-design",
+ "method": "requirement-bullets",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "count": 10,
+ "items": [
+  {
+   "text": "genesis/docs/PLACEMENT.md # PROPOSED \u2014 see \u00a710.4 for the exact six edits; not yet applied",
+   "line": 27,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L27",
+   "class": "process-meta"
+  },
+  {
+   "text": "spec: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md",
+   "line": 29,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L29",
+   "class": "process-meta"
+  },
+  {
+   "text": "placement-enforcement hook (.claude/hooks/, NOT YET BUILT)",
+   "line": 36,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L36",
+   "class": "process-meta"
+  },
+  {
+   "text": "delivery-status-poll (delivery-status-distribution.py SessionStart wiring, NOT YET BUILT)",
+   "line": 37,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L37",
+   "class": "process-meta"
+  },
+  {
+   "text": "pickup-semantic-surfacing hook (\u00a74b \u2014 .claude/hooks/pickup-semantic-surfacing.py + settings.json UserPromptSubmit/PreToolUse wiring, BUILT 2026-06-04; gate paths verified by synthetic stdin tests, live-session efficacy pending next session start)",
+   "line": 38,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L38",
+   "class": "process-meta"
+  },
+  {
+   "text": "Primary \u2014 UserPromptSubmit (the only surface that sees the raw prompt before the model frames an",
+   "line": 381,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L381",
+   "class": "process-meta"
+  },
+  {
+   "text": "Fallback net \u2014 PreToolUse on Grep|Glob|Agent, firing only when (a) no injection happened yet,",
+   "line": 389,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L389",
+   "class": "process-meta"
+  },
+  {
+   "text": "dead / superseded / abandoned \u2192 curate to history NOW. No CI needed \u2014 there is no working claim to",
+   "line": 559,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L559",
+   "class": "process-meta"
+  },
+  {
+   "text": "\"landed & working\" \u2192 graded green by ci-investigator (fed by the not-yet-built delivery-status-poll,",
+   "line": 561,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L561",
+   "class": "process-meta"
+  },
+  {
+   "text": "env-blocked \u2192 BLOCKED-BY-ENV hold: the chunk stays queued (not curated, not merged) with the blocker",
+   "line": 566,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-spec-plan-compaction-loop-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-spec-plan-compaction-loop-design.md#L566",
+   "class": "process-meta"
+  }
+ ]
+}

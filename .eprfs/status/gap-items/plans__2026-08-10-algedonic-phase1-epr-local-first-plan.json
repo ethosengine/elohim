@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md",
+ "slug": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "Step 1 \u2014 survey (read-only): read kind.rs, validation.rs, verdict.rs, error.rs for the crate's error/validation idiom; read both algedonic schema files (wire contracts only \u2014 source of truth: DHT FeedbackSignal entry); note the crate's workspace root and serde conventions",
+   "line": 47,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L47",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2 \u2014 failing tests first: (a) evidence-mandatory: constructing/validating a signal without stock/limit/bound_ref refuses; (b) Approach requires threshold_pct, Breach forbids requiring it; (c) NO valence: assert the type carries no agree/disagree field (compile-time \u2014 the struct simply has none; the test asserts serialized JSON key-set equals the wire schema's properties \u2229 required semantics \u2014 source of truth: DHT FeedbackSignal entry, schema is contract only); (d) wire parity: serialize a valid sample of each kind, load the matching schema JSON from elohim/sdk/schemas/v1/feedback-signals/, assert every schema-required field is present and no unknown keys emitted; (e) open_signal_key = (declarer, target, kind) \u2014 two signals differing only in evidence collide (dedupe key equality); (f) hysteresis predicate: should_emit(prev: Option<&AlgedonicSignal>, new) false inside the hysteresis band, true crossing it (band = threshold_pct for approach; any-open-signal suppression for same key)",
+   "line": 48,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L48",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3 \u2014 implement idiomatically: mirror the crate's existing error enum + validation style; severity: info|warn|critical; standing_impact fixed advisory (const fn / serialize-only constant \u2014 mirror how the wire schemas landed it); module rustdoc header states the loop (producer/stock/limit/consumer) in one paragraph and points to the canon (Task 2)",
+   "line": 49,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L49",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5 \u2014 commit (algedonic.rs + lib.rs only)",
+   "line": 51,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L51",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: write \u00a74b (\u226435 lines), every line carrying its anchor in parentheses; where the anchor is a Task 1 construct, name the function/test",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L63",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: cite-gen.py --refresh each citing doc AFTER confirming its claims still hold; cite-gen.py --verify both",
+   "line": 64,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L64",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Commit (spec + resealed citing docs)",
+   "line": 65,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L65",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1 \u2014 survey: read model.rs/fold.rs/walk.rs; find the existing limit/bound vocabulary (grep hits exist) and the event/observation shapes; decide the MINIMAL additive surface (prefer extending an existing enum/struct over new types; if a bound already exists, reuse it \u2014 the task may reduce to one event variant + one fold projection)",
+   "line": 79,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L79",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2 \u2014 failing tests: a commitment with a bound + stock events crossing it yields an approach/breach in the fold; the projection keys pain by the commitment CID; no bound \u2192 no pain (honest absence)",
+   "line": 80,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L80",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1 \u2014 failing test: synthesized hard-ceiling write (resolver-test payload shape, non-existent filename) with a binding carrying params: {concern: \"...\"} \u2192 the minted ledger entry (fixture ledger path, never the live one) carries stock/limit/bound_ref/concern; same write, no param \u2192 no concern key; fingerprint identical with and without the new fields",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L97",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2 \u2014 implement additively; Step 3 \u2014 run resolver + eval + cascade tests; Step 4 \u2014 commit",
+   "line": 98,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L98",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1 \u2014 failing test (fixture covers a concern-carrying architecture finding, a concernless entry, an absent ledger); Step 2 \u2014 implement; Step 3 \u2014 test + live smoke (python3 .claude/scripts/habits-status.py must render); Step 4 \u2014 commit",
+   "line": 110,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L110",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1 \u2014 write capture; Step 2 \u2014 slice-1 plan note + reseal; Step 3 \u2014 commit",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-08-10-algedonic-phase1-epr-local-first-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-10-algedonic-phase1-epr-local-first-plan.md#L122",
+   "class": "provisional"
+  }
+ ]
+}

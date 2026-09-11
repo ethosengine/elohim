@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "ethosengine-wedge-nfs-hardmount",
+  "claim": "ethosengine wedge root cause = hard NFS4 mounts to in-cluster ClusterIP (server pod on SAME node); bites when diagnosing node hangs or rebooting ethosengine",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_ethosengine_wedge_nfs_hardmount.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_ethosengine_wedge_nfs_hardmount.md",
+        "cid": "bafkreifdey7yvebns7gxqh43iibx4wxkaweg3qzwqfwumwhonitsgyvyie"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "ethosengine I/O wedge = NFS hard-mount deadlock",
+    "file": "project_ethosengine_wedge_nfs_hardmount.md",
+    "scopePath": ".claude/memory/project_ethosengine_wedge_nfs_hardmount.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

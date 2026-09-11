@@ -1,0 +1,146 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md",
+ "slug": "plans__2026-06-20-operational-weave-lens-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 17,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L69",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Register the module \u2014 modify folds/mod.rs",
+   "line": 136,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L136",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 154,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L154",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add the gauge to metrics.rs",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L177",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Write the failing adapter test",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L195",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Register the module \u2014 modify services/mod.rs",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L238",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing fold test (append to operational_weave.rs tests)",
+   "line": 277,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L277",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement rs_coverage (append to operational_weave.rs)",
+   "line": 289,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L289",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Add WeaveView to elohim-views/src/infrastructure.rs (mirror the #[derive(TS)] + export_to of the sibling views at :1433-1436; not-selected-field contract on every fold-optional field)",
+   "line": 302,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L302",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Add the gauge (metrics.rs, scaled \u2014 Prometheus IntGauge is integer)",
+   "line": 331,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L331",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing aggregate test (append to operational_weave.rs tests)",
+   "line": 363,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L363",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement the mirror row + folds",
+   "line": 386,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L386",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Loader + wire the dead handler. In operational_weave_facing.rs add load_custodian_relation(conn: &mut SqliteConnection) -> Vec<CustodianRow> (join custodian_metrics/system_metrics, map to the mirror row, key on agent_cid \u2014 the existing ComputeTriptych builder in household_resilience.rs is the reference join). In http.rs, route api/peer_capacity::handle (currently returns METHOD_NOT_ALLOWED at :19/:36 because it is unrouted) \u2014 add its match arm; confirm it now returns the capacity payload",
+   "line": 424,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L424",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing routing test FIRST (the shadow guard). In http.rs tests, assert is_service_path(\"/api/v1/weave\") is true and that the dispatch routes to the weave handler, not the SPA/EPR fallthrough (mirror the is_auth_owned_path unit test added in 37c822d1c)",
+   "line": 442,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L442",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run it \u2014 Expected FAIL (is_service_path returns false until the arm is added)",
+   "line": 451,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L451",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Add the is_service_path arm + the match arm + the handler in http.rs (the handler calls operational_weave_facing::build_weave_view(&mut conn)); add region_occupancy/tier_occupancy folds (bucket HolderRow by region/tier, count into the existing RegionalDistributionView/RiskTierDistribution). Define the weave-view.schema.json + add to INTERFACE_FILES and schema_contract.rs (the 6-step \"adding a new view\" recipe in root CLAUDE.md)",
+   "line": 453,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L453",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Run routing test (PASS) + fold tests + the schema contract + ts-rs codegen freshness; commit (feat(storage): full WeaveView + GET /api/v1/weave (Slice 4); commit the schema + generated TS together)",
+   "line": 455,
+   "state": "OPEN",
+   "id": "plans__2026-06-20-operational-weave-lens-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md#L455",
+   "class": "protocol-canonical"
+  }
+ ]
+}

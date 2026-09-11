@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md",
+ "slug": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design",
+ "method": "agent-decomposition",
+ "count": 13,
+ "items": [
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#1",
+   "text": "New hc_client_registry.rs: HcClientRegistry holds role-keyed Option<Arc<HcClient>> (infrastructure + imagodei), connects each role at startup, non-fatal on failure",
+   "line": 72,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L72"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#2",
+   "text": "Refactor main.rs heartbeat block to consume registry.infrastructure instead of constructing its own inline HcClient (no behavior change)",
+   "line": 108,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L108"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#3",
+   "text": "Forwarder helpers in account.rs: forward_self_revocation / forward_revocation_vote / forward_add_portal_host / forward_remove_portal_host \u2014 verify owner, deserialize InputView, From->zome input, call_zome, decode response",
+   "line": 110,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L110"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#4",
+   "text": "Mode gate verify_caller_owns_cell: compares hc.cell_id agent key against resolved agent_key; returns 503 BROWSER_WRITE_PATH_PENDING on mismatch",
+   "line": 150,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L150"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#5",
+   "text": "Two distinct 503 contracts replacing single PHASE_11_PENDING: BROWSER_WRITE_PATH_PENDING (owner mismatch) + IMAGODEI_BRIDGE_OFFLINE (hc connect failed); shared envelope, Angular switches on code",
+   "line": 176,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L176"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#6",
+   "text": "Route dispatch update: four account.rs arms call handle_* wrappers (resolve agent key, check Some(hc), forward) instead of zome_bridge_not_yet_wired",
+   "line": 189,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L189"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#7",
+   "text": "map_zome_err_to_http: string-match well-known zome error prefixes to 403/400/503/500 (PHASE-11-DEBT marker for typed-errors deferral)",
+   "line": 207,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L207"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#8",
+   "text": "Eventual-consistency: handlers respond on zome Ok immediately, do not wait on projection-signal echo into SQLite",
+   "line": 243,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L243"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#9",
+   "text": "Mocking strategy: trait CellOwner that HcClient implements; verify_caller_owns_cell takes &dyn CellOwner; hand-rolled stub in tests",
+   "line": 252,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L252"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#10",
+   "text": "Unit tests: remove two stub 503 tests; add owner-match-pass, owner-mismatch-503, and four map_zome_err_to_http cases",
+   "line": 253,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L253"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#11",
+   "text": "Acceptance: four /api/v1/account/* routes call imagodei coordinator via registered HcClient when cell-owner matches resolved agent key",
+   "line": 329,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L329"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#12",
+   "text": "Acceptance: remove five @phase11-pending tags across four feature files; corresponding scenarios pass on Jenkins (live verification surface)",
+   "line": 284,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L284"
+  },
+  {
+   "id": "specs__2026-04-26-storage-phase-11-zome-forwarding-bridge-design#13",
+   "text": "Out of scope (M6): defender path submit_specialist_revocation, browser-mode write forwarding, HA/reconnect pool, hashcash/rate-limiting, typed error contracts over conductor wire",
+   "line": 296,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-04-26-storage-phase-11-zome-forwarding-bridge-design.md#L296"
+  }
+ ]
+}

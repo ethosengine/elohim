@@ -1,0 +1,55 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md",
+ "slug": "plans__2026-06-04-url-routing-slice1-plan",
+ "method": "agent-decomposition",
+ "note": "Hand-authored 2026-06-04 per decompose.py agent-decomposition path (prose plan, no checkboxes). Tasks = the four workflow legs + the local render verification. Each drains the cited spec gap-item.",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 5,
+ "items": [
+  {
+   "text": "Leg A: spaFallback through schema -> EprProjectionView -> contract test -> ts-rs regen -> doorway derive_app_subpath ROUTE-gated entry_file (drains spec #12-1, #12-3 doorway half)",
+   "line": 39,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-04-url-routing-slice1-plan#A",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md#L39",
+   "class": "protocol-canonical",
+   "claim_note": "implemented + leg gate green \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Leg B: storage handle_app_request safety-net index.html fallback on ROUTE miss (both extraction and cache-hit paths) with X-SPA-Fallback header (drains spec #12-2, #12-3 storage half)",
+   "line": 52,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-04-url-routing-slice1-plan#B",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md#L52",
+   "class": "protocol-canonical",
+   "claim_note": "implemented + leg gate green \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Leg C: de-literalize ~20 '/lamad...' router sites in app/lamad to base-href-relative + pragmatic '/path' patch in epr-resolver.service.ts and eprToRoute with TODO(#12-6) (drains spec #12-6 partial)",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-04-url-routing-slice1-plan#C",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md#L58",
+   "class": "protocol-canonical",
+   "claim_note": "implemented + leg gate green \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Leg D: author a2o render-verified scenarios (cold path URL, deep step link, legacy doubled URL designed not-found, asset miss 404) + steps (drains spec #12-10 minus /epr scenario)",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-04-url-routing-slice1-plan#D",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md#L69",
+   "class": "protocol-canonical",
+   "claim_note": "implemented + leg gate green \u2014 2026-06-04 workflow wf_b34e80c5-cc6"
+  },
+  {
+   "text": "Done gate: all four leg gates green + local render verification (hc:start:seed + pnpm look /lamad/path/foundations-christian-technology) + commit proposal to operator",
+   "line": 96,
+   "state": "OPEN",
+   "id": "plans__2026-06-04-url-routing-slice1-plan#done",
+   "cites": "genesis/docs/superpowers/plans/2026-06-04-url-routing-slice1-plan.md#L96",
+   "class": "protocol-canonical"
+  }
+ ]
+}

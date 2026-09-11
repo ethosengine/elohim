@@ -1,0 +1,90 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md",
+ "slug": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 10,
+ "items": [
+  {
+   "text": "G1 \u2014 Gate CarryingCapacity's survival as a struct (\u00a75) \u2014 does it stay a struct",
+   "line": 206,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L206",
+   "class": "provisional"
+  },
+  {
+   "text": "G2 \u2014 Decide the commit disposition of the uncommitted tree (\u00a70). If the struct",
+   "line": 210,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L210",
+   "class": "provisional"
+  },
+  {
+   "text": "G3 \u2014 Converge compute_usage onto epr_rea::stock::stock_over_window, so",
+   "line": 215,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L215",
+   "class": "provisional"
+  },
+  {
+   "text": "G4 \u2014 Move the unit \u2192 kind classification off a string parser. YieldDenominator",
+   "line": 218,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L218",
+   "class": "provisional"
+  },
+  {
+   "text": "G5 \u2014 Land the aggregation rule as a declared field on a Measure family",
+   "line": 222,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L222",
+   "class": "provisional"
+  },
+  {
+   "text": "G6 \u2014 Land soft/hard limit semantics (measure-family row 5), so an ecological floor",
+   "line": 225,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L225",
+   "class": "provisional"
+  },
+  {
+   "text": "G7 \u2014 Wire or retire elohim/sdk/schemas/v1/objects/carrying-capacity.schema.json",
+   "line": 227,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L227",
+   "class": "provisional"
+  },
+  {
+   "text": "G8 \u2014 Reconcile the three thresholds to one declared object. spatial_dashboard.rs",
+   "line": 232,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L232",
+   "class": "provisional"
+  },
+  {
+   "text": "G9 \u2014 Replace the cumulative-sum stand-in for a level capacity with a real stock",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L236",
+   "class": "provisional"
+  },
+  {
+   "text": "G10 \u2014 Normalize the timestamp column so the window can be pushed back into SQL",
+   "line": 241,
+   "state": "OPEN",
+   "id": "plans__2026-08-12-holonic-capacity-measure-convergence-pivot#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-12-holonic-capacity-measure-convergence-pivot.md#L241",
+   "class": "provisional"
+  }
+ ]
+}

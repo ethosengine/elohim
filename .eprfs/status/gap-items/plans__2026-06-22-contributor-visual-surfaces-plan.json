@@ -1,0 +1,116 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md",
+ "slug": "plans__2026-06-22-contributor-visual-surfaces-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 13,
+ "items": [
+  {
+   "text": "Expose the content\u2192presences edge over HTTP: wire the dead DB reverse-query",
+   "line": 84,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L84",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "graphos contributor/credit card primitive (Library A default + Library B designed) \u2014 presence",
+   "line": 88,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L88",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Inject the presence fetch into ContentViewerComponent (injects no presence service today) +",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L91",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Label DERIVED_FROM / source_of in the EPR-relationships panel (defined RelationshipType",
+   "line": 93,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L93",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o scenario: \"see who inspired/contributed to this content.\"",
+   "line": 95,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L95",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Verify rendered (local stack or healthy alpha)",
+   "line": 96,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L96",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 1 \u2014 Lens fold + read route. ViewerLens::resolve + DisclosureTier::compute (local",
+   "line": 116,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L116",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2\u2032 \u2014 Service-layer sacred enforcement + consent gate (risk-closer, NO DNA; ships with Slice 1)",
+   "line": 121,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L121",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 4 \u2014 Page surface + pretty handle + claim-vs-administer (THE VISIBLE LANDING; pulled forward)",
+   "line": 127,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L127",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Leg-1 slice \u2014 Notarize the disclosure floor (in-arc DNA; upgrades underneath the visible surface)",
+   "line": 135,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L135",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 3 \u2014 Standing advisory demotion. Wire Standing::disclosure_demotion (demote-only, inert",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L140",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 5 \u2014 Domain composites + qahal projection. Manifest-declared profile surfaces",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L142",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Verify each slice rendered (pnpm look against a claimed presence \u2014 local stack or healthy alpha;",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-06-22-contributor-visual-surfaces-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-22-contributor-visual-surfaces-plan.md#L144",
+   "class": "protocol-canonical"
+  }
+ ]
+}

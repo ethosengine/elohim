@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "P2P inventory exchange ≠ byte replication",
+  "claim": "Inventory gossip is metadata-only (\"Received content inventory count=N\"); byte replication is separate — check per-peer blob counts before calling sync alive.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_inventory_exchange_not_byte_replication.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_inventory_exchange_not_byte_replication.md",
+        "cid": "bafkreib2exmrnjmmjjagxduogmhhjw3cswdpiqah7o52bxlg3eljlgvcpe"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "P2P inventory ≠ byte replication",
+    "file": "project_inventory_exchange_not_byte_replication.md",
+    "scopePath": ".claude/memory/project_inventory_exchange_not_byte_replication.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,0 +1,65 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md",
+ "slug": "specs__2026-06-02-scope-tree-reconciler-design",
+ "method": "checkbox-tasks",
+ "class": "process-meta",
+ "count": 7,
+ "items": [
+  {
+   "text": "cluster-state.yaml capability-rename + provided-by (\u00a72.2), and migrate the two artifacts saying requires_env:[shem] \u2192 [remote-compute] (iroh-recovery-e2e.md, PLACEMENT.md)",
+   "line": 116,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L116",
+   "class": "process-meta"
+  },
+  {
+   "text": "scope-reconcile.py \u2014 read cluster-state, git mv live\u2194held by requires_env subset check, idempotent, lossless round-trip, move summary (\u00a73.2)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L117",
+   "class": "process-meta"
+  },
+  {
+   "text": "held/ tree convention OUTSIDE the runner glob + STOP CLAUDE.md template + glob-exclusion verification (\u00a73.1)",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L118",
+   "class": "process-meta"
+  },
+  {
+   "text": "placement-audit --held listing so held work is focused-out, never forgotten (\u00a73.3)",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L119",
+   "class": "process-meta"
+  },
+  {
+   "text": "Per-file requires_env frontmatter contract + straddle-split lint \u2014 the file is the granularity unit (\u00a73.1)",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L120",
+   "class": "process-meta"
+  },
+  {
+   "text": "Dependency: build [Semantic-Computable Links](2026-06-02-semantic-computable-links-design.md) (content-addressed cites) first \u2014 moves are unsafe until links survive moves; its gap-items own the doc-id / envelope / cite_resolves work (\u00a74.2)",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L121",
+   "class": "process-meta"
+  },
+  {
+   "text": "PLACEMENT.md amendment \u2014 held/ doctrine (move vs compute label) + capability requires_env vocabulary (\u00a72.2/\u00a73)",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-06-02-scope-tree-reconciler-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-02-scope-tree-reconciler-design.md#L122",
+   "class": "process-meta"
+  }
+ ]
+}

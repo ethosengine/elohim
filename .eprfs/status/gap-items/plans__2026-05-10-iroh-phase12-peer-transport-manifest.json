@@ -1,0 +1,344 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md",
+ "slug": "plans__2026-05-10-iroh-phase12-peer-transport-manifest",
+ "method": "checkbox-tasks",
+ "count": 48,
+ "items": [
+  {
+   "text": "Step 1: Write up.sql. Create the new table, copy existing rows from cross_stack_peer_map with sensible defaults, drop the old table",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L224"
+  },
+  {
+   "text": "Step 2: Write down.sql. Inverse: recreate the bridge table, copy back the two-id columns, drop the new table",
+   "line": 309,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L309"
+  },
+  {
+   "text": "Step 3: Regenerate diesel_schema.rs. Run from /projects/elohim/elohim/elohim-storage/:",
+   "line": 344,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L344"
+  },
+  {
+   "text": "Step 4: Build to verify",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L350"
+  },
+  {
+   "text": "Step 5: Commit migration + schema regen",
+   "line": 356,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L356"
+  },
+  {
+   "text": "Step 1: Write the schema. Follow elohim/sdk/schemas/v1/views/CONVENTIONS.md exactly: kebab-case file name matching $id suffix, source-of-truth declaration in description, additionalProperties: false, required arrays, nullable type pattern",
+   "line": 384,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L384"
+  },
+  {
+   "text": "Step 2: Validate the schema parses. From repo root:",
+   "line": 476,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L476"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 482,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L482"
+  },
+  {
+   "text": "Step 1: Add view structs to views.rs. Append at end of file:",
+   "line": 505,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L505"
+  },
+  {
+   "text": "Step 2: Re-export from lib.rs. Add to the existing pub use views::{...} block in /projects/elohim/elohim/elohim-storage/src/lib.rs the names: Libp2pTransportProfileView, IrohTransportProfileView, PeerTransportManifestView. Locate the existing pub use views:: lines via grep -n \"pub use views::\" src/lib.rs and add to the matching block",
+   "line": 545,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L545"
+  },
+  {
+   "text": "Step 3: Run ts-rs export",
+   "line": 547,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L547"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 553,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L553"
+  },
+  {
+   "text": "Step 1: Add the contract test. Append at end of file (after the existing peer_list_view_matches_schema and before any closing module brace if present):",
+   "line": 580,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L580"
+  },
+  {
+   "text": "Step 1: Add to INTERFACE_FILES. Open the file, locate the INTERFACE_FILES array (starts at line 35). Add a new entry (insertion point: after view-slice.ts near the end of the array, line ~95):",
+   "line": 682,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L682"
+  },
+  {
+   "text": "Step 2: Run codegen. From repo root:",
+   "line": 687,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L687"
+  },
+  {
+   "text": "Step 1: Write failing unit tests for the new API first. Inside the rewritten peer_map.rs, append a #[cfg(test)] mod tests module with these tests (write them BEFORE the implementation so the cycle is red \u2192 green):",
+   "line": 722,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L722"
+  },
+  {
+   "text": "Step 2: Implement the new module. Replace the file entirely with the new module body:",
+   "line": 738,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L738"
+  },
+  {
+   "text": "Step 3: Build and run unit tests",
+   "line": 1173,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1173"
+  },
+  {
+   "text": "Step 1: Write migration round-trip test. Create the new test file:",
+   "line": 1207,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1207"
+  },
+  {
+   "text": "Step 2: Update tests/iroh_peer_map.rs to use the new API. Replace the four existing tests so they exercise both the back-compat shims AND the new API. Full replacement file body:",
+   "line": 1279,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1279"
+  },
+  {
+   "text": "Step 3: Run both test files",
+   "line": 1371,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1371"
+  },
+  {
+   "text": "Step 1: Write failing tests in the peer_map.rs test module. Add these test cases:",
+   "line": 1413,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1413"
+  },
+  {
+   "text": "Step 2: Implement select_transport. Append to peer_map.rs (after the lookup functions, before the #[cfg(test)] module):",
+   "line": 1421,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1421"
+  },
+  {
+   "text": "Step 1: Write the integration test",
+   "line": 1520,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1520"
+  },
+  {
+   "text": "Step 2: Run",
+   "line": 1619,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1619"
+  },
+  {
+   "text": "Step 1: Add a caller-resolver field + constructor. Edit the struct definition to add:",
+   "line": 1648,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1648"
+  },
+  {
+   "text": "Step 2: Update the handle method. Replace the body:",
+   "line": 1682,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1682"
+  },
+  {
+   "text": "Step 3: Add a unit test for the resolver path. In the existing mod tests:",
+   "line": 1727,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1727"
+  },
+  {
+   "text": "Step 4: Build + run",
+   "line": 1766,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1766"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 1772,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1772"
+  },
+  {
+   "text": "Step 1: Add a helper that yields Vec<PeerId> from the manifest. Edit peer_map.rs to add (no test needed \u2014 covered by Task 11 Step 3 below):",
+   "line": 1799,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1799"
+  },
+  {
+   "text": "Step 2: Update view_fed_backend.rs to use the helper. Add a DbPool field + constructor variant; in handle, if the pool is set, query and pass the resulting Vec<PeerId> to service.handle. Use libp2p::PeerId::from_bytes / from_str as appropriate (existing module already pulls libp2p in as a dep). Replace the Iroh-mode connected_peers is currently an empty libp2p PeerId slice comment block:",
+   "line": 1816,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1816"
+  },
+  {
+   "text": "Step 3: Add a test exercising the manifest-backed path. In the existing mod tests:",
+   "line": 1859,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1859"
+  },
+  {
+   "text": "Step 1: Add hydration helper to peer_map.rs",
+   "line": 1935,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1935"
+  },
+  {
+   "text": "Step 2: Wire TrustServiceBackend to hydrate. Edit auth_backends.rs:",
+   "line": 1952,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L1952"
+  },
+  {
+   "text": "Step 3: Wire IdentityHandshakeServiceBackend to use manifest agent_cid. Same file, replace the existing struct + handle body:",
+   "line": 2021,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2021"
+  },
+  {
+   "text": "Step 4: Add tests covering both new paths. Append to the existing mod tests:",
+   "line": 2087,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2087"
+  },
+  {
+   "text": "Step 5: Build + run",
+   "line": 2155,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2155"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 2161,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2161"
+  },
+  {
+   "text": "Step 1: Update the README's \"What's next\" section. Locate the existing block referencing cross_stack_peer_map (lines 110-113) and replace with a paragraph noting the Phase 12 graduation and the new module API. Update the Phase 10 acceptance checklist line to \"Phase 12 acceptance \u2014 peer_transport_manifest\". Cite the spec lines 440-505 and the four wired adapters",
+   "line": 2188,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2188"
+  },
+  {
+   "text": "Step 2: Add a docstring note to epr_backend.rs. The Announce stopgap is unblocked by Plans 4 (gossip dual-publish) + 5 (recovery e2e), NOT by Plan 1 (this plan). Add a single line to the existing module-level doc block after the Announce paragraph:",
+   "line": 2190,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2190"
+  },
+  {
+   "text": "Step 3: Pre-push gate sanity. Run from /projects/elohim/elohim/elohim-storage/:",
+   "line": 2199,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2199"
+  },
+  {
+   "text": "All 13 tasks landed as 13 commits",
+   "line": 2234,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2234"
+  },
+  {
+   "text": "git log --oneline | head -13 shows the chain",
+   "line": 2235,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2235"
+  },
+  {
+   "text": "cargo test --features p2p-iroh is green; cargo test --test schema_contract is green; cargo test export_bindings is green and produced the three new TS files",
+   "line": 2236,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2236"
+  },
+  {
+   "text": "git grep cross_stack_peer_map -- ':!/migrations/' returns no hits in production code (only the new migration's down.sql references it for inverse)",
+   "line": 2237,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2237"
+  },
+  {
+   "text": "git grep -E \"list_libp2p_peer_ids|list_libp2p_to_agent|lookup_by_(agent_cid|libp2p_peer_id|iroh_node_id)|select_transport\" shows usage from auth_backends.rs, view_fed_backend.rs, epr_atom_backend.rs \u2014 no other production file consumes the API yet (Plans 2 / 4 / 6 wire the rest)",
+   "line": 2238,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2238"
+  },
+  {
+   "text": "Spec lines 440-505 re-read; every numbered concern is in a numbered task above",
+   "line": 2239,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-phase12-peer-transport-manifest#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-phase12-peer-transport-manifest.md#L2239"
+  }
+ ]
+}

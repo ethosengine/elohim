@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_reach_earned_push_deterministic_floor",
+  "claim": "The pre-push gate dogfoods the protocol — a repo push is a reach-earned attestation at the deterministic floor.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_reach_earned_push_deterministic_floor.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_reach_earned_push_deterministic_floor.md",
+        "cid": "bafkreidriqrhmgupcldeespabn4x4g65kuom5dsar6zf2pod5ji575stym"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Repo push = reach-earned attestation (deterministic floor)",
+    "file": "project_reach_earned_push_deterministic_floor.md",
+    "scopePath": ".claude/memory/project_reach_earned_push_deterministic_floor.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -1,0 +1,286 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md",
+ "slug": "plans__2026-05-10-iroh-recovery-e2e",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 33,
+ "items": [
+  {
+   "text": "Step 1.1: Confirm the file-line catalog below by grep. Each entry must resolve to the cited symbol; if any drifted (e.g., p2p/mod.rs line moved), update the line number in this plan in-place",
+   "line": 100,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L100",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1.2: Confirm there is no existing two-stack recovery integration test (the plan asserts so in \"Discovery Required\" item 2). Run:",
+   "line": 126,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L126",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2.1: Verify each row's \"Wire interaction\" column matches Task 1's catalog. If a row's wire is anything other than the four listed (gossip publish, EPR record, sync delta, blob fetch), the row needs investigation:",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L140",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2.2: Confirm spec gate #4 (line 513) flags recovery-invitation and recovery-revocation as permanent post-cutover dual-publish (not just transitional). Cite the spec line to the executor",
+   "line": 157,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L157",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3.2: Validate the feature file parses with cucumber-js dry-run (no step bindings yet \u2014 this just verifies Gherkin syntax):",
+   "line": 245,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L245",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4.1: Create genesis/a2o/steps/recovery-cross-stack.steps.ts with the doc-comment + 13 stub Given/When/Then bindings (one per unique step phrase across the 5 scenarios). Bodies all return 'pending' until Task 6 wires them",
+   "line": 259,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L259",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4.2: Re-run cucumber-js --dry-run from Task 3.2 \u2014 should now report all steps \"skipped\" (binding found, body pending) instead of \"undefined\"",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L295",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5.1: Define the fixture struct + transport-profile enum:",
+   "line": 305,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L305",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5.2: Implement MultiStackFixture::new so each NodeSlot is wired per its profile:",
+   "line": 343,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L343",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5.3: Add a helper that returns the PeerTransportManifest (Plan 1 type) for any named slot, so the cross-stack peer-map can resolve \"Ben \u2192 iroh-only\" without duplicating the test data:",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L350",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5.4: Build:",
+   "line": 363,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L363",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6.1: Add an admin_port accessor to MultiStackFixture that returns the bound port for a given node name. Each spawned node's http::serve returns its bound port (existing pattern in forwarder_integration.rs)",
+   "line": 377,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L377",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6.2: Replace each step body with the real call (binds to the live multi-node stack):",
+   "line": 379,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-05-10-iroh-recovery-e2e#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L379",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6.3: Run again \u2014 all steps should report \"passed\" or \"failed\" (not \"skipped\") against the running stack:",
+   "line": 396,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-05-10-iroh-recovery-e2e#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L396",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7.1: Module doc-comment includes the Task 1 catalog table verbatim (so future agents reading the test see the source-of-truth file:line refs)",
+   "line": 410,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L410",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7.3: Write recovery_threshold_with_one_offline (mirrors scenario 4) and recovery_rejected_on_share_holder_revocation (mirrors scenario 5)",
+   "line": 439,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L439",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7.4: Build + run:",
+   "line": 441,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L441",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 8.1: At the recipient side of every blob fetch, after the fetch resolves, emit:",
+   "line": 458,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L458",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 8.2: Confirm there is no PII risk in the log line \u2014 agent_cid is the canonical content-derived agent identity (already public per peer_map.rs:1), hash is content-addressed",
+   "line": 470,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L470",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 8.3: Add the corresponding test assertion helper used by Task 7:",
+   "line": 472,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L472",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 8.4: Build:",
+   "line": 483,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L483",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 9.1: Rust integration tests:",
+   "line": 497,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L497",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 9.2: Cucumber a2o (live cross-node e2e):",
+   "line": 504,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-05-10-iroh-recovery-e2e#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L504",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 9.3: Pre-push hook from repo root:",
+   "line": 510,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L510",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 9.4: Remove @wip from feature file; re-run Step 9.2 to confirm green at the non-wip default tag.",
+   "line": 516,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-05-10-iroh-recovery-e2e#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L516",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 10.1: Stage:",
+   "line": 524,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L524",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 10.2: Commit message:",
+   "line": 535,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L535",
+   "class": "provisional"
+  },
+  {
+   "text": "Step definitions reference real coordinator functions: create_recovery_request (imagodei/zomes/imagodei/src/lib.rs:1883), submit_intimate_witness (:2709), commit_key_rotation (:2506), create_self_revocation (:1948); real wire types: RecoveryInvitation (p2p/recovery_invitation.rs:22), RecoveryRevocationMessage (p2p/recovery_revocation.rs:24); real HTTP routes: /api/v1/account/pending-recovery, /api/v1/account/self-revocation, /api/v1/account/recovery/:id/vote (api/account.rs:70-77)",
+   "line": 560,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L560",
+   "class": "provisional"
+  },
+  {
+   "text": "Inter-plan refs only use Plan 1 (PeerTransportManifest) and Plan 4 (publish_recovery_invitation_dual / publish_recovery_revocation_dual) APIs; both called out under \"Blocked Until\" with the exact symbols this plan assumes",
+   "line": 561,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L561",
+   "class": "provisional"
+  },
+  {
+   "text": "No new DHT entry types (mishpat is at 11/100 per project memory; recovery uses existing KeyStewardship / RecoveryRequest / HumanityWitness / KeyRotation / KeyRevocation)",
+   "line": 562,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L562",
+   "class": "provisional"
+  },
+  {
+   "text": "Read-only research; no production code changes proposed beyond a single tracing::debug! line in blob_fetch.rs for observability (Task 8) and one mod declaration in p2p_iroh/mod.rs",
+   "line": 563,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L563",
+   "class": "provisional"
+  },
+  {
+   "text": "--test-threads=1 cited per memory feedback_env_var_test_flakiness for tests that touch transport env vars",
+   "line": 564,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L564",
+   "class": "provisional"
+  },
+  {
+   "text": "Discovery-Required section enumerates the three pieces of the existing recovery flow that are not directly testable as drafted (share-bytes custody is metadata-only on DHT; no existing libp2p two-stack baseline; no per-share transport observability) \u2014 each with a concrete mitigation, none of which redesigns the protocol",
+   "line": 565,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-recovery-e2e#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-recovery-e2e.md#L565",
+   "class": "provisional"
+  }
+ ]
+}

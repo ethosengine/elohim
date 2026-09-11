@@ -1,0 +1,218 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md",
+ "slug": "plans__2026-05-23-spa-blob-deploy-drift",
+ "method": "checkbox-tasks",
+ "count": 30,
+ "items": [
+  {
+   "text": "Step 0.1: Pull latest and confirm starting commit",
+   "line": 57,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L57"
+  },
+  {
+   "text": "Step 0.2: Confirm the upstream stage is still broken (sanity-check the diagnosis)",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L67"
+  },
+  {
+   "text": "Step 1.1: Read the existing CreateContentInputView for the exact shape to mirror",
+   "line": 84,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L84"
+  },
+  {
+   "text": "Step 1.2: Write the schema-contract test first (red)",
+   "line": 93,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L93"
+  },
+  {
+   "text": "Step 1.3: Add the field on the struct",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L104"
+  },
+  {
+   "text": "Step 1.5: Regenerate TypeScript bindings",
+   "line": 126,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L126"
+  },
+  {
+   "text": "Step 1.6: Commit",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L137"
+  },
+  {
+   "text": "Step 2.1: Locate the existing handler + route registration",
+   "line": 170,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L170"
+  },
+  {
+   "text": "Step 2.2: Add .patch(...).auth_required() to the route entry",
+   "line": 181,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L181"
+  },
+  {
+   "text": "Step 2.3: Move the auth check from \"ambient\" to the handler entry",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L195"
+  },
+  {
+   "text": "Step 2.4: Verify service + diesel propagate blob_hash",
+   "line": 199,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L199"
+  },
+  {
+   "text": "Step 2.5: Add a route-level integration test",
+   "line": 213,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L213"
+  },
+  {
+   "text": "Step 2.7: Commit",
+   "line": 239,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L239"
+  },
+  {
+   "text": "Step 3.1: Locate the helper and the call site",
+   "line": 277,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L277"
+  },
+  {
+   "text": "Step 3.2: Check how other deploy-time stages access the admin API key",
+   "line": 286,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L286"
+  },
+  {
+   "text": "Step 3.3: Replace the stageSpaBlob body",
+   "line": 295,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L295"
+  },
+  {
+   "text": "Step 3.3a: Decide on the storageUrl writer target",
+   "line": 364,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L364"
+  },
+  {
+   "text": "Step 3.4: Verify the helper still parses (no Groovy CLI; structural sanity)",
+   "line": 368,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L368"
+  },
+  {
+   "text": "Step 3.5: Commit",
+   "line": 377,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L377"
+  },
+  {
+   "text": "Step 4.1: Start a local Holochain + storage stack",
+   "line": 404,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L404"
+  },
+  {
+   "text": "Step 4.2: Probe the PATCH route directly",
+   "line": 414,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L414"
+  },
+  {
+   "text": "Step 4.3: Confirm the doorway resolves it",
+   "line": 434,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L434"
+  },
+  {
+   "text": "Step 4.4: Verify the full chain with a real blob",
+   "line": 442,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L442"
+  },
+  {
+   "text": "Step 5.1: Pause and confirm with operator",
+   "line": 481,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L481"
+  },
+  {
+   "text": "Step 5.2: Push",
+   "line": 485,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L485"
+  },
+  {
+   "text": "Step 5.3: Watch the orchestrator + App pipeline",
+   "line": 492,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L492"
+  },
+  {
+   "text": "Step 5.4: Post-deploy verification",
+   "line": 501,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L501"
+  },
+  {
+   "text": "Step 6.1: Confirm alpha-b reads the same content rows",
+   "line": 547,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L547"
+  },
+  {
+   "text": "Step 6.2: Federation peer discovery",
+   "line": 556,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L556"
+  },
+  {
+   "text": "Step 6.3: Run a2o feature",
+   "line": 565,
+   "state": "OPEN",
+   "id": "plans__2026-05-23-spa-blob-deploy-drift#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-23-spa-blob-deploy-drift.md#L565"
+  }
+ ]
+}

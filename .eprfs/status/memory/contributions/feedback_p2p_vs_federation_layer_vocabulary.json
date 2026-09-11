@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_p2p_vs_federation_layer_vocabulary",
+  "claim": "p2p = DHT conductor + iroh/libp2p blob stores; federation = doorways riding OVER p2p; route WAN-NAT gaps by layer.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_p2p_vs_federation_layer_vocabulary.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_p2p_vs_federation_layer_vocabulary.md",
+        "cid": "bafkreid57hugmj3fwag5urhpk2wvmsdxpltiquootchk2rw3gryrggdala"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "p2p vs federation/fediverse layer vocabulary",
+    "file": "feedback_p2p_vs_federation_layer_vocabulary.md",
+    "scopePath": ".claude/memory/feedback_p2p_vs_federation_layer_vocabulary.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

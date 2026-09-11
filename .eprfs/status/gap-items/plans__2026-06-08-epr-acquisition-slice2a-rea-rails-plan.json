@@ -1,0 +1,180 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md",
+ "slug": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 21,
+ "items": [
+  {
+   "text": "Step 1: Write a probe sweettest at elohim/elohim-storage/tests/rea_event_emit_graduation_e2e.rs (this file is the home for Task 6 too \u2014 start it here). Mirror the two-conductor bootstrap of elohim/elohim-storage/tests/epr_atom_federation_integration.rs (or the dwelling-hub tests/harness two-conductor helper \u2014 find the one the replicates-dwelling sweettest at the Task-18 commit 3464d8d15 used; grep tests/ for two_conductor / single_agent_conductor). The probe: directly call the conductor's create_rea_economic_event zome function with a minimal CreateReaEconomicEventInput (action \"republish-epr\" \u2014 an existing valid action \u2014 provider/receiver/has_point_in_time set), and assert it returns a ReaEconomicEventOutput with a non-empty action_hash",
+   "line": 57,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L57",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run it",
+   "line": 74,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L74",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit the probe (it becomes the seed of the Task-6 e2e; keep it)",
+   "line": 82,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L82",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Add the wrapper next to call_create_rea_commitment (lines 60-71), mirroring it exactly (the ZOME_NAME = \"content_store\" const at line 51 is reused):",
+   "line": 97,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L97",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Build + confirm it compiles (the CreateReaEconomicEventInput type is shefa_types::CreateReaEconomicEventInput, lib.rs:172-207):",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L124",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing test (unit-level, mocking the conductor + the bounds fetcher \u2014 mirror bounds_validator_integration.rs:17-19's MockCommitmentFetcher/MockRateHistory):",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L140",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement the service",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L152",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 220,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L220",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing test \u2014 a commitment authored proposed (the default at rea_commitments.rs:308), after graduate_to_active, reads active in the projection and is included by ACTIVE_PROVIDE_STATES (rea_commitments.rs:215)",
+   "line": 236,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L236",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement graduate_to_active mirroring how create_via_conductor (rea_commitment_service.rs:218) calls the conductor, but using conductor_writes::call_update_rea_commitment_state:",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L238",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Run \u2192 PASS. Commit",
+   "line": 261,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L261",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the failing test \u2014 seed two rea_commitments rows (one active, one proposed) scoping a content id; assert commitments_for_content(conn, ctx, content_id) returns only the active one, and that DistributionDetails.replication_commitments for that content is non-empty",
+   "line": 278,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L278",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Implement commitments_for_content in db/rea_commitments.rs \u2014 a diesel query filtering state IN ACTIVE_PROVIDE_STATES (the :215 constant) and the content/scope match (parse the payload scope, mirroring how active_commitments_for_provider at replication_prioritizer.rs:53-96 filters by action + provider). Then replace the stubbed []/zeros in the DistributionDetails/HouseholdResilienceView computation with calls to it",
+   "line": 280,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L280",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Run \u2192 PASS. Confirm no instance-1 view test regressed (cargo test --lib distribution_view reciprocity_view household_resilience 2>&1 | tail). Commit",
+   "line": 282,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L282",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Write the e2e (beyond the Task-1 probe), driving the real services:",
+   "line": 297,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L297",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: Run (generous timeout; mirror the sibling two-conductor test's budget \u2014 use run_in_background if >10min):",
+   "line": 303,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L303",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 1: Full Rust gates",
+   "line": 321,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L321",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2: ts-rs freshness (if any view type changed in Task 5): cargo test export_bindings 2>&1 | tail -3 and commit regenerated TS",
+   "line": 332,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L332",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3: Decompose-flip \u2014 this plan's gap-items \u2192 CLAIMED (review-verified, awaiting CI). The spec gap-item that 2a partially advances (#9 sync-back / the REA rail) stays OPEN until 2b composes it; note 2a as the rail-prerequisite in the gap-item",
+   "line": 334,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L334",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4: Final commit (only-slice-2a files)",
+   "line": 339,
+   "state": "OPEN",
+   "id": "plans__2026-06-08-epr-acquisition-slice2a-rea-rails-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-08-epr-acquisition-slice2a-rea-rails-plan.md#L339",
+   "class": "protocol-canonical"
+  }
+ ]
+}

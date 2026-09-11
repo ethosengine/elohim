@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_upgrade_propagation_north_star_wall_clock",
+  "claim": "Master p2p hApp upgrade/revert propagation (mixed-version peers talk, no big-bang rolls) before builders; fleet rolls are friction evidence.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_upgrade_propagation_north_star_wall_clock.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_upgrade_propagation_north_star_wall_clock.md",
+        "cid": "bafkreif47lgxhrx2gznq5rattp2ghqsmid7lyq4jvbcwhkzwuuwzx6wulq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "North star: p2p upgrade propagation before builders",
+    "file": "feedback_upgrade_propagation_north_star_wall_clock.md",
+    "scopePath": ".claude/memory/feedback_upgrade_propagation_north_star_wall_clock.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

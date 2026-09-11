@@ -1,0 +1,309 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md",
+ "slug": "plans__2026-05-10-iroh-gossip-dual-publish",
+ "method": "checkbox-tasks",
+ "count": 43,
+ "items": [
+  {
+   "text": "Step 1.1: Open every file above and confirm the publish-site catalog below is exhaustive. Run:",
+   "line": 40,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L40"
+  },
+  {
+   "text": "Step 1.2: Write src/p2p_iroh/dual_publish/CATALOG.md (the table above plus a one-paragraph intro describing the dual-publish goal). Commit",
+   "line": 73,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L73"
+  },
+  {
+   "text": "Step 2.1: Add the per-topic verdict enum and lookup table in verdicts.rs. The trait stays sync; verdict is purely a routing table",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L92"
+  },
+  {
+   "text": "Step 2.2: Define IrohGossipPublisher in iroh_publisher.rs \u2014 implements the existing GossipPublisher trait by sending (topic_id, payload) to a tokio task that holds the GossipSender per subscribed topic",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L129"
+  },
+  {
+   "text": "Step 2.3: Define DualGossipPublisher in dual_publisher.rs \u2014 fans publish(topic, payload) to both inner publishers per classify_topic(topic)",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L185"
+  },
+  {
+   "text": "Step 2.4: Wire mod.rs:",
+   "line": 238,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L238"
+  },
+  {
+   "text": "Step 2.5: Build + test (p2p-iroh feature enabled):",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L257"
+  },
+  {
+   "text": "Step 2.6: Commit",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L266"
+  },
+  {
+   "text": "Step 3.1: Crate-wide grep for LibP2PGossipPublisher injection points (per memory feedback_signature_changes_grep_callers):",
+   "line": 284,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L284"
+  },
+  {
+   "text": "Step 3.3: Build + test:",
+   "line": 300,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L300"
+  },
+  {
+   "text": "Step 3.4: Commit",
+   "line": 307,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L307"
+  },
+  {
+   "text": "Step 4.1: Add gossip_publisher: Arc<dyn GossipPublisher> to P2PNode (constructor takes it). Where the swarm task was the sole publisher, the libp2p-side adapter now goes through the same actor pattern (no behavior change for libp2p; new path enables iroh fan-out)",
+   "line": 325,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L325"
+  },
+  {
+   "text": "Step 4.2: Replace the body of broadcast_inventory_snapshot (after building bytes) with:",
+   "line": 327,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L327"
+  },
+  {
+   "text": "Step 4.3: Crate-wide grep for broadcast_inventory_snapshot callers (per memory pin):",
+   "line": 342,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L342"
+  },
+  {
+   "text": "Step 4.5: Build + test:",
+   "line": 352,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L352"
+  },
+  {
+   "text": "Step 4.6: Commit",
+   "line": 358,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L358"
+  },
+  {
+   "text": "Step 5.1: Refactor the P2PCommand::PublishIdentityBinding arm to:",
+   "line": 377,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L377"
+  },
+  {
+   "text": "Step 5.2: Update EprServiceBackend::handle in src/p2p_iroh/epr_backend.rs:",
+   "line": 400,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L400"
+  },
+  {
+   "text": "Step 5.3: Update the announce_returns_unimplemented_in_iroh_mode test (src/p2p_iroh/epr_backend.rs:86-104) to assert accepted: true instead of false. Rename to announce_succeeds_after_dual_publish_identity_binding",
+   "line": 420,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L420"
+  },
+  {
+   "text": "Step 5.4: Byte-parity test (this satisfies plan requirement #6 third bullet) \u2014 create tests/iroh_gossip_byte_parity.rs:",
+   "line": 422,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L422"
+  },
+  {
+   "text": "Step 5.5: Two-node integration test tests/iroh_gossip_dual_publish_identity_binding.rs:",
+   "line": 435,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L435"
+  },
+  {
+   "text": "Step 5.6: Two-node integration test tests/iroh_epr_announce_accepted.rs:",
+   "line": 438,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L438"
+  },
+  {
+   "text": "Step 5.7: Build + test:",
+   "line": 441,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L441"
+  },
+  {
+   "text": "Step 5.8: Commit",
+   "line": 451,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L451"
+  },
+  {
+   "text": "Step 6.1: Refactor both arms in src/p2p/mod.rs to call self.gossip_publisher.publish(topic_const, msg.to_bytes()?). Same shape as Task 5 step 5.1; payloads are RecoveryInvitation and RecoveryRevocationMessage. Topic constants: RECOVERY_INVITATION_TOPIC = \"recovery.invitation\" and RECOVERY_REVOCATION_TOPIC = \"recovery.revocation\"",
+   "line": 465,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L465"
+  },
+  {
+   "text": "Step 6.2: Two-node integration test tests/iroh_gossip_dual_publish_recovery.rs:",
+   "line": 469,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L469"
+  },
+  {
+   "text": "Step 6.3: Build + test:",
+   "line": 472,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L472"
+  },
+  {
+   "text": "Step 6.4: Commit",
+   "line": 478,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L478"
+  },
+  {
+   "text": "Step 7.1: Subscriber side: existing libp2p subscribers (in src/p2p/mod.rs:4396-4607) consume gossipsub::Event::Message and decode via from_bytes. Iroh-side subscribers will be wired in a follow-up task \u2014 for the dual-publish cutover, iroh-side receivers come for free via the IrohGossipPublisher::spawn task's subscribe call (it stores both sender and receiver per topic; expose the receiver via a separate IrohGossipReceiver API to a routing hook). Document this seam without implementing the receivers \u2014 receive-side wiring is requirement #4 (\"Existing receivers don't need to change\") and the iroh-receive consumer ALPN is wired via iroh_gossip::ALPN already mounted in IrohNode::start_with_protocols (src/p2p_iroh/node.rs:65)",
+   "line": 492,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L492"
+  },
+  {
+   "text": "Step 7.2: Integrity-revocation: when a future producer is added (Recovery epic M4 follow-on), it will send a new P2PCommand::PublishIntegrityRevocation(payload) whose arm body uses self.gossip_publisher.publish(TOPIC_INTEGRITY_REVOCATION, payload.to_bytes()?) \u2014 the dual-publish path requires no further plan work for this topic",
+   "line": 494,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L494"
+  },
+  {
+   "text": "Step 7.3: Update src/p2p_iroh/README.md:",
+   "line": 496,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L496"
+  },
+  {
+   "text": "Step 7.4: Commit",
+   "line": 513,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L513"
+  },
+  {
+   "text": "Step 8.1: Three-node fixture: provider runs both transports with DualGossipPublisher; libp2p_only_subscriber runs libp2p; iroh_only_subscriber runs iroh. Provider publishes one inventory snapshot, one identity-binding, one recovery-invitation, one recovery-revocation, and one feedback-signal. Both subscribers MUST receive each of the five topics with byte-identical payloads. Test runs under a 60-second timeout",
+   "line": 526,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L526"
+  },
+  {
+   "text": "Step 8.2: Build + run:",
+   "line": 530,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L530"
+  },
+  {
+   "text": "Step 8.3: Commit",
+   "line": 537,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L537"
+  },
+  {
+   "text": "Step 9.1: Crate-wide build under both feature permutations:",
+   "line": 547,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L547"
+  },
+  {
+   "text": "Step 9.3: Full crate-wide test pass:",
+   "line": 561,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L561"
+  },
+  {
+   "text": "Step 9.4: No commit at this step \u2014 failures here mean returning to the responsible task",
+   "line": 567,
+   "state": "OPEN",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L567"
+  },
+  {
+   "text": "Catalog of publish sites is complete (Task 1, 12 sites + 1 future producer)",
+   "line": 581,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L581"
+  },
+  {
+   "text": "Each topic verdict has a wiring task: inventory (Task 4), identity-binding (Task 5), recovery (Task 6), attention (n/a \u2014 Holochain-private, not gossip), feedback (Task 3), integrity-revocation (Task 7 \u2014 future-producer hook documented), EPR-atom-announce (Task 3)",
+   "line": 582,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L582"
+  },
+  {
+   "text": "EPR Announce flip-to-accepted is in the plan (Task 5 step 5.2 + step 5.6 test)",
+   "line": 583,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L583"
+  },
+  {
+   "text": "Byte-parity test exists (Task 5 step 5.4)",
+   "line": 584,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L584"
+  },
+  {
+   "text": "No placeholders \u2014 every task has concrete file paths, code snippets, build/test commands, and commit steps",
+   "line": 585,
+   "state": "CLAIMED",
+   "id": "plans__2026-05-10-iroh-gossip-dual-publish#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-10-iroh-gossip-dual-publish.md#L585"
+  }
+ ]
+}

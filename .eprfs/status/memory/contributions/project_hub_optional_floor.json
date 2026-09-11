@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "Hub-optional floor — laptop is a full participant",
+  "claim": "One device is a full participant, no hub required; hubs graduate convenience/scale, never gate participation — a hub-required feature is a capture smell.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_hub_optional_floor.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_hub_optional_floor.md",
+        "cid": "bafkreibwtdynyuxtj3kur56lu4ejwkaykswnwsed5vhvtwnmfw4it4pmli"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Hub-optional floor — laptop is full participant",
+    "file": "project_hub_optional_floor.md",
+    "scopePath": ".claude/memory/project_hub_optional_floor.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

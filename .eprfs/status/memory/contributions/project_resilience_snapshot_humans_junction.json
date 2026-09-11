@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "resilience-snapshot-humans-junction",
+  "claim": "Both snapshot() joins pass through substrate-owned humans.agent_pub_key+household_id (no HTTP create sets them); commitments-only seeding lights nothing.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_resilience_snapshot_humans_junction.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_resilience_snapshot_humans_junction.md",
+        "cid": "bafkreifqgpjnyvvxoth5bu7bi75vicahghckexfbuau4yo52olyptotv4u"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Resilience snapshot humans-junction",
+    "file": "project_resilience_snapshot_humans_junction.md",
+    "scopePath": ".claude/memory/project_resilience_snapshot_humans_junction.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

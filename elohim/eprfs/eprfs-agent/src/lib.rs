@@ -8,6 +8,7 @@
 pub mod binding;
 pub mod canonical;
 pub mod error;
+pub mod memory;
 pub mod project;
 
 pub use binding::{normalize, FrontmatterDialect, ProjectionBinding};

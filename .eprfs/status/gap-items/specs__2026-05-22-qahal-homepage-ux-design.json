@@ -1,0 +1,36 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md",
+ "slug": "specs__2026-05-22-qahal-homepage-ux-design",
+ "method": "requirement-bullets",
+ "count": 4,
+ "items": [
+  {
+   "text": "The writing-plans skill produces a task-by-task plan",
+   "line": 629,
+   "state": "OPEN",
+   "id": "specs__2026-05-22-qahal-homepage-ux-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md#L629"
+  },
+  {
+   "text": "graphos-designer + component-architect agents lead the implementation",
+   "line": 630,
+   "state": "OPEN",
+   "id": "specs__2026-05-22-qahal-homepage-ux-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md#L630"
+  },
+  {
+   "text": "Storybook is the deliverable surface \u2014 operator can review at http://devspace:6006",
+   "line": 631,
+   "state": "OPEN",
+   "id": "specs__2026-05-22-qahal-homepage-ux-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md#L631"
+  },
+  {
+   "text": "MVP exit for Sprint 1: all canonical + variation Library B stories render; all 9 panels visible in power-user view; all 4 (5 simple-tier) deep-impl panels carry their full visual content; capability-gating + provenance + offline-grey treatments work in mock-data flow",
+   "line": 632,
+   "state": "OPEN",
+   "id": "specs__2026-05-22-qahal-homepage-ux-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-05-22-qahal-homepage-ux-design.md#L632"
+  }
+ ]
+}

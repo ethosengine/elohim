@@ -1,0 +1,180 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md",
+ "slug": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 21,
+ "items": [
+  {
+   "text": "Step 1: Write the failing tests",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L75",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run tests to verify they fail",
+   "line": 133,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L133",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Write the minimal implementation",
+   "line": 142,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L142",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run tests to verify they pass",
+   "line": 244,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L244",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 262,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L262",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the spec with these six laws, each anchored",
+   "line": 283,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L283",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Seal the cites",
+   "line": 301,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L301",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Verify the spec is auditable",
+   "line": 310,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L310",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 318,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L318",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement",
+   "line": 409,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L409",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 509,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L509",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run to verify it fails",
+   "line": 538,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L538",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Implement the validation",
+   "line": 547,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L547",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 579,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L579",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run tests and eyeball the real number",
+   "line": 710,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L710",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the canonical-bytes guard (L2's real enforcement)",
+   "line": 739,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L739",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Write the slice-2 contract into the spec",
+   "line": 770,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L770",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Verify the whole slice together",
+   "line": 783,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L783",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit and record the delta",
+   "line": 794,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L794",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Decompose the plan into budget line-items",
+   "line": 801,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L801",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7: One-line delta in genesis/manifests/habits.yaml",
+   "line": 809,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-11-measure-ontology-slice1-epr-local-first-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-08-11-measure-ontology-slice1-epr-local-first-plan.md#L809",
+   "class": "provisional"
+  }
+ ]
+}

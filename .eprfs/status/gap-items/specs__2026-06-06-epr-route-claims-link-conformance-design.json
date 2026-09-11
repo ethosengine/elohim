@@ -1,0 +1,137 @@
+{
+  "doc": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md",
+  "slug": "specs__2026-06-06-epr-route-claims-link-conformance-design",
+  "method": "agent-decomposition",
+  "note": "Hand-authored 2026-06-06 at /brainstorm POST per decompose.py (prose design spec, no checkboxes). Decomposes the Slice-3 routing contract: declare+grant claims, alias law, visitor-tiered dispatch, link-integrity conformance. Slicing per spec §11 (3a claims, 3b alias, 3c conformance).",
+  "class": "protocol-canonical",
+  "doc_requires_env": [],
+  "count": 14,
+  "items": [
+    {
+      "text": "route-claims schema: elohim/sdk/schemas/v1/route-claims.schema.json (declared + granted shapes, placeholder grammar, schemaVersion) + TS codegen via INTERFACE_FILES",
+      "line": 335,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#8-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L335",
+      "class": "protocol-canonical",
+      "claim_note": "dc72b333f: realized as $defs in epr-projection-view.schema.json + ts-rs types (EprProjectionView is ts-rs-anchored — INTERFACE_FILES path was wrong for it); schemaVersion field present || ALPHA-VERIFIED 2026-06-06: grants flow end-to-end (lamad row routeClaims YES via genesis #1102 Seed Projections)"
+    },
+    {
+      "text": "EprProjectionView extension: routeClaims (granted form) + redirectTemplates fields via the standard view-schema contract (schema → Rust struct → contract test → export_bindings)",
+      "line": 341,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#8-2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L341",
+      "class": "protocol-canonical",
+      "claim_note": "dc72b333f: routeClaims + redirectTemplates fields, schema-contract tested, export_bindings regenerated || ALPHA-VERIFIED: EprProjectionView carries routeClaims+redirectTemplates on the wire (db/rea_commitments)"
+    },
+    {
+      "text": "Grant validation: validate_project_epr_commitment extends to (doorway, contentType) uniqueness, alias reserved-prefix + live-mount collision checks, one-hop alias rule, contentType vocabulary check against the lamad manifest",
+      "line": 153,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#3-3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L153",
+      "class": "protocol-canonical",
+      "claim_note": "8b8ca9dd8: validator WIRED into create path (had zero call sites) + rules 5-6; rule-7 uniqueness deferred to router-warn (recorded in doc-comment) || ALPHA-VERIFIED: validation wired (create path live on alpha storage); supersession+upsert both proven (local supersede tests + alpha upsert re-grant)"
+    },
+    {
+      "text": "EprRouter claims + alias indexes compiled in replace_all (contentType→mount binding; exact + template alias→canonical), never evaluated per-request",
+      "line": 359,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#8-5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L359",
+      "class": "protocol-canonical",
+      "claim_note": "385a7485a: claims index + alias indexes compiled in replace_all, vector-pinned || ALPHA-VERIFIED: claims+alias indexes dispatch live (302s observed)"
+    },
+    {
+      "text": "classify_epr_universal pure classifier (target state × visitor tier × claimed/aliased → Disposition) replacing the 401/501 placeholders; 302-to-pretty-mount only when reach passes; local epr-head lookup only, snapshot-based visitor reach",
+      "line": 206,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#5-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L206",
+      "class": "protocol-canonical",
+      "claim_note": "385a7485a: classify_epr_universal pure classifier, anon tier live, authed param ready; 401/501 placeholders replaced on the universal arm || ALPHA-VERIFIED: /epr/{path-id} → 302 → /lamad/path/{id} live; anon-reach {commons,public} fix included"
+    },
+    {
+      "text": "redirectsFrom consumption (mount-level 301/302) + redirectTemplates dispatch (route-level, one-hop) wired at B13; legacy /lamad/resource/{id} 302s at the doorway before any bundle boot",
+      "line": 171,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#4-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L171",
+      "class": "protocol-canonical",
+      "claim_note": "385a7485a: alias 302 at B13 (templates before mounts); legacy /lamad/resource/{id} 302s doorway-side || ALPHA-VERIFIED: /lamad/resource/{id} → 302 → /epr/{id} live at the doorway (server-side, pre-bundle)"
+    },
+    {
+      "text": "Client derivation: bundles derive BUNDLE_ROUTE_CONTEXT from their own manifest declaration (build-time, single authoring home) replacing hand-wired composition-root useValue providers",
+      "line": 347,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#8-3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L347",
+      "class": "protocol-canonical",
+      "claim_note": "01fb7c851: lamad BUNDLE_ROUTE_CONTEXT derives from LAMAD_ROUTE_CLAIMS via claimsFromDeclaration || VERIFIED local + suite: lamad derives context from declaration; behavior pinned by vectors"
+    },
+    {
+      "text": "Two-layer drift fixtures: elohim/sdk/fixtures/route-claims.vectors.json consumed by doorway Rust dispatch tests AND client TS eprToRoute tests (generalizes spa-route-discrimination.vectors.json)",
+      "line": 353,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#8-4",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L353",
+      "class": "protocol-canonical",
+      "claim_note": "74499bcd6: route-claims.vectors.json consumed by doorway Rust + client TS + storage validator (reserved list) || VERIFIED: vectors consumed by doorway Rust + client TS + storage validator; all suites green"
+    },
+    {
+      "text": "epr-summary-hint envelope on /epr-head/{id}: id, contentType, reach, title, preview ref, gate-relation summary — commons-visible, cacheable; consumed by boundary face, link affordances, AttentionTending agents",
+      "line": 247,
+      "state": "OPEN",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#5-3",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L247",
+      "class": "protocol-canonical",
+      "note": "PARTIAL: /epr-head/{id} wire surface pre-exists (storage+doorway proxy); the three consumption legs (boundary face, link affordances, tending agents) ride the deferred gate-face plan"
+    },
+    {
+      "text": "Gate face rendering: shell universal viewer renders head-edge + inclusive path (gateHints graph, authed progress); LamadNotFoundComponent adopts the §6 outward-face pattern (absorbs the backlog capture gated on Slice 3)",
+      "line": 274,
+      "state": "OPEN",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#6-2",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L274",
+      "class": "protocol-canonical",
+      "note": "DEFERRED by plan design: gate-face UI needs angular-architect surfaces; own follow-up plan"
+    },
+    {
+      "text": "Static lint gate (CI): links minted never literal — generalize the runbook §4.4 router-literal canary into a permanent gate with documented keepers; SHOULD: build-time EPR id existence check for code-minted refs",
+      "line": 295,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#7-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L295",
+      "class": "protocol-canonical",
+      "claim_note": "c31f1d577: lint-route-literals gate wired into both app lint chains; 32 hits triaged || VERIFIED: gate hardened (backticks + shell-quoting fix), wired into just gate (runs on push)"
+    },
+    {
+      "text": "sitemap.xml doorway-generated (projections × granted claims × commons enumeration) + a2o conformance crawler walking rendered anchors against it + sweep stamping claims-stale / DEAD-ALIAS statuses",
+      "line": 314,
+      "state": "OPEN",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#7-5",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L314",
+      "class": "protocol-canonical",
+      "note": "PARTIAL: sitemap landed 385a7485a (generation-invalidated, ETag) + a2o scenario; conformance crawler + claims-stale/DEAD-ALIAS sweep remain (spec §13 follow-up)"
+    },
+    {
+      "text": "a2o scenarios (deep-link-delivery + doorway subject): claimed-commons 302, doorway legacy 302 (@regression anchor flip), fragment survival, anon gated boundary renders inclusive path, authed reach 302, sitemap enumerates claims, commons fast-path latency parity (R1)",
+      "line": 378,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#10-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L378",
+      "class": "protocol-canonical",
+      "claim_note": "5dfc3ddc1: 10 scenarios, dry-run bound; REAL run pending alpha post-push (@browser-only needs deployed doorway) || ALPHA-VERIFIED: 7/9 non-wip scenarios green vs alpha; final 2 (universal viewer render) blocked ONLY on the shell DI fix deploy (04fb91d9c built? pending operator dispatch — webhook outage); View-Resource @wip-pinned to #6-2 (reach-honest)"
+    },
+    {
+      "text": "Parent-spec amendments (forward-pointing): §12.3 routeClaims paragraph and §12.8 classification note point to this spec; §12.6 slice table marks Slice 3 designed-by epr-route-claims-link-conformance-design",
+      "line": 397,
+      "state": "CLAIMED",
+      "id": "specs__2026-06-06-epr-route-claims-link-conformance-design#11-1",
+      "cites": "genesis/docs/superpowers/specs/2026-06-06-epr-route-claims-link-conformance-design.md#L397",
+      "class": "protocol-canonical",
+      "claim_note": "704dcfc88: parent §12.3/§12.6/§12.8 forward pointers + backlog re-point; cite-verify green || VERIFIED: parent pointers landed + cite graph clean"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md",
+ "slug": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch",
+ "method": "checkbox-tasks",
+ "count": 5,
+ "items": [
+  {
+   "text": "Step 1: Write the failing tests",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md#L66"
+  },
+  {
+   "text": "Step 2: Run to verify they fail \u2014 cargo test --lib inventory_gossip \u2192 FAIL (BlobHint / hints not defined)",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md#L129"
+  },
+  {
+   "text": "Step 3: Implement",
+   "line": 131,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md#L131"
+  },
+  {
+   "text": "Step 4: Run to verify pass \u2014 cargo test --lib inventory_gossip \u2192 PASS. Then full crate: cargo test --lib \u2192 all green (the broadcaster + receive-arm sites compile with empty hints)",
+   "line": 167,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md#L167"
+  },
+  {
+   "text": "Step 6: Commit \u2014 git add <only the files you changed> then commit feat(storage): add optional BlobHint to inventory gossip wire (additive, backward-compatible)",
+   "line": 171,
+   "state": "OPEN",
+   "id": "plans__2026-05-29-prioritizer-end-state-wire-hub-fetch#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-prioritizer-end-state-wire-hub-fetch.md#L171"
+  }
+ ]
+}

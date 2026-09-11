@@ -1,0 +1,153 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md",
+ "slug": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan",
+ "method": "checkbox-tasks",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "PR1 \u2014 doorway-reachability \u2014 \u2705 FIXED (CLAIMED): epr/{scope}/lens-market was missing from the http.rs route manifest (build_manifest()), so on doorway/hosted it fell through to the SPA bootstrap (HTML not JSON) \u2192 unreachable except storage-direct/Tauri, S9's hosted render would fail. Registered the route alongside the epr siblings + test_manifest_builds now asserts it (RED\u2192GREEN verified). ([[project_doorway_main_route_needs_is_service_path]])",
+   "line": 292,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L292",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "PR2 \u2014 projection guard fail-open on role \u2014 \u2705 FIXED (CLAIMED): parse_author_lens accepted any non-empty role; since the S1 validator is a coordinator hot-swap, a stale-coordinator peer/replay could store an out-of-enum role (e.g. dictator) into lenses.role (floor/ceiling governance seam). Now re-validates role \u2208 {lens,floor,ceiling} at the projection layer, fail-closed (2 tests, RED\u2192GREEN; action is already routed by the dispatcher so the enum is the real gap).",
+   "line": 293,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L293",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "PR3 \u2014 lens revocation unwired + resurrection \u2014 \u2705 FIXED (CLAIMED): the revokes-commitment arm only revoked mishpat_commitments (0 rows on a lens CID \u2192 silent no-op), and upsert_with_anchor clobbered revoked_at = None on replay (fail-open resurrection). Added db::lenses::set_revoked_at, wired it into the revoke arm alongside the commitments call (each no-ops on the other table's CIDs), and made revoked_at sticky-on-set in the upsert (mirrors the dht_anchor_hash preservation). 2 tests, RED\u2192GREEN. This is the substrate primitive a future \"revert/yank\" builds on ([[project_versioned_entity_head_is_declared_dependency]]).",
+   "line": 294,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L294",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "PR5 \u2014 contention conflates distinct lenses: contention_index(&verdict_rows, epr_scope) (lens_facing.rs:171) tallies ALL verdicts in scope regardless of lens_cid \u2014 two internally-unanimous lenses (one agreed, one disagreed) read as a perfectly-split 1.0 \"high contention.\" Inert in prod today (no verdict producer) but fires false controversy the moment the verdict/ballot write-path (Wave-1 T7) lands. Make contention per-lens.",
+   "line": 298,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L298",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S1 \u2014 author-lens validator arm + payload schema (teeth); sweettest; cid==entry_hash; no integrity arm",
+   "line": 308,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L308",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S2 \u2014 lenses A-class DAO (source of truth: Holochain DHT, projected from the S1 author-lens entry; A3): migration + db/models.rs structs + db/lenses.rs anchor-preserving upsert",
+   "line": 309,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L309",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S3 \u2014 projection write-arm: parse_author_lens + CommitmentCommitted signal-arm \u2192 upsert; per-row warn-skip",
+   "line": 310,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L310",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S4 \u2014 forward index find_lenses_governing_epr (slug-id SQL projection) + C-class tables (source of truth: operational/reconstructable, NOT notarized; A3) \u2014 landed folded into db/lens_market.rs",
+   "line": 311,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L311",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S5 \u2014 service layer services/lens_facing.rs: DB\u2192fold\u2192LensBindingView, affinity-ranked, fail-closed per row",
+   "line": 312,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L312",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S6 \u2014 composite assembler build_lens_market_view \u2192 LensMarketView (contention + classify_regime + empty-valid); schema_contract green",
+   "line": 313,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L313",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S7 \u2014 HTTP route GET /api/v1/epr/{scope}/lens-market (route FOLLOWS the S1 author-lens DHT entry type, not vice-versa; read-projection of the A-class lenses table) \u2014 landed in api/epr.rs; unknown scope \u2192 empty-valid",
+   "line": 314,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L314",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S8 \u2014 ts-rs export_bindings + codegen drift-free (sha256-stable); pre-push freshness gate",
+   "line": 315,
+   "state": "CLAIMED",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L315",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "S9 \u2014 a2o qahal plural-observation scenario + live household-nodes render of the loop (scenario authored; live render OPEN \u2014 operator-gated)",
+   "line": 316,
+   "state": "OPEN",
+   "requires_env": [
+    "household-nodes"
+   ],
+   "id": "plans__2026-06-27-plural-mishpat-lenses-service-layer-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-plural-mishpat-lenses-service-layer-plan.md#L316",
+   "class": "protocol-canonical"
+  }
+ ]
+}

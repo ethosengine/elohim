@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_alpha_conductor_spin_root_cause",
+  "claim": "2026-08-21: Alpha pods pegged CPU — sys-validation on unfetchable deps. Root: unbounded local re-lookup.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_alpha_conductor_spin_root_cause.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_alpha_conductor_spin_root_cause.md",
+        "cid": "bafkreihfkdpjr2avih4wfjwk63p6yupp3ifsmdrg4eovippavgxuyc772a"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Alpha conductor spin — sys-validation retry loop",
+    "file": "project_alpha_conductor_spin_root_cause.md",
+    "scopePath": ".claude/memory/project_alpha_conductor_spin_root_cause.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md",
+ "slug": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 13,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test (add to acquisition.rs tests, beside reconcile_diffs_wants_and_rolls_up)",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L63",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run it, verify it FAILS",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L78",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Add the GapTracker helper in reconcile_rails.rs (after mark_completed, ~line 102)",
+   "line": 83,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L83",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Call it in acquisition.rs::reconcile (the per-pin loop, ~line 96-105). want_ids is moved into reconcile_desired, so clone the small item-pin set first (the loop already clones local_has per pin per the existing TODO):",
+   "line": 101,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L101",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Update the existing rollup test reconcile_diffs_wants_and_rolls_up (~line 292): the already-local item now counts as fetched, so the assertion (total, fetched, pending) == (3, 0, 2) becomes (3, 1, 2). Update it and its comment",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L115",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 7: Add an a2o regression note + commit (story-first). Append the constraint to the durability-arc Workstream E scenario coverage (projection caught-up across the fleet includes content-holder nodes). Then:",
+   "line": 122,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L122",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Record the p2p-design-gate decision (action string + whether the verify query widens) as a comment block at the head of the helper and in this task",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L151",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Write the failing test \u2014 drive a simulated ShardResponse::Data(bytes) through finalize_quilt_draw against test_pool() + BlobStore::new_memory(); assert economic_events has exactly one row with the chosen action and resource_inventoried_as == <hash>. (RED today: the production arm calls raw store(), writes zero rows.)",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L152",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Run it, verify it FAILS. Run: cd elohim/elohim-storage && cargo test --lib p2p::blob_fetch -- --nocapture",
+   "line": 153,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L153",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Implement the finalize_quilt_draw helper (persist + record_fetch_success + the economic event in one transaction) and call it from the mod.rs:3756-3777 arm (self.db_pool, self.config.self_cid, and peer are in scope in handle_behaviour_event)",
+   "line": 154,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L154",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Run blob_fetch tests + verify they PASS",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L155",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Story + commit (extend the durability-arc delivery scenario to assert delivery events \u22651 after a content-replication-driven draw)",
+   "line": 156,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L156",
+   "class": "provisional"
+  },
+  {
+   "text": "Action: open a canonical backlog concern (genesis/data/timeline/backlog/) citing this plan + the resolver spec + the storage-gospel security note. It carries the p2p-design-gate (where the key lives, who may assert it, one-human-per-pod, cross-signed proof) and is operator/security-owned. Do not implement until the cross-signed binding lands",
+   "line": 168,
+   "state": "OPEN",
+   "id": "plans__2026-06-18-genesis-seed-stabilization-postleakfix-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-18-genesis-seed-stabilization-postleakfix-plan.md#L168",
+   "class": "provisional"
+  }
+ ]
+}

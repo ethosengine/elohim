@@ -1,0 +1,102 @@
+{
+ "doc": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md",
+ "slug": "architecture__2026-05-11-tiered-quilt-stewardship-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "domain": "D5",
+ "note": "agent-decomposed 2026-06-04 from the \u00a74 amendment (declarative quilt-policy classes); the pre-amendment epic surface (TierController, drivers, ShelfRouter, scanners) is tracked by plans__2026-05-11-tiered-quilt-delivery-master.json | 2026-06-04 SDD sprint: items #1/#4/#5/#12 CLAIMED (schema shape, loader-enforced referential integrity in BOTH generators, drawLatencyBudget+draw fields, fixture tests + codegen gates green).",
+ "count": 13,
+ "items": [
+  {
+   "text": "app-manifest.schema.json: vocabulary.quiltPolicies named-class map + quiltPolicyDefault + contentTypes.<type>.quiltPolicy reference (substrate validates shape, pillar owns vocabulary)",
+   "line": 511,
+   "state": "CLAIMED",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#1",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L511"
+  },
+  {
+   "text": "Resolution precedence contentType.quiltPolicy -> quiltPolicyDefault -> archetype -> policy.toml (Band-1 manifest_test)",
+   "line": 550,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#2",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L550"
+  },
+  {
+   "text": "cost_class event column carries qualified policy name <pillar>/<policyName>; cost_class_hint retired from schema + examples",
+   "line": 552,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#3",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L552"
+  },
+  {
+   "text": "Manifest validator enforces quiltPolicy referential integrity \u2014 typo'd reference fails validation loud (NOT non-empty-string trusted)",
+   "line": 555,
+   "state": "CLAIMED",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#4",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L555"
+  },
+  {
+   "text": "quiltPolicies fields drawLatencyBudget (TTFB SLA; constrains shelf-destination eligibility at negotiation) + draw: atomic|streamed (iroh bao ranged draw; atomic fallback never fails the draw)",
+   "line": 558,
+   "state": "CLAIMED",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#5",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L558"
+  },
+  {
+   "text": "CommitmentFactory negotiation gate: accept stewardship commitment only if steward's active pledge tier backs >= declared floor (pledge governs above manifest; closes floor-via-declaration gap)",
+   "line": 576,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#6",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L576"
+  },
+  {
+   "text": "Unsatisfiable floors surface as placement_gaps gap_kind=tier-below-floor + shefa signal \u2014 never silently clamped down; soft fields (holdWarmMin, warm() grants) capped at pledge capacity",
+   "line": 582,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#7",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L582"
+  },
+  {
+   "text": "HeuristicClassifier ComputeSignals input: capacity_pressure (ResourceSnapshot disk), controller_backoff (load), swarm_confidence (PeerHealthRegistry), draw_rate corroboration (RequestCounters)",
+   "line": 590,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#8",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L590"
+  },
+  {
+   "text": "Signal staleness rule: observed_at older than 2x controller cadence decays to neutral; neutral never triggers a transition alone; no new polling loops",
+   "line": 603,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#9",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L603"
+  },
+  {
+   "text": "Storage SDK warm(cid,{until})->granted + release(cid) \u2014 signals into the classifier, never direct transitions; grants capped at pledge capacity",
+   "line": 610,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#10",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L610"
+  },
+  {
+   "text": "Cache-seam non-goal documented + enforced in review discipline: quiltPolicies never govern Category C operational state; drawn is the custody->cache handoff",
+   "line": 618,
+   "state": "OPEN",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#11",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L618"
+  },
+  {
+   "text": "Validation fixture tests: valid manifest / typo'd reference / bad duration / floor-above-any-pledge warn; manifest-types.ts codegen round-trip",
+   "line": 634,
+   "state": "CLAIMED",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#12",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L634"
+  },
+  {
+   "text": "a2o scaffold genesis/a2o/features/storage/declared-storage-policy.feature (@wip-tier-controller, held until TierController lands)",
+   "line": 641,
+   "state": "CLAIMED",
+   "id": "architecture__2026-05-11-tiered-quilt-stewardship-design#13",
+   "cites": "genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md#L641"
+  }
+ ]
+}

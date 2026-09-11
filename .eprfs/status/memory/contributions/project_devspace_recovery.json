@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_devspace_recovery",
+  "claim": "Devspace recovery: container restarts kill mesh + wipe /tmp/~/bin; ethosengine I/O = hard NFS deadlocks; pod swaps drop secrets — stop/start heals.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_devspace_recovery.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_devspace_recovery.md",
+        "cid": "bafkreifqwrkwtao3rvbvu4itnwrmwa74nggdw4ur3auvh6t5gzbwm6bciu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Devspace/container recovery (umbrella)",
+    "file": "project_devspace_recovery.md",
+    "scopePath": ".claude/memory/project_devspace_recovery.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

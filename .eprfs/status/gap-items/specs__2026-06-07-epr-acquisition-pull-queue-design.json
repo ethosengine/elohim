@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md",
+ "slug": "epr-acquisition-pull-queue-design",
+ "class": "protocol-canonical",
+ "count": 13,
+ "items": [
+  {
+   "text": "Extract shared reconcile_rails module (slot-backpressure, retry-on-next-cycle, peer-gating, AIMD, tri-state completion) consumed by replication AND acquisition streams",
+   "line": 191,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L191",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Acquisition reconcile stream acquisition.rs: wants x local-inventory diff, priority lanes (pin > closure > prefetch-hint, aging), sha256-verified-bytes done-signal",
+   "line": 191,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L191",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DevicePin local store acquisition_pins (source-of-truth comment, airplane-mode creatable, no conductor round-trip) + own-node /api/v1/pins route",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L67",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "P2PStatusInfo.pull rollup + per-pin scoped counts, unified vocab {total,fetched,pending,failed,caughtUp}, ts-rs export + schema contract test",
+   "line": 231,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L231",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "wait-for-pull tooling: tri-state poll (null=keep-waiting), caughtUp iff total concrete AND pending==0 AND total>=expectedMin",
+   "line": 236,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L236",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Ladder rungs 2-3 UI: contextMenuItems composition on elohim-epr-link (capability/reach-aware), Download via Loader CID-verify; browser SW lane = rung-3 only",
+   "line": 328,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L328",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Mint provide-content action via 5-step recipe (discriminator, body schema, bounds-validator reuse, handler, canon row) \u2014 closes Epic-B provide-rows gap",
+   "line": 76,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L76",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Scorer arm: score_and_enqueue_snapshot handles provide-content distinct from replicates-dwelling",
+   "line": 295,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L295",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Sync-back flow: conductor-path active commitment write (never proposed-inert), ProvideAnnounce EconomicEvent bounded_by commitment, un-pin = real revocation",
+   "line": 302,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L302",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Rung-4 pin UI + per-pin progress affordance (elohim-pin-progress-class consumer of .pull counts, popover/viewer chrome not ContextMenuItem)",
+   "line": 334,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L334",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Closure resolver: typed relation set + depthCap + sizeBudget in pin body, cycle detection, reach/closed termini, concrete count BEFORE fetch, re-resolve on head change",
+   "line": 245,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L245",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "contentToSync both ends: projection emits hint on closure-eligible heads (producer); rung-5 affordance visibility consumes it",
+   "line": 274,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L274",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o scenarios: airplane-mode pin, byte-arrival parity, zero-link closure never false-completes, un-pin revokes (land per slice, story-first)",
+   "line": 393,
+   "state": "OPEN",
+   "id": "specs__2026-06-07-epr-acquisition-pull-queue-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-07-epr-acquisition-pull-queue-design.md#L393",
+   "class": "protocol-canonical"
+  }
+ ],
+ "method": "agent-decomposition",
+ "note": "repaired 2026-06-09: file held the bare items array (wrapper lost at write); rewrapped to the canonical gap-items schema"
+}

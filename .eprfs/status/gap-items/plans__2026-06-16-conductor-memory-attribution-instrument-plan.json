@@ -1,0 +1,154 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md",
+ "slug": "plans__2026-06-16-conductor-memory-attribution-instrument-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "count": 18,
+ "items": [
+  {
+   "text": "Write failing tests \u2014 append table-driven tests (mirror parse_cgroup_mem_limit_cases):",
+   "line": 108,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L108",
+   "class": "provisional"
+  },
+  {
+   "text": "Run, expect FAIL (cannot find function parse_cgroup_memory_stat): ... cargo test --lib system_metrics 2>&1 | tail -40",
+   "line": 142,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L142",
+   "class": "provisional"
+  },
+  {
+   "text": "Write the two pure parsers (key\u2192value line scan; tolerate tabs/multiple spaces; ignore unknown keys)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L143",
+   "class": "provisional"
+  },
+  {
+   "text": "Run, expect PASS",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L144",
+   "class": "provisional"
+  },
+  {
+   "text": "Commit (selective-stage system_metrics.rs only): feat(elohim-storage): pure cgroup memory.stat + /proc/status RSS-split parsers",
+   "line": 145,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L145",
+   "class": "provisional"
+  },
+  {
+   "text": "Implement:",
+   "line": 151,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L151",
+   "class": "provisional"
+  },
+  {
+   "text": "Add a light reader test: proc_rss(std::process::id()) returns Some with vm_rss > 0 on Linux (the test process is alive); cgroup_memory_breakdown() is env-dependent \u2014 assert \"Some \u21d2 anon+file \u2264 a sane ceiling\" only if Some (like container_memory_limit_is_optional_and_sane)",
+   "line": 179,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L179",
+   "class": "provisional"
+  },
+  {
+   "text": "Run, expect PASS. Commit: feat(elohim-storage): cgroup memory.stat + per-process RSS + cpu-quota readers",
+   "line": 180,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L180",
+   "class": "provisional"
+  },
+  {
+   "text": "Add:",
+   "line": 186,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L186",
+   "class": "provisional"
+  },
+  {
+   "text": "Add a unit test: a fresh ConductorManager::new(...) (no start()) has child_pid() == None. (Do NOT spawn a real conductor in the unit test \u2014 child.id() semantics are exercised live in Task 6.)",
+   "line": 195,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L195",
+   "class": "provisional"
+  },
+  {
+   "text": "Run, expect PASS. Commit: feat(elohim-storage): ConductorManager::child_pid accessor for memory attribution",
+   "line": 196,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L196",
+   "class": "provisional"
+  },
+  {
+   "text": "Implement (guard on conductor_manager.is_some()):",
+   "line": 204,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L204",
+   "class": "provisional"
+  },
+  {
+   "text": "Verify the EnvFilter does NOT suppress info for this target (storage runs at info; the RCA's saturation spam is info-level, so info lines reach Loki). If a target filter exists, ensure memory_attribution=info is admitted",
+   "line": 242,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L242",
+   "class": "provisional"
+  },
+  {
+   "text": "Commit: feat(elohim-storage): 60s memory-attribution sampler (cgroup verdict + per-process attribution)",
+   "line": 244,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L244",
+   "class": "provisional"
+  },
+  {
+   "text": "Integrator pushes the commits to dev; confirm edge build SUCCESS (ci-observer / Jenkins MCP) and that jessica's pod image bumps (kube_pod_container_info image tag changes from 8c217137)",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L257",
+   "class": "provisional"
+  },
+  {
+   "text": "Wait one full jessica sawtooth (~40\u201350 min from a fresh restart to OOM). Then query Loki via the observability MCP (datasource loki):",
+   "line": 258,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L258",
+   "class": "provisional"
+  },
+  {
+   "text": "Apply the verdict criteria and write genesis/data/timeline/backlog/conductor-memory-attribution-verdict.md:",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L266",
+   "class": "provisional"
+  },
+  {
+   "text": "Cross-confirm on matthew (elohim-matthew-alpha-0, full-arc) \u2014 same query; if matthew's split matches jessica's shape, the verdict is arc-independent (the soak's prediction) and applies to the anchor",
+   "line": 271,
+   "state": "OPEN",
+   "id": "plans__2026-06-16-conductor-memory-attribution-instrument-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md#L271",
+   "class": "provisional"
+  }
+ ]
+}

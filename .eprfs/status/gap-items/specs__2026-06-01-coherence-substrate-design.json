@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md",
+ "slug": "specs__2026-06-01-coherence-substrate-design",
+ "method": "agent-decomposition",
+ "count": 13,
+ "items": [
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#1",
+   "text": "One typed coherence graph G=(N,E): node types story/archetype/scenario/glue/impl/spec/history mapped to existing paths; edge types covers/derives/informs/supersedes/attempted-abandoned/cites/grounds-ux; materialized view not a new store",
+   "line": 34,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L34"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#2",
+   "text": "Node identity: stable tag-ID with revision (type~name~revision, rename-proof, ~revision is change-signal) scoped to spec+history tier first; reject CID (whitespace re-fires) and path (renames break)",
+   "line": 62,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L62"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#3",
+   "text": "Phase 0: normalize status (Draft|In-flight|Landed|Superseded|Abandoned) + stamp spec/history IDs across superpowers/specs + plans; SUPERSEDED marker + history~ gotcha for doorway-ssr pair; required prior_art: section in template + p2p-design-gate",
+   "line": 215,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L215"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#4",
+   "text": "Phase 0C: prior-art WRITE gate \u2014 required prior_art frontmatter (supersedes-or-conforms-to + searched) + Prior-art markdown section before review; pure convention attacking diagnosis (a)",
+   "line": 161,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L161"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#5",
+   "text": "Phase 1: spec-coherence-index.json built by extended memory-coherence-audit.py (with frontmatter normalizer for heterogeneous spec frontmatter); benchmark index build + injector read",
+   "line": 218,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L218"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#6",
+   "text": "Phase 1 keystone: pre-coherence-context.py registered on existing PreToolUse[*] matcher, self-gating once-per-ppid via /tmp/claude-coherence-{ppid}, emits prior-art additionalContext (copies pre-tool-memory.py NOT the sonar Skill-matcher myth)",
+   "line": 92,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L92"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#7",
+   "text": "Phase 1: extend load-project-context.py SessionStart to inject aggregate spec-corpus drift summary (41 sprint specs, 13 no-Status, N stale-candidate)",
+   "line": 106,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L106"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#8",
+   "text": "Phase 2: dedupe-specs-scan.py (clone dedupe-memory-scan TF-IDF cosine over specs/+plans/) + edit 4 agent prompts (historian/librarian/storyteller/cartographer) to reference spec corpus + storyteller/historian compaction pass producing history~ records",
+   "line": 221,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L221"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#9",
+   "text": "history~ record format in decisions/: id/status/active(park)/derived(root)/supersedes/superseded-by/topic/pointer/gotcha(one sentence)/code_anchor(commit+path)/attempted-abandoned; distillation-with-provenance not lossy summary",
+   "line": 132,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L132"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#10",
+   "text": "Phase 3 (deferred traceability): cites: rolled out to 87 CITE-CANDIDATEs + second walker indexing feature-file cites; scan-coverage.ts gains pending vs regressed status; generate-step-skeletons --tag @epic:value_scanner scaffolds 1,681 conceptual scenarios",
+   "line": 224,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L224"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#11",
+   "text": "Phase 4: /gap-analysis --prior-art (regenerates report then escalates to MemPalace) + p2p-design-gate prior-spec step + SessionStart drift summary + grounds-ux edges (or cut if descoped)",
+   "line": 227,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L227"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#12",
+   "text": "Phase 5 (deferred, NEW machinery): graduate canonical specs to EPRs (avodah subgraph has ZERO code today); build spec->EprKind::Manifest ingestion with supersedes Cids; only after Phases 0-4 prove the git-file graph",
+   "line": 230,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L230"
+  },
+  {
+   "id": "specs__2026-06-01-coherence-substrate-design#13",
+   "text": "Three-layer firing blend: deterministic PreToolUse[*] injector floor + MemPalace semantic escalation (near-kin tags miss) + agent-mediated gap report (historian/cartographer write durable history nodes)",
+   "line": 88,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/specs/2026-06-01-coherence-substrate-design.md#L88"
+  }
+ ]
+}

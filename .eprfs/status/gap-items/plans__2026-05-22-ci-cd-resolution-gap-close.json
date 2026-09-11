@@ -1,0 +1,666 @@
+{
+ "doc": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md",
+ "slug": "plans__2026-05-22-ci-cd-resolution-gap-close",
+ "method": "checkbox-tasks",
+ "count": 94,
+ "items": [
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 70,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#1",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L70"
+  },
+  {
+   "text": "Step 2: Run test to verify it fails",
+   "line": 96,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#2",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L96"
+  },
+  {
+   "text": "Step 3: Implement the helper",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#3",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L104"
+  },
+  {
+   "text": "Step 4: Run test to verify it passes",
+   "line": 120,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#4",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L120"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 128,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#5",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L128"
+  },
+  {
+   "text": "Step 3: Implement the module",
+   "line": 196,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#6",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L196"
+  },
+  {
+   "text": "Step 1: Replace inline success-set checks with import",
+   "line": 266,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#7",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L266"
+  },
+  {
+   "text": "Step 2: Replace the inline success-rate computation",
+   "line": 276,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#8",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L276"
+  },
+  {
+   "text": "Step 3: Replace the persistent-failure detector",
+   "line": 292,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#9",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L292"
+  },
+  {
+   "text": "Step 4: Replace the supersede-waste detector",
+   "line": 306,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#10",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L306"
+  },
+  {
+   "text": "Step 5: Replace orchestrator-failure-streak detector",
+   "line": 320,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#11",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L320"
+  },
+  {
+   "text": "Step 6: Replace the default pipeline list using nonManualPipelines()",
+   "line": 336,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#12",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L336"
+  },
+  {
+   "text": "Step 7: Smoke test against live Jenkins",
+   "line": 352,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#13",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L352"
+  },
+  {
+   "text": "Step 8: Commit",
+   "line": 360,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#14",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L360"
+  },
+  {
+   "text": "Step 1: Read current state",
+   "line": 374,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#15",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L374"
+  },
+  {
+   "text": "Step 2: Replace inline set with import",
+   "line": 382,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#16",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L382"
+  },
+  {
+   "text": "Step 3: Run reconcile-build-graph tests",
+   "line": 392,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#17",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L392"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 400,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#18",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L400"
+  },
+  {
+   "text": "Step 1: Write the generator",
+   "line": 416,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#19",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L416"
+  },
+  {
+   "text": "Step 2: Make it executable and run it",
+   "line": 456,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#20",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L456"
+  },
+  {
+   "text": "Step 3: Add just ci-pipeline-list recipe",
+   "line": 466,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#21",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L466"
+  },
+  {
+   "text": "Step 4: Wire pre-push to enforce freshness",
+   "line": 477,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#22",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L477"
+  },
+  {
+   "text": "Step 2: Replace the hardcoded array with a jq read",
+   "line": 530,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#23",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L530"
+  },
+  {
+   "text": "Step 1: Add a drift-detection test",
+   "line": 581,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#24",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L581"
+  },
+  {
+   "text": "Step 2: Run test",
+   "line": 606,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#25",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L606"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 614,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#26",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L614"
+  },
+  {
+   "text": "Step 1: Locate the auto-include logic",
+   "line": 638,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#27",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L638"
+  },
+  {
+   "text": "Step 2: Replace the trigger predicate",
+   "line": 646,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#28",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L646"
+  },
+  {
+   "text": "Step 3: Add a comment + log line so it's audible at runtime",
+   "line": 673,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#29",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L673"
+  },
+  {
+   "text": "Step 4: Validate with just ci-preview",
+   "line": 681,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#30",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L681"
+  },
+  {
+   "text": "Step 5: Validate with a full-deploy changeset",
+   "line": 690,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#31",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L690"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 698,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#32",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L698"
+  },
+  {
+   "text": "Step 1: Identify per-image source roots",
+   "line": 715,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#33",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L715"
+  },
+  {
+   "text": "Step 2: Add per-image change detection in orchestrator",
+   "line": 732,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#34",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L732"
+  },
+  {
+   "text": "Step 3: In edge Jenkinsfile, derive a per-image build map",
+   "line": 746,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#35",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L746"
+  },
+  {
+   "text": "Step 4: Gate each Build stage",
+   "line": 767,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#36",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L767"
+  },
+  {
+   "text": "Step 5: Validate against build #996's changeset",
+   "line": 782,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#37",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L782"
+  },
+  {
+   "text": "Step 1: Identify upstream-failure lookup point",
+   "line": 807,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#38",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L807"
+  },
+  {
+   "text": "Step 2: Add a lastBaselineResult(pipelineName, sha) helper",
+   "line": 813,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#39",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L813"
+  },
+  {
+   "text": "Step 3: Skip downstream dispatch when upstream failed on same baseline",
+   "line": 838,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#40",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L838"
+  },
+  {
+   "text": "Step 4: Smoke-test in shadow run",
+   "line": 855,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#41",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L855"
+  },
+  {
+   "text": "Step 1: Locate disableConcurrentBuilds calls",
+   "line": 882,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#42",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L882"
+  },
+  {
+   "text": "Step 2: Update each call",
+   "line": 888,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#43",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L888"
+  },
+  {
+   "text": "Step 3: Document the trade-off in a Jenkinsfile comment",
+   "line": 904,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#44",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L904"
+  },
+  {
+   "text": "Step 4: Validate post-merge with trajectory tool",
+   "line": 917,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#45",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L917"
+  },
+  {
+   "text": "Step 1: Add a --shell-lines output mode to graph-walker",
+   "line": 946,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#46",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L946"
+  },
+  {
+   "text": "Step 2: Replace the husky eval block",
+   "line": 958,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#47",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L958"
+  },
+  {
+   "text": "Step 3: Smoke test against a synthetic changeset",
+   "line": 977,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#48",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L977"
+  },
+  {
+   "text": "Step 4: Smoke-test pre-push with HUSKY=0 bypass-test mode",
+   "line": 986,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#49",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L986"
+  },
+  {
+   "text": "Step 1: Wrap run_gate in a subshell",
+   "line": 1009,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#50",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1009"
+  },
+  {
+   "text": "Step 2: Remove the now-unneeded cd \"$OLDPWD\"",
+   "line": 1027,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#51",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1027"
+  },
+  {
+   "text": "Step 3: Smoke test by triggering two consecutive gates",
+   "line": 1037,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#52",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1037"
+  },
+  {
+   "text": "Step 1: Add the missing globs",
+   "line": 1060,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#53",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1060"
+  },
+  {
+   "text": "Step 2: Commit",
+   "line": 1081,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#54",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1081"
+  },
+  {
+   "text": "Step 1: Audit which projects have a justfile gate",
+   "line": 1097,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#55",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1097"
+  },
+  {
+   "text": "Step 2: Delete fallback case arms for projects with a justfile gate",
+   "line": 1111,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#56",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1111"
+  },
+  {
+   "text": "Step 3: Add a comment explaining the boundary",
+   "line": 1127,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#57",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1127"
+  },
+  {
+   "text": "Step 4: Test by triggering a gate run for each migrated project",
+   "line": 1138,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#58",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1138"
+  },
+  {
+   "text": "Step 1: Change shebang and add pipefail",
+   "line": 1156,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#59",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1156"
+  },
+  {
+   "text": "Step 2: Audit for pipe-failure regressions",
+   "line": 1171,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#60",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1171"
+  },
+  {
+   "text": "Step 3: Smoke-test by triggering a no-op push (then aborting)",
+   "line": 1179,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#61",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1179"
+  },
+  {
+   "text": "Step 1: Replace the scan with a pre-built index",
+   "line": 1205,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#62",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1205"
+  },
+  {
+   "text": "Step 2: Update the call site in main()",
+   "line": 1240,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#63",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1240"
+  },
+  {
+   "text": "Step 3: Smoke test",
+   "line": 1270,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#64",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1270"
+  },
+  {
+   "text": "Step 1: Define the thresholds block",
+   "line": 1292,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#65",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1292"
+  },
+  {
+   "text": "Step 2: Use the constants in pattern detection",
+   "line": 1312,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#66",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1312"
+  },
+  {
+   "text": "Step 3: Verify thresholds via --builds 5 (window too small for supersede-waste)",
+   "line": 1328,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#67",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1328"
+  },
+  {
+   "text": "Step 1: Create the drift detector",
+   "line": 1352,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#68",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1352"
+  },
+  {
+   "text": "Step 2: Make executable and run",
+   "line": 1433,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#69",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1433"
+  },
+  {
+   "text": "Step 3: Wire to trajectory tool's pattern section",
+   "line": 1442,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#70",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1442"
+  },
+  {
+   "text": "Step 1: Add a stage fetcher",
+   "line": 1479,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#71",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1479"
+  },
+  {
+   "text": "Step 2: Add --with-stages flag",
+   "line": 1511,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#72",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1511"
+  },
+  {
+   "text": "Step 3: Augment row composition with stage data",
+   "line": 1521,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#73",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1521"
+  },
+  {
+   "text": "Step 4: Render per-stage trajectory section",
+   "line": 1543,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#74",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1543"
+  },
+  {
+   "text": "Step 5: Add stage-level pattern detection",
+   "line": 1576,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#75",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1576"
+  },
+  {
+   "text": "Step 6: Smoke test against the live build #996 stages",
+   "line": 1638,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#76",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1638"
+  },
+  {
+   "text": "Step 7: Update the doc-comment header to mention --with-stages",
+   "line": 1649,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#77",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1649"
+  },
+  {
+   "text": "Step 1: Add --watch <seconds> flag",
+   "line": 1675,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#78",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1675"
+  },
+  {
+   "text": "Step 2: Smoke-test",
+   "line": 1700,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#79",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1700"
+  },
+  {
+   "text": "Step 1: Verify CACHE_BUST is in place",
+   "line": 1724,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#80",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1724"
+  },
+  {
+   "text": "Step 2: Replace the build invocation",
+   "line": 1733,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#81",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1733"
+  },
+  {
+   "text": "Step 3: Add a comment",
+   "line": 1747,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#82",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1747"
+  },
+  {
+   "text": "Step 1: Identify the Dockerfile",
+   "line": 1771,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#83",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1771"
+  },
+  {
+   "text": "Step 2: Apply the standard Rust cargo layer pattern",
+   "line": 1777,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#84",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1777"
+  },
+  {
+   "text": "Step 3: Validate with two consecutive local builds",
+   "line": 1798,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#85",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1798"
+  },
+  {
+   "text": "Step 1: List sweettest source files",
+   "line": 1828,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#86",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1828"
+  },
+  {
+   "text": "Step 2: Group by DNA touched",
+   "line": 1834,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#87",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1834"
+  },
+  {
+   "text": "Step 3: Commit the documentation",
+   "line": 1856,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#88",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1856"
+  },
+  {
+   "text": "Step 1: Find the existing stage",
+   "line": 1870,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#89",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1870"
+  },
+  {
+   "text": "Step 2: Replace single-stage with parallel shards",
+   "line": 1876,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#90",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1876"
+  },
+  {
+   "text": "Step 3: Validate with a shadow build",
+   "line": 1916,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#91",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1916"
+  },
+  {
+   "text": "Step 1: Identify the independent stages",
+   "line": 1938,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#92",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1938"
+  },
+  {
+   "text": "Step 2: Wrap in parallel",
+   "line": 1949,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#93",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1949"
+  },
+  {
+   "text": "Step 3: Validate Branch B fail-fast",
+   "line": 1970,
+   "state": "OPEN",
+   "id": "plans__2026-05-22-ci-cd-resolution-gap-close#94",
+   "cites": "genesis/docs/plans/2026-05-22-ci-cd-resolution-gap-close.md#L1970"
+  }
+ ]
+}

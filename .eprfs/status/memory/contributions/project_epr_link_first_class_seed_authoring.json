@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_epr_link_first_class_seed_authoring",
+  "claim": "Seed slug links drift silently; the cite-gen-style seal tool is DEFERRED until docs graduate peer-native — don't build it now.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_epr_link_first_class_seed_authoring.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_epr_link_first_class_seed_authoring.md",
+        "cid": "bafkreigeebvrriw6ji6brwlhfx42rgx4yuqoqoh4nvhwjdf2pmvac5557i"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "EPR-link first-class seed authoring (deferred design)",
+    "file": "project_epr_link_first_class_seed_authoring.md",
+    "scopePath": ".claude/memory/project_epr_link_first_class_seed_authoring.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": true
+  }
+}

@@ -6,18 +6,34 @@
 //! CID (frontmatter excluded, matching the Python cite oracle), all timestamps come from
 //! git, and records are deduped by CID against the existing sidecar before append.
 
+pub mod acceptance;
+pub mod cites;
 pub mod claim;
+pub mod cluster_state;
+pub mod concerns;
 pub mod context;
+pub mod context_sections;
 pub mod edges;
+pub mod env_scope;
 pub mod fulfill;
+pub mod gaps;
 pub mod governor;
 pub mod ledger;
+pub mod measures;
+pub mod memory;
 pub mod note;
+pub mod parity;
+pub mod placement;
 pub mod project;
 pub mod read;
+pub mod reconciliation;
 pub mod registers;
 pub mod registry;
+pub mod report;
+pub mod retract;
+pub mod scope;
 pub mod seal;
+pub mod stasis;
 pub mod stocks;
 pub mod walk;
 
@@ -82,10 +98,20 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         return Err(FlowError::InvalidArguments(usage()));
     };
 
+    // `--help` is a question, so it is answered on STDOUT with a zero exit. The bare `epr flow`
+    // arm above stays an argument ERROR (usage on stderr, non-zero) because an invocation that
+    // named no subcommand asked for something this command cannot do — the two look similar and
+    // are not the same event.
+    if sub == "--help" || sub == "-h" {
+        println!("{}", usage());
+        return Ok(ExitCode::SUCCESS);
+    }
+
     match sub {
         "project" => {
             let (opts, rest) = parse_global(&args[1..])?;
             let mut recipes = default_recipes(&opts.root);
+            let mut adopt: Option<PathBuf> = None;
             let mut i = 0;
             while i < rest.len() {
                 match rest[i].as_str() {
@@ -96,12 +122,35 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                         recipes = resolve_under(&opts.root, value);
                         i += 2;
                     }
+                    // The one-shot relocation. Takes an optional directory so the ordinary call is
+                    // bare; the default is the kit's own home, which is the only directory this
+                    // ever needs to read in practice.
+                    "--adopt-gap-items" => {
+                        let value = rest.get(i + 1).filter(|v| !v.starts_with("--"));
+                        adopt = Some(match value {
+                            Some(dir) => resolve_under(&opts.root, dir),
+                            None => opts.root.join(".claude/memory-kit/gap-items"),
+                        });
+                        i += 1 + usize::from(value.is_some());
+                    }
                     other => {
                         return Err(FlowError::InvalidArguments(format!(
                             "unknown project argument `{other}`"
                         )))
                     }
                 }
+            }
+            // Adoption is a MOVE, not a projection: it relocates the fallback store and returns,
+            // rather than also deriving records, so the operator can see exactly what moved before
+            // anything reads it.
+            if let Some(source) = adopt {
+                let summary = project::adopt_gap_items(&opts.root, &source)?;
+                if opts.json {
+                    println!("{}", serde_json::to_string_pretty(&summary)?);
+                } else {
+                    summary.render();
+                }
+                return Ok(ExitCode::SUCCESS);
             }
             let summary = project::project(&opts.root, &recipes)?;
             if opts.json {
@@ -154,12 +203,65 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
         "ledger" => run_ledger(&args[1..]),
         "fulfill" => run_fulfill(&args[1..]),
         "note" => run_note(&args[1..]),
+        "report" => run_report(&args[1..]),
         "stocks" => run_stocks(&args[1..]),
+        "concerns" => run_concerns(&args[1..]),
+        "memory" => memory::run(&args[1..]),
+        "cites" => run_cites(&args[1..]),
+        "retract" => run_retract(&args[1..]),
         other => Err(FlowError::InvalidArguments(format!(
             "unknown flow subcommand `{other}`\n{}",
             usage()
         ))),
     }
+}
+
+/// `epr flow concerns --corrections [--since YYYY-MM-DD] [--json]`.
+///
+/// A subcommand of its own rather than another `context` flag: the edge view answers "which sealed
+/// assertions drifted", and this answers "which recorded corrections were never discharged". They
+/// share the word `concern` and nothing else — one reads the cite/sidecar edge planes, the other
+/// reads run-note identity — and folding them into one flag surface is how a reader ends up
+/// believing a clean edge page means there is nothing outstanding.
+fn run_concerns(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) || rest.is_empty() {
+        println!(
+            "usage: epr flow concerns --corrections [--since YYYY-MM-DD] [--json] [--root DIR]"
+        );
+        return Ok(ExitCode::SUCCESS);
+    }
+    let mut i = 0;
+    while i < rest.len() {
+        match rest[i].as_str() {
+            "--corrections" => i += 1,
+            "--since" => i += 2,
+            other => {
+                return Err(FlowError::InvalidArguments(format!(
+                    "unknown concerns argument `{other}` — today the surface is --corrections"
+                )))
+            }
+        }
+    }
+    if !rest.iter().any(|a| a == "--corrections") {
+        return Err(FlowError::InvalidArguments(
+            "epr flow concerns needs --corrections; the sealed-edge view is `epr flow context <path> --concerns`".into(),
+        ));
+    }
+    let since = take_opt(&rest, "--since")?;
+    let result = concerns::corrections(&opts.root, since.as_deref())?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&result)?);
+    } else {
+        print!("{}", result.render_text());
+    }
+    // Parity with the reading this replaces: an unreadable ledger row is a REVALIDATE, and a
+    // revalidation signal that exits zero is a signal nothing acts on.
+    Ok(if result.issues.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::from(2)
+    })
 }
 
 /// The positional `<file>` (first non-flag argument) plus the remaining args untouched.
@@ -222,6 +324,13 @@ fn run_reseal(args: &[String]) -> FlowResult<ExitCode> {
 }
 
 fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
+    // `--scope` selects the SUBSTRATE-scope arm: the live↔held mover, not a cite-seal hold on one
+    // document. The two share a verb because they are the same act at two granularities — holding
+    // an artifact whose upstream is not ready — and the flag, not a second command name, is what
+    // says which plane. The scope arm takes no positional file, so the branch is unambiguous.
+    if args.iter().any(|a| a == "--scope") {
+        return run_hold_scope(args);
+    }
     let (file, tail) = positional_file(args)?;
     let (opts, rest) = parse_global(tail)?;
     let on = take_opt(&rest, "--on")?
@@ -234,6 +343,34 @@ fn run_hold(args: &[String]) -> FlowResult<ExitCode> {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
     } else {
         outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow hold --scope [--apply] [--set <res>=<on|off|degraded>] [--env] [--json]
+/// [--cluster-state PATH]`.
+///
+/// The mover. Default is a DRY RUN that prints exactly what `--apply` would do — the same default
+/// `scope-reconcile.py` carries, and for the same reason: a `git mv` across the plate is atomic and
+/// wide, so seeing it first is the cheap half of the loop.
+///
+/// `--env` prints only the derived runtime export and performs no move, so
+/// `eval "$(epr flow hold --scope --env)"` is safe in a shell profile.
+fn run_hold_scope(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let cluster =
+        placement::cluster_state_arg(&opts.root, take_opt(&rest, "--cluster-state")?.as_deref())?;
+    if rest.iter().any(|a| a == "--env") {
+        println!("{}", scope::env_line(&opts.root, cluster.as_deref()));
+        return Ok(ExitCode::SUCCESS);
+    }
+    let apply = rest.iter().any(|a| a == "--apply");
+    let report = match take_opt(&rest, "--set")? {
+        Some(arg) => scope::set_state(&opts.root, &arg, apply, cluster.as_deref())?,
+        None => scope::hold_scope(&opts.root, apply, cluster.as_deref())?,
+    };
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -268,7 +405,7 @@ fn run_ledger(args: &[String]) -> FlowResult<ExitCode> {
 fn run_context(args: &[String]) -> FlowResult<ExitCode> {
     let Some(target) = args.first().filter(|a| !a.starts_with("--")) else {
         return Err(FlowError::InvalidArguments(
-            "usage: epr flow context <path|cid> [--notes N] [--json] [--root DIR]".into(),
+            "usage: epr flow context <path|cid> [--notes N] [--section DOT_PATH --offset N --limit N] [--concerns --offset N --limit N --all-states] [--json] [--root DIR]".into(),
         ));
     };
     let target = target.clone();
@@ -276,13 +413,76 @@ fn run_context(args: &[String]) -> FlowResult<ExitCode> {
     let mut i = 0;
     while i < rest.len() {
         match rest[i].as_str() {
-            "--notes" => i += 2,
+            "--notes" | "--offset" | "--limit" | "--section" => i += 2,
+            "--concerns" | "--all-states" => i += 1,
             other => {
                 return Err(FlowError::InvalidArguments(format!(
                     "unknown context argument `{other}`"
                 )))
             }
         }
+    }
+    if let Some(section) = take_opt(&rest, "--section")? {
+        if rest
+            .iter()
+            .any(|a| a == "--concerns" || a == "--all-states")
+        {
+            return Err(FlowError::InvalidArguments(
+                "--section cannot combine with --concerns/--all-states".into(),
+            ));
+        }
+        let count = |key: &str, default: usize| -> FlowResult<usize> {
+            take_opt(&rest, key)?.map_or(Ok(default), |raw| {
+                raw.parse().map_err(|_| {
+                    FlowError::InvalidArguments(format!("{key} needs a nonnegative count"))
+                })
+            })
+        };
+        let result = context_sections::context_section(
+            &opts.root,
+            &target,
+            &section,
+            count("--notes", context::DEFAULT_NOTES)?,
+            count("--offset", 0)?,
+            count("--limit", 20)?,
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            print!("{}", result.render_text());
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+    if rest.iter().any(|a| a == "--concerns") {
+        let count = |key: &str, default: usize| -> FlowResult<usize> {
+            take_opt(&rest, key)?.map_or(Ok(default), |raw| {
+                raw.parse().map_err(|_| {
+                    FlowError::InvalidArguments(format!("{key} needs a nonnegative count"))
+                })
+            })
+        };
+        let result = concerns::concerns_with(
+            &opts.root,
+            &target,
+            count("--offset", 0)?,
+            count("--limit", 20)?,
+            rest.iter().any(|a| a == "--all-states"),
+        )?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        } else {
+            print!("{}", result.render_text());
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+    if rest
+        .iter()
+        .any(|a| a == "--offset" || a == "--limit" || a == "--all-states")
+    {
+        return Err(FlowError::InvalidArguments(
+            "--offset/--limit require --concerns or --section; --all-states requires --concerns"
+                .into(),
+        ));
     }
     let notes = match take_opt(&rest, "--notes")? {
         Some(raw) => raw.trim().parse::<usize>().map_err(|_| {
@@ -455,8 +655,312 @@ fn run_fulfill_on(args: &[String]) -> FlowResult<ExitCode> {
 /// writing a mid-run note should not have to repeat it. The fallback lives HERE, in the shell,
 /// and never in [`note::note`] — a projection whose record changed with an ambient variable would
 /// be neither testable nor reproducible.
+/// Every occurrence of a repeatable `--key <value>` option, in argument order.
+///
+/// [`take_opt`] returns the FIRST match only, which is right for the single-valued flags but wrong
+/// for `--env`: an environment is a set, and silently keeping one pair of several would mint a
+/// fold keyed by an env the caller never claimed.
+fn take_opts_all(rest: &[String], key: &str) -> FlowResult<Vec<String>> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < rest.len() {
+        if rest[i] == key {
+            let value = rest
+                .get(i + 1)
+                .ok_or_else(|| FlowError::InvalidArguments(format!("{key} needs a value")))?;
+            out.push(value.clone());
+            i += 2;
+        } else {
+            i += 1;
+        }
+    }
+    Ok(out)
+}
+
+/// Resolve the recipe list for `report`, in the order they were declared.
+///
+/// Three arms, in precedence order, and the FIRST resolved recipe is always the primary:
+///   1. `--recipe <name-or-dir>` (repeatable) — each names one measures+policies pair.
+///   2. `--measures PATH` / `--policies PATH` (repeatable) — zipped by position, the shorter list
+///      padded from the declared default. This is the low-ceremony arm for a one-off comparison.
+///   3. Neither — the declared default alone (`.epr-meta/manifest.md`'s `policy-recipe:`, else the
+///      `.claude/epr-meta` pair).
+///
+/// Explicit recipes REPLACE the default rather than adding to it: a caller who names the lenses is
+/// stating the whole reading, and silently appending a lens they did not ask for would put outcomes
+/// in their report that no argument of theirs accounts for.
+fn resolve_recipes(root: &Path, rest: &[String]) -> FlowResult<Vec<report::Recipe>> {
+    let named = take_opts_all(rest, "--recipe")?;
+    if !named.is_empty() {
+        return Ok(named
+            .iter()
+            .map(|value| report::Recipe::at_dir(root, Path::new(value)))
+            .collect());
+    }
+
+    let measures = take_opts_all(rest, "--measures")?;
+    let policies = take_opts_all(rest, "--policies")?;
+    if measures.is_empty() && policies.is_empty() {
+        // EVERY declared recipe, not just the primary: a second lens in `policy-recipes:` is
+        // evaluated with no flag, which is the whole point of declaring it there.
+        return Ok(report::declared_recipes(root));
+    }
+
+    let default = report::declared_default(root);
+    let pairs = measures.len().max(policies.len());
+    Ok((0..pairs)
+        .map(|i| {
+            let measures_path = measures
+                .get(i)
+                .map(|p| resolve_under(root, p))
+                .unwrap_or_else(|| default.measures.clone());
+            let policies_path = policies
+                .get(i)
+                .map(|p| resolve_under(root, p))
+                .unwrap_or_else(|| default.policies.clone());
+            // Named for the directory the measures file sits in — the same handle `--recipe` would
+            // have used, so the two arms describe one recipe the same way.
+            let name = measures_path
+                .parent()
+                .and_then(|p| p.file_name())
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| default.name.clone());
+            report::Recipe {
+                name,
+                measures: measures_path,
+                policies: policies_path,
+            }
+        })
+        .collect())
+}
+
+/// `epr flow report [placement|scope] …` — one verb, three readings of the repository.
+///
+/// The bare arm evaluates declared bounds against their folds (station one). The two positional
+/// arms are the document-placement and substrate-scope readings (station two). They share a verb
+/// rather than each getting one because all three answer the same question — *what does the
+/// repository currently say about itself* — and a caller who learns `epr flow report` should not
+/// then have to learn two more command names to finish the sentence.
+///
+/// Always exits SUCCESS, including with failed bounds and pending moves: a report projects state,
+/// and the enforcement class that decides what a failure costs is declared on the row, never
+/// inferred from this process's exit status.
+/// `epr flow cites <verb> …` — the native cite writer (station 3b of the memory-kit replacement).
+///
+/// The verb family replaces `.claude/scripts/memory-kit/{cite-gen,cite-describe,cite-propagate,
+/// cites-migrate}.py`. Exit codes are the oracle's: `seal` and `verify` exit 1 when the dissolution
+/// gate finds an unresolved cite, `stamp` exits 1 when it refused a document, everything else
+/// exits 0 because "did the command run" is a different question from "what did it find".
+fn run_cites(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    cites::run(&opts.root, opts.json, &rest)
+}
+
+/// `epr flow retract <edge-record-cid> --reason <text>` — the sidecar-slot WITHDRAWAL leg.
+///
+/// A sibling of `hold` rather than a flag on it: `hold` declares that a live edge deviates on
+/// purpose and must stay readable; `retract` says the declaration itself no longer stands, which
+/// is why it is the only verb admissible against a slot whose endpoints are already gone. See
+/// [`retract`] for the four refusals.
+fn run_retract(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    retract::run(&opts.root, opts.json, &rest)
+}
+
+fn run_report(args: &[String]) -> FlowResult<ExitCode> {
+    match args.first().map(String::as_str) {
+        Some("placement") => return run_report_placement(&args[1..]),
+        Some("scope") => return run_report_scope(&args[1..]),
+        Some("parity") => return run_report_parity(&args[1..]),
+        _ => {}
+    }
+    let (opts, rest) = parse_global(args)?;
+    let mut options = report::ReportOptions::new(&opts.root);
+    options.headline = rest.iter().any(|a| a == "--headline");
+    options.bound = take_opt(&rest, "--bound")?;
+    options.recipes = resolve_recipes(&opts.root, &rest)?;
+
+    let payload = report::report(&opts.root, &options)?;
+    // The scope slot's number is a measurement like any other: fold it onto its declared bound here,
+    // at the CLI edge, so the SessionStart headline run is also the producer. The pure `report()`
+    // stays side-effect-free, which is what lets a test evaluate it without writing to a sidecar.
+    if let Some(pending) = payload.scope_pending_moves {
+        report::fold_scope(&opts.root, pending);
+    }
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+    } else if options.headline {
+        payload.render_headline();
+    } else {
+        payload.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow report placement [--ledger] [--focus [<subject>]] [--json] [--cluster-state PATH]`.
+///
+/// The native replacement for `placement-audit.py --ledger` / `--focus`. `--focus` is deliberately
+/// an OPTIONAL-value flag: `--focus` alone renders the whole subject baseline and `--focus <name>`
+/// renders one, which is the same pair `focus-baseline.py` offers through its bare invocation and
+/// its `--subject`.
+fn run_report_placement(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let cluster =
+        placement::cluster_state_arg(&opts.root, take_opt(&rest, "--cluster-state")?.as_deref())?;
+    let coverage = rest.iter().any(|a| a == "--coverage");
+    let stasis = rest.iter().any(|a| a == "--stasis");
+    let fold = rest.iter().any(|a| a == "--fold");
+    if coverage && stasis {
+        return Err(FlowError::InvalidArguments(
+            "--coverage and --stasis are two different readings; name one. --coverage is the \
+             un-reviewed workload, --stasis is the composite that includes it"
+                .into(),
+        ));
+    }
+    if fold && !stasis {
+        return Err(FlowError::InvalidArguments(
+            "--fold belongs to --stasis: it appends this run's dimension ratios as the ratchet \
+             baseline, and there are no dimensions to fold without it"
+                .into(),
+        ));
+    }
+    let mut options = placement::PlacementOptions {
+        ledger: rest.iter().any(|a| a == "--ledger"),
+        coverage,
+        stasis,
+        fold,
+        focus: None,
+        brief: rest.iter().any(|a| a == "--brief"),
+    };
+    if let Some(index) = rest.iter().position(|a| a == "--focus") {
+        let subject = rest
+            .get(index + 1)
+            .filter(|v| !v.starts_with("--"))
+            .cloned();
+        options.focus = Some(subject);
+    }
+    placement::run(&opts.root, opts.json, &options, cluster.as_deref())?;
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow report parity --inventory <path> [--json]` — the retirement ledger against the tree.
+///
+/// The station-six fold of the memory-kit replacement. It reads the parity inventory's two
+/// markdown tables and renders one three-valued outcome per row, so "is the kit retirable" is a
+/// derivation over the tree rather than a claim in a summary line. See [`parity`].
+fn run_report_parity(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!("{}", parity::usage());
+        return Ok(ExitCode::SUCCESS);
+    }
+    let inventory = take_opt(&rest, "--inventory")?.ok_or_else(|| {
+        FlowError::InvalidArguments(
+            "report parity needs --inventory <path> — the inventory bytes ARE the method pin, so \
+             there is no default ledger to fall back on"
+                .into(),
+        )
+    })?;
+    let payload = parity::parity(&opts.root, Path::new(&inventory))?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&payload)?);
+    } else {
+        payload.render();
+    }
+    // Always SUCCESS, exactly like the bounds report it is a sibling of: this is a projection of
+    // what the tree says, and the decision a failed row costs belongs to station six's integration
+    // seat, not to this process's exit status.
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow report scope [--json] [--cluster-state PATH]` — the plate against the substrate.
+///
+/// Prints the SessionStart headline line by default. `--json` carries the whole derivation,
+/// including the `pendingMoves` count the observation bridge folds as `scope-pending-moves@1`, so
+/// the bridge can stop parsing prose out of a printed line.
+fn run_report_scope(args: &[String]) -> FlowResult<ExitCode> {
+    let (opts, rest) = parse_global(args)?;
+    let cluster =
+        placement::cluster_state_arg(&opts.root, take_opt(&rest, "--cluster-state")?.as_deref())?;
+    // `--docs` is the OTHER env-scope reading: which documents declare a `requires_env` and
+    // whether their capabilities are up (the kit spelled this `placement-audit.py --focus`, one of
+    // two unrelated `--focus` flags). It lives on `report scope` because it is an environment
+    // question about documents, not a placement question about files.
+    if rest.iter().any(|a| a == "--docs") {
+        let docs = scope::doc_scope(&opts.root, cluster.as_deref())?;
+        if opts.json {
+            println!("{}", serde_json::to_string_pretty(&docs)?);
+        } else {
+            docs.render();
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+    let report = scope::scope_report(&opts.root, cluster.as_deref())?;
+    // The reading is also a MEASUREMENT: fold the pending-move count onto its declared bound, so the
+    // number lives in the ledger rather than only in a printed line somebody else has to re-parse.
+    // `--cluster-state` runs are deliberately NOT folded — a fold taken against an overridden
+    // manifest is evidence of a different question than the one the bound asks.
+    if cluster.is_none() {
+        scope::fold_pending_moves(&opts.root, report.pending_moves);
+    }
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+    } else {
+        println!("{}", report.headline());
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `epr flow note --help` — the note leg's own usage, on STDOUT.
+///
+/// A dedicated help arm rather than the argument error this leg used to answer `--help` with.
+/// Two readers depend on it. A person typing `--help` is asking a question, and answering a
+/// question with "note needs --on" is answering a different one. And `.claude/hooks/_observation.py`
+/// probes THIS output to decide whether the running binary can append a structured observation at
+/// all — a probe that misses falls back silently, so every hook in the drift-signal family would
+/// conclude the verb is absent and write nothing. The flag list here is a capability contract, not
+/// documentation.
+pub fn note_usage() -> String {
+    "usage: epr flow note --on <target> --kind <kind> \
+     [--measure <id@version> --subject <path> --value <n> [--unit <u>] [--env k=v]...]\n\n  \
+     <kind> is failed-approach|correction|observation|ruling|verdict.\n\n  \
+     PROSE arm (--on names the target):\n    \
+     --on <commitment-cid|gap-id|path>   what the note is about\n    \
+     --reason <text>                     the authored body (required)\n    \
+     --switched-to <text>                the consequence, on --kind failed-approach\n    \
+     --closes <correction-cid>           the correction this note discharges; refused on\n                                        \
+     --kind failed-approach\n    \
+     --verdict approved|changes-requested  required by --kind verdict, refused on every other kind\n\n  \
+     STRUCTURED-OBSERVATION arm (--measure; --kind must be observation):\n    \
+     --measure <id@version>  a measure declared in .claude/epr-meta/measures.yaml; an undeclared\n                            \
+     id or a bare id with no version pin is REFUSED naming that registry\n    \
+     --subject <path-or-cid> what was measured; `.` names the repository itself, for a\n                            \
+     repository-wide bound (cleanup pressure, report-tier size, pending moves)\n    \
+     --value <number>        the observed magnitude\n    \
+     --unit <u>              defaults to the measure row's declared unit\n    \
+     --env k=v               repeatable; part of the fold's memoization key\n    \
+     --reason <text>         optional here — derived from the measurement when omitted\n    \
+     --measures <path>       override the registry location\n\n    \
+     --subject IS the target on this arm, so --on is refused alongside --measure. Two identical\n    \
+     observations mint one CID and one row.\n\n  \
+     Shared: [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR]\n"
+        .to_string()
+}
+
+/// Whether the caller asked for usage rather than an action.
+fn wants_help(args: &[String]) -> bool {
+    args.iter().any(|a| a == "--help" || a == "-h")
+}
+
 fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let (opts, rest) = parse_global(args)?;
+    if wants_help(&rest) {
+        println!("{}", note_usage());
+        return Ok(ExitCode::SUCCESS);
+    }
+    if let Some(measure) = take_opt(&rest, "--measure")? {
+        return run_observation(&opts, &rest, &measure);
+    }
     let on = take_opt(&rest, "--on")?.ok_or_else(|| {
         FlowError::InvalidArguments("note needs --on <commitment-cid-or-path>".into())
     })?;
@@ -468,19 +972,107 @@ fn run_note(args: &[String]) -> FlowResult<ExitCode> {
     let reason = take_opt(&rest, "--reason")?
         .ok_or_else(|| FlowError::InvalidArguments("note needs --reason <text>".into()))?;
     let switched_to = take_opt(&rest, "--switched-to")?;
+    // `--closes <correction-cid>` makes closure an explicit act: `epr flow concerns --corrections`
+    // reads it by identity rather than inferring resolution from a later date.
+    let closes = take_opt(&rest, "--closes")?;
     let verdict = take_opt(&rest, "--verdict")?;
     let actor = note::NoteActor {
         as_ref: take_opt(&rest, "--as")?,
         session: resolve_session(take_opt(&rest, "--session")?),
     };
-    let outcome = note::note(
+    let acceptance = acceptance::AcceptanceOptions {
+        appoint: take_opt(&rest, "--appoint")?,
+        purpose: take_opt(&rest, "--purpose")?,
+        appointment: take_opt(&rest, "--appointment")?,
+        fulfillment: take_opt(&rest, "--fulfillment")?,
+        review: take_opt(&rest, "--review")?,
+        report: take_opt(&rest, "--report")?,
+        supersedes: take_opt(&rest, "--supersedes")?,
+    };
+    let outcome = note::note_with_options_closing(
         &opts.root,
         &on,
         &kind,
         &reason,
         switched_to.as_deref(),
+        closes.as_deref(),
         verdict.as_deref(),
         &actor,
+        &acceptance,
+    )?;
+    if opts.json {
+        println!("{}", serde_json::to_string_pretty(&outcome)?);
+    } else {
+        outcome.render();
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// The structured-observation arm of `note`: `--measure <id@version> --subject <path-or-cid>
+/// --value <n> [--unit <u>] [--env k=v]…`.
+///
+/// `--subject` IS the target here, so `--on` is REFUSED alongside `--measure` rather than
+/// silently preferred: a measurement of one thing recorded against another is a fold that lies
+/// about its own key, and the key is the only thing the report indexes by.
+fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowResult<ExitCode> {
+    if take_opt(rest, "--on")?.is_some() {
+        return Err(FlowError::InvalidArguments(
+            "--measure takes --subject, not --on — a structured observation's subject IS its target"
+                .into(),
+        ));
+    }
+    let subject = take_opt(rest, "--subject")?.ok_or_else(|| {
+        FlowError::InvalidArguments(
+            "note --measure needs --subject <path-or-cid> — a measurement is OF something".into(),
+        )
+    })?;
+    let raw_value = take_opt(rest, "--value")?.ok_or_else(|| {
+        FlowError::InvalidArguments("note --measure needs --value <number>".into())
+    })?;
+    let value: f64 = raw_value.trim().parse().map_err(|_| {
+        FlowError::InvalidArguments(format!(
+            "--value `{raw_value}` is not a number — a fold's magnitude is arithmetic, not prose"
+        ))
+    })?;
+    let kind = take_opt(rest, "--kind")?.unwrap_or_else(|| "observation".to_string());
+    let unit = take_opt(rest, "--unit")?;
+
+    let mut env = std::collections::BTreeMap::new();
+    for pair in take_opts_all(rest, "--env")? {
+        let Some((key, value)) = pair.split_once('=') else {
+            return Err(FlowError::InvalidArguments(format!(
+                "--env `{pair}` is not a k=v pair"
+            )));
+        };
+        let (key, value) = (key.trim(), value.trim());
+        if key.is_empty() {
+            return Err(FlowError::InvalidArguments(format!(
+                "--env `{pair}` has an empty key"
+            )));
+        }
+        env.insert(key.to_string(), value.to_string());
+    }
+
+    let measures = match take_opt(rest, "--measures")? {
+        Some(path) => resolve_under(&opts.root, &path),
+        None => measures::default_measures(&opts.root),
+    };
+    let actor = note::NoteActor {
+        as_ref: take_opt(rest, "--as")?,
+        session: resolve_session(take_opt(rest, "--session")?),
+    };
+
+    let outcome = note::observe(
+        &opts.root,
+        &kind,
+        measure,
+        &subject,
+        value,
+        unit.as_deref(),
+        &env,
+        take_opt(rest, "--reason")?.as_deref(),
+        &actor,
+        &measures,
     )?;
     if opts.json {
         println!("{}", serde_json::to_string_pretty(&outcome)?);
@@ -613,9 +1205,24 @@ fn resolve_under(root: &Path, value: &str) -> PathBuf {
     }
 }
 
+/// The `epr flow` usage string.
+///
+/// Public so a test can assert the capability contract `.claude/hooks/_observation.py` probes for
+/// without spawning a subprocess against a binary whose freshness the test cannot control — which
+/// is exactly how a stale installed `epr` hid the flag's presence from the hooks once already.
+pub fn usage_text() -> String {
+    usage()
+}
+
 fn usage() -> String {
     "usage: epr flow <\n  \
      project [--root DIR] [--recipes PATH]\n  \
+     | project --adopt-gap-items [<dir>] [--json] [--root DIR] \
+     (one-shot: copy every gap-items record whose document still exists into \
+     .eprfs/status/gap-items/ byte-identically, recording each file's raw CID. The fallback store \
+     reads the native home FIRST and the kit path second, so an adopted record is read from its \
+     new home while the old copy is still on disk. Idempotent; orphans whose doc is gone are \
+     reported and NOT adopted)\n  \
      | walk <path> [--json] [--root DIR]\n  \
      | status [--root DIR] [--json]\n  \
      | seal <file> --on <upstream> \
@@ -624,7 +1231,22 @@ fn usage() -> String {
      (omit --governor to auto-derive from .claude/epr-meta/governors.yaml)\n  \
      | reseal <file> [--on <upstream>] [--all-stale] [--json] [--root DIR]\n  \
      | hold <file> --on <upstream> --reason <text> [--valid-from <iso8601>] [--json] [--root DIR]\n  \
-     | context <path|cid> [--notes N] [--json] [--root DIR] \
+     | hold --scope [--apply] [--set <resource>=<on|off|degraded>] [--env] [--json] [--root DIR] \
+     [--cluster-state PATH] \
+     (the SUBSTRATE-scope mover: git mv the live<->held set `report scope` proposes, write the \
+     held/ STOP markers, reconcile deployments.json `suspended` flags and refresh \
+     .claude/subject-focus.md. Default is a DRY RUN. --set flips a capability in the durable home \
+     and prints the coherent ELOHIM_REMOTE_COMPUTE_STATUS export; --env prints only that export \
+     and moves nothing)\n  \
+     | concerns --corrections [--since YYYY-MM-DD] [--json] [--root DIR] \
+     | retract <edge-record-cid> --reason <text> [--as agent:<role>@<model>] [--session <id>] \
+     [--json] [--root DIR] \
+     (withdraw ONE sidecar DepEdge/cite-seal slot whose declaration no longer stands: appends a \
+     `run:retraction` run-note naming the record, so every edge reader stops offering the slot \
+     while the record itself stays in the append-only sidecar. Refused for a non-DepEdge record, \
+     for a record already superseded in its own slot, and for a second retraction carrying a \
+     different reason)\n  \
+     | context <path|cid> [--notes N] [--section DOT_PATH --offset N --limit N] [--concerns --offset N --limit N --all-states] [--json] [--root DIR] \
      (identity · intents · commitments · notes · seals · habit · gate · governance on one screen; \
      a bare cid skips the path-only sections and says so)\n  \
      | ledger <path|cid> [--json] [--root DIR] \
@@ -640,11 +1262,65 @@ fn usage() -> String {
      (NEEDS_CONTEXT|BLOCKED|HOLD are refused — record those as note --kind observation)\n  \
      | note --on <commitment-cid-or-path> \
      --kind failed-approach|correction|observation|ruling|verdict \
-     --reason <text> [--switched-to <text>] \
+     --reason <text> [--switched-to <text>] [--closes <correction-cid>] \
      [--verdict approved|changes-requested (required by --kind verdict, refused on every other kind)] \
+     [--appoint <actor-claim-cid> (ruling only)] \
+     [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
+     --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
      (omit --session to fall back to CLAUDE_SESSION_ID/ELOHIM_SESSION_ID; \
      an agent-attributed note carries steward:<git-author-email> as its last slot)\n  \
+     | note --on <target> --kind <kind> \
+     [--measure <id@version> --subject <path> --value <n> [--unit <u>] [--env k=v]...] \
+     [--reason <text>] [--measures PATH] \
+     [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
+     (the STRUCTURED-OBSERVATION arm — the measure pin must be declared in \
+     .claude/epr-meta/measures.yaml or it is refused naming that file; --subject IS the target, \
+     so --on is refused alongside --measure; --subject . names the repository itself for a \
+     repository-wide bound. `epr flow note --help` prints the full per-flag contract)\n  \
+     | cites seal|assign-id|describe|verify|refresh|stamp|migrate [<doc>…] [--json] [--root DIR] \
+     (the native cite WRITER: `seal <doc>` assigns id:, converts legacy doc path-cites to \
+     slug|desc|fingerprint envelopes and refreshes the path: locator cache, then gates on \
+     resolvability; `stamp` fans each target's verdict onto every citing edge as inline \
+     status:/path: — dry run unless --write, and the verdict is the same derive_verdict the \
+     concern view shows; `migrate [--apply]` is the corpus sweep. `epr flow cites --help` prints \
+     the per-verb contract)\n  \
+     | report [--headline] [--bound <id>] [--recipe DIR]... [--measures PATH]... \
+     [--policies PATH]... [--json] [--root DIR] \
+     (evaluates every declared lens/ceiling bound against the latest matching fold: \
+     passed | failed | skipped, where a bound with NO fold is skipped naming its missing measure, \
+     never zero. The policy set is ONE LENS: --recipe is repeatable and each recipe is a \
+     measures+policies pair read over the same folds, grouped side by side and never merged; the \
+     first is primary. The default recipe is DECLARED — .epr-meta/manifest.md `policy-recipe:` if \
+     present, else the .claude/epr-meta pair. --headline prints the primary's \
+     memkit:/mempalace:/cleanup:/scope:/memory-budget: lines, a trailing recipe: <name>@<short-cid>, \
+     then one alt: count line per extra recipe. \
+     Never exits non-zero — enforcement class lives on the row, not on this process)\n  \
+     | report placement [--ledger] [--coverage] [--stasis [--fold]] \
+     [--focus [<subject>] [--brief]] [--json] [--root DIR] [--cluster-state PATH] \
+     (every file's placement state derived from the surfaces, frontmatter status, .claude/memory \
+     link state and cluster-state: ACTIVE | LINKED | MEM-UNLINKED | NEEDS-TRIAGE | CLAIMED-ONLY | \
+     SETTLED | SUPERSEDED | VERIFIED-STABLE | UNKNOWN-STATUS | REGRESSED | BLOCKED-BY-ENV. \
+     --ledger adds the pressure queue and the station roll-up; a corpus with no extractable \
+     station reports unknown, never zero. --focus renders the subject focus baseline. \
+     --coverage is the un-reviewed workload the memory-stasis loop drains (`uncaptured`); \
+     --stasis is the composite context-coverage readout the loop and the context ratchet read, \
+     and --fold appends its per-dimension ratios as the ratchet baseline — folds, not a private \
+     JSON file. A dimension with no prior fold is `unbaselined`, never a pass)\n  \
+     | report parity --inventory <path> [--json] [--root DIR] \
+     (the RETIREMENT ledger: reads a parity inventory's markdown tables and renders one \
+     three-valued outcome per row — passed when the named replacement resolves, the named tests \
+     exist and no executable consumer still references the kit path; failed when a leg is \
+     checkable and fails; skipped when the row names nothing checkable, never a pass. \
+     Method-pinned to the inventory bytes' raw CID)\n  \
+     | report scope [--docs] [--json] [--root DIR] [--cluster-state PATH] \
+     (the plate against the substrate: every live/held doc's requires_env and every .feature's \
+     @requires: tags evaluated gap-granularly against cluster-state.yaml. Prints the SessionStart \
+     scope: line; --json carries pendingMoves, the scope-pending-moves@1 fold value. --docs is the \
+     document reading instead: every .md declaring requires_env, split into in-scope and \
+     BLOCKED-BY-ENV against the same manifest)\n  \
+     | memory collective|pin|contribute|project|feedback|graduate [--input PATH] [--session ID] [--json] [--root DIR] \
+     (collective explains local declaration and strict input contracts; no network publication)\n  \
      | stocks --window START..END --per <second|minute|hour|day|week> \
      [--stock commitments|active-habits] [--check] [--json] [--root DIR] \
      (--check exits non-zero when a stock is filling, when a bounded stock is over its limit, \
@@ -753,8 +1429,12 @@ pub fn parse_frontmatter(text: &str) -> Frontmatter {
     let mut pending: Option<String> = None;
     for line in &lines[1..end] {
         let trimmed = line.trim_end();
-        if trimmed.trim().is_empty() {
-            pending = None;
+        // A blank line or a `#` comment INSIDE a block list is skipped without closing the list.
+        // Closing it truncates: every `- item` after the interruption is silently dropped, and the
+        // three frontmatter keys the placement reading depends on (`cites`, `verified_by`,
+        // `requires_env`) each change a document's state when they lose entries. Both the kit's
+        // parser and YAML itself read straight through, so this reads through too.
+        if trimmed.trim().is_empty() || trimmed.trim_start().starts_with('#') {
             continue;
         }
         // List continuation `  - item`

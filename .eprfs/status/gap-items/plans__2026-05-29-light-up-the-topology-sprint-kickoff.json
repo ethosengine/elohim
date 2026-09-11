@@ -1,0 +1,92 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md",
+ "slug": "plans__2026-05-29-light-up-the-topology-sprint-kickoff",
+ "method": "agent-decomposition",
+ "count": 12,
+ "items": [
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#1",
+   "text": "Epic A surface/posture UI - built: MyCluster /shefa/cluster + PeerTopology /shefa/peers (in sidenav), DeviceTile triptych, per-EPR ResilienceView Network tab, progressive icon, ConnectionIndicator chip",
+   "line": 38,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L38"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#2",
+   "text": "Epic A gap: top-level posture view (ResilienceSnapshotView/NetworkPostureView/TopologyOverviewView wire types exist, no consuming component); free/used <dl> text not clickable bar; peer/device cards not links (no drill-down)",
+   "line": 41,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L41"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#3",
+   "text": "Epic B committed accounting - built: cluster_view observed free/used+stewarded, constitutional_ratio_registry donut clamp, bounds_validator 7 checks, RS(4,3) sharding, replication.rs state machine, shard_manifests/locations/allocations CRUD, placement_gaps/household_resilience projections",
+   "line": 44,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L44"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#4",
+   "text": "Epic B gap: peer_capacity_service 3 reader stubs return 0 (query_latest_total_raw_bytes, aggregate_pledges_by_tier, compute_unique_shard_bytes); replication_prioritizer::score_advertised_blob DEAD CODE not wired into drain_gap_queue/inventory subscriber",
+   "line": 44,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L44"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#5",
+   "text": "Epic C doorway Role-2 resolver - gap: Role 2 (Resolver) ABSENT (no EPR head/CID -> DHT provider records -> pull bytes libp2p -> cache -> serve); REQUIRES p2p-design-gate; reach enforced peer-side",
+   "line": 50,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L50"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#6",
+   "text": "Epic D account-management - built: Login/AuthService password+OAuth+Tauri, doorway auth_routes recovery handlers, RecoveryCoordinatorService + Request/Interview/ElohimVerify DNA-notarized, social Profile",
+   "line": 56,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L56"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#7",
+   "text": "Epic D gap: Account-Management surface MISSING in elohim-app (only hosted-only doorway-app stub); no post-recovery key rotation (compromised key not revoked - dangerous); graduated-authority tier not surfaced; passkey/2FA unimplemented; no password-reset CTA. Build imagodei/components/account-management/",
+   "line": 56,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L56"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#8",
+   "text": "Epic E context menus - built: <elohim-context-menu> Lit primitive + Library A/B stories (ZERO app consumers); <elohim-epr-link> integrated via EprLinkComponent + EprPopover; EprRelationshipCard + qahal ContextMenuOnly exist but neither wired to EPR links",
+   "line": 62,
+   "state": "CLAIMED",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L62"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#9",
+   "text": "Epic E gap (integration not greenfield): wire <elohim-context-menu> into EprLinkComponent (right-click/long-press), populate ContextMenuItem[] with EPR actions (view/navigate-to-Network/steward/replicate/relationships/governance); make reach-vs-delivery-vs-persistence boundary legible (3 glyph sets exist)",
+   "line": 62,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L62"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#10",
+   "text": "Epic F delivery stats - built: replication stats (api/resilience.rs households/peers/health, placement-gaps, /p2p/status); gap: delivery stats ABSENT (no bytes-served/who-pulled/toll-settled endpoint, no blob-served aggregation, finance-bridge absent); toll economics separate v1 decision",
+   "line": 71,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L71"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#11",
+   "text": "Epic G join elohim ceiling to floor - gap: wisdom.rs input shape accepts only constitution/framing/event_summary -> no agent can reason over placement-gaps/resilience/inventory; grow input shape + feed live projections; sense-and-respond only; sequence LAST after B",
+   "line": 77,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L77"
+  },
+  {
+   "id": "plans__2026-05-29-light-up-the-topology-sprint-kickoff#12",
+   "text": "Operator-lane/infra deps: alpha conductor DNA installed + signal subscriber; DNA pipeline /cargo-target PVC disk-full #1303; elohim-doorway-app/dev Jenkins job missing; publish-but-mark-unstable for packed happ",
+   "line": 95,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-29-light-up-the-topology-sprint-kickoff.md#L95"
+  }
+ ]
+}

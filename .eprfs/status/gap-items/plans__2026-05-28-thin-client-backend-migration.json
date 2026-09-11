@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md",
+ "slug": "plans__2026-05-28-thin-client-backend-migration",
+ "method": "agent-decomposition",
+ "count": 11,
+ "items": [
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#1",
+   "text": "Audit findings: \u00a72.1 substrate policy as client constants, \u00a72.2 REA event composition client-side, \u00a72.3 aggregated state computed client-side, \u00a72.4 Lit element doing API calls (all anti-patterns); \u00a72.5 legitimate helpers do-NOT-migrate",
+   "line": 82,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L82"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#2",
+   "text": "Ticket M-POLICY-1: server-side AccumulationStatus (move accumulation-status policy computation from client constants to substrate)",
+   "line": 132,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L132"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#3",
+   "text": "Ticket M-POLICY-2: server-side MechanismSelection (mechanism-selection policy moves to substrate)",
+   "line": 154,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L154"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#4",
+   "text": "Ticket M-REA-1: substrate-side EconomicEvent composition (stop composing REA events client-side)",
+   "line": 175,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L175"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#5",
+   "text": "Ticket M-REA-2: native AttentionTending writes (substrate-native, not client-composed)",
+   "line": 196,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L196"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#6",
+   "text": "Ticket M-REA-3: substrate-side governance recognition",
+   "line": 221,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L221"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#7",
+   "text": "Ticket M-AGGR-1: SessionHumanView projection (server-side aggregation replacing client-side compute)",
+   "line": 244,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L244"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#8",
+   "text": "Ticket M-AGGR-2: Holochain source chain cutover",
+   "line": 267,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L267"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#9",
+   "text": "Ticket M-AGGR-3: ContentEngagementStatsView projection",
+   "line": 288,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L288"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#10",
+   "text": "Ticket M-ELEM-1: portal-shell host-pre-fetch refactor (Lit element stops doing API calls)",
+   "line": 308,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L308"
+  },
+  {
+   "id": "plans__2026-05-28-thin-client-backend-migration#11",
+   "text": "Sequencing: Wave A foundational substrate (parallelizable) then dependent waves; P2P design gate confirmed no new entry types (existing substrate primitives)",
+   "line": 325,
+   "state": "OPEN",
+   "cites": "genesis/docs/superpowers/plans/2026-05-28-thin-client-backend-migration.md#L325"
+  }
+ ]
+}

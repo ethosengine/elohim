@@ -1,0 +1,344 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md",
+ "slug": "plans__2026-05-26-substrate-rea-replication-fix",
+ "method": "checkbox-tasks",
+ "count": 48,
+ "items": [
+  {
+   "text": "Confirm qahal-m1 worktree is at origin/dev tip (currently c204b7394)",
+   "line": 278,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#1",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L278"
+  },
+  {
+   "text": "Confirm uncommitted .claude/deliver/feature-promise-epr-app-delivery.json is preserved or committed first (it's a session artifact; safe to commit on dev as a separate, isolated commit at start of work)",
+   "line": 279,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#2",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L279"
+  },
+  {
+   "text": "Run grep -n \"update_content\\|update_rea_commitment\\|fn update_content\" elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs and document findings \u2014 if update_content (taking blobHash) does NOT exist as #[hdk_extern], Task 7 expands to add it (a new coordinator function with its own validator + post-commit signal). Document the result in this checkbox",
+   "line": 280,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#3",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L280"
+  },
+  {
+   "text": "Run grep -rn \"pub.*AppState\\|struct AppState\" elohim/elohim-storage/src/ and locate AppState definition. Note its file:line. The handler functions need to read app_ws: AppWebsocket from it",
+   "line": 281,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#4",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L281"
+  },
+  {
+   "text": "Verify AppWebsocket is currently stored in AppState. If not, Task 2 includes adding it (additive change, no migration risk)",
+   "line": 282,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#5",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L282"
+  },
+  {
+   "text": "Step 1: Switch to qahal-m1 worktree",
+   "line": 291,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#6",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L291"
+  },
+  {
+   "text": "Step 2: Confirm baseline build green (storage)",
+   "line": 299,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#7",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L299"
+  },
+  {
+   "text": "Step 3: Confirm baseline build green (elohim DNA)",
+   "line": 309,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#8",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L309"
+  },
+  {
+   "text": "Step 4: Verify zome surface",
+   "line": 317,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#9",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L317"
+  },
+  {
+   "text": "Step 5: Commit baseline note",
+   "line": 325,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#10",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L325"
+  },
+  {
+   "text": "Step 1: Verify AppWebsocket usage pattern (read-only)",
+   "line": 345,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#11",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L345"
+  },
+  {
+   "text": "Step 2: Inspect existing call_zome shape",
+   "line": 352,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#12",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L352"
+  },
+  {
+   "text": "Step 3: Write the facade",
+   "line": 359,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#13",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L359"
+  },
+  {
+   "text": "Step 4: Register module",
+   "line": 428,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#14",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L428"
+  },
+  {
+   "text": "Step 5: Verify it compiles (no callers yet)",
+   "line": 436,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#15",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L436"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 451,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#16",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L451"
+  },
+  {
+   "text": "Step 1: Locate existing integration test scaffolding",
+   "line": 477,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#17",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L477"
+  },
+  {
+   "text": "Step 2: Write the failing test",
+   "line": 486,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#18",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L486"
+  },
+  {
+   "text": "Step 4: Commit the failing test",
+   "line": 567,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#19",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L567"
+  },
+  {
+   "text": "Step 1: Read existing implementation for reference",
+   "line": 587,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#20",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L587"
+  },
+  {
+   "text": "Step 2: Replace create with async + conductor round-trip",
+   "line": 594,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#21",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L594"
+  },
+  {
+   "text": "Step 4: Stash the unrelated build error temporarily",
+   "line": 667,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#22",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L667"
+  },
+  {
+   "text": "Step 1: Locate the handler function",
+   "line": 700,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#23",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L700"
+  },
+  {
+   "text": "Step 2: Locate AppState definition",
+   "line": 709,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#24",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L709"
+  },
+  {
+   "text": "Step 3 (conditional): Add AppWebsocket to AppState",
+   "line": 717,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#25",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L717"
+  },
+  {
+   "text": "Step 4: Thread AppWebsocket into the handler",
+   "line": 727,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#26",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L727"
+  },
+  {
+   "text": "Step 1: Check zome surface",
+   "line": 787,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#27",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L787"
+  },
+  {
+   "text": "Step 2 (conditional): Add update_rea_commitment_state coordinator function",
+   "line": 796,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#28",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L796"
+  },
+  {
+   "text": "Step 3: Add call_update_rea_commitment_state to conductor_writes",
+   "line": 855,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#29",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L855"
+  },
+  {
+   "text": "Step 4: Migrate ReaCommitmentService::update_state",
+   "line": 859,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#30",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L859"
+  },
+  {
+   "text": "Step 5: Thread through PATCH handler in http.rs",
+   "line": 863,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#31",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L863"
+  },
+  {
+   "text": "Step 6: Extend integration test",
+   "line": 867,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#32",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L867"
+  },
+  {
+   "text": "Step 7: Commit",
+   "line": 882,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#33",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L882"
+  },
+  {
+   "text": "Step 1: Add the failing test",
+   "line": 909,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#34",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L909"
+  },
+  {
+   "text": "Step 2: Run and confirm compile failure (drives Task 8)",
+   "line": 961,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#35",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L961"
+  },
+  {
+   "text": "Step 3: Commit",
+   "line": 968,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#36",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L968"
+  },
+  {
+   "text": "Step 1: Inspect content_store zome surface",
+   "line": 994,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#37",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L994"
+  },
+  {
+   "text": "Step 2: Mirror the REA commitment migration pattern for content",
+   "line": 1003,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#38",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1003"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 1011,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#39",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1011"
+  },
+  {
+   "text": "Step 1: Read existing sweettest scaffolding",
+   "line": 1035,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#40",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1035"
+  },
+  {
+   "text": "Step 2: Write the two-conductor test",
+   "line": 1044,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#41",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1044"
+  },
+  {
+   "text": "Step 3: Run sweettest",
+   "line": 1101,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#42",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1101"
+  },
+  {
+   "text": "Step 1: Push to dev",
+   "line": 1131,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#43",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1131"
+  },
+  {
+   "text": "Step 2: Wait for orchestrator + downstream pipelines",
+   "line": 1138,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#44",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1138"
+  },
+  {
+   "text": "Step 3: Probe alpha",
+   "line": 1142,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#45",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1142"
+  },
+  {
+   "text": "Step 4: Doorway pod robustness check",
+   "line": 1168,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#46",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1168"
+  },
+  {
+   "text": "Step 5: A2o scenario (regression seatbelt)",
+   "line": 1172,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#47",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1172"
+  },
+  {
+   "text": "Step 6: Update manifest + close the FeaturePromise",
+   "line": 1193,
+   "state": "OPEN",
+   "id": "plans__2026-05-26-substrate-rea-replication-fix#48",
+   "cites": "genesis/docs/superpowers/plans/2026-05-26-substrate-rea-replication-fix.md#L1193"
+  }
+ ]
+}

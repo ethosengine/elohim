@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "sccache-cache-corruption-recovery",
+  "claim": "sccache 'unclosed delimiter'/null-byte = .sccache_check 404 leaked into rustc probe; empty bucket (a wipe!) triggers it; fix RUSTC_WRAPPER='' or heal sentinel.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_sccache_cache_corruption_recovery.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_sccache_cache_corruption_recovery.md",
+        "cid": "bafkreiakrz2y6dce4swfdet7pedzpsl35pljkcjkdcj6ggbgtcix3ryqma"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "sccache cache corruption recovery",
+    "file": "feedback_sccache_cache_corruption_recovery.md",
+    "scopePath": ".claude/memory/feedback_sccache_cache_corruption_recovery.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

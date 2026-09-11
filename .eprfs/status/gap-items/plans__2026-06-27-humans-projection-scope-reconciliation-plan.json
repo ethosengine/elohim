@@ -1,0 +1,279 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md",
+ "slug": "plans__2026-06-27-humans-projection-scope-reconciliation-plan",
+ "method": "checkbox-tasks",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "count": 33,
+ "items": [
+  {
+   "text": "Step 1: Read the module + confirm the re-export path. Read db/context.rs (the AppContext doc says",
+   "line": 110,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L110",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Write the failing test. Add to the existing #[cfg(test)] mod tests in db/context.rs:",
+   "line": 114,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L114",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Run, verify FAIL. cargo test --lib db::context::tests::humans_happ_id_is_imagodei \u2192",
+   "line": 127,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L127",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Add the const. In db/context.rs, above pub struct AppContext:",
+   "line": 130,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L130",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Run, verify PASS. cargo test --lib db::context::tests::humans_happ_id_is_imagodei \u2192 PASS",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L152",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: Commit",
+   "line": 154,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L154",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test. In the peer_selection test module, seed: a peer_statuses row",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L177",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run, verify FAIL. cargo test --lib peer_selection -- --nocapture \u2192 the new test FAILs",
+   "line": 185,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L185",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Change both humans filters to the canonical scope. Add use crate::db::context::HUMANS_HAPP_ID;",
+   "line": 188,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L188",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run, verify PASS. cargo test --lib peer_selection -- --nocapture \u2192 all PASS (the new test",
+   "line": 208,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L208",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Commit",
+   "line": 212,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L212",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Update the join to the const + drop the param (production code). In build_salvage_candidates,",
+   "line": 239,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L239",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Update the call site. In main.rs, the salvage tick call to run_salvage_pass \u2014 remove the",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L257",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Migrate the 1b tests to the canonical scope. In the salvage #[cfg(test)] mod tests: change",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L273",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run, verify PASS. cargo test --lib salvage_commitment_author -- --nocapture \u2192 all PASS",
+   "line": 299,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L299",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Build the binary (the call-site arg change is binary-only)",
+   "line": 301,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#16",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L301",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the failing test",
+   "line": 323,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#17",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L323",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Run, verify FAIL. cargo test --lib cache_queries:: \u2192 FAIL (rows.len()==0)",
+   "line": 348,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#18",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L348",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Change the humans filter. Add use crate::db::context::HUMANS_HAPP_ID; to the file imports",
+   "line": 350,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#19",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L350",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Run, verify PASS. cargo test --lib cache_queries:: \u2192 PASS",
+   "line": 362,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#20",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L362",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Locate + read. Confirm handle_list_humans at http.rs:8405-8420 and that db/humans.rs",
+   "line": 384,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#21",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L384",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Write the failing test (in db/humans.rs #[cfg(test)], the unit the handler delegates to):",
+   "line": 387,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#22",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L387",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Run, verify PASS (this test passes immediately \u2014 it documents the contract). Then write the",
+   "line": 405,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#23",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L405",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Change the handler call. At http.rs:8412:",
+   "line": 409,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#24",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L409",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 5: Run + build. cargo test --lib db::humans:: \u2192 PASS; cargo build --bin elohim-storage \u2192",
+   "line": 418,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#25",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L418",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Route register_human. At api/identity.rs:112, replace h_app_id: \"imagodei\".to_string()",
+   "line": 440,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#26",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L440",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Route genesis_self_heal. At services/genesis_self_heal.rs:109, replace",
+   "line": 444,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#27",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L444",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Build + targeted tests. cargo build --bin elohim-storage \u2192 Finished;",
+   "line": 447,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#28",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L447",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit (selective-stage; do NOT include ambient identity.rs hunks)",
+   "line": 453,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#29",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L453",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1: Write the a2o scenario (household floor \u2014 M/J/J; NO). Assert the",
+   "line": 470,
+   "state": "OPEN",
+   "requires_env": [
+    "shem"
+   ],
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#30",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L470",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: Update the backlog item. Append a section to",
+   "line": 486,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#31",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L486",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: Capture the sibling, do NOT absorb. Add a one-line backlog item (home:",
+   "line": 492,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#32",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L492",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: Commit",
+   "line": 497,
+   "state": "OPEN",
+   "id": "plans__2026-06-27-humans-projection-scope-reconciliation-plan#33",
+   "cites": "genesis/docs/superpowers/plans/2026-06-27-humans-projection-scope-reconciliation-plan.md#L497",
+   "class": "provisional"
+  }
+ ]
+}

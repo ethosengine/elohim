@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:implementer@claude-opus-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "ci-playwright image is ci-builder + playwright layer",
+  "claim": "ci-playwright is a thin layer on ci-builder (node20+pnpm+CHROME_BIN) bundling playwright@1.59.1; root launch needs no --no-sandbox (auto-disabled in containers)",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_ci_playwright_image.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_ci_playwright_image.md",
+        "cid": "bafkreigqscw6osocmon6qiu637xba5567pfwrggxh5qqiblfyilb3di3lu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "ci-playwright = ci-builder + playwright",
+    "file": "project_ci_playwright_image.md",
+    "scopePath": ".claude/memory/project_ci_playwright_image.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "project",
+    "indexed": false
+  }
+}
