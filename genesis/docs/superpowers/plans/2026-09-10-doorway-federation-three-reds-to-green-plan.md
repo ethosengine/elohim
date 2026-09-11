@@ -129,7 +129,7 @@ Six tasks. Tasks 1 and 2 are **Opus** (feature authoring). Tasks 3–6 are **Son
 - Produces the step phrases Task 4 defines in `genesis/a2o/steps/ui/hosted-human.steps.ts`.
 - Produces `@concern:hosted-compute-contracted`, attached to `hosted-human-lifecycle.habit.md` `checks:` by Task 3.
 
-- [ ] **Step 1: Write the feature file**
+- [x] **Step 1: Write the feature file**
 
 Write exactly this to `genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature`. The file-level tags are the brief's, verbatim. The two portal-driven scenarios carry `@browser-only` at scenario level so the `mesh` profile (which excludes `@browser-only`) still runs the API-side scenarios and the `mesh-browser` profile runs the portal ones — the series is judged from two sides and the two sides run in two profiles.
 
@@ -211,7 +211,7 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
     And the withdrawn commitment is still readable as a promise that was made and ended
 ```
 
-- [ ] **Step 2: Check it parses and count the undefined steps**
+- [x] **Step 2: Check it parses and count the undefined steps**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -221,11 +221,11 @@ rm -f ./.cuke-scope-tmp.json
 ```
 Expected: `5 scenarios`, and a list of undefined steps (they are Task 4's work). A parse error is a failure of this step; undefined steps are not.
 
-- [ ] **Step 3: Blind-reader loop**
+- [x] **Step 3: Blind-reader loop**
 
 Dispatch the `blind-reader` agent with **only** this prompt content: the path `genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature` and the profile name `a2o-story`. Give it nothing else — no plan, no habit, no code. Revise the file against its report. **Then dispatch a FRESH `blind-reader`** on the revised file with the same prompt. Repeat until a fresh reader reports READY with no interpretability finding.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /projects/elohim
@@ -249,7 +249,7 @@ git commit -m "story(a2o): hosted by a household — the lent compute is a notar
 - Consumes the Prologue cast from Task 5 (N=3 hosted registrants, one on doorway A's pool via adam, two via matthew).
 - Produces `@concern:humans-served`, attached to `hosted-human-lifecycle.habit.md` `checks:` by Task 3.
 
-- [ ] **Step 1: Write the feature file**
+- [x] **Step 1: Write the feature file**
 
 Write exactly this to `genesis/a2o/features/dataplane/doorway-humans-served.feature`. File-level tags are the brief's, verbatim.
 
@@ -320,7 +320,7 @@ Feature: Humans served — a doorway counts the people it is actually hosting
     And the humans-served count of doorway "alpha" is what it was recorded as
 ```
 
-- [ ] **Step 2: Check it parses**
+- [x] **Step 2: Check it parses**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -330,11 +330,11 @@ rm -f ./.cuke-scope-tmp.json
 ```
 Expected: `5 scenarios`; `doorway "alpha" at "E2E_DOORWAY_ALPHA"` and `doorway "beta" at "E2E_DOORWAY_B"` resolve to the existing definition at `genesis/a2o/steps/mode-aware.steps.ts:95`; the rest are undefined (Task 4's work).
 
-- [ ] **Step 3: Blind-reader loop**
+- [x] **Step 3: Blind-reader loop**
 
 Same discipline as Task 1 Step 3: `blind-reader`, path only, `a2o-story` profile, revise, **fresh reader**, repeat until READY.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /projects/elohim
@@ -355,7 +355,7 @@ git commit -m "story(a2o): humans served — a doorway counts the people it host
 - Modify: `genesis/a2o/features/auth/hosted-human/README.md` (Stations table)
 - Modify: `doorway/doorway-service/.epr-meta/hosted-human-lifecycle.habit.md` (`checks:` list only — not the body)
 
-- [ ] **Step 1: Add the station row**
+- [x] **Step 1: Add the station row**
 
 In the `## Stations` table of `genesis/a2o/features/auth/hosted-human/README.md`, append one row after station 8. **Note the numbering:** the table's `#` column is a *station* number (0–8), not the file number — station 8 is `05-leaving.feature`. The new file is `07-hosted-by-a-household.feature` and it becomes station **9**:
 
@@ -365,7 +365,7 @@ In the `## Stations` table of `genesis/a2o/features/auth/hosted-human/README.md`
 
 Set the State cell to `written, @wip` if Task 4 has not landed when you write this row, and to the text above once it has.
 
-- [ ] **Step 2: Attach both concerns to the habit's `checks:`**
+- [x] **Step 2: Attach both concerns to the habit's `checks:`**
 
 Append two entries to the `checks:` list in `doorway/doorway-service/.epr-meta/hosted-human-lifecycle.habit.md` (frontmatter only; do not touch the DELTA body):
 
@@ -374,7 +374,7 @@ Append two entries to the `checks:` list in `doorway/doorway-service/.epr-meta/h
   - "a2o @concern:humans-served (genesis/a2o/features/dataplane/doorway-humans-served.feature — @act:i; needs `just mesh prologue` to have cast the hosted humans: `just test mesh features/dataplane/doorway-humans-served.feature`. The count is doorway-local and substrate-derived; a federation-wide aggregate is a different number and is not this check.)"
 ```
 
-- [ ] **Step 3: Re-project and verify**
+- [x] **Step 3: Re-project and verify**
 
 ```bash
 cd /projects/elohim
@@ -383,7 +383,7 @@ python3 .claude/scripts/habits-status.py --full | sed -n '1,40p'
 ```
 Expected: `habits.yaml` regenerates with both new checks under `hosted-human-lifecycle`; the status render still shows it `red` and `active: false`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /projects/elohim
