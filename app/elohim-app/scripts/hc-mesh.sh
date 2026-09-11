@@ -264,6 +264,13 @@ HAPP_WORKDIR="$REPO_ROOT/elohim/holochain/dna/elohim/workdir"
 # Deserialize (get_record_for_action input shape moved) that the probe below mislabelled
 # as a stale token.
 HAPP_PATH="${MESH_HAPP_PATH:-$HAPP_WORKDIR/elohim.happ}"
+# The node-local compute capability shared by a storage peer and the doorway whose
+# pool it backs. Storage refuses /api/v1/compute/* unless ELOHIM_COMPUTE_LOCAL_API=1
+# AND the bearer matches ELOHIM_COMPUTE_LOCAL_TOKEN (compute_tasks.rs local_token_
+# authorized: expected must be >= 32 bytes, compared by sha256). Two processes on one
+# household, never a public credential — so a fixed dev default is right here, and
+# MESH_COMPUTE_LOCAL_TOKEN overrides it for a run that wants its own.
+MESH_COMPUTE_LOCAL_TOKEN="${MESH_COMPUTE_LOCAL_TOKEN:-mesh-local-compute-capability-dev-0000}"
 POOL="/projects/.cargo-target-pool/family/dev"
 # Storage binary: the release pool slot when it exists, else the dev (debug) slot — the one
 # `just gate elohim-storage` and the iroh build command below actually fill. Before 2026-08-28
@@ -1998,6 +2005,24 @@ sandbox_agent_key() { # <admin-port> -> prints uhCAk…, or nothing
     | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4
 }
 
+# The same key, CACHED to disk. The doorways boot BEFORE the conductors (doorway A is
+# the island DHT's bootstrap + signal home), so on a cold start POOL_COMPUTE_PERFORMER
+# — which must be the pool peer's OWN cell actor or the grant surface answers 403
+# local-cell-actor-required (compute_tasks.rs same_actor) — is not yet knowable from a
+# running conductor. The sandbox data dir persists across stop/start, so the key does
+# too: cache it whenever a conductor answers, read the cache when none does. A cold
+# first-ever start still converges in one pass via reconcile_doorway_pool_performer.
+peer_agent_key() { # <peer-index> <peer-name> -> prints uhCAk…, or nothing
+  local cache="$MESH_DIR/$2/agent-pubkey" key
+  key="$(sandbox_agent_key "$(admin_port "$1")")"
+  if [ -n "$key" ]; then
+    mkdir -p "$MESH_DIR/$2"; printf '%s\n' "$key" > "$cache"
+  elif [ -s "$cache" ]; then
+    key="$(head -1 "$cache")"
+  fi
+  printf '%s' "$key"
+}
+
 peer_index_of() { # <peer-name> -> prints the index in PEERS, or returns 1
   local i=0 n
   for n in "${PEERS[@]}"; do [ "$n" = "$1" ] && { echo "$i"; return 0; }; i=$((i + 1)); done
@@ -2027,6 +2052,11 @@ restart_env_overlay() { # <captured-environ> <peer-name>
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
     printf '%s\n' "ELOHIM_DOORWAY_URL=http://localhost:$DOORWAY_PORT"
   fi
+  # The node-local compute capability. A peer captured before this wiring existed has
+  # neither key, and without them the doorway's hosted-cell grant leg gets
+  # 503 "local compute API disabled" on every hosted registration.
+  printf '%s\n' "ELOHIM_COMPUTE_LOCAL_API=1" \
+    "ELOHIM_COMPUTE_LOCAL_TOKEN=$MESH_COMPUTE_LOCAL_TOKEN"
   storage_ark_env "$2"
   if [ "${MESH_RESTART_APPLY_PROFILE:-0}" = "1" ]; then
     printf '%s\n' \
@@ -2493,6 +2523,8 @@ start_storage_peer() { # <peer-name> <peer-index>
     ALLOW_SEED_NETWORK_STAKES=1 \
     ALLOW_SEED_DELEGATES_COMPUTE=1 \
     ALLOW_SEED_SHARD_MANIFEST=1 \
+    ELOHIM_COMPUTE_LOCAL_API=1 \
+    ELOHIM_COMPUTE_LOCAL_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     setsid nohup "$STORAGE_BIN" --http-port "$(http_port "$i")" > "$LOGDIR/$name.log" 2>&1 &
     record_mesh_pid storage "$name" "$!" || true
     capture_storage_environ "$name" "$!" "$STORAGE_BIN"
@@ -3085,6 +3117,33 @@ EOF
     # doorway A answered 403 {"error":"Forbidden"} x-membrane:deny to the rest of the lane.
     # Override per run; the fleet keeps the binary defaults.
     #
+    # HOSTED PROVISIONING IS REAL NOW. Until 60fb28a39 a --dev-mode doorway skipped
+    # provisioning entirely and every hosted registration rode the singleton-Human
+    # recovery (one shared key); `should_provision` (auth_routes.rs) removed that path
+    # by design. So the doorway must install a cell for each hosted human, from a bundle
+    # that EXISTS on this host: HAPP_BUNDLE_PATH defaults to the container path
+    # /app/elohim.happ (config.rs), which on the mesh is NotFound -> 503
+    # PROVISIONING_FAILED on every registration (measured 2026-09-11, run
+    # 20260911T0231Z). Point it at the same packed bundle the sandboxes install.
+    #
+    # POOL_COMPUTE_* names the storage peer this doorway's pool is backed by, which
+    # NOTARIZES each hosted cell as a promise (POST /api/v1/compute/grants). All three
+    # are required together or the leg is skipped silently (pool_compute_config), and the
+    # grant surface refuses unless ELOHIM_COMPUTE_LOCAL_API=1 on that peer, the bearer
+    # matches its ELOHIM_COMPUTE_LOCAL_TOKEN, and X-Verified-Performer is the peer's OWN
+    # cell actor (compute_tasks.rs same_actor) — hence peer_agent_key, cached because the
+    # doorways boot before the conductors.
+    #
+    # DOORWAY_MAX_AGENTS_PER_CONDUCTOR: the fleet default is 50, an OPERATOR ceiling on
+    # kitsune2's per-space gossip budget (main.rs: arc convergence stalls past ~30 hosted
+    # agents on one conductor). The Prologue's cast is 26 hosted humans + 3 prologue-hosted
+    # registrants on ONE mesh conductor, and provisioner.rs registers each agent TWICE
+    # (URL_SAFE_NO_PAD and STANDARD base64) while registry.rs::register_agent increments
+    # capacity_used unconditionally — so 50 bites after ~25 cells, measured 2026-09-11:
+    # 26 provisions took conductor-0 to 50/50 from a seeded 0. Raise it here so the
+    # household can cast the roster it declares; the accounting defect stays named, not
+    # hidden, and MESH_DOORWAY_MAX_AGENTS pins it back down for a convergence experiment.
+    #
     # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
     # continuation, so everything above it becomes a plain shell assignment that the
     # nohup command never sees. 2026-08-22 (123cea498) that severed DOORWAY_ID and
@@ -3106,6 +3165,11 @@ EOF
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     DOORWAY_MANIFEST_BOARD_ENABLED="${DOORWAY_MANIFEST_BOARD_ENABLED:-true}" \
+    HAPP_BUNDLE_PATH="$HAPP_PATH" \
+    POOL_COMPUTE_URL="$primary" \
+    POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
+    POOL_COMPUTE_PERFORMER="$(peer_agent_key 0 "${PEERS[0]}")" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-200}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --app-port-min "$(app_port 0)" \
@@ -3125,6 +3189,9 @@ EOF
   # signal (A owns discovery — two mem-bootstrap doorways would partition the
   # island DHT). Gives the saga's cross-doorway legs a LOCAL target instead of
   # bleeding to the live production doorway (E2E_DOORWAY_B).
+  # Same hosted-provisioning wiring as A (see the block above), against B's OWN pool
+  # peer: jessica (:8091) is B's primaryStorageUrl in the household fixture, so she is
+  # the household that notarizes what B hosts. No comment lines inside the list below.
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     local gw_b=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_b=("DOORWAY_URL=http://localhost:$DOORWAY_B_PORT")
@@ -3142,6 +3209,11 @@ EOF
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     DOORWAY_MANIFEST_BOARD_ENABLED="${DOORWAY_MANIFEST_BOARD_ENABLED:-true}" \
+    HAPP_BUNDLE_PATH="$HAPP_PATH" \
+    POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 1)" \
+    POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
+    POOL_COMPUTE_PERFORMER="$(peer_agent_key 1 "${PEERS[1]}")" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-200}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
       --app-port-min "$(app_port 1)" \
@@ -3304,6 +3376,7 @@ EOF
   done
 
   refresh_mesh_pidfiles
+  reconcile_doorway_pool_performer
 
   echo
   status_all
@@ -3469,6 +3542,31 @@ stop_storage() { # <peer>
   if live_recorded_pid storage "$name" >/dev/null; then kill -9 "$pid"; fi
 }
 
+# A doorway boots BEFORE the conductors, so on a cold start it cannot know its pool
+# peer's cell actor key and boots with POOL_COMPUTE_PERFORMER empty — which
+# pool_compute_config reads as "not configured" and the hosted-cell grant leg is skipped
+# for the whole life of that process (registration still works; the promise just goes
+# unrecorded and humansServed reads 0). Once storage is up the key IS knowable: correct
+# it and restart only the doorway that is wrong. Every later start reads the cache and
+# boots right the first time.
+reconcile_doorway_pool_performer() {
+  [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] || return 0
+  local spec name idx want pid have
+  for spec in a:0 b:1; do
+    name="${spec%%:*}"; idx="${spec##*:}"
+    [ "${#PEERS[@]}" -gt "$idx" ] || continue
+    want="$(peer_agent_key "$idx" "${PEERS[$idx]}")"
+    [ -n "$want" ] || continue
+    pid="$(live_recorded_pid doorway "$name")" || continue
+    have="$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^POOL_COMPUTE_PERFORMER=//p' | head -1)"
+    [ "$have" = "$want" ] && continue
+    echo "doorway $name: pool performer ${have:-<unset>} -> ${want:0:16}… (restarting to arm the hosted-cell grant leg)"
+    export MESH_DOORWAY_ENV_SET="POOL_COMPUTE_PERFORMER=$want"
+    restart_doorway "$name" || true
+    unset MESH_DOORWAY_ENV_SET
+  done
+}
+
 restart_doorway() { # <a|b> [extra SSR slug]
   local name="$1" slug="${2:-}" pid next
   case "$name" in a|b) ;; *) echo 'REFUSED: doorway must be a or b' >&2; return 1 ;; esac
@@ -3480,6 +3578,13 @@ with open(f'/proc/{pid}/environ', 'rb') as f:
     env = dict(item.decode().split('=', 1) for item in f.read().split(b'\0') if b'=' in item)
 with open(f'/proc/{pid}/cmdline', 'rb') as f:
     argv = [part.decode() for part in f.read().split(b'\0') if part]
+# MESH_DOORWAY_ENV_SET (newline-separated K=V) layers onto the captured environment.
+# The capture is otherwise authoritative — this is the ONE way a caller corrects a value
+# the doorway could not know at boot (POOL_COMPUTE_PERFORMER; see peer_agent_key).
+for item in os.environ.get('MESH_DOORWAY_ENV_SET', '').split('\n'):
+    if '=' in item:
+        k, v = item.split('=', 1)
+        env[k] = v
 cwd = os.readlink(f'/proc/{pid}/cwd')
 exe = os.readlink(f'/proc/{pid}/exe').removesuffix(' (deleted)')
 if not os.path.isfile(exe) or not os.access(exe, os.X_OK):
