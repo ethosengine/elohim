@@ -704,6 +704,11 @@ pub(super) fn execute(
     let mut bootstrap_projection_value: Option<Value> = None;
     let mut bootstrap_render: Option<Value> = None;
     let mut bootstrap_usage = Value::Null;
+    // Fix round 2, finding 2: the top red's own atom/check actions, handed FIRST in the Linked
+    // choices — built here (not in `render.rs`) because they need `args` for `action()`'s argv,
+    // and the choice of WHICH atom/check to point at is the same auditable projection as
+    // everything else `bootstrap_projection` returns.
+    let mut bootstrap_priority_actions: Vec<Value> = Vec::new();
     if new_ceremony {
         if args.operation != "open" {
             return Err(refused("start with open; no ceremony continuation exists"));
@@ -743,13 +748,63 @@ pub(super) fn execute(
                 Some(habit) => json!({"id": habit.id, "check": habit.check}),
                 None => json!({"id": "none", "check": "no red habit; orient"}),
             });
-            bootstrap_projection_value = Some(json!({
+            let mut projection_value = json!({
                 "purpose": "bootstrap",
                 "audience": "private",
                 "inputs": projection.inputs,
                 "omissions": projection.omissions,
-            }));
+            });
+            // Fix round 2, finding 1: the atom and its last delta — only when the top red has
+            // one, never fabricated for "no red habit" or an atom the search could not find.
+            if let Some(atom) = &projection.atom {
+                projection_value["atom"] = json!(atom);
+            }
+            if let Some((text, lines)) = &projection.last_delta {
+                projection_value["last_delta"] = json!({"text": text, "lines": lines});
+            }
+            bootstrap_projection_value = Some(projection_value);
             bootstrap_usage = usage;
+
+            // Fix round 2, finding 2: (a) read the atom's own last delta — or, absent a delta,
+            // the atom's own head — FIRST; (b) source the first check's feature file, if it names
+            // one. Both read-only (finding 3): `read`/`source` never write.
+            match (&projection.atom, &projection.last_delta) {
+                (Some(atom), Some((_, lines))) => {
+                    let mut read_action = action(
+                        args,
+                        &format!("Read the top red's last delta — {atom} ({lines})"),
+                        "read",
+                        &[("path", json!(atom)), ("lines", json!(lines))],
+                    );
+                    read_action["bootstrap_priority"] = json!(true);
+                    bootstrap_priority_actions.push(read_action);
+                }
+                (Some(atom), None) => {
+                    let mut read_action = action(
+                        args,
+                        &format!("Read the top red's atom — {atom}"),
+                        "read",
+                        &[("path", json!(atom)), ("lines", json!("1:20"))],
+                    );
+                    read_action["bootstrap_priority"] = json!(true);
+                    bootstrap_priority_actions.push(read_action);
+                }
+                (None, _) => {}
+            }
+            if let Some(feature) = projection
+                .top_red
+                .as_ref()
+                .and_then(|habit| first_feature_path(&habit.check))
+            {
+                let mut source_action = action(
+                    args,
+                    &format!("Read the top red's first check — {feature}"),
+                    "source",
+                    &[("path", json!(feature))],
+                );
+                source_action["bootstrap_priority"] = json!(true);
+                bootstrap_priority_actions.push(source_action);
+            }
             intent
         } else {
             args.intent
@@ -803,6 +858,12 @@ pub(super) fn execute(
     }
     if !bootstrap_usage.is_null() {
         add_usage(&mut view["usage"], &bootstrap_usage);
+    }
+    // Pushed BEFORE the ceremony's own actions below (fix round 2, finding 2) — Linked-choice
+    // order follows push order, and a bootstrap reader's first move must be the top red's own
+    // evidence, never the ceremony's stale-edge scan.
+    for priority_action in bootstrap_priority_actions {
+        push_action(&mut view, priority_action);
     }
 
     let has_measurements = !recipe["measurements"].is_null();

@@ -546,6 +546,154 @@ fn an_all_green_register_still_orients_honestly() {
     assert!(omissions.contains(&"no red habit; orient"), "{v}");
 }
 
+// ── station 2.1, fix round 2 (controller review, two context-reset readers) ────────────────────────
+//
+// Both readers named the top red and its check from one screen but were both missing the same
+// two things: the habit atom's own path and its LAST DELTA (what was last proven), and one took a
+// wrong first step because the ONE handed Linked choice at minimal/simple was the ceremony's
+// stale-edge `select`, not the top red's own evidence.
+
+/// The commands actually printed under `Linked choices:` — one per `  <command>` line, in the
+/// order rendered (render_linked_choices's own "label\n  command\n" pairing, so this ignores the
+/// label lines entirely and reads only the indented command lines).
+fn linked_choice_commands(text: &str) -> Vec<String> {
+    text.split("Linked choices:\n")
+        .nth(1)
+        .unwrap_or_default()
+        .lines()
+        .filter(|line| line.starts_with("  "))
+        .map(|line| line.trim().to_string())
+        .collect()
+}
+
+/// A red `alpha` habit whose atom lives at `docs/.epr-meta/alpha.habit.md` with two DELTA
+/// paragraphs (newest first) and whose register check names a real `.feature` file.
+fn write_alpha_bootstrap_fixture(root: &std::path::Path) {
+    write(
+        root,
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: alpha\n  status: red\n  active: true\n  checks: ['a2o @concern:alpha (genesis/a2o/features/alpha-flow.feature)']\n  invariant: alpha holds\n",
+    );
+    write(
+        root,
+        "docs/.epr-meta/alpha.habit.md",
+        "---\nid: alpha\nstatus: red\n---\nDELTA 2026-09-11: the newest delta line for alpha.\n\nDELTA 2026-09-01: an older delta line that must not be selected.\n",
+    );
+    write(
+        root,
+        "genesis/a2o/features/alpha-flow.feature",
+        "Feature: alpha flow\n",
+    );
+}
+
+/// Finding 1: the atom's own path and its NEWEST delta paragraph (never the older one) render
+/// under the top-red line. Finding 2: at `minimal` the single Linked choice is the `read` of
+/// exactly that delta's line range, `5:5` for this fixture — never the ceremony's stale-edge scan.
+#[test]
+fn bootstrap_renders_the_atoms_last_delta_and_reads_it_at_minimal() {
+    let dir = repo();
+    write_alpha_bootstrap_fixture(dir.path());
+    let text = text_in(
+        dir.path(),
+        "boot-atom-minimal",
+        &["open", "--purpose", "bootstrap", "--lens", "minimal"],
+    );
+    assert!(
+        text.contains("last delta: DELTA 2026-09-11: the newest delta line for alpha."),
+        "{text}"
+    );
+    assert!(
+        !text.contains("an older delta line"),
+        "the older paragraph must not be selected:\n{text}"
+    );
+    assert!(
+        text.contains("atom: docs/.epr-meta/alpha.habit.md"),
+        "{text}"
+    );
+    let commands = linked_choice_commands(&text);
+    assert_eq!(commands.len(), 1, "{text}");
+    assert!(
+        commands[0].contains("read")
+            && commands[0].contains("--path docs/.epr-meta/alpha.habit.md")
+            && commands[0].contains("--lines 5:5"),
+        "{}",
+        commands[0]
+    );
+}
+
+/// Finding 2: at `simple` (`choice_count` 3) the first two Linked choices are the atom's `read`
+/// and the check's `source` — in that order, ahead of any concern-edge `select`.
+#[test]
+fn bootstrap_hands_the_read_then_the_source_at_simple() {
+    let dir = repo();
+    write_alpha_bootstrap_fixture(dir.path());
+    let text = text_in(
+        dir.path(),
+        "boot-atom-simple",
+        &["open", "--purpose", "bootstrap", "--lens", "simple"],
+    );
+    let commands = linked_choice_commands(&text);
+    assert!(commands.len() >= 2, "{text}");
+    assert!(
+        commands[0].contains("read") && commands[0].contains("docs/.epr-meta/alpha.habit.md"),
+        "{}",
+        commands[0]
+    );
+    assert!(
+        commands[1].contains("source")
+            && commands[1].contains("genesis/a2o/features/alpha-flow.feature"),
+        "{}",
+        commands[1]
+    );
+}
+
+/// An atom whose body carries no delta paragraph at all (frontmatter only) renders the honest
+/// `last delta: none recorded` — never fabricated, and never the refusal a genuinely unreadable
+/// REGISTER earns (fix round 1) — this atom is supplementary evidence, not the register itself.
+#[test]
+fn an_atom_with_no_delta_renders_none_recorded() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: beta\n  status: red\n  active: true\n  checks: ['a2o @concern:beta']\n  invariant: beta holds\n",
+    );
+    write(
+        dir.path(),
+        "docs/.epr-meta/beta.habit.md",
+        "---\nid: beta\nstatus: red\n---\n",
+    );
+    let text = text_in(
+        dir.path(),
+        "boot-atom-nodelta",
+        &["open", "--purpose", "bootstrap", "--lens", "minimal"],
+    );
+    assert!(text.contains("last delta: none recorded"), "{text}");
+}
+
+/// Finding 3: at `minimal`/`simple`, a bootstrap view's Linked choices are read-only operations
+/// only (`read`, `source`, `select`, `history`, `resume`) — never `prepare`, `reconcile`, `finish`
+/// or `remember`.
+#[test]
+fn bootstrap_linked_choices_are_read_only_at_minimal_and_simple() {
+    let dir = repo();
+    write_alpha_bootstrap_fixture(dir.path());
+    for lens in ["minimal", "simple"] {
+        let text = text_in(
+            dir.path(),
+            &format!("boot-readonly-{lens}"),
+            &["open", "--purpose", "bootstrap", "--lens", lens],
+        );
+        for command in linked_choice_commands(&text) {
+            let operation = command.split_whitespace().nth(4).unwrap_or_default();
+            assert!(
+                ["read", "source", "select", "history", "resume"].contains(&operation),
+                "writing operation `{operation}` offered at {lens}:\n{text}"
+            );
+        }
+    }
+}
+
 // ── fix round 2: an operation's own result renders at every lens, not just standard+ ──────────────
 //
 // A fresh reader found `read`, `source` and `history` printing NO primary payload at `simple`/

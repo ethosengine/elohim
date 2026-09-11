@@ -62,7 +62,7 @@ mod measure;
 use measure::measure;
 
 mod discovery;
-use discovery::{bootstrap_projection, first_screen, outline};
+use discovery::{bootstrap_projection, first_feature_path, first_screen, outline};
 pub use discovery::{discover, discover_scored};
 
 mod providers;

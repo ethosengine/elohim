@@ -885,13 +885,17 @@ fn first_check(habit: &serde_yaml::Value) -> String {
         .to_string()
 }
 
-/// One habit as `--purpose bootstrap` needs it: which one, and its own first check line. A named
-/// struct rather than a bare `(String, String)` tuple so a caller reads `.id`/`.check` instead of
-/// `.0`/`.1`, and so [`bootstrap_projection`]'s return type stays simple enough for clippy's
-/// `type_complexity` lint without an `#[allow]`.
+/// One habit as `--purpose bootstrap` needs it: which one, its own first check line, and — when
+/// the register row itself carries one (fix round 2, finding 1: `declared:` or `atom:`, no
+/// generated `habits.yaml` row does today, but a hand-authored fixture or a future census may) —
+/// its atom's own declared path, so [`bootstrap_projection`] can skip the repo-wide search
+/// entirely when the register already names it. A named struct rather than a bare tuple so a
+/// caller reads `.id`/`.check` instead of `.0`/`.1`, and so [`bootstrap_projection`]'s return type
+/// stays simple enough for clippy's `type_complexity` lint without an `#[allow]`.
 pub(super) struct TopRedHabit {
     pub(super) id: String,
     pub(super) check: String,
+    pub(super) declared: Option<String>,
 }
 
 /// The register's own top red — never a term match. First habit in DECLARED order with
@@ -922,10 +926,16 @@ fn top_red_habit(text: &str) -> Result<Option<TopRedHabit>, String> {
             .unwrap_or_default()
             .to_string();
         let check = first_check(habit);
+        let declared = habit
+            .get("declared")
+            .or_else(|| habit.get("atom"))
+            .and_then(serde_yaml::Value::as_str)
+            .map(str::to_string);
         if first_red.is_none() {
             first_red = Some(TopRedHabit {
                 id: id.clone(),
                 check: check.clone(),
+                declared: declared.clone(),
             });
         }
         let active = habit
@@ -933,32 +943,155 @@ fn top_red_habit(text: &str) -> Result<Option<TopRedHabit>, String> {
             .and_then(serde_yaml::Value::as_bool)
             .unwrap_or(false);
         if active && first_active_red.is_none() {
-            first_active_red = Some(TopRedHabit { id, check });
+            first_active_red = Some(TopRedHabit {
+                id,
+                check,
+                declared,
+            });
         }
     }
     Ok(first_active_red.or(first_red))
 }
 
-/// `--purpose bootstrap`'s whole contribution: the session's [`TopRedHabit`], the
-/// `ProjectionRequest`-shaped `inputs` (raw CIDs of the exact bytes read, `{path, cid}`), and every
-/// omission along the way.
+/// Directories a repo-wide atom search must never descend into — the same set
+/// `discover`/`discover_scored` already read from the contract's own `/discovery/
+/// exclude_directories` (version-control, dependency and build trees; `worktrees` is literally
+/// another checkout). Reused rather than re-declared so the two traversals can never disagree
+/// about what is "irrelevant tree," and a repo that adds a new one only has to say so once.
+fn atom_search_excluded(contract: &Contract) -> BTreeSet<String> {
+    contract
+        .value
+        .pointer("/discovery/exclude_directories")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `.epr-meta/<id>.habit.md`, found anywhere under `root` — a habit atom's directory is not
+/// knowable from the register alone (fix round 2, finding 1): `habits.yaml` carries no
+/// `declared:`/`atom:` field for any row today (`.claude/scripts/_lib/epr_habits.py`'s
+/// `project_habit` deliberately drops `_source`/`_dir` — the census's own reference to the file
+/// it read — from every projected row; `TopRedHabit::declared` above is the forward-compatible
+/// path for a register that one day does carry it, but this is the operative one). The walk is
+/// small in practice (a few dozen `.epr-meta` directories across the whole monorepo) but still
+/// BOUNDED — by `habit_register_bytes`, the same budget the register itself reads under, applied
+/// here to the running total of scanned directory-ENTRY NAME bytes (never file content, and never
+/// the atom's own bytes once found — that read is a separate, ordinary bounded read through
+/// [`read_bootstrap_input`]). `None` on an exhausted budget or no match; never a refusal — a habit
+/// atom that cannot be located is supplementary evidence going missing, not the register itself
+/// failing to read (contrast [`read_bootstrap_habits`], which does refuse).
+fn find_habit_atom(root: &Path, contract: &Contract, id: &str, budget: usize) -> Option<PathBuf> {
+    let excluded = atom_search_excluded(contract);
+    let target = format!("{id}.habit.md");
+    let mut stack = vec![root.to_path_buf()];
+    let mut scanned_bytes = 0usize;
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        let mut children: Vec<_> = entries.flatten().collect();
+        children.sort_by_key(std::fs::DirEntry::file_name);
+        for entry in children {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            scanned_bytes += name.len();
+            if scanned_bytes > budget {
+                return None;
+            }
+            let Ok(meta) = entry.path().symlink_metadata() else {
+                continue;
+            };
+            if meta.file_type().is_symlink() || !meta.is_dir() || excluded.contains(&name) {
+                continue;
+            }
+            if name == ".epr-meta" {
+                let candidate = entry.path().join(&target);
+                if candidate.is_file() {
+                    return Some(candidate);
+                }
+            }
+            stack.push(entry.path());
+        }
+    }
+    None
+}
+
+/// The newest `DELTA`/`GREEN`/`RED WRITTEN` paragraph in a habit atom's BODY — the markdown below
+/// its closing frontmatter fence — as `(first line clipped to 160, "START:END" 1-based inclusive
+/// line range within the whole file)`. The FIRST paragraph, since atoms are written newest-first
+/// (the same convention `habit_row`'s evidence-first-paragraph extraction already relies on for
+/// the register's OWN evidence field — which is this exact body text, verbatim: `census()` in
+/// `.claude/scripts/_lib/epr_habits.py` promotes an atom's body straight into the projected row's
+/// `evidence:`). Read the atom directly rather than trusting the register's copy here because the
+/// LINE RANGE — needed for a `read --lines` command to point at — only exists against the real
+/// file. `None` for an atom with no frontmatter fence at all, or an empty body — rendered as
+/// `last delta: none recorded`, never fabricated.
+fn atom_last_delta(text: &str) -> Option<(String, String)> {
+    let mut lines = text.lines().enumerate();
+    if lines.next().map(|(_, line)| line.trim()) != Some("---") {
+        return None;
+    }
+    let body_start = lines
+        .find(|(_, line)| line.trim() == "---")
+        .map(|(index, _)| index + 2)?;
+    let all_lines: Vec<&str> = text.lines().collect();
+    let (mut start, mut end) = (None, body_start);
+    for (offset, line) in all_lines.iter().enumerate().skip(body_start - 1) {
+        let line_no = offset + 1;
+        if line.trim().is_empty() {
+            if start.is_some() {
+                break;
+            }
+            continue;
+        }
+        start.get_or_insert(line_no);
+        end = line_no;
+    }
+    let start = start?;
+    Some((clip(all_lines[start - 1], 160), format!("{start}:{end}")))
+}
+
+/// The first `genesis/a2o/features/….feature` token a check names, or `None` when it names no
+/// feature file — fix round 2, finding 2's `source` Linked choice. A plain substring scan (this
+/// repo's a2o checks always spell the path this way) rather than a regex dependency for one fixed
+/// prefix.
+pub(super) fn first_feature_path(check: &str) -> Option<String> {
+    const PREFIX: &str = "genesis/a2o/features/";
+    let start = check.find(PREFIX)?;
+    let rest = &check[start..];
+    let end = rest.find(".feature")? + ".feature".len();
+    Some(rest[..end].to_string())
+}
+
+/// `--purpose bootstrap`'s whole contribution: the session's [`TopRedHabit`], its habit atom's
+/// path and last delta (fix round 2, finding 1), the `ProjectionRequest`-shaped `inputs` (raw CIDs
+/// of the exact bytes read, `{path, cid}`), and every omission along the way.
 pub(super) struct BootstrapProjection {
     pub(super) top_red: Option<TopRedHabit>,
+    pub(super) atom: Option<String>,
+    pub(super) last_delta: Option<(String, String)>,
     pub(super) inputs: Vec<Value>,
     pub(super) omissions: Vec<String>,
 }
 
 /// The `eprfs_agent::memory::ProjectionRequest` struct itself is not imported here — its
 /// `collective: FileRef` field has no meaning for a bootstrap orientation (no collective-memory
-/// request is being authored), so this returns [`BootstrapProjection`]'s three fields
-/// (`purpose`/`audience` are constants the caller adds) instead of a partially-populated struct.
+/// request is being authored), so this returns [`BootstrapProjection`]'s fields (`purpose`/
+/// `audience` are constants the caller adds) instead of a partially-populated struct.
 ///
 /// Fail-closed on the register itself (fix round 1, finding 2): `habits.yaml` reads through
 /// [`read_bootstrap_habits`], which refuses rather than returning `None`, and a register that
 /// reads but does not PARSE as the register's own shape refuses here too — never orienting a
 /// reader from a broken register the same way an honest all-green one would. `flows.jsonl` keeps
 /// the earlier best-effort behaviour: absent or unreadable is named in `omissions`, never a
-/// refusal, because it is supplementary evidence, not the register itself.
+/// refusal, because it is supplementary evidence, not the register itself. The top red's atom and
+/// last delta (fix round 2) are the SAME best-effort class as `flows.jsonl`: a habit atom the
+/// search could not locate, or one whose body carries no delta paragraph, is named or left honestly
+/// empty — never a reason to refuse an otherwise-readable register.
 pub(super) fn bootstrap_projection(
     root: &Path,
     contract: &Contract,
@@ -986,12 +1119,51 @@ pub(super) fn bootstrap_projection(
         inputs.push(json!({"path": FLOWS_REL, "cid": BlobCid::compute_raw(&data).to_string()}));
     }
 
+    let mut atom: Option<String> = None;
+    let mut last_delta: Option<(String, String)> = None;
+    if let Some(habit) = &top_red {
+        let budget = contract.limit_usize("habit_register_bytes");
+        // The register row's own atom path when it carries one (fix round 2, finding 1) — no
+        // generated `habits.yaml` row does today, but skipping the search when it is already
+        // named is the whole point of carrying it. Else, the bounded repo-wide search.
+        let located = match &habit.declared {
+            Some(declared) => confine_under(root, &root.join(declared))
+                .ok()
+                .filter(|path| path.is_file()),
+            None => find_habit_atom(root, contract, &habit.id, budget),
+        };
+        match located {
+            Some(path) => {
+                let rel = rel_to_root(root, &path);
+                if let Some(data) = read_bootstrap_input(
+                    root,
+                    contract,
+                    &rel,
+                    "habit_atom_bytes",
+                    usage,
+                    &mut omissions,
+                )? {
+                    last_delta = atom_last_delta(&String::from_utf8_lossy(&data));
+                    inputs
+                        .push(json!({"path": rel, "cid": BlobCid::compute_raw(&data).to_string()}));
+                    atom = Some(rel);
+                }
+            }
+            None => omissions.push(format!(
+                "habit atom for {} was not located within budget",
+                habit.id
+            )),
+        }
+    }
+
     if top_red.is_none() {
         omissions.push("no red habit; orient".into());
     }
 
     Ok(BootstrapProjection {
         top_red,
+        atom,
+        last_delta,
         inputs,
         omissions,
     })

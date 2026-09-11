@@ -249,6 +249,13 @@ fn render_floor_line(
 /// the `Bootstrap:` line — they were previously carried in `--json` only, invisible to a human
 /// reader at every lens even though the same omissions now also count toward the floor line's own
 /// `omissions: N` ([`nested_omissions_count`]).
+///
+/// Fix round 2, finding 1: two readers who each got only the top-red id and its first check on
+/// one screen could not see what was last PROVEN — a `last delta:` line (the atom's own newest
+/// `DELTA`/`GREEN`/`RED WRITTEN` paragraph, clipped to 160, or the honest `none recorded`) and an
+/// `atom:` line (the declaration's own path) render under the top-red line, before the omission
+/// bullets. Both are absent from a `Bootstrap:` block whose top red is `"none"` — there is no
+/// atom to point at when the register carries no red habit.
 fn render_bootstrap_line(view: &Value) -> Option<String> {
     if view["projection"]["purpose"].as_str() != Some("bootstrap") {
         return None;
@@ -258,6 +265,18 @@ fn render_bootstrap_line(view: &Value) -> Option<String> {
         .as_str()
         .unwrap_or("no red habit; orient");
     let mut line = format!("Bootstrap: top red: {id} — {}\n", clip(check, 120));
+    if id != "none" {
+        let last_delta = view["projection"]["last_delta"]["text"].as_str();
+        line.push_str(&format!(
+            "last delta: {}\n",
+            last_delta
+                .map(|text| clip(text, 160))
+                .unwrap_or_else(|| "none recorded".to_string())
+        ));
+        if let Some(atom) = view["projection"]["atom"].as_str() {
+            line.push_str(&format!("atom: {atom}\n"));
+        }
+    }
     for omission in view["projection"]["omissions"]
         .as_array()
         .cloned()
@@ -475,20 +494,34 @@ fn action_for_path<'a>(actions: &'a [Value], path: &str) -> Option<&'a Value> {
 
 /// `minimal`/`simple` ONLY: the Linked choices actually offered, built from `shown` (see
 /// [`select_shown_candidates`]) rather than the view's raw unbounded action list — fix round 1's
-/// finding. Order: EVERY `[floor]`-marked shown candidate's command first, unconditionally (the
-/// anti-capture invariant: floor content is one command away at every lens, never bumped by rank
-/// or by the choice budget); then ordinary shown candidates' commands while the running total is
-/// still under `choice_count`; then the view's own session actions (recipe/history/resume/measure
-/// — anything with no `--path`, so a dropped candidate's command can never leak in as a "session"
-/// filler) in their existing order, filling whatever budget remains. A command naming a candidate
-/// the content floor did NOT keep never appears here, by construction: only `shown`'s own
-/// candidates are ever looked up.
+/// finding. Order: FIRST, every action `journey.rs` marked `bootstrap_priority` (fix round 2,
+/// finding 2 — `--purpose bootstrap`'s own read/source of the top red's atom and check, ahead of
+/// EVERYTHING else, including floor content: a bootstrap reader's very first move must be the
+/// evidence its own top red points at). Then EVERY `[floor]`-marked shown candidate's command,
+/// unconditionally (the anti-capture invariant: floor content is one command away at every lens,
+/// never bumped by rank or by the choice budget); then ordinary shown candidates' commands while
+/// the running total is still under `choice_count`; then the view's own session actions
+/// (recipe/history/resume/measure/select — anything with no `--path`, so a dropped candidate's
+/// command can never leak in as a "session" filler) in their existing order, filling whatever
+/// budget remains. A command naming a candidate the content floor did NOT keep never appears here,
+/// by construction: only `shown`'s own candidates are ever looked up. A bootstrap-priority action
+/// DOES carry a `--path` (it names the atom or the check's feature file) but is matched by its own
+/// marker here, never by `action_path`/`action_for_path` — those exist to bind a candidate's OWN
+/// path to a command, and a bootstrap-priority action names no `shown` candidate at all.
 fn select_linked_choices(
     actions: &[Value],
     shown: &[(&Value, bool)],
     choice_count: usize,
 ) -> Vec<Value> {
     let mut chosen: Vec<Value> = Vec::new();
+    for action in actions {
+        if chosen.len() >= choice_count {
+            break;
+        }
+        if action["bootstrap_priority"].as_bool() == Some(true) {
+            chosen.push(action.clone());
+        }
+    }
     for (candidate, _) in shown.iter().filter(|(_, is_floor)| *is_floor) {
         let path = candidate["path"].as_str().unwrap_or_default();
         if let Some(action) = action_for_path(actions, path) {
