@@ -109,6 +109,12 @@ export function commitmentIsLive(commitment: CommitmentBody): boolean {
 /**
  * Decision 2's steward-key resolution: the agent key the POOL PEER at
  * `conductorOrigin` names as its own — never the doorway's opinion.
+ *
+ * `conductorOrigin` arrives from the doorway's conductor registry as a ws://
+ * app-interface URL, so it resolves against the household fixture peer's
+ * `conductorAppUrl` (stamped by `hc-mesh.sh refresh_fixture_pids`), NOT against
+ * its HTTP storage `url`. The key is still read off that peer's own
+ * `agentPubKey` — the registry only says WHICH peer, never who it is.
  */
 export function stewardAgentPubKeyForConductorOrigin(
   conductorOrigin: string,

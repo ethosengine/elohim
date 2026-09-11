@@ -36,6 +36,20 @@ export interface StoragePeerFixture {
    * matching a provider must accept either (reconcile/custody.rs contract).
    */
   agentPubKey?: string;
+  /**
+   * This peer's conductor admin port (`4444`, `4454`, …), stamped by
+   * `hc-mesh.sh` (`refresh_fixture_pids`). Declared beside the app URL so the
+   * pair reads as one conductor coordinate.
+   */
+  conductorAdminPort?: number;
+  /**
+   * This peer's conductor APP interface, as a WebSocket origin
+   * (`ws://127.0.0.1:4445`) — the namespace a doorway's conductor registry
+   * answers in (`GET /admin/agents/{key}/conductor` → `conductorUrl`). A
+   * peer's `url` above is its HTTP storage origin; the two never coincide, so
+   * resolving "which household peer is this conductor?" needs this field.
+   */
+  conductorAppUrl?: string;
 }
 
 export interface HouseholdMeshFixture {
@@ -357,8 +371,16 @@ export function requireFixtureStoragePeer(
 }
 
 /**
- * Which named household peer's storage self-identity a given HTTP origin belongs
- * to, matched by origin (protocol+host+port) against `storagePeers[name].url`.
+ * Which named household peer's self-identity a given origin belongs to.
+ *
+ * Two origin namespaces name the same peer and never coincide: its elohim-storage
+ * HTTP origin (`storagePeers[name].url`, `http://localhost:809x`) and its
+ * conductor's app-interface WebSocket origin (`storagePeers[name].conductorAppUrl`,
+ * `ws://127.0.0.1:444x`). A conductor origin is matched against `conductorAppUrl`
+ * only — host-insensitively, because the doorway's registry says `localhost`
+ * where `hc-mesh.sh` stamps `127.0.0.1` — and an HTTP origin against `url` only.
+ * Matching a `ws://` conductor origin against the HTTP storage URL is what made
+ * story 07's provider assertions unresolvable (2026-09-11).
  *
  * Two steward-key resolutions need exactly this (S1 plan, doorway-federation
  * 2026-09-10, Task 4's "Chief decisions" — Decision 2): a `hosted-cell` grant's
@@ -377,15 +399,28 @@ export function storagePeerForOrigin(
   fixture: HouseholdMeshFixture,
   origin: string
 ): { name: string; peer: StoragePeerFixture } | undefined {
+  // Loopback wears two names — the doorway registry says `localhost`, hc-mesh.sh
+  // stamps `127.0.0.1`. They are the same host, so normalise before comparing.
   const originOf = (value: string): string => {
+    let normalized: string;
     try {
-      return new URL(value).origin;
+      const url = new URL(value);
+      normalized = `${url.protocol}//${url.hostname === '127.0.0.1' ? 'localhost' : url.hostname}:${url.port}`;
     } catch {
-      return withoutTrailingSlashes(value);
+      normalized = withoutTrailingSlashes(value);
     }
+    return normalized;
   };
   const target = originOf(origin);
-  for (const [name, peer] of Object.entries(fixture.storagePeers ?? {})) {
+  const isWebSocket = target.startsWith('ws:') || target.startsWith('wss:');
+  const peers = Object.entries(fixture.storagePeers ?? {});
+  for (const [name, peer] of peers) {
+    if (peer.conductorAppUrl && originOf(peer.conductorAppUrl) === target) return { name, peer };
+  }
+  // A conductor (ws://) origin resolves through conductorAppUrl or not at all —
+  // falling back to the HTTP storage URL would only ever produce a false match.
+  if (isWebSocket) return undefined;
+  for (const [name, peer] of peers) {
     if (peer.url && originOf(peer.url) === target) return { name, peer };
   }
   return undefined;
