@@ -26,6 +26,10 @@ fn fixture() -> (TempDir, String, AcceptanceOptions) {
         let result = std::process::Command::new("git")
             .args(args)
             .current_dir(root)
+            // A parent git hook exports GIT_DIR; without this the fixture repo is the main repo.
+            .env_remove("GIT_DIR")
+            .env_remove("GIT_WORK_TREE")
+            .env_remove("GIT_INDEX_FILE")
             .env("GIT_AUTHOR_NAME", "Fixture")
             .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
             .env("GIT_COMMITTER_NAME", "Fixture")

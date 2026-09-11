@@ -64,6 +64,11 @@ export function gateChildEnv(project, baseEnv, root = ROOT) {
   const override = (policy.cargo_env_overrides || {})[project.name] || {};
   const declared = { ...override, ...((project.run.cargo || {}).env || {}) };
   const childEnv = { ...baseEnv };
+  // A git hook exports GIT_DIR (the pre-push pins it absolute so gate cwds resolve the repo);
+  // a gate that spawns `git` in a TEMP repo then operates on the main repo instead
+  // (eprfs flow_acceptance: "pathspec 'scope.md' did not match", 11 tests, 2026-09-11).
+  // Gates run inside the checkout, so git discovers it from cwd — drop the hook's pins.
+  for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX']) delete childEnv[k];
   if (declared && Object.keys(declared).length > 0) {
     childEnv.GATE_CARGO_ENV = JSON.stringify(declared);
   } else {
