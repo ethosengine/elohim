@@ -8,12 +8,10 @@ invariant: >
   leaves no session, no cell on any pool conductor, and no active account row — so the
   whole hosted stage can be walked end to end from the UI and leave the deployment as it
   was found.
-status: red
+status: green
 active: false
 checks:
   - "a2o @concern:hosted-human-lifecycle (genesis/a2o/features/auth/hosted-human/05-leaving.feature — @browser-only @act:i; authority is the household lane: `just test mesh features/auth/hosted-human/05-leaving.feature`; on a deployed doorway run with ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml A2O_ALLOW_DESTRUCTIVE=0 — the story creates and removes its own human, so it is safe on a shared fleet)"
-  - "a2o @concern:hosted-compute-contracted (genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature — @act:i; household lane is the authority: `just test mesh features/auth/hosted-human/07-hosted-by-a-household.feature` for the API-side scenarios and `just test mesh-browser features/auth/hosted-human/07-hosted-by-a-household.feature` for the two @browser-only ones. The story creates and removes its own human.)"
-  - "a2o @concern:humans-served (genesis/a2o/features/dataplane/doorway-humans-served.feature — @act:i; needs `just mesh prologue` to have cast the hosted humans: `just test mesh features/dataplane/doorway-humans-served.feature`. The count is doorway-local and substrate-derived; a federation-wide aggregate is a different number and is not this check.)"
 first_move: >
   Land the step definitions and the close-account route so the @wip scenarios execute and
   this habit measures red on a real run, then move the register/login provisioning
@@ -31,6 +29,18 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-09-11d (RED -> GREEN on measured evidence): run 20260911T065537Z-d48f3b69 — 05-leaving.feature under
+`just test mesh-browser`, **6/6 scenarios, 70/70 steps, EXIT=0**, on the household mesh at d48f3b690 (doorway
+eff30a245 build, storage fb4d10c7d build, REAL hosted provisioning: HAPP_BUNDLE_PATH + POOL_COMPUTE_* wired,
+dev_mode singleton path retired 60fb28a39, canonical uhCAk keys 36b0e053a/b870af164, closed identifiers re-register
+eff30a245, RFC3339 timestamps, account page survives a bad instant dfd2c8932, portal opened before sign-in 60c3b4a36).
+Every clause of the invariant walked from the UI: own display name, own cell on a pool conductor, close leaves no
+session, no cell, no active row; closing twice harmless. Earlier same-day runs: 4/6 (crashed render), 5/6 (story
+gap), 6/6-with-RAM-shed — all named and cured. The notarized-promise extension (07-hosted-by-a-household,
+doorway-humans-served) is NOT this invariant: it moved to its own habit `hosted-cell-promised` (born red,
+convergence-window + conductor-contention causes named there). Fleet confirmation: the next edge+app deploy carrying
+these commits; the flip authority is the household lane per the check.
+
 DELTA 2026-09-11c (REAL HOSTING MEASURED; RED with ONE named cause left): mesh at faca0d95e, doorway 3c7ee8d89, cold
 recast 04:02 (hc-mesh wired HAPP_BUNDLE_PATH + POOL_COMPUTE_* + ELOHIM_COMPUTE_LOCAL_API, 163b3e1eb; archive wiped on
 cold start, bceeb0424; hosted cast allow-listed to 14 lane personas, 5cf5f8f38). Prologue: 13 hosted registrants +
