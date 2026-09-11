@@ -21,14 +21,26 @@ use super::*;
 /// and receipts, collapsed onto one `render_floor_line`, at EVERY lens including `minimal`) and
 /// `floor.unfilterable` (the content floor — a candidate whose frontmatter `content_class` names
 /// one of `floor.unfilterable` survives the lens's own `choice_count` cut, marked `[floor]`, at
-/// `minimal`/`simple`). `Standard` and above are otherwise BYTE-IDENTICAL to the pre-1.2
-/// rendering — only the floor line is new — because nothing in that rendering ever dropped a
-/// candidate to begin with; the truncation this task adds only bites where a lens actually
-/// narrows (`minimal`/`simple`).
+/// `minimal`/`simple`).
+///
+/// Fix round 2 (a fresh reader's finding on the station-1 binary, ruled on by the controller):
+/// density bounds candidate LISTS and secondary blocks only — never an operation's own primary
+/// result. `open`/`resume`/`adopt`'s result IS a candidate list (`first_screen`'s ranked sources,
+/// or the whole-scope door's stale-edge groups), so it stays density-bounded at `minimal`/
+/// `simple` exactly as station 1.2 shipped it — [`is_open_shaped`] is what tells the two apart.
+/// EVERY OTHER operation's result — `read`'s excerpt, `source`'s outline, `history`'s findings,
+/// `finish`'s outcome, `context`/`select`'s standing block, `measure`'s measurement line, and by
+/// the same principle anything else the generic key dump below already knew how to print — now
+/// renders in full at EVERY lens, `minimal` included: before this fix `minimal`'s early return
+/// skipped straight from the floor line to Linked choices, so a reader who had just run `read`
+/// literally could not see what it read without asking for a wider lens. The `lens:` provenance
+/// line moves the same way, unconditional now: rule 3 is about the honesty floor's five fields,
+/// never a license to hide WHO is reading at a narrow lens too.
 pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> String {
     let mut out = String::new();
     let orientation = &view["orientation"];
     let minimal = matches!(lens.level, LensLevel::Minimal | LensLevel::Simple);
+    let is_open_shaped = is_open_shaped(view);
 
     out.push_str(&format!(
         "Intent: {}\n",
@@ -58,14 +70,13 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
                 value["source"].as_str().unwrap_or_default()
             ));
         }
-        // WHO is reading, printed right after the guiding context it bounds — contestable on
-        // sight, never buried among the generic key dump below (excluded there explicitly). Only
-        // at `standard`+: `minimal`/`simple` fold WHO-is-reading into the floor line's own `lens
-        // <cid>` token instead of also carrying this fuller provenance line — the honesty floor
-        // asks for one line, not two, when the budget is one command.
-        if !view["lens"].is_null() {
-            out.push_str(&render_lens(&view["lens"]));
-        }
+    }
+    // WHO is reading — every lens (fix round 2): contestable on sight, never buried among the
+    // generic key dump below (excluded there explicitly), and never gated behind `standard`+ —
+    // the honesty floor's own compact `lens <cid>` token is a cross-reference to this line, never
+    // a replacement for it.
+    if !view["lens"].is_null() {
+        out.push_str(&render_lens(&view["lens"]));
     }
 
     // The content floor's SELECTION is computed BEFORE the floor line prints, because the floor
@@ -75,7 +86,9 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
     // candidate BLOCK (the density cap) and choosing the Linked choices both read this same
     // `shown` selection, so the two never disagree about which candidates the reader was actually
     // offered — fix round 1's finding: a `[floor]` candidate past `choice_count` must be one
-    // command away too, and a dropped candidate's command must never leak in as a "choice."
+    // command away too, and a dropped candidate's command must never leak in as a "choice." Only
+    // meaningful for an `is_open_shaped` view; `first_screen.candidates` is absent everywhere
+    // else, so this is a harmless empty selection there.
     let empty_candidates: Vec<Value> = Vec::new();
     let candidates = if minimal {
         view["first_screen"]["candidates"]
@@ -92,7 +105,10 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
         out.push_str(&line);
     }
 
-    if minimal {
+    if minimal && is_open_shaped {
+        // `open`/`resume`/`adopt` ONLY: the candidate-shaped result stays density-bounded, and
+        // Linked choices are built from the same `shown` selection (fix round 1) rather than the
+        // view's raw action list.
         out.push_str(&render_candidate_block(&shown, lens));
         let actions = view["actions"].as_array().cloned().unwrap_or_default();
         let chosen = select_linked_choices(&actions, &shown, lens.choice_count as usize);
@@ -101,9 +117,10 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
         return out;
     }
 
-    // The focused door's first screen comes BEFORE the concern groups, because a reader who named
-    // an area asked "what is the shape here and what do I do first", and the stale-edge scan is
-    // the answer to a different question.
+    // Every other view's own primary result, at every lens (fix round 2) — the focused door's
+    // first screen (never reached when `minimal && is_open_shaped` already returned above) comes
+    // BEFORE the concern groups, because a reader who named an area asked "what is the shape here
+    // and what do I do first", and the stale-edge scan is the answer to a different question.
     if !view["first_screen"].is_null() {
         out.push_str(&render_first_screen(&view["first_screen"]));
     }
@@ -149,10 +166,25 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
             }
         }
     }
-    let standard_actions = view["actions"].as_array().cloned().unwrap_or_default();
-    let unbounded = standard_actions.len();
-    out.push_str(&render_linked_choices(&standard_actions, unbounded));
+    // Linked choices: bounded to `choice_count` at `minimal`/`simple` for a non-`open`-shaped
+    // view (a plain `.take` — there is no candidate floor to reconcile against here, unlike
+    // `select_linked_choices` above), unbounded at `standard`+ exactly as before this task.
+    let actions = view["actions"].as_array().cloned().unwrap_or_default();
+    let limit = if minimal {
+        lens.choice_count as usize
+    } else {
+        actions.len()
+    };
+    out.push_str(&render_linked_choices(&actions, limit));
     out
+}
+
+/// `open`/`resume`/`adopt`'s result is shaped like a candidate list — `first_screen` (the focused
+/// door) or `concerns` (the whole-scope door), or both at once. Everything else this executor can
+/// return (`read`'s excerpt, `source`'s outline, `history`'s findings, `finish`'s outcome, a
+/// `context`/`select` standing block, `measure`'s measurement, …) carries neither key.
+fn is_open_shaped(view: &Value) -> bool {
+    !view["first_screen"].is_null() || !view["concerns"].is_null()
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────

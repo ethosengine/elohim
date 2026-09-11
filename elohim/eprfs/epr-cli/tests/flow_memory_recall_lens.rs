@@ -443,3 +443,102 @@ fn bootstrap_purpose_carries_the_top_red_as_intent_and_declares_its_inputs() {
     assert_eq!(v["projection"]["audience"], "private");
     assert!(!v["projection"]["inputs"].as_array().unwrap().is_empty());
 }
+
+// ── fix round 2: an operation's own result renders at every lens, not just standard+ ──────────────
+//
+// A fresh reader found `read`, `source` and `history` printing NO primary payload at `simple`/
+// `minimal` — only the collapsed orientation, floor line and Linked-choices boilerplate — so the
+// reader had to guess `--lens detail` to see the passage it had just read. Ruling: density bounds
+// candidate LISTS and secondary blocks only; an operation's own result renders at every lens, and
+// so does the `lens:` provenance line (the floor line's compact `lens <cid>` token is a
+// cross-reference to it, never a replacement).
+
+/// `read`'s excerpt text and receipt key render at `simple`, not only at a wider lens.
+#[test]
+fn read_renders_its_excerpt_and_receipt_key_at_simple() {
+    let dir = repo();
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix2-read");
+    view_in(dir.path(), "fix2-read", &["open", "--need", "orient"]);
+    let text = text_in(
+        dir.path(),
+        "fix2-read",
+        &["read", "--path", "docs/a.md", "--lines", "1:3"],
+    );
+    assert!(text.contains("title: Preserve uncertainty"), "{text}");
+    assert!(text.contains("docs/a.md:1:3"), "{text}");
+}
+
+/// `source`'s outline — at least one heading — renders at `simple`, not only at a wider lens.
+#[test]
+fn source_renders_at_least_one_outline_heading_at_simple() {
+    let dir = repo();
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix2-source");
+    view_in(dir.path(), "fix2-source", &["open", "--need", "orient"]);
+    let text = text_in(
+        dir.path(),
+        "fix2-source",
+        &["source", "--path", "docs/a.md"],
+    );
+    assert!(
+        text.contains("Purpose") || text.contains("Evidence"),
+        "{text}"
+    );
+}
+
+/// The `lens:` provenance line renders EXACTLY once on `open`, `read` and `source` at `simple` —
+/// never zero (the pre-fix bug) and never duplicated by folding it into the generic key dump.
+#[test]
+fn the_lens_line_renders_exactly_once_at_simple_for_open_read_and_source() {
+    let dir = repo();
+
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix2-lens-open");
+    let open_text = text_in(dir.path(), "fix2-lens-open", &["open", "--need", "orient"]);
+    assert_eq!(
+        open_text
+            .lines()
+            .filter(|l| l.starts_with("lens: "))
+            .count(),
+        1,
+        "{open_text}"
+    );
+
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix2-lens-read");
+    view_in(dir.path(), "fix2-lens-read", &["open", "--need", "orient"]);
+    let read_text = text_in(
+        dir.path(),
+        "fix2-lens-read",
+        &["read", "--path", "docs/a.md", "--lines", "1:3"],
+    );
+    assert_eq!(
+        read_text
+            .lines()
+            .filter(|l| l.starts_with("lens: "))
+            .count(),
+        1,
+        "{read_text}"
+    );
+
+    claim_actor(
+        dir.path(),
+        "agent:reader@claude-sonnet-5",
+        "fix2-lens-source",
+    );
+    view_in(
+        dir.path(),
+        "fix2-lens-source",
+        &["open", "--need", "orient"],
+    );
+    let source_text = text_in(
+        dir.path(),
+        "fix2-lens-source",
+        &["source", "--path", "docs/a.md"],
+    );
+    assert_eq!(
+        source_text
+            .lines()
+            .filter(|l| l.starts_with("lens: "))
+            .count(),
+        1,
+        "{source_text}"
+    );
+}
