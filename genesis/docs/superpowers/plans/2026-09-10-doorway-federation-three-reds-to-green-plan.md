@@ -1327,6 +1327,9 @@ Five tasks, **in this order**. Tasks 17–20 are the measure; Task 21 is held.
 
 ## Task 17 — (a) The household mesh run
 
+> **Correction (chief, 2026-09-11) — the DNA-hash reference for the coordinator change.** Do NOT compare a locally packed `imagodei.dna` against `elohim/holochain/dna/dna-hashes.baseline`: that file holds the CI build's hashes, and DNA hashes depend on the absolute build path (memory `project_dna_hash_depends_on_build_path`, verified 2026-09-06 — identical source in two worktrees differs by 38 bytes of integrity WASM). From this checkout the baseline ALWAYS mismatches, before and after Task 13. The proof that a coordinator-only change is hash-neutral is local-vs-local: after `just pack`, the integrity wasm (`zomes/imagodei/target/wasm32-unknown-unknown/release/imagodei_integrity.wasm`) is NOT recompiled and `git log -1 -- dna.yaml zomes/imagodei_integrity/` predates the prior pack (last integrity change f2f25d73b, 2026-09-03; dna.yaml 2026-04-24). CI's DNA pipeline (`--run-ignored all` sweettest + its own baseline compare) is the authority for the fleet; run 2026-09-11 stopped on this mis-specified check once and was resumed.
+
+
 **Drains:** doorway-failover plan **Task 0.1** (record the frontier) and hosted-human plan **Task 8**'s household half.
 **Tier:** Sonnet, operator-style — this is running and recording, not deciding.
 
