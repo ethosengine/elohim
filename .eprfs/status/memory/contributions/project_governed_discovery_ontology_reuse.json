@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_governed_discovery_ontology_reuse",
+  "claim": "Design 2026-09-11: search/recall roles map to existing primitives — ProcessSpec/Manifest (recipe), Intent (need), AttentionTending (lens: TTL, tended, private), FlowEvent+Verdict+Observation (sample), ProjectionRequest/Feedback/FeedbackSignal (view+dispute), EpistemicStanding; social-reach five-constraint filter + anti-bubble floor govern lenses.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_governed_discovery_ontology_reuse.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_governed_discovery_ontology_reuse.md",
+        "cid": "bafkreid6jm4vmbptfzinwrwtoovk7vtbyrzxlevepto4qxrk5blhnxflmy"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Governed discovery reuses existing kinds — recipe=ProcessSpec, lens=AttentionTending, sample=FlowEvent+Verdict",
+    "file": "project_governed_discovery_ontology_reuse.md",
+    "scopePath": ".claude/memory/project_governed_discovery_ontology_reuse.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

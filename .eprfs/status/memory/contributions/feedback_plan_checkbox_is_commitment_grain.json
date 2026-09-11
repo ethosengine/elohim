@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_plan_checkbox_is_commitment_grain",
+  "claim": "epr flow project mints one gap-item/intent per `- [ ]` line in a plan; the writing-plans skill's per-step checkboxes minted 47 intents for a 17-task plan (2026-09-11). Put the checkbox on the task heading, number the steps.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_plan_checkbox_is_commitment_grain.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_plan_checkbox_is_commitment_grain.md",
+        "cid": "bafkreigrkbjapniu3luo3xamo44ff6oidbty7icmxrj7zvnfrl5nojvjkq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "In a plan, `- [ ]` is the commitment grain — one per task, never per step",
+    "file": "feedback_plan_checkbox_is_commitment_grain.md",
+    "scopePath": ".claude/memory/feedback_plan_checkbox_is_commitment_grain.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": false
+  }
+}

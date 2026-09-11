@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_bootstrapping_is_a_recall_journey.md",
-        "cid": "bafkreiexct4o6v3ucopek366swgt2sgt5v4fxcfwrt4t2xy7ovkq7brc6m"
+        "cid": "bafkreihfoxtjkmijsjoc2i5o52vodybag7k5hcqtxwchlur6fkzofdcrpy"
       },
       "reach": "repository"
     }
@@ -28,8 +28,8 @@
     "display": "Bootstrapping into a concern IS a recall journey — measure it, one door of two",
     "file": "feedback_bootstrapping_is_a_recall_journey.md",
     "scopePath": ".claude/memory/feedback_bootstrapping_is_a_recall_journey.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
-    "indexed": true
+    "indexed": false
   }
 }

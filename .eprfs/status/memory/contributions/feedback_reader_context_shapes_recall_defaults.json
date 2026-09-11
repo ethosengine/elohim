@@ -28,7 +28,7 @@
     "display": "Reader context shapes recall defaults — a negotiated preset, never a fixed default",
     "file": "feedback_reader_context_shapes_recall_defaults.md",
     "scopePath": ".claude/memory/feedback_reader_context_shapes_recall_defaults.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": true
   }

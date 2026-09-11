@@ -1,4 +1,5 @@
 ---
+index: false
 name: feedback_bootstrapping_is_a_recall_journey
 title: Bootstrapping into a concern IS a recall journey — measure it, one door of two
 id: feedback-bootstrapping-is-a-recall-journey

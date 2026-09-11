@@ -9,7 +9,7 @@
   "scope": "repository",
   "reach": "repository",
   "concern": "project_recall_reaches_authority_habit",
-  "claim": "Declared 2026-09-11 (born red): one governed recall journey serves ceremony and sprint doors; middot recall-{metered,unmetered}-bytes/mistaken-assertions/screens-to-shape; graduates to p2p when humans discover meaning in communities through the same inspectable artifact.",
+  "claim": "UMBRELLA for the 2026-09-11 recall work (folds: bootstrapping-is-a-recall-journey, governed-discovery-ontology-reuse, plan-checkbox-is-commitment-grain). Declared 2026-09-11 (born red→green): one governed recall journey serves ceremony and sprint doors; middot recall-{metered,unmetered}-bytes/mistaken-assertions/screens-to-shape; graduates to p2p when humans discover meaning in communities through the same inspectable artifact.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_recall_reaches_authority_habit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_recall_reaches_authority_habit.md",
-        "cid": "bafkreifzfk4eaqd62jid3yrfazmtm56ahqkipe4nyvq3wlbclcnlsh7cha"
+        "cid": "bafkreidj73e444xo3j3epofpwbgs4kkd4upxar3sbfaskpwcwhus7hnceu"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "recall-reaches-authority habit — bounded recall graduates from eprfs to p2p",
     "file": "project_recall_reaches_authority_habit.md",
     "scopePath": ".claude/memory/project_recall_reaches_authority_habit.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
     "indexed": true
   }
