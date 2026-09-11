@@ -931,7 +931,8 @@ Add `GET /admin/conductors/agents/{agentPubKey}` returning the registry entry or
 
 - [x] **Step 1: Write the failing component tests**
 
-In the spec: the section renders for a signed-in human; a wrong identifier surfaces `account-close-error` and calls nothing; the right identifier calls the route once and navigates to `/threshold/`; `account-hosted-by-household` renders the household name and `account-hosted-until` the promised-until date when the account response carries them, and both are absent (not blank) when it does not.
+In the spec: the section renders for a signed-in human; a wrong identifier surfaces `account-close-error` and calls nothing; the right identifier calls the route once and navigates to `/threshold/`; `account-hosted-by-household` renders the household name and `account-hosted-until` the promised-until date when the account response carries them, and both are absent (not blank) when it does not.  
+  > **Corrected 2026-09-11 (chief):** the surface always POSTs and lets the doorway refuse (400 `CONFIRMATION_MISMATCH`); it does not pre-judge the identifier in the browser. Account truth is the doorway's, and the committed glue (`submitClosure` awaits the response, `the account is not closed` asserts status 400) already encodes that. The prose above was wrong, the story was right.
 
 - [x] **Step 2: Run them and watch them fail**
 
@@ -980,6 +981,9 @@ git commit -m "feat(doorway-app): close-account surface and hosted-by-a-househol
 - [x] **Step 1: Rewrite the cleanup** — done in `genesis/a2o/steps/auth-lifecycle.steps.ts`: the registration `When`'s `this.onCleanup(...)` now calls `closeAccountCleanup()`, which POSTs `/auth/close-account` with the registering human's own bearer (`{ confirmIdentifier }`), logs which path fired, and falls back to the pre-existing admin soft-delete **only** on `404`/`405` (route absent) or a request-level throw — never on a genuine non-2xx from the route itself, and never rethrows. Covers the `features/auth/*` auth-lane (`auth-lifecycle.feature`, `operator-onboarding.feature`, `user-management.feature`) that `just test mesh features/auth` runs.
 
   **Found tree/plan mismatch — feature-preamble retirement withheld, not done.** The neighbourhood feature's Background step (`a hosted human is registered on doorway "alpha"`, `features/browser/doorway-portal-login-neighbourhood.feature:23`) does **not** route through `auth-lifecycle.steps.ts` at all — it matches a differently-worded step in `genesis/a2o/steps/ui/doorway-portal-login.steps.ts:123`, whose only `onCleanup` (line 186) closes the Playwright device, never the account. So the "not swept afterwards" caveat this task names is still literally true for that Background; retiring it as this task's acceptance evidence asks would put a false claim in the feature preamble. Missing node: `chain / auth-lane product-path cleanup (auth-lifecycle.steps.ts, Act I) → ??? → neighbourhood Background registration (doorway-portal-login.steps.ts:123, Act II) / missing node: wire an equivalent close-account cleanup into doorway-portal-login.steps.ts's registration step + probe: does the neighbourhood pipeline's fleet user count stop growing per run / current state: unwired — that file is out of this task's write set, left untouched`. The feature file is unchanged; only `auth-lifecycle.steps.ts` is committed below.
+
+- [x] **Step 1b: Close the gap** — `closeAccountCleanup` exported from `genesis/a2o/steps/auth-lifecycle.steps.ts` (its only shared home; no duplicate copy) and imported into `genesis/a2o/steps/ui/doorway-portal-login.steps.ts`. The `Given a hosted human is registered on doorway {string}` step (`doorway-portal-login.steps.ts:129`) now reads the bearer token off `POST /auth/register`'s own response (that route already returns `AuthResponse.token`, per `elohim/sdk/schemas/v1/views/auth-response.schema.json`) and registers `this.onCleanup(() => closeAccountCleanup(this, base, canonicalIdentifier, registrationToken))` — captured at registration time because the portal's own sign-in mints a separate session token later, not the same credential. The pre-existing `onCleanup` at `doorway-portal-login.steps.ts:186` (closes the Playwright device) is untouched and unrelated — it is a browser-resource cleanup, not the account cleanup. The neighbourhood feature's preamble caveat is retired accordingly (see below): the missing node named above is now wired.
+  - Verification: `npx cucumber-js --dry-run --tags '@auth or @browser'` — 56 undefined scenarios / 230 undefined steps before and after (unchanged); `pnpm exec tsc --noEmit -p tsconfig.json` clean; `npx eslint steps/ui/doorway-portal-login.steps.ts steps/auth-lifecycle.steps.ts` clean. No mesh started; the live count-unchanged assertion remains Step 2's job.
 
 - [ ] **Step 2: Prove the count is unchanged** — not run this pass (no mesh started; scope says this is S4's job).
 
@@ -1060,6 +1064,21 @@ git commit -m "feat(doorway): notarize the hosted cell as a delegates-compute pr
 ```
 
 **Habit delta line this produces:** `hosted-human-lifecycle` — "hosted register issues a `hosted-cell` delegates-compute grant (provider = pool peer, recipient = the human's key, 30d bound, commons ceiling); close revokes it and writes an `account-closed` self-revocation. Coordinator-only zome change, DNA hash unmoved. `just gate doorway` EXIT=0; unmeasured on mesh until S4."
+
+---
+
+## Task 13b — The account response names the hosting HOUSEHOLD, not the machine (found by Task 11, 2026-09-11)
+
+**Drains:** story 07 scenario "The account page says which household is hosting them" — `And the page names the household hosting them`. **Tier:** Opus (rust-architect). **Slice:** doorway-service + SDK view schema. **After Task 13** (same file).
+
+Task 11 rendered the strip from the only wire-true hosting fact available, `conductorId` — minted as `format!("conductor-{i}")` (`doorway-service/src/main.rs:483`), i.e. the MACHINE. The a2o assertion (non-empty, not an agent key) would pass on it, and the story would be lying. The honest value is the pool conductor's steward's display name: the doorway's conductor registry knows the storage peer behind each conductor; that peer names its steward agent key (its self-identity, never the doorway's opinion — Task 4 Decision 2); the steward's display name is that Human's record. `p2p-design-gate`: Ephemeral (C), derived at read time from A-class facts; no new entity; a new field on an existing View → schema first.
+
+- [ ] **Step 1:** `elohim/sdk/schemas/v1/views/account-response.schema.json` — add `hostedByHousehold: string | null` (the steward's display name for the pool conductor hosting this human; `null` when not hosted or not resolvable) and `hostedByConductorId` if Task 13 did not already expose it. Contract test in `elohim/elohim-storage/tests/schema_contract.rs` (or the doorway's equivalent for `AccountResponse` — find where `AccountResponse` is validated).
+- [ ] **Step 2:** doorway-service `GET /auth/account` — resolve conductor → storage peer → steward agent key → Human display name; `None` on any missing link, never the doorway's own name (story 07: arranger ≠ performer). Failing test first: a hosted account whose conductor's peer names steward X returns X's display name; an unhosted account returns `null`.
+- [ ] **Step 3:** `pnpm run schema:codegen:ts`; delete the `HostedCellFacts` overlay + `TODO(wire-codegen)` in `doorway/doorway-app/src/app/models/doorway.model.ts` and read the generated field; the strip renders `hostedByHousehold` and falls back to the promised-until row alone when null (Task 11 already renders that case). `just gate doorway` + doorway-app vitest + `ng build`.
+- [ ] **Step 4:** pathspec commits; tick.
+
+**Habit delta line this produces:** `hosted-human-lifecycle` — "account response carries hostedByHousehold (steward display name of the hosting pool conductor); the strip names the household, not the machine."
 
 ---
 
