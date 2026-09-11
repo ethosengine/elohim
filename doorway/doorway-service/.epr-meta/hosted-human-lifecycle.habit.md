@@ -31,6 +31,19 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-09-11c (REAL HOSTING MEASURED; RED with ONE named cause left): mesh at faca0d95e, doorway 3c7ee8d89, cold
+recast 04:02 (hc-mesh wired HAPP_BUNDLE_PATH + POOL_COMPUTE_* + ELOHIM_COMPUTE_LOCAL_API, 163b3e1eb; archive wiped on
+cold start, bceeb0424; hosted cast allow-listed to 14 lane personas, 5cf5f8f38). Prologue: 13 hosted registrants +
+3 prologue-hosted-* with DISTINCT canonical uhCAk keys and POPULATED hostedCellGrantCid; humansServed=13 on A, 0 on B.
+Lanes (04:12–04:15): 07 mesh 0/3, 07 mesh-browser 0/2, humans-served mesh 1/4 + browser 0/1, 05-leaving browser 4/6.
+THE CAUSE: every hosted red is `GET /api/v1/commitments/<cid>` on jessica's storage (not the pool) → 404 — the
+commitment is minted (cid in the roster) but not readable off the provider peer: the route serves the local projection
+and post_commit signals are cell-local, so a non-authoring peer never projects it until a fetch by cid. Secondary:
+hostedByHousehold null on the account page (resolver returns None — diagnosing); re-register of a CLOSED identifier
+answers exists with no grant (grant leg runs on first registration only); 05-leaving: agency pipeline has no
+"Hosted" step label. Measured cost: 786 MB conductor heap per hosted human (scale-risk row 7); 13 humans = 10.0 GB.
+Reports: genesis/a2o/reports/sprint-report-household-20260911T041{2,3,5}*-faca0d95.json.
+
 DELTA 2026-09-11b (FIRST HOUSEHOLD MEASURE of the S1+S2 work — RED with a NAMED cause; run 20260911T0240{31,53}Z /
 024102Z / 024112Z-b6c7947b, mesh at e2dcabebc+, imagodei coordinator repacked, integrity wasm untouched):
 @concern:hosted-compute-contracted 0/3 (mesh) + 0/2 (mesh-browser) — every scenario fails at registration with

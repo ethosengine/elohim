@@ -29,6 +29,15 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-11b (steady-state GREEN on the household pair; habit RED preserved by its own rule): run
+20260911T041537Z-faca0d95 — doorway-failover.feature **10/10 scenarios, EXIT=0** on the mesh at faca0d95e (doorway
+3c7ee8d89 build 04:03:51, both doorways restarted 04:11:38). The four reds of 02:41/03:24 were the Prologue refusing
+to stage a bundle without version.json (cured: hc-mesh-prologue stamps it, 7a31996e0) — never doorway code.
+Apex-transition (20260911T041555Z-faca0d95, A2O_RUN_WIP=1): 0 undefined, both scenarios fail at the named step
+(no household-owned membership authority); scenario 2 SIGSTOPs the apex doorway and the sibling serves the same
+declared head before the same-public-name step fails. Graduation still requires every apex-transition step passed +
+WAN ingress (plan Task 21, held). Mesh preflight now REFUSES a pool binary older than its source commit (4710606dc).
+
 DELTA 2026-09-11 (RED preserved; apex-transition is now a MEASURED red, not undefined): run 20260911T024151Z-b6c7947b
 under A2O_RUN_WIP=1 — 2 scenarios, 16 steps, 0 undefined. Scenario 1 fails at the predicted named step: `no
 household-owned membership authority: relay-addr-beacon reconcile_membership writes owner records through the
