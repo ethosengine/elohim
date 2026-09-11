@@ -1026,11 +1026,11 @@ git commit -m "test(a2o): harness cleanup closes accounts through the product pa
 
 **Bounds (D2, from `compute_grants::grant_input`):** `bounds.epr_scope` must be 1..64 entries of task CIDs or `"*"`; `rate_per_hour` and `rotation_ttl_days` both positive and finite; `reach_ceiling` must be `"commons"`; and `validUntil - validFrom` must not exceed `rotation_ttl_days * 86400`. Use `epr_scope: ["*"]`, `reach_ceiling: "commons"`, `rate_per_hour: 60`, `rotation_ttl_days: 30`, `validUntil = validFrom + 30d`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `auth_routes.rs`: `hosted_register_without_pool_compute_config_still_registers` (grant leg skipped, `hosted_cell_grant_cid` is `None`, registration succeeds); `hosted_register_records_the_grant_cid_when_the_pool_answers`; `close_account_revokes_the_hosted_cell_grant_and_clears_the_row`; `close_account_succeeds_when_the_revoke_call_fails` (non-fatal, reported in the response). In the imagodei zome: `account_closed_is_an_accepted_revocation_reason`.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -1038,13 +1038,13 @@ RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/doorway-target cargo test hosted_cell 2>&1 | 
 ```
 Expected: FAIL.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Register (hosted arm), **after** `provision_agent` returns and the Human is created: POST the grant with `recipient` = the provisioned `agent_pub_key`, `issuedAt`/`validFrom` = now, `validUntil` = now + 30d, and the bounds above. Store `grantCid` and `validUntil` on the row. Emit `hostedCellGrantCid` on the register response and on `GET /auth/account` alongside the `displayName` Task 11 needs.
 
 Close-account, inserted as step (1½) of Task 9's ordering — **before** the cell is uninstalled: (a) call `create_self_revocation` on the human's cell with reason `account-closed` (add the string to `REVOCATION_REASONS` at `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs:2857` — **coordinator-only, DNA-hash-NEUTRAL**), carrying `revocationCid` in the response; (b) call the provider-side revoke (S3 Task 16) for `hosted_cell_grant_cid`; (c) clear both row fields. Both are non-fatal and reported, never blocking a human from closing their account.
 
-- [ ] **Step 4: Green and gate**
+- [x] **Step 4: Green and gate**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -1053,7 +1053,7 @@ cd /projects/elohim && just gate doorway; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`. The imagodei change is coordinator-only, so the DNA hash must not move — confirm with the DNA gate when S3 is done, not here.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim
@@ -1073,10 +1073,10 @@ git commit -m "feat(doorway): notarize the hosted cell as a delegates-compute pr
 
 Task 11 rendered the strip from the only wire-true hosting fact available, `conductorId` — minted as `format!("conductor-{i}")` (`doorway-service/src/main.rs:483`), i.e. the MACHINE. The a2o assertion (non-empty, not an agent key) would pass on it, and the story would be lying. The honest value is the pool conductor's steward's display name: the doorway's conductor registry knows the storage peer behind each conductor; that peer names its steward agent key (its self-identity, never the doorway's opinion — Task 4 Decision 2); the steward's display name is that Human's record. `p2p-design-gate`: Ephemeral (C), derived at read time from A-class facts; no new entity; a new field on an existing View → schema first.
 
-- [ ] **Step 1:** `elohim/sdk/schemas/v1/views/account-response.schema.json` — add `hostedByHousehold: string | null` (the steward's display name for the pool conductor hosting this human; `null` when not hosted or not resolvable) and `hostedByConductorId` if Task 13 did not already expose it. Contract test in `elohim/elohim-storage/tests/schema_contract.rs` (or the doorway's equivalent for `AccountResponse` — find where `AccountResponse` is validated).
-- [ ] **Step 2:** doorway-service `GET /auth/account` — resolve conductor → storage peer → steward agent key → Human display name; `None` on any missing link, never the doorway's own name (story 07: arranger ≠ performer). Failing test first: a hosted account whose conductor's peer names steward X returns X's display name; an unhosted account returns `null`.
-- [ ] **Step 3:** `pnpm run schema:codegen:ts`; delete the `HostedCellFacts` overlay + `TODO(wire-codegen)` in `doorway/doorway-app/src/app/models/doorway.model.ts` and read the generated field; the strip renders `hostedByHousehold` and falls back to the promised-until row alone when null (Task 11 already renders that case). `just gate doorway` + doorway-app vitest + `ng build`.
-- [ ] **Step 4:** pathspec commits; tick.
+- [x] **Step 1:** `elohim/sdk/schemas/v1/views/account-response.schema.json` — add `hostedByHousehold: string | null` (the steward's display name for the pool conductor hosting this human; `null` when not hosted or not resolvable) and `hostedByConductorId` if Task 13 did not already expose it. Contract test in `elohim/elohim-storage/tests/schema_contract.rs` (or the doorway's equivalent for `AccountResponse` — find where `AccountResponse` is validated).
+- [x] **Step 2:** doorway-service `GET /auth/account` — resolve conductor → storage peer → steward agent key → Human display name; `None` on any missing link, never the doorway's own name (story 07: arranger ≠ performer). Failing test first: a hosted account whose conductor's peer names steward X returns X's display name; an unhosted account returns `null`.
+- [x] **Step 3:** `pnpm run schema:codegen:ts`; delete the `HostedCellFacts` overlay + `TODO(wire-codegen)` in `doorway/doorway-app/src/app/models/doorway.model.ts` and read the generated field; the strip renders `hostedByHousehold` and falls back to the promised-until row alone when null (Task 11 already renders that case). `just gate doorway` + doorway-app vitest + `ng build`.
+- [x] **Step 4:** pathspec commits; tick.
 
 **Habit delta line this produces:** `hosted-human-lifecycle` — "account response carries hostedByHousehold (steward display name of the hosting pool conductor); the strip names the household, not the machine."
 
@@ -1102,11 +1102,11 @@ Task 11 rendered the strip from the only wire-true hosting fact available, `cond
 
 `Option` semantics stay: a doorway with **no** conductor pool reports `None` → the SPA keeps rendering `—`. A doorway **with** a pool and no hosted humans reports `Some(0)` → the SPA renders `0`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `humans_served_counts_only_live_unexpired_hosted_rows`; `humans_served_is_zero_not_none_when_a_pool_exists_and_hosts_nobody`; `humans_served_is_none_without_a_pool`. The existing `humans_served: Some(42)` fixture at `status.rs:1499` should keep passing unchanged.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -1114,11 +1114,11 @@ RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/doorway-target cargo test humans_served 2>&1 
 ```
 Expected: FAIL.
 
-- [ ] **Step 3: Implement in `build_status_data`, and fix the landing's caption**
+- [x] **Step 3: Implement in `build_status_data`** — the `build_status_data` half landed (`a33e3876a`). The landing-caption half is **NOT done**: `doorway-landing.component.ts:28` and the card `data-testid` belong to the doorway-app write set, which S2 Task 11's owner holds. Handed to that agent with the D3 wording.
 
 Replace `humans_served: None` at `:802` with the derived count. In `doorway-landing.component.ts`, replace the comment at `:28` that describes the field as "a federation-wide social aggregate (sum of self-reported node …)" with the D3 semantics — *humans this doorway is currently hosting, derived from live hosted-cell commitments its pool provides* — and add the card's `data-testid`.
 
-- [ ] **Step 4: Green both gates, sequentially**
+- [x] **Step 4: Green the doorway gate** — `just gate doorway` EXIT=0. `just gate doorway-app` was **NOT run**: no doorway-app file changed in this task's landed half, so there was nothing of ours for it to verify; it belongs with the Task 11 caption change.
 
 ```bash
 cd /projects/elohim
@@ -1127,7 +1127,7 @@ just gate doorway-app; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`. Run them one after the other, never together.
 
-- [ ] **Step 5: Close the backlog atom**
+- [x] **Step 5: Close the backlog atom**
 
 In `genesis/data/timeline/backlog/doorway-landing-humans-served-source-2026-06-23.md`: set `status: "closed"` in the frontmatter and append one decision section:
 
@@ -1145,7 +1145,7 @@ Wired in `routes/status.rs::build_status_data`; specified by
 `genesis/a2o/features/dataplane/doorway-humans-served.feature` (`@concern:humans-served`).
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd /projects/elohim
