@@ -1,5 +1,5 @@
 import { provideHttpClient, withXhr } from '@angular/common/http';
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { ApplicationConfig, inject, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
@@ -21,6 +21,7 @@ import { environment } from '../environments/environment';
 import { LEARNER_BACKEND } from './interfaces/learner-backend.interface';
 import { LearnerBackendApiService } from './services/learner-backend-api.service';
 import { LAMAD_STORAGE_API, LAMAD_STORAGE_CLIENT } from './interfaces/storage.interface';
+import { withOriginRelativeBlobUrls } from './utils/blob-url';
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 import { LAMAD_AGENT } from './interfaces/agent.interface';
@@ -162,7 +163,16 @@ export const appConfig: ApplicationConfig = {
     // have significant elohim-app consumers) but lamad services inject via these tokens.
     // (Slice 2.1c P+inversion pattern)
     { provide: LAMAD_STORAGE_API, useExisting: StorageApiService },
-    { provide: LAMAD_STORAGE_CLIENT, useExisting: StorageClientService },
+    // Blob hrefs are origin-relative in doorway mode — see utils/blob-url.ts.
+    // The wrapper is required because this bundle server-side-renders: during
+    // SSR the shared connection strategy auto-detects Node and resolves DIRECT
+    // mode, which baked `http://localhost:8090/blob/{hash}` (the native storage
+    // sidecar) into the HTML shipped to every browser. Only getBlobUrl is
+    // rewritten; getStorageBaseUrl still drives /db + /api on the delegate.
+    {
+      provide: LAMAD_STORAGE_CLIENT,
+      useFactory: () => withOriginRelativeBlobUrls(inject(StorageClientService)),
+    },
     { provide: LAMAD_AGENT, useExisting: AgentService },
     // Cross-pillar P+inversion tokens — concrete classes stay in elohim-app due to
     // non-lamad deps (imagodei, qahal, CONNECTION_STRATEGY, PerformanceMetricsService, etc.)
