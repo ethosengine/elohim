@@ -120,10 +120,10 @@
       {% endfor %}
     </div>
 
-    <!-- Projection Subscribers -->
+    <!-- Conductor signal subscriptions -->
     {% if !projection_peers.is_empty() %}
     <div class="section">
-      <h2>Projection Subscribers</h2>
+      <h2>Conductor signal subscriptions</h2>
       <div class="peer-grid">
         {% for peer in projection_peers %}
         <div class="peer-card">
@@ -166,7 +166,7 @@
           <div class="value">{{ resource_usage.total_requests }}</div>
         </div>
         <div class="stat-card">
-          <div class="label">Subscribers</div>
+          <div class="label">Signal subscriptions</div>
           <div class="value">{{ resource_usage.active_subscribers }}</div>
         </div>
       </div>

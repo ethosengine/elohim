@@ -59,6 +59,27 @@ fn worker_threads() -> usize {
         .unwrap_or(DEFAULT_WORKER_THREADS)
 }
 
+/// Whether this doorway subscribes to conductor signals.
+///
+/// A projection WRITER subscribes. Stage-independent, mode-independent.
+///
+/// The old predicate was `!projection_writer || (dev_mode && !dev_signal_subscriber)`.
+/// Because `dev_mode` is `"true"` on every deployed manifest (alpha, alpha-b,
+/// prod, staging, staging-read — the same fact that made the anonymous-caller
+/// gate ungated in practice, `auth/http_permission.rs:73`, citing
+/// `2026-08-25-doorway-auth-posture-declared-stage.md`), it dropped the
+/// projection engine's signal sender at boot on the FLEET while reading as a
+/// dev-only convenience. That is the mechanism named in
+/// `doorway-failover.habit.md` DELTA 2026-09-04 ("DEV_MODE wiring drops the
+/// projection engine's signal sender at boot").
+///
+/// A doorway that fronts no conductor still costs only reconnect attempts, and
+/// those are already surfaced as peer-health `Degraded` on `/status` — visible
+/// noise is a better answer than a silently unfed projection.
+pub(crate) fn should_subscribe_to_signals(projection_writer: bool) -> bool {
+    projection_writer
+}
+
 /// Inbound admission ceiling (Pillar 2): max concurrent in-flight requests
 /// before doorway sheds 503+Retry-After. Floored at `MIN_MAX_INFLIGHT` so a
 /// fat-fingered tiny/zero value can never deadlock the gate.
@@ -1208,22 +1229,12 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
 
     // Start Projection Engine (if projection store is available)
     //
-    // Gating logic (projection_writer flag):
+    // Gating logic (projection_writer flag ALONE — see should_subscribe_to_signals):
     //   projection_writer=true  → starts signal subscriber (populates MongoDB from DHT signals)
     //   projection_writer=false → reads from shared MongoDB, no subscriber (read replica mode)
-    //
-    // In dev mode, the signal subscriber is skipped by default: many dev-mode
-    // contexts run with no conductor at all and would spin reconnect noise.
-    // Auth is NOT the blocker (the subscriber self-authenticates via
-    // TypedAppClient), so --dev-signal-subscriber opts back in when the dev
-    // stack fronts real conductors (e.g. hc-mesh.sh).
     let _projection_handle = if let Some(ref projection_store) = state.projection {
-        if !args.projection_writer || (args.dev_mode && !args.dev_signal_subscriber) {
-            if !args.projection_writer {
-                info!("Projection reader: using shared MongoDB (PROJECTION_WRITER=false)");
-            } else {
-                info!("Projection engine started (dev mode: signal subscriber disabled; opt in with --dev-signal-subscriber)");
-            }
+        if !should_subscribe_to_signals(args.projection_writer) {
+            info!("Projection reader: using shared MongoDB (PROJECTION_WRITER=false)");
 
             // Create engine without signals (it will still work for manual queries)
             let engine = Arc::new(ProjectionEngine::new(
@@ -1238,8 +1249,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
 
             Some((tokio::spawn(async {}), engine_handle))
         } else {
-            // Production mode + projection_writer=true: start multi-peer signal subscribers
-            // One subscriber per conductor, all feeding into a shared signal channel.
+            // projection_writer=true (under every declared stage): start multi-peer
+            // signal subscribers — one per conductor, all feeding a shared channel.
             info!(
                 "Starting projection engine with {} signal subscriber(s)",
                 conductor_urls.len()
@@ -2165,5 +2176,25 @@ mod inbound_max_tests {
         std::env::set_var("DOORWAY_MAX_INFLIGHT_READ", "1024");
         assert_eq!(inbound_max_read(), 1024, "honored above floor");
         std::env::remove_var("DOORWAY_MAX_INFLIGHT_READ");
+    }
+
+    // ── A projection writer subscribes under every stage (D1b) ──────────────
+    //
+    // Mirrors `auth/http_permission.rs`'s `loopback_grant_does_not_depend_on_dev_mode`:
+    // the predicate takes ONE input, so there is no mode flag left to suppress it.
+
+    /// `dev_mode` is `"true"` on every deployed manifest, so the old
+    /// `dev_mode && !dev_signal_subscriber` conjunct dropped the signal sender at
+    /// boot on the fleet. A writer subscribes regardless of declared stage.
+    #[test]
+    fn a_projection_writer_subscribes_under_every_stage() {
+        assert!(super::should_subscribe_to_signals(true));
+    }
+
+    /// A read replica reads the shared projection store and must not open
+    /// subscriptions it would only duplicate.
+    #[test]
+    fn a_read_replica_never_subscribes() {
+        assert!(!super::should_subscribe_to_signals(false));
     }
 }

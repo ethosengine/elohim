@@ -2539,3 +2539,29 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/auth_routes.rs
         testName: synthetic_identity_fallback_is_simulacra_only
         kind: unit
+
+  - name: should_subscribe_to_signals
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/main.rs
+      modulePath: main::should_subscribe_to_signals
+      line: 79
+    summary: >
+      Whether this doorway opens conductor signal subscriptions. A projection WRITER
+      subscribes under every declared stage; a read replica never does. dev_mode and
+      --dev-signal-subscriber are no longer read, because dev_mode is true on every
+      deployed manifest and so dropped the projection engine's signal sender at boot.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          a_projection_writer_subscribes_under_every_stage pins the case the old
+          `dev_mode && !dev_signal_subscriber` conjunct silently lost on the fleet — an
+          unfed projection that logged "Projection engine started" and read as healthy.
+    contractTests:
+      - path: doorway/doorway-service/src/main.rs
+        testName: a_projection_writer_subscribes_under_every_stage
+        kind: unit
+      - path: doorway/doorway-service/src/main.rs
+        testName: a_read_replica_never_subscribes
+        kind: unit
