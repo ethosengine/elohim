@@ -119,7 +119,10 @@ test target="changed" scope="":
           # <doorway>/threshold/login, so a single probe of exactly that URL is the whole
           # precondition: a 502 there is the portal upstream gone.
           portal_url="$E2E_APP_URL/threshold/login"
-          portal_code="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$portal_url" || echo 000)"
+          # curl already writes 000 on a transport failure, so do NOT append another
+          # fallback code — `|| echo 000` concatenated with it and printed "000000".
+          portal_code="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$portal_url" 2>/dev/null)"
+          [[ -n "$portal_code" ]] || portal_code=000
           if [[ "$portal_code" != "200" ]]; then
             echo "REFUSED: the sign-in portal does not answer at $portal_url (HTTP $portal_code)." >&2
             echo "  Every @browser scenario signs in there; without it they all time out in" >&2
