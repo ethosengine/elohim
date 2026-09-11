@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/scribe.json
   packageKind: AgentPackage
 model: claude-opus-4-6
-tools: Read, Write, Edit
+tools: Read, Write, Edit, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/scribe"
 ---
 

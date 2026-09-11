@@ -22,10 +22,15 @@
       "LSP",
       "mcp__sonarqube__analyze_code_snippet",
       "mcp__sonarqube__search_sonar_issues_in_projects",
-      "mcp__sonarqube__show_rule"
+      "mcp__sonarqube__show_rule",
+      "mcp__mempalace__mempalace_status",
+      "mcp__mempalace__mempalace_search",
+      "mcp__mempalace__mempalace_get_drawer"
     ],
     "sourceRuntime": "claude",
-    "mcpServerRefs": [],
+    "mcpServerRefs": [
+      "mempalace"
+    ],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/red-team",
       "policy": "capability-governance@1",
@@ -36,7 +41,19 @@
       "ledger": ".claude/data/governance-findings.jsonl"
     },
     "master": "package",
-    "composedBy": "claude-opus-4-8"
+    "composedBy": "claude-opus-4-8",
+    "mcpServers": [
+      {
+        "name": "mempalace",
+        "config": {
+          "command": "mempalace-mcp",
+          "args": [
+            "--palace",
+            "/projects/elohim/.mempalace/palace"
+          ]
+        }
+      }
+    ]
   },
   "instructions": {
     "format": "markdown",
@@ -48,11 +65,11 @@
       "frontmatter": {
         "name": "red-team",
         "description": "Adversarial security analyst (Opus). Thinks like a motivated attacker — explores attack surfaces, attempts spoofing/replay/auth bypass, surfaces vulnerabilities before real adversaries find them. Pairs with code-reviewer (defensive review) — red-team is offensive. Non-destructive: finds, never exploits. Invoke when \"can you try to break this auth flow?\", \"attempt to spoof X\", \"we're launching — find security holes\", or pre-release on any identity/auth/payment surface. Examples: <example>Context: User has implemented a new auth flow. user: 'I just finished the password reset flow, can you try to break it?' assistant: 'Let me use the red-team agent to attack the password reset implementation' <commentary>The agent thinks like an attacker to find vulnerabilities.</commentary></example> <example>Context: User wants a security review before release. user: 'We are launching the identity system next week, find any security holes' assistant: 'I'll use the red-team agent to perform adversarial analysis of the identity system' <commentary>Pre-release security assessment from attacker perspective.</commentary></example> <example>Context: User is concerned about a specific attack vector. user: 'Could someone spoof presence claims in the DHT?' assistant: 'Let me use the red-team agent to attempt presence claim spoofing attacks' <commentary>Targeted attack simulation on specific functionality.</commentary></example>",
-        "tools": "Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule",
+        "tools": "Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer",
         "model": "opus",
         "color": "darkred"
       },
-      "frontmatterRaw": "name: red-team\ndescription: Adversarial security analyst (Opus). Thinks like a motivated attacker — explores attack surfaces, attempts spoofing/replay/auth bypass, surfaces vulnerabilities before real adversaries find them. Pairs with code-reviewer (defensive review) — red-team is offensive. Non-destructive: finds, never exploits. Invoke when \"can you try to break this auth flow?\", \"attempt to spoof X\", \"we're launching — find security holes\", or pre-release on any identity/auth/payment surface. Examples: <example>Context: User has implemented a new auth flow. user: 'I just finished the password reset flow, can you try to break it?' assistant: 'Let me use the red-team agent to attack the password reset implementation' <commentary>The agent thinks like an attacker to find vulnerabilities.</commentary></example> <example>Context: User wants a security review before release. user: 'We are launching the identity system next week, find any security holes' assistant: 'I'll use the red-team agent to perform adversarial analysis of the identity system' <commentary>Pre-release security assessment from attacker perspective.</commentary></example> <example>Context: User is concerned about a specific attack vector. user: 'Could someone spoof presence claims in the DHT?' assistant: 'Let me use the red-team agent to attempt presence claim spoofing attacks' <commentary>Targeted attack simulation on specific functionality.</commentary></example>\ntools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule\nmodel: opus\ncolor: darkred"
+      "frontmatterRaw": "name: red-team\ndescription: Adversarial security analyst (Opus). Thinks like a motivated attacker — explores attack surfaces, attempts spoofing/replay/auth bypass, surfaces vulnerabilities before real adversaries find them. Pairs with code-reviewer (defensive review) — red-team is offensive. Non-destructive: finds, never exploits. Invoke when \"can you try to break this auth flow?\", \"attempt to spoof X\", \"we're launching — find security holes\", or pre-release on any identity/auth/payment surface. Examples: <example>Context: User has implemented a new auth flow. user: 'I just finished the password reset flow, can you try to break it?' assistant: 'Let me use the red-team agent to attack the password reset implementation' <commentary>The agent thinks like an attacker to find vulnerabilities.</commentary></example> <example>Context: User wants a security review before release. user: 'We are launching the identity system next week, find any security holes' assistant: 'I'll use the red-team agent to perform adversarial analysis of the identity system' <commentary>Pre-release security assessment from attacker perspective.</commentary></example> <example>Context: User is concerned about a specific attack vector. user: 'Could someone spoof presence claims in the DHT?' assistant: 'Let me use the red-team agent to attempt presence claim spoofing attacks' <commentary>Targeted attack simulation on specific functionality.</commentary></example>\ntools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer\nmodel: opus\ncolor: darkred"
     },
     "codex": {
       "path": ".codex/agents/red-team.md",
@@ -66,7 +83,7 @@
           "packageKind": "AgentPackage"
         },
         "model": "opus",
-        "tools": "Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule",
+        "tools": "Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer",
         "governance": "epr:elohim-agent/agents/red-team"
       }
     }

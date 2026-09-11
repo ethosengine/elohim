@@ -1,7 +1,13 @@
 ---
 name: component-architect
 description: "Protocol element author (Sonnet). Builds accessible, blank-slate Lit custom elements in app/elohim-elements/ and owns Library A (the default pattern library) in app/elohim-library/projects/graphos — boundary rules in app/elohim-library/CLAUDE.md. Elements are theme-agnostic primitives — behavior, a11y, ts-rs data shape, capability contracts (@capability* tags), CSS custom-property override surface — never brand. Invoke when \"create a new <elohim-X> element\", \"add the default stories for X\", \"migrate this Angular component to a Lit elohim-element\", \"review element X for capability-contract or a11y compliance\", or auditing a primitive for theme coupling/brand bake (the cardinal sin). NOT for theme binding or pattern composition (use graphos-designer), Angular-app component work (use angular-architect), or backend view definitions (use rust-architect). <example>user: \"Create an <elohim-shefa-balance-card> that renders ShefaBalanceView with a capability contract.\" assistant: \"I'll dispatch component-architect to author the element, declare its @capability* tags, satisfy the precondition gates, and ship Library A default stories with mock ShefaBalanceView data.\"</example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: sonnet
 color: cyan
 metadata:

@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/red-team.json
   packageKind: AgentPackage
 model: opus
-tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule
+tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__analyze_code_snippet, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__show_rule, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/red-team"
 ---
 

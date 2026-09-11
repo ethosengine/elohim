@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/component-architect.json
   packageKind: AgentPackage
 model: sonnet
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/component-architect"
 ---
 

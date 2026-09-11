@@ -12,15 +12,15 @@ governance: "epr:elohim-agent/skills/converge"
 
 # Converge — Trajectory Synthesis + "What's Next" Menu
 
-Extracted from `memory-kit` (May 2026). The hygiene tools (`cleanup`, `path-update`, `dedupe-memory`, `skill-audit`, `memory-review`) handle *maintenance*. This skill handles *synthesis*: turning the reports those tools produce into actionable plan edits and a ranked next-actions handoff.
+Extracted from the memory kit (May 2026; the kit itself was retired 2026-09-11 and its surviving lenses live at `.epr-meta/elohim/lenses/`). The hygiene tools (`cleanup`, `path-update`, `dedupe-memory`, the package verifier's quality advisories, `memory-review`) handle *maintenance*. This skill handles *synthesis*: turning the reports those tools produce into actionable plan edits and a ranked next-actions handoff.
 
 **Spec**: `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md`.
 
 ## When to invoke
 
-- After a `memory-kit` weekly sweep, before a major `/shift` or `/deliver`
+- After a `/memory-ceremony` hygiene sweep, before a major `/shift` or `/deliver`
 - When an operator types "what's next?" at session start (the menu surface this skill produces is the canonical answer)
-- Never in isolation — `convergence-themes.md` is computed from `memory-kit` reports; running converge without fresh reports produces a stale menu
+- Never in isolation — `convergence-themes.md` is computed from the hygiene lens reports; running converge without fresh reports produces a stale menu
 
 ## Four phases
 
@@ -31,11 +31,11 @@ python3 .claude/scripts/converge/converge-apply.py    # Phase 3: operator-approv
 # Phase 4: session-start UX reads the produced next-actions.md
 ```
 
-1. **Theme detection** (deterministic, `converge-scan.py`) — clusters BACKLOG items, dedupe pairs, plan-status cooling items, sprint-digest themes, and path-rename clusters by shared theme keywords (extracted from active plan filenames + filtered through stopwords + multi-source-type requirement). Outputs `.claude/memory-kit/<TODAY>/convergence-themes.md` with each theme's contributing items and a candidate canonical plan.
+1. **Theme detection** (deterministic, `converge-scan.py`) — clusters BACKLOG items, dedupe pairs, plan-status cooling items, sprint-digest themes, and path-rename clusters by shared theme keywords (extracted from active plan filenames + filtered through stopwords + multi-source-type requirement). Outputs `.eprfs/status/lenses/<TODAY>/convergence-themes.md` with each theme's contributing items and a candidate canonical plan.
 
 2. **Synthesis** (LLM judgment, subagent dispatch) — when this skill is invoked after a fresh scan, dispatch a `general-purpose` subagent (opus) with the prompt below. Set `effort` as a second dial alongside model tier (both the `Agent` tool and workflow `agent()` accept it): this synthesis dispatch is a judgment leg — vision × readiness scoring plus the memorial-tier safeguards — so it warrants high effort, while any helper dispatch that only gathers evidence (the per-theme `git log` / sprint-result / dev-intent reads in PER-THEME WORK steps 1-5) is a `low`/`medium` leg. Use the cheaper settings liberally wherever quality holds. Produces:
-   - Per-theme proposals at `.claude/memory-kit/<TODAY>/converge/<theme>-proposal.md` with structured edit blocks (mark-done, add-as-outstanding, merge-redundant, remove-obsolete, surface-question) — each operator-reviewable via `- [x] Accept` checkboxes.
-   - The **next-actions menu** at `.claude/memory-kit/<TODAY>/next-actions.md` — top 3-5 ranked recommendations with vision × readiness scoring and pre-authored Objectives.
+   - Per-theme proposals at `.eprfs/status/lenses/<TODAY>/converge/<theme>-proposal.md` with structured edit blocks (mark-done, add-as-outstanding, merge-redundant, remove-obsolete, surface-question) — each operator-reviewable via `- [x] Accept` checkboxes.
+   - The **next-actions menu** at `.eprfs/status/lenses/<TODAY>/next-actions.md` — top 3-5 ranked recommendations with vision × readiness scoring and pre-authored Objectives.
 
 3. **Apply** (deterministic, `converge-apply.py`) — for each accepted edit, performs the plan modification. v1 supports `mark-done` (`- [ ]` → `- [x]` with evidence comment) and `add-as-outstanding` (insert new `- [ ]` after named anchor); other kinds are operator-manual edits in v1.
 
@@ -55,7 +55,7 @@ the menu it feeds, so this runs **first**:
    (never rank BLOCKED-BY-ENV). The roadmap's §4 single-highest-leverage-move becomes the **top of the
    next-actions menu** — they must agree.
 2. **MAP-currency glance (librarian + historian, the LEGIBILITY/PATH co-owners).** Check the
-   **map-drift accumulator** (`.claude/memory-kit/map-currency-drift.json`, written by
+   **map-drift accumulator** (`the folds on map-currency-drift@1`, written by
    `map-drift-signal.py`, surfaced at the SessionStart budget
    headline): did architecture seeds or pillar guides move without `architecture/MAP.md` following? If
    so, that is a LEGIBILITY drift — surface it in the menu's "Quiet but load-bearing" section as a
@@ -69,8 +69,8 @@ half. Both run each pass.
 ## Synthesis subagent prompt (Phase 2 dispatch)
 
 ```
-You are the synthesis phase of /converge. Read .claude/memory-kit/<TODAY>/convergence-themes.md
-to see the themes detected from the latest memory-kit dreaming pass.
+You are the synthesis phase of /converge. Read .eprfs/status/lenses/<TODAY>/convergence-themes.md
+to see the themes detected from the latest hygiene-lens pass.
 
 For each theme above noise (skip themes with low total signal or that look like
 generic vocabulary like "execution", "peer" alone — focus on substantive ones
@@ -85,7 +85,7 @@ PER-THEME WORK
 4. Search recent sprint-results in .claude/shifts/ for theme mentions.
 5. Read .claude/data/dev-intent.jsonl entries (if exists) mentioning the theme.
 
-Produce a per-theme proposal at .claude/memory-kit/<TODAY>/converge/<theme>-proposal.md
+Produce a per-theme proposal at .eprfs/status/lenses/<TODAY>/converge/<theme>-proposal.md
 with structured edit blocks. Each edit block has form:
 
   ### N. `<kind>` — <one-line description>
@@ -114,7 +114,7 @@ theme summaries, or boilerplate; the menu below carries its own line caps.
 NEXT-ACTIONS MENU
 =================
 
-After per-theme proposals are written, produce .claude/memory-kit/<TODAY>/next-actions.md.
+After per-theme proposals are written, produce .eprfs/status/lenses/<TODAY>/next-actions.md.
 This is the "what's next" surface.
 
 For each refreshed plan that's ready-to-execute, score:
@@ -274,7 +274,7 @@ conservative; the operator can always tell you to be more aggressive next cycle.
 | **Bigram boost (1.6×)** | Multi-word phrasal themes get a score boost; but their constituent unigrams often dominate edges. | Don't assume bigrams = most important. Investigate sub-themes inside top unigrams. |
 | **TF-IDF + DF auto-stopwords** | Pervasive vocabulary (>40% of docs) drops out as noise. Once a concept becomes universally adopted, it stops surfacing as a theme. | Treat the DF cap as a signal: high-DF terms are *successfully integrated*, not *unimportant*. Cross-reference with manifesto/epics to confirm. |
 | **TextRank centrality** | Themes in dense co-occurrence clusters score higher; isolated themes lose. | Important-but-isolated work may rank low. Do not equate "low convergence rank" with "unimportant." |
-| **Multi-source-type requirement (≥2)** | Themes must appear in 2+ memory-kit report types. New themes in only one report don't surface. | First-touch themes are invisible until they propagate. Explicitly check sprint-digest's recent-themes section for things that haven't yet surfaced in convergence-themes. |
+| **Multi-source-type requirement (≥2)** | Themes must appear in 2+ lens report types. New themes in only one report don't surface. | First-touch themes are invisible until they propagate. Explicitly check sprint-digest's recent-themes section for things that haven't yet surfaced in convergence-themes. |
 | **No semantic similarity (no embeddings)** | Synonyms (`recover` ≠ `recovery`) don't cluster. | Manually fold related themes if they share a canonical plan. |
 
 **Reflexive biases** (today's writes shape tomorrow's search):
@@ -288,12 +288,12 @@ conservative; the operator can always tell you to be more aggressive next cycle.
 
 - Only modifies plans (after operator approval). Never edits specs, memory entries, sprint-results, or skills.
 - Never invents tasks — every add-as-outstanding cites a source.
-- Reads from `.claude/memory-kit/<date>/` (shared report dropoff with memory-kit) and writes its own outputs there. The output directory naming is legacy from when converge lived inside memory-kit; rename is follow-up scope.
+- Reads from `.eprfs/status/lenses/<date>/` (the shared lens report dropoff) and writes its own outputs there. The output directory naming is legacy from when converge lived inside memory-kit; rename is follow-up scope.
 - Hands off via the `next-actions.md` convention to `/shift` or `/deliver`. Not autonomous.
 
 ## Related
 
-- `.claude/skills/memory-kit/SKILL.md` — produces the reports converge consumes
+- `.claude/skills/memory-ceremony/SKILL.md` — produces the reports converge consumes
 - `genesis/docs/superpowers/specs/2026-05-10-converge-skill-design.md` — the design rationale and end-state vision
 - `genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md` — the lifecycle primitives this skill operates within
 - `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` — the standing PRIORITIZATION home the cartographer regenerates in Phase 0; the next-actions menu is its session read-out

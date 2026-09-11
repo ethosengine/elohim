@@ -27,7 +27,7 @@ Each round:
 ```bash
 python3 .claude/scripts/ci-harvest.py            # fresh CI evidence (network)
 python3 .claude/scripts/delivery-scoreboard.py   # the whole board, pure-local
-python3 .claude/scripts/memory-kit/placement-audit.py --ledger | head -25   # per-file queue when needed
+python3 epr flow report placement --ledger | head -25   # per-file queue when needed
 ```
 
 The scoreboard's CI floor is **failure-class-aware** — read the per-job

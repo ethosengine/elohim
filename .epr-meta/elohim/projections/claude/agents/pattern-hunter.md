@@ -1,7 +1,13 @@
 ---
 name: pattern-hunter
 description: "Codebase pattern detector (Sonnet). Hunts cross-cutting patterns — duplicated logic, architectural drift, recurring bug shapes, inconsistent service patterns — across modules. Wider lens than after-action (single-incident) or code-reviewer (single-diff); reports systemic issues for backlog rather than fixing locally. Invoke when \"find duplicate caching code\", \"are our Angular services consistent?\", \"we keep hitting similar null-pointer bugs — pattern?\" Examples: <example>Context: User suspects duplicated logic. user: 'I feel like we have similar caching code in multiple places' assistant: 'Let me use the pattern-hunter agent to find caching patterns across the codebase' <commentary>Detects code duplication that could be consolidated.</commentary></example> <example>Context: User wants to understand code health. user: 'Are we following consistent patterns in our Angular services?' assistant: 'I'll use the pattern-hunter agent to analyze service patterns for consistency' <commentary>Pattern consistency analysis across modules.</commentary></example> <example>Context: User notices recurring bugs. user: 'We keep having similar null pointer issues, is there a pattern?' assistant: 'Let me use the pattern-hunter agent to find null handling patterns and gaps' <commentary>Bug pattern detection to find systemic issues.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures
+tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: sonnet
 color: teal
 metadata:

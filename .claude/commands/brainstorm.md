@@ -16,7 +16,7 @@ yet — research / `systematic-debugging` first. Brainstorm only when the user i
 ## Step 1 — PRE: deterministic prior-art + scope preload (cheap, always run)
 
 ```bash
-python3 .claude/scripts/memory-kit/prep-brainstorm.py --check-drift "$ARGUMENTS"
+python3 .epr-meta/elohim/lenses/prior-art/prep-brainstorm.py --check-drift "$ARGUMENTS"
 ```
 
 Read the preload it prints. It tells you, deterministically:
@@ -195,27 +195,27 @@ content-addressed in one shot so the link survives the target moving (e.g. into 
 progressive-discovery hint:
 
 ```bash
-python3 .claude/scripts/memory-kit/cite-gen.py --seal <new-spec-path>   # assign-id + path-cites → slug|desc|fingerprint + verify
+epr flow cites seal <new-spec-path>   # assign-id + path-cites → slug|desc|fingerprint + verify
 ```
 
 If `--seal` flags `N cite(s) on the title-default desc`, author the relationship hint for each (what the
-target is AND why THIS spec points at it) — `cite-describe.py <doc> '{"<ref>":"<hint>"}'`. The cite-seal
+target is AND why THIS spec points at it) — `epr flow cites describe <doc> --slug <ref> --desc '<hint>'`. The cite-seal
 postHook nudges if you skip this; the seal is what makes the spec a stable, relocatable cite target.
 
 Then re-audit so the new artifact shows up in the budget immediately:
 
 ```bash
-python3 .claude/scripts/memory-kit/spec-coherence-index.py   # refresh prior-art index with the new spec
-python3 .claude/scripts/memory-kit/placement-audit.py --ledger | head -20
+python3 .epr-meta/elohim/lenses/prior-art/spec-coherence-index.py   # refresh prior-art index with the new spec
+python3 epr flow report placement --ledger | head -20
 ```
 
 **Decompose into gap-items** — run:
 
 ```bash
-python3 .claude/scripts/memory-kit/decompose.py <new-spec-path>
+python3 epr flow project <new-spec-path>
 ```
 
-It writes `.claude/memory-kit/gap-items/<slug>.json` — the bounded, cited gap list the next `/plan`
+It writes `.eprfs/status/gap-items/<slug>.json` — the bounded, cited gap list the next `/plan`
 targets (**OPEN** = implement, **CLAIMED** = verify; a checked box is a claim, never trusted as done). If it
 reports "needs AGENT decomposition" (a prose design spec with no checkboxes/requirements), extract the
 spec's components yourself: 5–15 bounded items, each citing a spec line, `OPEN` unless already

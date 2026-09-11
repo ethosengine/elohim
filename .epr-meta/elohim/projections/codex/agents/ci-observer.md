@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/ci-observer.json
   packageKind: AgentPackage
 model: haiku
-tools: Bash, Glob, Grep, Read, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures
+tools: Bash, Glob, Grep, Read, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/ci-observer"
 ---
 

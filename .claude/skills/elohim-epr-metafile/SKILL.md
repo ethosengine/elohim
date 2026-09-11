@@ -478,6 +478,6 @@ rate *is* its convergence (coverage), not a teaching-rule failure.
   "a content-shaped check too rich for a declarative predicate."
 - **`epr-content-addressing`** — the envelope / DAG-CBOR / `canonical_bytes` / reach-at-compose machinery
   the source↔canonical split rests on.
-- **`memory-ceremony`** and **`memory-kit`** (the `/hygiene-sweep` cadence lives in `memory-kit`) — the
+- **`memory-ceremony`** (which absorbed the retired `memory-kit` entry on 2026-09-11, including the `/hygiene-sweep` cadence) — the
   broader stasis cadence an `.epr-meta` rule participates in: the rule is the *local, executable* canon;
   the ceremonies are the *global* sweep.

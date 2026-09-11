@@ -21,7 +21,7 @@ Sibling to `/shift` (agentic-developer). Different intent: `/shift` drives a num
 >
 > This rule exists because **CI green ≠ human-visible delivery**. The whole point of `/deliver` is to close that gap by judging a rendered screenshot against the FeaturePromise. If the memory-ceremony hygiene group could promote a feature from raw cucumber JSON, the gap re-opens. They read the axis to gate graduations; they never write `active.*` / `stable` / `regression`.
 >
-> The full ownership matrix lives in `.claude/scripts/memory-kit/LIFECYCLE.md` under "The author/delivery axis split". This skill is the operating manual for the writing side of that boundary.
+> The full ownership matrix lives in `.epr-meta/elohim/lenses/LIFECYCLE.md` under "The author/delivery axis split". This skill is the operating manual for the writing side of that boundary.
 
 ## Principles (load-bearing)
 
@@ -172,7 +172,7 @@ The tier-3 verdict is qualitative (`delivered` / `partial` / `error_state` / `mi
 
 ### Storage classification (load-bearing)
 
-The manifest is a **local-only artifact; not protocol substrate**. It lives at the same tier as `.claude/memory-kit/claude-md-drift.json` and the memory balance-sheet snapshots:
+The manifest is a **local-only artifact; not protocol substrate**. It lives at the same tier as `the folds on claude-md-edit-signal@1` and the memory balance-sheet snapshots:
 
 - **Single-writer**: only `/deliver` mutates this file. The auto-poller is read-only.
 - **Local to the repo**: tracked in git for team-share, but **never DHT-bound**, never EPR-aliased, never seeded.
@@ -225,11 +225,11 @@ This classification was resolved at plan `/projects/.claude-config/plans/statele
 
 When invoked without an explicit `<handle>`, `/deliver` reads the pickup queue surfaced by the memory-ceremony group's auto-poller:
 
-- **Source**: `.claude/memory-kit/delivery-status-distribution.json` (audit-script output; the field naming may settle as `pickup_queue_for_deliver[]` or similar — confirm filename/array name on first invocation of this fallback)
+- **Source**: `.eprfs/status/lenses/delivery-status-distribution.json` (audit-script output; the field naming may settle as `pickup_queue_for_deliver[]` or similar — confirm filename/array name on first invocation of this fallback)
 - **Ordering**: regressions first (highest urgency — was-working, now-broken), then `active.beta` candidates ready to graduate, then `active.alpha` candidates ready to harden, then `wip` items whose features have green scenarios but no `/deliver` verdict yet
 - **Behavior**: present the top 3 candidates to the operator with the pickup-queue rationale; let the operator pick or pass a `<handle>` of their own
 
-If the distribution file doesn't exist yet (memory-kit audit not yet run this cycle), fall back to operator-supplied handle and surface a one-line note: *"pickup queue unavailable — run librarian's pre-flight before invoking `/deliver` without a handle."*
+If the distribution file doesn't exist yet (the delivery-status lens has not run this cycle), fall back to operator-supplied handle and surface a one-line note: *"pickup queue unavailable — run librarian's pre-flight before invoking `/deliver` without a handle."*
 
 ## CI artifact mechanics
 
@@ -354,11 +354,11 @@ If bailing: same sprint-result template with `disposition: bail-with-followup`, 
 | Direction | Who | What |
 |---|---|---|
 | **Write** | `/deliver` only | Mints `active.*` / `stable` / `regression` to the manifest, **at the feature-level only** (and onto the story/backlog frontmatter for the **immediately-linked** feature). `/deliver` writes one verdict per feature it judges; story-level aggregates are derived elsewhere. |
-| **Read via bridge** | memory-ceremony group (via `.claude/scripts/memory-kit/delivery-status-poll.py` auto-poller — **planned; not yet built**) | Reads `.claude/deliver/manifest.json`, **aggregates per-feature verdicts into per-story `delivery_status` via the weakest-link policy** documented at LIFECYCLE.md → "Story-level aggregation from feature verdicts", and writes the aggregated story-level value back to story frontmatter |
+| **Read via bridge** | memory-ceremony group (via `.epr-meta/elohim/lenses/delivery/delivery-status-poll.py` auto-poller — **planned; not yet built**) | Reads `.claude/deliver/manifest.json`, **aggregates per-feature verdicts into per-story `delivery_status` via the weakest-link policy** documented at LIFECYCLE.md → "Story-level aggregation from feature verdicts", and writes the aggregated story-level value back to story frontmatter |
 | **Floor only** | auto-poller fallback | When `/deliver` has not judged a feature, the auto-poller may write `envisioned` / `backlog` / `refined` / `wip` from raw a2o signals — **never** `active.*` / `stable` / `regression` |
 | **Never write** | memory-ceremony group | Does not author `active.*` / `stable` / `regression` under any circumstance |
 
-**Story-level aggregation is the bridge's job, not `/deliver`'s.** When `/deliver` writes a per-feature verdict, the aggregate effect on linked stories (whose `feature:` triple + `adjacent_features[]` include this feature) is computed downstream by the bridge per the weakest-link rule. See `.claude/scripts/memory-kit/LIFECYCLE.md` → "Story-level aggregation from feature verdicts" for the gradient order and the `regression`-propagates-UP exception. This keeps `/deliver` focused on the rendered-experience falsifier; per-iteration `/deliver` runs only need to think about one feature at a time.
+**Story-level aggregation is the bridge's job, not `/deliver`'s.** When `/deliver` writes a per-feature verdict, the aggregate effect on linked stories (whose `feature:` triple + `adjacent_features[]` include this feature) is computed downstream by the bridge per the weakest-link rule. See `.epr-meta/elohim/lenses/LIFECYCLE.md` → "Story-level aggregation from feature verdicts" for the gradient order and the `regression`-propagates-UP exception. This keeps `/deliver` focused on the rendered-experience falsifier; per-iteration `/deliver` runs only need to think about one feature at a time.
 
 **When `/deliver` is unsure**, write `pending` — never guess upward. The memory-ceremony group's Wave 2 storyteller defers any graduation that depends on `pending` features (storyteller's `graduated-narratively` vs `graduated-fully` branch reads `delivery_status`; `pending` defaults safe to `graduated-narratively` with a `delivery-poll-stale` flag for the librarian).
 
@@ -368,7 +368,7 @@ The bridge's read-only discipline keeps the memory-ceremony group honest: they c
 
 - **Spec:** `genesis/docs/superpowers/specs/2026-05-06-deliver-skill-design.md`
 - **Schema:** `.claude/schemas/feature-promise.schema.json`
-- **Lifecycle / authority matrix:** `.claude/scripts/memory-kit/LIFECYCLE.md` — "The author/delivery axis split" section is the authoritative reference for `status:` vs `delivery_status:` ownership across the memory-ceremony group, `/deliver`, and the auto-poller
+- **Lifecycle / authority matrix:** `.epr-meta/elohim/lenses/LIFECYCLE.md` — "The author/delivery axis split" section is the authoritative reference for `status:` vs `delivery_status:` ownership across the memory-ceremony group, `/deliver`, and the auto-poller
 - **Design wisdom:** `.claude/memory/feedback_story_delivery_status_axis.md` — the four-way convergence that surfaced the orthogonal-axes model in Memory Ceremony Run #2 (2026-05-14)
 - **Stories schema:** `genesis/data/stories/CONVENTIONS.md` — `delivery_status` frontmatter field; written by `/deliver` via the bridge, read-only to storyteller
 - **Timeline schema:** `genesis/data/timeline/CONVENTIONS.md` — backlog `status:` extension to the unified gradient; `regression_from` field

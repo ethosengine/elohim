@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/quality-sweep.json
   packageKind: AgentPackage
 model: haiku
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, SendMessage
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, SendMessage, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/quality-sweep"
 ---
 

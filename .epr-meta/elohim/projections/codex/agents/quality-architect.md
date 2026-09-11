@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/quality-architect.json
   packageKind: AgentPackage
 model: opus
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__analyze_code_snippet
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__analyze_code_snippet, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/quality-architect"
 ---
 

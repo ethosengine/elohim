@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/content-pipeline.json
   packageKind: AgentPackage
 model: sonnet
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__elohim-content__read_seed, mcp__elohim-content__write_seed, mcp__elohim-content__list_seeds, mcp__elohim-content__delete_seed, mcp__elohim-content__search_docs, mcp__elohim-content__read_doc, mcp__elohim-content__list_docs, mcp__elohim-content__create_concept, mcp__elohim-content__create_relationship
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__elohim-content__read_seed, mcp__elohim-content__write_seed, mcp__elohim-content__list_seeds, mcp__elohim-content__delete_seed, mcp__elohim-content__search_docs, mcp__elohim-content__read_doc, mcp__elohim-content__list_docs, mcp__elohim-content__create_concept, mcp__elohim-content__create_relationship, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/content-pipeline"
 ---
 

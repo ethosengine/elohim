@@ -1,6 +1,6 @@
 ---
 name: memory-ceremony
-description: Orchestrate the four-agent memory team (librarian, historian, cartographer, storyteller) through a four-phase substrate-currency ceremony — population-wide drift triage, four-lens deep-read on 1-2 picked surfaces, storyteller-pen synthesis, apply + downstream coherence verification. The deliverable is substrate-grounded gospel-tier rewrites. Invoke when the substrate-currency audit accumulates drift signal, when a major substrate landing happens that the gospel-tier hasn't absorbed, or on operator request.
+description: Carry a memory concern through purpose, governed collective context, evidence, action, independent review and reconciliation, with resumable projections and explicitly paired burden measurements.
 metadata:
   runtime: codex
   sourceRuntime: claude
@@ -9,328 +9,200 @@ metadata:
   packageKind: SkillPackage
 governance: "epr:elohim-agent/skills/memory-ceremony"
 ---
-
-# /memory-ceremony — Four-Phase Substrate-Currency Ceremony
-
-This skill orchestrates the four-agent memory team (librarian, historian, cartographer, storyteller) through a coordinated ceremony whose **deliverable is substrate-grounded gospel-tier rewrites**. The ceremony exists because four lenses on a surface produce a better rewrite than one — and because Run #6 proved that the audit-numbers-moving ≠ substrate-coherence-improving. Audit-number hygiene (CLAUDE.md byte budgets, cleanup-scan flags, archive ratios, MEMORY.md size) lives in `/hygiene-sweep` on a separate cadence.
-
-**When to invoke**:
-- Signal: `substrate-currency-audit.py` ranks the gospel-tier surfaces by drift count (path-existence + process-status findings, highest first) and the top of that ranking carries enough drift to warrant a rewrite — there is no fixed numeric threshold; the audit emits a ranked list (plus headline counts and an uncited-recent-memory list) and the ceremony picks 1-2 off the top itself, surfacing the ranking and its picks to the operator as information
-- Substrate landing: a phase ships, a substrate parallel rolls in, a vocabulary lands — and the gospel-tier hasn't absorbed it
-- Operator: when a gospel-tier surface feels stale, before a /shift that will read it as primer
-
-**Substrate references**:
-- `.claude/scripts/memory-kit/substrate-currency-audit.py` — Phase 1 triage script
-- `.claude/scripts/memory-kit/LIFECYCLE.md` — ownership matrix, dispositions
-- `.claude/agents/{librarian,historian,cartographer,storyteller}.md` — lens-job sections describe each agent's currency-mode role
-- `.claude/skills/memory-kit/SKILL.md` — `/hygiene-sweep` (byte-budget + archive-ratio cadence; separate from this ceremony)
-- `genesis/data/timeline/CONVENTIONS.md` — chronicle schema
-
-## Execution modes — conversational (default) or dynamic workflow
-
-The phases below define the ceremony's *content* regardless of how it's executed. Two modes:
-
-- **Conversational (default, 1-2 surfaces).** The orchestrator dispatches each phase via Task, holding the lens reports in its own context and surfacing the Phase 3 rewrites to the operator gate inline. Right for the standard small cycle.
-
-- **Dynamic workflow (3+ surfaces, or when you want the orchestration codified and rerunnable).** Phases 2-3 are a textbook fan-out + synthesis — per picked surface: librarian-prologue → three lenses in parallel → storyteller-pen. Run them as a dynamic workflow (`Workflow` tool) so the lens reports live in **script variables instead of the orchestrator's context**. That is what lets you pick more than two surfaces: the 1-2 cap is partly a context-budget limit, not only an attention one (see the "Picking too many surfaces" footgun). Pipeline shape, one item per picked surface:
-
-  ```
-  pipeline(pickedSurfaces,
-    s   => agent(prologue,      {agentType: 'librarian',   phase: '2a', model: 'opus'}),
-    fac => parallel([                                          // phase 2b, after prologue
-             agent(missing-citations, {agentType: 'historian',    phase: '2b'}),
-             agent(coverage-gaps,     {agentType: 'cartographer', phase: '2b'}),
-             agent(narrative-lens,    {agentType: 'storyteller',  phase: '2b'})]),
-    len => agent(compose-rewrite, {agentType: 'storyteller', phase: '3-compose'}))
-  // returns paste-ready rewrites + diff-rationales
-  ```
-
-  `opts.agentType` invokes the real memory-team agents (so each keeps its MemPalace MCP grants and lens-job definition); `opts.model` honors the tier discipline (`[[project_agentic_loop_economics]]`). **The workflow stops before the Phase 3 operator gate** — workflows take no mid-run input, so it returns the rewrites and the operator gates each one in conversation (approve / revise / decline). Phase 4 (apply + two-lens verify) then runs inline or as a second workflow, with Phase 4b's diff-regression review (`/code-review`) and fresh-context coherence check as the two adversarial-verify lenses (never one of the four content-lenses). Only launch a workflow when the operator has opted in — it spawns many agents.
-
-**Effort — a second dial, independent of model tier (both modes).** Task dispatches and workflow `agent()` both accept `effort` alongside `model`. Use `low`/`medium` liberally for the mechanical legs — the librarian's Phase-2a fact-verification, the Phase-1b deterministic currency readouts, the Phase-4d re-embed confirmation — where quality holds at a fraction of the tokens; reserve high or `xhigh` for the judgment legs: the storyteller's Phase-3 synthesis pen and Phase-4b's two adversarial-verify lenses.
-
-## Phase 0 — Read the in-flight record first (~1 min, deterministic)
-
-The ceremony's cheapest and most reliable input is what agents already witnessed while working:
-every session that finds a stale claim in a gospel surface, a memory note, a script's rationale
-comment, or a skill records it AT DISCOVERY with the run-plane's own correction verb —
-
-```
-epr flow note --on <surface path> --kind correction --reason 'STALE (<date>): "<claim as written>" → <what is true now> (<evidence>)'
-```
-
-That is the record. It is not a new ledger: notes are REA events in `.eprfs/status/flows.jsonl`
-(`unit: run-note`, `classifiedAs[0] = run:correction`, `classifiedAs[1] = target path`) and each
-target's notes render with `epr flow ledger <path>`. The ceremony reads them across targets with
-
-```
-python3 .claude/scripts/memory-kit/stale-record.py [--since <ISO date>]   # groups STALE corrections by surface
-```
-
-and treats every surface with a witnessed correction as a Phase 1 candidate BEFORE the
-population-wide audit runs. Witnessed staleness outranks scanned drift: a correction carries the
-claim, the truth, and the evidence, so the Phase 2 deep-read on that surface starts from a
-known delta instead of re-deriving one — that is where the ceremony's token cost drops. Default
-picks: every surface in the record (they are pre-triaged), then top up to N from the Phase 1
-audit only if the record is thin. A surface whose corrections are all applied is announced as
-such and skipped. Entries the ceremony absorbs are closed in the chronicle (Phase 4c) by naming
-the surface and the correction date, so the same STALE line is never carried into a second
-ceremony. `--since` defaults to the newest chronicle's date.
-
-Rule of thumb for authors of the record: one note per stale CLAIM (not per file), the quoted
-claim verbatim so the ceremony can grep it, and the replacement truth in the same note — a
-correction that says only "stale" is a dump.
-
-## Phase 1 — Population-wide triage (~2 min)
-
-Run the substrate-currency audit. Cheap, deterministic, idempotent:
-
-```
-python3 .claude/scripts/memory-kit/substrate-currency-audit.py
-```
-
-Output: `.claude/memory-kit/<TODAY>/substrate-currency-audit.{json,md}` — ranked drift list across all ~60 gospel-tier surfaces (agents + skills + CLAUDE.md), broken down by:
-- **PATH-EXISTS** findings — backticked path-like tokens that don't resolve
-- **PROCESS-STATUS** findings — temporal phrasing violating `[[feedback_agent_prompts_no_process_status]]`
-- **MISSING-CITATION** findings — recent MEMORY.md slugs that the surface's scope plausibly touches but doesn't cite
-
-Surface the top-5 by total drift **as information**, then **pick the top-N yourself and proceed** — default N=2. State the picks and one line of why each was picked, and continue into Phase 1b without waiting: the ranking is the ceremony's own instrument, and reading it is an execution decision. The operator keeps a standing **override** — a redirect at any point ("skip rust-architect, do code-reviewer and angular-architect — they touch the next sprint") is an input the ceremony re-picks on, not a gate it stops at. De-escalation is not de-authorization.
-
-Picking 0 is the ceremony's own call too: if the audit numbers are clean, or all top-ranked surfaces are bare-filename-heavy noise, announce that the ceremony has no work this cycle, surface the audit summary, and exit — decide it, don't ask it.
-
-**Why the pick is not a gate while Phase 3's approval is.** Gate placement follows the planning/execution split: escalate what-counts-as-done, never an execution decision the ceremony's own measure already answers ([context-engineering primary sources](epr:context-engineering-primary-sources-cross-pollination-2026-08-13) §4.5, run as TAKE-4). The two gates that are genuinely the operator's stay untouched: **Phase 3 rewrite approval** (approve / revise / decline per rewrite — what the gospel tier should say is a planning judgment) and the **holds menu for contested edges** (a scope decision the operator owns). Removing either would be the opposite error to the one this de-escalation fixes.
-
-**Edges gauge (sealed contract edges — spec 2026-07-21 §5):** alongside the audit, read `epr flow status --json` (`edges: sealed · governed · stale · held · dangling`). The stale/dangling set is ceremony work, not mechanical cleanup: the librarian drives the mechanical re-verify tier (reseal what still holds — stale-gated, never auto-blessed), and **contested or deviating edges go to the Phase-3 holds menu** for the operator. Governed edges are never stale; ignore them.
-
-### Phase 1b — PATH + PRIORITIZATION currency readout (~3 min)
-
-Alongside the gospel-tier drift triage, the ceremony carries two **standing canonical-surface
-currency checks** — the LEGIBILITY/PATH map and the PRIORITIZATION/ROADMAP — so both are maintained
-in-flight, not one-off. This sub-phase is a deterministic readout the operator sees next to the
-substrate-currency audit; it does not consume a picked-surface slot. Dispatch (in parallel, one
-message) two lightweight currency checks:
-
-- **MAP-CURRENCY (librarian + historian).** The librarian verifies
-  `genesis/docs/content/elohim-protocol/architecture/MAP.md` is current with the seeds — every D1–D10
-  seed still on disk and matching INDEX.md, walk-links in §2 resolve, §3 gap-ledger pointers real —
-  per its `MAP-CURRENCY mandate` lens-job. The historian verifies the §3 gap ledger is *substantively*
-  honest (closed gaps worth a `history/` record; recurring gap-shapes worth a `feedback_*`), per its
-  `MAP-CURRENCY mandate` lens-job. The **map-currency-drift accumulator**
-  (`.claude/memory-kit/map-currency-drift.json`, written by the `map-drift-signal.py` PostToolUse hook and
-  surfaced at SessionStart through the budget headline) names which seeds moved without the map
-  following; if absent, fall back to an `architecture/` directory-diff against MAP §1.
-- **ROADMAP-CURRENCY (cartographer).** The cartographer regenerates
-  `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` from the three live inputs
-  (`placement-audit.py --ledger` × `--focus` × the re-mined vision axis) per its `ROADMAP-CURRENCY
-  mandate`, re-stamping the dated regeneration header even when rankings are unchanged, and surfaces
-  the single highest-leverage next move (§4) so it agrees with the next-actions menu.
-
-Readout shape (one line each, surfaced under the Phase-1 triage summary):
-> **PATH currency:** MAP.md — `<current ✅ | N seeds drifted / M gap rows stale / K dead walk-links>`
-> **PRIORITIZATION currency:** roadmap — `<re-stamped <date>; top move: <one line> | stale vs today's --ledger>`
-
-If both read current, the ceremony notes them green and proceeds to surface-picking. If either drifted,
-the fix is the owning agent's standing duty (librarian/historian for MAP, cartographer for roadmap),
-applied per their structural-vs-substantive authority split — it does **not** require picking MAP or the
-roadmap as one of the 1-2 gospel-tier rewrite surfaces unless the drift is a substantive re-framing (in
-which case it joins the candidate list and the storyteller pens it in Phase 3, same as any surface).
-
-### Phase 1c — Lane pick (~1 min, deterministic)
-
-The ceremony has two lanes and runs exactly ONE per cycle. Read `index_unloaded` from
-`.claude/memory-kit/memory-index-drift.json` (emitted by `memory-index-projector.py`): the count of
-`MEMORY.md` index rows whose cumulative byte offset is past the 24.4 KB harness load cap — entries that
-cost tokens to write and never reach a session's context.
-
-- **`index_unloaded > 0` → HEAD-COMPACTION lane.** This cycle's work is the index head, not a
-  gospel-tier rewrite. The storyteller triages the lowest-value index rows with their three verbs: a
-  project note whose incident an umbrella already carries, a history doc, or a spec **memorializes**
-  into that umbrella as an `index: false` member; a row whose lesson a canonical story can carry
-  **graduates** to `genesis/data/stories/`; anything not yet ready is **held** for the next cycle.
-  Feedback notes stay unless a surviving entry duplicates them. The librarian applies the dispositions
-  (topic-file frontmatter edits, then `memory-index-projector.py --apply`) and re-projects.
-- **`index_unloaded == 0` → gospel-rewrite lane.** Proceed to Phase 2 with the picked surfaces.
-
-**The split is the LANE, not the ceremony: one invocation, one team, two lanes — and the storyteller
-owns compaction**, as they already own the admission gate. Phases 0 and 1 triage for both lanes, so
-neither needs a skill of its own. Phase 0's STALE record in particular feeds both: a witnessed
-correction on a gospel surface is a rewrite candidate, and one on a memory topic file is a compaction
-candidate — a row whose claim is already stale is the cheapest row to memorialize.
-
-## Phase 2 — Four-lens deep-read (~25-30 min)
-
-Each picked surface goes through the four lenses. The librarian runs first as prologue; the other three run in parallel against the librarian's verified-facts ground.
-
-### Phase 2a — Librarian prologue (~5 min per surface)
-
-Dispatch the librarian via Task with currency-mode framing (the agent's lens-job section in `.claude/agents/librarian.md` carries the full method). The dispatch prompt:
-
-> "**Substrate-currency ceremony Phase 2a — prologue.** Picked surface: `<path>`. Run mechanical fact-verification per your `Substrate-currency ceremony — Phase 2 prologue lens-job` section.
->
-> Output a verified-facts report for `<path>` listing every factual claim (path, crate/module/DNA, cited file, internal-citation slug) tagged `verified` / `not-found` / `drift` / `forbidden-phrasing` with line numbers. Process-status phrasing flagged per `[[feedback_agent_prompts_no_process_status]]`. Cap ~5 min per surface. Bare-filename-heavy surfaces get a heads-up note de-rating that class.
->
-> Do NOT interpret findings or propose rewrites — the historian, cartographer, and storyteller consume your report next."
-
-Run picked surfaces in parallel if more than one (one Task dispatch per surface, single message).
-
-### Phase 2b — Three lenses in parallel (~10 min per surface)
-
-After the librarian-prologue reports return, dispatch historian + cartographer + storyteller in parallel — one set of three dispatches per picked surface, all in a single message. Each agent's currency-mode lens-job is defined in its agent file; the dispatch hands them the librarian's verified-facts report verbatim.
-
-**Historian dispatch**:
-> "**Substrate-currency ceremony Phase 2b — missing canonical-discipline citations lens.** Picked surface: `<path>`. Librarian's verified-facts report attached: `<librarian Phase 2a output verbatim>`.
->
-> Per your `Substrate-currency ceremony — missing canonical-discipline citations lens-job` section, surface up to 10 missing canonical-discipline citations the surface should carry but doesn't. Walk MEMORY.md filtered to the surface's scope; walk the palace if you suspect uncodified-but-recurring shape. Each finding: `[[slug]]` + one-sentence discipline + one-sentence bug-shape-risk. Silence is valid output."
-
-**Cartographer dispatch**:
-> "**Substrate-currency ceremony Phase 2b — substrate-coverage gap lens.** Picked surface: `<path>`. Librarian's verified-facts report attached: `<librarian Phase 2a output verbatim>`.
->
-> Per your `Substrate-currency ceremony — substrate-coverage gap lens-job` section, surface up to 10 substrate-coverage gaps. Walk MEMORY.md entries from the last ~30 days; git log relevant repo paths from the last 60 days; check coverage-completeness (all 5 DNAs, both transport stacks, major substrate components, canonical vocabulary). Each finding: substrate citation + one-sentence gap + one-sentence suggested-claim. Silence is valid output."
-
-**Storyteller dispatch (Phase 2 lens only — synthesis pen comes in Phase 3)**:
-> "**Substrate-currency ceremony Phase 2b — narrative coherence & framing lens.** Picked surface: `<path>`. Librarian's verified-facts report attached: `<librarian Phase 2a output verbatim>`.
->
-> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-2 sub-section, surface 5-10 narrative-coherence findings: vocabulary consistency, causality/framing, memorable shape, narrative-shape of process-status leaking in. Do NOT compose the rewrite yet — that's Phase 3. Output findings only."
-
-After all three return per picked surface, you have the four reports (librarian facts + three lens findings). Move to Phase 3.
-
-## Phase 3 — Storyteller pens rewrite + operator single-gate (~20 min per surface)
-
-Dispatch the storyteller (one Task per surface; in parallel if more than one) with all four inputs:
-
-> "**Substrate-currency ceremony Phase 3 — synthesis pen.** Picked surface: `<path>`. Four inputs attached verbatim: (1) librarian verified-facts, (2) your Phase 2 narrative-coherence findings, (3) historian missing-citations, (4) cartographer coverage-gaps.
->
-> Per your `Substrate-currency ceremony — rewrite-synthesis pen lens-job` Phase-3 sub-section, compose the paste-ready rewrite of `<path>`. Preserve structural skeleton (frontmatter, section headings) unless lens findings argue for restructure. A rewrite is not an expansion: match its length to the substrate it must carry, and do not pad with filler sections, redundant summaries, or boilerplate the original did not need. Each addition must cite at least one input. Apply canonical vocabulary; apply `[[feedback_agent_prompts_no_process_status]]`. Do not upgrade a hedged claim into a confident dated assertion; preserve the original's tentativeness unless a lens supplies evidence — rewriting is itself a hazard ([Manufactured Confidence](https://arxiv.org/abs/2606.29279): a casual, hedged remark becomes a confident, dated assertion the next agent obeys like a verified fact).
->
-> Output: (a) full rewritten surface body, ready to paste, (b) 1-paragraph diff-rationale citing which findings drove which changes. Cap ~15 min. If the surface needs more, return what you have plus a one-sentence two-cycle-rewrite note for the operator to elevate as backlog."
-
-Surface each storyteller rewrite to the operator as ONE single gate per picked surface — approve / revise-with-direction / decline:
-
-- **Approve**: orchestrator applies the rewrite via Write or Edit, moves to Phase 4
-- **Revise-with-direction**: re-dispatch the storyteller with operator's direction folded in; one revision round, then re-surface
-- **Decline**: discard the rewrite; file a backlog entry naming what went wrong (operator's call) so the next ceremony picks differently
-
-This is the only operator gate in the ceremony. Surface only the rewrites, not the lens reports — the operator reviews the deliverable, not the process. Per `[[feedback_no_menu_punt_in_auto_mode]]`, no four-option ritual menus; one decision per surface.
-
-**Holds menu (operator-confirmed governance):** any edge the drain proposes to HOLD (`epr flow hold` — a declared deviation with reason + valid_from) is presented here as a menu item with the librarian's rationale, historian precedent if any, and the storyteller's graduation check. **The operator confirms each hold**; a hold is policy, never hygiene — no agent declares a deviation unilaterally.
-
-## Phase 4 — Apply + two-lens verification (diff-review + downstream-coherence) (~10 min)
-
-### Phase 4a — Apply approved rewrites
-
-For each approved rewrite, apply via Write (full-file replace) or Edit (section replace, when the rewrite preserves enough structure). Git diff IS the chronicle for what changed; do not duplicate diff content elsewhere.
-
-### Phase 4b — Two verification lenses (diff-review + coherence)
-
-Two orthogonal adversarial checks run on the applied rewrites; **both must clear (GREEN, or YELLOW-resolved) before the chronicle.** They catch different failure classes — Lens 1 looks at the *change*, Lens 2 looks at the *primed surface* — and neither is one of the four content-lenses (which carry confirmation bias from inside the ceremony).
-
-**Lens 1 — Diff-regression review (the `/code-review` lens).** Dispatch a `code-reviewer` agent (the plain-working-diff analog of `/code-review`; the orchestrator cannot launch the billed `/code-review ultra` cloud variant itself) on each rewrite's `git diff`. Its job is REGRESSION, not coherence: did the rewrite introduce a defect *versus the original* — a factual claim the code doesn't support, a dropped-but-still-true statement, a broken or mis-repointed `[[slug]]`, an internal contradiction? Hand it the specific claims the rewrite CHANGED or ADDED, and require each ground-truthed against live source — because a content-lens, and even the orchestrator's own Phase-3 grounding, can trust a stale doc (e.g. CLAUDE.md) or misread a `#[cfg(test)]` fixture as the production write-path, and the diff-review is the check that catches exactly that. Findings ride the same GREEN/YELLOW/RED scale below. Treat an empty finding set as a real, valuable result — but do not assume it: this lens reliably surfaces regressions the four-lens read and the orchestrator's review both miss.
-
-**Lens 2 — Downstream-reader coherence (fresh-context Explore agent).** Per `[[feedback_first_memory_team_ceremony]]` Phase 6d lesson — the only piece of the old ceremony worth preserving verbatim. Dispatch a fresh-context Explore agent (NOT one of the four memory agents, which carry confirmation bias from inside the ceremony):
-
-> "You are a downstream implementation-sprint agent about to start work on **<plausible-next-topic>**. Read these files as your primed context:
-> - MEMORY.md
-> - <each rewritten surface>
-> - <any CLAUDE.md or memory entries that the rewrite cites or is cited by>
->
-> Report: (a) contradictions across these files that would mislead your sprint; (b) gaps where context references something you cannot find; (c) stale citations (e.g., a CLAUDE.md mentions a pattern, the rewritten agent prompt cites the pattern, but the pattern is referenced inconsistently); (d) redundancies where the same fact lives in N places, unclear which is authoritative.
->
-> You are NOT executing the sprint — evaluating whether the context primes you well or poorly. Return a coherence score: GREEN (clean), YELLOW (minor noise, recoverable), RED (contradictions/gaps that would derail). Cite specific files + line evidence for any non-GREEN finding."
-
-Pick `<plausible-next-topic>` from cartographer's `/converge` backlog if active, otherwise from the substrate the rewritten surfaces describe (e.g., rewriting rust-architect.md → topic "elohim-storage view authoring" or "doorway endpoint addition").
-
-**Verdict handling** (applies to both lenses — take the worse of the two):
-- **GREEN**: ceremony closes. Brief chronicle entry per Phase 4c.
-- **YELLOW**: the librarian closes the noise inline if it's mechanical (typo, dead-path, citation fix, a precise stale-clause correction grounded against source); larger-than-mechanical noise becomes a single backlog entry for next cycle. Then ceremony closes; chronicle records the YELLOW + resolution.
-- **RED** (from either lens): the ceremony is NOT done. Resolve the findings — re-dispatch the storyteller, or (for a precise, evidence-backed factual fix) correct inline against the ground-truthed source — then re-apply and re-verify. RED is the highest-value signal the ceremony can produce — it means the four-lens deep-read missed cross-substrate impact, which a diff-review finding confirmed against live source is exactly. Do not paper over it.
-
-### Phase 4c — Lightweight chronicle write
-
-Chronicle stays as a deterministic record between ceremonies — **not** the heavy stasis-table-with-rationale-columns the old ceremony made it. Per operator direction (2026-05-15): the chronicle should surface drift deterministically without being leaned on as crutch.
-
-Write `genesis/data/timeline/chronicle/<YYYY-MM-DD>-substrate-currency-<slug>.md`. Body is concise (~150-300 words):
-
-```yaml
----
-kind: chronicle
-status: noted
-date: <today>
-ceremony: substrate-currency
-surfaces_rewritten:
-  - <path>
-  - <path>
-diff_review_verdict: GREEN | YELLOW | RED   # Phase-4b Lens 1 (/code-review)
-coherence_verdict: GREEN | YELLOW | RED     # Phase-4b Lens 2 (fresh-context Explore)
-next_topic_sampled: <topic>
-agent_minutes: <n>              # what this cycle cost in agent wall-clock
-surfaces_read: <n>              # surfaces the lenses actually read (denominator for cost-per-surface)
-stale_record_closed: <n>/<m>    # Phase-0 corrections absorbed / present at Phase 0
----
-
-## What changed
-
-<2-4 sentences naming the surfaces rewritten and the dominant lens-driver: which lens contributed the most weight to each rewrite. E.g., "rust-architect.md rewritten — cartographer's coverage-gap on iroh parallel stack was the driver; historian surfaced 4 missing canonical-discipline citations; librarian flagged 3 fictional path claims.">
-
-## Verification sampling (both Phase-4b lenses)
-
-<1-2 sentences per lens: the diff-review (`/code-review`) verdict + any confirmed regressions and their fix; and the coherence Explore's sampled topic + verdict + any non-GREEN findings + resolution.>
-
-## Wisdom worth carrying forward
-
-<Only write this section if the cycle taught something cross-cutting that the next ceremony should know. Otherwise omit. NOT a ritual section — silence is the default.>
+# Memory ceremony — preserve purpose through reconciliation
+
+The ceremony helps the next agent act from current evidence without losing the purpose of the work. Its unit is an assertion and its relationships. Its finish is a warranted, reviewed outcome tied to the original intent, with uncertainty and remaining work visible. Rewrites and recall-preserving head compaction are actions within this journey. Audit counts and smaller memory heads are supporting observations, never acceptance criteria.
+
+## Shared memory and deterministic lenses
+
+The `memory-kit` skill was RETIRED on 2026-09-11 (station six of the memory-kit replacement)
+and this ceremony is its only entry point. Shared knowledge belongs to the repository collective;
+files/docs/algorithms/code are EPRFS objects governed by `.epr-meta`. Inspect the
+static local relationship with `epr flow memory collective`, which carries the
+declaration and its native input guides. Live session attribution remains in the
+existing actor store. This is a local collaboration policy, not authentication or
+network membership.
+
+Collective memory has its own verbs, each taking an authored request file:
+`epr flow memory contribute|project|feedback|graduate --input <request.json>`, with
+`--session <registered-session>` on every write. They are deliberately NOT recall
+operations, so one governed act never has two addresses. `project` exposes qualified
+assertions, exact evidence, selection and omissions, and declares itself ephemeral:
+save its exact output and pin the saved bytes with `epr flow memory pin` before any
+consequential use, because feedback names those pinned bytes as its target. A resumed
+investigation re-derives the projection from the same authored request rather than
+caching it. Graduation is a read-only repository-reach rehearsal; it never publishes.
+The legacy Claude memory symlink already points into tracked `.claude/memory`;
+private/native separation is not retroactively established.
+
+Entry captures a burden baseline; finish closes the explicit pair. Set
+`--measure-scope authored:<relative-path>` (repeat with authored/projected/retained/
+operational categories) at entry to declare the cohort. Otherwise the ceremony scope
+is measured, with the recipe's default cohort for repository-wide work. Resume does
+not replace the baseline. `measure --phase close` closes measurement independently
+of a judgment; `measure --phase baseline` inspects the original observation.
+Incomplete or incompatible pairs report no delta. Closing artifacts and unknown
+model-token costs remain visible; reduced bytes never substitute for warranted judgment.
+
+### The deterministic lenses, after the kit
+
+`.epr-meta/elohim/lenses/` no longer exists. What it did is in three places, and knowing
+which one answers a question is most of the navigation:
+
+**Native verbs — the state machine.** `epr flow report --headline` (the SessionStart budget
+line), `epr flow report placement --ledger | --coverage | --focus [--brief] | --stasis` (the
+per-file budget, the un-captured queue, the env-scoped testable surface, the composite
+context-coverage readout with its ratchet), `epr flow project` (plan/spec to bounded gap-items),
+`epr flow report scope` and `epr flow hold --scope` (the env-scope reading and the mover),
+`epr flow memory project --index --budget memory-index-bytes@1` (MEMORY.md), `epr flow cites
+seal | describe | verify | stamp` (the cite writer), `epr flow concerns --corrections`
+(unresolved corrections by identity — Phase 0 below reads this).
+
+**Relocated lenses — no native replacement, declared as foreign measures** in
+`.claude/epr-meta/measures.yaml` and living under `.epr-meta/elohim/lenses/`:
+
+| Lens | Reads |
+|---|---|
+| `memory/memory-review.py` | memory-dir health: index lines vs budget, projected bytes, typed/untyped, stale, index↔file drift |
+| `memory/memory-coherence-audit.py` | each entry's `cites:` still resolve; writes the `cites-index.json` the coherence hook reads |
+| `memory/dedupe-memory-scan.py` | TF-IDF duplicate-candidate clusters across entries |
+| `memory/cleanup-scan.py` | the archive-candidate proposal set (its apply half was RETIRED — accepted proposals route through `epr flow hold`) |
+| `memory/path-update-scan.py` · `path-update-apply.py` | rename detection, and the healing edit |
+| `gospel/claude-md-audit.py` | CLAUDE.md drift + rightsizing |
+| `gospel/substrate-currency-audit.py` | gospel scanned for PATH-EXISTS / process-status phrasing |
+| `gospel/locus-drift.py` | per-locus drift roll-up over the cite graph |
+| `delivery/story-coverage-audit.py` | story ↔ a2o feature coverage |
+| `delivery/delivery-status-distribution.py` | the delivery-status gradient |
+| `prior-art/spec-coherence-index.py` | prior-art index — run `--query '<topic>'` BEFORE proposing, and compose rather than re-spec |
+| `prior-art/prep-brainstorm.py` | the `/brainstorm` deterministic preload |
+
+Every lens writes under `.eprfs/status/lenses/` — derived, regenerable, untracked, with
+`_lib.paths.reports_root` as its one authority. None of them keeps an accumulator; the
+accumulated counts are DERIVED from the fold plane by the report.
+
+**The operating map** — tiers, cadence, the disposition discriminators, the hook inventory and
+the hard-won gotchas — is `.epr-meta/elohim/lenses/CLAUDE.md` and its sibling `LIFECYCLE.md`,
+which moved there with the lenses. Read those rather than reconstructing them here.
+
+## Enter the journey
+
+Start with the delivered agent-facing entry:
+
+```sh
+epr flow memory recall open --session <ceremony-id> --need '<the question you carry>'
 ```
 
-The three metered fields exist because nothing measured this ceremony's cost before: a GREEN verdict with no number beside it leaves "expensive" a feeling on both sides, and three consecutive chronicles carrying them give a cost-per-surface trend instead. The chronicle is forensic record, not narrative scaffolding. Future ceremonies grep it to recall "have we rewritten this surface recently?" and "did the coherence-check find anything we should remember?" — that's the deterministic drift-surface role it plays. If a cycle taught nothing cross-cutting, the Wisdom section is omitted. Most cycles will land there.
+The executor is native: sixteen operations — `open`, `select`, `context`, `read`,
+`remember`, `recipe`, `search`, `source`, `history`, `compare`, `resume`, `adopt`,
+`prepare`, `reconcile`, `measure`, `finish` — under one session label. Its receipts and
+continuation are PRIVATE session records under `.eprfs/status/recall/<session>/`, mode
+`0600`, in a terminally ignored directory; they are never imported, projected, witnessed
+or targeted by feedback, and every path-shaped input (`--path`, `--scope`,
+`--search-scope`) is refused if it reaches into that store. What a session exposes is
+what was read and what was concluded, never a reasoning trace.
 
-### Phase 4d — MemPalace re-embed (the ceremony just rewrote the canonical surface)
+It supplies **Orient → choose a concern → understand its story → follow evidence → act → review → reconcile**. Orientation carries intent, source-backed guiding values, scope, constraints and a worthwhile finish across navigation. The concern view groups native stale/dangling edges by shared source, with per-edge identities, coverage, omitted scope and linked choices. A stale fingerprint is unreviewed drift; it does not establish either a safe repair or a substantive conflict.
 
-The ceremony's whole point is substrate-true rewrites of gospel-tier canonical content — which **changes the semantic surface the front-link recalls from**. A frozen index would keep surfacing the *old* gospel. So the final act, once 4b is GREEN, is to re-embed the cleaned surface:
+Follow an emitted choice rather than reconstructing command syntax. Use `--json` for structured views. `select` opens the source's section outline and current claim; `read` opens a bounded passage and returns its receipt key. `context` follows native intent, governance, review and acceptance through bounded sections. Follow its emitted section and continuation choices to expand individual records; indexed choices pin the observed context and refuse if it changes. Native `--section <dot-path>` is a progressive projection of the existing context, not a second authority reader. Views expose input-dependent choices for recording findings, preparing an action, or finishing. These choices name their required inputs; they do not author a placeholder judgment.
 
-```bash
-python3 .claude/scripts/memory-kit/mempalace-currency.py --remine   # sync-prune + mine canonical+history+memory+stories + record
+`remember` retains an investigator finding, inspected receipt references, an unresolved question and the next justified action. Classifications (`unreviewed`, `evidence-ready`, `conflict`, `missing-evidence`) are attributed observations, not authority. Each assertion keeps its own judgment even when evidence is shared. `prepare` produces a scoped native action for review and execution by the agent; preparation does not execute, approve, or bypass its governor. After an authorized effect, `reconcile` rereads affected edges, and `finish` rereads native acceptance while recording the bounded reported outcome. An unresolved stop is valid and does not require a normative hold.
+
+The same concern projection is readable directly as `epr flow context <path> --concerns [--offset N --limit N]`; `--all-states` includes healthy/governed/held edges for exact-slot revalidation. These are read-only projections of the existing graph, not a new queue — and the ceremony reads them in-process, so there is no second executable to locate and no separate stderr budget. If `epr` itself is missing or stale, build it through the owning `just gate memory-ceremony` and inspect `epr doctor`; do not interpret a failed query as no work. For repository Git ownership, use the command-scoped safe.directory environment described by the workspace governance rather than modifying shared global configuration.
+
+## Recipe, evidence and continuity
+
+The `recipe` choice exposes the authored defaults, selection/omission/order rules, source scope, dependencies, authorship, applicable change authority, permitted changes, actual method identity and provider restrictions from `.epr-meta/elohim/algorithms/recall-contract.json`. That EPRFS-governed algorithm content artifact owns the machinery under the journey, and its raw CID is the `method` pinned on every session and every receipt. Existing ProcessSpec, Intent, content references, rulings, review and acceptance records remain authoritative; no new protocol kind or peer authority is implied.
+
+`search` chooses an authorized recipe provider. Deterministic local traversal remains available when optional MemPalace is unavailable or declined. Opaque ranking/version/freshness stay visibly unknown. A local provider fixture proves interface interchange only, never live semantic fitness. Returned candidates require source verification; tags locate evidence and never grant acceptance.
+
+Use one session for a coherent investigation. `resume` restores intent, the selected concern, findings, evidence receipts, open questions and next action; it rereads native standing and checks bounded batches of source receipts. Follow the next revalidation offset when a batch is incomplete. Changed evidence invalidates dependent findings. Findings pin the inspected bytes; rereading changed evidence cannot validate an old judgment. The latest explicit judgment controls repair readiness. Use `history` to page earlier findings and questions, and `compare --evidence <receipt-key>` to expand the prior and current inspected passages. Current native state always wins over the cached selection; an absent, changed or ambiguous slot needs renewed investigation. Reopening never replays a mutation.
+
+Method changes refuse silent continuation. Use `adopt --from-session <prior-id> --session <new-id>` to retain prior method/accounting receipts explicitly, then revalidate. Local continuation has a bounded storage envelope; if it refuses growth, keep the existing receipt, start a scoped follow-up and reference the prior investigation. Never reset accounting to hide repeated work. Continuation is private local accounting/investigation, not another work queue or acceptance ledger.
+
+For additional bounded evidence questions, open a separate session label on the same
+executor: `epr flow memory recall open --session <packet-id> --need '<question>'`, then
+`search --search-scope <dir> --name '<glob>' --query <term>` for metadata candidates,
+`source --path <path>` for a section outline, and `read --path <path> --lines START:END`
+for the bounded passage and its receipt key. One executor now serves both the ceremony
+and its evidence packets, so the method pin is the same contract CID; keep the session
+LABELS distinct so each investigation's accounting stays its own. Retain their receipts
+together in the final scope/cost account. Widen only for a named unresolved question;
+budgets bound each context load, not the ceremony's number of useful batches. Direct
+shell/MCP/code reads remain outside executor enforcement and must be accounted
+separately. Unknown token/context measurements stay unknown.
+
+## Phase 0 — witnessed corrections first
+
+Read `epr flow concerns --corrections [--since YYYY-MM-DD] [--json]` before population scans. It lists every unresolved correction BY IDENTITY — a `run:correction` with no later note carrying `closes:<its exact CID>` — so a date, a newer chronicle or a `failed-approach` note never closes anything, and `--since` filters the display only (suppressed rows are counted, not resolved). Witnessed staleness outranks scan guesses. Notes use:
+
+```sh
+epr flow note --on <surface> --kind correction --reason 'STALE (<date>): "<exact claim>" → <current truth> (<evidence>)'
 ```
 
-This is the same back-fire-point re-mine the shift runs, fired eagerly here because the ceremony is *exactly* the event that stales the index. Confirm `placement-audit.py --headline` then reads `mempalace: fresh ✅`. (The `memory-stasis-loop` would also catch this via its `mempalace` dimension; closing it in-ceremony means the next session's front-link recalls the new gospel immediately, not after the next drain.)
+Keep one note per claim, including the quoted claim, replacement truth and evidence. Every unresolved correction remains a candidate across successive working batches. For the selected scope, read `epr flow context <path|cid> --json` and its human rendering. Follow actual fulfillment, technical review, appointment and acceptance evidence. Preserve `acceptance-unestablished`, `revalidation-required`, `changes-requested`, `contested`, historical candidates and missing evidence. Paths and gap labels do not establish identity; local appointments do not establish peer authority.
 
-## End state criteria
+Correction closure is an explicit act. Close one with a later note on the SAME subject
+naming the exact correction:
 
-- Each picked surface has either (a) an applied rewrite + GREEN/YELLOW coherence verdict, or (b) a declined-with-rationale entry filed as backlog
-- All Phase 4b RED verdicts resolved before chronicle write
-- Chronicle entry exists with the three required frontmatter fields
-- **PATH + PRIORITIZATION currency read (Phase 1b)**: MAP.md verified current (or its drift handed to the librarian/historian as a standing fix) and the roadmap re-stamped this cycle (or its staleness closed by the cartographer). Both readouts appear in the ceremony summary.
-- **MemPalace re-embedded (Phase 4d)**: the index re-mined after the rewrites land; `--headline` reads `mempalace: fresh ✅`.
-- All TaskCreate tasks closed
+```sh
+epr flow note --on <surface> --kind observation --closes <correction-CID> \
+  --reason '<verified explanation, its evidence path and that evidence body fingerprint>'
+```
 
-The operator should leave the ceremony with substrate-grounded gospel-tier surfaces — picked, rewritten with four lenses' contribution, coherence-verified, recorded. Audit-number wins (byte budgets, archive ratios, cleanup-scan flags) are NOT the ceremony's job; those land in `/hygiene-sweep` on a separate cadence.
+A closure may be an `observation`, `ruling`, `verdict` or `correction`; a
+`failed-approach` closes nothing. Retain correction CID, exact target, evidence
+fingerprint and a nonempty reason; changed or missing evidence reopens it. Because a
+repair changes the bytes the correction was written against, closure matches on the
+subject label rather than the resource CID — the `closes:` CID is what names the exact
+correction. **A closure written as chronicle frontmatter is no longer read**: the eight
+historical `stale_record_resolutions` entries were migrated into native closure notes,
+and any NEW closure must be a note. Never hand-author fingerprints.
 
-## Boundaries — what this ceremony does NOT do
+## Phase 1 — triage and orient without losing the selected concern
 
-The 6-wave predecessor accumulated machinery that masked its purpose. Explicitly out of scope here:
+Run `substrate-currency-audit.py` and read native `epr flow status --json`. Report population drift and native sealed/governed/stale/held/dangling counts separately from the selected concern and returned page. Show the top five scanned surfaces as information; select justified work autonomously, prioritizing witnessed corrections. Bare-filename path noise is not proven drift. A clean or unjustified candidate set can warrant stopping without another approval ritual.
 
-- **Byte-budget enforcement** (CLAUDE.md over-budget, MEMORY.md size) → `/hygiene-sweep`
-- **Archive ratios + cleanup-scan flags + agent-audit / skill-audit / claude-md-audit** → `/hygiene-sweep`
-- **Stasis-plan / defer-budget / 3-cycle-clock / 20%-floor machinery** → deleted; the ceremony's measure is rewrites delivered, not dimensions advanced
-- **Wave 5 retrospective every cycle** → runs quarterly on the ceremony itself, not every cycle
-- **Multi-question operator menus** → one gate per surface (approve/revise/decline); no four-option ritual
+Carry two standing checks alongside the selected concern:
 
-If the operator asks for byte-budget hygiene, invoke `/hygiene-sweep`. If they ask for the substrate to absorb a recent landing, this is the right skill.
+- **PATH currency:** librarian/historian verify `genesis/docs/content/elohim-protocol/architecture/MAP.md` against seeds/INDEX, walk links and the substantive gap ledger. Use `the folds on map-currency-drift@1` or bounded seed evidence. Mechanical links alone do not prove conceptual coverage.
+- **PRIORITIZATION currency:** cartographer checks `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` against placement ledger/focus, guiding vision and native selected-scope context. Regenerate/restamp only from the actual inputs; a new date cannot strengthen stale evidence. Separate production, technical review and experiential acceptance. Apply structural corrections within authority; substantive reframing follows Phase 3.
 
-## Known footguns
+Read ``epr flow memory project --index --json` (unloadedRows)`. `index_unloaded > 0` selects head compaction for the next batch; otherwise use concern reconciliation/gospel repair. Re-evaluate after each batch. Work in 1–2 surfaces per batch by default, continuing justified authorized work autonomously. No one-item invocation cap and no silent budget resets.
 
-- **Bare-filename audit noise**: surfaces like agent prompts cite many bare filenames that match against many subdirs. The audit's PATH-EXISTS check is conservative on purpose; the librarian-prologue de-rates bare-filename findings when reporting. Don't over-react to a surface flagged at 30 findings if 25 are bare filenames.
-- **Storyteller over-running the 15-min cap**: if a rewrite genuinely needs >15 min, return what you have plus a two-cycle-rewrite note. Don't blow the cap silently — the next cycle picks up the remainder.
-- **RED verdict paper-over**: tempting to close ceremony despite RED because "we already rewrote it." Don't. RED means the cross-substrate impact was missed; the value of the verdict is precisely that it catches what the four-lens missed. Resolve before chronicle.
-- **Audit-number-as-success conflation**: substrate-currency-audit numbers go down when surfaces are rewritten well, but that's a side-effect. The measure is coherence-verify verdict + operator's "yes this matches today's substrate" approval. Number-watching is `/hygiene-sweep`'s job.
-- **Picking too many surfaces**: in conversational mode, 1-2 per cycle — three is the upper edge, four guarantees one will be under-served, because the lens reports compete for the orchestrator's context. The dynamic-workflow execution mode (see "Execution modes") keeps those reports in script variables, relaxing the *context-budget* half of the cap — you can pipeline the top ~5 drifted surfaces in one run. The *attention* half still applies at the operator gate: review the returned rewrites in batches, not all at once. The audit's ranked list survives across cycles regardless — there is always more.
+## Phase 2 — four judgments, shared investigation
 
-## Related
+Use one bounded evidence packet: exact claim/correction, source path and passage or CID, verified fact, uncertainty and unresolved frontier. Four lenses are required judgments, not four repeated source-loading passes:
 
-- `.claude/scripts/memory-kit/substrate-currency-audit.py` — Phase 1 triage
-- `.claude/scripts/memory-kit/LIFECYCLE.md` — ownership matrix
-- `.claude/skills/memory-kit/SKILL.md` — `/hygiene-sweep` cadence (byte-budgets etc.)
-- `.claude/agents/{librarian,historian,cartographer,storyteller}.md` — currency-mode lens-jobs
-- `.claude/memory/feedback_first_memory_team_ceremony.md` — wisdom from inaugural 6-wave ceremony
-- `.claude/memory/feedback_agent_prompts_no_process_status.md` — gospel-tier surfaces describe stable architecture
-- `genesis/data/timeline/CONVENTIONS.md` — chronicle schema
-- `genesis/docs/content/elohim-protocol/architecture/MAP.md` — the LEGIBILITY/PATH walk (Phase 1b MAP-CURRENCY target; librarian + historian own its currency)
-- `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md` — the PRIORITIZATION/ROADMAP home (Phase 1b ROADMAP-CURRENCY target; cartographer regenerates it)
+- **Librarian:** verify factual claims, paths, citations and current evidence; distinguish missing, drifted, unverified and forbidden process-status phrasing.
+- **Historian:** check causal precedent and missing discipline; preserve historical facts rather than promoting them to current acceptance.
+- **Cartographer:** check affected relationships, current substrate coverage and implications for next work.
+- **Storyteller:** check purpose, narrative coherence, vocabulary, framing and recall preservation.
+
+Routine uncontested work may use one investigator carrying all four lenses. Contested facts require independently dispatched judgments, with shared excerpts and only each lens's new delta. Role details live in `.claude/agents/{librarian,historian,cartographer,storyteller}.md`. Explicitly name an additional evidence need before expanding a packet. Maintain existing subject/contribution tags per `genesis/data/timeline/CONVENTIONS.md`; assertions, not whole tagged documents, are the evidence.
+
+For head compaction, storyteller owns disposition: memorialize into an existing umbrella, graduate a lesson to a canonical story, or retain it. Librarian applies topic-file metadata and reprojects with `epr flow memory project --index --budget memory-index-bytes@1 --out .claude/memory/MEMORY.md` (the PostToolUse router `.claude/hooks/memory-index-projection.py` takes the same leg, falling back to `memory-index-projector.py --apply` while the native projection is over the hook's latency budget). A projected row comes from a CONTRIBUTION, so an entry the ceremony just wrote reaches the index through `epr flow memory import .claude/memory`. Preserve candidate-to-surviving-source mappings and the corrected lesson. Staleness alone does not authorize removal. Feedback remains unless a surviving entry genuinely duplicates it. Routine byte-budget and archive hygiene belong to the hygiene lenses at `.epr-meta/elohim/lenses/`.
+
+## Phase 3 — concrete decisions and authorized action
+
+Storyteller synthesizes substantive rewrites or compaction dispositions in a clean context carrying the target, verified packet, lens deltas and authorized scope, not investigation transcripts. Preserve useful structure, hedges and source-backed meaning; do not turn uncertainty into manufactured confidence or add boilerplate. Each addition must have evidence. Present the concrete rewrite with a short change rationale.
+
+Apply already-authorized substantive work without asking again. New substantive choices require approve/revise/decline on the concrete result. If approval is needed, name this skill's Phase 3 requirement and explain the uncovered scope. Mechanical adjacent evidenced corrections proceed within existing authority. A proposed normative `epr flow hold` always requires operator confirmation; a hold declares policy, not hygiene. Keeping an unresolved frontier is different and needs no policy mutation.
+
+One evidence-ready edge never authorizes blanket resealing a shared-source group. Reverify and reconcile each affected assertion. Classifications, prepared commands, passing tests and stale counts cannot substitute for independent review or acceptance. Optional dynamic workflows require operator opt-in because they spawn many agents; conversational successive batches remain the default.
+
+## Phase 4 — verify the experience, reconcile and retain learning
+
+After applying an authorized change, two independent verification lenses must clear GREEN or YELLOW-resolved:
+
+1. **Diff regression:** independent code-reviewer checks changed/added/dropped claims against live source, including production versus fixture paths and citation targets.
+2. **Downstream coherence:** a fresh-context implementation reader receives the changed primer and relevant source routes for a plausible next task. It checks contradictions, missing evidence, authority ambiguity and misleading duplication. It does not inherit the investigation or execute the imagined sprint.
+
+RED means the work is not done. Repair, reapply and reverify; resolve mechanical YELLOW inline and route substantive findings through existing authority. Preserve uncertain scope instead of declaring population-wide coherence from a sample.
+
+For ceremony-interface changes, project/review the final authoritative package and pass owning gates **before** appointed experiential acceptance. Register a distinct acceptor, appoint it to the exact commitment, and have it personally exercise entry, evidenced and contested concerns, selected-edge explanation, context-reset resumption, provider alternatives and warranted completion. For native writes attributed to a registered actor, use `--session <registered-actor-session>` without `--as`: that literal override omits the exact actor-claim linkage. A recall session is an investigation locator; it does not register an actor. Pin implementation, recipe, projected instructions, report, revision/environment, observations and limits. Later material changes require scoped revalidation. A technically approved build cannot supply that experience.
+
+Chronicle once justified authorized work reaches its stopping condition in `genesis/data/timeline/chronicle/<date>-substrate-currency-<slug>.md`. Keep the body about 150–300 words; git diff is the detailed change record. Frontmatter records: kind/status/date, ceremony, surfaces_rewritten, diff_review_verdict, coherence_verdict, sampled topic, the correction CIDs this run closed (the closure itself is the native note, not the frontmatter; `stale_record_resolutions` remains only as the historical field), measured agent minutes/surfaces/context/tokens (unknown where unavailable), recall correctness, review rounds and rework. Report selected scope, native acceptance states, evidence examined, unresolved frontier and PATH/PRIORITIZATION readouts. Record one evidence delta in the owning habit and reproject; never flip its status on intention.
+
+When verified canonical memory surfaces change, run `mempalace-currency.py --remine` and check `placement-audit.py --headline` for freshness. A failed refresh stays visible; do not claim the provider current or erase successful local work. No automatic diary/curation outside this authorized maintenance scope. Reuse the existing chronology and flow records rather than creating another ledger.
+
+Measure correct decisions, unsupported certainty, unnecessary context loading, repeated investigation with reasons, preserved uncertainty and downstream rework. Separate unique/total source bytes and overlapping scan counters; metered tokens support the result but never define Sacred Attention. Stop when no justified useful authorized work remains, a genuine authority/environment boundary prevents it, or diminishing returns justify it. Name the frontier and reason, and close orchestration tasks. A smaller index or a lower stale count alone never establishes success.

@@ -83,10 +83,10 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
    its cites survive into the permanent graph (and survive relocation
    into `held/`). Run the linking-tool sweep:
    ```bash
-   python3 .claude/scripts/memory-kit/cite-gen.py --seal-all   # seal any un-sealed doc-root .md (id + envelopes + verify)
+   epr flow cites seal --all   # seal any un-sealed doc-root .md (id + envelopes + verify)
    ```
    If it reports `✍ N cite(s) on the title-default desc`, author the
-   relationship hints (`cite-describe.py`, or dispatch the corpus-describe
+   relationship hints (`epr flow cites describe`, or dispatch the corpus-describe
    workflow) — the progressive-discovery payload. Decompose-self should
    not graduate a plan whose cites aren't sealed; the cite-seal postHook
    nudges in-flight, this sweep is the closing guarantee.

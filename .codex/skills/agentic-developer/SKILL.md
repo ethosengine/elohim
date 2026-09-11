@@ -99,7 +99,7 @@ When `/shift` invokes this skill:
    - **Lexical floor (always run, cheap):**
 
      ```bash
-     python3 .claude/scripts/memory-kit/spec-coherence-index.py --query "<objective topic / scope keywords>"
+     python3 .epr-meta/elohim/lenses/prior-art/spec-coherence-index.py --query "<objective topic / scope keywords>"
      ```
 
      It ranks every ACTIVE/CANONICAL doc with its PLACEMENT state: `CANONICAL → compose / don't re-spec`, `SUPERSEDED → read the gotcha, work around it`, `claimed-UNVERIFIED → don't assume it works`.
@@ -374,7 +374,7 @@ When done or bail:
 5. **decompose-self — dissolve concluded plan(s) to zero residue (the BACK fire point).** A shift may not end leaving a parked plan behind (compaction-loop spec §5.1, §5.2; `genesis/docs/PLACEMENT.md`). For each plan/spec this shift **concluded** — landed, superseded, or abandoned — run the BACK fire point so nothing plan-shaped survives in the live tree under the **No-Dumping-Grounds law** (every chunk lands in a living surface or is cleared; §10.3). Skip for a *bail* that left the plan genuinely in-flight — bail dissolves nothing, it hands off.
 
    ```bash
-   python3 .claude/scripts/memory-kit/decompose.py <concluded-plan-path>
+   python3 epr flow project <concluded-plan-path>
    ```
 
    `decompose.py` splits the plan into bounded, cited chunks (CHECKED ≠ VERIFIED). Route each chunk to exactly one of the three terminal fates (§5.2):

@@ -361,6 +361,19 @@ If a design names a tier `self-sovereign`, proposes `sovereignty`-as-achievement
 
 ---
 
+## SDO and RWA Test (hard boundaries, constitutional)
+
+Colloquially the "tyrant test", but the design question is always both halves, because neither exists without the other: social dominance orientation (the few who seek to dominate) paired with right-wing authoritarianism in the psychological sense (the many disposed to follow and enforce); credited source: Robert Altemeyer, *The Authoritarians*. Standing condition, taken as a given: hostile agent swarms will surveil, penetrate, battle-test and attempt to compel the network into gaming its own rules, and the following many can be synthetic; identities are free to mint (an agent's hard layer is a shared kind), so no boundary may rest on counting them — reach is earned by fruit over time under a steward's standing. Run this beside the Identity Ontology Guard for ANY store, plane, service or ledger. Ask: **if that pairing holds this, what can the dominant few see, join and compel, and what lets the following many carry it?** The dragnet is never the sensors; it is the aggregator behind them. The substrate passes by shape (no DHT query, per-holon spaces, earned reach, consumer-blinded census, thoughts never on a governed plane); the aggregators fail (doorway projections and caches, a holon's activity ledger read from outside, a counsel's consent-carried context). Canon: `genesis/docs/architecture/private-thought-governed-fruit.md` §4. The five hard boundaries no design may cross:
+
+1. Thoughts never enter a notarized plane; only attestations of outcome cross.
+2. Activity ledgers are held by the holon they describe; no cross-holon join without each holon's own crossing act; doorway projections declare a retention floor and are keyed per space.
+3. Counsel context is revocable and erasable by the participant and cannot be compelled.
+4. Counter-evidence and constitutional records are floor-protected.
+5. Correlation across identity namespaces is a consent act, never a string join or an inference.
+6. Participation itself is sensitive: ask what an OUTSIDE observer learns of a participant (that they participate, in which collectives, when, with whom, how far their words travel); at intimate and trusted reaches membership and activity are unobservable from outside the holon; the honest limit is the holon membrane (peers inside see each other; hosted participants are visible to their doorway).
+
+Add to the Output Format a `**SDO/RWA Test**:` line per entity stating what the worst holder could see, join and compel, and which boundary above bounds it. A store that fails the test is a design refusal, not a mitigation to schedule.
+
 ## Output Format
 
 When the gate is complete, present the result in this format before proceeding to design proposals.
@@ -414,5 +427,5 @@ Only after this output is complete and reviewed should design proposals (schemas
 | `doorway/CLAUDE.md` | When a route *does* need doorway-specific logic — the only reason to touch `doorway-service` |
 | `.claude/epr-meta/policies.yaml` + `.claude/epr-meta/concerns.yaml` | The concern canon (C0-C14) — enforcement rows (predicate-bearing classes) vs Precedent-shaped rows; Step 4's canon homes |
 | `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json` | Per-crate decision-point registry schema — where Step 4's registration lands |
-| `.claude/scripts/memory-kit/placement-audit.py` (`--epr-meta`) | The census — the enforcement backstop for Step 4, reads every crate's `seam-registry.yaml` |
+| `epr flow report placement` (`--epr-meta`) | The census — the enforcement backstop for Step 4, reads every crate's `seam-registry.yaml` |
 | `genesis/docs/content/elohim-protocol/protocol-specification.md` | Full EPR protocol specification |

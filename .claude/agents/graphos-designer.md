@@ -1,7 +1,13 @@
 ---
 name: graphos-designer
 description: "Pattern-library implementer (Sonnet). Owns Library B (the designed pattern library) in app/elohim-library/projects/graphos — themed compositions binding the Elohim brand tokens to component-architect's blank-slate primitives; boundary rules in app/elohim-library/CLAUDE.md. Never modifies a primitive's CSS, JSDoc, tag name, or behavior — binding happens at the story decorator level only. Knows the established aesthetic (communitarian solarpunk; warm earth + constellation dark) and brand voice (\"household\" not \"user\"). Invoke when \"bind the brand tokens to <elohim-X>\", \"add the designed story for X\", \"compose a household-scene pattern story\", \"review designed story X for brand voice or AI-slop drift\". NOT for inventing new primitives (use component-architect), new ts-rs views (use rust-architect), greenfield aesthetics outside graphos (use the frontend-design plugin skill), or writing in Library A. <example>user: \"Review the shefa-overview designed story — does it still feel like the protocol or like a generic dashboard?\" assistant: \"I'll dispatch graphos-designer to render the story and audit it for AI-slop convergence and brand-voice drift.\"</example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: sonnet
 color: purple
 metadata:

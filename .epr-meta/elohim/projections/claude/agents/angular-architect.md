@@ -1,7 +1,13 @@
 ---
 name: angular-architect
 description: "Frontend/UI-layer architect (Opus) — owns elohim-app Angular 19, reactive state, component coordination, display logic, and the person's felt experience. Thin-service discipline; defers business logic to rust-architect. Invoke when adding/refactoring Angular services or components, diagnosing reactive state/change-detection issues, integrating Holochain client calls into the UI. NOT for Lit protocol elements (use component-architect) or pattern-library styling (use graphos-designer). <example>user: 'The content viewer component is not updating when mastery changes' assistant: 'I'll dispatch angular-architect to diagnose the reactive state issue'</example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: opus
 color: blue
 metadata:

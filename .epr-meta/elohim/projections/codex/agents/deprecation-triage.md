@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/deprecation-triage.json
   packageKind: AgentPackage
 model: opus
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/deprecation-triage"
 ---
 
@@ -89,7 +89,7 @@ citation) can answer every re-encounter without another agent dispatch.
 4. **Canonicalize**: write/extend the backlog entry per the schema above
    (no cite-gen sealing — timeline-entity docs stay envelope-free). Optionally
    confirm projection pickup:
-   `python3 .claude/scripts/memory-kit/delivery-status-distribution.py`.
+   `python3 .epr-meta/elohim/lenses/delivery/delivery-status-distribution.py`.
 5. **Decide and act**:
    - **Bounded fix** (config migration, rename, small API swap): implement it,
      run the affected project's quality gates (the repo root CLAUDE.md lists

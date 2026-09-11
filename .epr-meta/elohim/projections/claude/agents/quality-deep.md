@@ -1,7 +1,13 @@
 ---
 name: quality-deep
 description: "Second-pass code quality agent (Sonnet). Receives ~20% escalations from quality-sweep and finishes them - complex tests, async flows, refactoring. Reports ~5% architectural issues to backlog/specialists. Examples: <example>Context: Quality-sweep escalated complex work. user: 'Finish the escalations from quality-sweep' assistant: 'Let me use quality-deep to handle the complex cases' <commentary>Sonnet finishes what Haiku escalated.</commentary></example> <example>Context: Complex async testing needed. user: 'Write tests for service with complex Observable chains' assistant: 'Let me use quality-deep for the async flow testing' <commentary>Handles complex mock setups and timing.</commentary></example> <example>Context: Implementation gaps and refactoring. user: 'Test the presence feature and refactor where needed' assistant: 'Let me use quality-deep to test and improve the implementation' <commentary>Tests + refactors, reports architectural issues.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: sonnet
 color: yellow
 metadata:

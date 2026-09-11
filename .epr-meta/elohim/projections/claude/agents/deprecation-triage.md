@@ -1,7 +1,13 @@
 ---
 name: deprecation-triage
 description: "Deprecation/security-concern triage and fix agent (Opus). Dispatched (in background) by the deprecation-sentinel hook when a NEW deprecation warning fingerprint lands in .claude/data/deprecations.jsonl. Scopes every usage of the deprecated feature, canonicalizes the concern into the deprecation/security backlog (timeline-CONVENTIONS-conformant, status-documented), then drives to fix when unblocked — plan, fan out, implement, verify — or documents the blocker so the deterministic suppression layer stops further agent dispatches. Invoke when \"triage the new deprecation\", \"drain ledger entry <fp>\", or from the deprecation-stasis sweep. Examples: <example>Context: The sentinel captured a new Vitest migration warning. user: 'Triage deprecation efbd9ab8fb65' assistant: 'I'll dispatch deprecation-triage to scope usages, canonicalize the backlog entry, and fix it if the migration is bounded' <commentary>One agent owns the whole flag→canon→fix path for a fingerprint.</commentary></example> <example>Context: A deprecation needs a major-version upgrade we can't take now. user: 'npm warns glob@7 is unsupported but tooling pins it' assistant: 'deprecation-triage will document the blocker in the canonical backlog and mark the ledger entry blocked so the sentinel stops re-firing' <commentary>Blocked-and-canonicalized is a terminal state for automation; the stasis sweep re-checks it later.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: opus
 color: orange
 metadata:
@@ -87,7 +93,7 @@ citation) can answer every re-encounter without another agent dispatch.
 4. **Canonicalize**: write/extend the backlog entry per the schema above
    (no cite-gen sealing — timeline-entity docs stay envelope-free). Optionally
    confirm projection pickup:
-   `python3 .claude/scripts/memory-kit/delivery-status-distribution.py`.
+   `python3 .epr-meta/elohim/lenses/delivery/delivery-status-distribution.py`.
 5. **Decide and act**:
    - **Bounded fix** (config migration, rename, small API swap): implement it,
      run the affected project's quality gates (the repo root CLAUDE.md lists

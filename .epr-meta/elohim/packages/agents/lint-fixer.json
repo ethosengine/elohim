@@ -17,12 +17,17 @@
       "Edit",
       "Grep",
       "Glob",
-      "Bash"
+      "Bash",
+      "mcp__mempalace__mempalace_status",
+      "mcp__mempalace__mempalace_search",
+      "mcp__mempalace__mempalace_get_drawer"
     ],
     "sourceRuntime": "claude",
     "master": "package",
     "composedBy": "claude-opus-4-8",
-    "mcpServerRefs": [],
+    "mcpServerRefs": [
+      "mempalace"
+    ],
     "governance": {
       "eprRef": "epr:elohim-agent/agents/lint-fixer",
       "policy": "capability-governance@1",
@@ -31,7 +36,19 @@
         "elohim-agent:packages:verify"
       ],
       "ledger": ".claude/data/governance-findings.jsonl"
-    }
+    },
+    "mcpServers": [
+      {
+        "name": "mempalace",
+        "config": {
+          "command": "mempalace-mcp",
+          "args": [
+            "--palace",
+            "/projects/elohim/.mempalace/palace"
+          ]
+        }
+      }
+    ]
   },
   "instructions": {
     "format": "markdown",
@@ -43,11 +60,11 @@
       "frontmatter": {
         "name": "lint-fixer",
         "description": "Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier — mechanical (pattern replacement), contextual (needs type/flow understanding), judgment (architectural decisions). Escalates rather than guessing; a clean escalation is as valuable as a good fix. Sibling to quality-sweep but narrower scope (lint-only, not test-writing). Invoke when \"fix lint issues in file X\", \"resolve these ESLint errors\", \"handle this SonarJS rule\", or as a dispatched worker for mass-lint passes. Examples: <example>Context: ESLint flagged 12 issues in a service file. user: 'Fix the lint issues in presence.service.ts' assistant: 'I'll dispatch lint-fixer to handle the mechanical fixes and escalate anything requiring judgment.' <commentary>Tiered classification keeps cheap work cheap; escalation preserves quality.</commentary></example> <example>Context: A todo-tag rule needs handling. user: 'Resolve the sonarjs/todo-tag warnings without losing context' assistant: 'I'll dispatch lint-fixer — it classifies TODOs and routes them appropriately.' <commentary>Lint-fixer treats TODOs as breadcrumbs, not noise.</commentary></example>",
-        "tools": "Read, Edit, Grep, Glob, Bash",
+        "tools": "Read, Edit, Grep, Glob, Bash, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer",
         "model": "haiku",
         "color": "pink"
       },
-      "frontmatterRaw": "name: lint-fixer\ndescription: Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier — mechanical (pattern replacement), contextual (needs type/flow understanding), judgment (architectural decisions). Escalates rather than guessing; a clean escalation is as valuable as a good fix. Sibling to quality-sweep but narrower scope (lint-only, not test-writing). Invoke when \"fix lint issues in file X\", \"resolve these ESLint errors\", \"handle this SonarJS rule\", or as a dispatched worker for mass-lint passes. Examples: <example>Context: ESLint flagged 12 issues in a service file. user: 'Fix the lint issues in presence.service.ts' assistant: 'I'll dispatch lint-fixer to handle the mechanical fixes and escalate anything requiring judgment.' <commentary>Tiered classification keeps cheap work cheap; escalation preserves quality.</commentary></example> <example>Context: A todo-tag rule needs handling. user: 'Resolve the sonarjs/todo-tag warnings without losing context' assistant: 'I'll dispatch lint-fixer — it classifies TODOs and routes them appropriately.' <commentary>Lint-fixer treats TODOs as breadcrumbs, not noise.</commentary></example>\ntools: Read, Edit, Grep, Glob, Bash\nmodel: haiku\ncolor: pink"
+      "frontmatterRaw": "name: lint-fixer\ndescription: Tiered lint-fix agent (Haiku-default). Fixes lint issues by tier — mechanical (pattern replacement), contextual (needs type/flow understanding), judgment (architectural decisions). Escalates rather than guessing; a clean escalation is as valuable as a good fix. Sibling to quality-sweep but narrower scope (lint-only, not test-writing). Invoke when \"fix lint issues in file X\", \"resolve these ESLint errors\", \"handle this SonarJS rule\", or as a dispatched worker for mass-lint passes. Examples: <example>Context: ESLint flagged 12 issues in a service file. user: 'Fix the lint issues in presence.service.ts' assistant: 'I'll dispatch lint-fixer to handle the mechanical fixes and escalate anything requiring judgment.' <commentary>Tiered classification keeps cheap work cheap; escalation preserves quality.</commentary></example> <example>Context: A todo-tag rule needs handling. user: 'Resolve the sonarjs/todo-tag warnings without losing context' assistant: 'I'll dispatch lint-fixer — it classifies TODOs and routes them appropriately.' <commentary>Lint-fixer treats TODOs as breadcrumbs, not noise.</commentary></example>\ntools: Read, Edit, Grep, Glob, Bash, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer\nmodel: haiku\ncolor: pink"
     },
     "codex": {
       "path": ".codex/agents/lint-fixer.md",
@@ -61,7 +78,7 @@
           "packageKind": "AgentPackage"
         },
         "model": "haiku",
-        "tools": "Read, Edit, Grep, Glob, Bash",
+        "tools": "Read, Edit, Grep, Glob, Bash, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer",
         "governance": "epr:elohim-agent/agents/lint-fixer"
       }
     }

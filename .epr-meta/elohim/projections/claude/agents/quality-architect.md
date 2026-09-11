@@ -1,7 +1,13 @@
 ---
 name: quality-architect
 description: "Quality system architect (Opus). Ensures coherence with project vision, discovers unimplemented features, generates user stories for sprint planning, identifies missing quality patterns, and improves how the QA pipeline works. Not a campaign runner — a strategic quality thinker. Examples: <example>Context: User wants to understand what's unfinished. user: 'What features are stubbed out or half-built in lamad?' assistant: 'Let me use quality-architect to audit for implementation gaps and generate user stories' <commentary>Opus reads the vision, scans for stubs/TODOs, and produces sprint-ready stories.</commentary></example> <example>Context: User wants quality pipeline to catch more. user: 'Our quality passes keep missing the same kinds of bugs' assistant: 'Let me use quality-architect to analyze systemic gaps in the pipeline' <commentary>Opus identifies missing patterns and updates agent instructions.</commentary></example> <example>Context: User wants accessibility strategy. user: 'We need accessibility standards for our quality passes' assistant: 'Let me use quality-architect to design the a11y quality strategy' <commentary>Opus defines standards, sweep/deep execute them.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__analyze_code_snippet
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, LSP, TaskList, TaskGet, TaskUpdate, TaskCreate, SendMessage, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__sonarqube__get_project_quality_gate_status, mcp__sonarqube__analyze_code_snippet, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: opus
 color: purple
 metadata:

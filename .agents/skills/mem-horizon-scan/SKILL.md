@@ -1,6 +1,6 @@
 ---
 name: mem-horizon-scan
-description: Quarterly horizon-scan of the LLM-memory landscape for the cartographer's future-projection role. WebFetches canonical sources at .claude/horizon-scan-sources.md to surface what's emerging externally that might change how our memory team operates. Use when "run a horizon scan", "check the state of LLM memory practice", or when the latest scan in .claude/memory-kit/horizon-scans/ is >90 days old. Auto-triggered by cartographer at the start of a memory-ceremony (or any /converge) when stale.
+description: Quarterly horizon-scan of the LLM-memory landscape for the cartographer's future-projection role. WebFetches canonical sources at .claude/horizon-scan-sources.md to surface what's emerging externally that might change how our memory team operates. Use when "run a horizon scan", "check the state of LLM memory practice", or when the latest scan in genesis/docs/analysis/horizon-scans/ is >90 days old. Auto-triggered by cartographer at the start of a memory-ceremony (or any /converge) when stale.
 metadata:
   runtime: antigravity
   sourceRuntime: claude
@@ -15,7 +15,7 @@ governance: "epr:elohim-agent/skills/mem-horizon-scan"
 The memory team's three temporal-perspective agents (librarian/historian/cartographer) are inward-tilted. They tend the substrate we have. This skill is cartographer's outward-tilted complement — a quarterly read on how OTHER people are building LLM memory systems, to catch primitives we don't have, breaking changes in our dependencies, and shifts in the field that might want to reshape our practice.
 
 **When to invoke**:
-- Cadence: every ~90 days. The latest report at `.claude/memory-kit/horizon-scans/` has a `next_recommended_scan` field; trigger when current date ≥ that field.
+- Cadence: every ~90 days. The latest report at `genesis/docs/analysis/horizon-scans/` has a `next_recommended_scan` field; trigger when current date ≥ that field.
 - Operator: when "is anything new in the memory space?" or before a major refactor that might be solved cleaner elsewhere.
 - Auto: cartographer's freshness check at memory-ceremony or `/converge` invocation — if latest report is missing or stale, dispatch this skill before producing its synthesis.
 
@@ -32,7 +32,7 @@ Canonical list at `.claude/horizon-scan-sources.md`. Read that file FIRST. It en
 
 ## Workflow
 
-1. **Check freshness**. Read `.claude/memory-kit/horizon-scans/` — what's the latest report's `scanned_at`? If <90 days ago and not operator-invoked, **bail with "next scan due [date]"** — don't redo work.
+1. **Check freshness**. Read `genesis/docs/analysis/horizon-scans/` — what's the latest report's `scanned_at`? If <90 days ago and not operator-invoked, **bail with "next scan due [date]"** — don't redo work.
 
 2. **Read the sources file** at `.claude/horizon-scan-sources.md`. Identifies what to watch.
 
@@ -41,9 +41,9 @@ Canonical list at `.claude/horizon-scan-sources.md`. Read that file FIRST. It en
    - **Surface**: concrete primitives we don't have, comparable systems' lessons-learned, breaking changes in our dependencies
    - **Elevate**: anything that would change a tier in LIFECYCLE.md, retire one of our roles, or replace a piece of our toolkit
 
-4. **Compare against our state**. For each finding, ask: "do we already have this?" Read `.claude/scripts/memory-kit/LIFECYCLE.md`, `.claude/agents/*.md`, MEMORY.md briefly. Most findings should land in "already-aligned" — that's a healthy outcome, it means our design is in the field's mainstream.
+4. **Compare against our state**. For each finding, ask: "do we already have this?" Read `.epr-meta/elohim/lenses/LIFECYCLE.md`, `.claude/agents/*.md`, MEMORY.md briefly. Most findings should land in "already-aligned" — that's a healthy outcome, it means our design is in the field's mainstream.
 
-5. **Write the dated report** at `.claude/memory-kit/horizon-scans/YYYY-MM-DD.md`:
+5. **Write the dated report** at `genesis/docs/analysis/horizon-scans/YYYY-MM-DD.md`:
 
 ```yaml
 ---
@@ -107,7 +107,7 @@ Single dated report + chronicle pointer + MEMORY.md index update. Don't write mo
 
 - `.claude/agents/cartographer.md` — cartographer agent (horizon-scan responsibility section)
 - `.claude/horizon-scan-sources.md` — canonical sources
-- `.claude/memory-kit/horizon-scans/` — dated reports
+- `genesis/docs/analysis/horizon-scans/` — dated reports
 - `.claude/skills/memory-ceremony/SKILL.md` — the ceremony's freshness check may invoke this skill
-- `.claude/scripts/memory-kit/LIFECYCLE.md` — what the scan is comparing our state against
+- `.epr-meta/elohim/lenses/LIFECYCLE.md` — what the scan is comparing our state against
 - `genesis/data/timeline/CONVENTIONS.md` — chronicle frontmatter (pointer field convention)

@@ -1,7 +1,13 @@
 ---
 name: quality-sweep
 description: "First-pass code quality agent (Haiku). Handles ~80% of lint fixes and tests - the mechanical, pattern-based work. Escalates the ~20% that needs deeper reasoning to quality-deep. Examples: <example>Context: User wants broad quality pass. user: 'Do a quality sweep of lamad services' assistant: 'Let me use quality-sweep for the first pass' <commentary>Handles 80% mechanical work, escalates 20% to quality-deep.</commentary></example> <example>Context: User wants lint fixes. user: 'Fix ESLint errors in lamad' assistant: 'Let me use quality-sweep to fix those' <commentary>Auto-fixes many common lint issues.</commentary></example> <example>Context: Coverage campaign starting. user: 'Start testing the imagodei module' assistant: 'Let me use quality-sweep for the first pass of mechanical tests' <commentary>Writes exists/returns tests, escalates complex tests to quality-deep.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, SendMessage
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, TaskList, TaskGet, TaskUpdate, SendMessage, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: haiku
 color: pink
 metadata:

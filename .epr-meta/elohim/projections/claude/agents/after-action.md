@@ -1,7 +1,7 @@
 ---
 name: after-action
 description: "Post-incident review specialist (Sonnet). Reads Jenkins build logs + git history to write a post-mortem after a specific failure resolves — trace root cause, identify process gaps, extract lessons. Single-incident scope; for cross-codebase pattern hunting use pattern-hunter. Invoke when \"do a post-mortem on X\", \"how did this bug get there\", \"why wasn't this caught\". Examples: <example>Context: Production incident just resolved. user: 'The seeder crashed in production yesterday, can you do a post-mortem?' assistant: 'I'll dispatch after-action to trace the incident and surface lessons' <commentary>Post-incident analysis to prevent recurrence.</commentary></example> <example>Context: Bug was fixed but user wants to understand root cause. user: 'We fixed the auth bug but I want to understand how it got there' assistant: 'I'll dispatch after-action to trace bug origin and find process gaps' <commentary>Root cause analysis beyond the immediate fix.</commentary></example>"
-tools: Task, Bash, Glob, Grep, Read, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getTestResults, mcp__observability__query_prometheus, mcp__observability__query_loki_logs, mcp__observability__query_loki_stats, mcp__observability__find_error_pattern_logs, mcp__observability__find_slow_requests, mcp__observability__get_assertions, mcp__observability__list_datasources
+tools: Task, Bash, Glob, Grep, Read, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getTestResults, mcp__observability__query_prometheus, mcp__observability__query_loki_logs, mcp__observability__query_loki_stats, mcp__observability__find_error_pattern_logs, mcp__observability__find_slow_requests, mcp__observability__get_assertions, mcp__observability__list_datasources, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 mcpServers:
   - jenkins:
       type: http
@@ -9,6 +9,11 @@ mcpServers:
   - observability:
       type: sse
       url: http://observability-mcp.observability.svc.cluster.local:8000/sse
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: sonnet
 color: gold
 metadata:

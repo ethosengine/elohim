@@ -1,7 +1,13 @@
 ---
 name: scribe
 description: Primary prose author for a document whose technical content the dispatcher supplies. Receives a technical spec plus a target path, writes the document directly into the file, and iterates against technical-coherence corrections across rounds while keeping context. Never invents technical facts — leaves marked gaps instead. Pair with a fresh blind-reader for the legibility audit.
-tools: Read, Write, Edit
+tools: Read, Write, Edit, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
+mcpServers:
+  - mempalace:
+      command: mempalace-mcp
+      args:
+        - --palace
+        - /projects/elohim/.mempalace/palace
 model: claude-opus-4-6
 color: gold
 metadata:

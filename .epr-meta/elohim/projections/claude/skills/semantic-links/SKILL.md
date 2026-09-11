@@ -1,6 +1,6 @@
 ---
 name: semantic-links
-description: "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run cite-gen; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\"."
+description: "Use when authoring or fixing a doc's cites: — the content-addressed citation convention (slug + desc + fingerprint + generated status/path) that survives file moves. Covers doc-roots AND gospel CLAUDE.mds. Run epr flow cites; never hand-write a slug, fingerprint, or path. Triggers: \"add a cites: entry\", \"this cite is dead\", \"migrate cites\", \"what's HELD-CITE vs DEAD-CITE\", \"add concern-routing pointers to a CLAUDE.md\"."
 metadata:
   sourceRuntime: claude
   master: package
@@ -22,7 +22,7 @@ cites:
   doc points at it*, so a reader/tool decides whether to follow WITHOUT resolving (progressive discovery).
   Anchor it from the citing doc's perspective — not the target's bare title (that's the weak migration default).
 - **`fingerprint`** — `sha256:<…>` of the target's content-body at cite-time (a body edit drifts it → `STALE`).
-- **`status:`** — OPTIONAL, **tool-managed** (`cite-propagate` stamps/clears it); absent on healthy links.
+- **`status:`** — OPTIONAL, **tool-managed** (`epr flow cites stamp` stamps/clears it); absent on healthy links.
 - **`path:`** — **tool-managed** (2026-06-05): the MATERIALIZED LOCATOR — a cache of the slug→path
   resolution so an agent follows a cite with a plain Read, no resolver run. Stamped at mint, refreshed by
   every propagate pass (a move self-heals). Never hand-written; never identity — slug + fingerprint stay truth.
@@ -51,17 +51,16 @@ hook + sweep consults). Never re-hardcode scope in a tool; that's how the 2026-0
 ## Never hand-write a slug, fingerprint, or path — run the tool
 
 ```
-cite-gen.py <target>            # emit the envelope line for a doc target (path: stamped at mint)
-cite-gen.py --assign-id <doc>   # give a doc a collision-guarded id: slug
-cite-gen.py --into <doc>        # convert this doc's legacy doc-cites → envelopes (+ refresh path: caches)
-cite-gen.py --verify <doc>      # the dissolution gate: are all cites content-addressed + resolvable?
-cite-gen.py --seal <doc>        # born-linked COMPOSITE: assign-id → --into → --verify, + flag title-default descs
-cite-gen.py --seal-all          # end-of-sprint sweep: seal every GRAPH MEMBER (doc-roots + gospels) with cite debt
-cite-gen.py --refresh <doc> [<ref>...]   # DELIBERATE stale-dequeue: after RE-VERIFYING claims against the
+epr flow cites assign-id <doc>  # give a doc a collision-guarded id: slug
+epr flow cites verify <doc>     # the dissolution gate: are all cites content-addressed + resolvable?
+epr flow cites seal <doc>       # born-linked COMPOSITE: assign-id → convert → verify, + flag title-default descs
+epr flow cites seal --all       # end-of-sprint sweep: seal every GRAPH MEMBER (doc-roots + gospels) with cite debt
+epr flow cites migrate [--apply]         # corpus sweep: assign id: + convert legacy doc-cites → envelopes
+epr flow cites refresh <doc> [<ref>...]  # DELIBERATE stale-dequeue: after RE-VERIFYING claims against the
                                 # drifted target, re-bless fingerprint (+ status + path). Verification is
                                 # EDGE-granular — name the ref(s) you verified; bare form blesses ALL edges
-cite-describe.py <doc> '{"<ref>":"<relationship hint>"}'   # enrich desc (the title default → progressive-discovery hint)
-cite-propagate.py [--apply]     # corpus pass: stamp/clear status:, refresh every path: locator
+epr flow cites describe <doc> --slug <ref> --desc '<relationship hint>'   # enrich desc (title default → progressive-discovery hint)
+epr flow cites stamp --all [--write]     # corpus pass: stamp/clear status:, refresh every path: locator
 ```
 
 ### Deterministic enforcement (you don't have to remember)
@@ -71,20 +70,20 @@ cite-propagate.py [--apply]     # corpus pass: stamp/clear status:, refresh ever
 - **preHook** — `.claude/hooks/managed-surface-context.py` (PreToolUse Edit|Write) injects the surface's
   discipline + exact tooling BEFORE you edit any managed-memory surface (gospel/spec/plan/doc/memory/…),
   once per file per session. Scope comes from `_lib.managed_surfaces` — the single edit-time registry.
-- **Ceremony POST-step** — `/brainstorm` and `/plan` run `cite-gen --seal <new-doc>` right after writing it.
+- **Ceremony POST-step** — `/brainstorm` and `/plan` run `epr flow cites seal <new-doc>` right after writing it.
 - **postHook** — `.claude/hooks/cite-seal-signal.py` (PostToolUse Edit|Write) nudges the moment a GRAPH
   MEMBER (doc-root .md or gospel CLAUDE.md — registry-scoped) is written with un-sealed cite debt (legacy
   path-cite to an id-bearing doc, or no `id:` yet). Self-limiting: goes silent once sealed.
 - **End-of-sprint** — `/shift`'s decompose-self close and the `memory-stasis-loop` `cites` dimension run
-  `--seal-all` so nothing graduates into the permanent graph un-sealed. Pair with `cite-describe` for the
+  `seal --all` so nothing graduates into the permanent graph un-sealed. Pair with `cites describe` for the
   title-default descs the seal flags.
 
-`cite-gen --into` seeds each new cite's `desc` with the target's title (a placeholder). Upgrade it to a real
-relationship hint with `cite-describe.py` — it sets `desc` only, preserving ref + fingerprint + status + path.
+`cites seal` seeds each new cite's `desc` with the target's title (a placeholder). Upgrade it to a real
+relationship hint with `epr flow cites describe` — it sets `desc` only, preserving ref + fingerprint + status + path.
 The whole corpus was enriched this way once; new cites just need the one follow-up call.
 
 Authoring a new spec/plan via `/brainstorm` or `/plan`: write `cites:` as plain paths, then run
-`cite-gen --into <doc>` once — it slug-ifies every doc-cite. The migration (`cites-migrate.py`) already
+`epr flow cites seal <doc>` once — it slug-ifies every doc-cite. The corpus sweep (`epr flow cites migrate`) already
 did this for the whole corpus; new docs just run `--into`.
 
 ## The audit verdicts (memory-coherence-audit.py)
@@ -93,7 +92,7 @@ did this for the whole corpus; new docs just run `--into`.
   again when the target returns (scope-tree reconciliation).
 - **`DEAD-CITE`** — the slug resolves nowhere. A real dangling link.
 - **`STALE-CANDIDATE`** — the target's content fingerprint drifted. This is a re-verify QUEUE: confirm the
-  citing doc's claims still hold against the moved-on target, then `cite-gen --refresh <doc>` (the
+  citing doc's claims still hold against the moved-on target, then `epr flow cites refresh <doc>` (the
   deliberate blessing — `--into` never auto-blesses drift).
 - **`CITE-FORMAT-CANDIDATE`** — a legacy doc path-string whose target HAS an `id:` (migratable); run `--into`.
 
@@ -102,9 +101,12 @@ did this for the whole corpus; new docs just run `--into`.
 - `.claude/scripts/_lib/cite_graph.py` — slug / fingerprint / envelope / verdict / path-materialization primitives.
 - `.claude/scripts/_lib/managed_surfaces.py` — the edit-time registry: surface classes → discipline + tooling +
   graph membership (single source of scope truth for hooks and sweeps).
-- `.claude/scripts/memory-kit/cite-gen.py` — author / migrate / verify / refresh one doc.
-- `.claude/scripts/memory-kit/cite-describe.py` — enrich a doc's cite descriptions (title default → relationship hint).
-- `.claude/scripts/memory-kit/cites-migrate.py` — one-time corpus migration (assign-id + --into).
-- `.claude/scripts/memory-kit/cite-propagate.py` — materialize the `status:` hint + `path:` locator (the self-describing edge).
+- `epr flow cites seal|assign-id|verify|refresh <doc>` — author / migrate / verify / refresh one doc.
+- `epr flow cites describe <doc> --slug <ref> --desc '<hint>'` — enrich a doc's cite descriptions (title default → relationship hint).
+- `epr flow cites migrate [--apply]` — the corpus sweep (assign-id + legacy-cite conversion).
+- `epr flow cites stamp --all [--write]` — materialize the `status:` hint + `path:` locator (the self-describing edge).
+
+The writer is native (`elohim/eprfs/epr-cli/src/flow/cites.rs`) and its verdicts come from the same
+`derive_verdict` the concern view uses, so an inline `status:` and `epr flow concerns` can never disagree.
 - Spec: `genesis/docs/superpowers/specs/2026-06-02-semantic-computable-links-design.md` (§9.1 = the 2026-06-05
   amendment) + `genesis/docs/superpowers/specs/2026-06-05-managed-surface-edit-discipline-design.md`.

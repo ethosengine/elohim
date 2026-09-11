@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/pattern-hunter.json
   packageKind: AgentPackage
 model: sonnet
-tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures
+tools: Task, Bash, Glob, Grep, Read, TodoWrite, LSP, mcp__sonarqube__search_sonar_issues_in_projects, mcp__sonarqube__get_component_measures, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/pattern-hunter"
 ---
 

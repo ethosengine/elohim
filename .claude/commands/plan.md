@@ -8,12 +8,12 @@ Plans the spec at: `$ARGUMENTS`
 ## Step 1 — PRE: decompose the spec into gaps + scope (deterministic)
 
 ```bash
-python3 .claude/scripts/memory-kit/decompose.py "$ARGUMENTS"        # OPEN gaps = implement, CLAIMED = verify
-python3 .claude/scripts/memory-kit/placement-audit.py --focus        # what's testable vs BLOCKED-BY-ENV
-python3 .claude/scripts/memory-kit/spec-coherence-index.py --query "<spec topic>"   # prior plans (compose, don't fork)
+python3 epr flow project "$ARGUMENTS"        # OPEN gaps = implement, CLAIMED = verify
+python3 epr flow report placement --focus        # what's testable vs BLOCKED-BY-ENV
+python3 .epr-meta/elohim/lenses/prior-art/spec-coherence-index.py --query "<spec topic>"   # prior plans (compose, don't fork)
 ```
 
-Read `.claude/memory-kit/gap-items/<spec-slug>.json`. If decompose says **"needs AGENT decomposition"**
+Read `.eprfs/status/gap-items/<spec-slug>.json`. If decompose says **"needs AGENT decomposition"**
 (a prose spec), extract 5–15 bounded gap-items yourself first (each citing a spec line).
 
 This is the **FRONT fire point** of the Spec/Plan Compaction Loop
@@ -125,15 +125,15 @@ in one shot so they survive the target relocating and carry a discovery hint (th
 skipped):
 
 ```bash
-python3 .claude/scripts/memory-kit/cite-gen.py --seal <new-plan-path>   # assign-id + path-cites → envelopes + verify
-# if it flags title-default descs, author relationship hints: cite-describe.py <plan> '{"<ref>":"<hint>"}'
+epr flow cites seal <new-plan-path>   # assign-id + path-cites → envelopes + verify
+# if it flags title-default descs, author relationship hints: epr flow cites describe <plan> --slug <ref> --desc '<hint>'
 ```
 
 Then decompose the plan into task-level gap-items (the budget line-items the implement→verify loop drives):
 
 ```bash
-python3 .claude/scripts/memory-kit/decompose.py <new-plan-path>
-python3 .claude/scripts/memory-kit/placement-audit.py --ledger | tail
+python3 epr flow project <new-plan-path>
+python3 epr flow report placement --ledger | tail
 ```
 
 Each task becomes a budget line-item; `BLOCKED-BY-ENV` tasks drop out of `--focus` automatically, and

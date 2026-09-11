@@ -8,7 +8,7 @@ metadata:
   sourcePath: .epr-meta/elohim/packages/agents/graphos-designer.json
   packageKind: AgentPackage
 model: sonnet
-tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch
+tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite, WebFetch, mcp__mempalace__mempalace_status, mcp__mempalace__mempalace_search, mcp__mempalace__mempalace_get_drawer
 governance: "epr:elohim-agent/agents/graphos-designer"
 ---
 
