@@ -33,6 +33,13 @@ import {
   verifyMcpProfilePackage,
   verifyMcpServerPackage,
 } from './mcp-packages.mjs';
+import {
+  descriptionFloorFor,
+  diagnoseDescription,
+  findOverlapPairs,
+  hardDescriptionKinds,
+  loadQualityBounds,
+} from './package-quality.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOMAIN_DIR = resolve(__dirname, '..');
@@ -59,6 +66,9 @@ const COMMAND_SOURCE_DIR = resolve(REPO_ROOT, '.claude/commands');
 // reconciled against, NEVER auto-written (a bad settings.json write can wedge
 // the whole PreToolUse gating toolchain).
 const SETTINGS_PATH = resolve(REPO_ROOT, '.claude/settings.json');
+// The middot registry the description/overlap bounds are declared in — see
+// package-quality.mjs for which rows are read and why staleness is not ported.
+const MEASURES_PATH = resolve(REPO_ROOT, '.claude/epr-meta/measures.yaml');
 const ANTIGRAVITY_RUNTIME = 'antigravity';
 
 const args = process.argv.slice(2);
@@ -92,6 +102,8 @@ function parseOnly(argv) {
 }
 const ONLY = parseOnly(args);
 const DRY_RUN = args.includes('--dry-run');
+// `--quality` expands the advisory quality lens from counts to the finding list.
+const QUALITY_DETAIL = args.includes('--quality');
 
 // Value-bearing flag reader (`--id foo` or `--id=foo`); null when absent.
 function flagValue(argv, flag) {
@@ -1263,7 +1275,7 @@ async function loadValidators() {
   };
 }
 
-async function verifyPackage(pkg, validators, settings, packageCatalog) {
+async function verifyPackage(pkg, validators, settings, packageCatalog, qualityBounds) {
   const validate =
     pkg.kind === 'SkillPackage'
       ? validators.skill
@@ -1369,6 +1381,23 @@ async function verifyPackage(pkg, validators, settings, packageCatalog) {
   }
 
   assert(pkg.instructions.body.length > 0, `${pkg.metadata.id} has canonical instruction body`);
+  // Description floor — the hard half of the retired {skill,agent}-audit quality
+  // scan, now bounded by the declared middot rows (see package-quality.mjs). The
+  // advisory halves (no-when / no-triggers phrasing, trigger overlap) are
+  // reported corpus-wide in runVerify rather than refused per package.
+  if (qualityBounds) {
+    const kinds = hardDescriptionKinds(
+      diagnoseDescription(pkg.kind, pkg.metadata.description, qualityBounds),
+    );
+    assert(
+      kinds.length === 0,
+      `${pkg.metadata.id} description meets the declared floor ` +
+        `(>= ${descriptionFloorFor(pkg.kind, qualityBounds)} chars): ` +
+        (kinds.length === 0
+          ? 'ok'
+          : `${kinds.join(', ')} — ${(pkg.metadata.description ?? '').trim().length} chars`),
+    );
+  }
   assert(
     pkg.projections.claude.frontmatter.description === pkg.metadata.description,
     `${pkg.metadata.id} Claude projection description matches package metadata`,
@@ -1647,6 +1676,76 @@ function packageClass(pkg) {
   return pkg.metadata.master === 'package' ? 'package-first' : 'source-fidelity';
 }
 
+// Synthetic boundary fixtures for the description floor — proved on every
+// `verify` run, not only under `selftest`, because the floor is the one quality
+// bound that REFUSES: the corpus passing tells you nothing about whether the
+// refusal still works. 40 chars must fail at both floors; 80 must pass at both.
+function verifyDescriptionFloorFixtures(bounds) {
+  const at40 = 'Fixture description of exactly 40 chars!';
+  const at80 =
+    'Fixture description of exactly eighty characters used to prove the floor passes!';
+  assert(at40.length === 40, `description-floor fixture is 40 chars (got ${at40.length})`);
+  assert(at80.length === 80, `description-floor fixture is 80 chars (got ${at80.length})`);
+  for (const kind of ['SkillPackage', 'AgentPackage']) {
+    const floor = descriptionFloorFor(kind, bounds);
+    assert(
+      hardDescriptionKinds(diagnoseDescription(kind, at40, bounds)).includes(
+        'description-too-short',
+      ),
+      `description floor REFUSES a 40-char ${kind} description (floor ${floor})`,
+    );
+    assert(
+      hardDescriptionKinds(diagnoseDescription(kind, at80, bounds)).length === 0,
+      `description floor ACCEPTS an 80-char ${kind} description (floor ${floor})`,
+    );
+    assert(
+      hardDescriptionKinds(diagnoseDescription(kind, '', bounds)).includes('description-missing'),
+      `description floor REFUSES an empty ${kind} description (floor ${floor})`,
+    );
+  }
+}
+
+// Corpus-wide advisory quality lens — the read-only half of the retired audits.
+// It PRINTS and never refuses. It cannot be a gate on this corpus: 110 pairs sit
+// above the declared `trigger-overlap-ceiling@1` (hard 3) today, and the largest
+// are intentional — the plant-eprfs-* family and the *-triage family each NAME
+// their siblings in their own descriptions, which is the disambiguation working,
+// not overlap drift. Turning it hard would refuse the corpus for doing the right
+// thing; the number is surfaced so a real regression is visible instead.
+function reportQualityAdvisories(packages, bounds) {
+  const lines = [];
+  for (const kind of ['SkillPackage', 'AgentPackage']) {
+    const entries = packages
+      .filter((pkg) => pkg.kind === kind)
+      .map((pkg) => ({ id: pkg.metadata.id, description: pkg.metadata.description ?? '' }));
+    if (entries.length === 0) continue;
+    const soft = entries
+      .map((e) => ({
+        id: e.id,
+        kinds: diagnoseDescription(kind, e.description, bounds).filter(
+          (k) => !hardDescriptionKinds([k]).length,
+        ),
+      }))
+      .filter((e) => e.kinds.length > 0);
+    const { pairs } = findOverlapPairs(entries, bounds);
+    const label = kind === 'SkillPackage' ? 'skills' : 'agents';
+    lines.push(
+      `  ${label}: ${entries.length} described · ${soft.length} advisory description finding(s) · ` +
+        `${pairs.length} trigger-overlap pair(s) above ${bounds.triggerOverlapThreshold} shared words`,
+    );
+    if (QUALITY_DETAIL) {
+      for (const s of soft) lines.push(`    ${s.id}: ${s.kinds.join(', ')}`);
+      for (const p of pairs.slice(0, 10)) {
+        lines.push(`    overlap ${p.a} ~ ${p.b} (${p.shared.length}): ${p.shared.join(', ')}`);
+      }
+    }
+  }
+  if (lines.length > 0) {
+    console.log('\nquality (advisory — never refuses; --quality for detail):');
+    for (const line of lines) console.log(line);
+  }
+}
+
 async function runVerify() {
   const sourcePackages = await loadSourcePackages();
   const packageFixtures = await loadPackageFixtures();
@@ -1656,6 +1755,15 @@ async function runVerify() {
 
   const validators = await loadValidators();
   const settings = await readSettings();
+  const qualityBounds = await loadQualityBounds(MEASURES_PATH);
+  assert(
+    qualityBounds.source.skillDescriptionFloor === 'skill-description-floor@1' &&
+      qualityBounds.source.agentDescriptionFloor === 'agent-description-floor@1' &&
+      qualityBounds.source.triggerOverlapThreshold === 'trigger-overlap-ceiling@1',
+    'quality bounds read from the declared middot rows in .claude/epr-meta/measures.yaml ' +
+      `(got ${JSON.stringify(qualityBounds.source)})`,
+  );
+  verifyDescriptionFloorFixtures(qualityBounds);
   const mcpServerIds = new Set(
     packageFixtures.filter((pkg) => pkg.kind === MCP_SERVER_KIND).map((pkg) => pkg.metadata.id),
   );
@@ -1677,8 +1785,9 @@ async function runVerify() {
   }
 
   for (const pkg of packageFixtures) {
-    await verifyPackage(pkg, validators, settings, packageFixtures);
+    await verifyPackage(pkg, validators, settings, packageFixtures, qualityBounds);
   }
+  reportQualityAdvisories(packageFixtures, qualityBounds);
 
   // Per-class accounting so a shifting check total self-explains (a plant moves a
   // package from source-fidelity → package-first; an adopt adds one; etc.).

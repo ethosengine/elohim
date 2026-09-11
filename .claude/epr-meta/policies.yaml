@@ -29,9 +29,9 @@ epr-meta-policies-version: 1
 policies:
   - id: source-file-loc-ceiling
     version: 1
-    contentHash: sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52
+    contentHash: sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d
     title: Source-file LoC ceiling — architecture-review trigger
-    binding: observation
+    binding: binding-local
     class: measure
     scope: { write: "*.rs" }
     measure:
@@ -106,9 +106,9 @@ policies:
 
   - id: capability-governance
     version: 1
-    contentHash: sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32
+    contentHash: sha256:c4caa19d64194b4ea6f4602cfa68a539387e1a6ad95365a48f4c405bf1823c28
     title: Capability package governance — re-import after editing its projection
-    binding: observation
+    binding: binding-local
     class: measure
     scope: { write: "*.json" }
     measure:

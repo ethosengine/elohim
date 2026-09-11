@@ -17,7 +17,12 @@ ledger and the gate can never disagree on what "apex" means. Net-new only: an Ed
 delta (pre-edit reconstructed from old_string→new_string), so cleaning/maintenance is never logged.
 
 Ledger:   .claude/data/sovereignty-guard.jsonl        (one line per landing)
-Drift:    .claude/memory-kit/sovereignty-guard-drift.json  (running tally; escalates for rule review)
+Drift:    ONE thing — a fold via `epr flow note --kind observation --measure
+          sovereignty-landings@1`. The private JSON tally this hook kept under
+          `.claude/memory-kit/` was deleted with the kit at station six round (b)
+          (2026-09-11). The running total the escalation message reads is DERIVED from the
+          folds by sovereignty-landings-ceiling@1's `derive: count-since-reset` and read back
+          with `_observation.bound_count` — paid per landing, never per edit.
 
 Hook Type: PostToolUse   Matcher: Edit|Write
 """
@@ -36,6 +41,8 @@ for _ in range(8):
         break
     _here = _here.parent
 from _lib import epr_meta as em  # noqa: E402  (shared detector — single source of truth)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; JSON fallback while absent)
 
 
 def active_rule_version(repo: Path, rule_id: str) -> str:
@@ -123,34 +130,31 @@ def main() -> int:
     except OSError:
         pass
 
-    # 2) aggregate into the drift tally (the signal that flows back to the rule)
-    total = net_new
-    try:
-        dj = repo / ".claude" / "memory-kit" / "sovereignty-guard-drift.json"
-        dj.parent.mkdir(parents=True, exist_ok=True)
-        state = {}
-        if dj.is_file():
-            try:
-                state = json.loads(dj.read_text())
-            except (json.JSONDecodeError, ValueError):
-                state = {}
-        state["rule"] = active_rule_version(repo, "sovereignty-ontology-guard")
-        state["landings"] = int(state.get("landings", 0)) + net_new
-        state["last"] = ts
-        by = state.setdefault("by_path", {})
-        by[rel] = int(by.get(rel, 0)) + net_new
-        state["distinct_paths"] = len(by)
-        total = state["landings"]
-        dj.write_text(json.dumps(state, indent=2) + "\n")
-    except OSError:
-        pass
+    # 2) aggregate into the drift tally (the signal that flows back to the rule).
+    # The bound lives in .claude/epr-meta (sovereignty-landings@1) and the fold is the ONLY
+    # home as of station six round (b): the private JSON tally this hook kept was deleted with
+    # the kit. The accumulated number the message escalates on is read straight back out of the
+    # fold plane by sovereignty-landings-ceiling@1's `derive: count-since-reset`.
+    rule_version = active_rule_version(repo, "sovereignty-ontology-guard")
+    _obs.emit("sovereignty-landings@1", rel, net_new,
+              reason="sovereignty guard: apex-sovereignty framing landed after the ask",
+              env={"rule": rule_version, "tool": tool}, root=str(repo))
+    # Read the accumulation back rather than keeping one. Paid per LANDING, not per edit —
+    # this branch is only reached when apex-sovereignty framing actually landed. `None` means
+    # the count could not be taken (no binary, no verb, a bad read); the message then reports
+    # THIS edit's landings and says the total is unavailable, instead of printing a number
+    # nobody measured.
+    accumulated = _obs.bound_count("sovereignty-landings-ceiling", root=str(repo))
+    total = accumulated if accumulated is not None else net_new
 
     # 3) surface it. Below threshold: a light note the landing was recorded. At/over: ask for review.
     ph = ", ".join(phrases) or "apex-sovereignty framing"
     if total >= _ESCALATE_AT:
         msg = (f"[sovereignty-guard] apex-sovereignty framing landed in {rel} ({ph}). "
                f"{total} landing(s) now aggregated across {rel!s} and peers "
-               f"(.claude/memory-kit/sovereignty-guard-drift.json) — at/over the review threshold. "
+               f"(folds on sovereignty-landings@1; drain with `epr flow note --kind observation "
+               f"--measure sovereignty-landings-reset@1 --subject . --value 1`) — at/over the "
+               f"review threshold. "
                f"EVALUATE: is the corpus drifting toward the crypto self-sovereignty apex the protocol "
                f"rejects, or has the RULE itself drifted (a legitimate adversary/bounded/bridge frame it "
                f"keeps mis-flagging)? Canon: genesis/docs/architecture/stewardship-over-sovereignty.md; "

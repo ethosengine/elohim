@@ -2,7 +2,7 @@
 """
 Phase 3 of /converge: apply operator-approved per-theme proposals to canonical plans.
 
-Reads per-theme proposal files at .claude/memory-kit/<date>/converge/<theme>-proposal.md.
+Reads per-theme proposal files at .eprfs/status/lenses/<date>/converge/<theme>-proposal.md.
 For each entry marked `- [x] Accept`, performs the indicated edit on the canonical plan.
 
 v1 supports two edit kinds:
@@ -27,6 +27,11 @@ from datetime import date
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+# Station six (2026-09-11): the dated-report tier moved out of `.claude/memory-kit/`.
+# `_lib.paths.reports_root` is its ONE authority — resolve through it, never a literal.
+if str(REPO_ROOT / ".claude" / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+from _lib import paths as _paths  # noqa: E402
 
 
 # Each accepted block has form:
@@ -127,14 +132,14 @@ def parse_edit_block(section_text: str) -> dict[str, str] | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("proposals_date", nargs="?", help="Date dir under .claude/memory-kit/ (default: today)")
+    parser.add_argument("proposals_date", nargs="?", help="Date dir under .eprfs/status/lenses/ (default: today)")
     args = parser.parse_args()
 
     if args.proposals_date:
         proposals_date = args.proposals_date
     else:
         proposals_date = date.today().isoformat()
-    converge_dir = REPO_ROOT / ".claude" / "memory-kit" / proposals_date / "converge"
+    converge_dir = _paths.reports_root(REPO_ROOT) / proposals_date / "converge"
     if not converge_dir.exists():
         print(f"error: converge dir not found: {converge_dir}", file=sys.stderr)
         return 1

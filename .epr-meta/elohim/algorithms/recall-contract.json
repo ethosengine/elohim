@@ -1,0 +1,233 @@
+{
+  "id": "bounded-evidence-recall",
+  "version": 4,
+  "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
+  "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
+  "limits": {
+    "source_files": 4,
+    "source_bytes": 20000,
+    "search_queries": 1,
+    "search_results": 3,
+    "native_projection_bytes": 12000,
+    "native_timeout_seconds": 15,
+    "scan_bytes": 262144,
+    "scan_files": 128,
+    "scan_entries": 4096,
+    "metadata_bytes": 8192,
+    "scan_seconds": 3,
+    "output_bytes": 32768,
+    "provider_bytes": 8192,
+    "provider_seconds": 15,
+    "native_raw_bytes": 262144,
+    "session_bytes": 1048576
+  },
+  "source_roots": [
+    ".claude/memory/",
+    "genesis/",
+    "elohim/",
+    "doorway/",
+    "steward/",
+    "app/",
+    ".epr-meta/elohim/lenses/",
+    ".epr-meta/elohim/packages/",
+    ".epr-meta/elohim/algorithms/"
+  ],
+  "method": [
+    "Try declared source routes first; verify locators and current bytes.",
+    "Read the packet sources before querying the semantic index.",
+    "If routes are absent or insufficient, make at most one MemPalace search per packet with limit 3; verify returned sources within that packet’s remaining file/byte budget.",
+    "Treat service ranking as candidate discovery, not authority; it may combine semantic and lexical scores. Record query, source locators and unknown ranking/version details.",
+    "If useful evidence does not fit this packet, report its unresolved frontier. Autonomously open another focused packet with an explicit evidence question when expected value justifies it; carry cumulative cost forward and do not reset accounting to conceal repeated fruitless searches.",
+    "Use native scoped reconciliation for current evidence; never infer acceptance from a test, date, similarity score or checkbox.",
+    "Clean adjacent evidence-backed issues in flight. Continue successive batches while useful authorized work remains; no one-item ceremony cap. Preserve independent verification and genuine authority boundaries.",
+    "Current native evidence is read in-process by the executor itself: the concern, context and reconciliation projections are calls, not a second process, so there is no separate executable to pin and no second stderr budget. Oversized or missing projections are refused. Record native output separately from source-file bytes.",
+    "Use one --session across CLI calls and an explicit --need each time. The executor pins algorithm bytes, charges cumulative operations and refuses oversized output. Discover returns metadata candidates; --lines reads an explicit bounded excerpt. External shell/MCP reads are outside enforcement.",
+    "The initial native-reconciliation packet supplies usage and causal context; its growing plan is an explicit follow-up route, read by selected excerpt or native scope rather than silently widening the initial packet."
+  ],
+  "freshness": [
+    "Fingerprint each source using the existing canonical body convention.",
+    "Check the verified CLI named in the usage source before a current-evidence query.",
+    "Check index currency when using MemPalace; stale retrieval may suggest a source but cannot establish current behavior.",
+    "No unconditional search, taxonomy load or diary writes. Mutation needs explicit maintenance authority."
+  ],
+  "evaluation": {
+    "questions": [
+      "Where is authoritative current doorway evidence, and does technical review establish acceptance?",
+      "How is an exact actor claim registered and retained by flow claim?",
+      "What causal lesson prevents green processes or tests from being mistaken for delivery?"
+    ],
+    "record": [
+      "authoritative sources reached",
+      "unsupported claims avoided",
+      "unresolved evidence",
+      "source file count and bytes",
+      "search calls and returned bytes",
+      "elapsed time",
+      "tokens if actually metered; otherwise unknown",
+      "subsequent implementation rework if observed; otherwise unknown"
+    ],
+    "acceptance": "Independent reader judges answer fitness. Budget compliance alone is not semantic correctness or stasis."
+  },
+  "cases": {
+    "native-reconciliation": {
+      "query": "native reconciliation independent acceptance actor claim",
+      "sources": [
+        "genesis/docs/superpowers/plans/acceptance-aware-reconciliation/usage.md",
+        ".claude/memory/project_experiential_evidence_boundary.md"
+      ],
+      "native_scope": "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md",
+      "followup_sources": [
+        "genesis/docs/superpowers/plans/2026-09-09-doorway-continuity-proof-chain.md"
+      ]
+    }
+  },
+  "budget_scope": "Each packet bounds a context load, not the number of issues or batches a ceremony may complete. Track cumulative usage and resolved work across packets.",
+  "artifact_type": "algorithm-content",
+  "governance": {
+    "owner": "dev-system-equilibrium",
+    "source": ".epr-meta/elohim/algorithms/recall-contract.json",
+    "executor": "elohim/eprfs/epr-cli/src/flow/memory/recall.rs",
+    "checks": [
+      "just gate memory-ceremony"
+    ],
+    "retire_when": "native EPR execution supplies equivalent verified discovery, limits and session continuity",
+    "authority_boundary": "Local EPRFS-sealed authored content; no new core kind, publication or peer authority.",
+    "native_executor": "epr flow memory recall"
+  },
+  "composition": [
+    "scope",
+    "discover",
+    "filter",
+    "group",
+    "select",
+    "read",
+    "judge"
+  ],
+  "discovery": {
+    "exclude_directories": [
+      ".git",
+      "node_modules",
+      "target",
+      ".mempalace",
+      ".eprfs",
+      ".venv",
+      "__pycache__",
+      "holochain-conductor",
+      "brit",
+      "kitsune2",
+      "tx5"
+    ],
+    "semantic_provider": "mempalace",
+    "semantic_output": "unverified provider text; exact tag filtering requires source metadata",
+    "group_scope": "returned candidate window"
+  },
+  "ceremony": {
+    "version": 3,
+    "entry": "epr flow memory recall <operation> --session <id>",
+    "purpose": "Reconcile a concern so the next agent can act from current evidence without losing purpose or concealing uncertainty.",
+    "finish": "A reviewed, evidence-backed outcome addressing the intent, with per-edge reconciliation and an explicit unresolved frontier. Responsible stopping is valid.",
+    "guiding_context": [
+      {
+        "value": "Sacred Attention: correct decisions and preserved uncertainty before byte savings",
+        "source": "bafyreig7os3vfj4z63vgy7lpfgcnzzr2z26vrvdtheapoegvgzhnnhxkr4"
+      },
+      {
+        "value": "Governed views select assertions and share evidence without creating another queue",
+        "source": "bafyreieicbex3dkkgounj4latxya32ezpl6622lpij327mzndwptfqkf7q"
+      }
+    ],
+    "intent_source": "genesis/docs/superpowers/plans/2026-09-09-purpose-preserving-memory-ceremony.md",
+    "authored_by": "agent:orchestrator@gpt-6 under the recorded operator direction; local attribution only",
+    "change_authority": "Existing repository governance applies. Operator authorization permits this implementation. Substantive ceremony rewrites use existing approval; normative holds require explicit operator confirmation.",
+    "permitted_changes": [
+      "explicit scope, page, concern or evidence question",
+      "choose a declared provider",
+      "version the recipe under existing source governance; resume with prior receipt retained"
+    ],
+    "defaults": {
+      "scope": ".",
+      "limit": 12,
+      "provider": "local"
+    },
+    "selection": "Native stale/dangling edge projection; stable native slot order, grouped by upstream source. Drift is not a substantive judgment.",
+    "omissions": [
+      "Only the declared scope and returned page are shown.",
+      "No semantic ranking quality, whole-corpus acceptance or peer authority is implied.",
+      "Whole-harness context and tokens remain unmetered."
+    ],
+    "dependencies": [
+      "native EPR context/edges/reconciliation and current local records",
+      "bounded recall executor and exact source excerpts",
+      "existing flow review, appointment and acceptance admission",
+      "elohim/eprfs/epr-cli/src/flow/memory/footprint.rs",
+      ".epr-meta/collective.json",
+      "elohim/eprfs/epr-cli/src/flow/memory/recall.rs"
+    ],
+    "providers": {
+      "local": {
+        "kind": "local",
+        "ranking": "deterministic metadata traversal; no semantic relevance ranking",
+        "restrictions": "declared source scope and scan/output budgets",
+        "optional": false
+      },
+      "mempalace": {
+        "kind": "mempalace",
+        "ranking": null,
+        "version": null,
+        "freshness": null,
+        "restrictions": "installed local executable and existing palace; candidates require source verification",
+        "optional": true
+      }
+    },
+    "continuation": "Local receipt stores intent, selected edge, evidence and unresolved questions. Native judgments are re-read; continuation is not a work queue or approval.",
+    "acceptance": "Independent technical review then appointed fresh agent exercises the final entry and records exact revision/environment/evidence/limits.",
+    "measurements": {
+      "owner": "EPRFS governed evidence; deterministic footprint lens",
+      "scope_rule": "Explicit --measure-scope wins at entry; otherwise ceremony scope, with declared default cohort for repository-wide ceremonies. Resume retains the original scope.",
+      "default_scope": [
+        {
+          "path": ".claude/memory/MEMORY.md",
+          "category": "projected"
+        },
+        {
+          "path": ".claude/memory",
+          "category": "authored"
+        },
+        {
+          "path": ".eprfs/status/recall",
+          "category": "operational"
+        },
+        {
+          "path": ".eprfs/status/lenses",
+          "category": "retained"
+        },
+        {
+          "path": "genesis/data/stories",
+          "category": "authored"
+        }
+      ],
+      "limits": {
+        "max_files": 1000,
+        "max_bytes": 20000000,
+        "max_entries": 6000,
+        "max_seconds": 5,
+        "max_depth": 64
+      },
+      "pairing": "Explicit pinned baseline and close in the continuation; incompatible or incomplete evidence refuses comparison; costs do not grade ceremony judgment."
+    },
+    "collective_memory": {
+      "declaration": ".epr-meta/collective.json",
+      "owner": "Repository collective; existing actor store owns local attribution, not authenticated membership",
+      "entry": "collective",
+      "operations": [
+        "memory-project",
+        "memory-contribute",
+        "memory-feedback",
+        "memory-graduate"
+      ],
+      "input": "--memory-input names an explicit governed request file; use native collective view for contracts",
+      "graduation": "Read-only local repository reach rehearsal, never publication",
+      "native_memory": "Legacy Claude memory path is already symlinked into tracked .claude/memory; no private/shared migration is claimed."
+    }
+  }
+}

@@ -47,7 +47,7 @@ recipes:
       - name: intent
         artifactKind: "gap-item"
         paths:
-          - ".claude/memory-kit/gap-items/*.json"
+          - ".eprfs/status/gap-items/*.json"
       - name: scenario
         artifactKind: "a2o:feature"
         paths:
@@ -166,7 +166,7 @@ recipes:
       - name: intent
         artifactKind: "gap-item"
         paths:
-          - ".claude/memory-kit/gap-items/plans__2026-09-09-doorway-continuity-proof-chain.json"
+          - ".eprfs/status/gap-items/plans__2026-09-09-doorway-continuity-proof-chain.json"
       - name: scenario
         artifactKind: "a2o:feature"
         paths:

@@ -4,10 +4,7 @@
   "jenkinsPath": "genesis/Jenkinsfile",
   "manualOnly": false,
   "triggersGenesis": false,
-  "dependsOn": [
-    "elohim-edge",
-    "elohim"
-  ],
+  "dependsOn": ["elohim-edge", "elohim"],
   "description": "Content seeding and validation",
   "steps": {
     "validate-seeds": {
@@ -18,14 +15,10 @@
           "elohim/sdk/schemas/**",
           "elohim/sdk/domains/**"
         ],
-        "buildProcess": [
-          "genesis/Jenkinsfile"
-        ]
+        "buildProcess": ["genesis/Jenkinsfile"]
       },
       "outputs": {
-        "artifacts": [
-          "validated-seeds"
-        ],
+        "artifacts": ["validated-seeds"],
         "verify": null
       },
       "depends": [],
@@ -37,17 +30,11 @@
     "seed-content": {
       "description": "Seed validated content to target environment",
       "inputs": {
-        "sources": [
-          "genesis/manifests/cluster-state.yaml"
-        ],
-        "buildProcess": [
-          "genesis/Jenkinsfile"
-        ]
+        "sources": ["genesis/manifests/cluster-state.yaml"],
+        "buildProcess": ["genesis/Jenkinsfile"]
       },
       "outputs": {
-        "artifacts": [
-          "seeded-content"
-        ],
+        "artifacts": ["seeded-content"],
         "verify": null
       },
       "depends": [
@@ -64,10 +51,7 @@
     "schema-validate": {
       "description": "Validate seed data against protocol schemas",
       "inputs": {
-        "sources": [
-          "genesis/seeds/**",
-          "elohim/sdk/schemas/**"
-        ],
+        "sources": ["genesis/seeds/**", "elohim/sdk/schemas/**"],
         "buildProcess": []
       },
       "outputs": {
@@ -134,9 +118,7 @@
     "lint-a2o": {
       "description": "Lint and typecheck a2o E2E framework",
       "inputs": {
-        "sources": [
-          "genesis/a2o/**"
-        ],
+        "sources": ["genesis/a2o/**"],
         "buildProcess": []
       },
       "outputs": {
@@ -206,11 +188,7 @@
     "projects": {
       "genesis": {
         "dir": "genesis/seeder",
-        "steps": [
-          "validate-seeds",
-          "seed-content",
-          "gate-genesis"
-        ],
+        "steps": ["validate-seeds", "seed-content", "gate-genesis"],
         "run": {
           "kind": "just",
           "recipe": "gate"
@@ -218,9 +196,7 @@
       },
       "schema-validate": {
         "dir": ".",
-        "steps": [
-          "schema-validate"
-        ],
+        "steps": ["schema-validate"],
         "run": {
           "kind": "root-just",
           "recipe": "_gate-schema-validate"
@@ -228,9 +204,7 @@
       },
       "schema-codegen": {
         "dir": ".",
-        "steps": [
-          "schema-codegen"
-        ],
+        "steps": ["schema-codegen"],
         "run": {
           "kind": "root-just",
           "recipe": "_gate-schema-codegen"
@@ -238,9 +212,7 @@
       },
       "constants-sync": {
         "dir": ".",
-        "steps": [
-          "constants-sync"
-        ],
+        "steps": ["constants-sync"],
         "run": {
           "kind": "root-just",
           "recipe": "_gate-constants-sync"
@@ -248,19 +220,56 @@
       },
       "genesis-a2o": {
         "dir": "genesis/a2o",
-        "steps": [
-          "lint-a2o"
-        ],
+        "steps": ["lint-a2o"],
         "run": {
           "kind": "root-just",
           "recipe": "_gate-genesis-a2o"
         }
       },
+      "memory-ceremony": {
+        "dir": ".",
+        "inputs": {
+          "sources": [
+            ".claude/epr-meta/measures.yaml",
+            ".claude/epr-meta/policies.yaml",
+            ".epr-meta/elohim/algorithms/recall-contract.json",
+            "elohim/eprfs/epr-cli/tests/flow_memory_recall.rs",
+            "elohim/eprfs/epr-cli/tests/flow_concerns_corrections.rs",
+            "elohim/eprfs/epr-cli/tests/flow_memory_footprint.rs",
+            "elohim/eprfs/epr-cli/src/flow/memory/footprint.rs",
+            ".claude/hooks/memory-index-projection.py",
+            ".claude/hooks/_observation.py",
+            ".claude/hooks/__tests__/*_test.py",
+            ".claude/settings.json",
+            ".epr-meta/elohim/lenses/memory/**",
+            ".claude/epr-meta/measures.yaml",
+            "elohim/eprfs/epr-cli/src/flow/concerns.rs",
+            "elohim/eprfs/epr-cli/src/flow/context.rs",
+            "elohim/eprfs/epr-cli/src/flow/edges.rs",
+            "elohim/eprfs/epr-cli/src/flow/mod.rs",
+            "genesis/a2o/features/devflow/ceremony-reconciliation.feature",
+            "genesis/a2o/steps/devflow/ceremony-reconciliation.steps.ts",
+            "genesis/a2o/features/devflow/collective-memory.feature",
+            "genesis/a2o/steps/devflow/collective-memory.steps.ts",
+            "elohim/eprfs/epr-cli/src/flow/memory/**/*.rs",
+            "elohim/eprfs/eprfs-agent/src/memory.rs",
+            ".epr-meta/collective.json"
+          ],
+          "buildProcess": ["genesis/a2o/cucumber.mjs", "justfile"]
+        },
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-memory-ceremony",
+          "cargo": {
+            "targetDir": "/tmp/eprfs-gate-target",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      },
       "gherkin-prepush-lint": {
         "dir": "genesis/a2o",
-        "steps": [
-          "gherkin-prepush-lint"
-        ],
+        "steps": ["gherkin-prepush-lint"],
         "run": {
           "kind": "root-just",
           "recipe": "_gate-gherkin-prepush-lint"
@@ -274,9 +283,7 @@
             "genesis/data/lamad/paths/**",
             "elohim/sdk/schemas/v1/enums/reach.schema.json"
           ],
-          "buildProcess": [
-            "genesis/seeder/scripts/check-reach-drift.mjs"
-          ]
+          "buildProcess": ["genesis/seeder/scripts/check-reach-drift.mjs"]
         },
         "run": {
           "kind": "root-just",
@@ -286,9 +293,7 @@
       "domain-types": {
         "dir": ".",
         "inputs": {
-          "sources": [
-            "elohim/sdk/**"
-          ],
+          "sources": ["elohim/sdk/**"],
           "buildProcess": []
         },
         "run": {

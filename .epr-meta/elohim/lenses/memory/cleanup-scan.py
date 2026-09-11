@@ -342,7 +342,7 @@ def render_proposals(
 
 def main() -> int:
     today = date.today()
-    out_dir = REPO_ROOT / ".claude" / "memory-kit" / today.isoformat()
+    out_dir = _paths.reports_dir_for_today(REPO_ROOT, today)
     out_dir.mkdir(parents=True, exist_ok=True)
     archive_root = REPO_ROOT / ".claude" / "archive" / today.isoformat()
 

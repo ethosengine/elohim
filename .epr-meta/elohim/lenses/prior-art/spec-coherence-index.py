@@ -8,7 +8,7 @@ specs with their lifecycle STATE, so brainstorming can COMPOSE from canonical in
 re-speccing.
 
 Build:  spec-coherence-index.py
-        → writes .claude/memory-kit/spec-coherence-index.json
+        → writes .eprfs/status/lenses/spec-coherence-index.json
 Query:  spec-coherence-index.py --query "doorway ssr routing"
         → ranked prior specs (canonical first), each with state + path
 """
@@ -24,8 +24,10 @@ QUERY = None
 if "--query" in sys.argv[1:]:
     i = sys.argv.index("--query")
     QUERY = " ".join(sys.argv[i + 1:])
-ROOT = Path(__file__).resolve().parents[3]
-INDEX_OUT = ROOT / ".claude/memory-kit/spec-coherence-index.json"
+# .epr-meta/elohim/lenses/prior-art/<this file> -> four parents up is the repo root.
+# (Was parents[3] under .claude/scripts/memory-kit/; the relocation added one level.)
+ROOT = Path(__file__).resolve().parents[4]
+INDEX_OUT = ROOT / ".eprfs/status/lenses/spec-coherence-index.json"
 
 SURFACES = {
     "canonical": "genesis/docs/content/elohim-protocol/architecture",

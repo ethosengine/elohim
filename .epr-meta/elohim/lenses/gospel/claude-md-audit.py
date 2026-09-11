@@ -18,7 +18,7 @@ Layered phases (cheap → expensive):
   Phase 3 (operator on-demand): judgment subagent dispatch (not implemented yet
                                 — parallel to cleanup-scan's Phase 2 structure).
 
-Output: .claude/memory-kit/<YYYY-MM-DD>/claude-md-audit.md
+Output: .eprfs/status/lenses/<YYYY-MM-DD>/claude-md-audit.md
 """
 from __future__ import annotations
 
@@ -704,7 +704,7 @@ def render(reports: list[FileReport], threshold: float,
     out.append(
         "_Operator-gated. To act: revise flagged sections in their CLAUDE.md files. "
         "After making changes, optionally reset signals for that file by editing "
-        "`.claude/memory-kit/claude-md-drift.json` (set `last_audited` to today and "
+        "`.claude/data/claude-md-drift` (retired — the drift tally is a fold on `claude-md-edit-signal@1`) (set `last_audited` to today and "
         "zero out `direct_edits` / `scope_edits`); the next audit will start from a "
         "fresh signal baseline._\n"
     )

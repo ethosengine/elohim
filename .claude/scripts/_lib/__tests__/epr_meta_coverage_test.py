@@ -199,7 +199,7 @@ with tempfile.TemporaryDirectory() as _td:
 with tempfile.TemporaryDirectory() as _td:
     root = Path(_td); (root / ".git").mkdir()
     _wr(root / ".gitmodules", '[submodule "sophia"]\n\tpath = sophia\n\turl = x\n')
-    _wr(root / ".claude" / "memory-kit" / "context-coverage.yaml",
+    _wr(root / ".epr-meta" / "elohim" / "lenses" / "context-coverage.yaml",
         'epr_meta_governance:\n  min_files: 9\n  min_exts: 1\n  exclude:\n    - "**/generated"\n')
     cfg = epr_meta.governance_cfg(root)
     check("governance_cfg reads yaml tunables", cfg["min_files"] == 9)

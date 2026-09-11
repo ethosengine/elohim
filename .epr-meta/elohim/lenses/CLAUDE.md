@@ -64,21 +64,69 @@ During disposition triage (the librarian's hygiene-sweep hands archive candidate
 storyteller agent's "Disposition triage" section), the storyteller produces a graduate/memorialize/hold decision
 that the cartographer can fold into the next-actions menu.
 
-## State & Coherence Tooling — the deterministic memory-stasis kit (decided 2026-06)
+## State & Coherence Tooling — native verbs, and the lenses that live here (kit retired 2026-09-11)
 
-A second toolkit sits alongside the hygiene scripts: a **deterministic (no-LLM) state machine** over the doc +
-memory surfaces, governed by the placement contract at **`genesis/docs/PLACEMENT.md`**. It exists so every file
-is instantly auditable for *position + state*, and so the surface trends toward **stasis** — equilibrium:
-pressure dirs empty, no dumps, every artifact has a next state.
+A **deterministic (no-LLM) state machine** over the doc + memory surfaces, governed by the placement
+contract at **`genesis/docs/PLACEMENT.md`**. It exists so every file is instantly auditable for
+*position + state*, and so the surface trends toward **stasis** — equilibrium: pressure dirs empty,
+no dumps, every artifact has a next state.
 
-| Tool | What it gives you |
+It used to be a Python kit under `.claude/scripts/memory-kit/`. Station six of the memory-kit
+replacement (2026-09-11) removed that directory: the state machine is NATIVE (`epr flow report`,
+`epr flow project`, `epr flow hold`), and the handful of lenses with no native replacement were
+relocated HERE, beside this file, and declared as foreign measures in
+`.claude/epr-meta/measures.yaml` so the report can invoke them and fold their outputs.
+
+**Native verbs — the state machine:**
+
+| Verb | What it gives you |
 |---|---|
-| `placement-audit.py` | scoreboard + `--ledger` (the BUDGET: every file → position + state + next-action) + `--focus` (the env-scoped testable surface; scope follows `cluster-state.yaml`) + `--headline` (the SessionStart budget line) + `--epr-meta` (**directory-governance coverage**: the remediation queue of structurally-substantial regions not yet OWNED by a `covers: subtree` `.epr-meta` — feeds the `epr_meta_coverage` stasis dimension + the `epr-meta:` headline token; reuses the subtree-coverage walk in `_lib/epr_meta.py`, tuned in `context-coverage.yaml`'s `epr_meta_governance` block) + structural anti-dump check + **stray-doc census** (the `STRAY-DOC` counter + `stray:` headline token: ungoverned `.md` parked at the repo-root or `genesis/docs/` root — the REMEDIAL counterpart to the preventive `.epr-meta` gate, since the gate only makes *new* docs born-governed and never sweeps residue already on disk; must trend to 0). `--epr-meta` is the PREVENTIVE-coverage complement to that remedial census: are the codebase's substantial directories *thoughtfully owned* by a self-responsible manifest, the way CLAUDE.md owns progressive init context? |
-| `spec-coherence-index.py [--query "<topic>"]` | deterministic prior-art index (token overlap) → "have we spec'd this?" so you compose from canonical instead of re-speccing |
-| `decompose.py <doc>` | spec/plan → bounded, cited gap-items (OPEN = implement, CLAIMED = verify) — the gap budget |
-| `state-machine-gen.py` | regenerates the `genesis/docs/_state/<state>/` pressure-dir CLAUDE.md gates (blockers / regression / unverified / needs-triage) |
-| `prep-brainstorm.py "<topic>"` | the `/brainstorm` pre-step preload (prior-art + focus + budget) |
+| `epr flow report --headline` | the SessionStart budget line: the five declared bounds folded against the observations the drift hooks append |
+| `epr flow report placement --ledger` | the BUDGET: every file → position + state + next-action |
+| `epr flow report placement --focus [--brief]` | the env-scoped testable surface; scope follows `cluster-state.yaml` |
+| `epr flow report placement --coverage` | the un-captured (needs-agent prose) queue |
+| `epr flow report placement --stasis` | the composite context-coverage readout, the `.epr-meta` governance census, the structural anti-dump check and the stray-doc census, with the ratchet |
+| `epr flow report parity --inventory <path>` | one three-valued outcome per inventory row, method-pinned to the inventory bytes |
+| `epr flow project` | spec/plan → bounded, cited gap-items (OPEN = implement, CLAIMED = verify) — the gap budget |
+| `epr flow report scope` / `epr flow hold --scope` | the env-scope reading, and the mover that narrows or widens the plate |
 | `genesis/manifests/cluster-state.yaml` | the env-reality input — flip a node/cluster/registry → `--focus` scope cascades |
+
+**Relocated lenses — no native replacement, declared as foreign measures:**
+
+| Lens | What it gives you |
+|---|---|
+| `prior-art/spec-coherence-index.py [--query "<topic>"]` | deterministic prior-art index (token overlap) → "have we spec'd this?" so you compose from canonical instead of re-speccing |
+| `prior-art/prep-brainstorm.py "<topic>"` | the `/brainstorm` pre-step preload (prior art + focus + budget) |
+| `gospel/claude-md-audit.py` | CLAUDE.md drift + rightsizing audit |
+| `gospel/substrate-currency-audit.py` | gospel scan for PATH-EXISTS / process-status phrasing |
+| `gospel/locus-drift.py` | per-locus drift roll-up over the cite graph |
+| `delivery/story-coverage-audit.py` | story ↔ feature coverage |
+| `delivery/delivery-status-distribution.py` | the delivery-status gradient |
+| `memory/*` | the memory analyzers relocated at station four (review, coherence, dedupe, cleanup-scan, path-update) |
+
+Every lens writes under `.eprfs/status/lenses/` — derived, regenerable, untracked. `_lib.paths.reports_root`
+is its ONE authority; never hard-code the path.
+
+`state-machine-gen.py` was RETIRED, not relocated: the four `genesis/docs/_state/<state>/` pressure-dir
+gates it generated are written and stable, and regenerating a hand-tuned gate from a template was how
+operator edits got silently reverted.
+
+**Old table, for readers arriving from a pre-2026-09-11 citation:**
+
+| Tool (deleted) | Now |
+|---|---|
+| `placement-audit.py` | `epr flow report placement` + `epr flow report --headline`. Original scope: scoreboard + `--ledger` (the BUDGET: every file → position + state + next-action) + `--focus` (the env-scoped testable surface; scope follows `cluster-state.yaml`) + `--headline` (the SessionStart budget line) + `--epr-meta` (**directory-governance coverage**: the remediation queue of structurally-substantial regions not yet OWNED by a `covers: subtree` `.epr-meta` — feeds the `epr_meta_coverage` stasis dimension + the `epr-meta:` headline token; reuses the subtree-coverage walk in `_lib/epr_meta.py`, tuned in `context-coverage.yaml`'s `epr_meta_governance` block) + structural anti-dump check + **stray-doc census** (the `STRAY-DOC` counter + `stray:` headline token: ungoverned `.md` parked at the repo-root or `genesis/docs/` root — the REMEDIAL counterpart to the preventive `.epr-meta` gate, since the gate only makes *new* docs born-governed and never sweeps residue already on disk; must trend to 0). `--epr-meta` is the PREVENTIVE-coverage complement to that remedial census: are the codebase's substantial directories *thoughtfully owned* by a self-responsible manifest, the way CLAUDE.md owns progressive init context? |
+| `spec-coherence-index.py` | relocated → `prior-art/spec-coherence-index.py` |
+| `decompose.py <doc>` | `epr flow project` |
+| `state-machine-gen.py` | retired (see above) |
+| `prep-brainstorm.py "<topic>"` | relocated → `prior-art/prep-brainstorm.py` |
+| `cleanup-pressure.py` | `epr flow report --bound cleanup-pressure-ceiling` (`derive: distinct-subjects-since-reset`; no accumulator file) |
+| `memkit-retention.py` | retired with the dated report tier it windowed |
+| `mempalace-currency.py` | `epr flow report --bound mempalace-surfaces-changed-ceiling` (`derive: files-newer-than`) |
+| `scope-reconcile.py` | `epr flow report scope` (read) + `epr flow hold --scope` (mover) |
+| `focus-baseline.py` | `epr flow report placement --focus --brief` |
+| `context-ratchet.py` | `epr flow report placement --stasis [--fold]` |
+| `memory-index-projector.py` | `epr flow memory project --index --budget memory-index-bytes@1` |
 
 The lifecycle, the four verification states (VERIFIED-STABLE / CLAIMED-ONLY / REGRESSED / BLOCKED-BY-ENV), the
 feedback graph (regression *warms* a doc; env-unavailable *holds* it), and the home taxonomy (CANONICAL /
@@ -101,7 +149,7 @@ HISTORY / ACTIVE + pressure dirs) all live in `genesis/docs/PLACEMENT.md`. Read 
 - **Don't archive trash.** mem-palace ingestion is a deliberate graduation act (landed-canonical +
   distilled-history only); raw/abandoned/superseded is never embedded. Coherence comes from the cheap
   deterministic floor, not from mining everything.
-- **Compose, don't fork.** Run `spec-coherence-index.py --query` before proposing — extend canonical; revive
+- **Compose, don't fork.** Run `prior-art/spec-coherence-index.py --query` before proposing — extend canonical; revive
   nothing superseded (read its history gotcha first).
 - **Fix deployed ≠ fix converged.** When a ceremony deploys a substrate fix, the immediate post-deploy counter
   shows the cascade unmasked — not convergence. Record it as the *starting baseline*. The next ceremony's
@@ -115,19 +163,28 @@ HISTORY / ACTIVE + pressure dirs) all live in `genesis/docs/PLACEMENT.md`. Read 
 
 ### Ceremony discipline — balance sheet
 
-Run `genesis/scripts/memory-balance.sh` at **Wave 0** (baseline) and **Wave 6** (close) of every memory ceremony.
-Snapshots persist to `balance-sheets/<ts>.{json,txt}` and auto-diff against the prior run. The **Surface:Archive
-ratio** is the smoking-gun metric — healthy: trending <100:1; runaway: flat archive across multiple ceremonies.
-Paste the delta into the chronicle entry as the ceremony's evidence. Healthy ceremony targets: `MEMORY.md` index
-≤ 24KB; ≥1 canonical story; 0 memorialize-archive orphans missing `story_pointer`.
+The ceremony entry captures an explicit baseline and close pair over a declared scope.
+Its continuation retains the original baseline through resume; reports are deterministic
+lenses over pinned evidence, not another status store. For standalone use, specify the
+same `--run-id` and `--scope category:path` with `--phase baseline --output <baseline.json>`,
+then `--phase close --baseline <baseline.json> --output <close.json>` through
+`epr flow memory recall measure`. (`genesis/scripts/memory-balance.sh` was deleted at station six
+round (a); the method is `flow/memory/footprint.rs`, `bounded-memory-balance-v1`, and the
+historical sheets are at `.eprfs/status/balance/`.) There is no latest-snapshot auto-diff. Incomplete or
+incompatible samples produce no delta. Count authored content, projections, retained
+archives and operational evidence separately; archive growth is not net removal.
+Closing artifacts and unknown token costs are explicit limitations. Correct decisions,
+preserved uncertainty and reviewable outcomes remain the ceremony's acceptance criteria.
 
 ### Your mandate (broad — you decide the how)
 
-You own a slice of this surface (past / present / future / meaning). **Use these tools to drive your domain
-toward memory stasis** — fewer no-status orphans, fewer unlinked memory entries, claims verified or moved to
-regression, dead paths distilled to history, pressure dirs empty. The budget (`placement-audit.py --ledger`)
-is your scoreboard; the debt numbers must fall. *How* you get there is your judgment — these are instruments,
-not a script.
+Memory-kit is transitional: shared memory belongs to the repository collective declared
+in `.epr-meta/collective.json`; deterministic files/docs/algorithms/code are governed EPRFS
+objects under `.epr-meta`. Existing actor records own live attribution. Keep useful tools
+as lenses and retire duplicate queues only after reader coverage is proven. The legacy
+native-memory symlink above already shares a tracked repository directory; it does not
+establish privacy or authorize wider reach. Retention currently holds deletion/movement
+pending custody evidence. No score or mandatory rewrite count grades ceremony judgment.
 
 ## Pollution regulation for agentic-developer context — source regulation at the emitter
 
@@ -220,19 +277,21 @@ hooks               .claude/hooks/pre-tool-memory.py     ← PreToolUse * — in
                     .claude/hooks/claude-md-drift-signal.py     ← PostToolUse Edit/Write — counters
                     .claude/hooks/claude-md-structural-signal.py ← PreToolUse Bash — mv/cp/rm signal
                     .claude/hooks/memory-coherence-signal.py    ← PostToolUse Edit/Write — bumps a memory entry when edited code matches its cites:
-                    .claude/hooks/placement-drift-signal.py     ← PostToolUse Edit/Write — terminal-status tripwire (feeds placement-audit / state-machine-gen)
+                    .claude/hooks/placement-drift-signal.py     ← PostToolUse Edit/Write — terminal-status tripwire (folds placement-drift-due@1)
                     .claude/hooks/cite-seal-signal.py           ← PostToolUse Edit/Write — born-linked nudge on graph members (doc-roots + gospel CLAUDE.mds) with cite debt
 
-skills              .claude/skills/memory-kit/SKILL.md   ← user-facing toolkit doc
-                    .claude/skills/converge/SKILL.md     ← future-projection synthesis
+skills              .claude/skills/memory-ceremony/SKILL.md ← the ceremony: purpose, evidence, review, reconciliation
+                    .claude/skills/converge/SKILL.md        ← future-projection synthesis
 
 subagents           .claude/agents/librarian.md          ← present-tending (operates this dir)
                     .claude/agents/historian.md          ← past-surface (operates archive + epic git)
                     .claude/agents/cartographer.md       ← future-projection (operates /converge)
                     .claude/agents/storyteller.md        ← meaning axis (operates genesis/data/stories/)
 
-reports / state     .claude/memory-kit/<YYYY-MM-DD>/     ← dated reports (operator review surface)
-                    .claude/memory-kit/claude-md-drift.json ← signal accumulator state
+lenses              .epr-meta/elohim/lenses/{gospel,delivery,prior-art,memory}/ ← relocated, declared as foreign measures
+
+reports / state     .eprfs/status/lenses/<YYYY-MM-DD>/   ← dated lens reports (derived, untracked, regenerable)
+                    .eprfs/status/flows.jsonl            ← the fold plane: every drift observation, append-only
                     .claude/archive/<YYYY-MM-DD>/        ← cleanup destinations (preserves trajectory; materializes on first archival)
 ```
 
@@ -256,25 +315,27 @@ reports / state     .claude/memory-kit/<YYYY-MM-DD>/     ← dated reports (oper
 
 | Operator question | Invoke |
 |---|---|
-| "Run a memory hygiene pass" | `librarian` (or `/memory-kit`) |
-| "Is memory healthy?" | `librarian` for a quick `memory-review.py` summary |
-| "What's next?" | `cartographer` (or `/converge`) — assumes recent memkit reports exist |
+| "Run a memory hygiene pass" | `librarian` (or `/memory-ceremony`) |
+| "Is memory healthy?" | `librarian` for a quick `memory/memory-review.py` summary |
+| "What's next?" | `cartographer` (or `/converge`) — assumes recent lens reports exist under `.eprfs/status/lenses/` |
 | "Pre-shift readiness check" | `librarian` for hygiene, then `cartographer` for objective selection |
 | "I'm about to do X; anything from history?" | `historian` |
 | "This caching bug feels familiar" | `historian` |
 | "Should this lesson become a story / be archived?" | `storyteller` (disposition triage: graduate / memorialize / hold) |
-| "Are CLAUDE.md files drifting?" | `librarian` runs `claude-md-audit.py` |
+| "Are CLAUDE.md files drifting?" | `librarian` runs `gospel/claude-md-audit.py` |
 | "Audit found false positives" | `librarian` triages, places `.no-claude.md` markers |
 
 ## Workflow — weekly hygiene + synthesis (~25 min)
 
-1. `librarian` invoked → runs `memory-review.py` first (baseline)
-2. `librarian` checks drift store, decides scope (light vs full)
-3. Full pass: `cleanup-scan.py` → judgment subagent → `cleanup-apply.py`
-4. Then: `path-update-scan.py` → `path-update-apply.py`
-5. Then (monthly): `dedupe-memory-scan.py`, `skill-audit.py`, `claude-md-audit.py`
-6. Reports land in `.claude/memory-kit/<today>/`
-7. `cartographer` invoked → reads memkit reports → runs `converge-scan.py`
+1. `librarian` invoked → runs `memory/memory-review.py` first (baseline)
+2. `librarian` reads the folds (`epr flow report --headline`), decides scope (light vs full)
+3. Full pass: `memory/cleanup-scan.py` → judgment subagent → accepted proposals route through
+   `epr flow hold` (the apply half was RETIRED: archival relocation is not net removal)
+4. Then: `memory/path-update-scan.py` → `memory/path-update-apply.py`
+5. Then (monthly): `memory/dedupe-memory-scan.py`, `gospel/claude-md-audit.py`, and the
+   description-quality + trigger-overlap checks inside `package-projections.mjs verify`
+6. Reports land in `.eprfs/status/lenses/<today>/`
+7. `cartographer` invoked → reads the lens reports → runs `converge-scan.py`
 8. Cartographer's synthesis subagent produces per-theme proposals + `next-actions.md`
 9. Operator reads `next-actions.md`, picks recommendation, invokes `/shift` or `/deliver`
 

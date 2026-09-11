@@ -447,15 +447,15 @@
       }
     },
     {
-      "citesContentCid": "bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi",
-      "citesContentSha256": "sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32",
+      "citesContentCid": "bafyreigezkqz2zazjnhkn5daft5grjjzhb7bu2wzkns2jd2mibn7dar4fa",
+      "citesContentSha256": "sha256:c4caa19d64194b4ea6f4602cfa68a539387e1a6ad95365a48f4c405bf1823c28",
       "registry": "policies.yaml",
       "precedent": {
         "id": "capability-governance@1",
         "title": "Capability package governance — re-import after editing its projection",
         "summary": "Capability package governance — re-import after editing its projection",
         "full_reasoning": "Packages under `.epr-meta/elohim/packages/{agents,skills}` are the canonical source for generated Claude/Codex runtime surfaces (`.claude/{agents,skills}/*`, `.codex/{agents,skills}/*`) — edit the package JSON, then re-run `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify` (regenerate with `--write-fixtures --write-runtime` when the projections should move) before commit, or the runtime surfaces silently drift from their source of truth. Observation tier: never blocks a package edit — the projection-drift check itself is the real gate (pre-push / verify), this rule only measures. The soft/hard LoC ceiling doubles as a growth signal: a package whose embedded instructions body has outgrown one file should split into a referenced asset or a second package rather than balloon.",
-        "binding": "observation",
+        "binding": "binding-local",
         "scope_json": "{\"scope\":{\"write\":\"*.json\"}}",
         "citations": null,
         "status": "active",
@@ -636,15 +636,15 @@
       }
     },
     {
-      "citesContentCid": "bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki",
-      "citesContentSha256": "sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52",
+      "citesContentCid": "bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu",
+      "citesContentSha256": "sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d",
       "registry": "policies.yaml",
       "precedent": {
         "id": "source-file-loc-ceiling@1",
         "title": "Source-file LoC ceiling — architecture-review trigger",
         "summary": "Source-file LoC ceiling — architecture-review trigger",
         "full_reasoning": "A first-party source file past the hard ceiling is a god-file: it corrodes its own governance (line-number invariant anchors drift every edit; two-location sync traps grow ~1000 lines apart) and outgrows what one context window can review. Soft ceiling = edit-time nudge (new logic likely belongs in a module). Hard ceiling = a fingerprinted architecture finding: canonicalize a modularization plan into the timeline backlog and drive it as bounded work — never refactor mid-edit. Refactor-safety asymmetry the reviewer must honor: coordinator zomes hot-swap via update_coordinators (cheap); integrity-zome changes move the DNA hash (reinstall/partition trap — ride a deliberate DNA-lineage event only); plain native Rust is gated by fmt/clippy/nextest alone. Ratchet ceilings DOWN as the tail drains; never up.",
-        "binding": "observation",
+        "binding": "binding-local",
         "scope_json": "{\"scope\":{\"write\":\"*.rs\"}}",
         "citations": null,
         "status": "active",

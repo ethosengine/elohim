@@ -19,7 +19,7 @@ relationship** between the feature corpus on disk and the story corpus:
 - **Stories with coverage** — per-story summary of canonical + adjacent counts.
 
 Cross-references each orphan/adjacent-only feature against
-`.claude/memory-kit/delivery-status-distribution.json` to surface
+`.eprfs/status/lenses/delivery-status-distribution.json` to surface
 `delivery_status` from `/deliver`'s manifest, where known. (Features the
 bridge has not yet judged are reported `null`.)
 
@@ -29,10 +29,10 @@ Both outputs are **LOCAL OPERATOR-TIER ARTIFACTS**, not P2P substrate.
 
 | Artifact | Class | Writer | Source of truth |
 |---|---|---|---|
-| `.claude/memory-kit/story-coverage-audit.json` | Derived projection (regenerable) | this script only | story frontmatter + features-on-disk |
-| `.claude/memory-kit/<date>/story-coverage-audit.md` | Dated human-readable report | this script only | same JSON |
+| `.eprfs/status/lenses/story-coverage-audit.json` | Derived projection (regenerable) | this script only | story frontmatter + features-on-disk |
+| `.eprfs/status/lenses/<date>/story-coverage-audit.md` | Dated human-readable report | this script only | same JSON |
 
-Same tier as `.claude/memory-kit/claude-md-drift.json` and the existing
+Same tier as `.claude/data/claude-md-drift` (retired — the drift tally is a fold on `claude-md-edit-signal@1`) and the existing
 `delivery-status-distribution.json`. Single-writer; idempotent across runs;
 not DHT-bound; not a notarized truth. The P2P-design-gate's intent (catch
 peer-divergent shapes before they ship) does not apply: these are derived
@@ -52,8 +52,8 @@ the `generated_at` timestamp. Rotation: before write, copies current JSON to
 `.prev.json` so the next run can compute orphan-count delta.
 
 Outputs:
-  - `.claude/memory-kit/story-coverage-audit.json` (rolling state)
-  - `.claude/memory-kit/<YYYY-MM-DD>/story-coverage-audit.md` (report)
+  - `.eprfs/status/lenses/story-coverage-audit.json` (rolling state)
+  - `.eprfs/status/lenses/<YYYY-MM-DD>/story-coverage-audit.md` (report)
 """
 from __future__ import annotations
 
@@ -265,7 +265,7 @@ def _scan_stories() -> list[dict]:
 
 
 def _delivery_status_lookup() -> dict[str, str]:
-    """Read `.claude/memory-kit/delivery-status-distribution.json` if present
+    """Read `.eprfs/status/lenses/delivery-status-distribution.json` if present
     and build a feature-slug → delivery_status lookup.
 
     delivery-status-distribution.json's `stories[]` carries `declared_feature`

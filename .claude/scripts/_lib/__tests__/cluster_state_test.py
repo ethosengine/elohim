@@ -8,7 +8,6 @@ re-inlined a private parser at a call site.
 Run: python3 .claude/scripts/_lib/__tests__/cluster_state_test.py (exit 0 = pass)
  or: python3 -m pytest .claude/scripts/_lib/__tests__/cluster_state_test.py
 """
-import importlib.util
 import sys
 import tempfile
 from pathlib import Path
@@ -23,8 +22,6 @@ for _ in range(8):
     here = here.parent
 from _lib import cluster_state as cs  # noqa: E402
 
-MK = REPO / ".claude" / "scripts" / "memory-kit"
-
 _p = 0
 
 
@@ -35,26 +32,6 @@ def check(label, cond):
     print(f"  ✅ {label}")
 
 
-def _load_script(name, filename):
-    """Import a hyphenated memory-kit script. sys.argv is neutralized first: placement-audit parses
-    argv AT IMPORT (`ROOT = Path(ARGS[0])` when a bare arg is present), so pytest's argv would
-    otherwise silently repoint its ROOT at this test file."""
-    saved = sys.argv
-    sys.argv = [str(MK / filename)]
-    try:
-        spec = importlib.util.spec_from_file_location(name, MK / filename)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
-        return mod
-    finally:
-        sys.argv = saved
-
-
-PA = _load_script("placement_audit_under_test", "placement-audit.py")
-SR = _load_script("scope_reconcile_under_test", "scope-reconcile.py")
-FB = _load_script("focus_baseline_under_test", "focus-baseline.py")
-
-
 def _write(text):
     d = tempfile.mkdtemp()
     p = Path(d) / "cluster-state.yaml"
@@ -63,20 +40,33 @@ def _write(text):
 
 
 def call_sites(path):
-    """Every consumer's cluster read, against `path`. Returns a dict of their outputs."""
-    SR.CLUSTER_STATE = path
-    FB.CLUSTER_STATE = path
-    avail_pa, updated_pa = PA.load_cluster_state(path)
-    avail_fb, roles_fb = FB._cluster_detail()
-    known_sr, available_sr = SR._parse_cluster()
+    """The consumers' cluster reads, against `path`.
+
+    THIS WAS A THREE-PARSER AGREEMENT TEST. Until 2026-09-11 it imported
+    `placement-audit.py` (the budget reader), `scope-reconcile.py` (the MOVER) and
+    `focus-baseline.py` (the focus reader) from `.claude/scripts/memory-kit/` and asserted that
+    each one read the same cluster-state as `_lib.cluster_state`. Station six round (b) deleted
+    all three: their readings are now `epr flow report scope` / `epr flow report placement
+    --focus` / `epr flow hold --scope`, whose parser is `flow/scope.rs` with its own Rust tests.
+
+    What survives here, and it is the load-bearing half: EVERY TRAP BELOW IS STILL PINNED — the
+    column-0 comment, the block terminator, role-only resources, duplicate keys in both orders,
+    the decoy blocks, the real-file agreement. This shim answers them from the library the
+    remaining Python consumers share, so the fixtures and their reasoning stay under test.
+
+    What is gone, named rather than quietly dropped: the CROSS-PARSER dimension. Four parsers
+    agreeing was the point when there were four. There is one Python parser now, and the native
+    one is tested where it lives.
+    """
+    st = cs.load(path)
     return {
-        "pa_avail": avail_pa,
-        "pa_updated": updated_pa,
-        "fb_avail": avail_fb,
-        "fb_roles": roles_fb,
-        "sr_known": known_sr,
-        "sr_available": available_sr,
-        "sr_provides": SR._parse_provides(),
+        "pa_avail": st.available_map(),
+        "pa_updated": st.updated,
+        "fb_avail": st.available_map(),
+        "fb_roles": st.roles(),
+        "sr_known": st.all_names(),
+        "sr_available": st.available_names(),
+        "sr_provides": st.provides_map(),
     }
 
 
@@ -159,13 +149,13 @@ p = _write(COMMENT_TRAP)
 c = call_sites(p)
 check("comment-in-block: library keeps every resource",
       cs.load(p).available_names() == {"household-nodes", "iroh", "shem"})
-check("comment-in-block: scope-reconcile (the MOVER) keeps every resource",
+check("comment-in-block: the MOVER reading (available_names) keeps every resource",
       c["sr_available"] == {"household-nodes", "iroh", "shem"})
 check("comment-in-block: provides_node_types below the comment survive",
       c["sr_provides"] == {"operations": {"household-nodes"}, "remote": {"iroh"}})
-check("comment-in-block: placement-audit (the BUDGET) keeps every resource",
+check("comment-in-block: the BUDGET reading (available_map) keeps every resource",
       set(c["pa_avail"]) == {"household-nodes", "iroh", "shem"})
-check("comment-in-block: focus-baseline keeps every resource + role",
+check("comment-in-block: the FOCUS reading keeps every resource + role",
       set(c["fb_avail"]) == {"household-nodes", "iroh", "shem"} and c["fb_roles"]["shem"] == "cross-node canvas")
 
 # …and the OTHER direction: a genuine top-level key MUST still terminate the block.
@@ -185,8 +175,8 @@ p = _write(BLOCK_END)
 c = call_sites(p)
 check("top-level key still TERMINATES the resources block (library)",
       cs.load(p).all_names() == {"household-nodes"})
-check("top-level key still terminates: placement-audit", set(c["pa_avail"]) == {"household-nodes"})
-check("top-level key still terminates: scope-reconcile", c["sr_known"] == {"household-nodes"})
+check("top-level key still terminates: budget reading", set(c["pa_avail"]) == {"household-nodes"})
+check("top-level key still terminates: mover reading", c["sr_known"] == {"household-nodes"})
 
 # ══════════════════════════════════════════════════════════════════════════════════════════
 # DECISION 2 — a resource must DECLARE `available:` to be an availability CLAIM.
@@ -217,7 +207,7 @@ check("role-only: available_map OMITS it (no '' entry — does not newly block)"
       "planned-cap" not in st.available_map())
 check("role-only: placement-audit budget does NOT treat it as cluster-tracked",
       set(c["pa_avail"]) == {"household-nodes"})
-check("role-only: focus-baseline `known` does NOT include it", set(c["fb_avail"]) == {"household-nodes"})
+check("role-only: the FOCUS `known` set does NOT include it", set(c["fb_avail"]) == {"household-nodes"})
 check("role-only: its role is still rendered (the WHY text)",
       c["fb_roles"]["planned-cap"] == "a capability we intend to stand up")
 check("role-only: all_names (vocabulary) DOES include it — --set + unknown-cap detection",
@@ -302,7 +292,7 @@ check("dup key false-THEN-true: the MOVER sees it available (matches HEAD _parse
       c["sr_available"] == {"shem"})
 check("dup key false-THEN-true: the BUDGET reader sees 'true' (matches HEAD load_cluster_state)",
       c["pa_avail"] == {"shem": "true"})
-check("dup key false-THEN-true: focus-baseline sees 'true' (matches HEAD _cluster_detail)",
+check("dup key false-THEN-true: the focus reading sees 'true' (matches HEAD _cluster_detail)",
       c["fb_avail"] == {"shem": "true"})
 check("dup key false-THEN-true: role still FIRST-wins", c["fb_roles"]["shem"] == "cross-node canvas")
 
@@ -327,7 +317,7 @@ check("same-block false-THEN-true: library reports AVAILABLE",
       st.available_names() == {"shem"} and st.available_map() == {"shem": "true"})
 check("same-block false-THEN-true: the MOVER sees it available", c["sr_available"] == {"shem"})
 check("same-block false-THEN-true: the BUDGET reader sees 'true'", c["pa_avail"] == {"shem": "true"})
-check("same-block false-THEN-true: focus-baseline sees 'true'", c["fb_avail"] == {"shem": "true"})
+check("same-block false-THEN-true: the focus reading sees 'true'", c["fb_avail"] == {"shem": "true"})
 check("same-block false-THEN-true: NOT a duplicate resource key (duplicate_keys is empty)",
       st.duplicate_keys == [])
 
@@ -393,10 +383,10 @@ p = _write(DECOY_AFTER)
 c = call_sites(p)
 check("decoy AFTER resources: not read as a resource (library)",
       "not-a-resource" not in cs.load(p).all_names())
-check("decoy AFTER resources: placement-audit CALL SITE is scoped",
+check("decoy AFTER resources: the budget CALL SITE is scoped",
       c["pa_avail"] == {"household-nodes": "true"})
-check("decoy AFTER resources: focus-baseline CALL SITE is scoped", set(c["fb_avail"]) == {"household-nodes"})
-check("decoy AFTER resources: scope-reconcile CALL SITE is scoped", c["sr_known"] == {"household-nodes"})
+check("decoy AFTER resources: the focus CALL SITE is scoped", set(c["fb_avail"]) == {"household-nodes"})
+check("decoy AFTER resources: the mover CALL SITE is scoped", c["sr_known"] == {"household-nodes"})
 
 DECOY_BEFORE = """\
 schema_version: 1
@@ -414,10 +404,10 @@ p = _write(DECOY_BEFORE)
 c = call_sites(p)
 check("decoy BEFORE resources: not read as a resource (library)",
       "phantom-cap" not in cs.load(p).all_names())
-check("decoy BEFORE resources: placement-audit CALL SITE is scoped",
+check("decoy BEFORE resources: the budget CALL SITE is scoped",
       c["pa_avail"] == {"household-nodes": "true"})
-check("decoy BEFORE resources: focus-baseline CALL SITE is scoped", set(c["fb_avail"]) == {"household-nodes"})
-check("decoy BEFORE resources: scope-reconcile CALL SITE is scoped", c["sr_known"] == {"household-nodes"})
+check("decoy BEFORE resources: the focus CALL SITE is scoped", set(c["fb_avail"]) == {"household-nodes"})
+check("decoy BEFORE resources: the mover CALL SITE is scoped", c["sr_known"] == {"household-nodes"})
 check("decoy BEFORE resources: `updated:` still captured through the call site",
       c["pa_updated"] == "2026-06-04")
 
@@ -426,11 +416,11 @@ REAL = REPO / "genesis" / "manifests" / "cluster-state.yaml"
 if REAL.is_file():
     real = cs.load(REAL)
     c = call_sites(REAL)
-    check("real cluster-state: placement-audit == library available_map",
+    check("real cluster-state: budget reading == library available_map",
           c["pa_avail"] == real.available_map() and c["pa_updated"] == real.updated)
-    check("real cluster-state: focus-baseline == library available_map/roles",
+    check("real cluster-state: focus reading == library available_map/roles",
           c["fb_avail"] == real.available_map() and c["fb_roles"] == real.roles())
-    check("real cluster-state: scope-reconcile == library all_names/available_names",
+    check("real cluster-state: mover reading == library all_names/available_names",
           (c["sr_known"], c["sr_available"]) == (real.all_names(), real.available_names()))
     check("real cluster-state: no duplicate resource keys", real.duplicate_keys == [])
     check("real cluster-state: every resource declares availability (decision 2 is inert today)",

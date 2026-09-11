@@ -15,7 +15,12 @@ Layered compute (trust-compute gradient):
 When a CLAUDE.md's drift_score crosses threshold, the next session's
 SessionStart hook surfaces it; until then, gospel stands.
 
-Storage: .claude/memory-kit/claude-md-drift.json (schema_version: 1)
+Storage: ONE thing — a fold via `epr flow note --kind observation --measure
+claude-md-edit-signal@1`. The private JSON accumulator under `.claude/memory-kit/` was deleted
+with the kit at station six round (b) (2026-09-11); per-scope edit counts and the drift score
+derived from them are read from the fold plane by `epr flow report`, never carried here.
+The JSON is not a fallback: cleanup-pressure.py counts its `files` collection, so the kit
+still produces the accumulated number the SessionStart bridge folds. Station six deletes it.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -35,7 +40,6 @@ import json
 import math
 import os
 import sys
-import time
 from pathlib import Path
 
 # Bootstrap: locate .claude/scripts/_lib by walking up
@@ -45,12 +49,13 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
-from _lib import store as _store  # noqa: E402
-from _lib import drift_score as _drift_score  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; fail-open, never blocks)
 
-# Tunables specific to this hook (the score formula itself lives in _lib.drift_score)
-RESCORE_EVERY_N_EDITS = 5  # medium-path trigger
-DEFAULT_THRESHOLD = 3.0
+# Tunable specific to this hook. The score formula and its threshold are NOT here any more:
+# `_lib.drift_score.compute_score` is fed by the fold plane through `epr flow report`, and the
+# threshold is DECLARED as claude-md-drift-score@1's ceiling in .claude/epr-meta/measures.yaml.
+# A hook that folds one event per edit does not need a rescore cadence or a private score.
 MAX_WALK_DEPTH = 12        # stop walking up after this many dirs
 
 
@@ -79,35 +84,6 @@ def find_enclosing_claude_md_files(edited_file: Path, repo_root: Path) -> list[P
     return results
 
 
-def drift_store_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "claude-md-drift.json"
-
-
-def normalize_store(data) -> dict:
-    """Coerce a loaded store to the canonical shape (tolerant of missing/malformed)."""
-    if not isinstance(data, dict):
-        data = {}
-    data.setdefault("schema_version", 1)
-    data.setdefault("threshold", DEFAULT_THRESHOLD)
-    data.setdefault("files", {})
-    return data
-
-
-def get_or_init_file_entry(store: dict, claude_md_rel: str, mtime_iso: str) -> dict:
-    entry = store["files"].get(claude_md_rel)
-    if not entry:
-        entry = {
-            "last_audited": None,       # ISO date or None
-            "claude_md_mtime": mtime_iso,
-            "direct_edits": 0,          # edits to the CLAUDE.md itself
-            "scope_edits": 0,           # edits to files within its scope
-            "lines_changed_in_scope": 0,  # reserved for medium-path
-            "drift_score": 0.0,
-            "last_signal_at": None,     # ISO timestamp of last increment
-            "rescore_counter": 0,       # increments to RESCORE_EVERY_N_EDITS
-        }
-        store["files"][claude_md_rel] = entry
-    return entry
 
 
 # compute_score moved to _lib.drift_score (shared with audit + structural hook)
@@ -137,45 +113,22 @@ def main() -> int:
     if not enclosing:
         return 0
 
-    store_path = drift_store_path(repo)
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
     is_direct_edit_target = edited_path.name == "CLAUDE.md"
 
-    def _mutate(data) -> dict:
-        store = normalize_store(data)
+    # The bound lives in .claude/epr-meta (claude-md-edit-signal@1 feeding the derived
+    # claude-md-drift-score@1 ceiling). One observation per enclosing scope; the drift score
+    # is derived from the folds by the native report, not carried in a private counter here.
+    if _obs.available():
         for claude_md in enclosing:
             try:
                 rel = str(claude_md.relative_to(repo))
             except ValueError:
                 rel = str(claude_md)
-            try:
-                mtime_iso = time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(claude_md.stat().st_mtime)
-                )
-            except OSError:
-                mtime_iso = now_iso
+            kind = "direct" if (is_direct_edit_target and edited_path == claude_md) else "scope"
+            _obs.emit("claude-md-edit-signal@1", rel, 1,
+                      reason=f"gospel drift: {kind} edit inside this CLAUDE.md scope",
+                      env={"kind": kind}, root=str(repo))
 
-            entry = get_or_init_file_entry(store, rel, mtime_iso)
-            entry["claude_md_mtime"] = mtime_iso
-            entry["last_signal_at"] = now_iso
-
-            if is_direct_edit_target and edited_path == claude_md:
-                entry["direct_edits"] = entry.get("direct_edits", 0) + 1
-            else:
-                entry["scope_edits"] = entry.get("scope_edits", 0) + 1
-
-            entry["rescore_counter"] = entry.get("rescore_counter", 0) + 1
-            if entry["rescore_counter"] >= RESCORE_EVERY_N_EDITS:
-                entry["drift_score"] = _drift_score.compute_score(entry)
-                entry["rescore_counter"] = 0
-        return store
-
-    # Serialize the read-modify-write so concurrent sessions don't lose each other's increments.
-    _store.locked_update(
-        store_path, _mutate,
-        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "files": {}},
-    )
     return 0  # hooks are best-effort; never block the tool call
 
 

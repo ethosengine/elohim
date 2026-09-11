@@ -6,9 +6,15 @@ Composes three cheap deterministic reads into ONE context preload the wrapper in
 BEFORE superpowers:brainstorming, so the session composes from existing canon and targets
 only the testable surface:
 
-  1. prior art          (spec-coherence-index.py --query)  → compose, don't re-spec
-  2. testable surface   (placement-audit.py --focus)        → what's in scope / blocked-by-env
-  3. budget headline    (placement-audit.py --ledger --json)→ outstanding pressure
+  1. prior art          (spec-coherence-index.py --query)             → compose, don't re-spec
+  2. testable surface   (epr flow report placement --focus [--brief])  → what's in scope / blocked-by-env
+  3. budget headline    (epr flow report placement --ledger --json)    → outstanding pressure
+
+Relocated to `.epr-meta/elohim/lenses/prior-art/` at station six of the memory-kit
+replacement (2026-09-11). Legs 2 and 3 were the kit's `placement-audit.py` and
+`focus-baseline.py`; station two ported both into the native placement report, so this
+lens now composes ONE kit-descended sibling (the prior-art index, which has no native
+replacement) with two native reads.
 
 Sub-second, no LLM. The EXPENSIVE agent-driven restructure is NOT run here — it fires only
 when --check-drift trips a threshold (so brainstorms don't each pay for a full restructure).
@@ -19,11 +25,15 @@ Usage:  prep-brainstorm.py "doorway ssr routing"
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+REPO = Path(__file__).resolve().parents[4]
+EPR = os.environ.get("EPR_BIN") or shutil.which("epr") or "epr"
 ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
 CHECK_DRIFT = "--check-drift" in sys.argv[1:]
 TOPIC = " ".join(ARGS).strip()
@@ -38,22 +48,29 @@ def run(script, *args):
         return f"(prep: {script} failed: {e})"
 
 
+def native(*args):
+    """One native `epr flow …` read. Absence is reported, never silently zeroed."""
+    try:
+        return subprocess.run([EPR, "flow", *args], cwd=str(REPO),
+                              capture_output=True, text=True, timeout=60).stdout.strip()
+    except Exception as e:  # noqa: BLE001
+        return f"(prep: epr flow {' '.join(args)} failed: {e})"
+
+
 def main() -> int:
     if not TOPIC:
         print("usage: prep-brainstorm.py \"<topic>\"", file=sys.stderr)
         return 2
 
     prior = run("spec-coherence-index.py", "--query", TOPIC)
-    focus = run("placement-audit.py", "--focus")
-    subject_focus = run("focus-baseline.py", "--brief")
+    focus = native("report", "placement", "--focus")
+    subject_focus = native("report", "placement", "--focus", "--brief")
     try:
-        led = json.loads(run("placement-audit.py", "--ledger", "--json") or "{}")
-        # Must match placement-audit ledger_mode pressure_order: BLOCKED-BY-ENV is
-        # HELD (Cascade: NONE per PLACEMENT.md), NOT actionable pressure, so it is
-        # excluded here too — otherwise held work falsely trips the drift advisory.
-        pressure = sum(1 for r in led.get("rows", [])
-                       if r["state"] in ("NEEDS-TRIAGE", "MEM-UNLINKED", "CLAIMED-ONLY",
-                                         "REGRESSED", "SUPERSEDED", "UNKNOWN-STATUS"))
+        led = json.loads(native("report", "placement", "--ledger", "--json") or "{}")
+        # The native ledger computes `pressure` on the payload with the SAME rule the kit
+        # applied inline: BLOCKED-BY-ENV is HELD (Cascade: NONE per PLACEMENT.md), NOT
+        # actionable pressure, so held work cannot falsely trip the drift advisory.
+        pressure = int(led.get("pressure", -1))
     except Exception:  # noqa: BLE001
         pressure = -1
 
@@ -67,7 +84,7 @@ def main() -> int:
     print("\n  -- SUBJECT FOCUS (a2o; no narrowing = fair-game) --")
     print(subject_focus)
     print(f"\n## 3. BUDGET — {pressure} pressure items outstanding "
-          f"(run `placement-audit.py --ledger` for the per-file queue)\n")
+          f"(run `epr flow report placement --ledger` for the per-file queue)\n")
     print("## RULE FOR THIS SESSION")
     print("  - If PRIOR ART shows a CANONICAL/done match → COMPOSE from it; extend canonical, don't fork.")
     print("  - If it shows a SUPERSEDED match → do NOT revive; read its history record for the gotcha.")

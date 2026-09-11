@@ -14,7 +14,7 @@ Five sections:
 This is the explicit "is memory healthy?" surface the original kit lacked.
 Read-only. No mutations. No LLM. No network.
 
-Output: .claude/memory-kit/<YYYY-MM-DD>/memory-review.md
+Output: .eprfs/status/lenses/<YYYY-MM-DD>/memory-review.md
 """
 
 from __future__ import annotations
@@ -32,7 +32,12 @@ REPO_ROOT = Path(__file__).resolve().parents[4]  # relocated 2026-09-10:
 # .epr-meta/elohim/lenses/memory/<this>.py is FOUR levels below the repo root
 # (was .claude/scripts/memory-kit/, three). Station four of the memory-kit
 # replacement — this lens is a declared foreign measure now, not a kit script.
-DEFAULT_OUT_ROOT = REPO_ROOT / ".claude" / "memory-kit"
+# Station six (2026-09-11): the dated-report tier moved out of `.claude/memory-kit/`.
+# `_lib.paths.reports_root` is its ONE authority — resolve through it, never a literal.
+if str(REPO_ROOT / ".claude" / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+from _lib import paths as _paths  # noqa: E402
+DEFAULT_OUT_ROOT = _paths.reports_root(REPO_ROOT)
 TODAY = date.today()
 NOW = datetime.now(timezone.utc)
 

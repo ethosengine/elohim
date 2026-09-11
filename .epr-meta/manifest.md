@@ -5,12 +5,33 @@ root: true
 purpose: >
   The repo-root constitutional base. Carries the build-time ci-trigger: leg (the cross-cutting
   CI-ignore set, projected into the flat .ci-ignore), and author-time rules including the repo-wide
-  binding of the source-file-LoC-ceiling policy (observation tier — never blocks) and the
+  binding of the source-file-LoC-ceiling policy (measure class — never blocks) and the
   governance-escalation-ladder (the agency charter — definitions live in the policy registry,
   .claude/epr-meta/policies.yaml), the brand-vocabulary boundary lint, a context-blind README review
   obligation, and three developer-valueflow authoring signals. It anchors the cascade and hosts the
   ignores and basename-wide rules that cannot decentralize, plus the subtree/orchestrator exact-path
   entries kept inline for the first cut.
+policy-recipe: .claude/epr-meta
+policy-recipes:
+  default:
+    name: default
+    dir: .claude/epr-meta
+    measures: .claude/epr-meta/measures.yaml
+    policies: .claude/epr-meta/policies.yaml
+    why: >
+      The declared DEFAULT recipe, named as an intentional act rather than left implicit
+      (operator plurality ruling, 2026-09-10, recorded on
+      genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md). This policy
+      set is ONE lens over this substrate, never the lens: a second recipe may be added here
+      and evaluated simultaneously over the same records, with every outcome labelled by its
+      recipe. Rows carry a PRECEDENT_BINDING level and lineage so a set can fork, propagate
+      and be ratified upward without a rewrite; ratification recommends, never overwrites
+      local tightening. `policy-recipe:` is the key the native report reads
+      (elohim/eprfs/epr-cli/src/flow/report.rs declared_default -> Recipe::at_dir): its value is
+      the DIRECTORY holding the recipe's `measures.yaml` + `policies.yaml`. The entry below is
+      that same recipe under its declared name `default` — joined to the scalar by its `dir:`,
+      and carrying `name:` so a label reader can take the name from the key or the field. The
+      declared name and the reported label agree at `default`; a second recipe is added here.
 rules:
   - id: rs-loc-ceiling
     policy: source-file-loc-ceiling@1

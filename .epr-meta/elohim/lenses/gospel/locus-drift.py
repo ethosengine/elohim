@@ -65,7 +65,7 @@ def corpus():
         if not r.exists():
             continue
         for md in r.rglob("*.md"):
-            if md.name in SKIP or "/_state/" in str(md) or "/memory-kit/" in str(md):
+            if md.name in SKIP or "/_state/" in str(md) or "/.eprfs/status/lenses/" in str(md):
                 continue
             f = fm.parse_file(md)
             if f.get("id") or f.get("cites"):

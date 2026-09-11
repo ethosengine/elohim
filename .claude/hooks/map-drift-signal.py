@@ -24,7 +24,13 @@ The drift count surfaces at SessionStart through the existing budget headline
 (placement-audit.py --headline) as a "path:" currency line:
     "path: N seed(s) changed since MAP update | roadmap: refreshed <date>"
 
-Storage: .claude/memory-kit/map-currency-drift.json (schema_version: 1)
+Storage: ONE thing — a fold via `epr flow note --kind observation --measure
+map-currency-drift@1`, routed to `map-currency-drift-reset@1` when MAP.md itself is edited
+(a bulk clear). The private JSON accumulator under `.claude/memory-kit/` was deleted with the
+kit at station six round (b) (2026-09-11); the accumulated count is DERIVED from the folds by
+map-currency-drift-ceiling@1's `derive: distinct-subjects-since-reset`.
+The JSON is not a fallback: cleanup-pressure.py counts its `changed` collection, so the kit
+still produces the accumulated number the SessionStart bridge folds. Station six deletes it.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -43,7 +49,6 @@ RETIRE_WHEN = (
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 # Bootstrap: locate .claude/scripts/_lib by walking up
@@ -53,7 +58,8 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
-from _lib import store as _store  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; fail-open, never blocks)
 
 # The CANONICAL architecture surface — the seeds the MAP walks over. Repo-relative
 # dir prefix. A *.md created/changed here (other than the two map artifacts) is a
@@ -67,16 +73,13 @@ MAP_ARTIFACTS = {"INDEX.md", "MAP.md"}
 # The walk-defining artifact whose edit RESETS the accumulator (the walk is now current).
 WALK_ARTIFACT = "MAP.md"
 
-DEFAULT_THRESHOLD = 1  # any seed changed since the last MAP refresh is worth surfacing
+# The threshold is DECLARED, not kept here: map-currency-drift-ceiling@1
+# in .claude/epr-meta/measures.yaml carries `hard: 1` — any seed changed since the last MAP refresh is worth surfacing.
 
 
 def repo_root_from_env() -> Path | None:
     pd = os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(pd).resolve() if pd else None
-
-
-def drift_store_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "map-currency-drift.json"
 
 
 def in_architecture_surface(rel: str) -> bool:
@@ -123,37 +126,19 @@ def main() -> int:
     if name in MAP_ARTIFACTS and name != WALK_ARTIFACT:
         return 0
 
-    store_path = drift_store_path(repo)
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    # The bound lives in .claude/epr-meta (map-currency-drift@1). `1` = a seed moved the
+    # territory the walk describes; `0` on MAP.md = the walk was refreshed, which is a BULK
+    # CLEAR of everything accumulated since the last walk. The zero is not sent as
+    # a zero: `_observation._BULK_CLEAR_ON_ZERO` routes it to `map-currency-drift-reset@1` on
+    # subject `.`, because a per-subject zero on MAP.md would leave every other accumulated seed
+    # counted forever. The routing lives in ONE place, the emitter, so every hook that clears a
+    # collection expresses it the same way; this hook just says what happened.
+    _obs.emit("map-currency-drift@1", rel, 0 if name == WALK_ARTIFACT else 1,
+              reason=("map currency: MAP.md walk refreshed" if name == WALK_ARTIFACT
+                      else "map currency: architecture seed changed since the MAP walk"),
+              env={"artifact": "walk" if name == WALK_ARTIFACT else "seed"},
+              root=str(repo))
 
-    def _mutate(data) -> dict:
-        store = data if isinstance(data, dict) else {
-            "schema_version": 1, "threshold": DEFAULT_THRESHOLD,
-            "last_map_refresh": None, "changed": {}}
-        store.setdefault("schema_version", 1)
-        store.setdefault("threshold", DEFAULT_THRESHOLD)
-        store.setdefault("last_map_refresh", None)
-        store.setdefault("changed", {})
-        # The walk just got refreshed → reset the accumulator. The seeds and the walk are back
-        # in sync as far as this cheap signal can tell.
-        if name == WALK_ARTIFACT:
-            store["changed"] = {}
-            store["last_map_refresh"] = now_iso
-            return store
-        # An architecture seed changed → accumulate it (deduped by path, hit-counted).
-        entry = store["changed"].get(rel) or {"hits": 0, "first_signal_at": now_iso}
-        entry["hits"] = entry.get("hits", 0) + 1
-        entry["last_signal_at"] = now_iso
-        entry.setdefault("first_signal_at", now_iso)
-        store["changed"][rel] = entry
-        return store
-
-    # Serialize the read-modify-write so concurrent sessions don't lose each other's updates.
-    _store.locked_update(
-        store_path, _mutate,
-        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD,
-                 "last_map_refresh": None, "changed": {}},
-    )
     return 0  # hooks are best-effort; never block the tool call
 
 

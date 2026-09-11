@@ -137,9 +137,9 @@ with tempfile.TemporaryDirectory() as td:
     generated_report = f'{{"last_changed": "src/{term}.rs"}}\n'
     v = verdict(
         merged,
-        tmp_write(tmp, ".claude/memory-kit/generated-report.json", None, generated_report),
+        tmp_write(tmp, ".eprfs/status/lenses/generated-report.json", None, generated_report),
     )
-    check("generated memory-kit observation stays silent", v is None, f"got {v}")
+    check("generated lens report stays silent", v is None, f"got {v}")
 
     # The validator and its fixtures enumerate the vocabulary by necessity, so they are exempt —
     # whether the hook hands the write an absolute path or a repo-relative one.

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "id": "collective:ethosengine/elohim",
+  "displayName": "Elohim repository collaboration",
+  "charter": "Repository-local shared assertions preserve source versions, uncertainty and independent judgment. Registered local sessions may contribute under repository stewardship; this declaration grants no network membership, authentication or publication authority. Private runtime stores remain independently owned.",
+  "steward": "repo:ethosengine/elohim",
+  "participation": "registered-local-session",
+  "sourceRules": [
+    {"path": ".epr-meta", "maxReach": "repository"},
+    {"path": "genesis", "maxReach": "repository"},
+    {"path": "elohim", "maxReach": "repository"},
+    {"path": ".claude/memory-kit", "maxReach": "workspace"},
+    {"path": ".claude/memory", "maxReach": "repository"},
+    {"path": ".eprfs", "maxReach": "workspace"},
+    {"path": ".eprfs/status/memory", "maxReach": "repository"}
+  ]
+}

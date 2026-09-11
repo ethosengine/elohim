@@ -28,13 +28,13 @@ The two outputs are LOCAL OPERATOR-TIER ARTIFACTS, not P2P substrate entities.
 
 | Artifact | Class | Writer | Reader(s) | Source of truth |
 |---|---|---|---|---|
-| `.claude/memory-kit/delivery-status-distribution.json` | Derived projection (regenerable) | this script only (single-writer) | `/deliver` (pickup queue), memory-ceremony Wave 0/1 | Story + backlog frontmatter; this JSON is a snapshot of them |
-| `.claude/memory-kit/<date>/delivery-status-distribution.md` | Dated human-readable report | this script only | Human operator + memory-ceremony Wave 0/1 | Same JSON projection above |
+| `.eprfs/status/lenses/delivery-status-distribution.json` | Derived projection (regenerable) | this script only (single-writer) | `/deliver` (pickup queue), memory-ceremony Wave 0/1 | Story + backlog frontmatter; this JSON is a snapshot of them |
+| `.eprfs/status/lenses/<date>/delivery-status-distribution.md` | Dated human-readable report | this script only | Human operator + memory-ceremony Wave 0/1 | Same JSON projection above |
 
 Neither is DHT-bound. Neither requires entity-class classification (A/A2/B/B2/C).
 Neither has wire contracts, sync messages, or peer-replication shape. They are
-the same tier as existing `.claude/memory-kit/claude-md-drift.json` (accumulator
-state) and the dated audit reports in `.claude/memory-kit/<date>/`. The P2P
+the same tier as existing `.claude/data/claude-md-drift` (retired — the drift tally is a fold on `claude-md-edit-signal@1`) (accumulator
+state) and the dated audit reports in `.eprfs/status/lenses/<date>/`. The P2P
 design gate's intent ("catch tables, models, routes, sync messages before they
 become peer-divergent") does not apply: these are single-writer or
 single-source-projection artifacts that the harness cleans up routinely.
@@ -62,8 +62,8 @@ next run can produce a state-diff section.
 Always 0 — observation, not gating.
 
 Outputs:
-  - `.claude/memory-kit/delivery-status-distribution.json` (rolling state)
-  - `.claude/memory-kit/<YYYY-MM-DD>/delivery-status-distribution.md` (report)
+  - `.eprfs/status/lenses/delivery-status-distribution.json` (rolling state)
+  - `.eprfs/status/lenses/<YYYY-MM-DD>/delivery-status-distribution.md` (report)
 """
 from __future__ import annotations
 

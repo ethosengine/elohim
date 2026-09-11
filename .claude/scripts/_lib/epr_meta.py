@@ -568,8 +568,8 @@ def _brand_vocabulary_boundary(write: dict) -> bool:
     rooted_path = f"/{normalized_path.lstrip('/')}"  # repo-relative and absolute paths compare alike
     if any(rooted_path.endswith(suffix) for suffix in _BRAND_LINT_INTERNAL_SUFFIXES):
         return False  # the validator and its fixtures necessarily enumerate the vocabulary
-    if "/.claude/memory-kit/" in rooted_path:
-        return False  # generated observation ledgers are neither code nor authored configuration
+    if "/.eprfs/status/lenses/" in rooted_path:
+        return False  # derived lens reports are neither code nor authored configuration
     suffix = path.suffix.lower()
     basename = path.name.lower()
     if suffix not in _BRAND_CODE_SUFFIXES and basename not in _BRAND_CODE_BASENAMES:
@@ -1992,7 +1992,8 @@ def governance_cfg(repo_root: Path) -> dict:
             pass
     if yaml is not None:
         try:
-            data = yaml.safe_load((repo_root / ".claude/memory-kit/context-coverage.yaml").read_text()) or {}
+            data = yaml.safe_load(
+                (repo_root / ".epr-meta/elohim/lenses/context-coverage.yaml").read_text()) or {}
             blk = data.get("epr_meta_governance", {}) or {}
             for k in ("min_files", "min_subdirs", "min_exts"):
                 if isinstance(blk.get(k), int):

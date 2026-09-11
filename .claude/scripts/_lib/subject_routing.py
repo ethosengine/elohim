@@ -7,7 +7,7 @@ of single-flow.
 Parent constitution: <repo>/.claude/subject-routing.yaml (hand-tuned). Sub-trees may add their own to
 cascade (one repo -> mono-repo -> submodule). The discriminator is DELIVERABLE-TARGET, never vocabulary.
 
-Pure-stdlib except PyYAML (already a repo dep; memory-kit scripts use it). No side effects on import.
+Pure-stdlib except PyYAML (already a repo dep). No side effects on import.
 """
 from __future__ import annotations
 

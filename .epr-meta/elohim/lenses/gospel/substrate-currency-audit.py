@@ -24,9 +24,9 @@ to surface the 1-3 highest-drift surfaces for four-lens rewrite.
 Standalone-runnable. Read-only. No mutations.
 
 Usage:
-  python3 .claude/scripts/memory-kit/substrate-currency-audit.py
-  python3 .claude/scripts/memory-kit/substrate-currency-audit.py --memory-days 30
-  python3 .claude/scripts/memory-kit/substrate-currency-audit.py --json-only
+  python3 .epr-meta/elohim/lenses/gospel/substrate-currency-audit.py
+  python3 .epr-meta/elohim/lenses/gospel/substrate-currency-audit.py --memory-days 30
+  python3 .epr-meta/elohim/lenses/gospel/substrate-currency-audit.py --json-only
 """
 from __future__ import annotations
 

@@ -10,7 +10,7 @@ registry answers "is this file managed, and how."
 Consumers:
   - .claude/hooks/managed-surface-context.py   PreToolUse Edit|Write — inject the discipline BEFORE the edit
   - .claude/hooks/cite-seal-signal.py          PostToolUse — born-linked nudge scope (in_cite_graph)
-  - cite-gen --seal-all / cites-migrate        sweep scope for the cite graph
+  - epr flow cites seal --all / migrate       sweep scope for the cite graph
 
 Path patterns anchor to the HOMES subject-routing.yaml names (write_location / gospel_homes /
 decomposition_flow); the cross-check in __tests__/managed_surfaces_test.py fails if the two axes drift.
@@ -41,19 +41,20 @@ SURFACES: list[dict] = [
         "in_cite_graph": False,
         "discipline": "Hand-tuned axis manifest: subject-routing.yaml is the class axis, cluster-state.yaml "
                       "the env axis (evidence-backed flips only — mirror the probe, never aspirational). "
-                      "A flip cascades: run scope-reconcile.py --apply after changing cluster-state.",
-        "tools": [".claude/scripts/scope-reconcile.py --apply"],
+                      "A flip cascades: run `epr flow hold --scope --apply` after changing cluster-state.",
+        "tools": ["epr flow hold --scope --apply"],
     },
     {
         "key": "process-gospel",
         "label": "process operating gospel",
-        "match": [".claude/CLAUDE.md", ".claude/*/CLAUDE.md", ".claude/scripts/memory-kit/LIFECYCLE.md",
+        "match": [".claude/CLAUDE.md", ".claude/*/CLAUDE.md",
+                  ".epr-meta/elohim/lenses/CLAUDE.md", ".epr-meta/elohim/lenses/LIFECYCLE.md",
                   "genesis/orchestrator/README.md", "genesis/data/timeline/CONVENTIONS.md"],
         "in_cite_graph": False,
         "discipline": "Process operating gospel (a subject-routing gospel_home): durable operating-discipline "
                       "residue lands here via gospel-diff at decompose. Keep it the single home for its "
                       "subdomain; route detail to specs/history, not into the gospel.",
-        "tools": [".claude/scripts/memory-kit/claude-md-audit.py"],
+        "tools": ["python3 .epr-meta/elohim/lenses/gospel/claude-md-audit.py"],
     },
     {
         "key": "gospel",
@@ -62,10 +63,10 @@ SURFACES: list[dict] = [
         "in_cite_graph": True,
         "discipline": f"Contextual gospel — a managed-memory surface IN the cite graph: {_CITE_TOOLING}. "
                       "Concern-routing lines reference slugs from this file's own cites:. After editing "
-                      "cites, run cite-gen --seal; author relationship hints with cite-describe. Keep rails "
+                      "cites, run epr flow cites seal; author relationship hints with epr flow cites describe. Keep rails "
                       "short — detail belongs in the cited doc. claude-md drift accumulators watch this scope.",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>",
-                  "python3 .claude/scripts/memory-kit/cite-describe.py <file> '{\"<ref>\":\"<hint>\"}'"],
+        "tools": ["epr flow cites seal <file>",
+                  "epr flow cites describe <file> --slug <ref> --desc '<hint>'"],
     },
     {
         "key": "memory",
@@ -74,8 +75,8 @@ SURFACES: list[dict] = [
         "in_cite_graph": True,
         "discipline": "Native memory stays LIGHT (2026-06-03 pair-off): durable knowledge GRADUATES to its "
                       f"managed home per subject-routing.yaml — don't pile it up here. {_CITE_TOOLING}.",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>",
-                  "python3 .claude/scripts/memory-kit/memory-coherence-audit.py"],
+        "tools": ["epr flow cites seal <file>",
+                  "python3 .epr-meta/elohim/lenses/memory/memory-coherence-audit.py"],
     },
     {
         "key": "spec",
@@ -84,10 +85,10 @@ SURFACES: list[dict] = [
         "in_cite_graph": True,
         "discipline": f"Spec — born-linked: {_CITE_TOOLING}; frontmatter carries class: per "
                       "subject-routing.yaml. Data-entity designs pass the p2p-design-gate. Terminal status "
-                      "→ decompose to zero residue (decompose.py), never parked in the live tree.",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>",
-                  "python3 .claude/scripts/memory-kit/decompose.py <file>",
-                  "python3 .claude/scripts/memory-kit/spec-coherence-index.py --query '<topic>'"],
+                      "→ decompose to zero residue (`epr flow project`), never parked in the live tree.",
+        "tools": ["epr flow cites seal <file>",
+                  "epr flow project",
+                  "python3 .epr-meta/elohim/lenses/prior-art/spec-coherence-index.py --query '<topic>'"],
     },
     {
         "key": "plan",
@@ -97,9 +98,9 @@ SURFACES: list[dict] = [
         "discipline": f"Plan — born-linked: {_CITE_TOOLING}. Landing a terminal status (landed/superseded/"
                       "abandoned) queues decompose-due (placement drift): a finished plan decomposes to zero "
                       "residue. Gap-granular env scope: prefer per-gap @requires:<cap> over doc-level holds.",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>",
-                  "python3 .claude/scripts/memory-kit/decompose.py <file>",
-                  "python3 .claude/scripts/memory-kit/placement-audit.py --ledger"],
+        "tools": ["epr flow cites seal <file>",
+                  "epr flow project",
+                  "epr flow report placement --ledger"],
     },
     {
         "key": "architecture-seed",
@@ -109,8 +110,8 @@ SURFACES: list[dict] = [
         "discipline": "Canonical architecture seed — editing one may stale MAP.md (map-drift watches; the "
                       "walk refresh is cartographer-gated). Compose, don't fork: query prior art before "
                       f"adding seeds. {_CITE_TOOLING}.",
-        "tools": ["python3 .claude/scripts/memory-kit/spec-coherence-index.py --query '<topic>'",
-                  "python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>"],
+        "tools": ["python3 .epr-meta/elohim/lenses/prior-art/spec-coherence-index.py --query '<topic>'",
+                  "epr flow cites seal <file>"],
     },
     {
         "key": "history",
@@ -119,7 +120,7 @@ SURFACES: list[dict] = [
         "in_cite_graph": True,
         "discipline": "Curated history (tier:history) — written once, cited forever; a lesson record, not a "
                       f"live obligation. {_CITE_TOOLING}.",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>"],
+        "tools": ["epr flow cites seal <file>"],
     },
     {
         "key": "doc",
@@ -128,8 +129,8 @@ SURFACES: list[dict] = [
         "in_cite_graph": True,
         "discipline": f"Doc-root surface in the cite graph: {_CITE_TOOLING}. Position + state are governed "
                       "by genesis/docs/PLACEMENT.md (every file instantly auditable; pressure dirs stay empty).",
-        "tools": ["python3 .claude/scripts/memory-kit/cite-gen.py --seal <file>",
-                  "python3 .claude/scripts/memory-kit/placement-audit.py --ledger"],
+        "tools": ["epr flow cites seal <file>",
+                  "epr flow report placement --ledger"],
     },
     {
         "key": "story",
@@ -165,18 +166,22 @@ SURFACES: list[dict] = [
         "label": "skill doc",
         "match": [".claude/skills/*/SKILL.md"],
         "in_cite_graph": False,
-        "discipline": "Skill doc — the description IS the dispatch trigger (skill-audit watches drift). Keep "
+        "discipline": "Skill doc — the description IS the dispatch trigger; it is PACKAGE metadata "
+                      "(edit the package, then `just codegen agents write`), and the declared floor "
+                      "(skill-description-floor@1, 60 chars) is refused by the package verifier. Keep "
                       "triggers concrete and current with the tooling the skill fronts.",
-        "tools": ["python3 .claude/scripts/memory-kit/skill-audit.py"],
+        "tools": ["node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify --quality"],
     },
     {
         "key": "agent",
         "label": "agent definition",
         "match": [".claude/agents/*.md"],
         "in_cite_graph": False,
-        "discipline": "Agent definition — description + tools drive dispatch (agent-audit watches drift). "
+        "discipline": "Agent definition — description + tools drive dispatch; both are PACKAGE metadata "
+                      "(edit the package, then `just codegen agents write`), and the declared floor "
+                      "(agent-description-floor@1, 80 chars) is refused by the package verifier. "
                       "Keep the role boundary crisp; route how-to detail to skills.",
-        "tools": ["python3 .claude/scripts/memory-kit/agent-audit.py"],
+        "tools": ["node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify --quality"],
     },
 ]
 
@@ -210,6 +215,6 @@ def classify(path, repo_root) -> dict | None:
 
 def in_cite_graph(path, repo_root) -> bool:
     """True iff the file is a member of the slug-envelope cite graph (doc-roots + gospel CLAUDE.mds) —
-    the scope cite-seal-signal / --seal-all / cites-migrate sweep."""
+    the scope cite-seal-signal / `epr flow cites seal --all` / `epr flow cites migrate` sweep."""
     e = classify(path, repo_root)
     return bool(e and e["in_cite_graph"])

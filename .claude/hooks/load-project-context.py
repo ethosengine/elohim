@@ -71,29 +71,56 @@ def _headline_cache_path(project_dir: str) -> str:
     return f"/tmp/claude-headline-{slug}.txt"
 
 
-def get_memory_budget(project_dir: str) -> str:
-    """Always-on memory budget headline (deterministic; from placement-audit.py --headline).
+def _observation_module(project_dir: str):
+    """The hooks' shared emitter, imported by path so this works however the hook was launched."""
+    sys.path.insert(0, os.path.join(project_dir, '.claude', 'hooks'))
+    try:
+        import _observation
+        return _observation
+    except Exception:
+        return None
 
-    Caches its stdout to a per-project /tmp file so delivery-gate.py (same SessionStart) can
-    reuse it instead of re-running the same heavy audit a second time (fail-open on both sides).
+
+def _epr_headline(project_dir: str) -> str:
+    """`epr flow report --headline` — the native projection of the declared bounds.
+
+    The bounds themselves live in .claude/epr-meta/{measures,policies}.yaml; this verb folds
+    each one against the observations the drift hooks append and prints the same headline
+    lines the SessionStart headline is made of. Returns "" when the verb is absent or fails;
+    there is no second producer to fall back to. Binary resolution: $EPR_BIN, gate target, PATH.
     """
     import subprocess
-    audit = os.path.join(project_dir, '.claude', 'scripts', 'memory-kit', 'placement-audit.py')
-    if not os.path.exists(audit):
+    obs = _observation_module(project_dir)
+    binary = obs.resolve_bin() if obs else None
+    if not binary:
         return ""
     try:
-        r = subprocess.run([sys.executable, audit, '--headline'],
+        r = subprocess.run([binary, 'flow', 'report', '--headline', '--root', project_dir],
                            capture_output=True, text=True, timeout=25)
-        out = r.stdout.strip()
-        if out:
-            try:
-                with open(_headline_cache_path(project_dir), 'w', encoding='utf-8') as fh:
-                    fh.write(out)
-            except OSError:
-                pass  # cache is a bonus; never fail the budget fetch on a write error
-        return out
+        return r.stdout.strip() if r.returncode == 0 else ""
     except Exception:
         return ""
+
+
+def get_memory_budget(project_dir: str) -> str:
+    """Always-on memory budget headline — `epr flow report --headline` is the OWNER.
+
+    The last-resort kit re-run went at station six round (a); the PRODUCER BRIDGE went at
+    round (b) (2026-09-11), when the last two bridged values — `memkit-report-tier-mb@1` and
+    `mempalace-surfaces-changed@1` — got native producers (the first `status: superseded` with
+    the report tier it measured, the second `derive: files-newer-than` over a declared surface
+    walk). Every one of the five slots is now derived, so a bridge would DOUBLE a value rather
+    than supply one. Caches its stdout to a per-project /tmp file so delivery-gate.py (same
+    SessionStart) reuses it instead of recomputing. Fail-open: any failure returns ''.
+    """
+    out = _epr_headline(project_dir)
+    if out:
+        try:
+            with open(_headline_cache_path(project_dir), 'w', encoding='utf-8') as fh:
+                fh.write(out)
+        except OSError:
+            pass  # cache is a bonus; never fail the budget fetch on a write error
+    return out
 
 
 def get_habits_status(project_dir: str) -> str:

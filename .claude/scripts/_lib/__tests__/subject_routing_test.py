@@ -27,7 +27,7 @@ def check(label, cond):
 
 # ── classify (the deliverable-TARGET discriminator) ──
 check("process targets -> process-meta",
-      sr.classify([".claude/scripts/memory-kit/decompose.py", "genesis/docs/PLACEMENT.md"]) == "process-meta")
+      sr.classify([".claude/scripts/delivery-scoreboard.py", "genesis/docs/PLACEMENT.md"]) == "process-meta")
 check("product targets -> protocol-canonical",
       sr.classify(["app/elohim-app/foo.ts", "genesis/docs/content/elohim-protocol/architecture/x.md"]) == "protocol-canonical")
 check("no targets -> provisional", sr.classify([]) == "provisional")
@@ -63,11 +63,11 @@ check("reconcile provisional -> process-meta from residue", sr.reconcile("provis
 check("reconcile keeps a resolved stamp", sr.reconcile("protocol-canonical", ["app/x.ts"]) == "protocol-canonical")
 
 # ── targets_from_frontmatter (derived_from is lineage, NOT a target) ──
-fm = {"proposed_amendments": [".claude/scripts/memory-kit/decompose.py"],
+fm = {"proposed_amendments": [".claude/scripts/delivery-scoreboard.py"],
       "derived_from": ["genesis/docs/content/elohim-protocol/architecture/2026-05-10-memory-lifecycle-design.md"],
       "cites": ["genesis/docs/PLACEMENT.md"]}
 tgt = sr.targets_from_frontmatter(fm)
-check("targets prefer proposed_amendments", ".claude/scripts/memory-kit/decompose.py" in tgt)
+check("targets prefer proposed_amendments", ".claude/scripts/delivery-scoreboard.py" in tgt)
 check("derived_from EXCLUDED from targets (lineage, not residue)",
       not any("memory-lifecycle-design" in t for t in tgt))
 check("a process spec with product-vocab derived_from still classifies process-meta",

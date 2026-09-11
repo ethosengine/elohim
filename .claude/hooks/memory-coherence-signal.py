@@ -10,13 +10,17 @@ verified") and resets them. Judgment is deferred to the sweep; this hot path
 only counts.
 
 Design (trust-compute gradient, mirrors claude-md-drift-signal.py):
-  - Loads the cached cites-index (.claude/memory-kit/cites-index.json) built by
-    memory-coherence-audit.py. Absent index → no-op (graceful degradation
-    until the first audit runs).
+  - Loads the cached cites-index (.eprfs/status/lenses/cites-index.json) built by
+    the relocated memory-coherence-audit lens
+    (.epr-meta/elohim/lenses/memory/memory-coherence-audit.py). Absent index → no-op
+    (graceful degradation until the first audit runs).
   - fnmatch the one edited path against the index globs; bump matched entries.
   - Best-effort, never blocks. Cost: load one small JSON + fnmatch one path.
 
-Storage: .claude/memory-kit/memory-coherence-drift.json (schema_version: 1)
+Storage: ONE thing — a fold via `epr flow note --kind observation --measure
+memory-coherence-drift@1`. The private JSON accumulator under `.claude/memory-kit/` was deleted
+with the kit at station six round (b) (2026-09-11); the accumulated count is DERIVED from the
+folds by cleanup-pressure-ceiling@1's `derive: distinct-subjects-since-reset`.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -36,7 +40,6 @@ import fnmatch
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 # Bootstrap _lib by walking up
@@ -47,6 +50,9 @@ for _ in range(8):
         break
     _here = _here.parent
 from _lib import store as _store  # noqa: E402
+from _lib import paths as _paths  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; JSON fallback while absent)
 
 
 def repo_root_from_env() -> Path | None:
@@ -55,11 +61,12 @@ def repo_root_from_env() -> Path | None:
 
 
 def index_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "cites-index.json"
+    """Where the memory-coherence-audit lens writes its cites index.
 
-
-def drift_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "memory-coherence-drift.json"
+    ONE authority: `_lib.paths.reports_root` — the same function the lens resolves its own
+    output through, so the reader cannot drift from the writer.
+    """
+    return _paths.reports_root(repo_root) / "cites-index.json"
 
 
 def changed_matches_cite(changed: str, pattern: str) -> bool:
@@ -110,23 +117,15 @@ def main() -> int:
     if not matched:
         return 0
 
-    store_path = drift_path(repo)
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    # The bound lives in .claude/epr-meta (memory-coherence-drift@1). One fold per memory
+    # entry whose declared cites: glob the edited path matched.
+    if _obs.available():
+        for slug in sorted(matched):
+            _obs.emit(
+                "memory-coherence-drift@1", f".claude/memory/{slug}.md", 1,
+                reason="memory coherence: cited code changed since this entry was verified",
+                env={"changed": rel}, root=str(repo))
 
-    def _mutate(data) -> dict:
-        store = data if isinstance(data, dict) else {"schema_version": 1, "entries": {}}
-        store.setdefault("schema_version", 1)
-        store.setdefault("entries", {})
-        for slug in matched:
-            e = store["entries"].get(slug) or {"hits": 0, "last_changed": "", "last_signal_at": ""}
-            e["hits"] = e.get("hits", 0) + 1
-            e["last_changed"] = rel
-            e["last_signal_at"] = now_iso
-            store["entries"][slug] = e
-        return store
-
-    # Serialize the read-modify-write so concurrent sessions don't drop each other's bumps.
-    _store.locked_update(store_path, _mutate, default={"schema_version": 1, "entries": {}})
     return 0
 
 

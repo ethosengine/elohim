@@ -117,18 +117,43 @@ def prompt_count(key: str) -> int:
         return 0
 
 
+def _epr_bin() -> str | None:
+    """Shared binary resolution — one owner (`_observation.resolve_bin`)."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from _observation import resolve_bin  # noqa: PLC0415
+        return resolve_bin()
+    except Exception:  # noqa: BLE001 — resolution is best-effort; absence is not an error
+        return None
+
+
 def currency_banner(root: Path) -> str:
-    script = root / ".claude" / "scripts" / "memory-kit" / "mempalace-currency.py"
+    """MemPalace index currency, read from the DECLARED bound rather than a kit probe.
+
+    `mempalace-surfaces-changed-ceiling@1` carries the surface globs, the `.last-mine` marker
+    and the grace window on the row itself (`derive: files-newer-than`), so the number is
+    re-derivable by anyone instead of living in `mempalace-currency.py`'s module constants.
+    That script was deleted with the kit at station six round (b), 2026-09-11.
+    """
+    binary = _epr_bin()
+    if not binary:
+        return ""
     try:
         out = subprocess.run(
-            [sys.executable, str(script), "--status", "--json"],
-            capture_output=True, text=True, timeout=5,
+            [binary, "flow", "report", "--bound", "mempalace-surfaces-changed-ceiling",
+             "--json", "--root", str(root)],
+            capture_output=True, text=True, timeout=5, cwd=str(root),
         ).stdout.strip()
-        st = json.loads(out)
-        if st.get("stale"):
-            return (f"DEGRADED: index {st.get('changed_since_mine', '?')} file(s) behind "
-                    f"front-link, last mine {st.get('last_mine', '?')}")
-        return "fresh"
+        payload = json.loads(out)
+        for recipe in payload.get("recipes") or []:
+            for outcome in recipe.get("outcomes") or []:
+                if not outcome.get("bound", "").startswith("mempalace-surfaces-changed-ceiling"):
+                    continue
+                if outcome.get("outcome") == "failed":
+                    return f"DEGRADED: {outcome.get('summary', 'index behind the surface walk')}"
+                if outcome.get("outcome") == "passed":
+                    return "fresh"
+        return ""
     except Exception:  # noqa: BLE001 — currency is advisory; absence of it must not block
         return "currency unknown"
 

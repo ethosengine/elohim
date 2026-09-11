@@ -21,10 +21,23 @@ PROJECT = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(
 )
 
 
+def _observation_module():
+    """The hooks' shared emitter (binary resolution + the kit->bounds producer bridge)."""
+    sys.path.insert(0, os.path.join(PROJECT, ".claude", "hooks"))
+    try:
+        import _observation
+        return _observation
+    except Exception:  # noqa: BLE001 — resolution is best-effort
+        return None
+
+
 def headline_text():
-    """The placement-audit budget headline. Reuse the cache load-project-context.py wrote earlier
-    THIS SessionStart (<120s old) so the heavy audit runs once, not once per consumer; fall back to
-    our own subprocess otherwise. Both paths fail-open (return '')."""
+    """The budget headline. Reuse the cache load-project-context.py wrote earlier THIS
+    SessionStart (<120s old) so it is computed once, not once per consumer; otherwise ask
+    `epr flow report --headline`, which is the sole OWNER. The last-resort kit re-run went at
+    station six round (a) and the producer bridge at round (b) (2026-09-11), once every
+    headline slot had a native producer — bridging a derived value would double it.
+    Fails open (returns '')."""
     slug = re.sub(r"[^A-Za-z0-9]+", "-", PROJECT).strip("-")
     cache = f"/tmp/claude-headline-{slug}.txt"
     try:
@@ -35,14 +48,23 @@ def headline_text():
                 return txt
     except OSError:
         pass  # no cache / stale / unreadable → recompute below
-    try:
-        return subprocess.run(
-            ["python3", os.path.join(PROJECT, ".claude/scripts/memory-kit/placement-audit.py"),
-             "--headline"],
-            capture_output=True, text=True, timeout=10, cwd=PROJECT,
-        ).stdout
-    except Exception:  # noqa: BLE001 — headline fetch is best-effort
-        return ""
+    obs = _observation_module()
+    if obs:
+        try:
+            binary = obs.resolve_bin()
+        except Exception:  # noqa: BLE001
+            binary = None
+        if binary:
+            try:
+                r = subprocess.run(
+                    [binary, "flow", "report", "--headline", "--root", PROJECT],
+                    capture_output=True, text=True, timeout=10, cwd=PROJECT,
+                )
+                if r.returncode == 0 and r.stdout.strip():
+                    return r.stdout
+            except Exception:  # noqa: BLE001 — native headline fetch is best-effort
+                pass
+    return ""
 
 
 def jread(rel, default):
@@ -69,18 +91,51 @@ def jsonl_count(rel, pred=lambda e: True):
     return n
 
 
-def main():
-    # Doc-budget numbers come from placement-audit's FILTERED judgment (the
-    # session headline) — never recount raw gap-items here (raw totals
-    # include terminal/historical specs and read as thousands of noise).
-    claimed = 0
+def claimed_unverified():
+    """The over-claim count: docs in an ACTIVE home whose status claims done with no verification.
+
+    Read from `epr flow report placement --json` — the native owner of document placement since
+    station two of the memory-kit replacement. The ACTIVE-home filter is the load-bearing half and
+    is kept exactly: CANONICAL and HISTORY are the SETTLED destinations, so an `accepted`/`landed`
+    status there is the correct steady state rather than debt awaiting CI, and counting them would
+    point the conveyor at documents that are already where they belong.
+
+    This deliberately does NOT enumerate the gap-item store (`.eprfs/status/gap-items/`) — raw station totals run to
+    thousands across terminal and historical specs and read as noise. It never did; it read a number
+    out of the kit's printed headline instead. It now reads the same judgment from a JSON field.
+
+    Falls back to scraping the headline text while the native binary is absent. Returns 0 on every
+    failure path — a planning-feed advisory that cannot compute stays silent rather than guessing.
+    """
+    obs = _observation_module()
+    binary = None
+    if obs:
+        try:
+            binary = obs.resolve_bin()
+        except Exception:  # noqa: BLE001 — resolution is best-effort
+            binary = None
+    if binary:
+        try:
+            r = subprocess.run(
+                [binary, "flow", "report", "placement", "--json", "--root", PROJECT],
+                capture_output=True, text=True, timeout=30, cwd=PROJECT,
+            )
+            if r.returncode == 0 and r.stdout.strip():
+                rows = json.loads(r.stdout).get("rows") or []
+                return sum(1 for row in rows
+                           if row.get("state") == "CLAIMED-ONLY"
+                           and str(row.get("position", "")).startswith("ACTIVE:"))
+        except Exception:  # noqa: BLE001 — native placement read is best-effort
+            pass
     try:
-        head = headline_text()
-        m = re.search(r"(\d+)\s+claimed-unverified", head)
-        if m:
-            claimed = int(m.group(1))
+        m = re.search(r"(\d+)\s+claimed-unverified", headline_text())
+        return int(m.group(1)) if m else 0
     except Exception:  # noqa: BLE001 — headline parse is best-effort
-        pass
+        return 0
+
+
+def main():
+    claimed = claimed_unverified()
 
     ci_open = jsonl_count(".claude/data/ci-findings.jsonl", lambda e: e.get("status") == "open")
     dep_open = jsonl_count(".claude/data/deprecations.jsonl", lambda e: e.get("status") != "fixed")

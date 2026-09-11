@@ -30,13 +30,13 @@ The `sha256` column is the registry's own live pin; the `CID` is that same diges
 | `c7-advertise-serve-symmetry` | `concerns.yaml@1` | `sha256:ba502823e801e8a0e91e50cf7545b97595865fce068af3c3290f58f562267576` | `bafyreif2kauch2ab5cqoshsqz52ulolvswdf7tqgrlz4gkipld2wejtvoy` |
 | `c8-observability-per-decision` | `concerns.yaml@1` | `sha256:598145dfcae8f2e72236ac8199565d0824c9bff037f2b48553c31c9a387c88d9` | `bafyreiczqfc57sxi6ltsenvmqgmvmxiiete374bx6k2iku6ddsndq7ei3e` |
 | `c9-identity-lineage-continuity` | `concerns.yaml@1` | `sha256:c2114b626c5a968b74323074fc061b41133aae5fd4a97ae9d01806e5f9cfdef2` | `bafyreigccffwe3c2s2fximrqot6amg2bcm5k4x6uvf5otuaya3s7tt666i` |
-| `capability-governance` | `policies.yaml@1` | `sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32` | `bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi` |
+| `capability-governance` | `policies.yaml@1` | `sha256:c4caa19d64194b4ea6f4602cfa68a539387e1a6ad95365a48f4c405bf1823c28` | `bafyreigezkqz2zazjnhkn5daft5grjjzhb7bu2wzkns2jd2mibn7dar4fa` |
 | `eprfs-meta-domain-neutrality` | `policies.yaml@2` | `sha256:307b4f47ccc93aeb4bf58cfcdf0e4756d18cb768fc6e279f4638370ff09b09da` | `bafyreibqpnhuptgjhlvux5mm7tpq4r2w2gglo2h4nytz6rryg4h7bgyj3i` |
 | `governance-escalation-ladder` | `policies.yaml@1` | `sha256:97008339f53de85e02ff63222f3e521889f538a458e56d05f656cc48ecf75954` | `bafyreiexacbtt5j55bpaf73deixt4uqyrh2trjcy4vwql5swzreoz52zkq` |
 | `habit-declaration-at-birth` | `policies.yaml@1` | `sha256:528917b7b386fe63209d385c1d194b6f366c617b65e4125201db39589cb789c2` | `bafyreicsrel3pm4g7zrsbhjylqorss3pgzwgc63f4qjfeao3hfmjzn4jyi` |
 | `memory-frontmatter-at-birth` | `policies.yaml@1` | `sha256:a622e4d20e5aa57ab9152e48a082ff437499ad5b498516408f0cc864cce003ee` | `bafyreifgelsneds2uv5lsfjojcqif72dosm22w2jqulebdymzbsmzyad5y` |
 | `ownership-ontology-guard` | `policies.yaml@3` | `sha256:4778db5e19f8b4867cca5241237d3fb10a875990da1665f18e4f28fa0e0a5b59` | `bafyreichpdnv4gpywsdhzsssierx2p5rbkdvteg2czs7ddspfd5a4cs3le` |
-| `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52` | `bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki` |
+| `source-file-loc-ceiling` | `policies.yaml@1` | `sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d` | `bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu` |
 | `sovereignty-ontology-guard` | `policies.yaml@3` | `sha256:8079c81249fc362244593df2067e5f9c5edcdf98106126e33a033a597b93b048` | `bafyreieaphebesp4gyreiwj56idh4x44l3on7gaqmetogoqdhjmxxe5qja` |
 | `test-bench-aggregate-capacity` | `policies.yaml@1` | `sha256:a39ac2f8ec21391c60e43bf97cce33c324b526ab54c5d9ca6d5283fff48b4dec` | `bafyreifdtlbpr3bbheogbzb37f6m4m6des2snk2uyxm4u3ksqp77jc2n5q` |
 

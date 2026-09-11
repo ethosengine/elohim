@@ -1,4 +1,4 @@
-"""One place where a memory-kit signal becomes a declared measure.
+"""One place where a drift signal becomes a declared measure.
 
 The kit computes a lot of numbers — drift scores, cleanup pressure, stasis composites, leverage
 scores — and until now not one of them declared what kind of quantity it was. That matters more

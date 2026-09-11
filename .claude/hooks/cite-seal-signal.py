@@ -5,7 +5,7 @@ Cite-seal advisory (deterministic born-linked enforcement).
 PostToolUse hook (matcher: Edit|Write). When a Write/Edit lands on a `.md` that is a CITE-GRAPH
 MEMBER (doc-roots + gospel CLAUDE.mds — membership answered by _lib.managed_surfaces, the single
 edit-time registry; hardcoding doc-roots here is what let the 2026-06-05 gospel episode through)
-and it carries UN-SEALED cite debt, it nudges the agent to run `cite-gen --seal <doc>` — so a new
+and it carries UN-SEALED cite debt, it nudges the agent to run `epr flow cites seal <doc>` — so a new
 spec/plan/memory/gospel enters the graph content-addressed instead of depending on anyone
 remembering the ceremony. This is the postHook half of the discipline; managed-surface-context.py
 is the PRE half (discipline injected before the edit); the ceremony POST-steps (brainstorm/plan)
@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -38,6 +39,26 @@ for _ in range(8):
 from _lib import cite_graph as cg  # noqa: E402
 from _lib import frontmatter as fm  # noqa: E402
 from _lib import managed_surfaces as ms  # noqa: E402
+
+
+def _epr_bin() -> str:
+    """How this repository invokes the native cite writer, resolved at nudge time.
+
+    `EPR_BIN` wins, then whatever is on PATH, then the cargo bin dir the gate installs into. When
+    none of those resolve the nudge says so and names the build, because pointing an agent at a
+    binary that is not there is worse than pointing it at the build that produces one — and the
+    Python cite scripts this replaced are gone, so there is no script to fall back to."""
+    override = os.environ.get("EPR_BIN")
+    if override and Path(override).exists():
+        return override
+    found = shutil.which("epr")
+    if found:
+        return "epr"
+    cargo_bin = Path("/opt/rust/cargo/bin/epr")
+    if cargo_bin.exists():
+        return str(cargo_bin)
+    return ("epr  # not on PATH — build it: env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-gate-target "
+            "cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli\n#")
 
 
 def _unsealed_debt(doc: Path, repo: Path) -> int:
@@ -95,10 +116,12 @@ def main() -> int:
         return 0
     if debt <= 0:
         return 0
+    seal = f"{_epr_bin()} flow cites seal {rel}"
     msg = (f"[cite-seal] {rel} has {debt} un-sealed cite issue(s) (legacy path-cite to an id-bearing doc, "
-           f"or no id: yet). Make it born-linked: `python3 .claude/scripts/memory-kit/cite-gen.py --seal {rel}` "
+           f"or no id: yet). Make it born-linked: `{seal}` "
            f"(assigns id, converts path-cites → slug|desc|fingerprint envelopes, verifies). Then author "
-           f"relationship descriptions for any title-default cites with cite-describe.py.")
+           f"relationship descriptions for any title-default cites with "
+           f"`epr flow cites describe {rel} --slug <ref> --desc '<hint>'`.")
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": msg}}))
     return 0
 

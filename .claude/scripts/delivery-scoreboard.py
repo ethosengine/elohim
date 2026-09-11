@@ -28,6 +28,7 @@ Usage:  python3 .claude/scripts/delivery-scoreboard.py [--json]
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -143,20 +144,30 @@ def ledgers():
 
 @section
 def doc_budget():
-    """The placement headline verbatim — its gate lines now self-report liveness."""
-    out = subprocess.run(
-        [sys.executable, os.path.join(PROJECT, ".claude/scripts/memory-kit/placement-audit.py"),
-         "--headline"],
-        capture_output=True, text=True, timeout=30, cwd=PROJECT)
+    """The budget headline verbatim — its gate lines now self-report liveness.
+
+    Owner since station one of the memory-kit replacement: `epr flow report --headline`,
+    switched here 2026-09-11 (station six round (a)). Binary resolution mirrors the hooks':
+    $EPR_BIN, the eprfs gate target, then PATH. No kit fallback — the native verb is the owner,
+    and a missing binary is reported as a gate-error rather than silently answered by a tool
+    this plan is retiring.
+    """
+    binary = (os.environ.get("EPR_BIN")
+              or next((c for c in ("/tmp/eprfs-gate-target/debug/epr",) if os.path.isfile(c)), None)
+              or shutil.which("epr"))
+    if not binary:
+        return ["⚠ gate-error (epr binary not found: $EPR_BIN, the gate target, or PATH)"]
+    out = subprocess.run([binary, "flow", "report", "--headline", "--root", PROJECT],
+                         capture_output=True, text=True, timeout=30, cwd=PROJECT)
     if out.returncode != 0:
         err = (out.stderr or "").strip().splitlines()
-        return [f"⚠ gate-error (placement-audit --headline: {err[-1][:90] if err else out.returncode})"]
+        return [f"⚠ gate-error (epr flow report --headline: {err[-1][:90] if err else out.returncode})"]
     return [ln for ln in out.stdout.splitlines() if ln.strip()]
 
 
 @section
 def delivery_distribution():
-    script = os.path.join(PROJECT, ".claude/scripts/memory-kit/delivery-status-distribution.py")
+    script = os.path.join(PROJECT, ".epr-meta/elohim/lenses/delivery/delivery-status-distribution.py")
     if not os.path.exists(script):
         return ["delivery-status-distribution.py absent (skip)"]
     out = subprocess.run([sys.executable, script], capture_output=True, text=True,
@@ -164,7 +175,7 @@ def delivery_distribution():
     if out.returncode != 0:
         err = (out.stderr or "").strip().splitlines()
         return [f"⚠ gate-error (delivery-status-distribution: {err[-1][:90] if err else out.returncode})"]
-    store = os.path.join(PROJECT, ".claude/memory-kit/delivery-status-distribution.json")
+    store = os.path.join(PROJECT, ".eprfs/status/lenses/delivery-status-distribution.json")
     try:
         with open(store, encoding="utf-8") as fh:
             d = json.load(fh)

@@ -203,7 +203,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/scripts/memory-kit/memory-index-projector.py\" --hook",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/memory-index-projection.py\" --hook",
             "timeout": 10
           },
           {

@@ -666,8 +666,9 @@ _CMD_HISTORY_TREE_RE = re.compile(
 #   carries no path prefix per line, so the command string is the only signal of
 #   source." Guard Q applies that reasoning to the tooling tree Guard E owns.
 #   Live proof, and it is the capture that dispatched the run which found it:
-#   fp `3054d0cb4bd7` (2026-08-11) — `grep -n "…DEAD_WORDS\s*=…"
-#   .claude/scripts/memory-kit/placement-audit.py` captured
+#   fp `3054d0cb4bd7` (2026-08-11) — `grep -n "…DEAD_WORDS\s*=…"` against the
+#   kit's placement audit (that path was deleted 2026-09-11; the constant now
+#   lives in epr-cli/src/flow/placement.rs, gated below) captured
 #   `73:DEAD_WORDS = {"superseded", …, "deprecated", "retired"}`, a plain Python
 #   STATUS-VOCABULARY set literal. The same constant was captured at line 72 as
 #   `802862c393b2` (hand-marked false-positive 2026-06-06) and with no prefix at
@@ -679,7 +680,7 @@ _CMD_HISTORY_TREE_RE = re.compile(
 #   hand-marked `false-positive`, 4 `open`, and **0 `triaged`** — no
 #   tooling-source read in the ledger's history ever became an actionable fix.
 #   READ-GATED, deliberately. The command must use a READ utility on the tooling
-#   path; EXECUTING one (`python3 .claude/scripts/memory-kit/…py`) is left
+#   path; EXECUTING one (`python3 .claude/scripts/…py`) is left
 #   capturable, because our own Python tools genuinely can emit a real
 #   DeprecationWarning and that IS a first-party finding worth having. This is
 #   the Guard-O BuildKit lesson applied before the fact: name the live channel
@@ -699,7 +700,7 @@ _CMD_TOOLING_SOURCE_READ_RE = re.compile(
     r"|(?:^|/|\s)\.epr-meta/"
     r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/"
     # Guard Q2 (2026-09-11, fp ce93d7acfefe) — the memory-kit's NATIVE port.
-    # The kit under `.claude/scripts/memory-kit/` is being transcribed into Rust
+    # The kit (deleted 2026-09-11) was transcribed into Rust
     # under `epr-cli/src/flow/` (placement.rs carries the literal comment
     # "Transcribed from the kit"), which carried the kit's status vocabulary —
     # Guard Q's OWN dispatching constant, DEAD_WORDS — outside every path gate
@@ -794,8 +795,8 @@ _CMD_EPHEMERAL_SCRIPT_RE = re.compile(
 #   `sed -n '35,106p' elohim/eprfs/epr-cli/src/flow/placement.rs` emitted the
 #   single array element `    "deprecated",` from `DEAD_WORDS`, the
 #   document-status vocabulary the placement kit classifies docs with. Guard Q
-#   dismisses that exact constant at its PYTHON home (`.claude/scripts/
-#   memory-kit/placement-audit.py`, see Guard Q's fp trio 3054d0cb4bd7 /
+#   dismisses that exact constant at its PYTHON home (the kit's placement
+#   audit, deleted 2026-09-11; see Guard Q's fp trio 3054d0cb4bd7 /
 #   802862c393b2 / 5723985e3232) — the native Rust port of the kit relocated the
 #   same string outside every `.claude/` path gate, and the class re-opened.
 #   Keying on the LINE's structure rather than on the file's address closes it

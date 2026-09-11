@@ -424,8 +424,8 @@
       "head": {
         "registry": "policies.yaml",
         "version": 1,
-        "cid": "bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi",
-        "sha256Pin": "sha256:49d6bf4b75e81ee6c8ec0cdf54af4dfe7ae7ff6ecd3edc1e72320bf22f8f4f32"
+        "cid": "bafyreigezkqz2zazjnhkn5daft5grjjzhb7bu2wzkns2jd2mibn7dar4fa",
+        "sha256Pin": "sha256:c4caa19d64194b4ea6f4602cfa68a539387e1a6ad95365a48f4c405bf1823c28"
       },
       "tipBasis": "sole-active",
       "competing": false,
@@ -434,7 +434,7 @@
           "registry": "policies.yaml",
           "version": 1,
           "status": "active",
-          "cid": "bafyreicj227uw5pid3tmr3am35kk6tp6plt763wnh3ob44rsbpzc7d2pgi",
+          "cid": "bafyreigezkqz2zazjnhkn5daft5grjjzhb7bu2wzkns2jd2mibn7dar4fa",
           "supersededBy": null
         }
       ]
@@ -577,8 +577,8 @@
       "head": {
         "registry": "policies.yaml",
         "version": 1,
-        "cid": "bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki",
-        "sha256Pin": "sha256:a892554052c189f021ac54d452b8e251229f15c98e5f3ce08e378fa4900a5d52"
+        "cid": "bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu",
+        "sha256Pin": "sha256:ba3d0c7ce8e5bdda3aa4241603a8d40706fcdc5f90072e38f38d30ef5070702d"
       },
       "tipBasis": "sole-active",
       "competing": false,
@@ -587,7 +587,7 @@
           "registry": "policies.yaml",
           "version": 1,
           "status": "active",
-          "cid": "bafyreifisjkuauwbrhycdlcu2rjlrysrekprlsmol46obdrxr6sjacs5ki",
+          "cid": "bafyreif2hughz2hfxxndvjbecyb2rvaha36nyx4qa4xdr44ngdxva4dqfu",
           "supersededBy": null
         }
       ]

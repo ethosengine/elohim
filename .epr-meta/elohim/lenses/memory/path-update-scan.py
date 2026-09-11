@@ -13,7 +13,7 @@ Two evidence classes:
      (medium confidence; surfaced as Accept candidates only when unique)
 
 Outputs:
-  .claude/memory-kit/<YYYY-MM-DD>/path-update-proposals.md
+  .eprfs/status/lenses/<YYYY-MM-DD>/path-update-proposals.md
 
 Boundary:
   - Read-only. Does NOT modify files.
@@ -46,6 +46,11 @@ from _lib.paths import memory_dir, repo_root_from_file  # noqa: E402
 REPO_ROOT = repo_root_from_file(__file__)
 # was a hardcoded machine-specific /projects/.claude-config/... path — silently
 # no-oped off this checkout (2026-07-02 review)
+# Station six (2026-09-11): the dated-report tier moved out of `.claude/memory-kit/`.
+# `_lib.paths.reports_root` is its ONE authority — resolve through it, never a literal.
+if str(REPO_ROOT / ".claude" / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+from _lib import paths as _paths  # noqa: E402
 MEMORY_ROOT = memory_dir(REPO_ROOT)
 
 # Doc locations to scan for stale path citations.
@@ -233,7 +238,7 @@ def gather_doc_paths() -> list[Path]:
             if p.is_file():
                 docs.add(p)
     # Skip our own outputs to avoid self-reference loops.
-    docs = {p for p in docs if ".claude/memory-kit" not in str(p)}
+    docs = {p for p in docs if "/.eprfs/status/lenses" not in str(p)}
     docs = {p for p in docs if ".claude/cleanup" not in str(p)}
     docs = {p for p in docs if ".claude/archive" not in str(p)}
     return sorted(docs)
@@ -495,11 +500,11 @@ def main() -> int:
         "--out-dir",
         type=Path,
         default=None,
-        help="Override output directory (default: .claude/memory-kit/<TODAY>/)",
+        help="Override output directory (default: .eprfs/status/lenses/<TODAY>/)",
     )
     args = parser.parse_args()
 
-    out_dir = args.out_dir or (REPO_ROOT / ".claude" / "memory-kit" / TODAY.isoformat())
+    out_dir = args.out_dir or _paths.reports_dir_for_today(REPO_ROOT, TODAY)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"scanning git renames over last {args.window_days} days...")

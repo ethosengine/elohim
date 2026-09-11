@@ -12,7 +12,7 @@ Usage:
     path-update-apply.py [proposals-path]
 
 If proposals-path is omitted, defaults to today's
-.claude/memory-kit/<YYYY-MM-DD>/path-update-proposals.md.
+.eprfs/status/lenses/<YYYY-MM-DD>/path-update-proposals.md.
 """
 
 from __future__ import annotations
@@ -26,6 +26,11 @@ REPO_ROOT = Path(__file__).resolve().parents[4]  # relocated 2026-09-10:
 # .epr-meta/elohim/lenses/memory/<this>.py is FOUR levels below the repo root
 # (was .claude/scripts/memory-kit/, three). Station four of the memory-kit
 # replacement — this lens is a declared foreign measure now, not a kit script.
+# Station six (2026-09-11): the dated-report tier moved out of `.claude/memory-kit/`.
+# `_lib.paths.reports_root` is its ONE authority — resolve through it, never a literal.
+if str(REPO_ROOT / ".claude" / "scripts") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / ".claude" / "scripts"))
+from _lib import paths as _paths  # noqa: E402
 MEMORY_ROOT = Path("/projects/.claude-config/projects/-projects-elohim/memory")
 
 # Match an accepted entry. Each entry's <!-- id: --> encodes
@@ -117,7 +122,7 @@ def main() -> int:
         proposals_path = Path(sys.argv[1])
         if not proposals_path.is_absolute():
             # Allow either "<date>/path-update-proposals.md" or full relative.
-            cand = REPO_ROOT / ".claude" / "memory-kit" / proposals_path
+            cand = _paths.reports_root(REPO_ROOT) / proposals_path
             if cand.exists():
                 proposals_path = cand
             else:
@@ -125,7 +130,7 @@ def main() -> int:
     else:
         today = date.today().isoformat()
         proposals_path = (
-            REPO_ROOT / ".claude" / "memory-kit" / today / "path-update-proposals.md"
+            _paths.reports_dir_for_today(REPO_ROOT) / "path-update-proposals.md"
         )
 
     if not proposals_path.exists():

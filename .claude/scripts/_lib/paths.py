@@ -60,16 +60,24 @@ def repo_root_from_file(file: str | Path, max_depth: int = 8) -> Path:
 
 
 def reports_root(repo_root: Path) -> Path:
-    """The shared dated-reports directory under .claude/memory-kit/.
+    """The shared dated-reports directory for relocated lenses: `.eprfs/status/lenses/`.
 
-    Legacy name retained for compatibility with /converge and dev-dashboard
-    scripts that also write here. Output dir naming is follow-up scope.
+    Moved here at station six of the memory-kit replacement (2026-09-11) when
+    `.claude/memory-kit/` was removed. Everything written under this root is a
+    DERIVED projection — regenerable by re-running the lens that wrote it — so it
+    lives in the untracked sidecar rather than the tree, and no `.gitignore`
+    re-include rung reopens it (contrast `.eprfs/status/{gap-items,memory,balance}/`,
+    each of which holds something nothing can regenerate).
+
+    One authority: `/converge`, the dev-dashboard scripts and every relocated lens
+    under `.epr-meta/elohim/lenses/` resolve their output through this function, so
+    the tier can move again without a second sweep.
     """
-    return repo_root / ".claude" / "memory-kit"
+    return repo_root / ".eprfs" / "status" / "lenses"
 
 
 def reports_dir_for_today(repo_root: Path, today: date | None = None) -> Path:
-    """Today's reports directory (e.g. .claude/memory-kit/2026-05-13/)."""
+    """Today's reports directory (e.g. .eprfs/status/lenses/2026-09-11/)."""
     return reports_root(repo_root) / (today or date.today()).isoformat()
 
 

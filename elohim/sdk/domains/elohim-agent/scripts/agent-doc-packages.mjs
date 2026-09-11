@@ -234,8 +234,8 @@ These run outside any harness and WILL fail your push or CI:
   Do not bypass with \`--no-verify\` unless the gates already ran green.
 - **\`pnpm run elohim-agent:packages:verify\`** — projection/governance drift. If
   you touched any agentic surface or its package, this must be GREEN before commit.
-- **cite-gen** owns \`cites:\` frontmatter. NEVER hand-write a slug, path, or
-  \`sha256:\` fingerprint — run \`python3 .claude/scripts/memory-kit/cite-gen.py\`.
+- **\`epr flow cites\`** owns \`cites:\` frontmatter. NEVER hand-write a slug, path,
+  or \`sha256:\` fingerprint — run \`epr flow cites seal <doc>\`.
   A hand-edited fingerprint fails the cite gate.
 
 ## 5. Rails (non-negotiable)

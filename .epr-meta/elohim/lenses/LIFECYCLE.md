@@ -121,7 +121,7 @@ Signal-driven, not calendar-driven. The first ceremony ran 2026-05-14; all four 
 
 Triggers (any of):
 - MEMORY.md byte-budget ≥ 90% of 24.4 KB threshold
-- Audit-script substrate edit (mtime on `.claude/scripts/memory-kit/audit*`)
+- Audit-lens substrate edit (mtime on `.epr-meta/elohim/lenses/**/*audit*`)
 - 3+ sprint-results in one wing within 14-day window
 - Manifesto edit
 - Operator-invoked (`/memory-ceremony`)
@@ -129,7 +129,7 @@ Triggers (any of):
 Floor: monthly if no signal fires. Ceiling: biweekly upper bound (cartographer rec — don't over-run).
 
 **Variants**:
-- **Hygiene-sweep** (librarian-solo): byte-budget + archive-ratio + dead-citation hygiene. Audit-number cadence. See `.claude/skills/memory-kit/SKILL.md`.
+- **Hygiene-sweep** (librarian-solo): byte-budget + archive-ratio + dead-citation hygiene. Audit-number cadence. See `.claude/skills/memory-ceremony/SKILL.md`.
 - **Substrate-currency ceremony** (all four agents, four phases): population-wide drift triage → four-lens deep-read on 1-2 picked surfaces → storyteller-pen rewrite → apply + coherence-verify. See `.claude/skills/memory-ceremony/SKILL.md`.
 - **Pre-shift readiness check**: lightweight (librarian + storyteller-disposition only)
 - **After substantive refactors** that affect palace embeddings: re-mine wing(s) + a full hygiene-sweep
@@ -209,7 +209,7 @@ The audit exposes data. It does not prescribe action. Each lens (storyteller, ca
 ```
 story-coverage-audit.py (runs in every hygiene-sweep)
         │
-        │  regenerates .claude/memory-kit/story-coverage-audit.json
+        │  regenerates .eprfs/status/lenses/story-coverage-audit.json
         ▼
 librarian surfaces the numbers as neutral data in the hygiene-sweep output
         │
@@ -320,7 +320,7 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 
 **Sticky exception — `regression` propagates UP**: `regression` is sideways-orthogonal in the per-feature axis (a feature can flip from `active.beta` to `regression` and back). At the story-aggregation layer, **any contributing feature in `regression` forces the story to `regression`**, regardless of how the others are doing. Regression dominates. The rationale: a story whose narrative claims a delivered experience cannot itself be "delivered" while one of its load-bearing scenarios is broken; the story carries the regression until the substrate repairs.
 
-**Who computes this**: the `deliver-bridge` auto-poller (`.claude/scripts/memory-kit/delivery-status-poll.py` — **[NOT YET BUILT]**). The storyteller never writes `delivery_status` on a canonical story directly above `wip`; the operator may set a `wip`-or-below floor when seeding a new story before any feature has been judged. **Once the bridge exists**, anything `active.alpha` or above must be derived from a manifest verdict (until then this rule cannot be enforced — there is no enforcer).
+**Who computes this**: the `deliver-bridge` auto-poller (a `delivery-status-poll` lens under `.epr-meta/elohim/lenses/delivery/` — **[NOT YET BUILT]**). The storyteller never writes `delivery_status` on a canonical story directly above `wip`; the operator may set a `wip`-or-below floor when seeding a new story before any feature has been judged. **Once the bridge exists**, anything `active.alpha` or above must be derived from a manifest verdict (until then this rule cannot be enforced — there is no enforcer).
 
 **What `/deliver` does NOT do**: `/deliver` writes per-feature verdicts; it does not compute story aggregates. The aggregation is the bridge's job. This keeps `/deliver` focused on the rendered-experience falsifier and the memory-team's bridge focused on the read-side projection. `/deliver`'s feature-level writes are stable; the bridge re-derives story aggregates on each poll.
 
@@ -328,7 +328,7 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 
 **Role**: the auto-poller is NOT an authoring tool. It is a **bridge** that reads `/deliver`'s output and writes `delivery_status:` onto stories and backlog entries that link to features `/deliver` has judged. The memory-ceremony group reads the written values; it does not produce the verdict.
 
-**Lives at**: `.claude/scripts/memory-kit/delivery-status-poll.py` — **[NOT YET BUILT]** (planned; librarian-invoked; bridge surface, not authority surface)
+**Lives at**: `.epr-meta/elohim/lenses/delivery/delivery-status-poll.py` — **[NOT YET BUILT]** (planned; librarian-invoked; bridge surface, not authority surface)
 
 **Reads** (the primary source is `/deliver`'s output; raw a2o reports only fill the floor of the gradient where `/deliver` has not yet judged):
 
@@ -356,12 +356,12 @@ regression  <  unknown  <  undelivered  <  pending  <  envisioned  <  backlog
 **Writes** (bridge-only; never to feature files themselves — those belong to `/deliver`):
 - Story frontmatter: `delivery_status: <gradient-value>` + `delivery_status_updated: <date>` + `delivery_status_source: deliver-bridge` (or `deliver-bridge-floor` when only floor signals available)
 - Backlog frontmatter: same fields (when the backlog entry has a linked feature AND `/deliver` has judged it)
-- Aggregate report at `.claude/memory-kit/<today>/delivery-status.md` for librarian audit surface — surfaces graduation-delivery-gaps and delivery-debt items for cartographer
+- Aggregate report at `.eprfs/status/lenses/<today>/delivery-status.md` for librarian audit surface — surfaces graduation-delivery-gaps and delivery-debt items for cartographer
 
 **Cadence**: signal-driven, accumulator pattern. Triggers:
 - PostToolUse Edit on any `.claude/shifts/*-deliver-*/**` artifact → increment delivery-drift counter (this is the load-bearing trigger — `/deliver` finished an iteration)
 - PostToolUse Edit on any `*.feature` or `genesis/data/stories/*.md` → smaller increment (linkage substrate changed)
-- Operator-invoked via `/memory-kit delivery-poll`
+- Operator-invoked via `/memory-ceremony` (delivery-poll leg)
 - Floor: every hygiene-sweep
 
 **Output discipline**: only surface stories/backlog where `delivery_status` changed since last poll, OR where graduation-delivery-gap (canonical + `< active.latest-stable`) is detected. No-change is silent.

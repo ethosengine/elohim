@@ -14,7 +14,7 @@ primitive specified in:
 
 Scope is read-only by design. The merge itself is a future tool.
 
-Output: .claude/memory-kit/<YYYY-MM-DD>/dedupe-clusters.md
+Output: .eprfs/status/lenses/<YYYY-MM-DD>/dedupe-clusters.md
 """
 
 from __future__ import annotations
@@ -362,7 +362,7 @@ def main() -> int:
         "--output-dir",
         type=Path,
         default=None,
-        help=f"Output directory (default: {REPO_ROOT}/.claude/memory-kit/<today>)",
+        help=f"Output directory (default: {REPO_ROOT}/.eprfs/status/lenses/<today>)",
     )
     args = parser.parse_args()
 
@@ -371,7 +371,7 @@ def main() -> int:
         print(f"error: memory directory does not exist: {memory_dir}", file=sys.stderr)
         return 2
 
-    out_dir: Path = args.output_dir or (REPO_ROOT / ".claude" / "memory-kit" / TODAY.isoformat())
+    out_dir: Path = args.output_dir or _paths.reports_dir_for_today(REPO_ROOT, TODAY)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     docs = load_docs(memory_dir)

@@ -15,6 +15,12 @@ Detection is best-effort regex; false-negatives are fine (we'll catch via
 direct-edit signals as fallback), false-positives are fine (small bump,
 no harm). Complex shell pipelines / scripts may slip past.
 
+Storage: ONE thing — a fold via `epr flow note --kind observation --measure
+claude-md-structural-signal@1`. The private JSON accumulator under `.claude/memory-kit/`
+was deleted with the kit at station six round (b) (2026-09-11); the per-scope structural
+counts and the drift score derived from them are read from the fold plane by
+`epr flow report`, never carried here.
+
 Hook Type: PreToolUse
 Matcher: Bash
 """
@@ -25,7 +31,6 @@ import math
 import os
 import re
 import sys
-import time
 from pathlib import Path
 
 # Bootstrap: locate .claude/scripts/_lib by walking up
@@ -35,13 +40,12 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
-from _lib import store as _store  # noqa: E402
-from _lib import drift_score as _drift_score  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; fail-open, never blocks)
 
-# Tunables
-# Structural ops rescore every time (they matter); no batching
+# Tunables. The drift threshold is DECLARED, not kept here: claude-md-drift-score@1's ceiling
+# in .claude/epr-meta/measures.yaml carries it, and the score is derived from the folds.
 MAX_WALK_DEPTH = 12
-DEFAULT_THRESHOLD = 3.0
 
 # Patterns that detect structural ops. Each captures the operation kind and
 # the argument tail. We split on shell separators before matching so each
@@ -123,10 +127,6 @@ def find_enclosing_claude_md_files(path: Path, repo_root: Path) -> list[Path]:
     return results
 
 
-def drift_store_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "claude-md-drift.json"
-
-
 def repo_root_from_env() -> Path | None:
     pd = os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(pd).resolve() if pd else None
@@ -151,46 +151,24 @@ def main() -> int:
     if not repo:
         return 0
 
-    store_path = drift_store_path(repo)
-    default = {"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "files": {}}
-    store = _store.load_json(store_path, default=default)
-    if not isinstance(store, dict):
-        store = default
-    store.setdefault("files", {})
+    # The bound lives in .claude/epr-meta (claude-md-structural-signal@1). Structural ops are
+    # rare and high-impact, so each affected scope gets its own fold rather than a batched score.
+    if _obs.available():
+        for op, paths in ops:
+            for raw in paths:
+                p = Path(raw)
+                if not p.is_absolute():
+                    p = repo / p
+                for cm in find_enclosing_claude_md_files(p, repo):
+                    try:
+                        rel = str(cm.relative_to(repo))
+                    except ValueError:
+                        rel = str(cm)
+                    _obs.emit(
+                        "claude-md-structural-signal@1", rel, 1,
+                        reason=f"gospel drift: structural op `{op}` inside this CLAUDE.md scope",
+                        env={"op": op.replace(" ", "-")}, root=str(repo))
 
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    affected_count = 0
-
-    for op, paths in ops:
-        for raw in paths:
-            # Resolve relative to repo if not absolute
-            p = Path(raw)
-            if not p.is_absolute():
-                p = repo / p
-            enclosing = find_enclosing_claude_md_files(p, repo)
-            for cm in enclosing:
-                try:
-                    rel = str(cm.relative_to(repo))
-                except ValueError:
-                    rel = str(cm)
-                entry = store["files"].setdefault(rel, {
-                    "last_audited": None,
-                    "direct_edits": 0,
-                    "scope_edits": 0,
-                    "structural_edits": 0,
-                    "lines_changed_in_scope": 0,
-                    "drift_score": 0.0,
-                    "rescore_counter": 0,
-                })
-                entry["structural_edits"] = entry.get("structural_edits", 0) + 1
-                entry["last_signal_at"] = now_iso
-                entry["last_structural_op"] = op
-                # Structural ops are rare + high-impact → always rescore
-                entry["drift_score"] = _drift_score.compute_score(entry)
-                entry["rescore_counter"] = 0
-                affected_count += 1
-
-    _store.save_json(store_path, store)
     return 0  # best-effort; never block
 
 

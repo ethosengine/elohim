@@ -16,10 +16,14 @@ This is the BACK fire point's tripwire from the Spec/Plan Compaction Loop
 §5.1 / §10.1). It mirrors claude-md-drift-signal.py + memory-coherence-signal.py:
 single-digit-ms cheap path, _lib bootstrap, best-effort, fail-open, never blocks.
 
-The decompose-due count surfaces at SessionStart through the existing budget
-headline (placement-audit.py --headline) as "N plans past-due to decompose".
+The decompose-due count surfaces at SessionStart through the native budget headline
+(`epr flow report --headline`), derived by placement-drift-due-ceiling@1's
+`derive: distinct-subjects-since-reset`.
 
-Storage: .claude/memory-kit/placement-drift.json (schema_version: 1)
+Storage: ONE thing — a fold via `epr flow note --kind observation --measure
+placement-drift-due@1`. The private JSON accumulator under `.claude/memory-kit/` was deleted with the
+kit at station six round (b) (2026-09-11); the accumulated count is DERIVED from the
+folds by `epr flow report` and is no longer any hook's to keep.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -41,7 +45,6 @@ import json
 import os
 import re
 import sys
-import time
 from pathlib import Path
 
 # Bootstrap: locate .claude/scripts/_lib by walking up
@@ -51,7 +54,8 @@ for _ in range(8):
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
-from _lib import store as _store  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _observation as _obs  # noqa: E402  (structured-observation emitter; fail-open, never blocks)
 
 # ACTIVE homes (repo-relative dir prefixes) — must mirror placement-audit.py's
 # ACTIVE_HOMES surfaces. A terminal-status doc here is plan-shaped residue that
@@ -75,16 +79,13 @@ TERMINAL_WORDS = DEAD_WORDS | LANDED_WORDS
 FM_STATUS_RE = re.compile(r"^status:\s*(.+?)\s*$", re.M | re.I)
 MD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.M)
 
-DEFAULT_THRESHOLD = 1  # any past-due doc is worth surfacing
+# The threshold is DECLARED, not kept here: placement-drift-due-ceiling@1
+# in .claude/epr-meta/measures.yaml carries `hard: 1` — any past-due doc is worth surfacing.
 
 
 def repo_root_from_env() -> Path | None:
     pd = os.environ.get("CLAUDE_PROJECT_DIR")
     return Path(pd).resolve() if pd else None
-
-
-def drift_store_path(repo_root: Path) -> Path:
-    return repo_root / ".claude" / "memory-kit" / "placement-drift.json"
 
 
 def in_active_home(rel: str) -> bool:
@@ -150,33 +151,12 @@ def main() -> int:
 
     status = terminal_status_of(text)
 
-    store_path = drift_store_path(repo)
-    now_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    # The bound lives in .claude/epr-meta (placement-drift-due@1); the outcome is a fold in
+    # the flows sidecar. `1` = this doc is decompose-due, `0` = it was re-opened (self-heal).
+    _obs.emit("placement-drift-due@1", rel, 1 if status else 0,
+              reason="placement drift: terminal-status doc in an ACTIVE home",
+              env={"status": status or "reopened"}, root=str(repo))
 
-    def _mutate(data) -> dict:
-        store = data if isinstance(data, dict) else {
-            "schema_version": 1, "threshold": DEFAULT_THRESHOLD, "due": {}}
-        store.setdefault("schema_version", 1)
-        store.setdefault("threshold", DEFAULT_THRESHOLD)
-        store.setdefault("due", {})
-        if status is None:
-            # Status was edited back to non-terminal (e.g. re-opened) → clear any queued
-            # entry so the headline does not over-report. Cheap self-healing path.
-            store["due"].pop(rel, None)
-            return store
-        entry = store["due"].get(rel) or {"hits": 0, "status": status, "first_signal_at": now_iso}
-        entry["hits"] = entry.get("hits", 0) + 1
-        entry["status"] = status
-        entry["last_signal_at"] = now_iso
-        entry.setdefault("first_signal_at", now_iso)
-        store["due"][rel] = entry
-        return store
-
-    # Serialize the read-modify-write so concurrent sessions don't lose each other's updates.
-    _store.locked_update(
-        store_path, _mutate,
-        default={"schema_version": 1, "threshold": DEFAULT_THRESHOLD, "due": {}},
-    )
     return 0  # hooks are best-effort; never block the tool call
 
 

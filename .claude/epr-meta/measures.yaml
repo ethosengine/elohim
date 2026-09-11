@@ -1,4 +1,7 @@
 # .claude/epr-meta/measures.yaml — the measure registry (middot) for the Elohim Protocol.
+# This file and policies.yaml are PROJECTIONS of one policy set whose graduated home is the
+# Mishpat Precedent entry (CID = entry_hash) — every row here is that entry's pre-image, so a
+# lift is a move of the same bytes.
 #
 # "Middot" (singular middah, Hebrew מִדָּה — measure, attribute, dimension) is the
 # project-internal name for this primitive family, joining the pillar vocabulary (lamad,
@@ -36,6 +39,27 @@
 #   • `lenses:` — governance-plane bindings that CONSUME one or more measures and declare an
 #     enforcement class (deny/ask/inject/measure, per the escalation ladder) over a context.
 #     A lens is where any teeth live; the measures it consumes stay teeth-free regardless.
+#
+# Lens keys the native report reads (elohim/eprfs/epr-cli/src/flow/{measures,report}.rs):
+#   • `soft:` / `hard:` — the watermarks. A row may carry one or both.
+#   • `compare:` — `above` (default) · `at-or-above` · `below` · `at-or-below`. A CEILING is
+#     crossed by exceeding its watermark; a TRIGGER COUNT fires AT it; a FLOOR is crossed by
+#     falling under it. The direction is declared because only the row knows which kind of number
+#     it holds — read as a ceiling, `agent-description-floor@1 hard: 80` says a 40-character
+#     description is fine and a thorough 200-character one is the problem.
+#   • `derive:` — `count-since-reset` | `distinct-subjects-since-reset`. Declares that the value is
+#     an ACCUMULATION over the folds of every measure in `consumes:`, counted from the latest
+#     reset observation onward, rather than the latest single reading. This is where the kit's
+#     private JSON accumulators graduate: the events were already observations, so the only thing
+#     that was unaddressable was the count.
+#   • `reset:` — the measure whose observation DRAINS a derived accumulation; defaults to
+#     `<primary-measure-id>-reset@1`. Appending one is the whole reset ceremony:
+#       epr flow note --kind observation --measure cleanup-pressure-reset@1 --subject . --value 1
+#     which replaces `cleanup-pressure.py --reset`. A derived bound with no reset and no folds is
+#     `skipped`, never 0; a reset with nothing since it is a WITNESSED 0.
+#   • `subject:` / `env:` — narrow which folds are evidence. `.` names the repository itself.
+#   • `headline:` — which SessionStart slot the bound renders into, when the measure id does not
+#     already imply it.
 
 measures-version: 1
 measures:
@@ -161,6 +185,641 @@ measures:
       touched code rather than re-litigating fork-parity noise the project already decided
       not to fix.
 
+  # ── memory-kit replacement, station one (2026-09-10) ──────────────────────────────────
+  # The 35 thresholds the memory kit hard-coded as module constants, declared once each.
+  # `provenance:` CITES the constant a row replaces; identity is `<id>@<version>` plus the
+  # row's own bytes, never a file path. No row in this batch supersedes an existing registry
+  # row (the registry held only the clippy family), so `supersedes:` is absent by
+  # construction; `subsumes:` is likewise absent because no conformance probe has yet
+  # evidenced byte-containment between any two of them. Watermarks live in `lenses:` below,
+  # one ceiling lens per bound, named `<measure-id>-ceiling` so a bound resolves from either
+  # end; measures stay teeth-free.
+
+  - id: memory-index-bytes
+    version: 1
+    family: memory-index
+    unit: bytes
+    procedure: "epr flow memory project --index --budget memory-index-bytes@1 — byte length of the projected .claude/memory/MEMORY.md"  # re-pointed 2026-09-11 (station six): the native projection is byte-identical to the kit's on this corpus
+    provenance: ".claude/scripts/memory-kit/memory-index-projector.py:53 SOFT_BUDGET_BYTES=20_000; :54 HARD_BUDGET_BYTES=24_000; .claude/scripts/memory-kit/memory-review.py:45 MEMORY_BUDGET_BYTES=24000; .claude/scripts/memory-kit/placement-audit.py:98 MEMORY_MD_BUDGET=24000"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-lines
+    version: 1
+    family: memory-index
+    unit: lines
+    procedure: ".epr-meta/elohim/lenses/memory/memory-review.py — line count of the projected MEMORY.md index"  # relocated 2026-09-10 (station four)
+    provenance: ".claude/scripts/memory-kit/memory-review.py:41 MEMORY_BUDGET_LINES=200"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-title-chars
+    version: 1
+    family: memory-index
+    unit: characters
+    procedure: "epr flow memory project --index — per-row title length before truncation (elohim/eprfs/epr-cli/src/flow/memory/entries.rs TITLE_MAX)"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/memory-index-projector.py:56 TITLE_MAX=80"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-desc-chars
+    version: 1
+    family: memory-index
+    unit: characters
+    procedure: "epr flow memory project --index — per-row description length before truncation (elohim/eprfs/epr-cli/src/flow/memory/entries.rs DESC_MAX)"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/memory-index-projector.py:55 DESC_MAX=200"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: gospel-bytes
+    version: 1
+    family: gospel
+    unit: bytes
+    procedure: "epr flow report placement --stasis — byte length of one CLAUDE.md gate, the claude_md_rightsized dimension's numerator test"
+    provenance: ".claude/scripts/memory-kit/placement-audit.py:101 CLAUDE_MD_BUDGET=12000"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: gospel-lines
+    version: 1
+    family: gospel
+    unit: lines
+    procedure: ".epr-meta/elohim/lenses/gospel/claude-md-audit.py — line count of one CLAUDE.md gate"  # RELOCATED 2026-09-11 (station six round (b)): no native replacement — the native stasis dimension measures BYTES (gospel-bytes@1), not lines, so the lens moved rather than retiring
+    provenance: ".claude/scripts/memory-kit/claude-md-audit.py:55 LINE_BUDGET_WARN=200"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-edit-signal
+    version: 1
+    family: gospel
+    unit: edits
+    procedure: ".claude/hooks/claude-md-drift-signal.py — one observation per edit landing inside a CLAUDE.md scope"
+    provenance: ".claude/hooks/claude-md-drift-signal.py:145-172 (scope_edits / direct_edits accumulator)"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-structural-signal
+    version: 1
+    family: gospel
+    unit: structural-ops
+    procedure: ".claude/hooks/claude-md-structural-signal.py — one observation per structural op inside a CLAUDE.md scope"
+    provenance: ".claude/hooks/claude-md-structural-signal.py:164-191 (structural_edits accumulator)"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-drift-score
+    version: 1
+    family: gospel
+    unit: drift-score
+    procedure: ".claude/scripts/_lib/drift_score.py compute_score — derived from the edit and structural folds"
+    provenance: ".claude/scripts/memory-kit/claude-md-audit.py:56 DEFAULT_DRIFT_THRESHOLD=3.0; .claude/hooks/claude-md-drift-signal.py:53 DEFAULT_THRESHOLD=3.0; .claude/hooks/claude-md-structural-signal.py:44 DEFAULT_THRESHOLD=3.0"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-rescore-interval
+    version: 1
+    family: gospel
+    unit: edits
+    procedure: ".claude/hooks/claude-md-drift-signal.py — edits between medium-path rescores"
+    provenance: ".claude/hooks/claude-md-drift-signal.py:52 RESCORE_EVERY_N_EDITS=5"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-walk-depth
+    version: 1
+    family: gospel
+    unit: directories
+    procedure: ".claude/hooks/claude-md-drift-signal.py — enclosing-scope walk depth from the edited file"
+    provenance: ".claude/hooks/claude-md-drift-signal.py:54 MAX_WALK_DEPTH=12; .claude/hooks/claude-md-structural-signal.py:43 MAX_WALK_DEPTH=12"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memkit-report-tier-mb
+    version: 1
+    family: report-tier
+    unit: megabytes
+    # The thing measured no longer exists. `.claude/memory-kit/` is removed in station six round
+    # (b); a bound over the size of a deleted directory is not a measurement anybody can take, and
+    # reporting it as `skipped` would read as neglect rather than as a decision. Never deleted,
+    # per the registry's rule at the head of this file: superseded, with its lineage readable.
+    procedure: "none — the report tier this measured was removed 2026-09-11 (station six round (b))"
+    provenance: ".claude/scripts/memory-kit/memkit-retention.py:16 SIZE_CAP_MB=8"
+    default-authority: observation
+    status: superseded
+    superseded_by: "epr flow report placement --ledger (the budget the report tier was a proxy for)"
+    superseded_reason: "report tier removed 2026-09-11"
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: retention-head-days
+    version: 1
+    family: report-tier
+    unit: days
+    procedure: "none — the report tier this windowed was removed 2026-09-11; retires with memkit-report-tier-mb@1 (station six round (b))"
+    provenance: ".claude/scripts/memory-kit/memkit-retention.py:14 HEAD_DAYS=30"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: retention-tail-days
+    version: 1
+    family: report-tier
+    unit: days
+    procedure: "none — the report tier this windowed was removed 2026-09-11; retires with memkit-report-tier-mb@1 (station six round (b))"
+    provenance: ".claude/scripts/memory-kit/memkit-retention.py:15 TAIL_DAYS=90"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: cleanup-pressure
+    version: 1
+    family: cleanup-pressure
+    unit: pressure-points
+    procedure: "epr flow report --bound cleanup-pressure-ceiling — derived natively by `derive: distinct-subjects-since-reset` over the five drift measures; no accumulator file"
+    provenance: ".claude/scripts/memory-kit/cleanup-pressure.py:47 THRESHOLD=120; .claude/scripts/memory-kit/prep-brainstorm.py:30 DRIFT_THRESHOLD=120"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: cleanup-cycle-history
+    version: 1
+    family: cleanup-pressure
+    unit: cycles
+    procedure: "none — the state file this bounded is replaced by the fold plane, which is append-only and needs no retention window (station six round (b))"
+    provenance: ".claude/scripts/memory-kit/cleanup-pressure.py:52 MAX_CYCLES=24"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: decompose-threshold
+    version: 1
+    family: placement
+    unit: gap-items
+    procedure: "epr flow project — checkbox stations minted as gap-items from one spec or plan"  # re-pointed 2026-09-11 (station six): station two ported decompose.py's checkbox-tasks method into flow/project.rs
+    provenance: ".claude/scripts/memory-kit/decompose.py:46 THRESHOLD=40"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: placement-drift-due
+    version: 1
+    family: placement
+    unit: documents
+    procedure: ".claude/hooks/placement-drift-signal.py — terminal-status docs still living plan-shaped in an ACTIVE home"
+    provenance: ".claude/hooks/placement-drift-signal.py:78 DEFAULT_THRESHOLD=1"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: stasis-margin
+    version: 1
+    family: placement
+    unit: fraction
+    procedure: "epr flow report placement --stasis — the `margin` on the payload; the band around the benchmark inside which the corpus reads at stasis"
+    provenance: ".claude/scripts/memory-kit/placement-audit.py:97 STASIS_MARGIN=0.15"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: map-currency-drift
+    version: 1
+    family: map-currency
+    unit: seeds
+    procedure: ".claude/hooks/map-drift-signal.py — architecture seeds changed since the MAP.md walk was refreshed"
+    provenance: ".claude/hooks/map-drift-signal.py:70 DEFAULT_THRESHOLD=1"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: entry-stale-days
+    version: 1
+    family: memory-entry
+    unit: days
+    procedure: ".epr-meta/elohim/lenses/memory/memory-review.py — age past which a memory entry reads as stale"  # relocated 2026-09-10 (station four)
+    provenance: ".claude/scripts/memory-kit/memory-review.py:46 STALE_DAYS=90"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-coherence-drift
+    version: 1
+    family: memory-entry
+    unit: entry-hits
+    procedure: ".claude/hooks/memory-coherence-signal.py — one observation per memory entry whose cited code changed"
+    provenance: ".claude/hooks/memory-coherence-signal.py:116-129 (entries accumulator; no hard-coded threshold)"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-drift
+    version: 1
+    family: memory-index
+    unit: rows
+    procedure: "epr flow memory project --index --json — index rows past the harness load cap (the `unloadedRows` array)"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/memory-index-projector.py:75 (memory-index-drift.json); read by cleanup-pressure.py:53-56"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+    why: >
+      The fifth accumulator cleanup-pressure.py sums (ACTIVITY_FILES) and the only one with no
+      measure row of its own. Declared so the derived cleanup-pressure lens can count over all five
+      the way the kit does, rather than over four and quietly under-reporting.
+
+  # ── reset measures ────────────────────────────────────────────────────────────────────────
+  # A reset is an ordinary structured observation, value 1, subject `.`. It replaces the kit's
+  # private `--reset` file mutation with a content-addressed act anyone can read:
+  #   epr flow note --kind observation --measure <id>-reset@1 --subject . --value 1
+  # `epr flow report` counts a derived lens's folds from the LATEST reset onward. The unit is
+  # `reset-marks` rather than a count of anything, because the value is never read — only its
+  # position in the fold order is.
+
+  - id: cleanup-pressure-reset
+    version: 1
+    family: cleanup-pressure
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure cleanup-pressure-reset@1 --subject . --value 1"
+    provenance: "replaces .claude/scripts/memory-kit/cleanup-pressure.py --reset (which zeroed five private JSON accumulators)"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: placement-drift-due-reset
+    version: 1
+    family: placement
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure placement-drift-due-reset@1 --subject . --value 1"
+    provenance: "replaces the placement-drift.json truncation inside cleanup-pressure.py --reset"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: map-currency-drift-reset
+    version: 1
+    family: map-currency
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure map-currency-drift-reset@1 --subject . --value 1"
+    provenance: "replaces the map-currency-drift.json truncation inside cleanup-pressure.py --reset"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: sovereignty-landings-reset
+    version: 1
+    family: sovereignty
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure sovereignty-landings-reset@1 --subject . --value 1"
+    provenance: "replaces the private `landings` tally sovereignty-guard-signal.py kept under the memory kit and reset by hand-editing the file; deleted with the kit at station six round (b) 2026-09-11"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: package-description-chars
+    version: 1
+    family: package-quality
+    unit: characters
+    procedure: "elohim/sdk/domains/elohim-agent/scripts/package-quality.mjs (run by package-projections.mjs verify) — frontmatter description length"  # re-pointed 2026-09-11 (station six): the two audits that established this floor are deleted; the verifier is the producer
+    provenance: ".claude/scripts/memory-kit/agent-audit.py:49 MIN_DESCRIPTION_CHARS=80; .claude/scripts/memory-kit/skill-audit.py:36 MIN_DESCRIPTION_CHARS=60"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: surface-stale-mtime-days
+    version: 1
+    family: package-quality
+    unit: days
+    procedure: "none — the deleted agent/skill audits were this row's only producer and staleness was DELIBERATELY not ported to package-projections.mjs verify (content-based verification supersedes an mtime heuristic). The row is declared and unproduced on purpose"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/agent-audit.py:50 STALE_MTIME_DAYS=90; .claude/scripts/memory-kit/skill-audit.py:37 STALE_MTIME_DAYS=90"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: trigger-overlap
+    version: 1
+    family: package-quality
+    unit: shared-words
+    procedure: "elohim/sdk/domains/elohim-agent/scripts/package-quality.mjs (run by package-projections.mjs verify) — distinctive words shared by two surfaces' triggers"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/agent-audit.py:51 TRIGGER_OVERLAP_THRESHOLD=3; .claude/scripts/memory-kit/skill-audit.py:38 TRIGGER_OVERLAP_THRESHOLD=3"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: dynamic-stopword-fraction
+    version: 1
+    family: package-quality
+    unit: fraction
+    procedure: "elohim/sdk/domains/elohim-agent/scripts/package-quality.mjs (run by package-projections.mjs verify) — corpus fraction above which a word is treated as a stopword"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/agent-audit.py:52 DYNAMIC_STOPWORD_FRACTION=0.25; .claude/scripts/memory-kit/skill-audit.py:69 DYNAMIC_STOPWORD_FRACTION=0.25"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: rationale-window-lines
+    version: 1
+    family: package-quality
+    unit: lines
+    procedure: ".epr-meta/elohim/lenses/gospel/claude-md-audit.py — lines either side scanned for a rationale (the agent-audit half of this pair was deleted when the package verifier absorbed it; the CLAUDE.md half is the producer)"  # RELOCATED 2026-09-11 (station six round (b))
+    provenance: ".claude/scripts/memory-kit/agent-audit.py:76 RATIONALE_WINDOW=3; .claude/scripts/memory-kit/claude-md-audit.py:65 RATIONALE_WINDOW=3"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: exempt-substr-window-chars
+    version: 1
+    family: substrate-currency
+    unit: characters
+    procedure: ".epr-meta/elohim/lenses/gospel/substrate-currency-audit.py — window either side of a match scanned for an exemption"  # RELOCATED 2026-09-11 (station six round (b)): no native gospel-drift scanner exists, so the lens moved rather than retiring
+    provenance: ".claude/scripts/memory-kit/substrate-currency-audit.py:366 EXEMPT_SUBSTR_WINDOW=80"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: negation-window-chars
+    version: 1
+    family: substrate-currency
+    unit: characters
+    procedure: ".epr-meta/elohim/lenses/gospel/substrate-currency-audit.py — window before a match scanned for framing negation"  # RELOCATED 2026-09-11 (station six round (b))
+    provenance: ".claude/scripts/memory-kit/substrate-currency-audit.py:368 NEGATION_WINDOW=60"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: bare-negation-window-chars
+    version: 1
+    family: substrate-currency
+    unit: characters
+    procedure: ".epr-meta/elohim/lenses/gospel/substrate-currency-audit.py — tighter window for bare no/not, which are general-purpose words"  # RELOCATED 2026-09-11 (station six round (b))
+    provenance: ".claude/scripts/memory-kit/substrate-currency-audit.py:369 BARE_NEGATION_WINDOW=20"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: mine-grace-seconds
+    version: 1
+    family: mempalace
+    unit: seconds
+    procedure: "epr flow report — the `grace-seconds:` key on mempalace-surfaces-changed-ceiling@1, applied by the native surface walk"
+    provenance: ".claude/scripts/memory-kit/mempalace-currency.py:27 GRACE_SECONDS=120"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: rename-window-days
+    version: 1
+    family: path-currency
+    unit: days
+    procedure: ".epr-meta/elohim/lenses/memory/path-update-scan.py — git-history window searched for renames"  # relocated 2026-09-10 (station four)
+    provenance: ".claude/scripts/memory-kit/path-update-scan.py:61 DEFAULT_RENAME_WINDOW_DAYS=365"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: story-vision-weight
+    version: 1
+    family: story-coverage
+    unit: weight
+    procedure: ".epr-meta/elohim/lenses/delivery/story-coverage-audit.py — weight applied to an axis the vision ranking does not name"  # RELOCATED 2026-09-11 (station six round (b)): story↔feature coverage has no native replacement, so the lens moved rather than retiring
+    provenance: ".claude/scripts/memory-kit/story-coverage-audit.py:106 DEFAULT_VISION_WEIGHT=1.0"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: sovereignty-landings
+    version: 1
+    family: sovereignty-guard
+    unit: landings
+    procedure: ".claude/hooks/sovereignty-guard-signal.py — net-new apex-sovereignty framing that landed after the ask"
+    provenance: ".claude/hooks/sovereignty-guard-signal.py:71 _ESCALATE_AT=3"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  # Two bounds the SessionStart headline reports that no kit CONSTANT names — the value is the
+  # line's own count. Added with the producer bridge so the native headline can carry them.
+  - id: mempalace-surfaces-changed
+    version: 1
+    family: mempalace
+    unit: files
+    procedure: "epr flow report — derived natively by mempalace-surfaces-changed-ceiling@1's `derive: files-newer-than`, which walks the declared surfaces against the .mempalace/.last-mine stamp"
+    provenance: ".claude/scripts/memory-kit/mempalace-currency.py:89 (headline count; the tolerance constant is mine-grace-seconds@1)"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  # The context-coverage ratchet's baseline, keyed by DIMENSION rather than by nine separate rows:
+  # a fold is addressed `subject × measure@version × env`, so one measure with the dimension name as
+  # its subject carries all nine. It replaces a private JSON file only `context-ratchet.py` could
+  # read or write — the unaddressable-history shape the whole replacement exists to end. The file it
+  # replaces is named in `provenance:` below, which the parity fold reads as a CITATION rather than
+  # as a surviving consumer; naming it in a comment here would gate a row against its own retirement.
+  - id: context-coverage-dimension
+    version: 1
+    family: context-coverage
+    unit: ratio
+    procedure: "epr flow report placement --stasis --fold — one observation per dimension, subject = the dimension key"
+    provenance: ".claude/scripts/memory-kit/context-ratchet.py:30 BASELINE (.claude/memory-kit/context-coverage-baseline.json); epsilon is ratchet_epsilon in context-coverage.yaml"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: scope-pending-moves
+    version: 1
+    family: scope
+    unit: count
+    procedure: "epr flow report scope — held<->live doc moves plus deployment flags pending against cluster-state (the payload's scopePendingMoves)"  # re-pointed 2026-09-11 (station six)
+    provenance: ".claude/scripts/memory-kit/scope-reconcile.py:425-455 (report line parts: to hold · to return to plate · deployment flag(s))"
+    default-authority: observation
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  # ── memory-kit replacement, station four (2026-09-10) ──────────────────────────────────
+  # The six memory ANALYZERS, relocated under the memory owner and declared as FOREIGN
+  # MEASURES. A foreign measure is one whose value is produced by a procedure this registry
+  # names but does not implement: `procedure:` is the executable, `unit:` is the shape it
+  # returns, and the native report invokes it and folds the outcome. The scripts moved
+  # unchanged in content — only their own REPO_ROOT depth and the paths that name themselves
+  # were corrected — so `provenance:` cites the parity-inventory row that authorised each
+  # relocation, and the row's identity is `<id>@<version>` plus these bytes, never a path.
+  #
+  # `binding: binding-local` on a MEASURE row is DECLARATIVE ONLY, and deliberately so.
+  # `elohim/eprfs/epr-cli/src/flow/measures.rs:548` reads `binding:` off a BOUND (a `lenses:`
+  # row or a `class: measure` ceiling in policies.yaml), never off a measure, and carries it
+  # through to the outcome without interpreting it. So this key states the rung a consuming
+  # bound inherits when one is declared over these measures; it gives the measure no teeth
+  # and cannot, which is the registry's standing contract three sections up. No ceiling lens
+  # is declared for them yet: a lens needs a watermark, and none of these six has a threshold
+  # that is not already its own row (`entry-stale-days@1`, `rename-window-days@1`,
+  # `memory-index-bytes@1`). Adding one before the report can invoke a foreign procedure
+  # would be a bound with no fold producer — `skipped` forever, which teaches nothing.
+  #
+  # `cleanup-apply.py` is NOT declared here: it was RETIRED in this station rather than
+  # relocated (archival relocation is not net removal, per the unified-memory-loop design).
+  # Accepted cleanups route through `epr flow hold`.
+
+  - id: memory-review-health
+    version: 1
+    family: memory-lens
+    unit: memory-review-report
+    procedure: ".epr-meta/elohim/lenses/memory/memory-review.py — memory-dir health diagnostic; returns the stdout summary (index lines vs budget · projected bytes · typed/untyped counts · recent-7d · stale · index<->file drift) and writes the markdown report"
+    provenance: "parity-inventory-2026-09-10.md:39 `memory-review.py` (native coverage: missing; relocated by station four). Relocated from .claude/scripts/memory-kit/memory-review.py; thresholds already declared as memory-index-lines@1, memory-index-bytes@1, entry-stale-days@1"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  - id: memory-coherence-findings
+    version: 1
+    family: memory-lens
+    unit: memory-coherence-findings
+    procedure: ".epr-meta/elohim/lenses/memory/memory-coherence-audit.py — verifies each memory entry's cites: still resolve; returns {changed_count, stale_candidates} and writes memory-coherence-audit.json plus the cites-index.json the memory-coherence-signal hook reads"
+    provenance: "parity-inventory-2026-09-10.md:37 `memory-coherence-audit.py` (native coverage: partial — `epr flow concerns` verifies edges but does not build cites-index.json). Relocated from .claude/scripts/memory-kit/memory-coherence-audit.py"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  - id: memory-dedupe-clusters
+    version: 1
+    family: memory-lens
+    unit: dedupe-clusters
+    procedure: ".epr-meta/elohim/lenses/memory/dedupe-memory-scan.py — TF-IDF duplicate-candidate clusters across memory topic files; returns the cluster report (entries scanned · pairs above threshold · clusters)"
+    provenance: "parity-inventory-2026-09-10.md:32 `dedupe-memory-scan.py` (native coverage: missing; read-only report). Relocated from .claude/scripts/memory-kit/dedupe-memory-scan.py"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  - id: memory-cleanup-proposals
+    version: 1
+    family: memory-lens
+    unit: cleanup-proposals
+    procedure: ".epr-meta/elohim/lenses/memory/cleanup-scan.py — deterministic staleness scan; returns the archive-candidate proposal set (candidates · flagged-for-review)"
+    provenance: "parity-inventory-2026-09-10.md:29 `cleanup-scan.py` (native coverage: missing). Relocated from .claude/scripts/memory-kit/cleanup-scan.py; its apply half was retired, so an accepted proposal is a decision routed through `epr flow hold`"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  - id: path-update-proposals
+    version: 1
+    family: memory-lens
+    unit: path-update-proposals
+    procedure: ".epr-meta/elohim/lenses/memory/path-update-scan.py — git + inferred rename detection; returns the mechanical OLD->NEW replacement proposals across citing docs"
+    provenance: "parity-inventory-2026-09-10.md:42 `path-update-scan.py` (native coverage: partial — slug-resolved cites self-heal on move; plain backticked path citations still drift). Relocated from .claude/scripts/memory-kit/path-update-scan.py; its window constant is rename-window-days@1"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  - id: path-update-applied
+    version: 1
+    family: memory-lens
+    unit: path-update-applied
+    procedure: ".epr-meta/elohim/lenses/memory/path-update-apply.py — applies operator-accepted OLD->NEW path replacements; returns the applied-edit set (docs touched · replacements made)"
+    provenance: "parity-inventory-2026-09-10.md:41 `path-update-apply.py` (native coverage: partial — same gap as its scan half). Relocated from .claude/scripts/memory-kit/path-update-apply.py. UNLIKE cleanup-apply, this apply is NET WORK — it heals a citation that no longer resolves — so it relocates rather than retires"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-4-2026-09-10
+
+  # ── memory-kit replacement, station six round (b) (2026-09-11) ────────────────────────
+  # The kit's last seven scripts, RELOCATED rather than retired. Each one has no native
+  # replacement — the parity fold's `replacement` cell for every row below opened `none` — so
+  # deleting them would have been a capability loss dressed as a cleanup. They moved to
+  # `.epr-meta/elohim/lenses/` beside the memory analyzers station four relocated, and they are
+  # declared here as FOREIGN MEASURES the report can invoke and fold, exactly as station four
+  # did. Two of them (`prior-art-index`, `brainstorm-preload`) are `partial` rather than absent:
+  # the native verb covers part of the reading and the row says which part it does not.
+  #
+  # All seven write under `.eprfs/status/lenses/` (`_lib.paths.reports_root`) — derived,
+  # regenerable, untracked. None of them keeps an accumulator: that is what was deleted.
+
+  - id: gospel-drift-findings
+    version: 1
+    family: gospel-lens
+    unit: claude-md-audit-report
+    procedure: ".epr-meta/elohim/lenses/gospel/claude-md-audit.py — CLAUDE.md drift + rightsizing audit; returns the per-surface drift score, line/byte budget verdict and the rationale-window findings"
+    provenance: "parity-inventory-2026-09-10.md `claude-md-audit.py` (native coverage: none — `epr check`/`govern` gate WRITES, not doc drift). Relocated from .claude/scripts/memory-kit/claude-md-audit.py; its constants are gospel-lines@1 and rationale-window-lines@1"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: substrate-currency-findings
+    version: 1
+    family: gospel-lens
+    unit: substrate-currency-report
+    procedure: ".epr-meta/elohim/lenses/gospel/substrate-currency-audit.py — scans gospel for PATH-EXISTS and process-status phrasing; returns {path_exists_findings, process_status_findings, uncited_recent_memory}"
+    provenance: "parity-inventory-2026-09-10.md `substrate-currency-audit.py` (native coverage: none). Relocated from .claude/scripts/memory-kit/substrate-currency-audit.py; its three window constants are exempt-substr-window-chars@1, negation-window-chars@1 and bare-negation-window-chars@1"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: locus-drift-rollup
+    version: 1
+    family: gospel-lens
+    unit: locus-drift-rollup
+    procedure: ".epr-meta/elohim/lenses/gospel/locus-drift.py — per-locus (id-bearing gospel) drift roll-up with layered propagation over the cite graph; returns the per-locus health rows"
+    provenance: "parity-inventory-2026-09-10.md:44 `locus-drift.py` (native coverage: partial — `epr flow concerns` pages the cite edges but has no per-locus / substrate-domain-impl roll-up). Relocated from .claude/scripts/memory-kit/locus-drift.py; the un-ported roll-up is the declared gap"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: story-feature-coverage
+    version: 1
+    family: delivery-lens
+    unit: story-coverage-report
+    procedure: ".epr-meta/elohim/lenses/delivery/story-coverage-audit.py — story <-> a2o feature coverage; returns {stories_total, features_orphan, features_adjacent_only, dangling_feature_references}"
+    provenance: "parity-inventory-2026-09-10.md `story-coverage-audit.py` (native coverage: none — nothing native projects story<->feature coverage). Relocated from .claude/scripts/memory-kit/story-coverage-audit.py; its weight constant is story-vision-weight@1"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: delivery-status-gradient
+    version: 1
+    family: delivery-lens
+    unit: delivery-status-distribution
+    procedure: ".epr-meta/elohim/lenses/delivery/delivery-status-distribution.py — the delivery-status gradient over stories and backlog frontmatter; returns {summary, counts, anomalies} and is read by delivery-scoreboard.py"
+    provenance: "parity-inventory-2026-09-10.md `delivery-status-distribution.py` (native coverage: none — nothing native projects the delivery-status gradient). Relocated from .claude/scripts/memory-kit/delivery-status-distribution.py"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: prior-art-index
+    version: 1
+    family: prior-art-lens
+    unit: spec-coherence-index
+    procedure: ".epr-meta/elohim/lenses/prior-art/spec-coherence-index.py [--query '<topic>'] — deterministic prior-art index (token overlap, no embeddings) over canonical/history/specs/plans; returns the ranked matches"
+    provenance: "parity-inventory-2026-09-10.md:61 `spec-coherence-index.py` (native coverage: none — nothing native indexes prior art). Relocated from .claude/scripts/memory-kit/spec-coherence-index.py"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
+  - id: brainstorm-preload
+    version: 1
+    family: prior-art-lens
+    unit: brainstorm-preload
+    procedure: ".epr-meta/elohim/lenses/prior-art/prep-brainstorm.py '<topic>' — the /brainstorm deterministic pre-read: prior art (the sibling lens) + testable surface and budget (both NATIVE, via epr flow report placement)"
+    provenance: "parity-inventory-2026-09-10.md:53 `prep-brainstorm.py` (native coverage: partial — `epr flow context` composes the flow plane, not the prior-art + scope preload). Relocated from .claude/scripts/memory-kit/prep-brainstorm.py; its two kit legs were re-pointed at the native placement report in the same act"
+    default-authority: observation
+    binding: binding-local
+    status: active
+    established_by: memory-kit-replacement-station-6b-2026-09-11
+
 lenses:
   - id: review-lint-lens
     version: 1
@@ -177,3 +836,434 @@ lenses:
       it. Normal dev gates never read the pedantic measure: nothing "falls back" because
       nothing switched, and strictness escalation stays a lens composition, never a mode
       switch on the measure itself.
+
+  - id: memory-index-bytes-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [memory-index-bytes@1]
+    context: memory-index-projection
+    soft: 20000
+    hard: 24000
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-lines-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [memory-index-lines@1]
+    context: memory-review
+    hard: 200
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-title-chars-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [memory-index-title-chars@1]
+    context: memory-index-projection
+    hard: 80
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memory-index-desc-chars-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [memory-index-desc-chars@1]
+    context: memory-index-projection
+    hard: 200
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: gospel-bytes-ceiling
+    version: 1
+    binding: binding-local
+    class: inject
+    consumes: [gospel-bytes@1]
+    context: session-headline
+    hard: 12000
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: gospel-lines-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [gospel-lines@1]
+    context: claude-md-audit
+    soft: 200
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-drift-score-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    consumes: [claude-md-drift-score@1]
+    context: session-headline
+    hard: 3.0
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-rescore-interval-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [claude-md-rescore-interval@1]
+    context: drift-accumulator
+    hard: 5
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: claude-md-walk-depth-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [claude-md-walk-depth@1]
+    context: drift-accumulator
+    hard: 12
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: memkit-report-tier-mb-ceiling
+    version: 1
+    headline: memkit
+    binding: binding-local
+    class: inject
+    consumes: [memkit-report-tier-mb@1]
+    context: session-headline
+    soft: 8
+    # Superseded with its measure. `epr flow report` leaves a superseded bound OUT of evaluation
+    # entirely — it is not `skipped`, because nobody failed to measure it — and renders its
+    # headline slot as `memkit: retired — <superseded_reason>`.
+    status: superseded
+    superseded_by: "placement-budget-ceiling (epr flow report placement --ledger)"
+    superseded_reason: "report tier removed 2026-09-11"
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: retention-head-days-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [retention-head-days@1]
+    context: report-tier-retention
+    hard: 30
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: retention-tail-days-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [retention-tail-days@1]
+    context: report-tier-retention
+    hard: 90
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: cleanup-pressure-ceiling
+    version: 1
+    headline: cleanup
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    # DERIVED, not read: the value is the count of distinct drifted subjects accumulated since the
+    # last reset — never a number some script hands over. `cleanup-pressure@1` stays first because
+    # it is the lens's identity anchor (headline slot, unit, and the name a `skipped` outcome
+    # reports); the five that follow are the accumulators the kit sums.
+    derive: distinct-subjects-since-reset
+    reset: cleanup-pressure-reset@1
+    consumes:
+      - cleanup-pressure@1
+      - placement-drift-due@1          # placement-drift.json
+      - map-currency-drift@1           # map-currency-drift.json
+      - claude-md-edit-signal@1        # claude-md-drift.json (claude-md-drift-signal.py:189)
+      - claude-md-structural-signal@1  # claude-md-drift.json (claude-md-structural-signal.py:174)
+      - memory-coherence-drift@1       # memory-coherence-drift.json
+      - memory-index-drift@1           # memory-index-drift.json — no fold producer yet
+    context: session-headline
+    hard: 120
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+    why: >
+      Six source measures for five accumulator FILES: claude-md-drift.json is written by two
+      hooks that fold two different measures (claude-md-drift-signal.py:189 folds
+      claude-md-edit-signal@1; claude-md-structural-signal.py:174 folds
+      claude-md-structural-signal@1), so both are consumed. `claude-md-drift-score@1` is
+      deliberately NOT a source — it is the derived score, not the accumulator, and consuming it
+      would count a summary as an event. memory-index-drift@1 has no fold producer yet and
+      contributes 0 until one exists, which is honest rather than absent.
+      Parity target is cleanup-pressure.py::activity() (cleanup-pressure.py:53-56 + the
+      COLLECTIONS loop): it sums len() over each of the five accumulator files in turn, so
+      cardinality is DISTINCT-PER-MEASURE THEN SUMMED — one path drifting in two accumulators is
+      two items, the same path drifting twice in one accumulator is one. The native rule matches
+      that exactly rather than adopting a tidier global-distinct count, because a different number
+      than the gate it replaces is not a replacement.
+      ONE DELIBERATE DIVERGENCE, disclosed rather than hidden: the kit's COLLECTIONS tuple
+      (cleanup-pressure.py:56) lists files/entries/due/items but NOT `changed`, which is the
+      only collection map-currency-drift.json has — so the kit reads 0 from that file by
+      omission, while this row consumes map-currency-drift@1 and counts it (3 of today's 94).
+      The kit's omission is a defect, not a semantic the replacement should inherit, so this
+      row is deliberately HIGHER than the gate it replaces by exactly the map-drift count.
+      No `supersedes:` accompanies this: the registry's never-mutate rule binds at FIRST
+      LANDING, this row has never landed on dev and is amended in place by its authoring
+      session with the contentHash re-pinned, and there is no earlier registry row for it to
+      supersede — the constant it replaces is cited in the measures' `provenance:`, which is a
+      citation, not lineage. Version stays 1 for the same reason.
+
+  - id: cleanup-cycle-history-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [cleanup-cycle-history@1]
+    context: cleanup-pressure
+    hard: 24
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: decompose-threshold-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [decompose-threshold@1]
+    context: decompose
+    hard: 40
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: placement-drift-due-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    derive: distinct-subjects-since-reset
+    reset: placement-drift-due-reset@1
+    consumes: [placement-drift-due@1]
+    context: session-headline
+    hard: 1
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+    why: >
+      An accumulator, not a reading: the hook folds one observation per past-due document as it
+      finds it, and the bound is how many DISTINCT documents have accumulated since the last drain.
+      Counting folds instead of subjects would double-count a document the hook saw twice.
+
+  - id: stasis-margin-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [stasis-margin@1]
+    context: placement-stasis
+    hard: 0.15
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: map-currency-drift-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    derive: distinct-subjects-since-reset
+    reset: map-currency-drift-reset@1
+    consumes: [map-currency-drift@1]
+    context: session-headline
+    hard: 1
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+    why: >
+      Same shape as placement-drift-due: distinct architecture seeds changed since the MAP walk was
+      last refreshed, drained by a reset observation rather than by truncating a private JSON file.
+
+  - id: entry-stale-days-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: measure
+    consumes: [entry-stale-days@1]
+    context: memory-review
+    hard: 90
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: agent-description-floor
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [package-description-chars@1]
+    context: agent-audit
+    hard: 80
+    compare: below
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: skill-description-floor
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [package-description-chars@1]
+    context: skill-audit
+    hard: 60
+    compare: below
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: surface-stale-mtime-days-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [surface-stale-mtime-days@1]
+    context: package-quality-audit
+    hard: 90
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: trigger-overlap-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [trigger-overlap@1]
+    context: package-quality-audit
+    hard: 3
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: dynamic-stopword-fraction-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [dynamic-stopword-fraction@1]
+    context: package-quality-audit
+    hard: 0.25
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: rationale-window-lines-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [rationale-window-lines@1]
+    context: package-quality-audit
+    hard: 3
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: exempt-substr-window-chars-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [exempt-substr-window-chars@1]
+    context: substrate-currency-audit
+    hard: 80
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: negation-window-chars-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [negation-window-chars@1]
+    context: substrate-currency-audit
+    hard: 60
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: bare-negation-window-chars-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [bare-negation-window-chars@1]
+    context: substrate-currency-audit
+    hard: 20
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: mine-grace-seconds-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [mine-grace-seconds@1]
+    context: mempalace-currency
+    hard: 120
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: rename-window-days-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [rename-window-days@1]
+    context: path-update-scan
+    hard: 365
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: sovereignty-landings-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    # DERIVED as of station six round (b), 2026-09-11. `sovereignty-guard-signal.py` escalated on
+    # a `landings` total it accumulated in a private JSON file under the deleted kit — the
+    # last of the six hooks' private JSON tallies. The file is deleted with the kit, so the number
+    # the hook's own message escalates on is now the count of landing observations since the last
+    # reset, read back with `epr flow report --bound sovereignty-landings-ceiling --json`.
+    #
+    # ONE DECLARED CHANGE OF MEANING, recorded rather than hidden: the kit SUMMED each edit's
+    # `net_new` phrase count; this counts one per LANDING EVENT. They differ only when a single
+    # edit lands two or more apex-sovereignty phrases at once, where the kit would cross the
+    # threshold in one edit and this crosses it in three. Counting events is the better reading
+    # for a drift guard — three separate landings say more about corpus drift than one verbose
+    # paragraph does — and `count-since-reset` is the derive the fold plane implements.
+    derive: count-since-reset
+    reset: sovereignty-landings-reset@1
+    consumes: [sovereignty-landings@1]
+    context: post-tool-guard
+    hard: 3
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: mempalace-surfaces-changed-ceiling
+    version: 1
+    headline: mempalace
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    consumes: [mempalace-surfaces-changed@1]
+    context: session-headline
+    hard: 1
+    # DERIVED FROM THE TREE, not from a fold. `mempalace-currency.py` hid this walk as module
+    # constants (SURFACE, GRACE_SECONDS, the marker path) that only that script could read; the
+    # walk is declared here instead, so the number is re-derivable by anyone and the producer
+    # bridge that used to fold it is no longer needed.
+    #
+    # A MISSING STAMP IS `skipped`, NEVER ZERO. The kit falls back to epoch 0 when nothing is
+    # recorded, which makes every file read as newer — maximum staleness asserted from an absence
+    # of evidence. `marker-fallback` keeps the kit's real second stamp (the palace config's mtime);
+    # with neither, nobody knows when the index was built and the bound says so.
+    derive: files-newer-than
+    marker: .mempalace/.last-mine
+    marker-fallback: .mempalace/config.json
+    surfaces:                       # mempalace-currency.py:22-26 SURFACE, verbatim
+      - genesis/docs/content/elohim-protocol
+      - .claude/memory
+      - genesis/data/stories
+    suffix: .md
+    grace-seconds: 120              # the value mine-grace-seconds@1 declares
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10
+
+  - id: scope-pending-moves-ceiling
+    version: 1
+    headline: scope
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    consumes: [scope-pending-moves@1]
+    context: session-headline
+    hard: 1
+    status: active
+    established_by: memory-kit-replacement-station-1-2026-09-10

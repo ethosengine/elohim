@@ -114,7 +114,54 @@ genesis/research/repos/
 .claude/data/run-projection-cache.json
 # epr flow value-chain sidecar — derived/operational (append-only flow records + label index);
 # reconstruction = re-run `epr flow project`. Never source-of-truth.
-.eprfs/
+#
+# ONE EXCEPTION: `.eprfs/status/gap-items/` is the gap-items FALLBACK STORE, and it is NOT derived.
+# 61 documents / 649 stations in it were decomposed by an agent against prose specs that carry no
+# checkboxes — those stations exist in no document's bytes and `epr flow project` cannot reconstruct
+# them. Ignoring the store would leave them in one working tree. Tracked as a PRE-IMAGE until the
+# stations are written back into their documents (station six of the memory-kit replacement); the
+# `.claude/memory-kit/gap-items/` original stays ignored, as it always was.
+#
+# TWO rules are in play and both matter:
+#
+#   - A pattern containing an interior slash is ANCHORED to this file's directory. `.eprfs/*` looks
+#     like the old unanchored `.eprfs/` and is not: it stops matching every NESTED sidecar
+#     (`elohim/elohim-storage/.eprfs/`, the ark payloads under genesis/a2o/reports/…), so the first
+#     version of this block silently un-ignored all of them. `**/.eprfs/` restores the unanchored
+#     reading, and the anchored lines below re-include only the ROOT store.
+#   - A path cannot be re-included once a PARENT directory is excluded, so each level has to be
+#     reopened before the next can be named. That is what the ladder is for, not decoration.
+**/.eprfs/
+!/.eprfs/
+/.eprfs/*
+!/.eprfs/status/
+/.eprfs/status/*
+!/.eprfs/status/gap-items/
+# SECOND EXCEPTION: `.eprfs/status/memory/` is the collective-memory CONTRIBUTIONS STORE
+# (`epr flow memory import --contributions` default: `.eprfs/status/memory/contributions`).
+# A contribution is durable shared knowledge — fruit a participant placed into shared space —
+# not a derived projection, so it belongs in the tree every clone reads, and its declared reach
+# has to match where it actually lives: `.epr-meta/collective.json` carries the paired
+# `{"path": ".eprfs/status/memory", "maxReach": "repository"}` rule over this same directory.
+# Same ladder shape as gap-items above: only the ROOT store is reopened; `**/.eprfs/` still
+# ignores every NESTED sidecar, including any `.eprfs/` under this path.
+!/.eprfs/status/memory/
+# THIRD EXCEPTION: `.eprfs/status/balance/` holds the paired memory-burden BALANCE SHEETS
+# (a ceremony's baseline and close measurements, relocated from `.claude/memory-kit/balance-sheets/`
+# at station six of the memory-kit replacement, 2026-09-11). They are AUTHORED measurement evidence,
+# not a derivation: nothing regenerates a 2026-05-14 reading of a tree that no longer exists, and
+# each sheet is one half of a pair whose other half only means something beside it. Same ladder
+# shape as gap-items and memory above: only the ROOT store is reopened; `**/.eprfs/` still ignores
+# every NESTED sidecar under this path.
+!/.eprfs/status/balance/
+# TERMINAL, and deliberately NOT a re-include: `.eprfs/status/recall/` holds recall receipts and
+# session continuations. Those are PRIVATE records under `private-thought-governed-fruit` §2 — a
+# participant's reasoning trace, never fruit — so they are never imported, witnessed, projected or
+# targeted by feedback, and never tracked. Naming the DIRECTORY (not its contents) is what makes
+# this durable: git does not descend into an excluded directory, so nothing inside can be
+# re-included by a later `!` rung without first re-including this line's directory explicitly.
+# It sits LAST in the ladder for the same reason.
+/.eprfs/status/recall/
 .stage0-logs/
 
 # Angular CLI cache written when ng runs from the repo root (app-level .gitignore covers app/elohim-app/.angular/cache)

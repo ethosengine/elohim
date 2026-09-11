@@ -40,7 +40,7 @@ def _ctx(payload):
 with tempfile.TemporaryDirectory() as _td:
     root = Path(_td); (root / ".git").mkdir()
     # the hook reads tunables from governance_cfg → the temp repo's yaml; small thresholds keep it cheap
-    _wr(root / ".claude" / "memory-kit" / "context-coverage.yaml",
+    _wr(root / ".epr-meta" / "elohim" / "lenses" / "context-coverage.yaml",
         "epr_meta_governance:\n  min_files: 3\n  min_subdirs: 4\n  min_exts: 1\n")
     _mkfiles(root / "ungoverned", [".ts", ".py", ".rs"])          # substantial, unclaimed
     _wr(root / "owned" / ".epr-meta", "---\nepr-meta-version: 1\ncovers: subtree\n---\n")
