@@ -37,7 +37,8 @@ Feature: The EPR atom home — every reachable resource has one place of its own
   #   Technical holding detail (shard maps, replica counts) lives behind a "Network
   #   detail" link, never on the home itself.
   # - household floor: how many households currently hold a copy, out of how many
-  #   the resource wants for safety — shown as "1 of 3".
+  #   the resource wants for safety — shown as "N of M", both numbers read from
+  #   the doorway's own household report, never hardcoded.
   # - the tender: the short note above the reply box, written as if by the person's
   #   own agent, saying who a message will reach and that the author's standing
   #   travels with it.
@@ -87,7 +88,7 @@ Feature: The EPR atom home — every reachable resource has one place of its own
     # another to help hold these").
     When Matthew opens the atom home for "evolution-of-trust"
     Then the leg "Who holds it" reads the holding sentence the doorway reports for "evolution-of-trust"
-    And the leg "Who holds it" shows the household floor as "1 of 3"
+    And the leg "Who holds it" shows the household floor the doorway reports for "evolution-of-trust"
     And the atom home shows no trust percentage
     And the shard map and replica counts stay behind a "Network detail" link
 

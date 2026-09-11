@@ -168,10 +168,22 @@ Then(
 );
 
 Then(
-  'the leg "Who holds it" shows the household floor as {string}',
-  async function (this: E2EWorld, floor: string) {
+  'the leg "Who holds it" shows the household floor the doorway reports for {string}',
+  async function (this: E2EWorld, id: string) {
     const { page } = home(this, 'Matthew');
-    assert.ok((await page.legText('holds')).includes(`${floor} households`));
+    const doorway = this.getDoorway('alpha');
+    const res = await fetch(`${doorway.url}/api/v1/resilience/${encodeURIComponent(id)}/household`);
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as {
+      feltStatus?: { floor?: { wantsHouseholds: number; hasHouseholds: number } };
+    };
+    const floor = body.feltStatus?.floor;
+    assert.ok(floor, 'no feltStatus.floor on the household snapshot');
+    assert.ok(
+      (await page.legText('holds')).includes(
+        `${floor.hasHouseholds} of ${floor.wantsHouseholds} households`
+      )
+    );
   }
 );
 
