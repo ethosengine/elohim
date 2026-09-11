@@ -842,7 +842,9 @@ assert_binary_newer_than_source() { # <binary> <src-path…>
   # Reference is the newest TRACKED source file mtime, not the commit time: a binary built from
   # the working tree and committed afterwards is current (same bytes) although bin mtime < commit
   # time — that false refusal cost a cold recast on 2026-09-11. Untracked/ignored files never count.
-  src_ts="$(git -C "$REPO_ROOT" ls-files -z -- "$@" 2>/dev/null | xargs -0 stat -c %Y 2>/dev/null | sort -n | tail -1)"
+  # …and only files UNMODIFIED against HEAD count: an uncommitted edit (another seat's WIP, a
+  # cargo fmt touch) must not refuse a binary built from every committed byte.
+  src_ts="$(comm -23 <(git -C "$REPO_ROOT" ls-files -- "$@" 2>/dev/null | sort) <(git -C "$REPO_ROOT" diff --name-only HEAD -- "$@" 2>/dev/null | sort) | (cd "$REPO_ROOT" && xargs -r stat -c %Y 2>/dev/null) | sort -n | tail -1)"
   [ -n "$src_ts" ] || return 0
   [ "$bin_ts" -ge "$src_ts" ] && return 0
   echo "built $(date -u -d "@$bin_ts" +%Y-%m-%dT%H:%M:%SZ), newest tracked source file under $* was modified $(date -u -d "@$src_ts" +%Y-%m-%dT%H:%M:%SZ) (HEAD $(git -C "$REPO_ROOT" log -1 --format=%h -- "$@"))" >&2
