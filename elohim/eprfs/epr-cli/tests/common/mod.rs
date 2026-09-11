@@ -3,6 +3,11 @@
 //! Moved out of `flow_memory_recall.rs` verbatim (station zero of the governed-discovery split,
 //! task 0.1) so `flow_memory_recall_golden.rs` can build the same fixture repo without duplicating
 //! it. Behaviour is unchanged — only the location moved.
+//!
+//! Shared across several independent test binaries (`flow_memory_recall*.rs`), each of which
+//! `mod common;`-includes this whole file fresh and uses only the subset it needs — so an item
+//! unused by one binary is routinely used by another, not genuinely dead.
+#![allow(dead_code)]
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -163,6 +168,58 @@ pub fn ok(root: &Path, args: &[&str]) -> Value {
         run.stdout, run.stderr
     );
     run.json()
+}
+
+/// `ok`, but for a caller that needs its own `--session` label instead of the shared [`SESSION`]
+/// constant — the shape every governed-discovery lens test needs, since a lens is resolved per
+/// session and three tests sharing one session would resolve against each other's claims.
+///
+/// `#[allow(dead_code)]`: this shared fixture module is included by every `flow_memory_recall*`
+/// test binary, and not every one of them calls every helper — a binary that does not is not
+/// dead code in the sense this lint means.
+#[allow(dead_code)]
+pub fn view_in(root: &Path, session: &str, args: &[&str]) -> Value {
+    let run = run_in(root, session, args);
+    assert_eq!(
+        run.code, 0,
+        "{args:?} refused: {}{}",
+        run.stdout, run.stderr
+    );
+    run.json()
+}
+
+/// The same invocation as [`view_in`], but the HUMAN rendering (no `--json`) — for a caller
+/// asserting on the printed screen rather than the payload.
+#[allow(dead_code)]
+pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .args(["flow", "memory", "recall"])
+        .args(args)
+        .args(["--root", &root.to_string_lossy()])
+        .args(["--contract", "contract.json"])
+        .args(["--session", session]);
+    let out = command.output().expect("epr runs");
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+/// Register an actor claim against the fixture root — `epr actor claim --as <ref> --session <id>
+/// --root <root>`. Requires a committed HEAD (claims are dated by the tree, never by wall clock —
+/// see `elohim_epr_rea::ActorClaim`), which [`repo`] already provides.
+#[allow(dead_code)]
+pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["actor", "claim", "--as", claimed, "--session", session])
+        .arg("--root")
+        .arg(root)
+        .output()
+        .expect("epr actor claim runs");
+    assert!(
+        out.status.success(),
+        "actor claim {claimed} refused: {}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 /// Open a session with a question and no concern selection — the FOCUSED door.

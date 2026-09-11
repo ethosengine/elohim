@@ -20,8 +20,9 @@ interface MemoryFixture {
 const fixtures = new WeakMap<object, MemoryFixture>();
 const repository = resolve('../..');
 const binary = process.env.EPR_BIN ?? 'epr';
-// The footprint measurement is native to `epr flow memory recall`; `--lens <script>` remains only
-// as an explicit override for an external lens and is never needed here.
+// The footprint measurement is native to `epr flow memory recall`; `--footprint-lens <script>`
+// remains only as an explicit override for an external lens and is never needed here (`--lens`
+// now names the READER lens level, governed-discovery station 1).
 const projectionPath = 'genesis/projection.json';
 const purpose =
   'Recover the passage-opening evidence while keeping whole-workflow acceptance undecided';

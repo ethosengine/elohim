@@ -189,7 +189,7 @@ pub(super) fn measure(
         let (sample, lens_notes) = sample_balance(
             &args.root,
             contract,
-            args.lens.as_deref(),
+            args.footprint_lens.as_deref(),
             &run_id,
             phase,
             &scope,

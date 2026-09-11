@@ -25,9 +25,9 @@ digest, that is either a real regression (fix the split) or an intentional rende
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `7e4b4a3e2b6b7502f05d5498e84dab53fdb2a1e2841835e519410bb3ad5dfc53` |
-| Whole open | `whole_open_is_byte_identical` | `52f65a4ee15db636ae50474a72b3de0088d1c257f00d43a3d8030af9878e6781` |
-| Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` |
+| Focused open | `focused_open_is_byte_identical` | `a3b304920260fc1a38d903e5645bf985c36603234805cb5c3e20a75e9d189678` |
+| Whole open | `whole_open_is_byte_identical` | `8ca20e6f1ae913f42e06b6cac20533121c6e0259e5f84b089463a7379b676b4d` |
+| Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
 
@@ -56,3 +56,16 @@ failing test — `focused_open_is_byte_identical`, `whole_open_is_byte_identical
 `refusal_is_byte_identical`, in that order when run single-threaded), paste them into the
 `GOLDEN_*` constants, and update this table plus the source commit. A re-baseline commit must
 say *why* the rendering changed.
+
+## 2026-09-11 — station 1 (Task 1.1)
+
+One `lens:` line added after `Guiding context` on every rendered view (the reader lens: WHO is
+reading, resolved from the actor sidecar and the recipe's declared `lens_table`, printed with
+its stated/revealed provenance and a content-addressed CID — see `src/flow/memory/recall/lens.rs`
+and `flow_memory_recall_lens.rs`). `GOLDEN_FOCUSED` and `GOLDEN_WHOLE` re-baselined; `GOLDEN_REFUSAL`
+is unchanged because a refusal never reaches `render()`'s orientation/lens preamble — verified by
+re-running `refusal_is_byte_identical` unmodified after the lens line landed. The lens CID itself
+does not vary run to run: it is `BlobCid::compute_raw` of canonical JSON over `{level,
+choice_count, density_bytes, scaffold, provenance}` alone (no timestamp, no path), and neither of
+these two fixture sessions registers an actor claim, so both resolve to the same `stated: ["none"]`
+/ `standard` lens on every run — confirmed stable by re-running the capture command twice.

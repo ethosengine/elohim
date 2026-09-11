@@ -40,6 +40,11 @@ pub(super) fn render(view: &Value) -> String {
             value["source"].as_str().unwrap_or_default()
         ));
     }
+    // WHO is reading, printed right after the guiding context it bounds — contestable on sight,
+    // never buried among the generic key dump below (excluded there explicitly).
+    if !view["lens"].is_null() {
+        out.push_str(&render_lens(&view["lens"]));
+    }
     // The focused door's first screen comes BEFORE the concern groups, because a reader who named
     // an area asked "what is the shape here and what do I do first", and the stale-edge scan is
     // the answer to a different question.
@@ -50,7 +55,7 @@ pub(super) fn render(view: &Value) -> String {
         for (key, value) in map {
             if matches!(
                 key.as_str(),
-                "orientation" | "actions" | "execution_method" | "first_screen"
+                "orientation" | "actions" | "execution_method" | "first_screen" | "lens"
             ) {
                 continue;
             }
@@ -91,6 +96,32 @@ pub(super) fn render(view: &Value) -> String {
         ));
     }
     out
+}
+
+/// WHO is reading, resolved and contestable on sight: the level, its stated and revealed
+/// provenance, and the recipe default it fell back to. One line, however many provenance
+/// entries there are — the honesty floor requires the lens be NAMED on every view, not that it
+/// be spelled out in full; `--json` carries every provenance line for a reader who wants them.
+fn render_lens(lens: &Value) -> String {
+    let level = lens["level"].as_str().unwrap_or_default();
+    let stated = joined_or(&lens["provenance"]["stated"], "none");
+    let revealed = joined_or(&lens["provenance"]["revealed"], "no evidence yet");
+    let defaults = lens["provenance"]["defaults"].as_str().unwrap_or_default();
+    format!("lens: {level} · stated {stated} · revealed {revealed} · {defaults}\n")
+}
+
+/// Every string in a JSON array, joined for one line; `fallback` when the array is empty or
+/// absent.
+fn joined_or(value: &Value, fallback: &str) -> String {
+    let items: Vec<&str> = value
+        .as_array()
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    if items.is_empty() {
+        fallback.to_string()
+    } else {
+        items.join("; ")
+    }
 }
 
 /// The focused door: the area's habits with their last delta, then the competing sources.

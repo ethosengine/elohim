@@ -1780,7 +1780,9 @@ fn the_footprint_lens_is_native_and_needs_no_script_in_the_tree() {
         "elohim-epr-cli flow/memory/footprint.rs"
     );
 
-    // `--lens` remains an EXPLICIT external override, and a missing one refuses about that path.
+    // `--footprint-lens` remains an EXPLICIT external override, and a missing one refuses about
+    // that path. (Renamed from `--lens` in governed-discovery station 1: that flag now names the
+    // READER lens level — see `flow_memory_recall_lens.rs`.)
     let overridden = run_in(
         root,
         "named-lens",
@@ -1788,7 +1790,7 @@ fn the_footprint_lens_is_native_and_needs_no_script_in_the_tree() {
             "open",
             "--intent",
             "Name an external lens",
-            "--lens",
+            "--footprint-lens",
             "docs/not-a-lens.py",
         ],
     );

@@ -1536,6 +1536,11 @@ pub(super) fn execute(
         );
     }
     view["orientation"] = orientation(&recipe, &state);
+    // The reader lens: WHO is reading, resolved once per operation and printed on every view —
+    // never refused, never silently skipped. See `lens.rs`.
+    let reader = lens::reader_from_session(&args.root, &args.session);
+    let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
+    view["lens"] = resolved_lens.to_value();
     push_action(
         &mut view,
         action(

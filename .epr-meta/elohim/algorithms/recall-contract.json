@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 10,
+  "version": 11,
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
   "limits": {
@@ -137,6 +137,26 @@
       "source": { "kind": "declared" }
     }
   ],
+  "lens_table": {
+    "defaults": { "level": "standard", "choice_count": 6, "density_bytes": 6000, "scaffold": "rank-and-let-choose" },
+    "stated": {
+      "claude-haiku-4-5": "minimal",
+      "claude-sonnet-5": "simple",
+      "claude-opus-5": "standard",
+      "claude-fable-5-1": "detail",
+      "gpt-5.6-sol": "standard"
+    },
+    "levels": {
+      "minimal": { "choice_count": 1, "density_bytes": 1500, "scaffold": "locate-and-hand-one-command" },
+      "simple": { "choice_count": 3, "density_bytes": 3000, "scaffold": "locate-and-hand-one-command" },
+      "standard": { "choice_count": 6, "density_bytes": 6000, "scaffold": "rank-and-let-choose" },
+      "detail": { "choice_count": 12, "density_bytes": 12000, "scaffold": "rank-and-let-choose" },
+      "debug": { "choice_count": 12, "density_bytes": 24000, "scaffold": "rank-and-let-choose" },
+      "trace": { "choice_count": 24, "density_bytes": 32768, "scaffold": "rank-and-let-choose" }
+    },
+    "revealed_rule": "a reader tier whose last 3 journeys reached authority at level L is offered the next level; a tier with a mistaken assertion in its last 3 is offered the previous level",
+    "expiry_days": 90
+  },
   "discovery": {
     "exclude_directories": [
       ".git",

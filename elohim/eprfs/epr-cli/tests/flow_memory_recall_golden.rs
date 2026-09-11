@@ -57,8 +57,11 @@ fn digest(s: &str) -> String {
     format!("{:x}", Sha256::digest(s.as_bytes()))
 }
 
-const GOLDEN_FOCUSED: &str = "7e4b4a3e2b6b7502f05d5498e84dab53fdb2a1e2841835e519410bb3ad5dfc53";
-const GOLDEN_WHOLE: &str = "52f65a4ee15db636ae50474a72b3de0088d1c257f00d43a3d8030af9878e6781";
+// Re-baselined station 1 (Task 1.1): a `lens:` line is now printed after `Guiding context` on
+// every rendered view — see tests/fixtures/recall-golden/README.md. GOLDEN_REFUSAL is unchanged:
+// a refusal never reaches `render()`'s orientation/lens preamble.
+const GOLDEN_FOCUSED: &str = "a3b304920260fc1a38d903e5645bf985c36603234805cb5c3e20a75e9d189678";
+const GOLDEN_WHOLE: &str = "8ca20e6f1ae913f42e06b6cac20533121c6e0259e5f84b089463a7379b676b4d";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

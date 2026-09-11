@@ -72,6 +72,9 @@ use providers::{process_result, providers_for};
 mod journey;
 use journey::execute;
 
+mod lens;
+use lens::LensLevel;
+
 /// Where the algorithm artifact lives, relative to the repository root.
 pub const CONTRACT_REL: &str = ".epr-meta/elohim/algorithms/recall-contract.json";
 
@@ -762,7 +765,15 @@ pub struct Args {
     pub measure_scope: Vec<String>,
     pub phase: String,
     /// An explicit external footprint-lens override. Absent means the native footprint sampler runs.
-    pub lens: Option<PathBuf>,
+    pub footprint_lens: Option<PathBuf>,
+    /// The reader lens level explicitly requested with `--lens <level>`. `None` means resolve it
+    /// from the actor sidecar's claim and this reader's own revealed evidence — see `lens.rs`.
+    ///
+    /// Module-private (not `pub`), unlike every other `Args` field: `LensLevel` is itself
+    /// `pub(super)` (recall-scoped), and every reader of this field is inside `recall`'s own
+    /// module tree — `Args` never crosses that boundary today. A `pub` field of a `pub(super)`
+    /// type is `private_interfaces`-denied under `-D warnings`.
+    lens: Option<LensLevel>,
     /// Exact metadata tags a discovery must carry, repeatable. Every named tag must be present.
     pub tags: Vec<String>,
     /// Whether `--root`/`--contract` were named, so linked next actions repeat only real overrides.
@@ -806,6 +817,7 @@ impl Args {
             actor_session: None,
             measure_scope: Vec::new(),
             phase: "baseline".into(),
+            footprint_lens: None,
             lens: None,
             tags: Vec::new(),
             root_explicit: false,
@@ -906,7 +918,9 @@ pub fn usage() -> String {
         "usage: epr flow memory recall <{}> --session <id> [--need TEXT] [--json] [--root DIR]\n\
          \x20      epr flow memory recall --adopt-receipts [--from-dir DIR] [--dry-run] [--json]\n\
          \x20      search|source accept --tag <t> (repeatable, EXACT frontmatter membership, local provider only)\n\
-         \x20      --lens <path> names an EXTERNAL footprint lens script; the lens is NATIVE by default\n\
+         \x20      --lens <level> widens/narrows the READER lens (minimal|simple|standard|detail|debug|trace); \
+resolved and printed on every view when omitted\n\
+         \x20      --footprint-lens <path> names an EXTERNAL footprint-measurement lens script; native by default\n\
          Receipts and continuations are PRIVATE session records under {RECALL_DIR_REL}/<session>/; \
          they are never imported, projected, witnessed or targeted by feedback.",
         OPERATIONS.join("|")
@@ -985,12 +999,17 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
                 };
                 args.contract_explicit = true;
             }
-            "--lens" => {
-                args.lens = Some(if Path::new(&value).is_absolute() {
+            "--footprint-lens" => {
+                args.footprint_lens = Some(if Path::new(&value).is_absolute() {
                     PathBuf::from(&value)
                 } else {
                     args.root.join(&value)
                 })
+            }
+            "--lens" => {
+                args.lens = Some(LensLevel::parse(&value).ok_or_else(|| {
+                    refused("--lens must be one of minimal|simple|standard|detail|debug|trace")
+                })?)
             }
             "--tag" => args.tags.push(value),
             "--session" => args.session = value,
@@ -1251,7 +1270,7 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
         "contract_path": rel_to_root(&args.root, &contract.path),
         "executor": "epr flow memory recall",
         "native_executable": executor_digest,
-        "measurement_lens": match &args.lens {
+        "measurement_lens": match &args.footprint_lens {
             Some(path) => json!(rel_to_root(&args.root, path)),
             None => json!(footprint::method()),
         },
@@ -1329,6 +1348,7 @@ mod shape {
             "journey.rs",
             "discovery.rs",
             "providers.rs",
+            "lens.rs",
             "render.rs",
             "refusal.rs",
             "measure.rs",

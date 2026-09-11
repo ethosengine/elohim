@@ -32,8 +32,9 @@ interface Fixture {
 const fixtures = new WeakMap<object, Fixture>();
 const repository = resolve('../..');
 const binary = process.env.EPR_BIN ?? 'epr';
-// The footprint measurement is native to `epr flow memory recall`; `--lens <script>` remains only
-// as an explicit override for an external lens and is never needed here.
+// The footprint measurement is native to `epr flow memory recall`; `--footprint-lens <script>`
+// remains only as an explicit override for an external lens and is never needed here (`--lens`
+// now names the READER lens level, governed-discovery station 1).
 /// Named once: the fixture's copy of the live algorithm artifact, and the flag that carries an
 /// unresolved question into a note or a completion.
 const contractFile = 'contract.json';
