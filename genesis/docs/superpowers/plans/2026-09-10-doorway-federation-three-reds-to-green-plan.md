@@ -1629,6 +1629,8 @@ both doorways (doorway-failover: "whichever serves resolves the same declared he
 
 ## Task 19 — (c) ONE fleet push, then read the build
 
+> **Landed 2026-09-11 10:2xZ:** `git push origin dev` → `753b766a1..2c338124a` (105 commits: the doorway-federation sprint + the memory-kit replacement + the serving-receipt/GIT_DIR gate fixes). Pre-push ALL CLEAR (1388 s) after two refusals (missing serving receipt; eprfs tests under an inherited GIT_DIR). Receipt run 20260911T081627Z-62fb8fb6. Fleet read: the pipeline shift that follows.
+
 **Drains:** doorway-failover plan **§Operator menu** (the deploy decision) and D7(ii).
 **Tier:** operator for the push; `ci-observer` (Haiku) for the read.
 

@@ -29,6 +29,14 @@ retire-when: >
   declared head from the mesh directly. At that point "either doorway can die" is a
   statement about a component that no longer sits in the path.
 ---
+DELTA 2026-09-11c (SERVING RECEIPT on current source; habit RED preserved by rule): epr-app-deliverability.feature
+**5/5 scenarios, 102/102 steps** on a fresh household mesh (run 20260911T081627Z-62fb8fb6, doorway eff30a245 build,
+storage fb4d10c7d build); serving-receipt validator EXIT=0; the pre-push gate accepted it and 105 commits landed on
+origin/dev at 2c338124a (753b766a1..2c338124a, gates ALL CLEAR 1388 s). Two findings on the way: the deliverability
+cleanup must cancel the owned root through its AUTHOR peer only (zome rule from 2cea494ee; glue 62fb8fb64), and a
+mesh cold start keeps storage projection DBs (two receipt attempts lost; backlog
+mesh-cold-start-leaves-storage-projection-dbs-2026-09-11). Fleet confirmation = the edge/app builds this push dispatches.
+
 DELTA 2026-09-11b (steady-state GREEN on the household pair; habit RED preserved by its own rule): run
 20260911T041537Z-faca0d95 — doorway-failover.feature **10/10 scenarios, EXIT=0** on the mesh at faca0d95e (doorway
 3c7ee8d89 build 04:03:51, both doorways restarted 04:11:38). The four reds of 02:41/03:24 were the Prologue refusing
