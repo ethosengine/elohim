@@ -128,6 +128,55 @@ pub fn lookup_forms(raw: &[u8]) -> Vec<String> {
     forms
 }
 
+/// The raw 39 bytes behind ANY spelling of a HoloHash string, or `None` when the
+/// string is not a HoloHash in any encoding.
+///
+/// This is the ONE decoder. Every reader that needs BYTES rather than a string
+/// goes through it, so no caller has to pick a base64 alphabet — picking one is
+/// exactly how `worker::zome_call` came to decode with `STANDARD` what
+/// `services::discovery` encodes with `URL_SAFE_NO_PAD`, which fails on the ~80%
+/// of keys whose url-safe spelling contains a `-` or `_`.
+///
+/// It is defined as *normalize, then read the canonical body*, so it cannot
+/// disagree with [`normalize_agent_key`] about what a string means: if the
+/// normalizer maps two spellings onto one canonical form, this returns identical
+/// bytes for both, by construction rather than by two implementations agreeing.
+///
+/// An `AgentPubKey` and a `DnaHash` share this length (39 raw bytes) and this
+/// multibase tag — only the 3-byte prefix differs (`uhCAk…` vs `uhC0k…`) — so a
+/// cell id's BOTH halves decode here.
+pub fn decode_key_bytes(key: &str) -> Option<Vec<u8>> {
+    let canonical = normalize_agent_key(key);
+    let body = canonical.strip_prefix(MULTIBASE_TAG)?;
+    URL_SAFE_NO_PAD
+        .decode(body)
+        .ok()
+        .filter(|raw| raw.len() == AGENT_PUB_KEY_RAW_LEN)
+}
+
+/// Every string form of the identity a READER's string names, canonical first.
+///
+/// The sibling of [`lookup_forms`] for callers holding a string rather than raw
+/// bytes — an operator's hand-typed admin query, a Mongo filter, a JWT claim.
+/// Widening an equality match to an `$in` over this is what lets a row written
+/// by a pre-canonical doorway be found by its canonical spelling and the reverse.
+///
+/// Always a SUPERSET of the plain equality it replaces: the caller's own string
+/// is present whatever it is, so a string that is not a key (a dev-mode
+/// placeholder) still matches its own row exactly and nothing else.
+pub fn lookup_forms_of(key: &str) -> Vec<String> {
+    match decode_key_bytes(key) {
+        Some(raw) => {
+            let mut forms = lookup_forms(&raw);
+            if !forms.iter().any(|form| form == key) {
+                forms.push(key.to_string());
+            }
+            forms
+        }
+        None => vec![key.to_string()],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,6 +282,95 @@ mod tests {
                 "{not_a_key} is not a key in any encoding"
             );
         }
+    }
+
+    #[test]
+    fn every_spelling_decodes_to_the_same_raw_bytes() {
+        // The property the worker's cell_id depends on: whichever vintage of
+        // string a reader holds, the BYTES it hands the conductor are identical.
+        let raw = raw_key(0xFB); // url-safe spelling contains '-' and '_'
+        for spelling in [
+            canonical_agent_key(&raw),
+            URL_SAFE_NO_PAD.encode(&raw),
+            STANDARD.encode(&raw),
+        ] {
+            assert_eq!(
+                decode_key_bytes(&spelling).as_deref(),
+                Some(raw.as_slice()),
+                "spelling {spelling} must decode to the one identity's bytes"
+            );
+        }
+    }
+
+    #[test]
+    fn decode_key_bytes_refuses_a_non_key_rather_than_guessing() {
+        for not_a_key in [
+            "uhCAk-dev-mode-agent-key",
+            "uhCAk...",
+            "human-matthew-manager",
+            "",
+        ] {
+            assert!(
+                decode_key_bytes(not_a_key).is_none(),
+                "{not_a_key} has no bytes to hand a conductor"
+            );
+        }
+        // Decodable base64 at the wrong length is still not a key.
+        assert!(decode_key_bytes(&URL_SAFE_NO_PAD.encode(vec![0u8; 32])).is_none());
+    }
+
+    #[test]
+    fn lookup_forms_of_a_string_names_one_identity_in_every_spelling() {
+        let raw = raw_key(0xFB);
+        let canonical = canonical_agent_key(&raw);
+        let legacy = URL_SAFE_NO_PAD.encode(&raw);
+
+        // Asked canonically, the legacy spelling is among the forms — and asked
+        // in the legacy spelling, the canonical one is. This is what makes a
+        // pre-canonical Mongo row reachable from a canonical admin query.
+        assert!(lookup_forms_of(&canonical).contains(&legacy));
+        assert!(lookup_forms_of(&legacy).contains(&canonical));
+        assert_eq!(lookup_forms_of(&canonical)[0], canonical);
+        assert_eq!(lookup_forms_of(&legacy)[0], canonical);
+    }
+
+    #[test]
+    fn lookup_forms_of_always_contains_the_callers_own_string() {
+        // The widening must be a SUPERSET of the equality it replaces: whatever a
+        // caller passes, a row spelled exactly that way is still matched.
+        let raw = raw_key(5);
+        for spelling in [
+            canonical_agent_key(&raw),
+            URL_SAFE_NO_PAD.encode(&raw),
+            STANDARD.encode(&raw),
+            "uhCAk-dev-mode-agent-key".to_string(),
+            "human-matthew-manager".to_string(),
+        ] {
+            assert!(
+                lookup_forms_of(&spelling).contains(&spelling),
+                "{spelling} must still match its own row"
+            );
+        }
+    }
+
+    #[test]
+    fn lookup_forms_of_a_non_key_matches_only_itself() {
+        // A placeholder has no other spelling; widening it must not start
+        // matching unrelated rows.
+        assert_eq!(
+            lookup_forms_of("uhCAk-dev-mode-agent-key"),
+            vec!["uhCAk-dev-mode-agent-key".to_string()]
+        );
+    }
+
+    #[test]
+    fn lookup_forms_of_two_different_keys_never_overlap() {
+        let a = lookup_forms_of(&canonical_agent_key(&raw_key(1)));
+        let b = lookup_forms_of(&canonical_agent_key(&raw_key(2)));
+        assert!(
+            !a.iter().any(|form| b.contains(form)),
+            "widening must never make one identity's query match another's row"
+        );
     }
 
     #[test]

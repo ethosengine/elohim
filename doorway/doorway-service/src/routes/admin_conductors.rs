@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info, warn};
 
-use crate::conductor::AgentProvisioner;
+use crate::conductor::{lookup_forms_of, AgentProvisioner};
 use crate::db::schemas::{UserDoc, USER_COLLECTION};
 use crate::routes::admin_users::require_admin;
 use crate::server::AppState;
@@ -704,6 +704,27 @@ pub async fn handle_graduation_completed(state: Arc<AppState>) -> Response<Full<
     )
 }
 
+/// The Mongo predicate that matches ONE agent identity however its row spells it.
+///
+/// `UserDoc.agent_pub_key` rows written before `conductor::agent_key` landed carry
+/// the BARE base64 spelling (`hCAk…`); rows written since carry the canonical
+/// HoloHash form (`uhCAk…`). A plain equality filter therefore misses whenever the
+/// operator's spelling and the row's vintage disagree — and misses SILENTLY, as a
+/// 404 "User not found" for an account that plainly exists.
+///
+/// Widening to an `$in` over [`lookup_forms_of`] is strictly a superset of the
+/// equality it replaces: the caller's own string is always among the forms, so a
+/// string that is not a key in any encoding (a dev-mode placeholder) still matches
+/// its own row and nothing else.
+///
+/// Both admin filters on `UserDoc.agent_pub_key` — the force-graduation `find_one`
+/// and the steward-flag `update_one` — build their filter HERE. They must agree:
+/// a find that matched while the update did not would report a graduation that
+/// wrote nothing.
+fn agent_identity_filter(agent_key: &str) -> bson::Document {
+    doc! { "agent_pub_key": { "$in": lookup_forms_of(agent_key) } }
+}
+
 /// Handle POST /admin/graduation/force/{agent_key} — force-graduate a user
 pub async fn handle_force_graduation(
     state: Arc<AppState>,
@@ -727,10 +748,7 @@ pub async fn handle_force_graduation(
     };
 
     // Find user by agent_pub_key
-    let user = match collection
-        .find_one(doc! { "agent_pub_key": agent_key })
-        .await
-    {
+    let user = match collection.find_one(agent_identity_filter(agent_key)).await {
         Ok(Some(u)) => u,
         Ok(None) => {
             return json_response(
@@ -753,7 +771,7 @@ pub async fn handle_force_graduation(
     let stewardship_time = bson::DateTime::now();
     if let Err(e) = collection
         .update_one(
-            doc! { "agent_pub_key": agent_key },
+            agent_identity_filter(agent_key),
             doc! {
                 "$set": {
                     "is_steward": true,
@@ -934,5 +952,114 @@ mod tests {
         assert_ne!(resp.status(), StatusCode::FORBIDDEN);
         assert_ne!(resp.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    // ---- the two admin UserDoc filters match an IDENTITY, not a SPELLING ----
+    //
+    // Both filters below are built by `agent_identity_filter`, so these assert
+    // the predicate both call sites share. Mongo itself is not in the loop: the
+    // honest boundary a unit test can hold is which strings the filter WOULD
+    // match, and that is precisely what regressed — a row written before
+    // `conductor::agent_key` landed carries the bare `hCAk…` spelling and a plain
+    // equality filter answered 404 "User not found" for an account that exists.
+
+    /// A REAL 39-byte agent key, minted the way a conductor mints one.
+    /// `AgentPubKey::try_from` verifies the 4-byte location trailer, so a
+    /// hand-rolled 39 bytes would answer `BadChecksum` and prove the wrong thing.
+    fn raw_key(fill: u8) -> Vec<u8> {
+        holo_hash::AgentPubKey::from_raw_32(vec![fill; 32])
+            .get_raw_39()
+            .to_vec()
+    }
+
+    /// The spellings a filter would match.
+    fn matched_spellings(filter: &bson::Document) -> Vec<String> {
+        filter
+            .get_document("agent_pub_key")
+            .expect("filter must key on agent_pub_key")
+            .get_array("$in")
+            .expect("the filter must be an $in over every spelling, not an equality")
+            .iter()
+            .map(|b| b.as_str().expect("spellings are strings").to_string())
+            .collect()
+    }
+
+    fn legacy_spelling(raw: &[u8]) -> String {
+        use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+        use base64::Engine;
+        URL_SAFE_NO_PAD.encode(raw)
+    }
+
+    #[test]
+    fn force_graduation_finds_a_pre_canonical_row_from_the_canonical_key() {
+        // The force-graduation `find_one` site: operator pastes the canonical key
+        // an `/admin/conductors` listing now shows; the row predates the change.
+        let raw = raw_key(0xFB);
+        let canonical = crate::conductor::canonical_agent_key(&raw);
+        let legacy = legacy_spelling(&raw);
+        assert_ne!(canonical, legacy, "fixture must be two distinct spellings");
+
+        let matched = matched_spellings(&agent_identity_filter(&canonical));
+        assert!(
+            matched.contains(&legacy),
+            "a canonical query must reach a legacy row: {matched:?}"
+        );
+    }
+
+    #[test]
+    fn the_steward_flag_update_reaches_a_canonical_row_from_the_legacy_key() {
+        // The `update_one` site, queried the other way round: an operator working
+        // from an older roster still flips a row written since canonicalization.
+        let raw = raw_key(0xFB);
+        let canonical = crate::conductor::canonical_agent_key(&raw);
+        let legacy = legacy_spelling(&raw);
+
+        let matched = matched_spellings(&agent_identity_filter(&legacy));
+        assert!(
+            matched.contains(&canonical),
+            "a legacy query must reach a canonical row: {matched:?}"
+        );
+    }
+
+    #[test]
+    fn both_admin_filters_still_match_the_exact_spelling_they_used_to() {
+        // The widening is a SUPERSET of the equality it replaced — no vintage of
+        // caller loses the row it could already find.
+        let raw = raw_key(7);
+        for spelling in [
+            crate::conductor::canonical_agent_key(&raw),
+            legacy_spelling(&raw),
+            "uhCAk-dev-mode-agent-key".to_string(),
+        ] {
+            assert!(
+                matched_spellings(&agent_identity_filter(&spelling)).contains(&spelling),
+                "{spelling} must still match its own row"
+            );
+        }
+    }
+
+    #[test]
+    fn an_admin_filter_never_reaches_a_different_agent() {
+        // Widening must not become a wrong match. A force-graduation that hit the
+        // wrong human would deprovision a cell nobody asked to close.
+        let mine = crate::conductor::canonical_agent_key(&raw_key(1));
+        let theirs = matched_spellings(&agent_identity_filter(
+            &crate::conductor::canonical_agent_key(&raw_key(2)),
+        ));
+        let matched = matched_spellings(&agent_identity_filter(&mine));
+        assert!(
+            !matched.iter().any(|form| theirs.contains(form)),
+            "one agent's filter must not overlap another's row: {matched:?} vs {theirs:?}"
+        );
+    }
+
+    #[test]
+    fn an_admin_filter_for_a_non_key_matches_only_that_string() {
+        // A dev-mode placeholder has no other spelling; an honest miss must stay
+        // a miss rather than becoming a plausible-looking wrong match.
+        assert_eq!(
+            matched_spellings(&agent_identity_filter("uhCAk-dev-mode-agent-key")),
+            vec!["uhCAk-dev-mode-agent-key".to_string()]
+        );
     }
 }

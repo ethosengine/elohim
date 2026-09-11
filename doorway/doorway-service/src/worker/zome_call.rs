@@ -24,6 +24,7 @@
 use rmpv::Value;
 use serde::{Deserialize, Serialize};
 
+use crate::conductor::agent_key;
 use crate::types::{DoorwayError, Result};
 
 /// Requester identity for access control (passed to DNA)
@@ -180,8 +181,11 @@ impl ZomeCallBuilder {
             (
                 Value::String("cell_id".into()),
                 Value::Array(vec![
-                    Value::Binary(decode_base64(&self.config.dna_hash)?),
-                    Value::Binary(decode_base64(&self.config.agent_pub_key)?),
+                    Value::Binary(decode_cell_id_half(&self.config.dna_hash, "dna_hash")?),
+                    Value::Binary(decode_cell_id_half(
+                        &self.config.agent_pub_key,
+                        "agent_pub_key",
+                    )?),
                 ]),
             ),
             (
@@ -198,7 +202,10 @@ impl ZomeCallBuilder {
             ),
             (
                 Value::String("provenance".into()),
-                Value::Binary(decode_base64(&self.config.agent_pub_key)?),
+                Value::Binary(decode_cell_id_half(
+                    &self.config.agent_pub_key,
+                    "provenance",
+                )?),
             ),
             (
                 Value::String("cap_secret".into()),
@@ -262,12 +269,32 @@ impl ZomeCallBuilder {
     }
 }
 
-/// Decode base64 string to bytes
-fn decode_base64(s: &str) -> Result<Vec<u8>> {
-    use base64::{engine::general_purpose::STANDARD, Engine};
-    STANDARD
-        .decode(s)
-        .map_err(|e| DoorwayError::Internal(format!("Invalid base64: {e}")))
+/// Decode a cell-id half (a `DnaHash` or an `AgentPubKey`) to its raw 39 bytes,
+/// through the ONE decoder, whatever vintage of string the role map holds.
+///
+/// WHY (encode/decode mismatch, found alongside the 2026-09-11 agent-key
+/// canonicalization): this used to decode with `base64::STANDARD` what
+/// `services::discovery::encode_base64` writes with `URL_SAFE_NO_PAD` —
+/// `discovery.rs:245-246`, straight off the conductor's `app_info.cell_ids`, into
+/// the `ZomeCallConfig` this builder is handed. The two alphabets agree only on a
+/// string containing no `-`/`_`, which is about one key in five at this length,
+/// so ~80% of discovered cells could not be called at all: `Invalid base64:
+/// Invalid byte 45`. Padding was never the issue — 39 bytes is a multiple of 3
+/// and encodes to 52 characters with none.
+///
+/// The cure is to stop CHOOSING an alphabet here. `agent_key::decode_key_bytes`
+/// normalizes first and reads the canonical body, so every spelling a doorway has
+/// ever written — bare url-safe (discovery, the provisioner), bare STANDARD (the
+/// startup walk), canonical `uhCAk…`/`uhC0k…` — yields identical bytes, and a
+/// string that is not a HoloHash in any encoding is REFUSED rather than decoded
+/// into a short, plausible-looking cell id the conductor would reject obscurely.
+fn decode_cell_id_half(s: &str, field: &str) -> Result<Vec<u8>> {
+    agent_key::decode_key_bytes(s).ok_or_else(|| {
+        DoorwayError::Internal(format!(
+            "{field} is not a HoloHash in any encoding (got {len} chars)",
+            len = s.chars().count()
+        ))
+    })
 }
 
 /// Get a field from a MessagePack map
@@ -335,5 +362,166 @@ mod tests {
         assert_eq!(config.zome_name, "content_store");
         assert_eq!(config.app_id, "elohim");
         assert_eq!(config.role_name, "lamad");
+    }
+
+    // ---- cell-id round-trip: the worker path carries BYTES, not a spelling ----
+    //
+    // The value's journey. `DiscoveryService::discover_cells` reads the raw
+    // `(dna_hash, agent_pub_key)` off the conductor's `app_info.cell_ids` and
+    // encodes both with `URL_SAFE_NO_PAD` (`services/discovery.rs:245-246, :292`).
+    // They are carried as strings — `CellInfo` → `ZomeCallConfig`, into the
+    // `zome_configs` DashMap on `AppState` and back out through
+    // `zome_helpers::get_zome_config_by_role`. There is no JWT and no Mongo row on
+    // this path; it is an in-process role map. They are CONSUMED here, in
+    // `build_zome_call`, which must hand the conductor the original bytes back.
+    //
+    // Before this fix the consumer decoded with `STANDARD`, which cannot read the
+    // producer's alphabet — so these round-trips did not close.
+
+    use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+    use base64::Engine;
+
+    /// A REAL 39-byte agent key, minted the way a conductor mints one.
+    fn raw_key(fill: u8) -> Vec<u8> {
+        holo_hash::AgentPubKey::from_raw_32(vec![fill; 32])
+            .get_raw_39()
+            .to_vec()
+    }
+
+    /// A REAL 39-byte DNA hash — the other half of a cell id, same length and
+    /// same multibase tag, different 3-byte prefix.
+    fn raw_dna(fill: u8) -> Vec<u8> {
+        holo_hash::DnaHash::from_raw_32(vec![fill; 32])
+            .get_raw_39()
+            .to_vec()
+    }
+
+    /// Pull `(dna_bytes, agent_bytes, provenance_bytes)` back out of a built call.
+    fn cell_id_of(payload: &[u8]) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        let mut cursor = std::io::Cursor::new(payload);
+        let value = rmpv::decode::read_value(&mut cursor).expect("built call is valid msgpack");
+        let Value::Map(ref outer) = value else {
+            panic!("call envelope must be a map")
+        };
+        let Some(Value::Map(ref data)) = get_field(outer, "data") else {
+            panic!("call envelope must carry a data map")
+        };
+        let Some(Value::Array(ref cell_id)) = get_field(data, "cell_id") else {
+            panic!("data must carry a cell_id pair")
+        };
+        let Some(Value::Binary(ref provenance)) = get_field(data, "provenance") else {
+            panic!("data must carry a binary provenance")
+        };
+        let (Value::Binary(dna), Value::Binary(agent)) = (&cell_id[0], &cell_id[1]) else {
+            panic!("cell_id halves must be binary")
+        };
+        (dna.clone(), agent.clone(), provenance.clone())
+    }
+
+    fn build_with(dna_hash: String, agent_pub_key: String) -> Result<Vec<u8>> {
+        ZomeCallBuilder::new(ZomeCallConfig {
+            dna_hash,
+            agent_pub_key,
+            ..ZomeCallConfig::default()
+        })
+        .build_doorway_get("Content", "manifesto", None)
+    }
+
+    #[test]
+    fn the_legacy_url_safe_spelling_discovery_writes_round_trips_to_the_original_bytes() {
+        // THE LIVE DEFECT. This is exactly what `services/discovery.rs` puts in
+        // the role map, and 0xFB forces `-`/`_` into the url-safe alphabet — the
+        // bytes the old STANDARD decoder choked on.
+        let (dna, agent) = (raw_dna(0xFB), raw_key(0xFB));
+        let payload = build_with(URL_SAFE_NO_PAD.encode(&dna), URL_SAFE_NO_PAD.encode(&agent))
+            .expect("the form discovery actually writes must build");
+        let (got_dna, got_agent, _) = cell_id_of(&payload);
+        assert_eq!(got_dna, dna);
+        assert_eq!(got_agent, agent);
+    }
+
+    #[test]
+    fn the_pre_fix_standard_decoder_refused_the_form_discovery_actually_writes() {
+        // Teeth for the test above: the alphabets really do disagree here, so the
+        // round-trip is proving a fix rather than restating a tautology.
+        let bare = URL_SAFE_NO_PAD.encode(raw_key(0xFB));
+        assert!(
+            bare.contains('-') || bare.contains('_'),
+            "fixture must exercise the url-safe alphabet: {bare}"
+        );
+        assert!(
+            STANDARD.decode(&bare).is_err(),
+            "the decoder this fix replaced could not read {bare}"
+        );
+    }
+
+    #[test]
+    fn a_canonical_cell_id_round_trips_to_the_original_bytes() {
+        let (dna, agent) = (raw_dna(0xFB), raw_key(0xFB));
+        let payload = build_with(
+            crate::conductor::canonical_agent_key(&dna),
+            crate::conductor::canonical_agent_key(&agent),
+        )
+        .expect("the canonical form must build");
+        let (got_dna, got_agent, _) = cell_id_of(&payload);
+        assert_eq!(got_dna, dna);
+        assert_eq!(got_agent, agent);
+    }
+
+    #[test]
+    fn the_standard_alphabet_spelling_also_round_trips() {
+        // The startup agent-discovery walk registers this encoding too.
+        let (dna, agent) = (raw_dna(0xFB), raw_key(0xFB));
+        let payload = build_with(STANDARD.encode(&dna), STANDARD.encode(&agent))
+            .expect("the STANDARD form must build");
+        let (got_dna, got_agent, _) = cell_id_of(&payload);
+        assert_eq!(got_dna, dna);
+        assert_eq!(got_agent, agent);
+    }
+
+    #[test]
+    fn every_spelling_produces_a_byte_identical_call() {
+        // One identity, three vintages of string, one wire payload — the property
+        // that makes the role map's spelling stop mattering.
+        let (dna, agent) = (raw_dna(3), raw_key(3));
+        let canonical = build_with(
+            crate::conductor::canonical_agent_key(&dna),
+            crate::conductor::canonical_agent_key(&agent),
+        )
+        .unwrap();
+        for (d, a) in [
+            (URL_SAFE_NO_PAD.encode(&dna), URL_SAFE_NO_PAD.encode(&agent)),
+            (STANDARD.encode(&dna), STANDARD.encode(&agent)),
+        ] {
+            assert_eq!(
+                build_with(d, a).unwrap(),
+                canonical,
+                "a legacy spelling must build the same call as the canonical one"
+            );
+        }
+    }
+
+    #[test]
+    fn provenance_carries_the_same_bytes_as_the_cell_id_agent() {
+        // The conductor checks provenance against the cell's agent; two decoders
+        // could disagree, one decoder cannot.
+        let agent = raw_key(9);
+        let payload = build_with(
+            URL_SAFE_NO_PAD.encode(raw_dna(9)),
+            URL_SAFE_NO_PAD.encode(&agent),
+        )
+        .unwrap();
+        let (_, got_agent, provenance) = cell_id_of(&payload);
+        assert_eq!(provenance, agent);
+        assert_eq!(provenance, got_agent);
+    }
+
+    #[test]
+    fn a_cell_id_half_that_is_not_a_holo_hash_is_refused_not_truncated() {
+        // An honest error beats a short, plausible-looking cell id the conductor
+        // would reject obscurely.
+        let agent = URL_SAFE_NO_PAD.encode(raw_key(1));
+        assert!(build_with("uhC0k-dev-mode".to_string(), agent.clone()).is_err());
+        assert!(build_with(URL_SAFE_NO_PAD.encode(raw_dna(1)), String::new()).is_err());
     }
 }

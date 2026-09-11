@@ -13,7 +13,10 @@ pub mod router;
 pub mod typed_admin;
 pub mod typed_app;
 
-pub use agent_key::{canonical_agent_key, is_agent_key_form, lookup_forms, normalize_agent_key};
+pub use agent_key::{
+    canonical_agent_key, decode_key_bytes, is_agent_key_form, lookup_forms, lookup_forms_of,
+    normalize_agent_key,
+};
 pub use pool_map::{
     max_agents_per_conductor_from_env, ConductorPoolMap, ConductorPoolStatus,
     DEFAULT_MAX_AGENTS_PER_CONDUCTOR, MAX_AGENTS_PER_CONDUCTOR_ENV,

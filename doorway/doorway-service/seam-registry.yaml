@@ -3004,7 +3004,17 @@ decisionPoints:
           any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it stores ONLY the legacy
           form and then resolves it by the canonical one, and
           bare_base64_is_normalized_onto_the_canonical_form proves the repaired string
-          satisfies the exact parse the grant surface makes.
+          satisfies the exact parse the grant surface makes. The two string-holding readers
+          follow the same rule through `lookup_forms_of` and `decode_key_bytes`, which are
+          defined as normalize-then-read so they cannot disagree with this predicate about
+          what a string means: force_graduation_finds_a_pre_canonical_row_from_the_canonical_key
+          and the_steward_flag_update_reaches_a_canonical_row_from_the_legacy_key pin the admin
+          Mongo filters in both directions, and
+          the_legacy_url_safe_spelling_discovery_writes_round_trips_to_the_original_bytes pins
+          the worker cell id — with
+          the_pre_fix_standard_decoder_refused_the_form_discovery_actually_writes showing the
+          alphabets really did disagree, so the round-trip proves a fix rather than a
+          tautology.
       - id: C10
         status: answered
         justification: >
@@ -3062,6 +3072,60 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/conductor/registry.rs
         testName: any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: every_spelling_decodes_to_the_same_raw_bytes
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: decode_key_bytes_refuses_a_non_key_rather_than_guessing
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: lookup_forms_of_a_string_names_one_identity_in_every_spelling
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: lookup_forms_of_always_contains_the_callers_own_string
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: lookup_forms_of_a_non_key_matches_only_itself
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: lookup_forms_of_two_different_keys_never_overlap
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_conductors.rs
+        testName: force_graduation_finds_a_pre_canonical_row_from_the_canonical_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_conductors.rs
+        testName: the_steward_flag_update_reaches_a_canonical_row_from_the_legacy_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_conductors.rs
+        testName: both_admin_filters_still_match_the_exact_spelling_they_used_to
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_conductors.rs
+        testName: an_admin_filter_never_reaches_a_different_agent
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_conductors.rs
+        testName: an_admin_filter_for_a_non_key_matches_only_that_string
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: the_legacy_url_safe_spelling_discovery_writes_round_trips_to_the_original_bytes
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: the_pre_fix_standard_decoder_refused_the_form_discovery_actually_writes
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: a_canonical_cell_id_round_trips_to_the_original_bytes
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: the_standard_alphabet_spelling_also_round_trips
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: every_spelling_produces_a_byte_identical_call
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: provenance_carries_the_same_bytes_as_the_cell_id_agent
+        kind: unit
+      - path: doorway/doorway-service/src/worker/zome_call.rs
+        testName: a_cell_id_half_that_is_not_a_holo_hash_is_refused_not_truncated
         kind: unit
 
   - name: count_distinct_agents_by_conductor
