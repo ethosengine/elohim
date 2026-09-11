@@ -1390,8 +1390,8 @@ on alpha gets that blob refused. Rule: in doorway mode a blob URL is origin-rela
 serving origin), never `storageUrl`; `storageUrl` is direct/native mode only. Same bundle must serve from
 both doorways (doorway-failover: "whichever serves resolves the same declared head").
 
-- [ ] **Step 1:** failing lamad unit test — doorway mode + served origin → origin-relative blob URL, never `localhost:8090`; direct mode unchanged.
-- [ ] **Step 2:** implement in the concrete `ILamadStorageClient`; lamad gate + direct `ng build`; pathspec commit.
+- [x] **Step 1:** failing lamad unit test — doorway mode + served origin → origin-relative blob URL, never `localhost:8090`; direct mode unchanged. *(blob-url.spec.ts, 10 tests red→green)*
+- [x] **Step 2:** implement in the concrete `ILamadStorageClient`; lamad gate + direct `ng build`; pathspec commit. *(e09eec608 — root cause one layer deeper: SSR `detectConnectionMode()` returns `direct` on Node, so server-rendered HTML baked `storageUrl`; cured at lamad's composition root with `withOriginRelativeBlobUrls`; `just gate elohim-app` 4596 tests, lamad 2822 tests, AOT+SSR build, lint ratchet — all EXIT=0. General cure + transfer-state drift filed: backlog `ssr-connection-mode-conflates-node-with-native-2026-09-11`; lamad dev-environment-in-production folded as arch-frontend-bundle-seams row 11.)*
 - [ ] **Step 3:** rides the Task 19 app deploy; then Task 18 Step 3 re-runs against alpha — **that** run is the flip evidence (expected 7/7).
 
 **Habit delta line this produces:** `epr-atom-home` — "lamad blob URLs origin-relative in doorway mode (was localhost:8090 on alpha, found by the Task 18 measure); flip waits on the app build that carries it."
