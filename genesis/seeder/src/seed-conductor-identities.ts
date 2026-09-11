@@ -24,7 +24,10 @@
  *                                name-affine as a whole the moment ANY entry
  *                                is named or hostname-affine — see
  *                                urlsAreNameAffine / resolveCandidateUrls.
- *   INSTALLED_APP_ID             Holochain app ID prefix (default: elohim)
+ *   INSTALLED_APP_ID             The steward's own installed app id (default: elohim).
+ *                                Matched EXACTLY first — a conductor also hosts
+ *                                doorway-provisioned apps whose ids start with the
+ *                                same string (see connectToConductor).
  *   CONDUCTOR_CONNECT_TIMEOUT_MS Per-connect timeout (default: 10000) — fail fast on
  *                                unreachable conductors so the stage's catchError can
  *                                soft-land before the pipeline's global timeout fires
@@ -232,7 +235,33 @@ async function connectToConductor(
   try {
     const cellTarget = seedCellTarget(process.argv.slice(2));
     const apps = await adminWs.listApps({});
-    const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+    // THE STEWARD'S OWN APP, not "the first app whose id starts with `elohim`".
+    //
+    // A conductor now legitimately hosts OTHER PEOPLE'S cells: that is story 07's
+    // topology — the steward's machine performs the hosting. The doorway installs
+    // each hosted human as `<INSTALLED_APP_ID>-<conductor-id>-<6 hex>`
+    // (doorway-service/src/conductor/provisioner.rs `generate_app_id`), and the
+    // steward's own app is installed as EXACTLY `INSTALLED_APP_ID` (hc-mesh.sh
+    // `hc sandbox generate --app-id elohim`; happ_manager on the fleet). Both match
+    // `startsWith(appIdPrefix)`, so the old prefix-only `find` returned whichever
+    // hosted app `list_apps` happened to order first, and this seeder then read that
+    // stranger's `get_my_human` and reported the steward's own conductor as
+    // conflicted: "[C] Matthew doorway — conductor already embodies '<uuid>' —
+    // expected 'human-matthew-manager'" (measured 2026-09-11, run 20260911T0319Z).
+    //
+    // The conductor's steward is the agent of the steward's OWN installed app, so
+    // an exact id match is the correct resolution and is checked first. The prefix
+    // match survives only as the fallback for a deployment whose configured id is a
+    // genuine prefix of the installed one — and it now prefers an app that is NOT
+    // shaped like a doorway-provisioned hosted app, so even that path stops picking
+    // a hosted cell when the steward's app is named something else.
+    const hostedAppId = /-conductor-[^-]+-[0-9a-f]{6}$/;
+    const matchingApp =
+      apps.find(a => a.installed_app_id === appIdPrefix) ??
+      apps.find(
+        a => a.installed_app_id.startsWith(appIdPrefix) && !hostedAppId.test(a.installed_app_id)
+      ) ??
+      apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
 
     if (!matchingApp) {
       if (cellTarget !== undefined) {
