@@ -17,7 +17,7 @@
 # set as CI's Dataplane Validation).
 #
 # USAGE:
-#   ./hc-mesh.sh [start|preflight|wait|stop|status|probe|prologue|join-peer|conductors-restart|coordswap]
+#   ./hc-mesh.sh [start|preflight|wait|stop|status|probe|prologue|join-peer|conductors-restart|portal-restart|coordswap]
 #
 #   `start` now runs `preflight` first, then launches detached (`setsid nohup
 #   bash "$0" __start_all_inner`, its own session) and returns in seconds —
@@ -1640,11 +1640,23 @@ status_all() {
     if curl -s -m 2 -o /dev/null "http://localhost:$DOORWAY_PORT/threshold/login"; then
       case "$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://localhost:$DOORWAY_PORT/threshold/login")" in
         200) echo "UP (/threshold/login serves through the doorway)" ;;
-        502) echo "down (doorway proxies /threshold/* here; nothing listening)" ;;
+        # Name WHICH of the two processes is missing. The RAM guard sheds the
+        # portal's `ng serve` (a fat node process with no supervisor) and leaves
+        # the doorway proxying to nothing — read through the proxy alone, that is
+        # indistinguishable from a doorway fault, and the browser lane then dies
+        # in a step timeout instead of on a named component. `portal-restart`
+        # brings it back without touching the rest of the mesh.
+        502) if portal_ready; then
+               echo "down (doorway cannot reach the portal upstream on :$THRESHOLD_PORT)"
+             else
+               echo "DOWN (no portal on :$THRESHOLD_PORT — shed or never started; ./hc-mesh.sh portal-restart)"
+             fi ;;
         *)   echo "down" ;;
       esac
+    elif portal_ready; then
+      echo "up on :$THRESHOLD_PORT but NOT reachable through the doorway (:$DOORWAY_PORT/threshold/login)"
     else
-      echo "down"
+      echo "DOWN (no portal on :$THRESHOLD_PORT — shed or never started; ./hc-mesh.sh portal-restart)"
     fi
   else
     echo "doorways: disabled (MESH_DOORWAYS=0)"
@@ -2983,7 +2995,7 @@ wait_all() { # [--timeout N]
     fi
     local portal_ok=1
     if [ "$MESH_PORTAL" = "1" ]; then
-      curl -s -m 2 -o /dev/null "http://127.0.0.1:$THRESHOLD_PORT/threshold/" || portal_ok=0
+      portal_ready || portal_ok=0
     fi
     local conductors_ok=1 i=0
     for _n in "${PEERS[@]}"; do
@@ -3019,6 +3031,34 @@ start_all() {
   # and it is made in the same place, for the same reason.
   assert_launch_prerequisites || return 1
   mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR" "$PID_DIR"
+
+  # COLD START: peer 0's admin port is silent, so step 2 below will `rm -rf` every
+  # peer's data root and regenerate the sandboxes. Decide that HERE, before anything
+  # is launched, because one more store has to go with them.
+  #
+  # The doorways' Mongo archive holds the ACCOUNT rows: identifier, password hash,
+  # human_id, agent_pub_key, installed_app_id. Those name cells on the conductors
+  # that are about to be destroyed. Keeping it across a cold start is not caution,
+  # it is incoherence — `POST /auth/register` answers 409 for an account whose cell
+  # no longer exists, `verifyExisting`'s login succeeds against the stale row, and
+  # nothing ever re-provisions. Measured 2026-09-11: after a stop/start, all 13 cast
+  # humans reported `[=] exists` and `prologue-hosted-2/3` reported
+  # `conductorId=elohim-conductor-0-5d7c97` on a conductor holding exactly ONE app.
+  # A credential whose cell is gone is a lie the mesh tells its own lane.
+  #
+  # MESH_KEEP_DOORWAY_DB=1 keeps it (for deliberately studying that skew).
+  MESH_COLD_START=0
+  if [ "$(ss -tln | grep -cE "127.0.0.1:$(admin_port 0) ")" -eq 0 ]; then
+    MESH_COLD_START=1
+    if [ "${MESH_KEEP_DOORWAY_DB:-0}" != "1" ] && [ -d "$MONGO_DIR" ]; then
+      if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
+        echo "WARN: cold start, but mongod is already live on :$MONGO_PORT — leaving the doorway archive in place (stop the mesh fully to get a clean recast)" >&2
+      else
+        echo "cold start: dropping the doorway archive ($MONGO_DIR) — its account rows name cells the conductor regenerate destroys"
+        rm -rf "$MONGO_DIR"
+      fi
+    fi
+  fi
 
   # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
   # ITS CWD; a missing file silently disables the whole heartbeat + signal-
@@ -3136,13 +3176,19 @@ EOF
     #
     # DOORWAY_MAX_AGENTS_PER_CONDUCTOR: the fleet default is 50, an OPERATOR ceiling on
     # kitsune2's per-space gossip budget (main.rs: arc convergence stalls past ~30 hosted
-    # agents on one conductor). The Prologue's cast is 26 hosted humans + 3 prologue-hosted
-    # registrants on ONE mesh conductor, and provisioner.rs registers each agent TWICE
-    # (URL_SAFE_NO_PAD and STANDARD base64) while registry.rs::register_agent increments
-    # capacity_used unconditionally — so 50 bites after ~25 cells, measured 2026-09-11:
-    # 26 provisions took conductor-0 to 50/50 from a seeded 0. Raise it here so the
-    # household can cast the roster it declares; the accounting defect stays named, not
-    # hidden, and MESH_DOORWAY_MAX_AGENTS pins it back down for a convergence experiment.
+    # agents on one conductor). provisioner.rs registers each agent TWICE (URL_SAFE_NO_PAD
+    # and STANDARD base64) while registry.rs::register_agent increments capacity_used
+    # unconditionally — so the ceiling bites at HALF the agents it names, measured
+    # 2026-09-11: 26 provisions took conductor-0 to 50/50 from a seeded 0.
+    #
+    # Sized to the DECLARED household cast, not to a round number. That cast is
+    # seed-humans.ts's HOUSEHOLD_HOSTED_CAST allow-list (14 names — the humans some
+    # household-lane a2o scenario actually signs in as) plus seed-hosted-humans.ts's 3
+    # `prologue-hosted-*` registrants = 17, doubled for the double-count = 34. The first
+    # `200` here was sized for the 29-persona cast that took matthew's conductor to
+    # 22.8 GB and got the lane shed; a ceiling no cast can reach is not a ceiling.
+    # The x2 comes out again when the doorway's double-count is fixed (Task 19b).
+    # MESH_DOORWAY_MAX_AGENTS overrides it for a convergence experiment.
     #
     # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
     # continuation, so everything above it becomes a plain shell assignment that the
@@ -3169,7 +3215,7 @@ EOF
     POOL_COMPUTE_URL="$primary" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 0 "${PEERS[0]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-200}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-34}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --app-port-min "$(app_port 0)" \
@@ -3213,7 +3259,7 @@ EOF
     POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 1)" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 1 "${PEERS[1]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-200}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-34}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
       --app-port-min "$(app_port 1)" \
@@ -3246,25 +3292,7 @@ EOF
   # and nothing else in the mesh depends on it, so blocking here would tax every
   # `mesh start` for a surface most runs never touch.
   if [ "$MESH_PORTAL" = "1" ]; then
-    if curl -s -m 2 -o /dev/null "http://127.0.0.1:$THRESHOLD_PORT/threshold/"; then
-      record_listener_pid portal mesh "$THRESHOLD_PORT" || true
-      echo "portal already up on :$THRESHOLD_PORT"
-    elif [ -d "$REPO_ROOT/doorway/doorway-app/node_modules" ] || [ -d "$REPO_ROOT/node_modules" ]; then
-      ( cd "$REPO_ROOT/doorway/doorway-app" && \
-        # --live-reload=false: the doorway PROXIES /threshold/* to this server, and
-        # a hot-reload WebSocket cannot traverse that proxy — it fails the
-        # handshake against the proxied 200 and emits console errors on every
-        # page. Those errors are indistinguishable from product errors to the
-        # browser a2o lane, which asserts a clean console after login. A portal
-        # that is only ever reached through the proxy has no use for HMR anyway.
-        nohup pnpm exec ng serve --port "$THRESHOLD_PORT" --serve-path /threshold \
-          --live-reload false \
-          --host 127.0.0.1 > "$LOGDIR/portal.log" 2>&1 & \
-        record_mesh_pid portal mesh "$!" || true )
-      echo "portal starting on :$THRESHOLD_PORT (doorway-app; ~40s to first paint, log: $LOGDIR/portal.log)"
-    else
-      echo "portal SKIPPED: no node_modules for doorway-app — run pnpm install (set MESH_PORTAL=0 to silence)" >&2
-    fi
+    start_portal
   fi
   fi
 
@@ -3276,7 +3304,7 @@ EOF
   #    `generate -r=$rports`) creates the window the pacing profile needs:
   #    the conductor must not boot until the patch has landed, or its first
   #    kitsune2 gossip round starts at prod cadence.
-  if [ "$(ss -tln | grep -cE "127.0.0.1:$(admin_port 0) ")" -eq 0 ]; then
+  if [ "$MESH_COLD_START" = "1" ]; then
     # Peer 0's silent admin port is not evidence that peers 1..n are idle, nor
     # that an ark is not alive between incarnations — and the next line removes
     # every peer's data root. Ask each peer before destroying anything.
@@ -3567,6 +3595,83 @@ reconcile_doorway_pool_performer() {
   done
 }
 
+# ---------------------------------------------------------------------------
+# The sign-in portal (doorway-app on THRESHOLD_PORT) as a first-class mesh
+# component — a readiness check and a restart arm, like storage and the doorways.
+#
+# Why it earns them: `ng serve` is a node process with a several-hundred-MB
+# resident set and no supervisor. The workspace RAM guard sheds it like any other
+# hot node process, and NOTHING in the mesh noticed — `mesh status` read the
+# doorway's /threshold/login proxy (a 502 once the upstream is gone) and every
+# browser scenario then timed out inside `threshold-register-display-name` with no
+# line naming the cause (measured 2026-09-11, run 20260911T0326Z). A component the
+# lane depends on that nothing can restart is a component that silently ends runs.
+portal_ready() { # -> 0 when the portal itself answers on THRESHOLD_PORT
+  curl -s -m 2 -o /dev/null "http://127.0.0.1:$THRESHOLD_PORT/threshold/"
+}
+
+# Started detached and NOT waited on: the dev server takes ~40s to become ready
+# and nothing else in `mesh start` depends on it, so blocking here would tax every
+# start for a surface most runs never touch. `mesh wait` already gates on it.
+start_portal() {
+  if portal_ready; then
+    record_listener_pid portal mesh "$THRESHOLD_PORT" || true
+    echo "portal already up on :$THRESHOLD_PORT"
+    return 0
+  fi
+  if [ ! -d "$REPO_ROOT/doorway/doorway-app/node_modules" ] && [ ! -d "$REPO_ROOT/node_modules" ]; then
+    echo "portal SKIPPED: no node_modules for doorway-app — run pnpm install (set MESH_PORTAL=0 to silence)" >&2
+    return 1
+  fi
+  ( cd "$REPO_ROOT/doorway/doorway-app" && \
+    # --live-reload=false: the doorway PROXIES /threshold/* to this server, and
+    # a hot-reload WebSocket cannot traverse that proxy — it fails the
+    # handshake against the proxied 200 and emits console errors on every
+    # page. Those errors are indistinguishable from product errors to the
+    # browser a2o lane, which asserts a clean console after login. A portal
+    # that is only ever reached through the proxy has no use for HMR anyway.
+    nohup pnpm exec ng serve --port "$THRESHOLD_PORT" --serve-path /threshold \
+      --live-reload false \
+      --host 127.0.0.1 > "$LOGDIR/portal.log" 2>&1 & \
+    record_mesh_pid portal mesh "$!" || true )
+  echo "portal starting on :$THRESHOLD_PORT (doorway-app; ~40s to first paint, log: $LOGDIR/portal.log)"
+}
+
+# Reap whatever is (or is not) on THRESHOLD_PORT and bring the portal back, then
+# BLOCK until it answers — unlike `start`, the caller of a restart is waiting on
+# this surface specifically, so returning before first paint would just move the
+# timeout. MESH_PORTAL_WAIT bounds it (default 180s: `ng serve` cold-compiles).
+restart_portal() {
+  local pid waited=0 budget="${MESH_PORTAL_WAIT:-180}"
+  if [ "$MESH_PORTAL" != "1" ]; then
+    echo "REFUSED: MESH_PORTAL=0 — this mesh declares no portal" >&2; return 2
+  fi
+  if pid="$(live_recorded_pid portal mesh)"; then
+    echo "portal: killing recorded pid $pid"
+    kill "$pid" 2>/dev/null || true
+    sleep 1
+    kill -9 "$pid" 2>/dev/null || true
+  else
+    # The shed case: the pidfile names a process that is gone. An `ng serve`
+    # leaves no listener behind, so there is nothing else to reap.
+    echo "portal: no live recorded process (shed, or never started)"
+  fi
+  rm -f "$PID_DIR/portal-mesh"
+  start_portal || return 1
+  echo -n "portal: waiting for first paint (<=${budget}s)"
+  while [ "$waited" -lt "$budget" ]; do
+    if portal_ready; then
+      echo " ready"
+      record_listener_pid portal mesh "$THRESHOLD_PORT" || true
+      return 0
+    fi
+    sleep 3; waited=$((waited + 3)); echo -n .
+  done
+  echo
+  echo "portal: NOT ready after ${budget}s — see $LOGDIR/portal.log" >&2
+  return 1
+}
+
 restart_doorway() { # <a|b> [extra SSR slug]
   local name="$1" slug="${2:-}" pid next
   case "$name" in a|b) ;; *) echo 'REFUSED: doorway must be a or b' >&2; return 1 ;; esac
@@ -3631,11 +3736,12 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
     storage-restart) shift; restart_storage "$@" ;;
     storage-stop) shift; stop_storage "$@" ;;
     doorway-restart) shift; restart_doorway "$@" ;;
+    portal-restart) restart_portal ;;
     zome-probe) probe_zome_paths ;;
     fixture-refresh) refresh_fixture_pids ;;
     lineage-reset) lineage_reset_all ;;
     blocks)   shift; mesh_blocks "$@" ;;
     prologue) shift; exec bash "$SCRIPT_DIR/hc-mesh-prologue.sh" "$@" ;;
-    *) echo "usage: hc-mesh.sh [start|preflight|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
+    *) echo "usage: hc-mesh.sh [start|preflight|wait [--timeout N]|stop|status|probe|prologue|join-peer <fresh-name>|conductors-restart|coordswap <fleet-coordswap args...>|storage-restart [peer...]|portal-restart|blocks [peer...]|zome-probe|fixture-refresh|lineage-reset]"; exit 2 ;;
   esac
 fi

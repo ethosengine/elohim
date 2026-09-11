@@ -110,6 +110,26 @@ test target="changed" scope="":
           export E2E_DEVICE_MODE=playwright
           export E2E_APP_URL="${E2E_APP_URL:-$DOORWAY_URL}"
           export CUCUMBER_JSON_REPORT="${CUCUMBER_JSON_REPORT:-$reports_dir/cucumber-mesh-browser.json}"
+          # PORTAL PREFLIGHT — refuse before launch, the same contract `just mesh preflight`
+          # holds for the mesh itself. The portal is a bare `ng serve` with no supervisor;
+          # the workspace RAM guard sheds it and the only symptom the lane produced was a
+          # step timeout inside `threshold-register-display-name` with nothing naming the
+          # cause (measured 2026-09-11, run 20260911T0326Z — every browser scenario timed
+          # out, ~1 wasted run). Every browser scenario signs in through
+          # <doorway>/threshold/login, so a single probe of exactly that URL is the whole
+          # precondition: a 502 there is the portal upstream gone.
+          portal_url="$E2E_APP_URL/threshold/login"
+          portal_code="$(curl -s -m 10 -o /dev/null -w '%{http_code}' "$portal_url" || echo 000)"
+          if [[ "$portal_code" != "200" ]]; then
+            echo "REFUSED: the sign-in portal does not answer at $portal_url (HTTP $portal_code)." >&2
+            echo "  Every @browser scenario signs in there; without it they all time out in" >&2
+            echo "  'threshold-register-display-name' with no hint. Bring it back with:" >&2
+            echo "    just mesh portal-restart      # then re-run this lane" >&2
+            echo "  (502 = the doorway is up but its THRESHOLD_URL upstream is gone — the" >&2
+            echo "   usual case, a RAM-guard shed. 000 = the doorway itself is down: just mesh status.)" >&2
+            exit 2
+          fi
+          echo "portal preflight ok: $portal_url -> 200"
         fi
         cd "{{ a2o_dir }}"
         # NO `exec`: exec replaces the shell, so nothing after cucumber ever ran and a run
@@ -265,8 +285,13 @@ mesh action="status" *args:
       # recovery harness drives, reachable through the verb so a shift never has to know the script.
       conductors-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" conductors-restart ;;
       storage-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" storage-restart {{ args }} ;;
+      # The sign-in portal (doorway-app `ng serve` on THRESHOLD_PORT) is shed by the
+      # workspace RAM guard like any other fat node process and nothing supervises it.
+      # `just test mesh-browser` refuses to start without it, and this is the arm that
+      # brings it back — no other mesh component is touched.
+      portal-restart) exec "{{ app_dir }}/scripts/hc-mesh.sh" portal-restart ;;
       join-peer) exec "{{ app_dir }}/scripts/hc-mesh.sh" join-peer {{ args }} ;;
-      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|join-peer <fresh-name>" >&2; exit 2 ;;
+      *) echo "mesh action must be start|preflight|wait [--timeout N]|stop|status|probe|prologue|quiesce|monitor|matrix|recovery|recovery-matrix|conductors-restart|storage-restart [peer...]|portal-restart|join-peer <fresh-name>" >&2; exit 2 ;;
     esac
 
 # Seed content or validate a corpus facet (profile: local|alpha|mesh). False content dry-run modes are intentionally absent.
@@ -444,6 +469,29 @@ _gate-eprfs:
     cd elohim/eprfs && cargo fmt --check
     cd elohim/eprfs && cargo clippy --workspace --all-targets -- -D warnings
     cd elohim/eprfs && cargo test --workspace
+
+# Exercise the agent journey against the same native binary just built in the
+# manifest-selected pool slot; the Cucumber profile owns isolated local fixtures.
+_gate-memory-ceremony:
+    # Station six round (a) (2026-09-11): genesis/scripts/memory_balance.py, its shell wrapper
+    # and its unittest are deleted. The paired burden/benefit measure is native —
+    # elohim/eprfs/epr-cli/src/flow/memory/footprint.rs (METHOD_VERSION bounded-memory-balance-v1),
+    # gated below by --test flow_memory_footprint, whose pinned normalized digest is asserted
+    # unconditionally and does not need the Python oracle to be present.
+    cargo build --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli
+    # Station five (2026-09-10): the recall executor and the identity-closed corrections view are
+    # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
+    # out-of-process artefacts); the Python suite and its scripts are gone.
+    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint
+    # Station four (2026-09-10): the memory-index projection router and the relocated memory
+    # lenses. Station six round (b) (2026-09-11) removed the kit leg from every hook, so these
+    # now pin the INVERTED contract: a drift signal is a fold and only a fold, and the index
+    # projection STANDS DOWN rather than falling back. Nothing else ran .claude/hooks/__tests__ —
+    # the same verification-that-never-runs shape pre-push names for .claude/scripts/_lib/__tests__.
+    EPR_BIN="$CARGO_TARGET_DIR/debug/epr" python3 -m unittest discover -s .claude/hooks/__tests__ -p '*_test.py'
+    python3 .epr-meta/elohim/lenses/memory/__tests__/memory_coherence_audit_test.py
+    cd genesis/a2o && EPR_BIN="$CARGO_TARGET_DIR/debug/epr" pnpm exec cucumber-js --profile ceremony
+    cd genesis/a2o && EPR_BIN="$CARGO_TARGET_DIR/debug/epr" pnpm exec cucumber-js --profile collective-memory
 
 _gate-seam-contracts:
     cd crates/seam-contracts && cargo test --all-features
