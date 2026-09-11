@@ -1697,6 +1697,9 @@ This task is **held on purpose**, tagged so `--focus` drops it rather than count
 
 ## Complementary work captured, not planned
 
+- **05-leaving.feature blind-reader findings deferred by the chief (2026-09-11, READY verdict after 60c3b4a36):** (1) "agency pipeline" is asserted (line 58) but never defined in the preamble — it is carried by `../agency-pipeline-coherence.feature`; add one defining sentence or move the assertion. (2) "the password they registered with" (lines 66, 123) names a credential no step ever shows being chosen — surface it in the registration step or a preamble note. Minor: station/finish-line relationship lives in a comment; `E2E_DOORWAY_ALPHA` unexplained; "a second browser" has no Given. Owner: the hosted-human series author, next authoring pass.
+
+
 One finding from the 2026-09-10 probes, **not in this sprint's scope** — file it as a one-line backlog atom, do not create the file as part of this plan's tasks:
 
 - **Two doorways project different custody views of one CID.** `/epr/evolution-of-trust` reads "Held by 1 of 3 households" on `elohim.host` (apex) and "Held by 3 of 3 (Eden, Matthew's, Susan's)" on `alpha.elohim.host` — same CID, two answers, so at least one doorway's custody projection is stale or partial. Domain D8. File as `genesis/data/timeline/backlog/doorway-custody-view-diverges-per-doorway-2026-09-10.md`.
