@@ -41,6 +41,7 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
     let orientation = &view["orientation"];
     let minimal = matches!(lens.level, LensLevel::Minimal | LensLevel::Simple);
     let is_open_shaped = is_open_shaped(view);
+    let operation = view["operation"].as_str().unwrap_or_default();
 
     out.push_str(&format!(
         "Intent: {}\n",
@@ -106,6 +107,13 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
     }
 
     if minimal && is_open_shaped {
+        // Fix round 3: a resumed session's recovered state (`continuation`) is the READER'S OWN
+        // findings/evidence/questions, never a candidate list — it renders here even though the
+        // candidate block below it stays density-bounded. `open` always recovers an empty
+        // continuation (a brand-new ceremony), so it keeps the one-line summary only; `resume`/
+        // `adopt` additionally get the latest finding and latest unresolved question, since those
+        // are exactly what the reader asked to recover.
+        out.push_str(&render_continuation_summary(view, operation));
         // `open`/`resume`/`adopt` ONLY: the candidate-shaped result stays density-bounded, and
         // Linked choices are built from the same `shown` selection (fix round 1) rather than the
         // view's raw action list.
@@ -146,7 +154,7 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
                 out.push_str(&render_concerns(value));
                 continue;
             }
-            if let Some(line) = summary_line(key, value) {
+            if let Some(line) = summary_line(key, value, operation) {
                 out.push_str(&line);
                 continue;
             }
@@ -260,6 +268,59 @@ fn render_bootstrap_line(view: &Value) -> Option<String> {
         }
     }
     Some(line)
+}
+
+/// Fix round 3: at `minimal`/`simple`, an `open`/`resume`/`adopt` view's recovered `continuation`
+/// state is never density-bounded — it is the READER'S OWN findings/evidence/questions, not a
+/// candidate list, even though the candidate block it sits beside stays bounded. Prints the SAME
+/// one-line summary [`summary_line`]'s `"continuation"` case prints (deliberately without that
+/// case's optional `Selected:` line — provenance for a chosen concern edge, not part of "what did
+/// I recover"), plus [`continuation_recovery_lines`]. `""` when the view carries no `continuation`
+/// at all (a harmless no-op, not a panic). Only reached for an `is_open_shaped` view at `minimal`/
+/// `simple` — [`render`]'s early return there is exactly where `summary_line`'s `"continuation"`
+/// case (which ALSO calls `continuation_recovery_lines`, so a `resume`/`adopt` view gets the same
+/// finding/question lines regardless of which of the two code paths it takes) would otherwise
+/// have printed it, had that path not returned before reaching the generic key dump.
+fn render_continuation_summary(view: &Value, operation: &str) -> String {
+    let continuation = &view["continuation"];
+    if continuation.is_null() {
+        return String::new();
+    }
+    let counts = &continuation["counts"];
+    let mut out = format!(
+        "Continuation: {} finding(s) · {} evidence · {} question(s) · next: {}\n",
+        count_of(counts, "findings"),
+        count_of(counts, "evidence"),
+        count_of(counts, "questions"),
+        continuation["next_action"]
+            .as_str()
+            .unwrap_or("choose a concern"),
+    );
+    out.push_str(&continuation_recovery_lines(continuation, operation));
+    out
+}
+
+/// The latest finding's claim and the latest unresolved question from a `continuation` block,
+/// each clipped to 160 chars on its own line (mirroring `render_bootstrap_line`'s bullet
+/// treatment) — ONLY for `resume`/`adopt`, where there is a PRIOR session's state to recover;
+/// never a fresh `open`, whose continuation is always freshly empty. `""` when the operation
+/// isn't `resume`/`adopt`, or when a slot is honestly absent (fewer than one finding/question
+/// retained yet). Shared by [`render_continuation_summary`] (the `minimal`/`simple`
+/// `is_open_shaped` early return) and `summary_line`'s `"continuation"` case (every other path,
+/// at every lens) — a resumed reader's recovered state must be visible whichever of the two
+/// `render()` paths their view takes, not just one of them.
+fn continuation_recovery_lines(continuation: &Value, operation: &str) -> String {
+    if !matches!(operation, "resume" | "adopt") {
+        return String::new();
+    }
+    let mut out = String::new();
+    if let Some(finding) = continuation["findings"][0]["claim"].as_str() {
+        out.push_str(&format!("Finding: {}\n", clip(finding, 160)));
+    }
+    if let Some(question) = continuation["unresolved_questions"][0].as_str() {
+        out.push_str(&format!("Question: {}\n", clip(question, 160)));
+    }
+    out
 }
 
 /// The rule this view actually ranked candidates by, from whichever door produced them — the
@@ -681,7 +742,9 @@ fn render_concerns(value: &Value) -> String {
 }
 
 /// The compact line for one accounting structure, or `None` when the key has no summary shape.
-fn summary_line(key: &str, value: &Value) -> Option<String> {
+/// `operation` is only consulted by the `"continuation"` case (fix round 3 —
+/// [`continuation_recovery_lines`]); every other case ignores it.
+fn summary_line(key: &str, value: &Value, operation: &str) -> Option<String> {
     match key {
         "continuation" => {
             let counts = &value["counts"];
@@ -695,6 +758,11 @@ fn summary_line(key: &str, value: &Value) -> Option<String> {
             if let Some(selected) = value["selected"]["slot"]["from"].as_str() {
                 line.push_str(&format!("Selected: {selected}\n"));
             }
+            // Fix round 3: a resumed reader's recovered state must be visible at every lens —
+            // `resume`/`adopt` views that carry `concerns`/`first_screen` (so `render()` takes
+            // the `minimal`/`simple` early return) get these same lines from
+            // `render_continuation_summary` instead; this arm covers every other path.
+            line.push_str(&continuation_recovery_lines(value, operation));
             Some(line)
         }
         "cumulative" => {

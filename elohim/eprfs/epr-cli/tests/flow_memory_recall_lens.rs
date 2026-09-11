@@ -644,3 +644,70 @@ fn the_lens_line_renders_exactly_once_at_simple_for_open_read_and_source() {
         "{source_text}"
     );
 }
+
+// ── fix round 3: a resumed session's recovered state renders at every lens ────────────────────────
+//
+// `resume`/`adopt` views that carry `concerns` (the whole-scope door, or a selected edge) are
+// `is_open_shaped`, so at `minimal`/`simple` the early return that keeps the candidate block
+// density-bounded was ALSO hiding `view["continuation"]` — the resumed session's recovered
+// findings, evidence receipts and unresolved questions. Ruling: the continuation renders as one
+// summary line at every open-shaped lens, and `resume`/`adopt` additionally get the latest
+// finding and latest unresolved question — the reader's own recovered state is never
+// density-bounded, even though the candidate list it sits beside still is.
+
+/// `resume` at `simple` recovers a finding and a question remembered in a prior `remember` call —
+/// both must be visible without asking for a wider lens.
+#[test]
+fn resume_renders_its_recovered_finding_and_question_at_simple() {
+    let dir = repo();
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix3-resume");
+    view_in(dir.path(), "fix3-resume", &["open", "--need", "orient"]);
+    view_in(
+        dir.path(),
+        "fix3-resume",
+        &["select", "--edge", "1", "--need", "Check the dependency"],
+    );
+    view_in(
+        dir.path(),
+        "fix3-resume",
+        &["read", "--path", "docs/source.md", "--lines", "6:7"],
+    );
+    view_in(
+        dir.path(),
+        "fix3-resume",
+        &[
+            "remember",
+            "--finding",
+            "Needs a qualified reading",
+            "--question",
+            "Does the narrow evidence support the wider claim?",
+            "--next-action",
+            "Seek independent review",
+            "--evidence",
+            "docs/source.md:6:7",
+        ],
+    );
+    let resume_text = text_in(dir.path(), "fix3-resume", &["resume"]);
+    assert!(
+        resume_text.contains("Continuation:") && resume_text.contains("finding(s)"),
+        "{resume_text}"
+    );
+    assert!(
+        resume_text.contains("Needs a qualified reading"),
+        "the latest finding must render at simple:\n{resume_text}"
+    );
+    assert!(
+        resume_text.contains("Does the narrow evidence support the wider claim?"),
+        "the latest unresolved question must render at simple:\n{resume_text}"
+    );
+}
+
+/// `open` at `simple` carries the same one-line continuation summary exactly once — a fresh
+/// ceremony recovers nothing, so it never grows the finding/question lines `resume`/`adopt` do.
+#[test]
+fn open_carries_the_continuation_summary_exactly_once_at_simple() {
+    let dir = repo();
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "fix3-open");
+    let open_text = text_in(dir.path(), "fix3-open", &["open", "--need", "orient"]);
+    assert_eq!(open_text.matches("Continuation:").count(), 1, "{open_text}");
+}
