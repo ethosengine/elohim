@@ -3999,3 +3999,76 @@ decisionPoints:
       - path: elohim/elohim-storage/src/services/feedback_projector/tests.rs
         testName: fresh_rebuild_replays_retained_acts_after_links_disappear
         kind: unit
+
+  # =========================================================================
+  # Hosted compute contract — the delegates-compute grant surface (D2,
+  # 2026-09-10 doorway-federation plan Tasks 15-16). No new entry type, no new
+  # route: the scope is a payload field on the EXISTING `delegates-compute`
+  # Mishpat commitment, and withdrawal is a body variant of the EXISTING
+  # `POST /api/v1/compute/grants`.
+  # =========================================================================
+
+  - name: grant_scope
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/api/compute_grants.rs
+      modulePath: api::compute_grants::grant_scope
+      line: 52
+    summary: >
+      Decides which delegated scope a grant request names, from a fixed
+      `&'static str` allow-list, so no caller-supplied bytes ever reach the
+      notarized payload; absent answers the historical `sweettest-feedback`
+      default and an unrecognised value is refused rather than dropped.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The scope is a field of the notarized commitment payload (DHT truth); the
+          `mishpat_commitments.scope` column is its projection, and this predicate
+          decides the truth-plane value, never the projection's.
+      - { id: C1, status: n-a, justification: "Names no author and elects no head." }
+      - { id: C2, status: n-a, justification: "No selection among competing claims; one request, one scope." }
+      - { id: C3, status: n-a, justification: "Not a state machine; a total function with no non-terminal state." }
+      - id: C4
+        status: answered
+        justification: >
+          Absent, accepted and unrecognised are three distinct answers. The defect this
+          closes is exactly C4's shape: an unrecognised scope used to be SILENTLY DROPPED
+          by the unknown-field guard's sibling path, so every grant this surface ever
+          issued read `sweettest-feedback` whatever it was for.
+      - { id: C5, status: n-a, justification: "Nothing is transferred or believed; the caller's string is matched, never trusted as evidence." }
+      - { id: C6a, status: answered, justification: "One scan of a two-element const list; no loop, retry or budget to declare." }
+      - id: C6b
+        status: answered
+        justification: >
+          Pure. An absent scope re-derives byte-identical notarized payload bytes, so the
+          existing exact-retry hash stability (`grant_hash`) is preserved for every caller
+          that predates the field.
+      - id: C7
+        status: answered
+        justification: >
+          The refusal message now names what the surface actually accepts. It previously
+          advertised "provider and scope are server-owned" while the field guard refused a
+          caller-supplied scope outright — advertising one contract and serving another.
+      - { id: C8, status: partial, justification: "Refusals surface as typed InvalidInput to the caller; there is no labeled per-scope counter, so a rejected scope is not countable in metrics." }
+      - { id: C9, status: n-a, justification: "Carries no agent reference; provider and recipient identity are decided elsewhere in grant_input." }
+      - id: C10
+        status: answered
+        justification: >
+          Contract-evolution honesty in its literal form: an unknown scope value FAILS the
+          parse rather than defaulting, and the absent case defaults to a DECLARED value
+          chosen so old callers' wire bytes do not move.
+      - { id: C11, status: n-a, justification: "No externally-imposed load reaches a pure match over a const list." }
+      - { id: C12, status: partial, justification: "The scope NAMES the class of authority delegated; enforcing that class where the authority is spent is the bounds validator's gate, not this predicate's." }
+      - { id: C13, status: n-a, justification: "A vocabulary entry, not an authority gate serving a lower social tier; it confers no tier and has no successor criterion to record." }
+      - { id: C14, status: partial, justification: "An unrecognised scope is refused with its own message; no RCA context capsule is captured for a scope the fleet has not seen." }
+    contractTests:
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: a_named_scope_reaches_the_notarized_payload
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: an_unnamed_scope_still_defaults_to_the_sweettest_feedback_lane
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: an_unknown_scope_value_is_refused
+        kind: unit

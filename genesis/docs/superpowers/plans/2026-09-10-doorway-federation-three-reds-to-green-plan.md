@@ -1148,7 +1148,7 @@ Two tasks, both small, both **Opus (rust-architect)**. **The gate is slow here**
 
 **The defect being fixed:** `grant_input` hard-codes `"scope":"sweettest-feedback"` in the notarized payload (line 115) and `issue` hard-codes it again in the consent metadata (line 194), while `grant_input`'s own unknown-field guard (line 46-56) rejects a caller-supplied `scope` with *"unknown grant field; provider and scope are server-owned"*. Every grant this surface has ever issued is therefore scoped `sweettest-feedback`, whatever it was for.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 In `compute_grants.rs`'s test module:
 
@@ -1185,7 +1185,7 @@ fn an_unknown_scope_value_is_refused() {
 
 Reuse the constants and the `VALID_KEY` fixture the module's existing tests already build (see the `bounds` fixture at `:344` and the field-rejection table at `:363`/`:399`).
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim/elohim-storage
@@ -1193,13 +1193,13 @@ CARGO_TARGET_DIR=/tmp/elohim-storage-target CARGO_BUILD_JOBS=1 cargo test --lib 
 ```
 Expected: FAIL — the first test sees `"sweettest-feedback"`; the third is accepted today (scope is silently dropped, so nothing refuses it — the test fails because `is_err()` is false).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Add `"scope"` to the accepted key set at `:46-56` (and correct the error message so it no longer says scope is server-owned). Validate it against a fixed allow-list — `"sweettest-feedback"` and `"hosted-cell"`, nothing else — defaulting to `"sweettest-feedback"` when absent, so every existing caller's notarized bytes are unchanged. Thread the chosen value into the payload at `:115` and the consent metadata at `:194`.
 
 **This does not move the DNA hash:** the commitment is the existing `delegates-compute` entry type with a different `payload_json` string. It is a payload change, not an entry-type change, exactly as D2 says.
 
-- [ ] **Step 4: Green the tests, then the gate**
+- [x] **Step 4: Green the tests, then the gate**
 
 ```bash
 cd /projects/elohim/elohim-storage
@@ -1208,7 +1208,7 @@ cd /projects/elohim && just gate elohim-storage; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`. The full gate takes a while at one cargo job; do not run another heavy gate beside it.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim

@@ -34,6 +34,35 @@ fn stamp(input: &Value, field: &str) -> Result<DateTime<Utc>, StorageError> {
         .map_err(|_| invalid("timestamps must be RFC3339"))
 }
 
+/// The delegated-scope vocabulary this surface will notarize. A caller NAMES a
+/// scope, it does not invent one: every accepted value is a `&'static str` from
+/// this list, so no caller-supplied bytes ever reach the notarized payload.
+/// Extending the protocol's social vocabulary is an entry in this list plus its
+/// consumer, never a new entry type — the commitment stays the existing
+/// `delegates-compute` Mishpat entry and the DNA hash does not move.
+const GRANT_SCOPES: [&str; 2] = ["sweettest-feedback", "hosted-cell"];
+
+/// The scope a grant request names, or the historical default.
+///
+/// Pure. An absent scope answers `"sweettest-feedback"` so every caller that
+/// predates the field notarizes byte-identical payload bytes; a named scope is
+/// admitted only when it is one of [`GRANT_SCOPES`]; anything else is refused
+/// rather than silently dropped (dropping is what made every grant this surface
+/// ever issued read as `sweettest-feedback`, whatever it was actually for).
+fn grant_scope(input: &Value) -> Result<&'static str, StorageError> {
+    let Some(named) = input.get("scope") else {
+        return Ok(GRANT_SCOPES[0]);
+    };
+    let named = named
+        .as_str()
+        .ok_or_else(|| invalid("scope must be a string"))?;
+    GRANT_SCOPES
+        .iter()
+        .find(|known| **known == named)
+        .copied()
+        .ok_or_else(|| invalid("unknown grant scope"))
+}
+
 fn grant_input(
     provider: &str,
     input: &Value,
@@ -45,13 +74,14 @@ fn grant_input(
     if fields.keys().any(|k| {
         !matches!(
             k.as_str(),
-            "recipient" | "issuedAt" | "validFrom" | "validUntil" | "bounds"
+            "recipient" | "scope" | "issuedAt" | "validFrom" | "validUntil" | "bounds"
         )
     }) {
         return Err(invalid(
-            "unknown grant field; provider and scope are server-owned",
+            "unknown grant field; provider is server-owned and scope must be named from the accepted list",
         ));
     }
+    let delegated = grant_scope(input)?;
     let recipient = input["recipient"]
         .as_str()
         .ok_or_else(|| invalid("recipient required"))?;
@@ -112,7 +142,7 @@ fn grant_input(
         ));
     }
     let payload = json!({
-        "action":"delegates-compute", "scope":"sweettest-feedback",
+        "action":"delegates-compute", "scope":delegated,
         "provider":provider, "recipient":recipient, "bounds":input["bounds"],
         "valid_from":from.to_rfc3339(), "valid_until":until.to_rfc3339()
     });
@@ -138,6 +168,7 @@ pub async fn issue(
     input: &Value,
 ) -> Result<Value, StorageError> {
     let provider = hc.agent_key_uhcak();
+    let delegated = grant_scope(input)?;
     let grant = grant_input(&provider, input, Utc::now())?;
     let entry_hash = grant_hash(&grant)?;
     let cid = entry_hash.to_string();
@@ -191,7 +222,8 @@ pub async fn issue(
         }
     }
 
-    let metadata = json!({"grant_cid":cid,"grant_action_hash":action_hash.to_string(),"scope":"sweettest-feedback"});
+    let metadata =
+        json!({"grant_cid":cid,"grant_action_hash":action_hash.to_string(),"scope":delegated});
     let consent_input: shefa_types::CreateReaEconomicEventInput = serde_json::from_value(json!({
         "id":format!("compute-consent:{cid}"), "action":"accept", "provider":provider,
         "receiver":input["recipient"], "has_point_in_time":grant.signed_at,
@@ -387,6 +419,30 @@ mod tests {
         assert!(jsonschema::validator_for(&schema)
             .unwrap()
             .is_valid(&payload));
+    }
+
+    #[test]
+    fn a_named_scope_reaches_the_notarized_payload() {
+        let mut raw = input();
+        raw["scope"] = json!("hosted-cell");
+        let grant = grant_input("provider", &raw, now()).expect("accepted");
+        let payload: Value = serde_json::from_str(&grant.payload_json).unwrap();
+        assert_eq!(payload["scope"], "hosted-cell");
+    }
+
+    #[test]
+    fn an_unnamed_scope_still_defaults_to_the_sweettest_feedback_lane() {
+        // existing callers pass no scope; their notarized payload must not change
+        let grant = grant_input("provider", &input(), now()).expect("accepted");
+        let payload: Value = serde_json::from_str(&grant.payload_json).unwrap();
+        assert_eq!(payload["scope"], "sweettest-feedback");
+    }
+
+    #[test]
+    fn an_unknown_scope_value_is_refused() {
+        let mut raw = input();
+        raw["scope"] = json!("whatever-i-want");
+        assert!(grant_input("provider", &raw, now()).is_err());
     }
 
     #[test]
