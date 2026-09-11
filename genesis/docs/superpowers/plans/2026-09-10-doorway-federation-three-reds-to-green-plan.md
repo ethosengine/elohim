@@ -641,7 +641,7 @@ Eight tasks. Tier: **Opus (rust-architect)** for Tasks 7, 8, 9, 13, 14; **Sonnet
 **Interfaces:**
 - Produces: `pub(crate) fn should_provision(registry_configured: bool, dev_mode: bool) -> bool` in `auth_routes.rs`. Task 13 calls the same register path immediately after provisioning succeeds.
 
-- [ ] **Step 1: Write the failing unit tests**
+- [x] **Step 1: Write the failing unit tests**
 
 In `doorway/doorway-service/src/routes/auth_routes.rs`, in the module's `#[cfg(test)] mod tests`:
 
@@ -659,7 +659,7 @@ fn should_provision_is_false_without_a_pool() {
 }
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [ ] **Step 2: Run them and watch them fail** — NOT RUN. The host build guards (IO-pressure deny, then one-build-at-a-time behind another session's cargo) displaced the red run; the red is established by construction instead — the tests were written and left on disk while the predicate did not yet exist anywhere in the crate, so the compile could only have failed. The green run is the gate (`just gate doorway` EXIT=0, 2026-09-11).
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -667,7 +667,7 @@ RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/doorway-target cargo test should_provision 2>
 ```
 Expected: FAIL — `cannot find function 'should_provision'`.
 
-- [ ] **Step 3: Implement the predicate and use it**
+- [x] **Step 3: Implement the predicate and use it**
 
 ```rust
 /// Whether a hosted registrant gets their own provisioned cell.
@@ -691,7 +691,7 @@ At `:1040` and `:1303`, replace `} else if state.args.dev_mode {` with a declare
 } else if matches!(state.network_stage, seam_contracts::freshness::NetworkStage::Simulacra) {
 ```
 
-- [ ] **Step 4: Run the tests to green, then the whole gate**
+- [x] **Step 4: Run the tests to green, then the whole gate**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -700,7 +700,7 @@ cd /projects/elohim && just gate doorway; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`.
 
-- [ ] **Step 5: Add the seam-registry row**
+- [x] **Step 5: Add the seam-registry row**
 
 Append to `decisionPoints:` in `doorway/doorway-service/seam-registry.yaml`, matching the existing row shape (`name`, `kind`, `sourceLocation{file,modulePath,line}`, `summary`, `concernIds`, `contractTests`):
 
@@ -734,7 +734,14 @@ Re-run `just gate doorway; echo "EXIT=$?"` (the seam census runs inside it). Exp
 
 **Note on the brief's optional hardening:** a stage-gated *fallback ladder* (Simulacra → cheap synthetic identity; Bootstrap+ → refuse) beyond the single `matches!` guard above is **OPTIONAL hardening, not required by this plan**. Do not expand scope into it.
 
-- [ ] **Step 6: Commit**
+**Landed 2026-09-11 (commit `60fb28a39`):** the fallback guard landed as a named predicate
+`synthetic_identity_fallback_allowed(stage)` rather than an inline `matches!`, so it is pinned by
+`synthetic_identity_fallback_is_simulacra_only` and carries its own seam-registry row — the
+"one-line addition WITH a test" bar. No fallback ladder was added. `auth_routes.rs` is now 5238
+lines and tripped the `rs-loc-ceiling` soft nudge (3000; hard 7000) at commit time — recorded
+here, not refactored mid-edit.
+
+- [x] **Step 6: Commit**
 
 ```bash
 cd /projects/elohim
@@ -759,7 +766,7 @@ git commit -m "fix(doorway): provision hosted cells on pool presence, not dev_mo
 **Interfaces:**
 - Produces: `pub(crate) fn should_subscribe_to_signals(projection_writer: bool) -> bool` in `main.rs`.
 
-- [ ] **Step 1: Write the failing unit tests**
+- [x] **Step 1: Write the failing unit tests**
 
 ```rust
 #[test]
@@ -773,7 +780,7 @@ fn a_read_replica_never_subscribes() {
 }
 ```
 
-- [ ] **Step 2: Run them and watch them fail**
+- [ ] **Step 2: Run them and watch them fail** — NOT RUN. The host build guards (IO-pressure deny, then one-build-at-a-time behind another session's cargo) displaced the red run; the red is established by construction instead — the tests were written and left on disk while the predicate did not yet exist anywhere in the crate, so the compile could only have failed. The green run is the gate (`just gate doorway` EXIT=0, 2026-09-11).
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -781,7 +788,7 @@ RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/doorway-target cargo test should_subscribe_to
 ```
 Expected: FAIL — function not found.
 
-- [ ] **Step 3: Implement and rewire**
+- [x] **Step 3: Implement and rewire**
 
 ```rust
 /// A projection WRITER subscribes to conductor signals. Stage-independent.
@@ -797,11 +804,11 @@ pub(crate) fn should_subscribe_to_signals(projection_writer: bool) -> bool {
 
 At `main.rs:1221`, replace the condition `if !args.projection_writer || (args.dev_mode && !args.dev_signal_subscriber)` with `if !should_subscribe_to_signals(args.projection_writer)`. Leave the inner `info!` branch that distinguishes reader mode; delete the now-unreachable dev-mode `else` message and update the surrounding comment block (`main.rs:1210-1219`) so it no longer describes dev-mode gating. Leave the `--dev-signal-subscriber` CLI flag in place as a no-op with a deprecation note in its doc comment; removing a flag is a separate change.
 
-- [ ] **Step 4: Relabel the tile**
+- [x] **Step 4: Relabel the tile**
 
 `templates/status.html`: change the `<h2>Projection Subscribers</h2>` (line 126) to `<h2>Conductor signal subscriptions</h2>`, the HTML comment above it to match, and the stat-card label at line 169 from `Subscribers` to `Signal subscriptions`. Do not change `resource_usage.active_subscribers` — the field name stays.
 
-- [ ] **Step 5: Green the tests and gate**
+- [x] **Step 5: Green the tests and gate**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -810,11 +817,11 @@ cd /projects/elohim && just gate doorway; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`.
 
-- [ ] **Step 6: Add the seam-registry row**
+- [x] **Step 6: Add the seam-registry row**
 
 Same shape as Task 7 Step 5, `name: should_subscribe_to_signals`, `modulePath: main::should_subscribe_to_signals`, with the two tests as `contractTests`. Re-run `just gate doorway; echo "EXIT=$?"`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 cd /projects/elohim
