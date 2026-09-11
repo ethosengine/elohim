@@ -200,6 +200,33 @@ pub struct UserDoc {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conductor_id: Option<String>,
 
+    /// Display name this human registered under.
+    ///
+    /// A doorway-local PROJECTION of the `Human` profile on the DHT, kept here
+    /// so `GET /auth/account` can greet a person by name without a zome call on
+    /// every account-page load. The DHT entry is the truth; this is a cache of
+    /// it, and a stale copy here is a cosmetic bug, never an identity one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    // ── The hosted cell as a notarized promise (D2) ──────────────────────────
+    /// CID of the live `hosted-cell` `delegates-compute` commitment the pool
+    /// peer issued for this human — the ENTRY hash, which is what
+    /// `GET /api/v1/commitments/{id}` reads back.
+    ///
+    /// Absent means no promise was recorded: either this doorway notarizes
+    /// nothing (no pool-compute configuration), or the notary was unreachable at
+    /// registration. It never means "the human is not hosted" — that is what
+    /// `conductor_id` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_grant_cid: Option<String>,
+
+    /// When that promise runs out, RFC3339 UTC at seconds precision (see
+    /// `routes::hosted_cell::rfc3339_utc_secs`). The format is load-bearing:
+    /// `live_hosted_cell_filter` compares these as strings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_valid_until: Option<String>,
+
     /// When this human closed their OWN account via `POST /auth/close-account`.
     ///
     /// Distinct from `metadata.deleted_at`, which an operator's soft-delete
@@ -251,6 +278,9 @@ impl UserDoc {
             is_steward: false,
             stewardship_at: None,
             conductor_id: None,
+            display_name: None,
+            hosted_cell_grant_cid: None,
+            hosted_cell_valid_until: None,
             closed_at: None,
         }
     }

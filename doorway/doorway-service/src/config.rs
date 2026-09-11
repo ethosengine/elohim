@@ -263,6 +263,31 @@ pub struct Args {
     #[arg(long, env = "STORAGE_URLS", value_delimiter = ',')]
     pub storage_urls: Vec<String>,
 
+    // ── Pool compute: notarizing the cells this doorway's pool hosts (D2) ────
+    //
+    // All three are required TOGETHER. The grant surface refuses any request
+    // that is missing the capability token or whose verified performer is not
+    // the storage peer's own cell actor, so a partly-configured doorway would
+    // fail on every registration rather than skip the leg. `pool_compute_config`
+    // treats "not all three" as "not configured" for exactly that reason.
+    /// URL of the pool peer's elohim-storage, which NOTARIZES the hosted cells
+    /// this doorway provisions (`POST /api/v1/compute/grants`). Unset means
+    /// hosted registration proceeds exactly as before, with no promise recorded.
+    #[arg(long, env = "POOL_COMPUTE_URL")]
+    pub pool_compute_url: Option<String>,
+
+    /// Node-local capability token for that peer's compute API
+    /// (`ELOHIM_COMPUTE_LOCAL_TOKEN` on the storage side). A shared secret
+    /// between two processes on the same household, never a public credential.
+    #[arg(long, env = "POOL_COMPUTE_TOKEN")]
+    pub pool_compute_token: Option<String>,
+
+    /// The pool peer's OWN cell actor key (`uhCAk…`), sent as the verified
+    /// performer. The grant surface refuses anything else, which is what makes
+    /// the household's steward — not the doorway — the provider of the promise.
+    #[arg(long, env = "POOL_COMPUTE_PERFORMER")]
+    pub pool_compute_performer: Option<String>,
+
     /// URL of elohim-agent-sdk sidecar for AI agent invocation
     /// (e.g., "http://localhost:8095")
     /// Doorway proxies /api/v1/elohim/invoke requests here

@@ -188,6 +188,8 @@ fn auth_response_full_matches_schema() {
         profile: Some(sample_profile()),
         is_steward: true,
         portal_host_url: Some("https://portal.matthew.example".to_string()),
+        hosted_cell_grant_cid: Some("uhCEkHostedCellCommitment".to_string()),
+        hosted_cell_valid_until: Some("2026-10-11T09:00:00Z".to_string()),
     };
 
     let json = serde_json::to_value(&response).unwrap();
@@ -210,6 +212,8 @@ fn auth_response_minimal_matches_schema() {
         profile: None,
         is_steward: false,
         portal_host_url: None,
+        hosted_cell_grant_cid: None,
+        hosted_cell_valid_until: None,
     };
 
     let json = serde_json::to_value(&response).unwrap();
@@ -224,6 +228,11 @@ fn auth_response_minimal_matches_schema() {
         "installedAppId",
         "profile",
         "portalHostUrl",
+        // A login carries no hosting promise: only a hosted REGISTRATION
+        // notarizes one, and emitting a null here would read as "promised
+        // nothing" rather than "not the question this response answers".
+        "hostedCellGrantCid",
+        "hostedCellValidUntil",
     ] {
         assert!(
             !obj.contains_key(absent),
@@ -458,6 +467,10 @@ fn account_response_full_matches_schema() {
         is_steward: true,
         stewardship_at: Some("2026-05-01T12:00:00Z".to_string()),
         key_exported: true,
+        display_name: Some("Matthew".to_string()),
+        hosted_cell_grant_cid: Some("uhCEkHostedCellCommitment".to_string()),
+        hosted_cell_valid_until: Some("2026-10-11T09:00:00Z".to_string()),
+        hosted_by_household: Some("alpha-elohim-host".to_string()),
         created_at: Some("2026-01-15T08:30:00Z".to_string()),
         last_login_at: Some("2026-06-10T07:45:00Z".to_string()),
     };
@@ -488,13 +501,28 @@ fn account_response_minimal_matches_schema() {
         is_steward: false,
         stewardship_at: None,
         key_exported: false,
+        display_name: None,
+        hosted_cell_grant_cid: None,
+        hosted_cell_valid_until: None,
+        hosted_by_household: None,
         created_at: None,
         last_login_at: None,
     };
 
     let json = serde_json::to_value(&response).unwrap();
     let obj = json.as_object().unwrap();
-    for absent in ["conductorId", "stewardshipAt", "createdAt", "lastLoginAt"] {
+    for absent in [
+        "conductorId",
+        "stewardshipAt",
+        "createdAt",
+        "lastLoginAt",
+        // A doorway that notarizes nothing must emit NOTHING about hosting —
+        // not an empty string, which a client reads as "hosted, unnamed".
+        "displayName",
+        "hostedCellGrantCid",
+        "hostedCellValidUntil",
+        "hostedByHousehold",
+    ] {
         assert!(
             !obj.contains_key(absent),
             "{} must be absent when None (serde skip_serializing_if)",

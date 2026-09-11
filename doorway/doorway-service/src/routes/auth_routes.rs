@@ -30,9 +30,12 @@ use crate::db::schemas::{
     get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
     OAUTH_SESSION_COLLECTION, USER_COLLECTION,
 };
+use crate::routes::hosted_cell::{
+    issue_hosted_cell_grant, pool_compute_config, revoke_hosted_cell_grant, HostedCellGrant,
+};
 use crate::routes::zome_helpers::{
     call_create_human, call_create_human_on_conductor, call_get_my_human, get_agent_pub_key,
-    CreateHumanInput,
+    CreateHumanInput, CreateSelfRevocationInput, KeyRevocationOutput, ACCOUNT_CLOSED_REASON,
 };
 use crate::server::AppState;
 use crate::types::DoorwayError;
@@ -199,6 +202,15 @@ pub struct AuthResponse {
     /// Omitted when not a steward or when no host is reachable.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub portal_host_url: Option<String>,
+    /// CID of the `hosted-cell` `delegates-compute` commitment the pool peer
+    /// notarized for this human at registration (D2). Present only on a hosted
+    /// registration whose doorway notarizes what its pool hosts; omitted
+    /// everywhere else, including every login and refresh.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_grant_cid: Option<String>,
+    /// When that promise runs out (RFC3339 UTC, seconds precision).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_valid_until: Option<String>,
 }
 
 /// Human profile response (from imagodei zome)
@@ -306,6 +318,14 @@ pub struct CloseAccountResponse {
     pub closed: bool,
     pub cell_uninstalled: bool,
     pub already_closed: bool,
+    /// CID of the `account-closed` self-revocation this human's own cell wrote
+    /// before the cell was uninstalled. Absent when there was no cell to write
+    /// from, or when the write failed — in which case `warnings` says so.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revocation_cid: Option<String>,
+    /// Whether the `hosted-cell` promise was withdrawn on the substrate.
+    /// `false` with no warning means there was no promise to withdraw.
+    pub hosted_cell_grant_revoked: bool,
     pub warnings: Vec<String>,
 }
 
@@ -372,6 +392,12 @@ pub fn close_account_row_update(now: bson::DateTime) -> bson::Document {
             "metadata.deleted_at": now,
             "metadata.updated_at": now,
             "closed_at": now,
+            // The hosting promise is withdrawn on the substrate before this
+            // runs, so the row must stop claiming it. Leaving a stale cid here
+            // would keep the human inside `humans_served` forever — the
+            // doorway counting a promise it has already given back.
+            "hosted_cell_grant_cid": bson::Bson::Null,
+            "hosted_cell_valid_until": bson::Bson::Null,
         }
     }
 }
@@ -411,6 +437,25 @@ pub struct AccountResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stewardship_at: Option<String>,
     pub key_exported: bool,
+    /// The name this human registered under, projected from their `Human`
+    /// profile. A person's account page should greet them, not their identifier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    // Hosted-cell promise (D2) — present only when this doorway's pool
+    // notarized one for this human.
+    /// CID of the live `hosted-cell` commitment, readable back from ANY peer
+    /// projecting the substrate — which is the point: the promise is checkable
+    /// by someone other than the doorway that reports it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_grant_cid: Option<String>,
+    /// When the hosting is promised until (RFC3339 UTC, seconds precision).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_valid_until: Option<String>,
+    /// Human-readable name of the household hosting this person — what a portal
+    /// SHOWS. Never the commitment cid: a person should read who is hosting
+    /// them, not an address.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosted_by_household: Option<String>,
     // Timestamps
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
@@ -1589,6 +1634,7 @@ async fn handle_register(
             None, // No conductor_id yet for dev-mode register
             false,
             false,
+            None, // Dev-mode register notarizes no hosted cell
         )
         .await;
     }
@@ -1645,6 +1691,46 @@ async fn handle_register(
         custodial_key.public_key.clone()
     };
 
+    // ── The hosted cell becomes a notarized promise (D2) ───────────────────
+    //
+    // A household is about to lend this newcomer real compute. Say so where
+    // anyone can check it: a `hosted-cell` `delegates-compute` commitment whose
+    // PROVIDER is the pool peer's own key and whose RECIPIENT is the agent key
+    // just provisioned. The doorway carries the message; it does not promise.
+    //
+    // Only for a hosted registrant who actually got a cell. And entirely
+    // best-effort: an unconfigured or unreachable notary leaves the promise
+    // unrecorded and the registration untouched, because refusing to create a
+    // person over a missing record is the wrong trade.
+    let hosted_cell = match (
+        agency_phase,
+        provisioned.as_ref(),
+        pool_compute_config(&state.args),
+    ) {
+        ("hosted", Some(p), Some(cfg)) => {
+            match issue_hosted_cell_grant(&cfg, &p.agent_pub_key, chrono::Utc::now()).await {
+                Ok(grant) => {
+                    info!(
+                        identifier = %body.identifier,
+                        grant_cid = %grant.grant_cid,
+                        valid_until = %grant.valid_until,
+                        "Hosted: the cell is a notarized promise"
+                    );
+                    Some(grant)
+                }
+                Err(e) => {
+                    warn!(
+                        identifier = %body.identifier,
+                        "Hosted: the hosting promise could not be notarized (non-fatal): {}",
+                        e
+                    );
+                    None
+                }
+            }
+        }
+        _ => None,
+    };
+
     // Create user document with custodial key
     let mut user = UserDoc::new_with_custodial_key(
         body.identifier.clone(),
@@ -1653,6 +1739,11 @@ async fn handle_register(
         human_id.clone(),
         custodial_key,
     );
+    user.display_name = Some(display_name.clone());
+    if let Some(ref grant) = hosted_cell {
+        user.hosted_cell_grant_cid = Some(grant.grant_cid.clone());
+        user.hosted_cell_valid_until = Some(grant.valid_until.clone());
+    }
 
     // If agent was provisioned on a conductor, set conductor_id and override agent key
     if let Some(ref p) = provisioned {
@@ -1749,6 +1840,7 @@ async fn handle_register(
         provisioned.as_ref().map(|p| p.conductor_id.clone()),
         false, // New registrations are never stewards
         false,
+        hosted_cell.as_ref(),
     )
     .await
 }
@@ -1834,6 +1926,7 @@ async fn handle_login(
             None,  // No conductor_id in dev mode
             false, // Dev mode: not a steward
             false,
+            None, // Dev-mode login notarizes no hosted cell
         )
         .await;
     }
@@ -2037,6 +2130,7 @@ async fn handle_login(
         login_conductor_id,
         user.is_steward,
         user.conductor_id.is_some(),
+        None, // A login reports the session, not the hosting promise
     )
     .await
 }
@@ -2113,6 +2207,7 @@ async fn handle_refresh(
         old_claims.conductor_id, // Preserve conductor_id from old token
         old_claims.is_steward,
         old_claims.has_local_conductor,
+        None, // A refresh reports the session, not the hosting promise
     )
     .await
 }
@@ -2314,6 +2409,10 @@ async fn handle_account(
                 is_steward: false,
                 stewardship_at: None,
                 key_exported: false,
+                display_name: None,
+                hosted_cell_grant_cid: None,
+                hosted_cell_valid_until: None,
+                hosted_by_household: None,
                 created_at: None,
                 last_login_at: None,
             },
@@ -2419,10 +2518,36 @@ async fn handle_account(
             is_steward: user.is_steward,
             stewardship_at: user.stewardship_at.map(|d| d.to_string()),
             key_exported,
+            display_name: user.display_name,
+            // The household name is shown only when there is a promise to name.
+            // A portal can paint a name; only the commitment makes it checkable,
+            // so the two travel together or not at all.
+            hosted_by_household: user
+                .hosted_cell_grant_cid
+                .as_ref()
+                .and_then(|_| household_label(&state)),
+            hosted_cell_grant_cid: user.hosted_cell_grant_cid,
+            hosted_cell_valid_until: user.hosted_cell_valid_until,
             created_at: user.metadata.created_at.map(|d| d.to_string()),
             last_login_at: user.last_login_at.map(|d| d.to_string()),
         },
     )
+}
+
+/// The name a person should READ when told who is hosting them.
+///
+/// The doorway's configured id, falling back to its gateway hostname. Never the
+/// commitment cid: a cid is an address, and showing an address where a name
+/// belongs is how "hosted by a household" degrades into "hosted by uhCEk…".
+/// `None` when the doorway declares neither — better absent than a placeholder
+/// that reads like a name and is not one.
+fn household_label(state: &AppState) -> Option<String> {
+    state
+        .args
+        .doorway_id
+        .clone()
+        .filter(|id| !id.is_empty())
+        .or_else(|| gateway_domain(state.args.doorway_url.as_deref()))
 }
 
 /// POST /auth/close-account
@@ -2568,6 +2693,8 @@ async fn handle_close_account(
                     closed: true,
                     cell_uninstalled: false,
                     already_closed: true,
+                    revocation_cid: None,
+                    hosted_cell_grant_revoked: false,
                     warnings: Vec::new(),
                 },
             );
@@ -2592,6 +2719,51 @@ async fn handle_close_account(
         {
             warn!("close-account: failed to drop OAuth codes: {}", e);
             warnings.push("Pending sign-in codes could not be dropped".into());
+        }
+    }
+
+    // ── (1½) Say out loud that this human left ─────────────────────────────
+    //
+    // BEFORE the cell is uninstalled, because after it there is no cell to
+    // author from. An `account-closed` self-revocation is the human's own last
+    // act on their own source chain: it distinguishes "I left" from "that key
+    // went quiet", which is the difference between a closure and an
+    // unexplained disappearance.
+    let revocation_cid = write_account_closed_revocation(&state, &user).await;
+    if revocation_cid.is_none() && user.conductor_id.is_some() {
+        warnings.push("The closure could not be recorded on this human's own cell".into());
+    }
+
+    // Then withdraw the hosting promise, provider-side. The household stops
+    // being on the hook for compute it is no longer lending. Withdrawal is
+    // terminal and idempotent, so an already-withdrawn grant is a success.
+    let mut hosted_cell_grant_revoked = false;
+    if let Some(cid) = user.hosted_cell_grant_cid.as_deref() {
+        match pool_compute_config(&state.args) {
+            Some(cfg) => match revoke_hosted_cell_grant(&cfg, cid).await {
+                Ok(already) => {
+                    hosted_cell_grant_revoked = true;
+                    info!(
+                        grant_cid = %cid,
+                        already_withdrawn = already,
+                        "close-account: hosting promise withdrawn"
+                    );
+                }
+                Err(e) => {
+                    // Non-fatal by design. A notary that cannot be reached must
+                    // not hold a human inside an account they asked to end; the
+                    // stale promise is reported, and the row is cleared anyway.
+                    warn!("close-account: grant withdrawal failed (non-fatal): {}", e);
+                    warnings.push(format!("The hosting promise could not be withdrawn: {e}"));
+                }
+            },
+            None => {
+                warnings.push(
+                    "This doorway has no pool-compute configuration; the hosting promise was \
+                     left standing on the substrate"
+                        .into(),
+                );
+            }
         }
     }
 
@@ -2654,9 +2826,62 @@ async fn handle_close_account(
             closed: true,
             cell_uninstalled,
             already_closed: false,
+            revocation_cid,
+            hosted_cell_grant_revoked,
             warnings,
         },
     )
+}
+
+/// Write the human's own `account-closed` self-revocation on their own cell.
+///
+/// Authored BY that human's agent on the conductor that hosts them — not by the
+/// doorway's singleton, which could not speak for them and whose revocation
+/// would be a different claim entirely. Returns `None` on every failure path;
+/// the caller turns that into a warning, never a refusal.
+///
+/// `account-closed` is accepted by the imagodei COORDINATOR zome
+/// (`self_revocation_reason_accepted`), which is why adding it does not move the
+/// DNA hash: the integrity zome's `REVOCATION_REASONS` is untouched and no
+/// validation callback reads the reason.
+async fn write_account_closed_revocation(state: &AppState, user: &UserDoc) -> Option<String> {
+    let registry = state.conductor_registry.as_ref()?;
+    let entry = registry.get_conductor_for_agent(&user.agent_pub_key)?;
+    let conductor = registry.get_conductor_info(&entry.conductor_id)?;
+    let revoked_key = holo_hash::AgentPubKey::try_from(user.agent_pub_key.as_str()).ok()?;
+
+    let caller =
+        crate::services::ZomeCaller::new(&conductor.admin_url, &entry.conductor_url, &entry.app_id);
+    let input = CreateSelfRevocationInput {
+        revoked_key,
+        reason: ACCOUNT_CLOSED_REASON.to_string(),
+    };
+    match caller
+        .call::<CreateSelfRevocationInput, KeyRevocationOutput>(
+            "imagodei",
+            "imagodei",
+            "create_self_revocation",
+            &input,
+        )
+        .await
+    {
+        Ok(out) => {
+            info!(
+                identifier = %user.identifier,
+                revocation_cid = %out.revocation_cid,
+                "close-account: the closure is on the human's own chain"
+            );
+            Some(out.revocation_cid)
+        }
+        Err(e) => {
+            warn!(
+                identifier = %user.identifier,
+                "close-account: self-revocation failed (non-fatal): {}",
+                e
+            );
+            None
+        }
+    }
 }
 
 /// Drop every pending session-transfer token minted for this identifier.
@@ -4889,6 +5114,7 @@ async fn generate_auth_response(
     conductor_id: Option<String>,
     is_steward: bool,
     has_local_conductor: bool,
+    hosted_cell: Option<&HostedCellGrant>,
 ) -> Response<BoxBody> {
     // Get doorway identity from config
     let doorway_id = state.args.doorway_id.clone();
@@ -4950,6 +5176,8 @@ async fn generate_auth_response(
                     profile,
                     is_steward,
                     portal_host_url,
+                    hosted_cell_grant_cid: hosted_cell.map(|g| g.grant_cid.clone()),
+                    hosted_cell_valid_until: hosted_cell.map(|g| g.valid_until.clone()),
                 },
             )
         }
@@ -5709,6 +5937,42 @@ mod tests {
         assert!(
             !session_revoked_by_user_doc(Some(&hosted_row(ident))),
             "an open account keeps working"
+        );
+    }
+
+    /// Closing gives the hosting promise BACK, and the row stops claiming it.
+    ///
+    /// The withdrawal call itself is pinned in `routes::hosted_cell`
+    /// (`an_already_withdrawn_grant_is_not_an_error`,
+    /// `close_account_succeeds_when_the_revoke_call_fails`). What this pins is
+    /// the half that lives here: the row's own claim is nulled in the SAME
+    /// update that ends the account, so a doorway cannot keep counting a
+    /// promise it has already handed back.
+    #[test]
+    fn close_account_revokes_the_hosted_cell_grant_and_clears_the_row() {
+        let ident = "ruth@alpha.elohim.host";
+        let mut hosted = hosted_row(ident);
+        hosted.hosted_cell_grant_cid = Some("uhCEkHostedCell".into());
+        hosted.hosted_cell_valid_until = Some("2026-10-11T09:00:00Z".into());
+        assert_eq!(
+            close_account_verdict(ident, ident, Some(&hosted)),
+            CloseVerdict::Close,
+            "a hosted human with a live promise closes like anyone else"
+        );
+
+        let set = close_account_row_update(bson::DateTime::now());
+        let set = set.get_document("$set").expect("$set");
+        assert_eq!(
+            set.get("hosted_cell_grant_cid"),
+            Some(&bson::Bson::Null),
+            "a closed row must stop naming a commitment the household no longer owes"
+        );
+        assert_eq!(set.get("hosted_cell_valid_until"), Some(&bson::Bson::Null));
+        // And the cleared row is exactly the row live_hosted_cell_filter excludes.
+        let filter = crate::routes::hosted_cell::live_hosted_cell_filter(chrono::Utc::now());
+        assert!(
+            filter.get_document("hosted_cell_grant_cid").is_ok(),
+            "humansServed counts on the field this update nulls"
         );
     }
 }

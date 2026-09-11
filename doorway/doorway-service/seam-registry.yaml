@@ -2685,3 +2685,174 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/auth_routes.rs
         testName: closed_row_cannot_log_in
         kind: unit
+
+  - name: pool_compute_config
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::pool_compute_config
+      line: 99
+    summary: >
+      Whether this doorway notarizes the cells its pool hosts. All three parts —
+      pool URL, local capability token, and the peer's own cell-actor key — are required
+      together, because the grant surface refuses a request missing any of them; "not all
+      three" therefore answers None (skip the leg), never a partial attempt.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          hosted_register_without_pool_compute_config_still_registers pins that an
+          unconfigured and a half-configured doorway both answer None — SKIPPED, which is a
+          different answer from FAILED. A half-configured doorway that "tried anyway" would
+          turn every hosted registration into a 503, so the distinction is the difference
+          between no record and no person.
+      - id: C12
+        status: answered
+        justification: >
+          The performer key is carried explicitly rather than inferred, so the provider of
+          the promise is structurally the pool peer acting for itself. A doorway cannot
+          promise compute it does not own; the grant surface's same_actor check is what
+          enforces it and this config is what satisfies it honestly.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: hosted_register_without_pool_compute_config_still_registers
+        kind: unit
+
+  - name: hosted_cell_grant_body
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::hosted_cell_grant_body
+      line: 141
+    summary: >
+      The exact body that issues one hosted-cell delegates-compute promise: scope
+      hosted-cell, recipient = the newly provisioned agent key, and the D2 bounds
+      (epr_scope ["*"], reach_ceiling commons, rate_per_hour 60, rotation_ttl_days 30,
+      a 30-day window). No new entry type and no new route — the existing Mishpat
+      Commitment, named through the storage peer's own accepted-scope list.
+    concernIds:
+      - id: C6a
+        status: answered
+        justification: >
+          hosted_cell_grant_body_carries_the_d2_bounds pins every bound the grant
+          validator enforces, including that validUntil - validFrom stays within
+          rotation_ttl_days * 86400. An unbounded hosting promise is not a promise but an
+          assumption; the window is what makes renewal a household's choice to make again.
+      - id: C10
+        status: answered
+        justification: >
+          Every field is named from the surface's own vocabulary (GRANT_SCOPES,
+          the four accepted bounds keys). The validator refuses an unknown scope or an
+          unsupported bound outright rather than dropping it — which is exactly the defect
+          that once made every grant read as sweettest-feedback whatever it was for.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: hosted_cell_grant_body_carries_the_d2_bounds
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: hosted_register_records_the_grant_cid_when_the_pool_answers
+        kind: unit
+
+  - name: revoke_hosted_cell_grant
+    kind: state-transition
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::revoke_hosted_cell_grant
+      line: 214
+    summary: >
+      Provider-side withdrawal of one hosted-cell promise, as a BODY VARIANT of the same
+      grant route. Its registrable claim is the shape of the effect: withdrawal is terminal
+      on the substrate, so asking again converges rather than accruing, and an
+      already-withdrawn grant answers Ok(true).
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          an_already_withdrawn_grant_is_not_an_error pins that replay against a settled
+          withdrawal is success, not failure. A human closing an account that was already
+          half-closed must not be told the close failed.
+      - id: C14
+        status: answered
+        justification: >
+          close_account_succeeds_when_the_revoke_call_fails pins that an unreachable notary
+          is REPORTED (an Err the close route turns into a warning line) rather than
+          dropped or escalated into a refusal. The residual is witnessed: the human leaves,
+          and the stale promise is named in the response.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: an_already_withdrawn_grant_is_not_an_error
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: close_account_succeeds_when_the_revoke_call_fails
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: close_account_revokes_the_hosted_cell_grant_and_clears_the_row
+        kind: unit
+
+  - name: live_hosted_cell_filter
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::live_hosted_cell_filter
+      line: 270
+    summary: >
+      Which credential rows carry a LIVE hosted-cell promise: active, not soft-deleted,
+      carrying a grant cid the substrate returned, and not past their promised-until stamp.
+      The stamp comparison is lexicographic, which is correct only because every stamp comes
+      from the single writer rfc3339_utc_secs.
+    concernIds:
+      - id: C5
+        status: partial
+        justification: >
+          This is a doorway-local PROJECTION of the notary's answer, not a substrate read.
+          The row carries the grant cid the substrate returned and the doorway's own close
+          path clears it, so what a receiver can actually re-derive is the COMMITMENT (by
+          cid, from any peer) — not this count. A receiver who needs the authoritative
+          answer reads GET /api/v1/commitments/{cid}.
+      - id: C4
+        status: partial
+        justification: >
+          Expired and revoked-through-close are both honestly excluded. What is NOT yet
+          distinguished is a commitment revoked PROVIDER-SIDE on the substrate without
+          passing through close-account: until a reconcile reads it back, this filter still
+          counts it. Named, not hidden — see gapNote.
+    gapNote: >
+      Deferred reconcile: no read-back of provider-side withdrawals into the credential
+      rows. Until it lands, humansServed is "promises this doorway believes it is keeping",
+      which may exceed "promises the notary still records". Recorded as the honesty caveat in
+      the module doc and in the backlog decision
+      (genesis/data/timeline/backlog/doorway-landing-humans-served-source-2026-06-23.md).
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: humans_served_counts_only_live_unexpired_hosted_rows
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: hosted_cell_valid_until_is_lexicographically_ordered
+        kind: unit
+
+  - name: humans_served
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::humans_served
+      line: 286
+    summary: >
+      The humansServed answer on /status.json (D3, Option B). None only when this doorway
+      operates no conductor pool, or when a pool exists but the count could not be taken.
+      A pool that hosts nobody answers Some(0), because zero is an answer.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          humans_served_is_zero_not_none_when_a_pool_exists_and_hosts_nobody and
+          humans_served_is_none_without_a_pool pin the three distinct answers this field
+          must keep apart: not-applicable (no pool), unknown (pool, count untakeable), and
+          zero (pool, nobody hosted). Collapsing zero into unknown is what made the number
+          meaningless for a year; fabricating zero for unknown would be worse.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: humans_served_is_zero_not_none_when_a_pool_exists_and_hosts_nobody
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: humans_served_is_none_without_a_pool
+        kind: unit

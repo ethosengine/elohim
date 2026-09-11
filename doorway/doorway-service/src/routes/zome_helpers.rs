@@ -4,6 +4,7 @@
 //! doorway's HTTP handlers, particularly for identity management operations.
 
 use holo_hash::ActionHash;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use crate::server::AppState;
@@ -12,6 +13,40 @@ use crate::worker::ZomeCallConfig;
 
 // Wire types from SDK domain crate — compiler enforces zome/doorway agreement
 pub use imagodei_types::{CreateHumanInput, Human, HumanOutput};
+
+/// Reason a human's own closure is recorded under.
+///
+/// Accepted by the imagodei COORDINATOR zome's `self_revocation_reason_accepted`
+/// — deliberately NOT added to the integrity zome's `REVOCATION_REASONS`, whose
+/// bytes the DNA hash covers. No validation callback reads the reason, so the
+/// vocabulary is a coordinator gate and extending it hot-swaps via
+/// `update_coordinators` instead of forcing a reinstall and a re-key.
+pub const ACCOUNT_CLOSED_REASON: &str = "account-closed";
+
+/// Input to `imagodei::create_self_revocation`.
+///
+/// A LOCAL MIRROR of the zome's inline struct
+/// (`elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs`), which is not
+/// published through `imagodei-types`. Field names and order are the contract:
+/// this rides MessagePack, so a rename on either side is a decode failure at
+/// run time, not a compile error. Keep them in step.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateSelfRevocationInput {
+    pub revoked_key: holo_hash::AgentPubKey,
+    pub reason: String,
+}
+
+/// Output of `imagodei::create_self_revocation`. Local mirror — see
+/// [`CreateSelfRevocationInput`].
+///
+/// `revocation_cid` is the entry hash of the
+/// `governance-action:key-revocation` Content entry on the elohim DNA, which is
+/// where the canonical record lives — not on imagodei's own DHT.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRevocationOutput {
+    pub revocation_id: String,
+    pub revocation_cid: String,
+}
 
 // =============================================================================
 // Zome Call Functions

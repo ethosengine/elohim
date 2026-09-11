@@ -2822,6 +2822,70 @@ pub struct KeyRevocationOutput {
     pub revocation_cid: String,
 }
 
+/// Self-revocation reasons this COORDINATOR accepts beyond the integrity zome's
+/// `REVOCATION_REASONS`.
+///
+/// Why it lives here and not there: the DNA hash covers the INTEGRITY zomes'
+/// bytes plus the modifiers. Extending `REVOCATION_REASONS` in
+/// `imagodei_integrity` would move the hash, and a moved hash means a reinstall,
+/// a new agent key, and a partitioned DHT for anyone who did not roll —
+/// an enormous price for one string. No validation callback reads the reason
+/// (it is consulted only by coordinator externs), so the reason vocabulary is
+/// already a coordinator gate. Extending it here is DNA-hash-NEUTRAL and heals
+/// onto running conductors through `update_coordinators`.
+///
+/// `account-closed` is written by a hosted human's own cell when they end their
+/// account through `POST /auth/close-account`. It exists so a chain that goes
+/// quiet because someone LEFT is distinguishable from one that went quiet for
+/// any other reason — a closure is a decision, not a disappearance.
+const COORDINATOR_ONLY_REVOCATION_REASONS: [&str; 1] = ["account-closed"];
+
+/// Is `reason` an accepted SELF-revocation reason?
+///
+/// Deliberately scoped to self-revocation. The emergency-contact path
+/// (`create_revocation_request`) and the specialist path
+/// (`submit_specialist_revocation`) keep the integrity zome's list unchanged:
+/// closing your own account is something only you can say about yourself.
+pub(crate) fn self_revocation_reason_accepted(reason: &str) -> bool {
+    REVOCATION_REASONS.contains(&reason) || COORDINATOR_ONLY_REVOCATION_REASONS.contains(&reason)
+}
+
+#[cfg(test)]
+mod self_revocation_reason_tests {
+    use super::{self_revocation_reason_accepted, COORDINATOR_ONLY_REVOCATION_REASONS};
+    use imagodei_integrity::REVOCATION_REASONS;
+
+    #[test]
+    fn account_closed_is_an_accepted_revocation_reason() {
+        assert!(
+            self_revocation_reason_accepted("account-closed"),
+            "a human closing their own account must be able to say so on their own chain"
+        );
+        assert!(
+            !REVOCATION_REASONS.contains(&"account-closed"),
+            "it must NOT be in the integrity zome's list — that array's bytes are covered by \
+             the DNA hash, and moving the hash costs a reinstall and a re-key on every conductor"
+        );
+    }
+
+    #[test]
+    fn the_integrity_vocabulary_still_applies() {
+        for reason in REVOCATION_REASONS {
+            assert!(
+                self_revocation_reason_accepted(reason),
+                "{reason} was accepted before this extension and must stay accepted"
+            );
+        }
+        assert!(!self_revocation_reason_accepted("whatever"));
+        assert!(!self_revocation_reason_accepted(""));
+        assert_eq!(
+            COORDINATOR_ONLY_REVOCATION_REASONS.len(),
+            1,
+            "every addition here is a protocol-vocabulary decision, not a convenience"
+        );
+    }
+}
+
 /// M4: Self-revocation. A human with a valid agent key voluntarily revokes
 /// a different (compromised) key they control. Single-cell authority, no
 /// quorum, no witnesses.
@@ -2854,10 +2918,10 @@ pub fn create_self_revocation(
         )));
     }
 
-    if !REVOCATION_REASONS.contains(&input.reason.as_str()) {
+    if !self_revocation_reason_accepted(&input.reason) {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "create_self_revocation: invalid reason '{}'. Must be one of {:?}",
-            input.reason, REVOCATION_REASONS
+            "create_self_revocation: invalid reason '{}'. Must be one of {:?} or {:?}",
+            input.reason, REVOCATION_REASONS, COORDINATOR_ONLY_REVOCATION_REASONS
         ))));
     }
 

@@ -26,6 +26,7 @@ pub mod epr;
 pub mod federation;
 pub mod freshness;
 pub mod health;
+pub mod hosted_cell;
 pub mod identity;
 pub mod import;
 pub mod import_ws;
