@@ -1276,30 +1276,42 @@ Then(
 After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (this: E2EWorld) {
   const record = publishedApps.get(this);
   if (!record?.rootCommitments?.length) return;
+  // Every root commitment here was minted through ONE storage endpoint: "an
+  // EPR record this run owns for it" (above) always posts via
+  // resolveStorageUrl('alpha-A') — matthew's storage — regardless of which
+  // doorway's hosting path the mount loop is on. The zome's commitment
+  // lifecycle guard ("recover original bindings and observed commitment
+  // lifecycle", 2cea494ee) restricts an update to the root's AUTHOR, so
+  // cancelling through any other household peer's storage endpoint is
+  // correctly refused with "Only the Commitment root author may update its
+  // observed lifecycle" — that is expected behavior, not a fault to route
+  // around. Cancel through the author peer (alpha-A / matthew) only.
+  const authorStorageUrl = resolveStorageUrl('alpha-A');
+  assert.ok(
+    authorStorageUrl,
+    'no direct storage URL for peer "alpha-A" (the root commitment author) — set E2E_STORAGE_URL'
+  );
   const restores = await Promise.allSettled(
-    householdPeers.get(this)!.all.map(async peer => {
-      const storageUrl = loadHouseholdMeshFixture().storagePeers![peer].url;
-      for (const id of record.rootCommitments!) {
-        const response = await postFixtureCommitment(`${storageUrl}/api/v1/commitments/${id}`, {
-          method: 'PATCH',
-          headers: {
-            'content-type': 'application/json',
-            'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
-          },
-          body: JSON.stringify({ state: 'cancelled', finished: true }),
-        });
-        assert.ok(
-          response.ok || response.status === 404,
-          `${peer}: could not cancel owned root mount ${id}: ${response.status} ${response.text}`
+    record.rootCommitments.map(async id => {
+      const response = await postFixtureCommitment(`${authorStorageUrl}/api/v1/commitments/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+        },
+        body: JSON.stringify({ state: 'cancelled', finished: true }),
+      });
+      assert.ok(
+        response.ok || response.status === 404,
+        `alpha-A/matthew (root author): could not cancel owned root mount ${id}: ${response.status} ${response.text}`
+      );
+      if (response.ok) {
+        const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`);
+        assert.equal(
+          ((await readback.json()) as { state: string }).state,
+          'cancelled',
+          `alpha-A/matthew (root author): owned root commitment remains live`
         );
-        if (response.ok) {
-          const readback = await fetch(`${storageUrl}/api/v1/commitments/${id}`);
-          assert.equal(
-            ((await readback.json()) as { state: string }).state,
-            'cancelled',
-            `${peer}: owned root commitment remains live`
-          );
-        }
       }
     })
   );
