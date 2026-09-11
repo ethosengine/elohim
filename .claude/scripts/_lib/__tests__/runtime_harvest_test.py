@@ -47,35 +47,72 @@ check("fingerprint count-churn invariant (provenance normalized)",
 
 
 # ── evaluate: render-degenerate predicate (LANDED-today signal) ──
+# /admin/render-stats counters are LIFETIME-cumulative (elohim-render stats.rs:10-11),
+# so the predicate reads a DELTA across the window — the plan's D2 wording
+# ("stalled/timedOut deltas"), mirroring _admission_shed on the equally-cumulative
+# shedTotal. Every case below is therefore written in cumulative counters.
 def _win(node, samples):
     return {"node": node, "samples": samples}
 
 
-def _render(rate, stalled=0, timed=0):
-    return {"render": {"degenerateRate": rate, "stalled": stalled, "timedOut": timed}}
+def _render(total, stalled=0, timed=0):
+    """One poll's LIFETIME render-stats counters."""
+    rate = (stalled + timed) / total if total else 0.0
+    return {"render": {"total": total, "stalled": stalled, "timedOut": timed,
+                       "degenerateRate": rate}}
 
 
-# sustained high degenerateRate across DEGEN_POLLS -> one finding
-hot = _win("alpha", [_render(0.40, 5, 1)] * rh.DEGEN_POLLS)
+# NEW renders arriving degenerate across the window -> one finding
+hot = _win("alpha", [_render(100, 10), _render(104, 12), _render(108, 16)])
 f_hot = rh.evaluate(hot)
-check("render-degenerate fires when sustained",
+check("render-degenerate fires when NEW renders are degenerate",
       any(f["provenance"] == "render-degenerate" for f in f_hot))
 check("render-degenerate finding carries node+class",
       f_hot[0]["node"] == "alpha" and f_hot[0]["class"] == rh.CLASS)
 
+# REGRESSION (alpha-b, 2026-09-11): counters BYTE-IDENTICAL across the window —
+# no renders happened at all. A cumulative read filed "sustained >= 3 polls
+# (SSR saturation)" off a stall burst that had already ended; a delta read is silent.
+idle = _win("alpha-b", [_render(11, 4)] * rh.DEGEN_POLLS)
+check("render-degenerate silent when counters are flat (no renders in window)",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(idle)))
+check("flat-counter idleness also fires nothing else",
+      rh.evaluate(idle) == [])
+
+# a high LIFETIME rate whose NEW renders are all clean -> no finding
+healed = _win("alpha-b", [_render(11, 4), _render(20, 4), _render(31, 4)])
+check("render-degenerate silent when new renders are clean despite bad lifetime rate",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(healed)))
+
 # single hot poll (< DEGEN_POLLS) -> no finding
-blip = _win("alpha", [_render(0.40, 5, 1)])
+blip = _win("alpha", [_render(100, 40)])
 check("render-degenerate silent on a single blip",
       not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(blip)))
 
-# healthy (low rate) -> no finding
-cool = _win("alpha", [_render(0.01)] * rh.DEGEN_POLLS)
+# healthy (low delta rate) -> no finding
+cool = _win("alpha", [_render(100, 1), _render(140, 1), _render(180, 1)])
 check("render-degenerate silent when healthy",
       not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(cool)))
+
+# counter RESET (pod restart mid-window) -> negative delta, no finding
+reset = _win("alpha", [_render(900, 300), _render(2, 1), _render(4, 2)])
+check("render-degenerate silent across a counter reset (pod restart)",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(reset)))
+
+# the smaller /admin/self-healing render sub-object ({total, degenerateRate}) still works
+sh_shape = _win("alpha", [{"render": {"total": 100, "degenerateRate": 0.10}},
+                          {"render": {"total": 104, "degenerateRate": 0.125}},
+                          {"render": {"total": 108, "degenerateRate": 0.148}}])
+check("render-degenerate reads the self-healing {total,degenerateRate} shape",
+      any(f["provenance"] == "render-degenerate" for f in rh.evaluate(sh_shape)))
 
 # absent render field -> no finding (field-presence-tolerant)
 empty = _win("alpha", [{}] * rh.DEGEN_POLLS)
 check("render-degenerate silent when field absent", rh.evaluate(empty) == [])
+
+# the fingerprint is provenance-keyed, so the delta rewrite does NOT churn fps
+check("render-degenerate fp unchanged by the delta rewrite",
+      rh.fingerprint("alpha-b", rh.CLASS, "render-degenerate") == "afc100835f7c")
 
 
 # ── evaluate: circuit-open predicate (PENDING /admin/self-healing) ──
@@ -179,12 +216,24 @@ import http.server  # noqa: E402
 import threading  # noqa: E402
 import tempfile  # noqa: E402
 
-_hot = json.dumps({"total": 100, "stalled": 40, "timedOut": 5, "degenerateRate": 0.45})
+# Counters RISE per poll (total +10, stalled +6 => a 0.60 delta rate). They must
+# rise: /admin/render-stats is LIFETIME-cumulative, so a fixture serving constant
+# counters describes a node that has rendered NOTHING since boot — which the
+# delta predicate correctly reads as silence, not saturation.
+_hot_state = {"total": 100, "stalled": 40, "timedOut": 5}
+
+
+def _hot_body():
+    _hot_state["total"] += 10
+    _hot_state["stalled"] += 6
+    degen = _hot_state["stalled"] + _hot_state["timedOut"]
+    return json.dumps({**_hot_state,
+                       "degenerateRate": degen / _hot_state["total"]})
 
 
 class _Hot(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        body = _hot if self.path == "/admin/render-stats" else "{}"
+        body = _hot_body() if self.path == "/admin/render-stats" else "{}"
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()

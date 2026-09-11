@@ -6,20 +6,21 @@ contentFormat: "markdown"
 title: "doorway-alpha storage:8090 breaker exhaustion (circuit Open / half-open reshedding) is a FAITHFUL MESSENGER of a substrate defect: matthew-alpha (genesis-pair member) underwent a self-heal REKEY + DNA-reinstall at edge #1199 boot, orphaning its DHT anchors (divergentAnchor climbing, not reconciling) so its server-side read path sheds 503 catching-up; the doorway breaker + conductor-auth remint are working AS DESIGNED"
 slug: "self-heal-doorway-alpha-storage-breaker-matthew-rekey"
 written: "2026-07-18"
+updated: "2026-09-11"
 author: "runtime-triage"
 status: "backlog"
 priority: "high"
 self_heal_status: blocked
 severity: high
-fingerprints: [b7b25f86fe13]
-nodes: [doorway-alpha, elohim-matthew-alpha, intel-nuc]
+fingerprints: [b7b25f86fe13, 6cdded115d74]
+nodes: [doorway-alpha, elohim-matthew-alpha, intel-nuc, alpha]
 relatedNodeIds:
   - "memory:project_local_stack_dht_anchor_gap"
   - "memory:project_alpha_topology_bootstrap_pair"
   - "memory:project_edge_deploy_restarts_genesis_conductors"
   - "memory:project_dna_hash_blind_to_coordinator_zomes"
   - "memory:project_p1_reconciliation_controller"
-tags: [self-heal, circuit, doorway, storage-breaker, conductor-auth, genesis-rekey, anchor-divergence, catching-up, matthew, intel-nuc, operator-domain, substrate]
+tags: [self-heal, circuit, doorway, storage-breaker, conductor-auth, genesis-rekey, anchor-divergence, catching-up, matthew, intel-nuc, operator-domain, substrate, projector-reconcile, divergent-refused, tail-phase]
 cites:
   - https://doorway-alpha.elohim.host/admin/self-healing
   - https://doorway-alpha.elohim.host/admin/render-stats
@@ -205,3 +206,115 @@ reopen on alpha-only legs with `served == previous build's declared` is THIS con
 not the probe race — split before re-triaging. The edge #1220 deploy (16:0x UTC,
 storage+doorway image roll, conductor restarts) cleared the saturation; alpha
 `/health/startup` back to 200/warmup-complete/circuits-closed at 16:22 UTC.
+
+## 2026-09-11 — triage of ledger fingerprint `6cdded115d74` (projector arm; the TAIL of this same concern)
+
+**This concern did not recur. It is finishing.** A different poller arm
+(`projector:reconcile`, not `circuit:<endpoint>`) filed a new fingerprint on node `alpha`:
+
+```
+projector caughtUp=false sustained >= 3 polls
+```
+
+It is folded in here rather than given its own file because it is the *same root cause in
+its residue phase* — and because this record predicted it. The 2026-07-18 "Poller-detection
+note" above says, verbatim, that "`divergentAnchor` climbing is not a predicate at all";
+what finally caught the tail was `caughtUp`, and the numbers below are this concern's own
+closure criterion, partly met.
+
+### What the closure criterion says vs what is live
+
+That criterion: *"resolved when matthew's `divergentAnchor` drains to ~0, its server-side
+reads return 200, and the doorway breaker sits `closed` with `errorStreak:0`."*
+
+Live at triage, `GET https://doorway-alpha.elohim.host/admin/self-healing` (HTTP 200):
+
+```json
+"upstreams": [{"endpoint": "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090",
+               "circuit": "closed", "errorStreak": 0, "recentFailures": 0, "skipped": false}],
+"admission": {"maxInflight": 256, "available": 256, "shedTotal": 0},
+"projector": {"lagSeconds": null, "caughtUp": false, "divergentAnchor": 9},
+"conductor": {"connected": true, "connectedWorkers": 4, "totalWorkers": 4}
+```
+
+- **Breaker leg: MET.** `closed`, `errorStreak: 0`, `skipped: false`, no shed. The
+  `b7b25f86fe13` arm of this concern is substantively resolved.
+- **Anchor leg: 99.6% drained, not met.** `divergentAnchor` has gone **2177 → 9**. The
+  rekey's orphaned-anchor population has very nearly healed; 9 rows remain.
+
+`GET https://doorway-alpha.elohim.host/p2p/status` — `projectionReconcile`, the detail the
+`/admin/self-healing` projector block does not carry:
+
+```json
+{"pending": 4, "completed": 0, "failed": 2, "caughtUp": false, "peersAsked": 5,
+ "divergentAnchor": 9, "healedTotal": 31, "sweeps": 57, "exhausted": 0, "converged": false}
+```
+
+`sweeps: 57` with `healedTotal: 31` settles the freshness question raised in the scope pass
+(`ProjectionReconcileStatus` carries no timestamp, so a frozen `caughtUp:false` normally
+cannot be told from a live one): **the heal leg is running and doing work.** This is a live
+stuck residue, not a stale snapshot.
+
+### The A/B asymmetry is the whole finding
+
+The B-side (`https://elohim.host`, adam) reports the **same `divergentAnchor: 9`** and yet
+`caughtUp: true`, `converged: true`, `pending: 0`, `failed: 0`.
+
+`divergentAnchor` and `caughtUp` are orthogonal: the former is the discovery-side total of
+distinct ids whose local anchor disagrees with a peer's advertised anchor (deliberately
+never reduced — `elohim/elohim-storage/src/p2p/projection_reconcile.rs:1391-1401`); the
+latter is `pending.is_empty()` at end-of-sweep, ANDed across all four heal arms
+(`reconcile_rails.rs:244-246`, folded at `projection_reconcile.rs:1661`). `converged`
+additionally requires `divergent_actionable == 0` where
+`divergent_actionable = divergent_anchor - divergent_refused`
+(`projection_reconcile.rs:1466`, predicate `elohim/elohim-storage/src/metrics.rs:4457-4483`).
+
+So B, at the identical count of 9, has **refused all 9** into the declared-head refusal
+partition and converged. A has not: its 9 stay actionable, 4 sit `pending` and 2 `failed`
+at the end of every sweep, and `caughtUp` is honestly false.
+
+`exhausted: 0` is the sharp detail. The cross-sweep `MissLedger` give-up arm
+(`projection_reconcile.rs:304-380`) writes a row off after `MAX_RETRIES` misses **under
+unchanged evidence**, but new evidence resets the counter immediately (`:349-356`). After
+57 sweeps nothing has been written off — consistent with these 9 re-presenting as "new
+evidence" each sweep and never aging into exhaustion. A retries them forever.
+
+### Same 9 as the B-side provide-loop concern (cross-link, not a fork)
+
+adam's `provideLoop` reports `reanchorDeadRemaining: 9`, `deadRemainingStuck: true`
+(ledger fp `2b4761b2eaf6`, already `blocked`, canonicalized in
+`genesis/data/timeline/backlog/dataplane-reanchor-dead-remaining-rekeyed-peer.md`). That
+record's 2026-09-11 mechanism correction — rows are *settled-not-skipped*, and nothing on
+the settled path clears the persisted `dht_anchor_state = 'dead'` verdict — describes the
+same population from the other side: **9 content rows anchored under a pre-re-genesis agent
+key whose chain nobody holds.** One population, three surfaces (A's actionable divergence,
+B's refused divergence, B's dead reanchor remainder). Triage the three together; do not
+re-derive them separately.
+
+### Current decision — BLOCKED (unchanged posture, narrowed target)
+
+The cure is the one already written in **Fix path** above, now pointed at 9 rows instead of
+2177: either the identity-lineage bridge so matthew's current key inherits the old key's
+anchors, or an explicit declared supersession for these specific rows (which is what would
+move them from *actionable* to *refused* and let A converge exactly as B already does).
+Both are operator/substrate actions — a conductor identity action and an in-flight DNA
+lineage plan — and cluster ops are operator-owned.
+
+Nothing in this tree fixes it. Making A refuse the 9 to force `converged: true` would be
+falsifying convergence, not achieving it; the storage-side discriminator needed to confirm
+*why* A does not refuse them (`elohim_projection_reconcile_converged_blocked_by{term}`,
+`..._divergent_refused{stream}`) is per-pod Prometheus, not reachable from the admin
+surfaces.
+
+Ledger fp `6cdded115d74` set **`status: blocked`** citing this file, so the poller
+suppresses re-dispatch (present fp = suppressed, ANY status) and the stasis sweep owns
+re-checks.
+
+**Closure signature, refined.** Previously "divergentAnchor drains to ~0". Now: `alpha`'s
+`projectionReconcile` reaching `pending: 0, failed: 0, caughtUp: true, converged: true` —
+reached either by the 9 healing under lineage (`divergentAnchor → 0`) or by a filed
+supersession moving them to `divergent_refused` (`divergentAnchor` may stay 9, exactly as
+B's does). **Watch that second shape**: `divergentAnchor: 9` alone is no longer evidence of
+ill health — B proves 9-and-converged is a valid resting state. The regression signature
+from the original record still stands: `divergentAnchor` *climbing* after any genesis-pair
+conductor restart or rekey.

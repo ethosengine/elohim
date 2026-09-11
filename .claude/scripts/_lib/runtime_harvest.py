@@ -47,22 +47,65 @@ def _tail(samples, n):
     return samples[-n:] if len(samples) >= n else []
 
 
-def _render_degenerate(node, samples):
-    """SSR saturation: degenerateRate >= DEGEN_RATE for >= DEGEN_POLLS
-    consecutive polls. degenerateRate = (stalled+timedOut)/total, the LANDED
-    /admin/render-stats headline (stats.rs:50). Field-presence-tolerant."""
-    win = _tail(samples, DEGEN_POLLS)
-    rates = [s["render"]["degenerateRate"] for s in win
-             if isinstance(s.get("render"), dict) and "degenerateRate" in s["render"]]
-    if len(rates) < DEGEN_POLLS or any(r < DEGEN_RATE for r in rates):
+def _cum_render(s):
+    """A sample's LIFETIME render counters as (total, degenerate), or None.
+
+    Prefers the /admin/render-stats shape (`stalled` + `timedOut`); falls back to
+    /admin/self-healing's smaller `{total, degenerateRate}` render sub-object so the
+    predicate keeps working off either endpoint. Field-presence-tolerant."""
+    r = s.get("render")
+    if not isinstance(r, dict) or not isinstance(r.get("total"), (int, float)):
         return None
-    worst = max(rates)
+    total = r["total"]
+    if isinstance(r.get("stalled"), (int, float)) and isinstance(r.get("timedOut"), (int, float)):
+        return total, r["stalled"] + r["timedOut"]
+    if isinstance(r.get("degenerateRate"), (int, float)):
+        return total, r["degenerateRate"] * total
+    return None
+
+
+def _render_degenerate(node, samples):
+    """SSR saturation happening NOW: the degenerate share of the renders that are
+    NEW across the window (a DELTA), >= DEGEN_RATE.
+
+    Why a delta and not the served `degenerateRate` scalar: /admin/render-stats
+    counters are LIFETIME-cumulative by construction (elohim-render
+    `src/stats.rs:10-11` — "Cumulative (lifetime) counters for the MVP"), so
+    `degenerateRate` is a since-boot ratio, not a current condition. Reading it
+    "sustained >= N polls" carries ZERO currency: once the lifetime ratio crosses
+    DEGEN_RATE it stays crossed on every later poll until diluted by a large
+    volume of clean renders, so the finding can never close by disappearance (D5)
+    and an idle node keeps re-asserting a stall burst that ended hours ago.
+    Measured 2026-09-11 on alpha-b: three consecutive polls carried byte-identical
+    counters (total=11, stalled=4 — no renders at all in the window) and the
+    cumulative read still filed "sustained >= 3 polls (SSR saturation)".
+
+    Deltas are what the plan specified all along ("`stalled`/`timedOut` deltas",
+    elevate-arm plan D2) and what the sibling `_admission_shed` already does to
+    the equally-cumulative `shedTotal`. The delta baseline spans the whole stored
+    ring buffer (WINDOW) so low-volume saturation is still visible, but at least
+    DEGEN_POLLS observations are required before the predicate may fire."""
+    win = samples[-WINDOW:]
+    if len(win) < DEGEN_POLLS:
+        return None
+    cums = [c for c in (_cum_render(s) for s in win) if c is not None]
+    if len(cums) < DEGEN_POLLS:
+        return None
+    d_total = cums[-1][0] - cums[0][0]
+    d_degen = cums[-1][1] - cums[0][1]
+    # d_total == 0: nothing rendered in the window — silence, not saturation.
+    # Either delta < 0: the counters reset (pod restart); the window refills.
+    if d_total <= 0 or d_degen < 0:
+        return None
+    rate = d_degen / d_total
+    if rate < DEGEN_RATE:
+        return None
     return {
         "node": node,
         "class": CLASS,
         "provenance": "render-degenerate",
-        "line": f"render.degenerateRate {worst:.2f} sustained >= {DEGEN_POLLS} polls "
-                f"(SSR stalled/timedOut saturation)",
+        "line": f"render degenerate {int(round(d_degen))}/{int(d_total)} of NEW renders "
+                f"= {rate:.2f} across last {len(cums)} polls (SSR stalled/timedOut saturation)",
     }
 
 
