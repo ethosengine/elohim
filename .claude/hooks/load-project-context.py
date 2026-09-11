@@ -125,25 +125,7 @@ def get_memory_budget(project_dir: str) -> str:
     return out
 
 
-def _bootstrap_session_id(data: dict, project_dir: str) -> str:
-    """The one session label the bootstrap view carries for this session.
-
-    Prefers the harness payload's own `session_id` (so the SessionStart `open` and every later
-    per-turn `open` in run-projection.py address the SAME recall session and its continuation
-    state accumulates). Absent that, falls back to a short hash of the project dir + today's
-    date — deterministic across both hooks for the same tree on the same day, which is the
-    best available continuity without a harness-supplied id.
-    """
-    sid = data.get('session_id')
-    if sid:
-        return str(sid)[:64]
-    import hashlib
-    from datetime import date
-    basis = f"{project_dir}:{date.today().isoformat()}"
-    return hashlib.sha256(basis.encode()).hexdigest()[:16]
-
-
-def _epr_bootstrap_block(project_dir: str, session_id: str) -> str:
+def _epr_bootstrap_block(project_dir: str, data: dict) -> str:
     """The SessionStart BOOTSTRAP block: the `minimal` lens of
     `epr flow memory recall open --purpose bootstrap` — the bootstrapping head declared in
     `.claude/hooks/.epr-meta` (rule `bootstrapping-head-is-recall-open`).
@@ -154,14 +136,26 @@ def _epr_bootstrap_block(project_dir: str, session_id: str) -> str:
     same habits register, and keeping both would be exactly the "a hook renders it at a lens
     and never derives a second orientation" drift the rule exists to catch.
 
+    Landing: this hook is SessionStart and SYNCHRONOUS, so its `hookSpecificOutput.
+    additionalContext` is the documented landing path (verified empirically — see
+    `main()`'s comment). The caller folds this block's return value INTO that same JSON
+    wrapper alongside the memory-budget headline; nothing here is printed on its own.
+
+    Session-id and binary resolution both come from `_observation` (`resolve_bin`,
+    `bootstrap_session_id`) — the same shared helper `run-projection.py` uses, so the two
+    hooks' fallback session ids always agree. When `_observation` itself cannot be imported
+    (a missing/broken copy in this project dir), there is no binary to resolve either, so the
+    same "no epr binary resolved" absence line covers both cases without a separate check.
+
     Honest absence, never a fallback renderer: a missing binary, a non-zero exit, or a run past
-    the 6-second budget all print exactly one line, `bootstrap: skipped — <reason>`.
+    the 6-second budget all return exactly one line, `bootstrap: skipped — <reason>`.
     """
     import subprocess
     obs = _observation_module(project_dir)
     binary = obs.resolve_bin() if obs else None
     if not binary:
         return "bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)"
+    session_id = obs.bootstrap_session_id(project_dir, data)
     try:
         r = subprocess.run(
             [binary, 'flow', 'memory', 'recall', 'open',
@@ -254,26 +248,30 @@ def main():
             )
             context_parts.append("")
 
-        if context_parts:
-            # Output context for Claude
-            output = {
-                "hookSpecificOutput": {
-                    "hookEventName": "SessionStart",
-                    "additionalContext": "\n".join(context_parts)
-                }
-            }
-            print(json.dumps(output))
-
         # The bootstrap block: the `minimal` lens of `epr flow memory recall open --purpose
-        # bootstrap` (the bootstrapping head; see `.claude/hooks/.epr-meta`). Printed as its own
-        # plain-text section AFTER the JSON block above — the same plain-stdout-lands-at-
-        # SessionStart shape `durability-guard.py` already uses — so this hook derives no
-        # second orientation of its own (no habits.yaml re-scan; see the retired
+        # bootstrap` (the bootstrapping head; see `.claude/hooks/.epr-meta`, rule
+        # `bootstrapping-head-is-recall-open`). This hook is SessionStart and SYNCHRONOUS
+        # (unlike run-projection.py's `--event session`, which is registered `async: true` and
+        # so is never relied on to land anything) — the ONE documented landing path for a
+        # SessionStart hook's output is the `hookSpecificOutput.additionalContext` JSON wrapper,
+        # so the BOOTSTRAP block is folded INTO that same wrapper below, never printed as a
+        # separate plain-text section. Always computed (context_parts is never empty once this
+        # is appended, even on the honest-absence `bootstrap: skipped` line) — no second
+        # orientation is derived here (no habits.yaml re-scan; see the retired
         # `get_habits_status`, replaced by `_epr_bootstrap_block`).
-        bootstrap_session_id = _bootstrap_session_id(data, project_dir)
-        bootstrap_block = _epr_bootstrap_block(project_dir, bootstrap_session_id)
-        print("BOOTSTRAP:")
-        print(bootstrap_block)
+        bootstrap_block = _epr_bootstrap_block(project_dir, data)
+        context_parts.append("BOOTSTRAP:")
+        context_parts.append(bootstrap_block)
+
+        # Output context for Claude — one JSON hookSpecificOutput wrapper, always emitted (the
+        # bootstrap block above guarantees context_parts is never empty).
+        output = {
+            "hookSpecificOutput": {
+                "hookEventName": "SessionStart",
+                "additionalContext": "\n".join(context_parts)
+            }
+        }
+        print(json.dumps(output))
 
     except json.JSONDecodeError:
         sys.exit(0)

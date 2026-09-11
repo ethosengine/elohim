@@ -26,13 +26,32 @@ THE PROJECTION CONTRACT — what survives the rewrite:
   * Honest absence, never a fallback renderer: a missing binary, a non-zero exit, or a run past
     the budget all print exactly one line, `bootstrap: skipped — <reason>` — never the retired
     habits/saga/stocks derivation re-grown as a silent substitute.
+  * Binary resolution and session-id derivation both come from `_observation.py`
+    (`resolve_bin`, `bootstrap_session_id`) — the SAME shared module `load-project-context.py`
+    uses, imported DEFENSIVELY (try/except, not a hard top-level `from _observation import ...`)
+    so a missing or broken copy of that module degrades this hook to the `bootstrap: skipped`
+    line rather than a Python traceback. Fix round 1 (2026-09-11 review): the session-id formula
+    used to be duplicated verbatim in both hook files — one helper now, imported by both.
 
-DELIVERY: plain stdout, always — on UserPromptSubmit this lands directly as model context
-(the `--event prompt` shape); at SessionStart plain stdout also lands as context
-(`durability-guard.py` already relies on exactly this for its SessionStart advisory), so no event
-branch is needed on the emission shape any more. `--event` is still accepted (the real
-registration in `.claude/settings.json` passes it) but is otherwise unused: the derivation and the
-print are identical regardless of which event fired it.
+DELIVERY — corrected in fix round 1 (2026-09-11 review): the two registered events do NOT
+receive the same treatment.
+
+  * `--event prompt` (UserPromptSubmit, synchronous): plain stdout reaches model context
+    directly — no wrapper (`pickup-semantic-surfacing.py:205-206`). This is where the run-plane
+    block actually lands, and the only path this hook does real work on.
+  * `--event session` (SessionStart, registered `async: true` in `.claude/settings.json`): an
+    ASYNC hook's stdout is not read by anything landing in the turn — Claude Code has already
+    rendered the SessionStart context by the time an async hook exits, unlike a SYNCHRONOUS
+    SessionStart hook (`load-project-context.py`) whose `hookSpecificOutput.additionalContext`
+    JSON wrapper IS the documented landing path. A prior revision of this docstring claimed
+    "durability-guard.py already relies on exactly this for its SessionStart advisory" as
+    justification for plain-stdout-lands-at-SessionStart in general; that claim does not hold
+    for an ASYNC entry specifically (durability-guard.py is registered synchronous), so this
+    hook now treats `--event session` as a NO-OP (nothing derived, nothing printed) rather than
+    spend a subprocess call whose output is not relied upon to land anywhere. Any orientation
+    that must land at SessionStart belongs in `load-project-context.py`'s synchronous path.
+  * No `--event` flag at all (bare invocation) behaves like `prompt` — the derivation is cheap
+    and this is the shape the task's own test drives directly.
 
 RETIRE_WHEN — updated for the new head. The scaffold this hook still is (a thin per-turn
 shell-out) is exactly the class that is load-bearing on one model tier and dead weight on the
@@ -43,12 +62,9 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import date
 from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent
-sys.path.insert(0, str(HOOKS))
-from _observation import resolve_bin  # noqa: E402  (shared binary resolution, one owner)
 
 RETIRE_WHEN = (
     "when a paired run shows the block adds nothing: two consecutive model-tier landings in "
@@ -77,17 +93,18 @@ def read_payload() -> dict:
         return {}
 
 
-def bootstrap_session_id(payload: dict, root: Path) -> str:
-    """The one session label the bootstrap view carries for this session — see the identical
-    helper in `load-project-context.py`. Prefers the harness payload's own `session_id` so the
-    SessionStart `open` and this per-turn `open` address the SAME recall session; falls back to
-    a short hash of the project dir + today's date when the payload carries none."""
-    sid = payload.get("session_id")
-    if sid:
-        return str(sid)[:64]
-    import hashlib
-    basis = f"{root}:{date.today().isoformat()}"
-    return hashlib.sha256(basis.encode()).hexdigest()[:16]
+def _observation_module():
+    """The hooks' shared emitter, imported DEFENSIVELY — the same try/except pattern
+    `load-project-context.py`'s `_observation_module()` uses. A missing or broken
+    `.claude/hooks/_observation.py` degrades this hook to the `bootstrap: skipped` line
+    (fix round 1, 2026-09-11 review: this used to be a hard top-level
+    `from _observation import resolve_bin` that would raise ImportError at load time)."""
+    sys.path.insert(0, str(HOOKS))
+    try:
+        import _observation
+        return _observation
+    except Exception:
+        return None
 
 
 def run_plane_lines(root: Path, payload: dict) -> list[str]:
@@ -95,14 +112,16 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
     half of the one bootstrapping head. No second orientation is derived here: no habits.yaml
     line-scan, no saga import, no flows.jsonl tail scan (all retired; see the module docstring).
 
-    Honest absence on any failure: a missing binary, a non-zero exit, or a run past the 6s
-    budget all return a single `bootstrap: skipped — <reason>` line.
+    Honest absence on any failure: a missing `_observation` module, a missing binary, a
+    non-zero exit, or a run past the budget all return a single `bootstrap: skipped —
+    <reason>` line.
     """
     import subprocess
-    binary = resolve_bin()
+    obs = _observation_module()
+    binary = obs.resolve_bin() if obs else None
     if not binary:
         return ["bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)"]
-    session = "bootstrap-" + bootstrap_session_id(payload, root)
+    session = "bootstrap-" + obs.bootstrap_session_id(root, payload)
     try:
         r = subprocess.run(
             [binary, "flow", "memory", "recall", "open",
@@ -111,7 +130,7 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
             capture_output=True, text=True, timeout=TIMEOUT_S,
         )
     except subprocess.TimeoutExpired:
-        return ["bootstrap: skipped — recall open exceeded the 6s budget"]
+        return [f"bootstrap: skipped — recall open exceeded the {TIMEOUT_S}s budget"]
     except Exception as exc:  # noqa: BLE001 — a per-turn hook must never block or crash a turn
         return [f"bootstrap: skipped — {exc}"]
     if r.returncode != 0:
@@ -125,8 +144,14 @@ def run_plane_lines(root: Path, payload: dict) -> list[str]:
 
 
 def main() -> int:
+    event = sys.argv[sys.argv.index("--event") + 1] if "--event" in sys.argv else "prompt"
     payload = read_payload()  # drained so the writing end never blocks on a full pipe
     try:
+        if event == "session":
+            # Registered `async: true` — nothing reads this event's stdout, so a real
+            # derivation here would be a subprocess call paid for nothing. See the module
+            # docstring's DELIVERY section (fix round 1, 2026-09-11 review).
+            return 0
         root = project_dir()
         lines = run_plane_lines(root, payload)
         print("\n".join(lines))

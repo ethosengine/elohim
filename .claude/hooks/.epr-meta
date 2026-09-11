@@ -56,17 +56,41 @@ rules:
       which every `run:correction` / `run:failed-approach` note in .eprfs/status/flows.jsonl was
       authored in a session where this rule did not fire first (the nudge is describing a habit,
       not producing one)
-  - id: bootstrapping-head-is-recall-open
+  - id: bootstrapping-head-is-recall-open-run-projection
     class: inject
     when:
-      # `*project*.py` matches exactly `load-project-context.py` and `run-projection.py` in this
-      # directory (no other hook filename here contains "project" — "run-projection.py" carries
-      # it as the prefix of "projection"). The task brief named these two files with a
-      # `a|b` alternation; this manifest's `when.write` is matched by `fnmatch` (plain glob), which
-      # has no alternation operator, so a literal pipe pattern would never match either filename.
-      # This glob is the working equivalent within the file's existing grammar — verified against
-      # `epr-meta-resolver.py` on synthesized payloads for both filenames (task-2.2-report.md).
-      write: "*project*.py"
+      # EXACT filename, not a glob. `*project*.py` (this rule's first cut, 2026-09-11) matched
+      # `memory-index-projection.py` too — that hook has nothing to do with the bootstrapping
+      # head, and `fnmatch` has no alternation operator (the task brief's literal `a|b` pattern
+      # never matches either target filename under this file's grammar; a broader glob is not a
+      # safe substitute either, as this exact false-positive proved). Two rules, one per exact
+      # filename, sharing the same `why`/`dedupe-of` text, is the correct shape for an "exactly
+      # these two files" concern under a matcher with no alternation and no list support for
+      # `when.write` (`_matches_when` in `_lib/epr_meta.py` calls `pat.lower()` on the value,
+      # which requires a plain string).
+      write: "run-projection.py"
+    dedupe-of: "epr flow memory recall open --purpose bootstrap (the bootstrapping head; rendered by .claude/hooks/load-project-context.py at `minimal` and .claude/hooks/run-projection.py at `simple`)"
+    why: >
+      the bootstrapping head is `epr flow memory recall open --purpose bootstrap`; a hook renders
+      it at a lens and never derives a second orientation. Station two of the governed-discovery
+      plan (2026-09-11) retired both hooks' bespoke habits.yaml / flows.jsonl derivations (the
+      former `get_habits_status` re-scan, and `run-projection.py`'s whole habits/saga/stocks
+      derivation plus its private cache) — the SessionStart headline and the per-turn run-plane
+      line are now thin renderers of ONE native recall session, at `minimal` and `simple`
+      respectively. Re-deriving a top-red, WIP-fence, saga or commitments-stock reading inside
+      either hook body — even a small one, even "just this one field" — is exactly the
+      second-orientation drift this rule exists to catch before it regrows the cache/derivation
+      pair station two just removed.
+    retire-when: >
+      when these two hook bodies are deleted or merged into a single thin transport (the per-hook
+      distinction this rule polices no longer exists to drift), or when the harness itself
+      resolves the bootstrapping head natively per turn and neither file shells to `epr flow
+      memory recall open` at all — at which point there is no hook body left for the rule to
+      keep honest
+  - id: bootstrapping-head-is-recall-open-load-project-context
+    class: inject
+    when:
+      write: "load-project-context.py"
     dedupe-of: "epr flow memory recall open --purpose bootstrap (the bootstrapping head; rendered by .claude/hooks/load-project-context.py at `minimal` and .claude/hooks/run-projection.py at `simple`)"
     why: >
       the bootstrapping head is `epr flow memory recall open --purpose bootstrap`; a hook renders
@@ -129,13 +153,25 @@ under `_lib/__tests__/`) or `.epr-meta/elohim/lenses/` (tested under its own `__
 so the transport can be swapped (the brit/eprfs direction) without losing the rules. None of
 those three is expressible as an enforced `.epr-meta` predicate, and none has been made one.
 
-**Two `class: inject` teaching signals, added 2026-08-13** under this manifest's own admission
-bar ("only if a NEW recurring, mechanizable drift appears in this tree"), both advisory and
-both carrying their exit. `per-turn-injector-carries-its-budget` fires when a hook file names
-`UserPromptSubmit`: the per-turn path is a genuinely new shape here — before the run-plane
-projection landed, this tree had exactly ONE prompt-path hook — and its four admissibility
-properties (cached hot path, event-correct emission shape, measured timeout, declared
-`RETIRE_WHEN`) are each recorded in this tree as an existing miss, not a hypothetical.
-`correction-outlives-the-turn` fires on a correction-shaped edit and points at
-`epr flow note` — the edit-time half of the discipline whose read-time half is the projection
-block's footer. Neither blocks; both retire on a counted condition.
+**Five `class: inject` teaching signals** under this manifest's own admission bar ("only if a
+NEW recurring, mechanizable drift appears in this tree"), all advisory and all carrying their
+exit. Two, added 2026-08-13: `per-turn-injector-carries-its-budget` fires when a hook file
+names `UserPromptSubmit`: the per-turn path is a genuinely new shape here — before the
+run-plane projection landed, this tree had exactly ONE prompt-path hook — and its four
+admissibility properties (cached hot path, event-correct emission shape, measured timeout,
+declared `RETIRE_WHEN`) are each recorded in this tree as an existing miss, not a hypothetical.
+`correction-outlives-the-turn` fires on a correction-shaped edit and points at `epr flow note`
+— the edit-time half of the discipline whose read-time half is the projection block's footer.
+Two more, added 2026-09-11 (station two of the governed-discovery plan):
+`bootstrapping-head-is-recall-open-run-projection` and
+`bootstrapping-head-is-recall-open-load-project-context` fire on an edit to their EXACT
+namesake filename — split into two rules, one per exact filename, rather than one glob, after
+a first cut (`write: "*project*.py"`) was found to also match `memory-index-projection.py`
+(fnmatch has no alternation, and `"project"` is a substring of `"projection"`) — and point at
+`epr flow memory recall open --purpose bootstrap` as the one place either hook's orientation
+comes from. One more, added 2026-09-11 (Task 2.4, after a Haiku subagent's `git reset --hard`
+wiped another lane's uncommitted work on the shared `dev` checkout):
+`capability-tier-gate-owns-destructive-git` fires when destructive-git command text appears in
+a `.py` file, pointing at the one declared pattern table
+(`.claude/epr-meta/policies.yaml`'s `destructive-git-requires-tier@1`) rather than a second,
+driftable copy. None of the five blocks; each retires on a counted condition.

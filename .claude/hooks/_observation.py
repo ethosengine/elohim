@@ -45,7 +45,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-__all__ = ["resolve_bin", "available", "emit", "reset_cache", "bound_count"]
+__all__ = ["resolve_bin", "available", "emit", "reset_cache", "bound_count",
+           "bootstrap_session_id"]
 
 # Resolution order is the one the plan fixes: $EPR_BIN, the gate target, then PATH.
 _GATE_TARGET_BIN = "/tmp/eprfs-gate-target/debug/epr"
@@ -70,6 +71,31 @@ def resolve_bin() -> str | None:
     if os.path.isfile(_GATE_TARGET_BIN) and os.access(_GATE_TARGET_BIN, os.X_OK):
         return _GATE_TARGET_BIN
     return shutil.which("epr")
+
+
+def bootstrap_session_id(project_dir, payload: dict) -> str:
+    """The one session label the bootstrap view carries for this session — shared by
+    `load-project-context.py` (SessionStart) and `run-projection.py` (UserPromptSubmit) so the
+    SessionStart `open` and every later per-turn `open` address the SAME `epr flow memory recall`
+    session and its continuation state accumulates, rather than each hook opening its own.
+
+    Prefers the harness payload's own `session_id`. Absent that, falls back to a short hash of
+    the project dir + today's date — deterministic across both hooks for the same tree on the
+    same day, which is the best available continuity without a harness-supplied id. `project_dir`
+    accepts anything `str()`-able (a plain string or a `Path`) so both hooks' native project-dir
+    types pass through unchanged.
+
+    This was previously duplicated verbatim in both hook files (the `bootstrapping-head-is-
+    recall-open` rule's whole point is exactly one derivation of the bootstrapping head — a
+    duplicated formula is the same drift class one file over). One helper, imported by both.
+    """
+    sid = (payload or {}).get('session_id')
+    if sid:
+        return str(sid)[:64]
+    import hashlib
+    from datetime import date
+    basis = f"{project_dir}:{date.today().isoformat()}"
+    return hashlib.sha256(basis.encode()).hexdigest()[:16]
 
 
 def _binary_key(path: str) -> str:
