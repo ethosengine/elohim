@@ -218,6 +218,11 @@ class Berth:
             self._write_leases(leases)
             return True, mine[0], "renewed"
         if len(live) >= cap:
+            if cap == 1:
+                # One slot: the refusal names THE holder as a record (who/claim callers index it).
+                cur = live[0]
+                self.record("refuse", resource=resource, session=session, holder=cur["holder"], since=cur.get("since"))
+                return False, cur, f"held by {cur['holder']} since {time.strftime('%H:%M:%SZ', time.gmtime(cur['since']))}"
             holders = ",".join(lease["holder"] for lease in live)
             self.record("refuse", resource=resource, session=session, holder=holders)
             return False, live, f"all {cap} slots held by {holders}"
