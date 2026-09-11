@@ -31,6 +31,17 @@
  * pubkey for everyone (silently emptying the topology aggregation this
  * seeder exists to feed).
  *
+ * The SAME class, one level down, measured 2026-09-11 (run 20260911T0319Z):
+ * having picked the right conductor, this seeder then picked the wrong APP on it.
+ * A doorway-provisioned hosted human's app is `elohim-conductor-0-<6 hex>`, which
+ * satisfies `startsWith('elohim')` just as the steward's own `elohim` does, and
+ * `listApps` promises no ordering — so `create_agent_peer_binding` was signed with
+ * a stranger's cell and the zome's signer-match gate refused it, correctly. The
+ * doorway is NOT at fault: it binds by exact `installed_app_id` equality
+ * (zome_caller.rs). App selection now goes through the shared `selectStewardApp`
+ * (exact id first, never an id containing `-conductor-`), imported rather than
+ * re-derived for exactly the reason the paragraph above gives.
+ *
  * Idempotency: re-running this seeder creates additional binding entries —
  * there is no Stage-1 dedup check inside the zome. peer_id derivation is
  * deterministic from (humanId, archetype), so re-runs produce identical
@@ -74,6 +85,7 @@ import {
   humanShortName,
   parseConductorUrls,
   resolveCandidateUrls,
+  selectStewardApp,
   type ConductorUrlEntry,
 } from './seed-conductor-identities.js';
 
@@ -195,7 +207,11 @@ async function connectToConductor(
   try {
     const cellTarget = seedCellTarget(process.argv.slice(2));
     const apps = await adminWs.listApps({});
-    const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+    // The steward's OWN app — see selectStewardApp's note. Shared with
+    // seed-conductor-identities on purpose: this file's header already records
+    // what re-deriving conductor affinity here cost once (genesis #1380-#1386),
+    // and selecting the app is the same class of decision.
+    const matchingApp = selectStewardApp(apps, appIdPrefix);
 
     if (!matchingApp) {
       if (cellTarget !== undefined) {

@@ -200,6 +200,48 @@ function toAdminUrl(appUrl: string): string {
   return u.toString();
 }
 
+/**
+ * THE STEWARD'S OWN APP on this conductor — not "the first app whose id starts
+ * with `elohim`".
+ *
+ * A conductor now legitimately hosts OTHER PEOPLE'S cells: that is story 07's
+ * topology — the steward's machine performs the hosting. The doorway installs each
+ * hosted human as `<INSTALLED_APP_ID>-<conductor-id>-<6 hex>`
+ * (doorway-service/src/conductor/provisioner.rs `generate_app_id`), while the
+ * steward's own app is installed as EXACTLY `INSTALLED_APP_ID` (hc-mesh.sh
+ * `hc sandbox generate --app-id elohim`; happ_manager on the fleet). Both satisfy
+ * `startsWith(appIdPrefix)` and `listApps` promises no ordering, so a prefix-only
+ * `find` returns an arbitrary app. Two seeders paid for that on 2026-09-11 (run
+ * 20260911T0319Z):
+ *
+ *   seed-conductor-identities read a stranger's `get_my_human` and reported the
+ *   steward's own conductor as conflicted — "[C] Matthew doorway — conductor
+ *   already embodies '<uuid>' — expected 'human-matthew-manager'".
+ *
+ *   seed-agent-bindings signed `create_agent_peer_binding` with that stranger's
+ *   cell, and the zome's signer-match gate refused it CORRECTLY. The doorway is
+ *   not at fault: it binds by exact `installed_app_id` equality
+ *   (doorway-service zome_caller.rs).
+ *
+ * The rule, in one place because copying it is exactly how the affinity fix
+ * drifted back to first-match-wins (genesis #1380–#1386):
+ *   1. exact `installed_app_id === appIdPrefix` — the steward's own app;
+ *   2. else a prefix match that is NOT shaped like a doorway-provisioned app, for
+ *      a deployment whose configured id is a genuine prefix of the installed one;
+ *   3. never an id containing `-conductor-`. A hosted human's cell is never the
+ *      steward's, and returning one is worse than returning nothing.
+ */
+export function selectStewardApp<T extends { installed_app_id: string }>(
+  apps: readonly T[],
+  appIdPrefix: string,
+): T | undefined {
+  const hostedShaped = (id: string): boolean => id.includes('-conductor-');
+  return (
+    apps.find(a => a.installed_app_id === appIdPrefix) ??
+    apps.find(a => a.installed_app_id.startsWith(appIdPrefix) && !hostedShaped(a.installed_app_id))
+  );
+}
+
 interface ConductorSession {
   appWs: AppWebsocket;
   cellId: [Uint8Array, Uint8Array];
@@ -235,33 +277,7 @@ async function connectToConductor(
   try {
     const cellTarget = seedCellTarget(process.argv.slice(2));
     const apps = await adminWs.listApps({});
-    // THE STEWARD'S OWN APP, not "the first app whose id starts with `elohim`".
-    //
-    // A conductor now legitimately hosts OTHER PEOPLE'S cells: that is story 07's
-    // topology — the steward's machine performs the hosting. The doorway installs
-    // each hosted human as `<INSTALLED_APP_ID>-<conductor-id>-<6 hex>`
-    // (doorway-service/src/conductor/provisioner.rs `generate_app_id`), and the
-    // steward's own app is installed as EXACTLY `INSTALLED_APP_ID` (hc-mesh.sh
-    // `hc sandbox generate --app-id elohim`; happ_manager on the fleet). Both match
-    // `startsWith(appIdPrefix)`, so the old prefix-only `find` returned whichever
-    // hosted app `list_apps` happened to order first, and this seeder then read that
-    // stranger's `get_my_human` and reported the steward's own conductor as
-    // conflicted: "[C] Matthew doorway — conductor already embodies '<uuid>' —
-    // expected 'human-matthew-manager'" (measured 2026-09-11, run 20260911T0319Z).
-    //
-    // The conductor's steward is the agent of the steward's OWN installed app, so
-    // an exact id match is the correct resolution and is checked first. The prefix
-    // match survives only as the fallback for a deployment whose configured id is a
-    // genuine prefix of the installed one — and it now prefers an app that is NOT
-    // shaped like a doorway-provisioned hosted app, so even that path stops picking
-    // a hosted cell when the steward's app is named something else.
-    const hostedAppId = /-conductor-[^-]+-[0-9a-f]{6}$/;
-    const matchingApp =
-      apps.find(a => a.installed_app_id === appIdPrefix) ??
-      apps.find(
-        a => a.installed_app_id.startsWith(appIdPrefix) && !hostedAppId.test(a.installed_app_id)
-      ) ??
-      apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+    const matchingApp = selectStewardApp(apps, appIdPrefix);
 
     if (!matchingApp) {
       if (cellTarget !== undefined) {
