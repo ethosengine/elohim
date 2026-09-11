@@ -795,7 +795,7 @@ policies:
 
   - id: destructive-git-requires-tier
     version: 1
-    contentHash: sha256:378faa031d04e3c40afc4f0ea10644ae37120feb2ea071ddd121779dfab0b291
+    contentHash: sha256:f924a6d0ceb53991f6ea5897802aefe76f2d027005479d6b6c46169d74e0e2e7
     title: Destructive git requires a declared tier or a team check
     binding: constitutional
     class: deny
@@ -808,43 +808,57 @@ policies:
       this key exists only to satisfy the registry loader's actionable-predicate check and to
       point at the one enforcer, never a second copy of the pattern table.
     parameters:
-      # Fix round 1 (adversarial review, measured with 30 payloads): literal substring patterns
-      # were bypassable (`git reset -q --hard`, `git -C <other-checkout> reset --hard`, `git
-      # clean -xfd`, `git checkout HEAD -- .`, `git restore --staged --worktree .`, `rm -rf
-      # /projects/elohim`, `rm -rf *`, `rm -rf ..`) and missed a whole class never in the old set
-      # at all (`rebase`, `filter-branch`, `checkout -B`, `switch -C`, `reflog expire`,
-      # `gc --prune=now`). `rules:` replaces `patterns:` with a TOKENISED subcommand
-      # classification (`capability-tier-gate.py` unwraps `bash -c`/`sh -c`/`command`/`env`/an
-      # absolute path to git, strips git global options `-C <p>`/`--git-dir=`/`--work-tree=`/
-      # `-c k=v` before reading the subcommand, and classifies by subcommand + flags — never a
-      # substring scan). Each row: `sub` (required) + zero or more of `any_flags` (a declared
-      # flag present as its own token or as `flag=value`), `any_args` (a declared token present
-      # anywhere in the subcommand's argv), `flag_letters` (a declared letter present in a
-      # combined short-option token, e.g. `-xfd` catches `flag_letters: [f]`) — multiple keys on
-      # one rule AND together (worktree needs BOTH `remove` present AND a force flag); a rule
-      # with only `sub` (rebase / filter-branch / update-ref) matches the subcommand
-      # unconditionally. `rm -rf`/`-fr`/`-r -f` is classified separately (not subcommand-shaped):
-      # destructive when both a recursive and a force flag are present AND a target is one of
-      # `rm-force-recursive-targets`, or an absolute path whose `<path>/.git` exists (a checkout
-      # root) — the literal-target list is declared here; the filesystem check is structural hook
-      # logic, not data. A segment whose (unwrapped) head is `echo`/`printf`/`grep`/`cat` is
-      # never classified — this falls out of the unwrap logic by construction (only
-      # `bash`/`sh`/`git`/`rm` heads are ever inspected further), not a special case.
+      # R1 (30 payloads): substring patterns were bypassable + missed rebase/filter-branch/
+      # checkout -B/switch -C/reflog expire/gc --prune=now. Replaced with TOKENISED subcommand
+      # classification (unwrap bash -c/sh -c/command/env/an absolute path to git; strip git
+      # global opts -C/--git-dir=/--work-tree=/-c before reading the subcommand; classify by
+      # subcommand+flags).
+      # R2 (30+ more payloads): the tokeniser required the HEAD token to literally be git/rm/a
+      # shell — eval "…", $(echo git) …, xargs git …, echo … | xargs -I{} bash -c '{}',
+      # (git …), { git …; }, if/then/for/do wrapping, bash -lc/-x -c, nohup/setsid/stdbuf/time,
+      # python3 -c "…git…" all bypassed. Now: DENY ON AMBIGUITY — strip a wider wrapper set
+      # (eval, command, env+assignments, nohup, setsid, stdbuf, time, timeout, nice, sudo, bare
+      # ( ) { } if then else elif fi do done while until); a shell is unwrapped whenever any
+      # leading option carries `c` (-c/-lc/-x -c/-euo pipefail -c). If STILL indirect after that
+      # — command substitution ($(/backtick), xargs anywhere, or an interpreter
+      # (python*/perl/ruby/node) whose args carry a git/rm word — DENY the whole segment with
+      # "indirect invocation carrying a destructive token; run it plainly or ask the controller",
+      # never trying to resolve what it does. echo/printf/grep/cat/rg stay exempt only as a
+      # SINGLE stage (no |, no xargs downstream).
+      # R2 gaps closed: push +refspec or --delete/-d; reset --keep; git-subcommand `rm` (distinct
+      # from shell rm below) with -r + target ./*; checkout --orphan; symbolic-ref writing (2
+      # positional args, or -d). Relaxed: restore/checkout deny only on a broad target (./*/​:/),
+      # never a specific path; branch --delete without -D/--force allowed; rebase
+      # --abort|--continue|--skip|--quit allowed via exempt_if_any_args (unmatches an otherwise-
+      # unconditional rule when any listed token is present).
+      # Rule engine: sub (required) + any_flags (token, or flag=value) / any_args (token,
+      # anywhere — ONE list per rule, OR within it, never AND) / flag_letters (letter in a
+      # combined short opt) / any_arg_prefix (prefix match, e.g. "+") / min_positional_args
+      # (non-dash token count >= N) / exempt_if_any_args (final override, unmatches). Multiple
+      # KEYS on one rule AND (worktree: remove + force; rm: -r + target); multiple ROWS sharing
+      # one `sub` OR (push's force/delete vs its +prefix are independent). sub-only (rebase/
+      # filter-branch/update-ref) matches unconditionally unless exempt fires.
+      # Shell `rm -rf`/-fr/-r -f is classified separately: recursive+force present AND a target
+      # in rm-force-recursive-targets, or an absolute path whose <path>/.git exists.
       rules:
-        - { sub: reset, any_flags: ["--hard", "--merge"] }
-        - { sub: checkout, any_args: [".", "--", "-B", "-f", "--force"] }
-        - { sub: restore, any_args: [".", "--worktree", "--staged"] }
+        - { sub: reset, any_flags: ["--hard", "--merge", "--keep"] }
+        - { sub: checkout, any_args: [".", "*", ":/", "-B", "-f", "--force", "--orphan"] }
+        - { sub: restore, any_args: [".", "*", ":/"] }
         - { sub: clean, flag_letters: ["f"] }
-        - { sub: push, any_flags: ["-f", "--force", "--force-with-lease"] }
-        - { sub: branch, any_flags: ["-D", "-f", "--force", "--delete"] }
+        - { sub: push, any_flags: ["-f", "--force", "--force-with-lease", "--delete", "-d"] }
+        - { sub: push, any_arg_prefix: ["+"] }
+        - { sub: branch, any_flags: ["-D", "-f", "--force"] }
         - { sub: switch, any_flags: ["-C", "--force-create"] }
-        - { sub: rebase }
+        - { sub: rebase, exempt_if_any_args: ["--abort", "--continue", "--skip", "--quit"] }
         - { sub: filter-branch }
         - { sub: reflog, any_args: ["expire", "delete"] }
         - { sub: gc, any_flags: ["--prune"] }
         - { sub: update-ref }
         - { sub: stash, any_args: ["drop", "clear"] }
         - { sub: worktree, any_args: ["remove"], any_flags: ["--force", "-f"] }
+        - { sub: rm, flag_letters: ["r"], any_args: [".", "*"] }
+        - { sub: symbolic-ref, min_positional_args: 2 }
+        - { sub: symbolic-ref, any_flags: ["-d", "--delete"] }
       rm-force-recursive-targets: [".", "./", "..", "*", "~", "/"]
       tier-floor: claude-opus-5
       tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol]
@@ -870,10 +884,16 @@ policies:
       rewriting, working-tree-discarding, or ref-mutating) is refused below the declared tier
       floor UNLESS the acting tier resolves at or above it. Tier resolution order (fail-closed):
       `CLAUDE_MODEL` env ONLY (fix round 1 dropped `ANTHROPIC_MODEL` — a process-wide config
-      value would be a blanket bypass, not a per-actor declaration), then the actor sidecar's
+      value would be a blanket bypass, not a per-actor declaration; fix round 2: this harness
+      does not export `CLAUDE_MODEL` at all, so in practice the ladder is honour-system via
+      `epr actor claim`, and absent a claim it is a uniform deny), then the actor sidecar's
       latest claim (`.eprfs/status/actors.jsonl`, ActorClaim `{claimed: "agent:<role>@<model>",
-      session, claimedAt}` — elohim/epr-rea/src/actor.rs) for `CLAUDE_SESSION_ID`, then
-      `unknown`. `unknown-tier: deny` is fail-closed on purpose: an unclaimed actor is treated as
+      session, claimedAt}` — elohim/epr-rea/src/actor.rs) for the session id (`CLAUDE_CODE_
+      SESSION_ID` read first — fix round 2: this is the harness's REAL session-id env var, round
+      1 read only `CLAUDE_SESSION_ID`, which this harness never sets, so the sidecar lookup
+      never matched and every actor silently resolved `unknown`; `CLAUDE_SESSION_ID` stays as a
+      fallback for any harness that does use it), then `unknown`. `unknown-tier: deny` is
+      fail-closed on purpose: an unclaimed actor is treated as
       below the floor, never assumed safe. The tier is SELF-ASSERTED either way — an honesty
       fence, not a control; `.claude/worktrees/<plan>` (a worktree per plan) is the structural
       half of this discipline, this row the behavioral half. The remedy is deliberately narrowed
