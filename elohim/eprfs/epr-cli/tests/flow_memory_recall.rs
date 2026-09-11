@@ -17,7 +17,7 @@
 //!   ignored — an assertion about a string in a file would pass while the ladder above it silently
 //!   re-included the directory.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use elohim_epr_cli::flow::memory::footprint;
@@ -29,159 +29,9 @@ use elohim_epr_rea::{AgentRef, DepEdge, FlowRecord, FlowStore, Governor, Sidecar
 use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tempfile::TempDir;
 
-const SESSION: &str = "station-five";
-
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../..")
-        .canonicalize()
-        .expect("repository root")
-}
-
-/// The live algorithm artifact, read from its EPRFS owner — never a local copy.
-///
-/// A hand-written fixture contract would let the real one drift (a budget renamed, a stage added)
-/// while these tests stayed green about an algorithm nobody runs.
-fn live_contract() -> Value {
-    let raw = std::fs::read(repo_root().join(recall::CONTRACT_REL)).expect("live contract");
-    serde_json::from_slice(&raw).expect("contract parses")
-}
-
-fn write(root: &Path, rel: &str, text: &str) {
-    let path = root.join(rel);
-    std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
-    std::fs::write(path, text).expect("write");
-}
-
-/// Pinned for the same reason the corrections fixture pins it: git HEAD's author date is part of a
-/// note's content address, so a fixture built a second later is a different address.
-const FIXTURE_DATE: &str = "2026-09-10T00:00:00+00:00";
-
-fn git(root: &Path, args: &[&str]) {
-    let out = elohim_epr_cli::process::build_command("git", args, root, &[])
-        .env("GIT_AUTHOR_NAME", "Fixture Author")
-        .env("GIT_COMMITTER_NAME", "Fixture Author")
-        .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
-        .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
-        .env("GIT_AUTHOR_DATE", FIXTURE_DATE)
-        .env("GIT_COMMITTER_DATE", FIXTURE_DATE)
-        .output()
-        .expect("git runs");
-    assert!(out.status.success(), "git {args:?}");
-}
-
-fn edge(root: &Path, from: &str, to: &str) {
-    let seal = Some(*BlobCid::compute_raw(b"old").as_cid());
-    let record = DepEdge::new(
-        from.into(),
-        to.into(),
-        Some("This assertion relies on the evidence".into()),
-        Governor::CiteSeal,
-        seal,
-        AgentRef("agent:test".into()),
-        0,
-        None,
-    )
-    .expect("edge");
-    SidecarFlowStore::open(root)
-        .expect("sidecar")
-        .append(FlowRecord::Edge(record))
-        .expect("append");
-}
-
-/// A synthetic repository whose declared source scope is `docs/` and whose two stale edges give the
-/// ceremony something real to select.
-fn repo() -> TempDir {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let root = dir.path();
-    for name in ["a", "b", "source"] {
-        write(
-            root,
-            &format!("docs/{name}.md"),
-            "---\ntitle: Preserve uncertainty\ntags:\n  - evidence\n---\n# Purpose\nPreserve uncertainty.\n# Evidence\nold evidence\n",
-        );
-    }
-    save_contract(root, contract_value(false));
-    git(root, &["init", "-q"]);
-    git(root, &["add", "-A"]);
-    git(root, &["commit", "-qm", "fixture"]);
-    edge(root, "docs/a.md", "docs/source.md");
-    edge(root, "docs/b.md", "docs/source.md");
-    dir
-}
-
-/// The live contract, re-scoped to the fixture.
-///
-/// `with_measurements` selects whether the paired footprint lens participates: most ceremony
-/// assertions are about paging, receipts and refusals, and running a Python lens on every one of
-/// them would buy nothing but seconds.
-fn contract_value(with_measurements: bool) -> Value {
-    let mut contract = live_contract();
-    contract["source_roots"] = json!(["docs"]);
-    contract["ceremony"]["defaults"]["scope"] = json!("docs");
-    contract["ceremony"]["providers"]["alternative"] =
-        json!({"kind": "fixture", "source": "docs/source.md", "ranking": Value::Null});
-    if !with_measurements {
-        contract["ceremony"]
-            .as_object_mut()
-            .expect("ceremony")
-            .remove("measurements");
-    }
-    contract
-}
-
-fn save_contract(root: &Path, contract: Value) {
-    write(
-        root,
-        "contract.json",
-        &serde_json::to_string(&contract).expect("encode"),
-    );
-}
-
-struct Run {
-    stdout: String,
-    stderr: String,
-    code: i32,
-}
-
-impl Run {
-    fn json(&self) -> Value {
-        serde_json::from_str(&self.stdout)
-            .unwrap_or_else(|error| panic!("stdout is not JSON ({error}): {}", self.stdout))
-    }
-}
-
-fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
-    command
-        .args(["flow", "memory", "recall"])
-        .args(args)
-        .args(["--root", &root.to_string_lossy()])
-        .args(["--contract", "contract.json"])
-        .args(["--session", session, "--json"]);
-    let out = command.output().expect("epr runs");
-    Run {
-        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
-        code: out.status.code().unwrap_or(-1),
-    }
-}
-
-fn run(root: &Path, args: &[&str]) -> Run {
-    run_in(root, SESSION, args)
-}
-
-fn ok(root: &Path, args: &[&str]) -> Value {
-    let run = run(root, args);
-    assert_eq!(
-        run.code, 0,
-        "{args:?} refused: {}{}",
-        run.stdout, run.stderr
-    );
-    run.json()
-}
+mod common;
+use common::*;
 
 /// A view that legitimately carries an unresolved frontier.
 ///
@@ -207,21 +57,6 @@ fn begin(root: &Path) {
     ok(
         root,
         &["select", "--edge", "1", "--need", "Check the dependency"],
-    );
-}
-
-/// Open a session with a question and no concern selection — the FOCUSED door.
-///
-/// `begin` selects a concern edge, which is the ceremony door; a focused journey has no edge to
-/// select and is the shape several assertions below are about.
-fn begin_focused(root: &Path, about: &str) {
-    ok(
-        root,
-        &[
-            "open",
-            "--need",
-            &format!("where does the pelican nest in {about}"),
-        ],
     );
 }
 
