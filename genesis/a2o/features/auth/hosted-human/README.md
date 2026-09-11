@@ -37,8 +37,15 @@ Series discipline, in four lines:
 Paths are relative to this directory; `..` is `features/auth/`, `../..` is `features/`.
 State means: **live** — the file exists and its scenarios run in the suite (some may still be
 tagged `@wip`, meaning their step definitions are not yet written, so they are skipped rather
-than failed); **written, @wip** — the file exists, every scenario is `@wip`; **to author** —
-no file yet.
+than failed); **written, @wip** — the file exists, every scenario is `@wip`; **live, failing**
+— the file exists, carries no `@wip`, and its scenarios therefore run and fail until their step
+definitions land (a deliberate choice: the station measures red rather than disappearing into a
+skip); **to author** — no file yet.
+
+Station numbers and file numbers do not correspond. A station number counts a *stage of the
+life*, including stages whose story was born elsewhere and has no file in this directory; a file
+number counts only the stories born here. So station 8 is `05-leaving.feature` and station 9 is
+`07-hosted-by-a-household.feature`. A mismatch is the scheme working, not an off-by-one.
 
 | # | Station | Story | State |
 |---|---|---|---|
@@ -51,6 +58,7 @@ no file yet.
 | 6 | Being hosted: the doorway keeps my cell for me, and gets it back to me when its pool changes | `../conductor-pool-recovery.feature` | live (@wip) |
 | 7 | The operator and me: suspension, quota, and what I am told when they act | `../user-management.feature` (operator side), `04-the-operator-and-me.feature` (my side) | partly live, rest written, @wip |
 | 8 | Leaving: I close my account from the portal and the doorway stops hosting me | `05-leaving.feature` | live (steps wired; red until the close-account route and UI land) |
+| 9 | Hosted by a household: whose machine runs my cell, and the promise that says so | `07-hosted-by-a-household.feature` | live, failing (steps undefined until the glue lands) |
 
 ## What is deliberately not here
 
