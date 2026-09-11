@@ -107,6 +107,14 @@ fi
 cd "${WORKSPACE}"
 pnpm install --frozen-lockfile --filter "@elohim/a2o..."
 
+# The served-shell stations (served-shell-boots.feature "opens the page … in a browser") launch
+# Playwright's chromium even in plain cucumber mode; without the browser they red on
+# `browserType.launch: Executable doesn't exist` on every run (edge #1450, #1452). Same install
+# verify-served-shell.sh already performs in this job; a failed install is reported, not fatal,
+# so the non-browser stations still measure.
+pnpm --dir "${A2O_DIR}" exec playwright install --with-deps chromium \
+  || echo "WARNING: playwright chromium install failed — browser stations will report Executable doesn't exist"
+
 # Run the @dataplane cucumber suite.
 # --format json:... ADDS this formatter alongside any config defaults so we get a
 # per-run file (cucumber-report-dataplane.json) distinct from the main report.
