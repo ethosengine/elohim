@@ -3261,18 +3261,19 @@ EOF
     #
     # DOORWAY_MAX_AGENTS_PER_CONDUCTOR: the fleet default is 50, an OPERATOR ceiling on
     # kitsune2's per-space gossip budget (main.rs: arc convergence stalls past ~30 hosted
-    # agents on one conductor). provisioner.rs registers each agent TWICE (URL_SAFE_NO_PAD
-    # and STANDARD base64) while registry.rs::register_agent increments capacity_used
-    # unconditionally — so the ceiling bites at HALF the agents it names, measured
-    # 2026-09-11: 26 provisions took conductor-0 to 50/50 from a seeded 0.
+    # agents on one conductor). provisioner.rs used to register each agent TWICE
+    # (URL_SAFE_NO_PAD and STANDARD base64) while registry.rs::register_agent incremented
+    # capacity_used unconditionally, so the ceiling bit at HALF the agents it named —
+    # fixed in 36b0e053a, which counts distinct identities instead of registration calls.
     #
-    # Sized to the DECLARED household cast, not to a round number. That cast is
-    # seed-humans.ts's HOUSEHOLD_HOSTED_CAST allow-list (14 names — the humans some
-    # household-lane a2o scenario actually signs in as) plus seed-hosted-humans.ts's 3
-    # `prologue-hosted-*` registrants = 17, doubled for the double-count = 34. The first
-    # `200` here was sized for the 29-persona cast that took matthew's conductor to
-    # 22.8 GB and got the lane shed; a ceiling no cast can reach is not a ceiling.
-    # The x2 comes out again when the doorway's double-count is fixed (Task 19b).
+    # Sized to the DECLARED household cast, not to a round number, with no double-count
+    # headroom now the fix above lands: seed-humans.ts's HOUSEHOLD_HOSTED_CAST allow-list
+    # (14 names — the humans some household-lane a2o scenario actually signs in as) + 3
+    # `prologue-hosted-*` registrants (seed-hosted-humans.ts) = 17, + 8 headroom for
+    # story-created humans that register and close again within one scenario (closing
+    # deprovisions, so the count returns) = 25. The first `200` here was sized for the
+    # 29-persona cast that took matthew's conductor to 22.8 GB and got the lane shed; a
+    # ceiling no cast can reach is not a ceiling.
     # MESH_DOORWAY_MAX_AGENTS overrides it for a convergence experiment.
     #
     # NO COMMENT LINES INSIDE THE ASSIGNMENT LIST BELOW: a comment ends the backslash
@@ -3300,7 +3301,7 @@ EOF
     POOL_COMPUTE_URL="$primary" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 0 "${PEERS[0]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-34}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_PORT" \
       --conductor-url "ws://localhost:$(admin_port 0)" \
       --app-port-min "$(app_port 0)" \
@@ -3344,7 +3345,7 @@ EOF
     POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 1)" \
     POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
     POOL_COMPUTE_PERFORMER="$(peer_agent_key 1 "${PEERS[1]}")" \
-    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-34}" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
     nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_B_PORT" \
       --conductor-url "ws://localhost:$(admin_port 1)" \
       --app-port-min "$(app_port 1)" \
