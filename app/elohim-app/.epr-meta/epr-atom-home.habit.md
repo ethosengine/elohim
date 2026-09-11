@@ -25,6 +25,19 @@ retire-when: >
   legs and gate) so that the shell component and the runtime path are one rendering path — the
   habit then describes the runtime, not an Angular component.
 ---
+DELTA 2026-09-11 (FLEET MEASURE, stays RED — one named failure left): a2o @concern:epr-atom-home run
+against the deployed alpha (app build face02de, buildTime 2026-09-09T13:40:18Z) — three runs. Runs 1–2:
+5 passed / 2 failed. The custody literal `"1 of 3"` in epr-atom-home.feature asserted live state (alpha
+now says 3 of 3); replaced by a read of the doorway's own household report (06bafc316). Run 3: **6 passed /
+1 failed, 46/46 steps passed**. The frame is proven on the fleet: `pnpm look` shot at
+genesis/a2o/reports/look/epr-home-alpha-face02de (four legs, custody meter, address footer, no viewer
+chrome; 0 pageErrors, 0 httpErrors). The one failure is the After-hook of "The learning app is one lens
+away": the lamad bundle on alpha resolves a blob to http://localhost:8090/blob/sha256-c5dcc24c… (its
+environment.client.storageUrl; ILamadStorageClient.getBlobUrl, blob-manager.service.ts:162) → browser
+ERR_CONNECTION_REFUSED for every real visitor of a lamad path. Cure in flight (plan Task 18b: origin-
+relative /blob/{hash} in doorway mode). Flip needs the app build that carries it + a 7/7 run — a build
+number, not this note.
+
 DELTA 2026-09-02b (LOCAL PROOF, stays RED until an app deploy renders it on alpha):
 Slice 1 landed on dev (fb0117114 … cc9cbe385, plus the a2o retargets in flight):
 EprHomeComponent owns /epr/{id}; EprFocalComponent extracted count-neutral (the
