@@ -1,4 +1,6 @@
 //! Rendering — the human screen an agent can act from.
+use cid::Cid;
+
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -107,7 +109,20 @@ fn render_lens(lens: &Value) -> String {
     let stated = joined_or(&lens["provenance"]["stated"], "none");
     let revealed = joined_or(&lens["provenance"]["revealed"], "no evidence yet");
     let defaults = lens["provenance"]["defaults"].as_str().unwrap_or_default();
-    format!("lens: {level} · stated {stated} · revealed {revealed} · {defaults}\n")
+    let cid = lens["cid"]
+        .as_str()
+        .and_then(|s| s.parse::<Cid>().ok())
+        .map(|parsed| crate::flow::short_cid(&parsed))
+        .unwrap_or_default();
+    // A wall-clock `renew by <date>` would break this line's digest daily; real expiry arrives
+    // with station 4's tending record, and until then the honest answer is that there is none.
+    let renew = match lens["expires_at"].as_str() {
+        Some(date) => format!("renew by {date}"),
+        None => "renew: none (no tending record)".to_string(),
+    };
+    format!(
+        "lens: {level} · stated {stated} · revealed {revealed} · {defaults} · cid {cid} · {renew}\n"
+    )
 }
 
 /// Every string in a JSON array, joined for one line; `fallback` when the array is empty or

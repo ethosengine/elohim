@@ -1540,6 +1540,9 @@ pub(super) fn execute(
     // never refused, never silently skipped. See `lens.rs`.
     let reader = lens::reader_from_session(&args.root, &args.session);
     let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
+    if let Some(message) = &resolved_lens.malformed {
+        push_unresolved(&mut view, message.clone());
+    }
     view["lens"] = resolved_lens.to_value();
     push_action(
         &mut view,

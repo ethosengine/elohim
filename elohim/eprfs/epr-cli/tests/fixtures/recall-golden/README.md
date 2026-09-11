@@ -25,8 +25,8 @@ digest, that is either a real regression (fix the split) or an intentional rende
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `a3b304920260fc1a38d903e5645bf985c36603234805cb5c3e20a75e9d189678` |
-| Whole open | `whole_open_is_byte_identical` | `8ca20e6f1ae913f42e06b6cac20533121c6e0259e5f84b089463a7379b676b4d` |
+| Focused open | `focused_open_is_byte_identical` | `78d4a0bc492390c356e99418cd78f75f5093de2e648450a69775b2a8812f10e9` |
+| Whole open | `whole_open_is_byte_identical` | `bd599c7295bfa07164001bd6f09805ecb8ff7d34e7d678eede82eb2406561d06` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -69,3 +69,17 @@ does not vary run to run: it is `BlobCid::compute_raw` of canonical JSON over `{
 choice_count, density_bytes, scaffold, provenance}` alone (no timestamp, no path), and neither of
 these two fixture sessions registers an actor claim, so both resolve to the same `stated: ["none"]`
 / `standard` lens on every run — confirmed stable by re-running the capture command twice.
+
+## 2026-09-11 — fix round 1 of Task 1.1's review
+
+Two independent changes to the `lens:` line landed in the same round, so both are re-baselined
+together (once). (1) `render_lens` now appends a short CID and a `renew:` slot to the line —
+`lens: {level} · stated {…} · revealed {…} · {defaults} · cid {short} · renew: none (no tending
+record)` — the short CID via the existing `crate::flow::short_cid` (never a wall-clock date: that
+would re-baseline this digest daily; real expiry arrives with station 4's tending record). (2)
+`tests/common/mod.rs`'s `contract_value()` now declares an EXPLICIT `lens_table` (identical
+values to `lens::builtin_table()`) rather than only inheriting whatever the live contract file
+happens to carry, so `provenance.defaults` on these two golden fixtures reads `"declared"`
+instead of the earlier round's `"builtin"` — a value that appears in the line and therefore in
+the digest, even though neither fixture's resolved level, choices, density or scaffold changed.
+`GOLDEN_REFUSAL` is unchanged again, for the same reason as round 1.

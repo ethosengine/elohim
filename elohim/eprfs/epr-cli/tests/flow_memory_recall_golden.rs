@@ -58,10 +58,13 @@ fn digest(s: &str) -> String {
 }
 
 // Re-baselined station 1 (Task 1.1): a `lens:` line is now printed after `Guiding context` on
-// every rendered view — see tests/fixtures/recall-golden/README.md. GOLDEN_REFUSAL is unchanged:
-// a refusal never reaches `render()`'s orientation/lens preamble.
-const GOLDEN_FOCUSED: &str = "a3b304920260fc1a38d903e5645bf985c36603234805cb5c3e20a75e9d189678";
-const GOLDEN_WHOLE: &str = "8ca20e6f1ae913f42e06b6cac20533121c6e0259e5f84b089463a7379b676b4d";
+// every rendered view — see tests/fixtures/recall-golden/README.md. Re-baselined AGAIN in fix
+// round 1 of Task 1.1's review: the `lens:` line gained a short CID and a `renew:` slot, and the
+// fixture contract now declares an explicit `lens_table` (see tests/common/mod.rs
+// `contract_value`) rather than only inheriting the live one. GOLDEN_REFUSAL is unchanged across
+// both rounds: a refusal never reaches `render()`'s orientation/lens preamble.
+const GOLDEN_FOCUSED: &str = "78d4a0bc492390c356e99418cd78f75f5093de2e648450a69775b2a8812f10e9";
+const GOLDEN_WHOLE: &str = "bd599c7295bfa07164001bd6f09805ecb8ff7d34e7d678eede82eb2406561d06";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

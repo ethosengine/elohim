@@ -10,7 +10,7 @@
 //! ladder is the wrong shape: a cucumber fixture runs with its cwd under `/tmp` and a fixture
 //! contract, so every rung misses and the operation that needs a measurement refuses. A measurement
 //! primitive the ceremony depends on cannot be conditional on where the process happens to be
-//! standing. `--lens <script>` survives as an EXPLICIT override for an external lens, and only as
+//! standing. `--footprint-lens <script>` survives as an EXPLICIT override for an external lens, and only as
 //! that.
 //!
 //! **What is preserved exactly**, because these are the promises the measurement makes:

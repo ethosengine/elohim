@@ -22,13 +22,24 @@
 //! is named in `provenance.stated[0]` as `requested: <level> (stated <inner>)` — the widening
 //! the reader asked for, next to what the recipe would otherwise have offered.
 //!
-//! **Never refuses.** [`resolve`] returns a [`LensView`] unconditionally: a malformed or absent
-//! `lens_table` falls back to a compiled-in table byte-identical to the one this contract
-//! version declares (the same additive-fallback discipline `Contract::process_spec` and
-//! `Contract::bounds` already hold for their own pre-v10 callers), and an unreadable flows
-//! sidecar is read as zero revealed evidence rather than an error. A lens is orientation, not an
-//! admission gate — the honesty floor (every view names its lens, its CID and its provenance) is
-//! what must never be skipped, not any one input to computing it.
+//! **Never refuses — but absent and malformed are NOT the same shape.** [`resolve`] returns a
+//! [`LensView`] unconditionally; an unreadable flows sidecar is read as zero revealed evidence
+//! rather than an error, for the same reason. But `lens_table` itself splits in two:
+//!
+//! - **Absent** (a pre-v11 contract, or one that simply never declares it) falls back to
+//!   [`builtin_table`] SILENTLY — `provenance.defaults` reads `"builtin"`. This is the legitimate
+//!   additive-fallback discipline `Contract::process_spec`/`Contract::bounds` already hold for a
+//!   field that genuinely does not exist yet.
+//! - **Declared but malformed** (the field is present and fails to parse) is a DIFFERENT case and
+//!   is never silent: `Contract::process_spec`/`Contract::bounds` REFUSE outright on this shape —
+//!   "a hand-edit error, not a shape to silently paper over with a minted default" (Task 0.6
+//!   hardened this after an earlier drift let one through quietly). A lens must not refuse the
+//!   same way, so [`resolve`] still falls back to [`builtin_table`] — but SAYS SO: the message is
+//!   pushed onto `view["unresolved"]` by the caller (`journey::execute`, via [`LensView::malformed`])
+//!   and `provenance.defaults` reads `"builtin (declared lens_table malformed)"` rather than the
+//!   silent `"builtin"` the absent case gets. A lens is orientation, not an admission gate — the
+//!   honesty floor (every view names its lens, its CID and its provenance, AND names a fallback it
+//!   was forced into) is what must never be skipped, not any one input to computing it.
 //!
 //! **Station 2/3 are not here yet.** `expires_at`/`tended_at` (the TTL and tending cadence the
 //! design doc's human lens needs) stay `None`/empty — honest absence, since nothing in this
@@ -199,7 +210,10 @@ pub(super) struct LensProvenance {
     /// The revealed input's account. Empty when there is not yet enough of this reader's own
     /// journey history to say anything — never padded with a placeholder line.
     pub revealed: Vec<String>,
-    /// The recipe default this reader would fall back to absent any other evidence.
+    /// WHERE the effective table came from: `"declared"` (the contract's own `lens_table`
+    /// parsed cleanly), `"builtin"` (no `lens_table` declared — silent, legitimate fallback), or
+    /// `"builtin (declared lens_table malformed)"` (a `lens_table` WAS declared and failed to
+    /// parse — see [`LensView::malformed`], which carries the reason).
     pub defaults: String,
 }
 
@@ -219,6 +233,13 @@ pub(super) struct LensView {
     pub expires_at: Option<String>,
     /// Tending timestamps, oldest first. Always empty today, for the same reason.
     pub tended_at: Vec<String>,
+    /// `Some(message)` exactly when the contract declared a `lens_table` that failed to parse —
+    /// the message the caller must push onto `view["unresolved"]`. `None` on every other path
+    /// (declared-and-valid, or genuinely absent), which is why it is NOT part of [`to_value`]:
+    /// this is a signal for `journey::execute`, not a field of the lens itself.
+    ///
+    /// [`to_value`]: LensView::to_value
+    pub malformed: Option<String>,
 }
 
 impl LensView {
@@ -252,6 +273,7 @@ struct LevelSpec {
     scaffold: Scaffold,
 }
 
+#[derive(Debug)]
 struct LensTable {
     defaults_level: LensLevel,
     stated: BTreeMap<String, LensLevel>,
@@ -327,31 +349,78 @@ fn builtin_table() -> LensTable {
     }
 }
 
-/// Parse the contract's declared `lens_table`, falling back to [`builtin_table`] when it is
-/// absent or malformed. Never refuses: a lens must resolve on every view, including one built
-/// from an old or hand-damaged contract.
-fn table_from_contract(contract: &Contract) -> LensTable {
-    contract
-        .value
-        .get("lens_table")
-        .and_then(parse_table)
-        .unwrap_or_else(builtin_table)
+/// Resolve the effective `lens_table` and where it came from — see the module doc's "Never
+/// refuses — but absent and malformed are NOT the same shape" section. Returns `(table,
+/// defaults_provenance, malformed_message)`; `malformed_message` is `Some` exactly when a
+/// declared `lens_table` failed to parse, and is the exact text [`resolve`] pushes onto
+/// `view["unresolved"]` via [`LensView::malformed`].
+fn table_from_contract(contract: &Contract) -> (LensTable, String, Option<String>) {
+    match contract.value.get("lens_table") {
+        None => (builtin_table(), "builtin".to_string(), None),
+        Some(raw) => match parse_table(raw) {
+            Ok(table) => (table, "declared".to_string(), None),
+            Err(reason) => (
+                builtin_table(),
+                "builtin (declared lens_table malformed)".to_string(),
+                Some(format!(
+                    "lens_table declared but malformed: {reason}; builtin defaults applied"
+                )),
+            ),
+        },
+    }
 }
 
-fn parse_table(raw: &Value) -> Option<LensTable> {
-    let defaults_level = LensLevel::parse(raw.pointer("/defaults/level")?.as_str()?)?;
+/// Parse a declared `lens_table`, naming exactly what failed rather than collapsing every shape
+/// of malformed into one opaque `None` — the message becomes part of the `unresolved` line a
+/// reader actually sees.
+fn parse_table(raw: &Value) -> Result<LensTable, String> {
+    let defaults_level_str = raw
+        .pointer("/defaults/level")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "lens_table.defaults.level missing or not a string".to_string())?;
+    let defaults_level = LensLevel::parse(defaults_level_str).ok_or_else(|| {
+        format!("lens_table.defaults.level `{defaults_level_str}` is not a recognized level")
+    })?;
+
     let mut levels = BTreeMap::new();
     for level in LensLevel::ALL {
-        let spec = raw.pointer(&format!("/levels/{}", level.as_str()))?;
+        let name = level.as_str();
+        let spec = raw
+            .pointer(&format!("/levels/{name}"))
+            .ok_or_else(|| format!("lens_table.levels.{name} missing"))?;
+        let choice_count = spec
+            .get("choice_count")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| {
+                format!("lens_table.levels.{name}.choice_count missing or not a number")
+            })?;
+        let choice_count = u8::try_from(choice_count)
+            .map_err(|_| format!("lens_table.levels.{name}.choice_count out of range"))?;
+        let density_bytes = spec
+            .get("density_bytes")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| {
+                format!("lens_table.levels.{name}.density_bytes missing or not a number")
+            })?;
+        let density_bytes = usize::try_from(density_bytes)
+            .map_err(|_| format!("lens_table.levels.{name}.density_bytes out of range"))?;
+        let scaffold_str = spec
+            .get("scaffold")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("lens_table.levels.{name}.scaffold missing or not a string"))?;
+        let scaffold = Scaffold::parse(scaffold_str).ok_or_else(|| {
+            format!("lens_table.levels.{name}.scaffold `{scaffold_str}` is not recognized")
+        })?;
         levels.insert(
             level,
             LevelSpec {
-                choice_count: u8::try_from(spec.get("choice_count")?.as_u64()?).ok()?,
-                density_bytes: usize::try_from(spec.get("density_bytes")?.as_u64()?).ok()?,
-                scaffold: Scaffold::parse(spec.get("scaffold")?.as_str()?)?,
+                choice_count,
+                density_bytes,
+                scaffold,
             },
         );
     }
+
     let mut stated = BTreeMap::new();
     for (model, level) in raw
         .get("stated")
@@ -363,7 +432,7 @@ fn parse_table(raw: &Value) -> Option<LensTable> {
             stated.insert(model.clone(), level);
         }
     }
-    Some(LensTable {
+    Ok(LensTable {
         defaults_level,
         stated,
         levels,
@@ -498,7 +567,7 @@ pub(super) fn resolve(
     requested: Option<LensLevel>,
     root: &Path,
 ) -> LensView {
-    let table = table_from_contract(contract);
+    let (table, defaults_provenance, malformed) = table_from_contract(contract);
     let (stated_level, stated_lines) = stated_for(reader, &table);
     let (offered_level, revealed_lines) = revealed_for(root, reader, stated_level);
 
@@ -518,19 +587,10 @@ pub(super) fn resolve(
     };
 
     let spec = table.spec(level);
-    let defaults_spec = table.spec(table.defaults_level);
-    let defaults = format!(
-        "recipe default: {} ({} choice(s), {} B, {})",
-        table.defaults_level.as_str(),
-        defaults_spec.choice_count,
-        defaults_spec.density_bytes,
-        defaults_spec.scaffold.as_str(),
-    );
-
     let provenance = LensProvenance {
         stated: stated_lines,
         revealed: revealed_lines,
-        defaults,
+        defaults: defaults_provenance,
     };
     let cid = compute_cid(
         level,
@@ -549,6 +609,7 @@ pub(super) fn resolve(
         provenance,
         expires_at: None,
         tended_at: Vec::new(),
+        malformed,
     }
 }
 
@@ -621,5 +682,48 @@ mod tests {
         assert_eq!(level, LensLevel::Standard);
         assert!(lines[0].contains("some-new-model"));
         assert!(lines[0].contains("recipe default"));
+    }
+
+    #[test]
+    fn an_absent_lens_table_is_silent_builtin() {
+        let mut contract = crate::flow::memory::recall::tests_support::minimal_contract();
+        contract.as_object_mut().unwrap().remove("lens_table");
+        let (_table, provenance, malformed) =
+            table_from_contract(&Contract::from_value(contract).expect("valid contract"));
+        assert_eq!(provenance, "builtin");
+        assert!(malformed.is_none());
+    }
+
+    #[test]
+    fn a_declared_lens_table_that_fails_to_parse_is_never_silent() {
+        let bad = json!({"levels": "nope"});
+        let error = parse_table(&bad).expect_err("malformed table must not parse");
+        assert!(error.contains("defaults.level"), "{error}");
+
+        let mut contract = crate::flow::memory::recall::tests_support::minimal_contract();
+        contract["lens_table"] = bad;
+        let (_table, provenance, malformed) =
+            table_from_contract(&Contract::from_value(contract).expect("valid contract"));
+        assert_eq!(provenance, "builtin (declared lens_table malformed)");
+        let message = malformed.expect("a malformed lens_table must be named, not swallowed");
+        assert!(
+            message.contains("lens_table declared but malformed"),
+            "{message}"
+        );
+        assert!(message.contains("builtin defaults applied"), "{message}");
+    }
+
+    #[test]
+    fn a_declared_lens_table_that_parses_wins_over_the_builtin() {
+        let mut contract = crate::flow::memory::recall::tests_support::minimal_contract();
+        contract["lens_table"]["stated"]["claude-sonnet-5"] = json!("detail");
+        let (table, provenance, malformed) =
+            table_from_contract(&Contract::from_value(contract).expect("valid contract"));
+        assert_eq!(provenance, "declared");
+        assert!(malformed.is_none());
+        assert_eq!(
+            table.stated.get("claude-sonnet-5"),
+            Some(&LensLevel::Detail)
+        );
     }
 }

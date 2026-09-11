@@ -5,9 +5,10 @@
 //! it. Behaviour is unchanged — only the location moved.
 //!
 //! Shared across several independent test binaries (`flow_memory_recall*.rs`), each of which
-//! `mod common;`-includes this whole file fresh and uses only the subset it needs — so an item
-//! unused by one binary is routinely used by another, not genuinely dead.
-#![allow(dead_code)]
+//! `mod common;`-includes this whole file fresh and uses only the subset it needs. An item one
+//! binary never reaches is genuinely dead FOR THAT BINARY'S compilation, so it carries its own
+//! `#[allow(dead_code)]` rather than a blanket module-level one — the fix-round-1 ruling that
+//! narrowed this from the earlier blanket attribute.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -18,6 +19,7 @@ use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 use tempfile::TempDir;
 
+#[allow(dead_code)]
 pub const SESSION: &str = "station-five";
 
 pub fn repo_root() -> PathBuf {
@@ -116,6 +118,33 @@ pub fn contract_value(with_measurements: bool) -> Value {
             .expect("ceremony")
             .remove("measurements");
     }
+    // Pinned explicitly here (station 1, fix round 1) rather than left to inherit whatever
+    // `live_contract()` happens to declare: a test fixture that only inherits the real
+    // `lens_table` cannot tell "lens.rs's parse_table() actually ran" from "it silently fell
+    // through to the builtin table", because the two are value-identical. Pinning the exact
+    // brief JSON here — same values as `lens::builtin_table()` — keeps every existing rendering
+    // unchanged while making the DECLARED path a real, test-owned fact rather than an
+    // assumption borrowed from the live file.
+    contract["lens_table"] = json!({
+        "defaults": {"level": "standard", "choice_count": 6, "density_bytes": 6000, "scaffold": "rank-and-let-choose"},
+        "stated": {
+            "claude-haiku-4-5": "minimal",
+            "claude-sonnet-5": "simple",
+            "claude-opus-5": "standard",
+            "claude-fable-5-1": "detail",
+            "gpt-5.6-sol": "standard"
+        },
+        "levels": {
+            "minimal": {"choice_count": 1, "density_bytes": 1500, "scaffold": "locate-and-hand-one-command"},
+            "simple": {"choice_count": 3, "density_bytes": 3000, "scaffold": "locate-and-hand-one-command"},
+            "standard": {"choice_count": 6, "density_bytes": 6000, "scaffold": "rank-and-let-choose"},
+            "detail": {"choice_count": 12, "density_bytes": 12000, "scaffold": "rank-and-let-choose"},
+            "debug": {"choice_count": 12, "density_bytes": 24000, "scaffold": "rank-and-let-choose"},
+            "trace": {"choice_count": 24, "density_bytes": 32768, "scaffold": "rank-and-let-choose"}
+        },
+        "revealed_rule": "a reader tier whose last 3 journeys reached authority at level L is offered the next level; a tier with a mistaken assertion in its last 3 is offered the previous level",
+        "expiry_days": 90
+    });
     contract
 }
 
@@ -156,10 +185,12 @@ pub fn run_in(root: &Path, session: &str, args: &[&str]) -> Run {
     }
 }
 
+#[allow(dead_code)]
 pub fn run(root: &Path, args: &[&str]) -> Run {
     run_in(root, SESSION, args)
 }
 
+#[allow(dead_code)]
 pub fn ok(root: &Path, args: &[&str]) -> Value {
     let run = run(root, args);
     assert_eq!(
@@ -200,6 +231,12 @@ pub fn text_in(root: &Path, session: &str, args: &[&str]) -> String {
         .args(["--contract", "contract.json"])
         .args(["--session", session]);
     let out = command.output().expect("epr runs");
+    assert!(
+        out.status.success(),
+        "{args:?} refused: {}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8_lossy(&out.stdout).to_string()
 }
 
@@ -226,6 +263,7 @@ pub fn claim_actor(root: &Path, claimed: &str, session: &str) {
 ///
 /// `begin` selects a concern edge, which is the ceremony door; a focused journey has no edge to
 /// select and is the shape several assertions below are about.
+#[allow(dead_code)]
 pub fn begin_focused(root: &Path, about: &str) {
     ok(
         root,

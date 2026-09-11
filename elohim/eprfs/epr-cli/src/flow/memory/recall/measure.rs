@@ -8,8 +8,8 @@ use super::*;
 /// Take one sample: NATIVELY unless the caller named an external lens script.
 ///
 /// The lens is a measurement primitive the ceremony depends on, so it is part of the executor
-/// rather than a script the executor has to go and find. `--lens` stays available for an external
-/// lens — a different implementation someone wants to measure with — and is the only thing that
+/// rather than a script the executor has to go and find. `--footprint-lens` stays available for an
+/// external lens — a different implementation someone wants to measure with — and is the only thing that
 /// reaches the subprocess path.
 fn sample_balance(
     root: &Path,
@@ -185,7 +185,7 @@ pub(super) fn measure(
             .as_array()
             .cloned()
             .unwrap_or_default();
-        // No path search and no refusal: the lens is native. `--lens` names an EXTERNAL one.
+        // No path search and no refusal: the lens is native. `--footprint-lens` names an EXTERNAL one.
         let (sample, lens_notes) = sample_balance(
             &args.root,
             contract,
