@@ -7,7 +7,7 @@ title: "Threshold landing 'Humans Served' — decide the canonical source/semant
 slug: "doorway-landing-humans-served-source-2026-06-23"
 written: "2026-06-23"
 author: "oAuth+federation shakeout — counts contract fix"
-status: "open"
+status: "closed"
 priority: "low"
 tags: [doorway, threshold-landing, metrics, humans-served, semantics, architect-decision]
 relatedNodeIds:
@@ -53,3 +53,37 @@ This is decoupled from the substrate-read framing the old caption implied — ne
 a live DHT query. The corrected caption now describes each honestly (`contentAvailable` =
 projection of substrate content; `humansServed` = federation aggregate). See
 [[backlog-wan-nat-federation-dataplane-discovery-gap]].
+
+## Decision (2026-09-10)
+
+**Option B.** "Humans Served" is the count of humans THIS doorway is currently hosting —
+live, unexpired, unrevoked `hosted-cell` delegates-compute commitments its pool provides,
+read from the credential rows that carry the grant cid the substrate returned. Option A
+(the orchestrator heartbeat social aggregate in `admin.rs`) is rejected: it is a k8s-plane
+self-report, not a substrate read, and it is not what "served by this doorway" means. A
+federation-wide aggregate remains a separate, separately-labelled number and is out of scope.
+A doorway with a pool that hosts nobody now shows `0`; a doorway with no pool still shows `—`.
+Wired in `routes/status.rs::build_status_data`; specified by
+`genesis/a2o/features/dataplane/doorway-humans-served.feature` (`@concern:humans-served`).
+
+### Honesty caveat (chief, 2026-09-10) — carried forward, not closed with the atom
+
+The count is a doorway-local **projection of the notary's answer**, not a substrate read.
+The row carries the grant cid the substrate returned and is cleared by the doorway's own
+close path (`POST /auth/close-account`). A commitment revoked **provider-side on the
+substrate**, without passing through close-account, is NOT reflected here until a reconcile
+reads it back — and that reconcile is **deferred**, named rather than hidden. So the number
+means "promises this doorway believes it is keeping", which may exceed "promises the notary
+still records". A reader who needs the authoritative answer reads
+`GET /api/v1/commitments/{cid}` on any peer projecting the substrate — which is exactly why
+`hostedCellGrantCid` is on `GET /auth/account`. Registered as a `partial` C5/C4 binding with
+a `gapNote` on `live_hosted_cell_filter` in `doorway/doorway-service/seam-registry.yaml`.
+
+### Landed as
+
+`routes/hosted_cell.rs` — `live_hosted_cell_filter` (which rows count) and `humans_served`
+(None without a pool; `Some(0)` for a pool hosting nobody); `routes/status.rs` —
+`count_live_hosted_cells` + `build_status_data`. The caption fix in
+`doorway/doorway-app/src/app/components/landing/doorway-landing.component.ts:28`, which still
+describes the field as a federation-wide social aggregate, is **still open** — it belongs to
+the doorway-app write set (S2 Task 11's owner), not to this backend change.

@@ -248,10 +248,15 @@ pub struct StatusResponse {
     // --- Threshold-landing summary (camelCase for the doorway-app SPA) ---
     /// Region label, if configured.
     pub region: Option<String>,
-    /// Humans served — a federation-wide social aggregate (sum of self-reported
-    /// node counts). `None` until that aggregate is surfaced at this layer; the
-    /// landing renders it as "—" (unknown, never 0). Source/semantics is an open
-    /// design decision — see backlog `doorway-landing-humans-served-source`.
+    /// Humans served — how many people THIS doorway is currently hosting: live,
+    /// unexpired, unrevoked `hosted-cell` `delegates-compute` commitments its
+    /// pool provides (D3, Option B).
+    ///
+    /// `None` ONLY when this doorway operates no conductor pool — it hosts
+    /// nobody's cell, the question does not apply, and the landing renders "—".
+    /// A doorway WITH a pool that hosts nobody reports `0`, because zero is an
+    /// answer. A federation-wide aggregate is a different, separately-labelled
+    /// number and is deliberately not this one.
     #[serde(rename = "humansServed")]
     pub humans_served: Option<u32>,
     /// Content available — count of substrate entries this doorway has projected
@@ -475,6 +480,33 @@ async fn fetch_projection_stats(state: &Arc<AppState>) -> (u64, u64) {
 
     *cached = (std::time::Instant::now(), result.0, result.1);
     result
+}
+
+/// Count credential rows carrying a live hosted-cell promise.
+///
+/// `None` — not `Some(0)` — when the count cannot be taken at all (no
+/// credential store, or the query failed). An unknown count must stay unknown:
+/// reporting 0 for "I could not look" is the exact dishonesty this field was
+/// stuck on before.
+async fn count_live_hosted_cells(state: &Arc<AppState>) -> Option<u64> {
+    let mongo = state.mongo.as_ref()?;
+    let collection = mongo
+        .collection::<crate::db::schemas::UserDoc>(crate::db::schemas::USER_COLLECTION)
+        .await
+        .ok()?;
+    match collection
+        .inner()
+        .count_documents(crate::routes::hosted_cell::live_hosted_cell_filter(
+            chrono::Utc::now(),
+        ))
+        .await
+    {
+        Ok(n) => Some(n),
+        Err(e) => {
+            tracing::warn!("humansServed count failed (reporting unknown): {e}");
+            None
+        }
+    }
 }
 
 /// Build the StatusResponse from the current AppState.
@@ -780,6 +812,24 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         shed_total: crate::metrics::admission_shed_total(),
     };
 
+    // Humans this doorway is hosting right now (D3). A doorway-local PROJECTION
+    // of the notary's answer, not a substrate read: the count is taken over the
+    // credential rows that carry the grant cid the substrate returned, and the
+    // close path clears them. A commitment withdrawn provider-side WITHOUT
+    // passing through close-account is not reflected until a reconcile reads it
+    // back, and that reconcile is deferred — named here rather than hidden. See
+    // `routes::hosted_cell::live_hosted_cell_filter`.
+    let pool_present = state
+        .conductor_registry
+        .as_ref()
+        .is_some_and(|r| r.conductor_count() > 0);
+    let live_hosted = if pool_present {
+        count_live_hosted_cells(state).await
+    } else {
+        None
+    };
+    let humans_served = crate::routes::hosted_cell::humans_served(pool_present, live_hosted);
+
     StatusResponse {
         service: "doorway",
         version: env!("CARGO_PKG_VERSION"),
@@ -797,9 +847,7 @@ async fn build_status_data(state: &Arc<AppState>) -> StatusResponse {
         diagnostics,
         compute,
         region: state.args.region.clone(),
-        // Honest until surfaced: a federation social aggregate, not a doorway-local
-        // measure — left None rather than reporting a misleading 0. See backlog.
-        humans_served: None,
+        humans_served,
         // The doorway's projection of substrate content — always measurable here.
         content_available: Some(projection_documents),
         federated_peers,
