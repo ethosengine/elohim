@@ -31,6 +31,18 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-09-11b (FIRST HOUSEHOLD MEASURE of the S1+S2 work — RED with a NAMED cause; run 20260911T0240{31,53}Z /
+024102Z / 024112Z-b6c7947b, mesh at e2dcabebc+, imagodei coordinator repacked, integrity wasm untouched):
+@concern:hosted-compute-contracted 0/3 (mesh) + 0/2 (mesh-browser) — every scenario fails at registration with
+`503 PROVISIONING_FAILED … install app on conductor-0 … NotFound /app/elohim.happ`; Prologue seed-humans and the
+three prologue-hosted-* casts fail the same way (agentPubKey `-`, grant cid `-`). CAUSE: the household mesh never
+provisioned a hosted human — until 60fb28a39 dev_mode routed every registration to the singleton-Human recovery (one
+shared key), and hc-mesh.sh sets neither HAPP_BUNDLE_PATH (default /app/elohim.happ, a container path) nor
+POOL_COMPUTE_URL/TOKEN/PERFORMER. The cure exposed the gap; the mesh was relying on the bug. Wiring in flight.
+@concern:humans-served 3/4 — humansServed is LIVE (present, `0` not `—`, sibling isolation holds); the close
+scenario has no live registrant to close. 05-leaving measured 0 scenarios under `mesh` (file-level @browser-only;
+rerun under mesh-browser). Reports: genesis/a2o/reports/sprint-report-household-20260911T0240*-b6c7947b.json.
+
 DELTA 2026-09-11 (S1+S2 of plan 2026-09-10-doorway-federation-three-reds-to-green LANDED LOCALLY; stays RED —
 nothing measured on a mesh yet). Stories: 07-hosted-by-a-household (@concern:hosted-compute-contracted, 7 blind-reader
 rounds, 3× READY, steward binding declared self-asserted) and dataplane/doorway-humans-served (@concern:humans-served,

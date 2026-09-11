@@ -1513,6 +1513,17 @@ habits:
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/served-shell-boots.feature — Act II dynamic clause: Chromium must observe a visible root with the browser-only bootstrap-success marker, no page errors or failed same-origin requests, and version.json equal to the immutable declared browser head. Both doorway origins are measured independently; redirecting to a sibling cannot certify the requested doorway.)"
       - "a2o @concern:doorway-failover (genesis/a2o/features/dataplane/epr-app-deliverability.feature — Act I: just test mesh features/dataplane/epr-app-deliverability.feature runs every station, including Chromium. Checks browser boot through both public mounts; server declaration and bytes on all peers; actual SSR and running-version adoption at both doorways; warmed rendering with storage unavailable; restart-before-storage recovery; and broken-bundle refusal/fallback. The serving receipt requires all stations passed for the current source, with no skipped or pending proof.)"
     evidence: >
+      DELTA 2026-09-11 (RED preserved; apex-transition is now a MEASURED red, not undefined): run 20260911T024151Z-b6c7947b
+      under A2O_RUN_WIP=1 — 2 scenarios, 16 steps, 0 undefined. Scenario 1 fails at the predicted named step: `no
+      household-owned membership authority: relay-addr-beacon reconcile_membership writes owner records through the
+      Cloudflare sink only … hc-mesh.sh stages no membership apparatus` (steps ea7c70026; scenario 2 really SIGSTOPs the
+      apex doorway and proves the sibling serves the same declared head before failing at the same-public-name step).
+      Steady-state doorway-failover.feature this run: 6/10 (20260911T024122Z) — the 4 reds (both local doorways
+      `shedding`, :8889/ 404, warmup.completed with servedBundleHeads []) coincide with the Prologue's staging legs failing
+      after a provisioning regression on the mesh (see hosted-human-lifecycle 2026-09-11b); cause under diagnosis, not
+      attributed to doorway code. Doorway /status wiring (1d8ca0200) and the dev_mode decouples (60fb28a39, f64d8c5bf)
+      are local-green, unrendered on the fleet.
+
       DELTA 2026-09-08 (authorized current-source household receipt, RED preserved): sequential upgrade of three storage peers and both doorways completed with health/kernel-hash parity; run 20260909-codex-current-deliverability (executed 2026-09-08) passed all 5 deliverability scenarios / 102 steps, no skips or failures, 4m26s, zero findings. Both roots booted; server declarations and bytes propagated to all peers; rendering and next-version adoption passed at both doorways; warmed serving survived all-storage outage with successful cleanup; restart-before-peer recovery and broken-bundle refusal passed. The earlier Jessica server-pointer mismatch did not reproduce on current binaries. Receipt records dual/3 peers/processControl; networkStage and DNA hash remain unknown, with source inventory and actual executable hashes recorded separately. Evidence: genesis/a2o/reports/delivery-20260908/current-deliverability.log and runtime-upgrade-health-parity.json; sprint-report-household-20260909-codex-current-deliverability.json under genesis/a2o/reports/. No fleet deployment or apex routing-through-shed proof is claimed; whole habit remains RED.
 
       DELTA 2026-09-08 (Codex delivery sweep, RED preserved): three native commitments independently reviewed and fulfilled: missing-root HTML no longer invents conductor failure (just gate doorway EXIT=0, 1209 passed/2 ignored; desktop/mobile template renders); local served-shell probes honor CI=false and require real Jenkins build context before installing (just gate genesis-a2o EXIT=0; 36 browser/bootstrap controls passed); storage fault-stop refuses mismatched/missing executable bytes, incompatible transport or failed capture before signal (just gate elohim-app EXIT=0, 4573 tests; 12 stop controls and 6 release-slot controls passed). The prior-runtime full deliverability run 20260908T2251Z-codex-deliverability measured 1/5 scenarios passed: Jessica held server metadata but had a null top-level server pointer, and replaced cargo-path bytes broke outage cleanup; all peers were subsequently restored without data reset. Current-source storage/doorway builds succeeded, but automatic approval review refused the controlled five-service upgrade before execution; explicit operator approval is pending for upgrade plus final fault run. Fleet root probe still fails its version.json stamp; no delivery graduation or fresh serving receipt is claimed. Reports and native briefs: genesis/a2o/reports/delivery-20260908/.
@@ -2900,6 +2911,18 @@ habits:
       - "a2o @concern:hosted-compute-contracted (genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature — @act:i; household lane is the authority: `just test mesh features/auth/hosted-human/07-hosted-by-a-household.feature` for the API-side scenarios and `just test mesh-browser features/auth/hosted-human/07-hosted-by-a-household.feature` for the two @browser-only ones. The story creates and removes its own human.)"
       - "a2o @concern:humans-served (genesis/a2o/features/dataplane/doorway-humans-served.feature — @act:i; needs `just mesh prologue` to have cast the hosted humans: `just test mesh features/dataplane/doorway-humans-served.feature`. The count is doorway-local and substrate-derived; a federation-wide aggregate is a different number and is not this check.)"
     evidence: >
+      DELTA 2026-09-11b (FIRST HOUSEHOLD MEASURE of the S1+S2 work — RED with a NAMED cause; run 20260911T0240{31,53}Z /
+      024102Z / 024112Z-b6c7947b, mesh at e2dcabebc+, imagodei coordinator repacked, integrity wasm untouched):
+      @concern:hosted-compute-contracted 0/3 (mesh) + 0/2 (mesh-browser) — every scenario fails at registration with
+      `503 PROVISIONING_FAILED … install app on conductor-0 … NotFound /app/elohim.happ`; Prologue seed-humans and the
+      three prologue-hosted-* casts fail the same way (agentPubKey `-`, grant cid `-`). CAUSE: the household mesh never
+      provisioned a hosted human — until 60fb28a39 dev_mode routed every registration to the singleton-Human recovery (one
+      shared key), and hc-mesh.sh sets neither HAPP_BUNDLE_PATH (default /app/elohim.happ, a container path) nor
+      POOL_COMPUTE_URL/TOKEN/PERFORMER. The cure exposed the gap; the mesh was relying on the bug. Wiring in flight.
+      @concern:humans-served 3/4 — humansServed is LIVE (present, `0` not `—`, sibling isolation holds); the close
+      scenario has no live registrant to close. 05-leaving measured 0 scenarios under `mesh` (file-level @browser-only;
+      rerun under mesh-browser). Reports: genesis/a2o/reports/sprint-report-household-20260911T0240*-b6c7947b.json.
+
       DELTA 2026-09-11 (S1+S2 of plan 2026-09-10-doorway-federation-three-reds-to-green LANDED LOCALLY; stays RED —
       nothing measured on a mesh yet). Stories: 07-hosted-by-a-household (@concern:hosted-compute-contracted, 7 blind-reader
       rounds, 3× READY, steward binding declared self-asserted) and dataplane/doorway-humans-served (@concern:humans-served,
