@@ -2974,3 +2974,69 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/hosted_cell.rs
         testName: hosted_register_records_the_grant_cid_when_the_pool_answers
         kind: unit
+
+  - name: count_distinct_agents_by_conductor
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/registry.rs
+      modulePath: conductor::registry::count_distinct_agents_by_conductor
+      line: 56
+    summary: >
+      Counts DISTINCT hosted agents per conductor from `(conductor_id, agent_key)` rows,
+      deduplicating on the NORMALIZED key. The single predicate behind both the live recount
+      (`ConductorRegistry::recount_capacity`, registry.rs:290, called on every register and
+      unregister) and the restart seed (`seed_capacity_from_agents`), so `capacity_used` cannot
+      mean one thing while a process is up and another after it restarts.
+    notes: >
+      Replaces an unconditional `capacity_used += 1`, which counted string SPELLINGS: the
+      provisioner and the startup discovery walk each register one agent under several
+      encodings so a JWT of any vintage routes, so the live number ran at about 2x the real
+      cell count — a pool with DOORWAY_MAX_AGENTS_PER_CONDUCTOR=50 was really admitting about
+      25 — while the restart path (which always deduped) halved it again, so the cap moved when
+      nothing about the conductor had. It also retires the earlier `(conductor_id, app_id)`
+      proxy: app_id was only ever a stand-in for identity adopted because no normalizer
+      existed, and it leaked the other way, collapsing every row carrying the bare default
+      `"elohim"` app id onto ONE count no matter how many humans it represented — an undercount
+      on the surface that enforces the cap.
+    concernIds:
+      - id: C6b
+        status: answered
+        justification: >
+          Idempotent effect: registering another spelling of an agent already counted, or
+          replaying the seed, mints nothing.
+          registering_one_agent_under_every_encoding_costs_one_capacity registers every form of
+          one key and asserts capacity_used == 1, then seeds and asserts it is still 1.
+      - id: C7
+        status: answered
+        justification: >
+          Advertise/serve symmetry across a restart: the capacity a live pool advertises equals
+          the capacity it would seed from its own persisted rows, because both go through this
+          one function. The same test asserts the live and seeded numbers are equal rather than
+          merely both plausible.
+      - id: C4
+        status: answered
+        justification: >
+          distinct_agents_handles_empty_and_default_app_id_rows keeps absence distinct from
+          collapse: rows with no conductor_id are skipped rather than bucketed under an empty
+          key, and three distinct humans sharing the default app id count as 3, not as the 1
+          the retired proxy reported. An undercount here reads as spare capacity that is not
+          there.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: registering_one_agent_under_every_encoding_costs_one_capacity
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: distinct_agents_dedupes_the_alias_fan_out
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: distinct_agents_partitions_by_conductor
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: distinct_agents_handles_empty_and_default_app_id_rows
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: seed_capacity_counts_persisted_agents_not_process_lifetime
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it
+        kind: unit

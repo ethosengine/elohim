@@ -20,38 +20,50 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+
+use super::agent_key::{is_agent_key_form, normalize_agent_key};
 use tracing::{info, warn};
 
-/// Count DISTINCT hosted installs per conductor from `(conductor_id, app_id)` pairs.
+/// Count DISTINCT hosted agents per conductor from `(conductor_id, agent_key)` rows.
 ///
-/// # Why `app_id` and not the agent key
+/// # Why the unit is the NORMALIZED agent key
 ///
-/// The registry deliberately holds **two keys per discovered agent** — the same
-/// `AgentPubKey` under base64-STANDARD (the provisioner's format) and under
-/// base64-URL-SAFE-NO-PAD (Holochain's display format), so a JWT in either
-/// encoding routes. Counting agent keys therefore double-counts every discovered
-/// agent. Both encodings of one agent share a single `installed_app_id`, and the
-/// provisioner mints a deterministic per-user app id
-/// (`generate_app_id(app_id, conductor_id, user_identifier)`), so `app_id` is the
-/// per-install unique proxy for "one hosted human."
+/// The registry deliberately holds **several keys per agent** — the canonical
+/// `uhCAk…` HoloHash form plus the bare base64 encodings a pre-canonical JWT or
+/// Mongo row can still carry — so a person routes whatever spelling they hold.
+/// Counting raw key strings therefore counts SPELLINGS, and inflates every
+/// conductor's load by the alias fan-out. Normalizing first collapses every
+/// spelling of one key onto one identity, which is what "one hosted human"
+/// actually means.
 ///
-/// # Known undercount
+/// # What this replaced, and why
 ///
-/// `load_from_db` coerces a legacy Mongo row with no `app_id` field to the bare
-/// `"elohim"` default, so several such rows on one conductor collapse to a single
-/// count. The seeded count is therefore a floor, never an overcount — it can only
-/// make the cap more permissive, never spuriously refuse provisioning.
-pub fn count_distinct_installs_by_conductor<I>(pairs: I) -> HashMap<String, usize>
+/// This used to count distinct `(conductor_id, app_id)` pairs. `app_id` was only
+/// ever a PROXY for identity, adopted because no normalizer existed: the
+/// provisioner mints a deterministic per-user app id, so two encodings of one
+/// agent shared one app id and collapsed correctly. The proxy leaked in the
+/// other direction, though — every row that carries the bare default `"elohim"`
+/// app id (a legacy Mongo row, a `ConductorRouter` miss-path auto-registration,
+/// a hand-driven `/admin/conductors/assign`) collapsed onto ONE count no matter
+/// how many real humans it represented. That is an UNDERCOUNT on the same
+/// surface that enforces `DOORWAY_MAX_AGENTS_PER_CONDUCTOR`, i.e. a cap that
+/// silently stops biting. With [`normalize_agent_key`] available, the proxy is
+/// no longer needed and the real unit can be used directly.
+///
+/// A string that is not a key in any encoding is counted as itself — an
+/// unrecognized identity is still an identity, and dropping it would undercount
+/// exactly the way the app_id proxy did.
+pub fn count_distinct_agents_by_conductor<I>(rows: I) -> HashMap<String, usize>
 where
     I: IntoIterator<Item = (String, String)>,
 {
     let mut seen: HashSet<(String, String)> = HashSet::new();
     let mut counts: HashMap<String, usize> = HashMap::new();
-    for (conductor_id, app_id) in pairs {
+    for (conductor_id, agent_key) in rows {
         if conductor_id.is_empty() {
             continue;
         }
-        if seen.insert((conductor_id.clone(), app_id)) {
+        if seen.insert((conductor_id.clone(), normalize_agent_key(&agent_key))) {
             *counts.entry(conductor_id).or_insert(0) += 1;
         }
     }
@@ -190,15 +202,11 @@ impl ConductorRegistry {
     /// of the seed). Conductors with no persisted agents are explicitly seeded to
     /// 0 so a stale in-memory value can never survive a re-seed.
     ///
-    /// Deduplicates via [`count_distinct_installs_by_conductor`] — see its docs
-    /// for why raw agent-key counts double-count.
+    /// Deduplicates via [`count_distinct_agents_by_conductor`] — the SAME
+    /// predicate `register_agent` recounts through, so a restart can neither
+    /// halve nor inflate a live count.
     pub fn seed_capacity_from_agents(&self) -> Vec<(String, usize)> {
-        let pairs: Vec<(String, String)> = self
-            .agents
-            .iter()
-            .map(|e| (e.value().conductor_id.clone(), e.value().app_id.clone()))
-            .collect();
-        let counts = count_distinct_installs_by_conductor(pairs);
+        let counts = count_distinct_agents_by_conductor(self.agent_rows());
 
         let mut seeded: Vec<(String, usize)> = Vec::new();
         for mut entry in self.conductors.iter_mut() {
@@ -251,19 +259,84 @@ impl ConductorRegistry {
                 .await?;
         }
 
-        // Update capacity
-        if let Some(mut conductor) = self.conductors.get_mut(conductor_id) {
-            conductor.capacity_used += 1;
-        }
-
         self.agents.insert(agent_pub_key.to_string(), entry);
+
+        // Capacity is RECOUNTED from the agent map, never incremented.
+        //
+        // An unconditional `+= 1` counted string FORMS, not humans: the
+        // provisioner and the startup discovery walk each register one agent
+        // under several encodings so a JWT of any vintage still routes, so the
+        // live number ran at ~2x the real cell count while
+        // `seed_capacity_from_agents` — which has always deduped by install —
+        // halved it again on every restart. A pool with
+        // DOORWAY_MAX_AGENTS_PER_CONDUCTOR=50 was really admitting ~25, and the
+        // cap moved when nothing about the conductor had.
+        //
+        // Recounting through the SAME predicate the restart path uses makes the
+        // live count and the seeded count equal by construction rather than by
+        // two agreeing implementations, and makes re-registering an agent (or
+        // any of its aliases) idempotent.
+        self.recount_capacity(conductor_id);
 
         Ok(())
     }
 
-    /// Look up which conductor hosts an agent
+    /// Set one conductor's `capacity_used` to its DISTINCT install count.
+    ///
+    /// The unit is the normalized agent key — see
+    /// [`count_distinct_agents_by_conductor`]. Idempotent and order-free: it is
+    /// a projection of the agent map, so replaying it, or registering another
+    /// spelling of an agent already counted, changes nothing.
+    fn recount_capacity(&self, conductor_id: &str) {
+        let count = count_distinct_agents_by_conductor(self.agent_rows())
+            .get(conductor_id)
+            .copied()
+            .unwrap_or(0);
+        if let Some(mut conductor) = self.conductors.get_mut(conductor_id) {
+            conductor.capacity_used = count;
+        }
+    }
+
+    /// `(conductor_id, agent_key)` for every registered mapping — the single
+    /// shape both the live recount and the restart seed count over, so the two
+    /// cannot drift into disagreeing implementations.
+    fn agent_rows(&self) -> Vec<(String, String)> {
+        self.agents
+            .iter()
+            .map(|e| (e.value().conductor_id.clone(), e.key().clone()))
+            .collect()
+    }
+
+    /// Look up which conductor hosts an agent, in ANY string form of its key.
+    ///
+    /// Exact hit first (the overwhelmingly common case, since every form is
+    /// registered as an alias at write time). The fallbacks exist for rows this
+    /// process did not write: a Mongo row persisted by a pre-canonical doorway
+    /// is loaded under the bare form it was stored in, while a freshly issued
+    /// JWT carries the canonical one. Answering "not found" there would not be
+    /// an honest absence — the agent IS hosted, under a different spelling — and
+    /// on the router's path a miss does not even fail loudly: it auto-registers
+    /// the key against a DEFAULT conductor and mis-routes from then on.
+    ///
+    /// The scan is miss-path only and is skipped outright for anything that is
+    /// not a key in any encoding, so a genuine miss stays O(1).
     pub fn get_conductor_for_agent(&self, agent_pub_key: &str) -> Option<ConductorEntry> {
-        self.agents.get(agent_pub_key).map(|e| e.clone())
+        if let Some(entry) = self.agents.get(agent_pub_key) {
+            return Some(entry.clone());
+        }
+        if !is_agent_key_form(agent_pub_key) {
+            return None;
+        }
+        let canonical = normalize_agent_key(agent_pub_key);
+        if canonical != agent_pub_key {
+            if let Some(entry) = self.agents.get(&canonical) {
+                return Some(entry.clone());
+            }
+        }
+        self.agents
+            .iter()
+            .find(|e| normalize_agent_key(e.key()) == canonical)
+            .map(|e| e.value().clone())
     }
 
     /// Look up conductor info by ID
@@ -295,14 +368,34 @@ impl ConductorRegistry {
 
     /// Remove an agent→conductor mapping (for deprovisioning).
     pub fn unregister_agent(&self, agent_pub_key: &str) {
-        if let Some((_, entry)) = self.agents.remove(agent_pub_key) {
-            // Decrement capacity
-            if let Some(mut conductor) = self.conductors.get_mut(&entry.conductor_id) {
-                conductor.capacity_used = conductor.capacity_used.saturating_sub(1);
+        // Remove EVERY alias of this agent, not just the spelling the caller
+        // happened to hold. Leaving a sibling encoding behind would keep the
+        // install counted and keep the deprovisioned agent routable.
+        let canonical = normalize_agent_key(agent_pub_key);
+        let aliases: Vec<String> = if is_agent_key_form(agent_pub_key) {
+            self.agents
+                .iter()
+                .filter(|e| normalize_agent_key(e.key()) == canonical)
+                .map(|e| e.key().clone())
+                .collect()
+        } else {
+            vec![agent_pub_key.to_string()]
+        };
+
+        let mut touched: HashSet<String> = HashSet::new();
+        for alias in aliases {
+            if let Some((_, entry)) = self.agents.remove(&alias) {
+                touched.insert(entry.conductor_id);
             }
+        }
+
+        // Recount rather than decrement, for the same reason register_agent
+        // does: the removed aliases were one install, not one each.
+        for conductor_id in &touched {
+            self.recount_capacity(conductor_id);
             info!(
                 agent = %agent_pub_key,
-                conductor = %entry.conductor_id,
+                conductor = %conductor_id,
                 "Removed agent from registry"
             );
         }
@@ -529,37 +622,56 @@ mod tests {
         assert_eq!(info.capacity_used, 20);
     }
 
-    // ---- capacity seeding (DOORWAY_MAX_AGENTS_PER_CONDUCTOR support) ----
+    // ---- capacity accounting (DOORWAY_MAX_AGENTS_PER_CONDUCTOR support) ----
 
-    fn pair(conductor: &str, app: &str) -> (String, String) {
-        (conductor.to_string(), app.to_string())
+    fn row(conductor: &str, agent: &str) -> (String, String) {
+        (conductor.to_string(), agent.to_string())
+    }
+
+    /// A REAL agent key, in whichever spelling the caller asks for. Fake keys
+    /// cannot exercise a normalizer, so the dedupe fixtures must be real.
+    fn key_forms(seed: u8) -> Vec<String> {
+        let raw = holo_hash::AgentPubKey::from_raw_32(vec![seed; 32])
+            .get_raw_39()
+            .to_vec();
+        super::super::agent_key::lookup_forms(&raw)
     }
 
     #[test]
-    fn distinct_installs_dedupes_dual_encoded_agent_keys() {
-        // The shape `discover_existing_agents` produces: ONE agent registered
-        // twice (base64-std + base64-url keys) sharing one installed_app_id.
-        let counts = count_distinct_installs_by_conductor(vec![
-            pair("conductor-0", "elohim-conductor-0-adam"),
-            pair("conductor-0", "elohim-conductor-0-adam"),
-            pair("conductor-0", "elohim-conductor-0-eve"),
-            pair("conductor-0", "elohim-conductor-0-eve"),
-        ]);
+    fn distinct_agents_dedupes_the_alias_fan_out() {
+        // The shape the provisioner and `discover_existing_agents` produce: ONE
+        // agent registered under every string form of its key.
+        let adam = key_forms(1);
+        let eve = key_forms(2);
+        let mut rows: Vec<(String, String)> = Vec::new();
+        for form in adam.iter().chain(eve.iter()) {
+            rows.push(row("conductor-0", form));
+        }
+        assert!(
+            adam.len() > 1,
+            "fixture must actually fan out, or it proves nothing"
+        );
         assert_eq!(
-            counts.get("conductor-0").copied(),
+            count_distinct_agents_by_conductor(rows)
+                .get("conductor-0")
+                .copied(),
             Some(2),
-            "two humans registered under two encodings each must count as 2, not 4"
+            "two humans registered under every encoding each must count as 2, not {}",
+            adam.len() + eve.len()
         );
     }
 
     #[test]
-    fn distinct_installs_partitions_by_conductor() {
-        let counts = count_distinct_installs_by_conductor(vec![
-            pair("conductor-0", "app-a"),
-            pair("conductor-0", "app-b"),
-            pair("conductor-1", "app-c"),
-            // Same app_id on a different conductor is a distinct install.
-            pair("conductor-1", "app-a"),
+    fn distinct_agents_partitions_by_conductor() {
+        let a = key_forms(3).remove(0);
+        let b = key_forms(4).remove(0);
+        let c = key_forms(5).remove(0);
+        let counts = count_distinct_agents_by_conductor(vec![
+            row("conductor-0", &a),
+            row("conductor-0", &b),
+            row("conductor-1", &c),
+            // The same agent on a different conductor is a distinct hosting.
+            row("conductor-1", &a),
         ]);
         assert_eq!(counts.get("conductor-0").copied(), Some(2));
         assert_eq!(counts.get("conductor-1").copied(), Some(2));
@@ -567,26 +679,129 @@ mod tests {
     }
 
     #[test]
-    fn distinct_installs_handles_empty_and_legacy_rows() {
-        assert!(count_distinct_installs_by_conductor(vec![]).is_empty());
+    fn distinct_agents_handles_empty_and_default_app_id_rows() {
+        assert!(count_distinct_agents_by_conductor(vec![]).is_empty());
 
         // Rows with no conductor_id are skipped entirely.
-        let counts = count_distinct_installs_by_conductor(vec![
-            pair("", "app-a"),
-            pair("conductor-0", "app-a"),
-        ]);
+        let a = key_forms(6).remove(0);
+        let counts = count_distinct_agents_by_conductor(vec![row("", &a), row("conductor-0", &a)]);
         assert_eq!(counts.get("conductor-0").copied(), Some(1));
         assert_eq!(counts.get("").copied(), None);
 
-        // Documented undercount: legacy rows coerced to the bare "elohim"
-        // app_id collapse to 1. Asserted so the floor-not-overcount property
-        // is a contract, not an accident.
-        let legacy = count_distinct_installs_by_conductor(vec![
-            pair("conductor-0", "elohim"),
-            pair("conductor-0", "elohim"),
-            pair("conductor-0", "elohim"),
-        ]);
-        assert_eq!(legacy.get("conductor-0").copied(), Some(1));
+        // THE REGRESSION the app_id proxy carried: three humans whose rows all
+        // carry the bare default app id. The proxy collapsed these to 1 and the
+        // cap stopped biting; counted by identity they are 3.
+        let three: Vec<(String, String)> = (10u8..13)
+            .map(|seed| row("conductor-0", &key_forms(seed).remove(0)))
+            .collect();
+        assert_eq!(
+            count_distinct_agents_by_conductor(three)
+                .get("conductor-0")
+                .copied(),
+            Some(3),
+            "distinct humans must not collapse onto a shared app id"
+        );
+    }
+
+    #[tokio::test]
+    async fn registering_one_agent_under_every_encoding_costs_one_capacity() {
+        // THE double-count this fix closes. The provisioner registers each agent
+        // under the canonical form AND its legacy spellings so any JWT vintage
+        // routes; an unconditional `capacity_used += 1` counted each spelling,
+        // so a pool capped at 50 really admitted about half that — and a restart
+        // (which always deduped) silently halved the number again.
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://c0:4445".to_string(),
+            admin_url: "ws://c0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 32,
+        });
+
+        let forms = key_forms(21);
+        assert!(forms.len() >= 2, "fixture must fan out across encodings");
+        for form in &forms {
+            registry
+                .register_agent(form, "conductor-0", "elohim-conductor-0-abc123")
+                .await
+                .unwrap();
+        }
+
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            1,
+            "one human is one cell, however many spellings of their key route to it"
+        );
+
+        // And the restart path agrees with the live number BY CONSTRUCTION.
+        let seeded = registry.seed_capacity_from_agents();
+        assert_eq!(seeded, vec![("conductor-0".to_string(), 1)]);
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-0")
+                .unwrap()
+                .capacity_used,
+            1,
+            "a restart must neither halve nor inflate the live count"
+        );
+    }
+
+    #[tokio::test]
+    async fn any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it() {
+        // A Mongo row persisted by a pre-canonical doorway loads under the bare
+        // form; the JWT that arrives next carries the canonical one. Answering
+        // "not found" there is not an honest absence — and on the router's path
+        // a miss auto-registers against a DEFAULT conductor and mis-routes.
+        let registry = ConductorRegistry::new(None).await;
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-7".to_string(),
+            conductor_url: "ws://c7:4445".to_string(),
+            admin_url: "ws://c7:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 32,
+        });
+
+        let forms = key_forms(33);
+        let canonical = forms[0].clone();
+        let legacy = forms[1].clone();
+        assert_ne!(canonical, legacy);
+
+        // Only the LEGACY spelling is stored, as an old Mongo row would be.
+        registry
+            .register_agent(&legacy, "conductor-7", "elohim-conductor-7-legacy")
+            .await
+            .unwrap();
+
+        for spelling in [&canonical, &legacy] {
+            assert_eq!(
+                registry
+                    .get_conductor_for_agent(spelling)
+                    .expect("every spelling of one key must resolve")
+                    .conductor_id,
+                "conductor-7"
+            );
+        }
+
+        // A string that is not a key in any encoding still misses honestly.
+        assert!(registry
+            .get_conductor_for_agent("uhCAk-dev-mode-agent-key")
+            .is_none());
+
+        // Deprovisioning by the canonical spelling must clear the legacy alias
+        // too, or the agent stays routable and the install stays counted.
+        registry.unregister_agent(&canonical);
+        assert!(registry.get_conductor_for_agent(&legacy).is_none());
+        assert_eq!(
+            registry
+                .get_conductor_info("conductor-7")
+                .unwrap()
+                .capacity_used,
+            0
+        );
     }
 
     #[tokio::test]
@@ -594,11 +809,13 @@ mod tests {
         let registry = ConductorRegistry::new(None).await;
 
         // Simulate load_from_db: agent mappings exist BEFORE any conductor is
-        // registered, and two encodings of one agent share one app_id.
+        // registered, and two SPELLINGS of adam's one key are both persisted.
+        let adam = key_forms(41);
+        let eve = key_forms(42);
         for (key, app) in [
-            ("uhCAk_adam_std", "elohim-conductor-0-adam"),
-            ("uhCAk_adam_url", "elohim-conductor-0-adam"),
-            ("uhCAk_eve_std", "elohim-conductor-0-eve"),
+            (&adam[0], "elohim-conductor-0-adam"),
+            (&adam[1], "elohim-conductor-0-adam"),
+            (&eve[0], "elohim-conductor-0-eve"),
         ] {
             registry
                 .register_agent(key, "conductor-0", app)
@@ -637,7 +854,7 @@ mod tests {
                 ("conductor-0".to_string(), 2),
                 ("conductor-1".to_string(), 0)
             ],
-            "2 distinct installs on conductor-0 (not 3 agent keys); conductor-1 seeded to 0"
+            "2 distinct humans on conductor-0 (not 3 key spellings); conductor-1 seeded to 0"
         );
         assert_eq!(
             registry
