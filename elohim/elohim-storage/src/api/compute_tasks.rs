@@ -352,6 +352,13 @@ pub async fn handle(
         .lock()
         .await;
     if grant_request {
+        // Withdrawal is a BODY VARIANT of the same route (`{grantCid, revoke:true}`),
+        // never a second route family — the dev-seed lever already reads this shape.
+        if input["revoke"] == json!(true) {
+            return super::compute_grants::revoke(&hc, pool, &input)
+                .await
+                .map(|v| response::ok(&v));
+        }
         return super::compute_grants::issue(&hc, pool, &input)
             .await
             .map(|v| response::ok(&v));

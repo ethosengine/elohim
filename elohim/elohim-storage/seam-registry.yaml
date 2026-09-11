@@ -4072,3 +4072,143 @@ decisionPoints:
       - path: elohim/elohim-storage/src/api/compute_grants.rs
         testName: an_unknown_scope_value_is_refused
         kind: unit
+
+  - name: withdrawn_by_provider
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/api/compute_grants.rs
+      modulePath: api::compute_grants::withdrawn_by_provider
+      line: 181
+    summary: >
+      The single home of "has THIS provider withdrawn this grant", read off the
+      notarized CommitmentByState links — consulted by `issue` before it
+      reactivates anything and by `revoke` to confirm its own write.
+    concernIds:
+      - { id: C0, status: answered, justification: "Reads the DHT state links (lifecycle truth), never the SQL revoked_at column (its projection)." }
+      - { id: C1, status: n-a, justification: "Elects nothing." }
+      - { id: C2, status: partial, justification: "Withdrawal is terminal, so no newest-wins selection is needed; the predicate does not order competing links and would report the first it finds if a provider somehow authored several." }
+      - { id: C3, status: n-a, justification: "A predicate over links already read; enables no transition of its own." }
+      - id: C4
+        status: answered
+        justification: >
+          An empty slice is an ANSWER ("no withdrawal on this conductor's view"), never an
+          outage — the outage is the Err from the read that produced the slice, which the
+          caller keeps separate.
+      - id: C5
+        status: answered
+        justification: >
+          Only a link whose signed AUTHOR is the provider counts. A `revoked` link authored
+          by anyone else — the recipient, a bystander — confers nothing.
+      - { id: C6a, status: answered, justification: "One bounded scan of the slice the caller already fetched; no fetch, loop or retry of its own." }
+      - { id: C6b, status: answered, justification: "Pure: the same links answer the same way on every replay." }
+      - { id: C7, status: n-a, justification: "Advertises nothing; it is an internal predicate with no inventory or capability surface." }
+      - { id: C8, status: partial, justification: "The callers' refusals are typed errors; the predicate itself increments no labeled counter." }
+      - { id: C9, status: partial, justification: "Author identity is compared as the agent-key string, not through a lineage root — a provider re-key would orphan its own prior withdrawal link." }
+      - { id: C10, status: n-a, justification: "Reads an existing wire shape and adds no field; a link tag it cannot parse never reaches it." }
+      - { id: C11, status: n-a, justification: "No scheduling or load decision." }
+      - id: C12
+        status: answered
+        justification: >
+          This IS the may-act gate `issue` consults: authority to reactivate is verified
+          structurally against notarized links at the acting node, never inferred from the
+          caller's body.
+      - { id: C13, status: n-a, justification: "Confers no tier; it reports a fact about an existing grant." }
+      - { id: C14, status: partial, justification: "A malformed or unexpected state string is simply not a withdrawal; no capsule records that the fleet emitted a lifecycle state this vocabulary does not know." }
+    contractTests:
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: a_revoked_grant_cannot_be_reissued
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: revoke_is_idempotent
+        kind: unit
+
+  - name: revoke_verdict
+    kind: verdict-fn
+    sourceLocation:
+      file: src/api/compute_grants.rs
+      modulePath: api::compute_grants::revoke_verdict
+      line: 202
+    summary: >
+      Decides whether a provider-side withdrawal may proceed and whether it has
+      anything left to do — refusing a commitment that is not a delegates-compute
+      grant and a grant this peer is not the provider of, and answering
+      AlreadyWithdrawn with the existing withdrawal's own signed time.
+    concernIds:
+      - { id: C0, status: answered, justification: "Decides on the lifecycle-truth plane (the notarized links plus the authenticated payload); the projection write that follows is derived from that answer, never the reverse." }
+      - { id: C1, status: n-a, justification: "Elects no author or head." }
+      - id: C2
+        status: answered
+        justification: >
+          The verdict carries the withdrawal LINK's own deterministic `signed_at`, never
+          this conductor's clock, so replaying the decision projects the same instant.
+      - id: C3
+        status: answered
+        justification: >
+          Every reachable state has an automated exit: a live grant answers Withdraw (the
+          link write follows automatically), a withdrawn one answers AlreadyWithdrawn and
+          is terminal. No human hand or deploy is the only transition.
+      - id: C4
+        status: answered
+        justification: >
+          Withdraw, AlreadyWithdrawn and refusal are three distinct answers; an empty link
+          set never reads as "already withdrawn", and a refusal never reads as absence.
+      - id: C5
+        status: answered
+        justification: >
+          Provider identity is read from the AUTHENTICATED commitment the conductor
+          returned, never from the request body — the body names only which grant.
+      - { id: C6a, status: answered, justification: "One payload parse and one bounded scan; the caller makes a fixed number of native calls around it with no polling ladder." }
+      - id: C6b
+        status: answered
+        justification: >
+          Replay answers AlreadyWithdrawn carrying the same timestamp, so the projection
+          write it drives is the same value twice — a repeated withdrawal mints nothing
+          native and moves no row.
+      - { id: C7, status: n-a, justification: "The route surface it is reached through is compute_tasks::handle's concern; this fn advertises nothing." }
+      - { id: C8, status: partial, justification: "Outcomes are a typed enum and typed errors, but no labeled counter is incremented per verdict, so a rising rate of refused withdrawals is not readable in metrics." }
+      - { id: C9, status: partial, justification: "Provider comparison is agent-key-string equality against the payload, not a lineage-root resolution; a re-keyed provider could no longer withdraw its own grant." }
+      - id: C10
+        status: answered
+        justification: >
+          The withdrawal body is parsed by `revoke_cid`, which refuses an unknown field and
+          an implicit revoke rather than defaulting either.
+      - { id: C11, status: n-a, justification: "Schedules nothing; the existing MUTATIONS lock on the route owns local write serialization." }
+      - id: C12
+        status: answered
+        justification: >
+          Only the grant's provider may withdraw it, verified structurally against the
+          notarized payload at the acting node. Withdrawal is the provider's act, never the
+          recipient's and never a bystander's.
+      - { id: C13, status: n-a, justification: "Retracts authority; it grants none and serves no lower social tier." }
+      - { id: C14, status: partial, justification: "An unreadable payload is refused with a message; no RCA capsule carries the offending bytes for cross-node diagnosis." }
+    contractTests:
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: revoke_is_idempotent
+        kind: unit
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: revoke_refuses_a_grant_this_peer_did_not_provide
+        kind: unit
+    notes: >
+      The body-variant parser `revoke_cid` (same file) is pinned by the second test
+      above — it is the guard that keeps withdrawal explicit (`revoke:true`) and keeps
+      the surface a single route rather than a second route family.
+
+  - name: RevokeVerdict
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/api/compute_grants.rs
+      modulePath: api::compute_grants::RevokeVerdict
+      line: 187
+    summary: >
+      The two-arm answer `revoke_verdict` returns — Withdraw, or AlreadyWithdrawn
+      carrying the existing withdrawal's notarized signed time, which is what makes
+      the projection write converge instead of restamping.
+    concernIds:
+      - { id: C2, status: answered, justification: "AlreadyWithdrawn carries the notarized link's own clock value, so the answer is independent of the answering conductor." }
+      - { id: C4, status: answered, justification: "The two arms are distinct and neither can be produced by an unread or unreachable link set — that path is an Err from the read, not a variant here." }
+      - { id: C6b, status: answered, justification: "Carrying the timestamp in the variant is precisely what makes a replayed withdrawal a no-op on the projection row." }
+      - { id: C12, status: answered, justification: "The type is only constructed after the provider check has passed, so holding a value of it IS the evidence that the actor may act." }
+    contractTests:
+      - path: elohim/elohim-storage/src/api/compute_grants.rs
+        testName: revoke_is_idempotent
+        kind: unit

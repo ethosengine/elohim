@@ -1235,11 +1235,11 @@ git commit -m "fix(storage): a delegates-compute grant carries its real scope; h
 
 **Semantics, taken from what `issue` already enforces:** revoke writes a provider-authored `"revoked"` commitment-state link via `native::call_create_commitment_state_link`, then sets `revoked_at` on the projection row (`crate::db::mishpat_commitments::set_revoked_at`, `db/mishpat_commitments.rs:141`). `issue` already refuses to reactivate anything a provider has withdrawn (`:172-190`: *"withdrawn grant cannot be reactivated"* / *"withdrawn projection requires reconciliation, never reactivation"*) — so this makes withdrawal terminal by construction and needs no new guard. Revoking an already-revoked grant answers `200` and is a no-op. Revoking a grant this peer is not the provider of is refused.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `revoke_is_idempotent`; `revoke_refuses_a_grant_this_peer_did_not_provide`; `a_revoked_grant_cannot_be_reissued` (asserting the existing `issue` guard fires after a revoke).
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim/elohim-storage
@@ -1247,11 +1247,11 @@ CARGO_TARGET_DIR=/tmp/elohim-storage-target CARGO_BUILD_JOBS=1 cargo test --lib 
 ```
 Expected: FAIL — `revoke` not found.
 
-- [ ] **Step 3: Implement and dispatch**
+- [x] **Step 3: Implement and dispatch**
 
 In `compute_tasks.rs`, at the `if grant_request {` arm (`:354`), branch on `input["revoke"] == true` to `compute_grants::revoke` and otherwise to `issue`. Keep the existing `grant_request && method != Method::POST → method_not_allowed` guard at `:315` unchanged.
 
-- [ ] **Step 4: Green and gate**
+- [x] **Step 4: Green and gate**
 
 ```bash
 cd /projects/elohim/elohim-storage
@@ -1260,7 +1260,7 @@ cd /projects/elohim && just gate elohim-storage; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim

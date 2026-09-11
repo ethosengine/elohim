@@ -57,9 +57,8 @@ fn grant_scope(input: &Value) -> Result<&'static str, StorageError> {
         .as_str()
         .ok_or_else(|| invalid("scope must be a string"))?;
     GRANT_SCOPES
-        .iter()
-        .find(|known| **known == named)
-        .copied()
+        .into_iter()
+        .find(|known| *known == named)
         .ok_or_else(|| invalid("unknown grant scope"))
 }
 
@@ -153,6 +152,98 @@ fn grant_input(
     })
 }
 
+/// The lifecycle states that mean a provider has WITHDRAWN the authority it
+/// granted. Withdrawal is terminal by construction: [`issue`] refuses to
+/// reactivate anything carrying one of these, and [`revoke`] authors one.
+const WITHDRAWN_STATES: [&str; 3] = ["revoked", "cancelled", "sunset"];
+
+/// When THIS provider withdrew the grant, read off the notarized state links.
+///
+/// Pure. The DHT link — not the SQL row — is the authority for lifecycle, so the
+/// answer is the link's own deterministic `signed_at`, which makes a repeated
+/// withdrawal write the same projection value rather than a fresh timestamp.
+/// A withdrawal link authored by anyone else is NOT this provider's withdrawal.
+/// An empty slice is an ANSWER ("no withdrawal on this conductor's view"), never
+/// an outage — the outage is the `Err` from the read that produced it.
+fn provider_withdrawal_at<'a>(
+    provider: &str,
+    states: &'a [native::CommitmentStateLink],
+) -> Option<&'a str> {
+    states
+        .iter()
+        .find(|s| s.author == provider && WITHDRAWN_STATES.contains(&s.state.as_str()))
+        .map(|s| s.signed_at.as_str())
+}
+
+/// The predicate [`issue`] consults before it reactivates anything, and the one
+/// [`revoke`] confirms its own write against. One home, two readers.
+fn withdrawn_by_provider(provider: &str, states: &[native::CommitmentStateLink]) -> bool {
+    provider_withdrawal_at(provider, states).is_some()
+}
+
+/// What a provider-side withdrawal must do to a grant this peer holds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum RevokeVerdict {
+    /// No provider withdrawal on the anchor yet — author the `"revoked"` link.
+    Withdraw,
+    /// The provider already withdrew: write nothing native, and answer with the
+    /// withdrawal's own signed time so the projection converges on replay.
+    AlreadyWithdrawn { at: String },
+}
+
+/// Decide whether a withdrawal request may proceed, and whether it has anything
+/// left to do.
+///
+/// Pure over the authenticated commitment content and the notarized state links.
+/// Refuses a commitment that is not a `delegates-compute` grant, and refuses a
+/// grant this peer is not the PROVIDER of — withdrawal is the provider's act,
+/// never the recipient's and never a bystander's.
+fn revoke_verdict(
+    provider: &str,
+    action: &str,
+    payload_json: &str,
+    states: &[native::CommitmentStateLink],
+) -> Result<RevokeVerdict, StorageError> {
+    if action != "delegates-compute" {
+        return Err(invalid("only a delegates-compute grant is withdrawn here"));
+    }
+    let payload: Value =
+        serde_json::from_str(payload_json).map_err(|_| invalid("grant payload unreadable"))?;
+    if payload["provider"].as_str() != Some(provider) {
+        return Err(invalid("only the grant's provider may withdraw it"));
+    }
+    Ok(match provider_withdrawal_at(provider, states) {
+        Some(at) => RevokeVerdict::AlreadyWithdrawn { at: at.to_owned() },
+        None => RevokeVerdict::Withdraw,
+    })
+}
+
+/// Parse the withdrawal body variant of the EXISTING grant route:
+/// `{ "grantCid": "<entry hash>", "revoke": true }`. No new route — the same
+/// `POST /api/v1/compute/grants`, exactly as the dev-seed lever already does it
+/// (`api::seed_delegates_compute`).
+fn revoke_cid(input: &Value) -> Result<String, StorageError> {
+    let fields = input
+        .as_object()
+        .ok_or_else(|| invalid("expected object"))?;
+    if fields
+        .keys()
+        .any(|k| !matches!(k.as_str(), "grantCid" | "revoke"))
+    {
+        return Err(invalid("withdrawal takes grantCid and revoke only"));
+    }
+    if input["revoke"] != json!(true) {
+        return Err(invalid("withdrawal requires an explicit revoke:true"));
+    }
+    let cid = input["grantCid"]
+        .as_str()
+        .filter(|c| !c.is_empty())
+        .ok_or_else(|| invalid("grantCid required"))?;
+    EntryHash::try_from(cid)
+        .map_err(|_| invalid("grantCid must be a base64 commitment entry hash"))?;
+    Ok(cid.to_owned())
+}
+
 /// Reuse Holochain's canonical app-entry encoding and hash, never a parallel CID encoder.
 fn grant_hash(input: &CreateMishpatCommitmentInput) -> Result<EntryHash, StorageError> {
     let bytes = rmp_serde::to_vec_named(input).map_err(|e| invalid(&e.to_string()))?;
@@ -204,9 +295,7 @@ pub async fn issue(
         return Err(invalid("existing grant differs from explicit consent"));
     }
     let states = native::get_commitment_authority_links(hc, &cid).await?;
-    if states.iter().any(|s| {
-        s.author == provider && matches!(s.state.as_str(), "revoked" | "cancelled" | "sunset")
-    }) {
+    if withdrawn_by_provider(&provider, &states) {
         return Err(invalid("withdrawn grant cannot be reactivated"));
     }
     {
@@ -264,11 +353,10 @@ pub async fn issue(
         .await?;
     }
     let confirmed = native::get_commitment_authority_links(hc, &cid).await?;
-    if confirmed.iter().any(|s| {
-        s.author == provider && matches!(s.state.as_str(), "revoked" | "cancelled" | "sunset")
-    }) || !confirmed
-        .iter()
-        .any(|s| s.author == provider && s.state == "active" && s.event_hash == event_hash)
+    if withdrawn_by_provider(&provider, &confirmed)
+        || !confirmed
+            .iter()
+            .any(|s| s.author == provider && s.state == "active" && s.event_hash == event_hash)
     {
         return Err(invalid("provider activation not confirmed"));
     }
@@ -299,6 +387,65 @@ pub async fn issue(
         json!({"grantCid":cid,"grantActionHash":action_hash.to_string(),
         "consentActionHash":event_hash,"provider":provider,"recipient":input["recipient"],"state":"active"}),
     )
+}
+
+/// Provider-side withdrawal of a grant this peer issued. A fixed number of
+/// bounded native calls (read, one link write, one confirming read) — no polling
+/// loop, and no implicit revocation of anything the caller did not name.
+///
+/// Reached by the EXISTING `POST /api/v1/compute/grants` as the body variant
+/// `{ "grantCid": "<cid>", "revoke": true }` — no new route, no second route
+/// family, no parallel encoder. The `"revoked"` `CommitmentByState` link is the
+/// truth; `mishpat_commitments.revoked_at` is its projection.
+///
+/// Withdrawal is terminal by construction and needs no new guard: [`issue`]
+/// already refuses both a native withdrawal ("withdrawn grant cannot be
+/// reactivated") and a withdrawn projection ("withdrawn projection requires
+/// reconciliation, never reactivation").
+pub async fn revoke(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    input: &Value,
+) -> Result<Value, StorageError> {
+    let provider = hc.agent_key_uhcak();
+    let cid = revoke_cid(input)?;
+    let held = native::get_commitment(hc, &cid)
+        .await?
+        .ok_or_else(|| invalid("grant unavailable"))?;
+    let states = native::get_commitment_authority_links(hc, &cid).await?;
+    let verdict = revoke_verdict(&provider, &held.action, &held.payload_json, &states)?;
+    let withdrawn_at = match &verdict {
+        RevokeVerdict::AlreadyWithdrawn { at } => at.clone(),
+        RevokeVerdict::Withdraw => {
+            let signed_at = Utc::now().to_rfc3339();
+            native::call_create_commitment_state_link(
+                hc,
+                native::CreateCommitmentStateLinkInput {
+                    commitment_cid: cid.clone(),
+                    state: "revoked".into(),
+                    // A withdrawal spends no economic event — it RETRACTS the
+                    // authority the grant conferred — so the transition points
+                    // at the grant's own notarizing action.
+                    event_hash: held.action_hash.to_string(),
+                    signed_at: signed_at.clone(),
+                },
+            )
+            .await?;
+            let confirmed = native::get_commitment_authority_links(hc, &cid).await?;
+            provider_withdrawal_at(&provider, &confirmed)
+                .ok_or_else(|| invalid("provider withdrawal not confirmed"))?
+                .to_owned()
+        }
+    };
+    // Eagerly project the CONFIRMED native withdrawal. Writing the LINK's own
+    // signed time (not `now()`) is what makes a repeated call a no-op on the row.
+    {
+        let mut conn = pool.get().map_err(|e| invalid(&e.to_string()))?;
+        crate::db::mishpat_commitments::set_revoked_at(&mut conn, &cid, &withdrawn_at)?;
+    }
+    Ok(json!({"grantCid":cid,"provider":provider,"state":"revoked",
+        "revokedAt":withdrawn_at,
+        "alreadyWithdrawn":matches!(verdict, RevokeVerdict::AlreadyWithdrawn { .. })}))
 }
 
 fn verify_consent(
@@ -443,6 +590,91 @@ mod tests {
         let mut raw = input();
         raw["scope"] = json!("whatever-i-want");
         assert!(grant_input("provider", &raw, now()).is_err());
+    }
+
+    fn grant_payload(provider: &str) -> String {
+        let base = input();
+        json!({"action":"delegates-compute","scope":"hosted-cell","provider":provider,
+            "recipient":AgentPubKey::from_raw_32(vec![3;32]).to_string(),
+            "bounds":base["bounds"],
+            "valid_from":"2026-09-07T00:00:00Z","valid_until":"2026-09-08T00:00:00Z"})
+        .to_string()
+    }
+
+    fn link(author: &str, state: &str, at: &str) -> native::CommitmentStateLink {
+        native::CommitmentStateLink {
+            author: author.into(),
+            state: state.into(),
+            signed_at: at.into(),
+            event_hash: ActionHash::from_raw_32(vec![9; 32]).to_string(),
+        }
+    }
+
+    #[test]
+    fn revoke_is_idempotent() {
+        let payload = grant_payload("provider");
+        assert_eq!(
+            revoke_verdict("provider", "delegates-compute", &payload, &[]).unwrap(),
+            RevokeVerdict::Withdraw
+        );
+        // Once the provider's own withdrawal is on the anchor, a repeat writes
+        // nothing native and answers with the LINK's signed time, so the second
+        // call projects the same `revoked_at` the first one did.
+        let after = [link("provider", "revoked", "2026-09-07T02:00:00Z")];
+        let first = revoke_verdict("provider", "delegates-compute", &payload, &after).unwrap();
+        let second = revoke_verdict("provider", "delegates-compute", &payload, &after).unwrap();
+        assert_eq!(
+            first,
+            RevokeVerdict::AlreadyWithdrawn {
+                at: "2026-09-07T02:00:00Z".into()
+            }
+        );
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn revoke_refuses_a_grant_this_peer_did_not_provide() {
+        assert!(revoke_verdict(
+            "provider",
+            "delegates-compute",
+            &grant_payload("another-agent"),
+            &[]
+        )
+        .is_err());
+        // and a commitment that is not a compute grant at all
+        assert!(
+            revoke_verdict("provider", "custody-blob", &grant_payload("provider"), &[]).is_err()
+        );
+        // the withdrawal body variant is explicit, never inferred
+        let cid = EntryHash::from_raw_32(vec![7; 32]).to_string();
+        assert_eq!(
+            revoke_cid(&json!({"grantCid":cid,"revoke":true})).unwrap(),
+            cid
+        );
+        for refused in [
+            json!({"grantCid":cid,"revoke":false}),
+            json!({"grantCid":cid}),
+            json!({"grantCid":"","revoke":true}),
+            json!({"grantCid":"not-a-hash","revoke":true}),
+            json!({"grantCid":cid,"revoke":true,"provider":"someone"}),
+        ] {
+            assert!(revoke_cid(&refused).is_err(), "{refused}");
+        }
+    }
+
+    #[test]
+    fn a_revoked_grant_cannot_be_reissued() {
+        // the exact predicate `issue` consults before it reactivates anything
+        assert!(withdrawn_by_provider(
+            "provider",
+            &[link("provider", "revoked", "2026-09-07T02:00:00Z")]
+        ));
+        for not_a_withdrawal in [
+            link("someone-else", "revoked", "2026-09-07T02:00:00Z"),
+            link("provider", "active", "2026-09-07T02:00:00Z"),
+        ] {
+            assert!(!withdrawn_by_provider("provider", &[not_a_withdrawal]));
+        }
     }
 
     #[test]
