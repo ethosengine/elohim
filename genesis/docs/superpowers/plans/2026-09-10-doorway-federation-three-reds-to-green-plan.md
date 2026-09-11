@@ -564,7 +564,7 @@ git commit -m "feat(prologue): cast three hosted humans through the doorway's ow
 - Consumes: `signalOwnedDoorway(state, 'SIGSTOP'|'SIGCONT')` pattern from `genesis/a2o/steps/dataplane/doorway-sibling-reader.steps.ts:77`; the household fixture's `doorways.{alpha,beta,apex}` handles (written by `hc-mesh-prologue.sh` section 6); `Then('the raw response status is {int}')` and `Then('the raw response body contains {string}')`, already defined at `genesis/a2o/steps/dataplane/resiliency-saga.steps.ts:671` and `:681` — **reuse, do not redefine**.
 - Produces: nothing other tasks import.
 
-- [ ] **Step 1: Confirm the current undefined count**
+- [x] **Step 1: Confirm the current undefined count**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -572,9 +572,9 @@ printf '{"default":{"requireModule":["tsx"],"require":["steps/**/*.ts"],"format"
 npx cucumber-js --config ./.cuke-scope-tmp.json --dry-run features/dataplane/doorway-apex-transition.feature
 rm -f ./.cuke-scope-tmp.json
 ```
-Expected (measured 2026-09-10): `2 scenarios (2 undefined)` / `16 steps (14 undefined, 2 skipped)`. Those 14 are this task's work.
+Expected (measured 2026-09-10): `2 scenarios (2 undefined)` / `16 steps (14 undefined, 2 skipped)`. Those 14 are this task's work. Confirmed exactly as measured before writing the glue.
 
-- [ ] **Step 2: Define the 14 phrases — with an explicit missing-apparatus verdict**
+- [x] **Step 2: Define the 14 phrases — with an explicit missing-apparatus verdict**
 
 Create `genesis/a2o/steps/dataplane/apex-transition.steps.ts` defining every phrase the dry-run listed.
 
@@ -611,7 +611,9 @@ A2O_RUN_WIP=1 just test mesh features/dataplane/doorway-apex-transition.feature;
 ```
 Expected: `2 scenarios`, **0 undefined**, with failures naming either the missing membership authority or a real doorway defect. Record the run id printed by the runner and the report path under `genesis/a2o/reports/`.
 
-- [ ] **Step 4: Commit**
+Not run in this pass — glue-authoring lane was explicitly scoped to NOT start a mesh or run the live suite. Verified instead via `--dry-run --tags '@concern:doorway-failover'`: 0 undefined across the whole concern (25 scenarios, 230 steps), exit 0. This step remains open for the household-pair run.
+
+- [x] **Step 4: Commit**
 
 ```bash
 cd /projects/elohim
