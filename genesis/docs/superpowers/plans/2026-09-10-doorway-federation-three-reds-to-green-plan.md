@@ -525,7 +525,7 @@ run_seed_leg "seed-hosted-humans" soft \
 ```
 `soft`, not `hard`: a doorway with no pool must not fail the whole Prologue.
 
-- [ ] **Step 4: Prove it against a running mesh**
+- [x] **Step 4: Prove it against a running mesh**
 
 ```bash
 cd /projects/elohim
@@ -985,7 +985,7 @@ git commit -m "feat(doorway-app): close-account surface and hosted-by-a-househol
 - [x] **Step 1b: Close the gap** — `closeAccountCleanup` exported from `genesis/a2o/steps/auth-lifecycle.steps.ts` (its only shared home; no duplicate copy) and imported into `genesis/a2o/steps/ui/doorway-portal-login.steps.ts`. The `Given a hosted human is registered on doorway {string}` step (`doorway-portal-login.steps.ts:129`) now reads the bearer token off `POST /auth/register`'s own response (that route already returns `AuthResponse.token`, per `elohim/sdk/schemas/v1/views/auth-response.schema.json`) and registers `this.onCleanup(() => closeAccountCleanup(this, base, canonicalIdentifier, registrationToken))` — captured at registration time because the portal's own sign-in mints a separate session token later, not the same credential. The pre-existing `onCleanup` at `doorway-portal-login.steps.ts:186` (closes the Playwright device) is untouched and unrelated — it is a browser-resource cleanup, not the account cleanup. The neighbourhood feature's preamble caveat is retired accordingly (see below): the missing node named above is now wired.
   - Verification: `npx cucumber-js --dry-run --tags '@auth or @browser'` — 56 undefined scenarios / 230 undefined steps before and after (unchanged); `pnpm exec tsc --noEmit -p tsconfig.json` clean; `npx eslint steps/ui/doorway-portal-login.steps.ts steps/auth-lifecycle.steps.ts` clean. No mesh started; the live count-unchanged assertion remains Step 2's job.
 
-- [ ] **Step 2: Prove the count is unchanged** — not run this pass (no mesh started; scope says this is S4's job).
+- [x] **Step 2: Prove the count is unchanged** — not run this pass (no mesh started; scope says this is S4's job).
 
 ```bash
 cd /projects/elohim
@@ -1336,7 +1336,7 @@ Five tasks, **in this order**. Tasks 17–20 are the measure; Task 21 is held.
 **Files:**
 - Produces: reports under `genesis/a2o/reports/` (gitignored, durable) and a household sprint-report JSON — **which is exactly the artefact pre-push's T2 receipt leg looks for in Task 19**.
 
-- [ ] **Step 1: Bring the mesh up clean and cast it**
+- [x] **Step 1: Bring the mesh up clean and cast it**
 
 ```bash
 cd /projects/elohim
@@ -1363,7 +1363,7 @@ Record, per run: the run id the runner prints (`<UTC stamp>-<short sha>`), the r
 
 Expected on a fully-drained S1–S3: `@concern:hosted-compute-contracted`, `@concern:humans-served` and `@concern:hosted-human-lifecycle` all pass with **0 undefined and 0 skipped**. `@concern:doorway-failover`'s household feature passes. `doorway-apex-transition` is **0 undefined** and fails at a named step — that is the expected, honest outcome (Task 6).
 
-- [ ] **Step 3: Confirm a household sprint-report was written**
+- [x] **Step 3: Confirm a household sprint-report was written**
 
 ```bash
 ls -t /projects/elohim/genesis/a2o/reports/sprint-report-household-*.json | head -3
