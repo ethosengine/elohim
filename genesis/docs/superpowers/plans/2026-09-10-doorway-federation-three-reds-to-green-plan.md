@@ -1491,6 +1491,49 @@ The hosted reds now share ONE shape: a hosted-cell commitment is minted (the cid
 
 ---
 
+## Task 17c — The notary is readable off-pool; a closed name is free again; the account page's dates (found by Task 17's household run)
+
+**Drains:** the three product reds run `20260911T041{2,3,5}*-faca0d95` charged, after Task 17b cleared the mesh-side noise hiding them. **Tier:** rust truth-layer (Fable). **Slice:** `elohim/elohim-storage/src/{api/rea_commitments.rs,services/commitment_read_fallback.rs}`, `doorway/doorway-service/src/routes/auth_routes.rs`, `elohim/sdk/schemas/v1/views/account-response.schema.json`. No `app/**` and no mesh scripts.
+
+- [x] **Step A: a notarized commitment is readable by cid from any peer holding the mishpat cell.** Story 07 scenario 3 and its vocabulary ("what the notary records, any peer holding the network can read back") is the spec; `GET /api/v1/commitments/<grant-cid>` on jessica's `:8091` 404'd three for three.
+
+  Measured first, and the hypothesis was too narrow. The 404 was **not peer-local**: matthew's `:8090` — the peer that ISSUED the grant — 404'd on the same cid while listing it under `GET /api/v1/commitments/facing/rea` in the same breath. `GET /api/v1/commitments/{id}` served only the `rea_commitments` (elohim/lamad REA) projection; a notarized Mishpat `Commitment` lands in `mishpat_commitments`, and the mishpat→REA mirror bridges the `replicates-*` actions only (`mishpat_projection::replication_mirror_for`), so a `delegates-compute` grant has no `rea_commitments` row on ANY peer, by design. The cell-local `post_commit` fact is the SECOND layer, not the first: a non-authoring peer additionally has no `mishpat_commitments` row to serve. Both were confirmed live — jessica's own conductor answered `mishpat::get_commitment(uhCEk64woTR-…)` with the full `hosted-cell` grant while her storage 404'd on the same cid.
+
+  So the read cascades, per the p2p-design-gate's Notarized (A) reading — the DHT is truth, SQL is a cache, and a cache miss is not an absence: `rea_commitments` (unchanged fast path) → `mishpat_commitments` → ONE bounded `mishpat::get_commitment` through **this peer's own conductor**, projecting the row on success so the second read is local → 404 only when this peer's own DHT view also answers none. A malformed cid is refused (400) before the uncancellable call is spent; a slug that could never be a cid never spends one at all; an unreachable conductor is an outage (503), never a truthful absence. No fan-out to other peers — a peer answers from its own conductor or not at all.
+
+- [x] **Step B: a CLOSED account's identifier registers again, as a new account.** `humans-served`'s "casts that human again" re-registered `prologue-hosted-1` and got `exists` with no `hostedCellGrantCid`. Story 05-leaving is explicit — "the doorway keeps nothing that would host it" — so registering a closed identifier again is a NEW registration: new cell, new agent key, new grant, and the closed row stays as history, never resurrected.
+
+  The measured chain (doorway A log, 04:15:16–04:15:24) shows the duplicate CHECK was never the blocker: `MongoCollection::find_one` already appends `metadata.is_deleted != true`, so the pre-check passed, a new agent was provisioned, `Hosted: the cell is a notarized promise` was logged — and then no `Registered new user` line, because the insert died on the `identifier_unique` index. The refusal is the unique key, one layer below where it looked. That also **leaks a notarized promise**: `uhCEk64woTR-…` is a live `hosted-cell` grant for an agent whose account row never landed. So the close releases the live handle (tombstoned `closed:<millis>:<identifier>`, with `closed_identifier` keeping the name the human used) and the register pre-check states the intent explicitly by filtering on `is_active`. Releasing the name — rather than dropping the unique index or making it partial — is what keeps every `find_one({identifier})` in `auth_routes.rs` single-valued: at most one row ever answers to a name.
+
+- [x] **Step C: the account page's dates are RFC3339, and that is what the "no Hosted step" red actually was.** `stewardship_at` / `created_at` / `last_login_at` were serialized with `bson::DateTime`'s `Display` (`2026-09-11 4:54:40.628 +00:00:00` — the `time` crate's format, not RFC3339) while `hostedCellValidUntil` on the same response was RFC3339. All three now go through `routes::hosted_cell::rfc3339_utc_secs`, the schema describes them `format: date-time`, and a test asserts every timestamp on `AccountResponse` parses as RFC3339.
+
+  This is also the answer to the third red. `account-hosted-by-household` never rendering was **not** a doorway-side resolver defect: none of the three candidates held. The resolver's failure branch never logged once (`could not read the hosting household's Human` appears zero times in the whole doorway log); `hosted_cell_provider` IS persisted on register (`auth_routes.rs`, the grant's own `provider`); and the running binary already carried the cell-targeting fix `3c7ee8d89` (built 04:03:51, started 04:11:38) when the 04:13 lane ran. Re-measured live on that same binary, an API-registered human returned `hostedByHousehold: "Matthew"` immediately — matching the portal-registered human the doorway-app agent measured at ~04:40. What killed the element was the malformed `createdAt`: `DatePipe` throws `NG02100` and abandons every node below, and `memberSince` renders ABOVE the hosted block in `doorway-account.component.ts`. The component's own `instantOrNull` guard (dfd2c8932) names this exact wire defect in a `TODO(rust-fix)`; with the stamp landed that guard becomes a rail rather than the thing holding the page up.
+
+**Run (2026-09-11, household mesh kept warm; `just gate elohim-storage` EXIT=0, `just gate doorway` EXIT=0; both mesh binaries rebuilt and restarted):**
+
+Step A, on the grant the 04:15 lane left behind (`uhCEk64woTR-…`), measured on jessica's `:8091` — the peer story 07 names as "not the doorway's pool":
+
+```
+$ curl -s http://127.0.0.1:8091/api/v1/commitments/uhCEk64woTR-RLRs6-rs6qpmqHNP_tD-O7ZQNxMbUBjUOt50NKmst
+{"cid":"uhCEk64woTR-RLRs6-rs6qpmqHNP_tD-O7ZQNxMbUBjUOt50NKmst","action":"delegates-compute",
+ "scope":"hosted-cell","provider":"uhCAkwZmnsxA_FMajziYQDbvwWpGX49rxBh-CZyEmMI5Q7_3iB5Fu",
+ "recipient":"uhCAkRB5x3YIURVWFhObwjYWW6zuf6n_iMfhyp3AykeQJCMNyUkl9",
+ "bounds":{"epr_scope":["*"],"reach_ceiling":"commons","rate_per_hour":60,"rotation_ttl_days":30},
+ "validFrom":"2026-09-11T04:15:24+00:00","validUntil":"2026-10-11T04:15:24+00:00","state":"proposed",
+ "dhtAnchorHash":"uhCkkWgW02Pifws33XttLc_P6ea1NoySbhZAXZzjRfgfli3s4lftC","createdAt":"2026-09-11T05:28:07Z"}
+HTTP=200
+```
+
+`scope` is `hosted-cell`, `provider` is the pool peer's own key (not the doorway's), `recipient` is the human's own agent key, `validUntil` is in the future. The second read of the same cid is served from the row the first read projected. All three peers now answer (matthew `:8090` and james `:8092` included — matthew was 404 before, being the author). The rest of the cascade, live: a valid-but-absent EntryHash → **404**; a truncated cid → **400**; an existing `rea_commitments` slug → **200 in its unchanged shape**; an unknown slug → **404**.
+
+Step B, a full cycle on a fresh identifier: register `t17c-cycle-1` → 201, agent `uhCAk5y7Lvz…`, grant `uhCEkHcAuUXf…`; close → `{"closed":true,"hostedCellGrantRevoked":true}`; **re-register the same identifier → 201 with a NEW agent `uhCAk9IeX8wR…` and a NEW grant `uhCEkkzlJBsM…`**. The name now resolves to the new account; the closed row keeps its history under `closed_identifier` and is unreachable by that name. The pre-17c leftovers heal too: `prologue-hosted-1`, whose closed row still held its name from the 04:15 run, re-registered **201** with a fresh grant.
+
+Step C, on the same live doorway: `GET /auth/account` now answers `"createdAt":"2026-09-11T04:54:40Z"` where it answered `"2026-09-11 4:54:40.628 +00:00:00"` an hour earlier — and carries `"hostedByHousehold":"Matthew"` on both the API and portal registration paths.
+
+**Residue, named rather than left:** the notary read-back projects the lifecycle the ENTRY implies, not the `CommitmentByState` links off the commitment's anchor, so a commitment revoked provider-side and first seen by a non-authoring peer through this path caches as unrevoked until a reconcile reads the links (single-call budget; recorded as a `gapNote` on the `read_notarized_with` seam row). A commitment action with no `mishpat_commitments` row shape (`revokes-commitment`, `author-lens`, identity-head) is answered absent with a warn. And the grant leak above is a doorway ordering concern — the promise is notarized before the row is committed — which Step B stops reproducing but does not itself reorder.
+
+---
+
 ## Task 18 — (b) The epr-atom-home measure against the deployed alpha, now
 
 **Drains:** epr-atom-home plan **Task 8** (fleet half) and verifies **Task 1**.
