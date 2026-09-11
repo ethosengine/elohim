@@ -353,3 +353,90 @@
 .profile-link:hover {
   text-decoration: underline;
 }
+
+/* Hosted by a household — who is lending the machine, and until when. */
+.hosting-strip .hosting-lede {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+}
+
+/* Close this account — a deliberate, reversible-until-confirmed exit. */
+.close-account {
+  border-color: var(--dw-error);
+}
+
+.close-account p {
+  margin: 0 0 0.75rem;
+  font-size: 0.875rem;
+  color: var(--dw-text-secondary);
+}
+
+.close-account .close-keeps {
+  color: var(--dw-text-primary);
+}
+
+.btn-danger {
+  padding: 0.5rem 1rem;
+  background: var(--dw-error-bg);
+  border: 1px solid var(--dw-error);
+  border-radius: 0.375rem;
+  color: var(--dw-error-text);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--dw-error);
+  color: var(--dw-bg-surface);
+}
+
+.btn-danger:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.close-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.close-confirm .close-label {
+  font-size: 0.875rem;
+  color: var(--dw-text-primary);
+}
+
+.close-input {
+  padding: 0.5rem 0.75rem;
+  background: var(--dw-bg-surface);
+  border: 1px solid var(--dw-border);
+  border-radius: 0.375rem;
+  color: var(--dw-text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+}
+
+.close-input[aria-invalid='true'] {
+  border-color: var(--dw-error);
+}
+
+.close-error {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--dw-error-bg);
+  border-radius: 0.375rem;
+  color: var(--dw-error-text);
+  font-size: 0.875rem;
+}
+
+.close-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.close-actions .btn-secondary {
+  margin-top: 0;
+}

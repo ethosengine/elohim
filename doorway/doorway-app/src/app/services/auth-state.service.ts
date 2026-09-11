@@ -110,6 +110,19 @@ export class AuthStateService {
   }
 
   /**
+   * Drop the local session WITHOUT the server courtesy call.
+   *
+   * For the one case where the session is already gone on the doorway side —
+   * the human closed their account (`POST /auth/close-account`). Calling
+   * `logout()` there would POST a bearer the doorway has just destroyed, which
+   * answers 401 and prints a console error on a page that did nothing wrong.
+   */
+  clearLocalSession(): void {
+    this._account.set(null);
+    this.tokenStore.clear();
+  }
+
+  /**
    * Store a JWT token (used after login or session exchange).
    */
   storeToken(token: string): void {

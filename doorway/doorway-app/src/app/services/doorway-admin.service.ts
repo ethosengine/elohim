@@ -31,6 +31,7 @@ import {
   GraduationCompletedResponse,
   // Account models
   AccountResponse,
+  CloseAccountResponse,
   PortalHostResponse,
   // Capabilities
   CapabilitiesResponse,
@@ -448,6 +449,23 @@ export class DoorwayAdminService {
         timeout(this.timeout),
         catchError(this.handleError<AccountResponse | null>('getAccount', null))
       );
+  }
+
+  /**
+   * Close the current user's hosted account (self-service, irreversible).
+   *
+   * Thin wrapper: the doorway owns the whole decision — it checks
+   * `confirmIdentifier` against the session's own identifier and answers 400
+   * `CONFIRMATION_MISMATCH` when they differ, uninstalls the human's cell, and
+   * withdraws the hosting promise. Deliberately NOT wrapped in `handleError`:
+   * the caller needs the refusal, not a swallowed null.
+   */
+  async closeAccount(confirmIdentifier: string): Promise<CloseAccountResponse> {
+    return firstValueFrom(
+      this.http.post<CloseAccountResponse>(`${this.baseUrl}/auth/close-account`, {
+        confirmIdentifier,
+      })
+    );
   }
 
   /**
