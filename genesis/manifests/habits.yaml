@@ -1836,6 +1836,8 @@ habits:
       DELTA 2026-09-09 (asset station GREEN; whole habit RED preserved): edge #1450 SUCCESS deployed 9b55e82f to both public doorways; mandatory shell/SSR and unchanged browser scenarios pass (3 scenarios / 24 steps), with declared/root asset bytes and version matching. Fresh private full5 resume10 passes 5 scenarios / 102 steps with cleanup and incumbent/source guards at EXIT=0. Native station 8 records DONE_WITH_CONCERNS: all eight inspected light/dark captures render complete pages but pnpm look exits 1 for real federation discovery timeouts and third-party aborts; newer app publication, cross-request hot-swap binding and actual apex/WAN transition remain unproved.
 
       DELTA 2026-09-09 (delivery gate repair; RED preserved): the documentation-only public-proof push exposed gate-runner --names emitting human status prose as project IDs. The CLI now emits an empty machine list for an empty selection; human output, manifest selection, executed commands and exit codes are unchanged. The real subprocess regression failed before the fix and passes afterward; just gate orchestrator EXIT=0, including 148 suite tests. No serving receipt, fixture, assertion or shift measurement was weakened.
+
+      DELTA 2026-09-11 (fleet confirm of the sprint batch; RED preserved): edge #1452 SUCCESS deployed f7cfa7e6 (the doorway-federation batch 753b766a1..2c338124a plus fixes 86f2b32e8/3c690ec54) to all 7 storage + 7 conductor statefulsets and both doorways; `fleet-quiesce` PASS sustained 362 s (A/B caughtUp, A quiesced actionable=0, converged, both doorways 200 on elohim-host-landing). Dataplane Validation 112 scenarios: 7 passed / 3 failed / 3 pending (baseline edge #1450: 6 / 4 / 3) — `[FAIL] doorway-failover: passed=1 failed=2 pending=20`, identical to #1450: both reds are `served-shell-boots.feature:76/77` "opens the page … in a browser" failing on `browserType.launch: Executable doesn't exist at /root/.cache/ms-playwright/chromium_headless_shell-1217` — the validation container has no chromium (env, pre-existing; cure = the `playwright install --with-deps chromium` line verify-served-shell.sh already runs, added to run-dataplane-validation.sh this shift, unproven until the next edge run). Steady-state clauses are confirmed on the fleet only to the extent the plain-cucumber stations reach; the browser stations stay unmeasured on CI; apex-transition + WAN ingress unchanged. Serving receipt on the household mesh remains the current-source proof (run 20260911T081627Z-62fb8fb6). Fleet context: adam's conductor was CPU-pegged (4/4 cores) for ~24 h before the roll and the apex doorway shed writes (app #1704/#1705 red on env) — scale-risk row 8.
     refs:
       - "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md"
       - "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"
@@ -2857,6 +2859,56 @@ habits:
       when the Python and Rust evaluators are ONE artifact both hosts call, rather than two
       implementations held in correspondence by parity vectors. "Exactly one evaluator" is
       then a fact about the build, not a property under watch.
+
+  - id: recall-reaches-authority
+    invariant: >
+      One governed journey serves every agent question — a ceremony's "understand this assertion
+      and its changed evidence" and a session's "what is the shape of this concern and what do I
+      do first" are the same experience through the same algorithm (recall-contract.json), bounded
+      by the same mishpat (the recall-journey ceilings) and measured by the same middot
+      (recall-metered-bytes, recall-unmetered-bytes, recall-mistaken-assertions,
+      recall-screens-to-shape). A context-reset agent carrying a concrete question reaches the
+      current authoritative source through the entry alone: the session records the agent's own
+      question as its intent, every surface an agent must recall (docs, code, skills, hooks,
+      commands, measures, memory) is inside the declared scope, the bytes it read are metered, the
+      first screen fits its door — whole-scope: stale edges grouped by shared source so specs can be
+      converged and a head chosen; focused: the area's habit, its last delta and the competing
+      sources ranked with the commands to compare, choose and file the residue — and the agent concludes without a mistaken assertion. Bytes saved
+      never substitute for a correct decision; an unmetered direct read is a defect of the entry,
+      not of the agent.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:recall-reaches-authority (genesis/a2o/features/devflow/ceremony-reconciliation.feature — a fresh agent opens with its own question, the orientation carries it, a passage under .claude/skills/ is readable and receipted, and finish reports the question with bounded bytes)"
+      - "just gate memory-ceremony (the native recall executor, corrections view and footprint suites plus the hook, lens and cucumber legs)"
+      - "epr flow report --bound recall-unmetered-bytes-ceiling (and its three siblings recall-metered-bytes / recall-mistaken-assertions / recall-screens-to-shape): the latest journey's folds against the declared ceilings — a fold is written per journey by the reader's own honest account and by `recall measure --phase close`; no fold is `skipped`, never green"
+    evidence: >
+      RED WRITTEN 2026-09-11 (born red; the orchestrator's own bootstrapping into this sprint is the
+      first journey sample — 14 probe rounds and ~100 KB of unmetered direct reads before the concern's
+      shape was nameable, 1 mistaken assertion (looked for a memory habit that did not exist), 62,939
+      metered bytes from the test-drive baseline; folded on the four recall-journey measures, evidence from the memory-kit replacement's station six and the
+      2026-09-11 test-drive): two isolated after-readers reached authority 5/5 with 0 and 1 mistaken
+      assertions, tooling-scoped bytes 18,178 and 24,524, but honest totals with direct reads outside
+      source_roots were 85.2 KB and 49.1 KB — the byte leg fails for one reader because `.claude/` is
+      outside the entry's scope. Test-drive session `test-drive-20260911`: `open --need` dropped the
+      question (intent = recipe default), `search`/`read` under `.claude/skills` refused, three refusals
+      each re-printed ~900 B of orientation, the human `open` view was 12.6 KB of inline JSON. The a2o
+      scenario is not yet written; the gate is green on the pre-sprint binary.
+    guard: >
+      Regression risks: (1) greening by widening source_roots to everything — the private recall
+      store and other worktrees stay refused, and a scope that admits scratch is not a governed
+      entry; (2) greening by shrinking the human view until the Linked choices are gone — the
+      emitted next-choice commands are the progressive-discovery payload, never optional; (3) a
+      fresh-reader observation taken by the agent that made the change is not a fresh reader.
+    refs:
+      - "genesis/docs/superpowers/plans/2026-09-11-bounded-recall-mastery-sprint.md"
+      - "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md — the verdict rule this habit inherits from dev-system-equilibrium, where it never belonged"
+      - "genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md — the five fresh-start questions"
+      - ".epr-meta/elohim/algorithms/recall-contract.json — the method every receipt pins"
+    retire-when: >
+      when the fresh-reader observation has been green for a full quarter of ceremonies with
+      metered bytes inside the SessionStart budget and no unmetered direct read — an entry that
+      reliably serves the next agent no longer needs a reader watching it.
 
   - id: epr-atom-home
     invariant: >

@@ -573,3 +573,54 @@ void describe('destructiveAllowed', () => {
     assert.equal(destructiveAllowed(), false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Tool caps — `@requires:epr-cli` gates on the binary the steps would spawn, not on cluster-state.
+// genesis #1575: `spawnSync epr ENOENT` surfaced as FAILED steps although the feature declared the
+// cap, because a developer tool is not (and must not be) a cluster-state resource.
+// ---------------------------------------------------------------------------
+const MISSING_BIN = 'definitely-not-here';
+const TOOL_TAGS = ['@e2e', '@requires:epr-cli'];
+
+void describe('tool caps (@requires:epr-cli)', () => {
+  let savedBin: string | undefined;
+  let savedOverride: string | undefined;
+  let tmp: string;
+  beforeEach(() => {
+    savedBin = process.env.EPR_BIN;
+    savedOverride = process.env.ELOHIM_CAP_EPR_CLI_STATUS;
+    delete process.env.ELOHIM_CAP_EPR_CLI_STATUS;
+    tmp = mkdtempSync(join(tmpdir(), 'a2o-toolcap-'));
+  });
+  afterEach(() => {
+    if (savedBin === undefined) delete process.env.EPR_BIN;
+    else process.env.EPR_BIN = savedBin;
+    if (savedOverride === undefined) delete process.env.ELOHIM_CAP_EPR_CLI_STATUS;
+    else process.env.ELOHIM_CAP_EPR_CLI_STATUS = savedOverride;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  void it('holds the scenario when the epr binary is not where the steps would spawn it', () => {
+    process.env.EPR_BIN = join(tmp, MISSING_BIN);
+    assert.ok(unavailableRequiredCaps(TOOL_TAGS).includes('epr-cli'));
+  });
+
+  void it('does not hold when the binary exists (absolute EPR_BIN)', () => {
+    const bin = join(tmp, 'epr');
+    writeFileSync(bin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    process.env.EPR_BIN = bin;
+    assert.ok(!unavailableRequiredCaps(TOOL_TAGS).includes('epr-cli'));
+  });
+
+  void it('the per-cap env override wins over the PATH probe', () => {
+    process.env.EPR_BIN = join(tmp, MISSING_BIN);
+    process.env.ELOHIM_CAP_EPR_CLI_STATUS = 'available';
+    assert.ok(!unavailableRequiredCaps(TOOL_TAGS).includes('epr-cli'));
+  });
+
+  void it('a tool cap is not reported as an undeclared substrate cap', () => {
+    process.env.EPR_BIN = join(tmp, MISSING_BIN);
+    const held = unavailableRequiredCaps(TOOL_TAGS);
+    assert.deepEqual(held, ['epr-cli']);
+  });
+});

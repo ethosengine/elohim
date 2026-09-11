@@ -19,7 +19,7 @@
  * deliberate — a2o has no YAML dependency and the file's shape is stable.
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -340,6 +340,32 @@ function heldBaselineCaps(
     .map(cap => `${cap} (act ${act} baseline)`);
 }
 
+/**
+ * Tool caps — `@requires:<tool>-cli` names a binary the scenario spawns, not a substrate resource.
+ * The devflow scenarios (`ceremony-reconciliation`, `collective-memory`, `acceptance-aware-
+ * reconciliation`) spawn the native `epr` CLI; a CI image without it produced `spawnSync epr ENOENT`
+ * as a FAILED step (genesis #1575) although the feature already declared `@requires:epr-cli` — the
+ * gate ignored the tag because cluster-state.yaml does not (and should not) list a developer tool.
+ * Resolution: the per-cap env override still wins (`ELOHIM_CAP_EPR_CLI_STATUS`); otherwise the
+ * binary the steps would spawn (`EPR_BIN`, default `epr`) must resolve on PATH. HELD, never failed.
+ */
+const TOOL_CAP_BINARIES: Record<string, () => string> = {
+  'epr-cli': () => process.env.EPR_BIN ?? 'epr',
+};
+
+function binaryOnPath(bin: string): boolean {
+  if (bin.includes('/')) return existsSync(bin);
+  const dirs = (process.env.PATH ?? '').split(':').filter(Boolean);
+  return dirs.some(dir => existsSync(join(dir, bin)));
+}
+
+/** `null` when <cap> is not a tool cap; otherwise its status for this run. */
+export function toolCapStatus(cap: string): CapStatus | null {
+  const bin = TOOL_CAP_BINARIES[cap];
+  if (!bin) return null;
+  return capEnvOverride(cap) ?? (binaryOnPath(bin()) ? AVAILABLE : 'unavailable');
+}
+
 function heldExplicitCaps(
   caps: string[],
   known: Set<string>,
@@ -361,17 +387,20 @@ export function unavailableRequiredCaps(tags: string[]): string[] {
   const acts = actsFromTags(tags);
   if (explicit.length === 0 && acts.length === 0) return [];
   if (acts.length > 1) warnMultipleActs(acts);
+  // Tool caps resolve from the run's own PATH, independent of the durable substrate home.
+  const toolHeld = explicit.filter(cap => toolCapStatus(cap) === 'unavailable');
+  const substrate = explicit.filter(cap => toolCapStatus(cap) === null);
   let raw: string;
   try {
     raw = readFileSync(clusterStatePath(), 'utf-8');
   } catch {
-    return []; // unreadable durable home → fail-open (never silently gate)
+    return toolHeld; // unreadable durable home → fail-open for substrate caps (never silently gate)
   }
   const known = knownResourcesFromText(raw);
   const laneStatus = (cap: string): CapStatus =>
     capEnvOverride(cap) ?? parseResourceAvailability(raw, cap);
   const baseline = acts.length > 0 ? heldBaselineCaps(acts[0], known, laneStatus) : [];
-  return [...baseline, ...heldExplicitCaps(explicit, known, laneStatus)];
+  return [...baseline, ...heldExplicitCaps(substrate, known, laneStatus), ...toolHeld];
 }
 
 // ---------------------------------------------------------------------------
