@@ -25,7 +25,10 @@ pub mod agreement_service;
 pub mod anomaly_detection;
 pub mod arc_actuator; // conductor authority-arc actuation core — {0,1} coverage gate + config render (spec §5)
 pub mod arc_policy; // conductor authority-arc Auto policy — pure derive() (2026-06-13-conductor-authority-arc-auto-policy.md)
+pub(crate) mod authenticated_record;
 pub mod back_prop;
+pub(crate) mod rea_commitment_projection;
+pub(crate) mod rea_commitment_record;
 
 pub mod behavioral_trust;
 pub mod boot_registration;
@@ -35,6 +38,7 @@ pub mod capacity_pledge_author; // Explicit Class-A commons-capacity pledge via 
 pub mod capacity_reporter; // Periodic local capacity reporter — measures + upserts custodian_metrics, sets the cluster-capacity gauges
 pub mod cluster_view;
 pub mod commitment_fetcher;
+pub mod commitment_read_fallback; // GET /api/v1/commitments/{cid} notary read-back (projection miss → ONE bounded native read)
 pub mod commitment_record;
 pub mod concentration_service;
 pub mod conductor_commitment_author; // Slice-2b — production CommitmentAuthor (conductor-backed provide loop)

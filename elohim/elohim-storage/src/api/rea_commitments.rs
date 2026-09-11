@@ -73,7 +73,17 @@ pub async fn handle(
         (&Method::GET, "facing/rea") => handle_facing_rea(pool).await,
 
         // GET /api/v1/commitments/{id}
-        (&Method::GET, id) if !id.contains('/') => handle_get_by_id(id, pool, ctx).await,
+        (&Method::GET, id) if !id.contains('/') => {
+            let refresh = parse_refresh(req.uri().query().unwrap_or(""))?;
+            if refresh {
+                let hc = hc_lamad.as_ref().ok_or_else(|| {
+                    StorageError::Conductor("REA refresh requires own lamad conductor".into())
+                })?;
+                crate::services::rea_commitment_projection::refresh_by_id(hc, pool, ctx, id)
+                    .await?;
+            }
+            handle_get_by_id(id, pool, ctx, hc_lamad.as_ref()).await
+        }
 
         // PATCH /api/v1/commitments/{id}
         (&Method::PATCH, id) if !id.contains('/') => {
@@ -268,14 +278,58 @@ fn normalize_create_input(
     Ok(input)
 }
 
+// Operational query only; reconstructs the existing notarized projection.
+fn parse_refresh(query: &str) -> Result<bool, StorageError> {
+    #[derive(serde::Deserialize, Default)]
+    struct ReadQuery {
+        #[serde(default)]
+        refresh: bool,
+    }
+    serde_urlencoded::from_str::<ReadQuery>(query)
+        .map(|q| q.refresh)
+        .map_err(|e| StorageError::InvalidInput(format!("Invalid commitment read query: {e}")))
+}
+
+/// GET /api/v1/commitments/{id} — read one commitment back BY ITS IDENTIFIER.
+///
+/// The projection is a cache; the DHT is the truth (p2p-design-gate, Notarized /
+/// Path A). So a miss in the local REA projection is NOT evidence of absence,
+/// and the read cascades:
+///
+/// 1. `rea_commitments` — the elohim/lamad REA ledger (unchanged fast path).
+/// 2. `mishpat_commitments` — the notarized Mishpat ledger this peer holds. A
+///    `delegates-compute` grant lives ONLY here (the mishpat→REA mirror bridges
+///    the `replicates-*` actions only), which is why even the AUTHORING peer
+///    404'd on a `hosted-cell` grant it had itself issued.
+/// 3. ONE bounded `mishpat::get_commitment` through this peer's OWN conductor,
+///    projecting the row on success so the second read is local. `post_commit`
+///    signals are cell-local, so a peer that did not author the commitment has
+///    no projection to miss — but its conductor can still read the entry.
+/// 4. 404 only when this peer's own DHT view also answers none.
+///
+/// This is what story 07 ("what the notary records, any peer holding the network
+/// can read back") asks of a storage peer, and the reason it is a fallback
+/// rather than a fan-out: a peer answers from its OWN conductor, never by
+/// iterating other peers (the doorway blob fan-out anti-pattern, storage-side).
+///
+/// Shape: legs 2 and 3 answer with `MishpatCommitmentView` (the pinned
+/// `mishpat-commitment-view.schema.json` contract). Leg 1 is untouched, so no
+/// response that succeeds today changes shape — the mishpat shape is only ever
+/// reached on a path that is a 404 now.
 async fn handle_get_by_id(
     id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    hc_lamad: Option<&Arc<HcClient>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let mut conn = get_conn(pool)?;
+    {
+        let mut conn = get_conn(pool)?;
+        if let Some(view) = ReaCommitmentService::get_by_id(&mut conn, ctx, id)? {
+            return Ok(response::ok(&view));
+        }
+    }
     Ok(from_option(
-        ReaCommitmentService::get_by_id(&mut conn, ctx, id),
+        crate::services::commitment_read_fallback::read_notarized(hc_lamad, pool, id).await,
         &format!("Commitment not found: {}", id),
     ))
 }
@@ -473,5 +527,25 @@ mod tests {
             Some(r#"["compute","storage"]"#)
         );
         assert_eq!(input.in_scope_of.as_deref(), Some(r#"["[not json"]"#));
+    }
+}
+
+#[cfg(test)]
+mod refresh_query_tests {
+    use super::parse_refresh;
+
+    #[test]
+    fn refresh_requires_explicit_valid_boolean() {
+        assert!(!parse_refresh("").unwrap());
+        assert!(!parse_refresh("refresh=false").unwrap());
+        assert!(parse_refresh("refresh=true").unwrap());
+        for invalid in [
+            "refresh=1",
+            "refresh=",
+            "refresh=notary",
+            "refresh=true&refresh=false",
+        ] {
+            assert!(parse_refresh(invalid).is_err(), "{invalid}");
+        }
     }
 }

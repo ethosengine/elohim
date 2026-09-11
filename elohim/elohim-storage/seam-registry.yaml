@@ -4212,3 +4212,138 @@ decisionPoints:
       - path: elohim/elohim-storage/src/api/compute_grants.rs
         testName: revoke_is_idempotent
         kind: unit
+
+  - name: classify_cid
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/commitment_read_fallback.rs
+      modulePath: services::commitment_read_fallback::classify_cid
+    summary: >
+      Decides, before any database or conductor work, what a `{id}` on
+      `GET /api/v1/commitments/{id}` can be: a well-formed base64 EntryHash eligible for
+      ONE bounded notary read; an id wearing the `uhC` HoloHash prefix that does not
+      decode (a mistyped cid — refused, never reported as a truthful absence); or an
+      opaque local projection slug, which can never be a notarized commitment and so
+      never spends an uncancellable conductor call.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          Pure in the id alone — no clock, no DB, no conductor. The same id classifies the
+          same way on every peer, which is what lets the caller's refusal be stated as the
+          caller's error rather than as this node's state.
+      - id: C4
+        status: answered
+        justification: >
+          The three verdicts keep "cannot be a cid", "is a malformed cid" and "is a cid we
+          must go and ask about" apart. Collapsing the first two into one absent answer is
+          exactly how a truncated cid would have been reported as "the notary has nothing".
+      - id: C6a
+        status: answered
+        justification: >
+          a_malformed_cid_is_refused_before_the_conductor_call pins that the reader is not
+          invoked at all for a refused id, and the length bound caps the work an
+          over-long path segment can provoke.
+      - { id: C11, status: n-a, justification: "Schedules nothing; it is a classification over one string." }
+    contractTests:
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_real_entry_hash_is_eligible_for_the_notary_read
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_projection_slug_never_spends_a_conductor_call
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_truncated_cid_is_refused_rather_than_reported_absent
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: empty_and_over_long_ids_are_refused_before_any_work
+        kind: unit
+    notes: >
+      `CidVerdict` is this predicate's three-arm answer type and is registered here rather
+      than as its own row: it has no constructor other than this function, so the type and
+      the predicate are one decision.
+
+  - name: read_notarized_with
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/commitment_read_fallback.rs
+      modulePath: services::commitment_read_fallback::read_notarized_with
+    summary: >
+      The notary read-back behind `GET /api/v1/commitments/{cid}`. A miss in the local REA
+      projection is a CACHE miss, not evidence of absence, so the read cascades: the
+      `mishpat_commitments` ledger this peer already holds, then ONE bounded
+      `mishpat::get_commitment` through this peer's OWN conductor, projecting the row on
+      success so the second read is local. 404 only when the peer's own DHT view also
+      answers none. Measured 2026-09-11 on the household mesh: a `hosted-cell`
+      delegates-compute grant 404'd on ALL THREE peers including its author (the GET served
+      only `rea_commitments`, and the mishpat→REA mirror bridges `replicates-*` only),
+      while jessica's own conductor returned the entry in full.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The DHT entry is the authority; the row written is a projection of what the
+          conductor returned, never an authored commitment. Nothing here creates a head.
+      - id: C2
+        status: answered
+        justification: >
+          an_answer_about_another_cid_is_refused pins that a conductor answering about a
+          different entry hash than the one asked for is rejected rather than cached — the
+          cid the caller named is the pin, not whatever came back.
+      - id: C4
+        status: answered
+        justification: >
+          an_unreachable_conductor_is_an_outage_not_an_absence and
+          a_cid_absent_from_both_answers_absent are the pair: an Err propagates as an outage
+          (503) and only a conductor's own None becomes a 404. Absence and outage never
+          collapse into one answer.
+      - id: C6a
+        status: answered
+        justification: >
+          a_commitment_only_the_dht_holds_is_served_and_projected counts the reader's
+          invocations: exactly one per request, and zero on the second read. No retry loop,
+          no polling, and no fan-out to other peers — a peer answers from its own conductor
+          or not at all.
+      - id: C6b
+        status: answered
+        justification: >
+          The projection write is the existing idempotent `upsert_with_anchor`, so a
+          repeated read converges on the same row; the same test asserts the second read
+          is served locally without a further conductor call.
+      - id: C5
+        status: partial
+        justification: >
+          The answer is this peer's own DHT view, which is exactly the claim story 07 makes
+          ("any peer holding the network can read back"). It is not a claim of global
+          completeness: a peer whose conductor has not yet seen the entry answers absent.
+      - { id: C12, status: n-a, justification: "A read over an already-notarized ledger; it grants nothing and requires no actor." }
+      - id: C14
+        status: partial
+        justification: >
+          A commitment action with no `mishpat_commitments` row shape is warned with its
+          cid and action rather than dropped silently; no RCA capsule carries the payload.
+    contractTests:
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_commitment_only_the_dht_holds_is_served_and_projected
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_cid_absent_from_both_answers_absent
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: a_malformed_cid_is_refused_before_the_conductor_call
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: an_unreachable_conductor_is_an_outage_not_an_absence
+        kind: unit
+      - path: elohim/elohim-storage/src/services/commitment_read_fallback.rs
+        testName: an_answer_about_another_cid_is_refused
+        kind: unit
+    gapNote: >
+      Two named gaps, both in the module doc. (1) A commitment whose payload does not
+      project to `CommitmentProjection::Upsert` (`revokes-commitment`, `author-lens`,
+      identity-head) has no row shape here and is answered absent with a warn. (2) The
+      lifecycle a freshly-fetched row carries is the entry-derived one; the authoritative
+      lifecycle lives in the `CommitmentByState` links off the commitment's own anchor,
+      which the single-call budget does not read — so a commitment REVOKED provider-side
+      and first seen by a non-authoring peer through this path projects as unrevoked until
+      a reconcile reads the links.
