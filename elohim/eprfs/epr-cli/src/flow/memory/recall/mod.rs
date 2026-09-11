@@ -274,6 +274,70 @@ impl Contract {
     fn recipe(&self) -> &Value {
         self.value.get("ceremony").unwrap_or(&Value::Null)
     }
+
+    /// The contract read as a VF knowledge-level `ProcessSpec` — the same seven-stage
+    /// [`COMPOSITION`] this executor already refuses to run any other shape of, now typed rather
+    /// than a bespoke JSON array. A contract carrying a declared `process_spec` deserializes it
+    /// directly; an older contract (pre-v10) that only declared `composition` gets one minted from
+    /// it, so `Contract::load` never fails on a contract this executor already accepts.
+    pub fn process_spec(&self) -> elohim_epr_rea::ProcessSpec {
+        if let Some(raw) = self.value.get("process_spec") {
+            if let Ok(spec) = serde_json::from_value(raw.clone()) {
+                return spec;
+            }
+        }
+        elohim_epr_rea::ProcessSpec {
+            id: self
+                .value
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("bounded-evidence-recall")
+                .to_string(),
+            version: self
+                .value
+                .get("version")
+                .and_then(Value::as_u64)
+                .unwrap_or(0) as u32,
+            stages: COMPOSITION
+                .iter()
+                .map(|name| elohim_epr_rea::StageSpec {
+                    name: (*name).to_string(),
+                    artifact_kind: "Window".to_string(),
+                })
+                .collect(),
+            edges: Vec::new(),
+        }
+    }
+
+    /// The contract's declared budgets read as VF [`elohim_epr_rea::Bound`]s. A declared `bounds`
+    /// array deserializes directly; an older contract without one gets a `Bound` folded from every
+    /// `limits.*` entry [`validate`](Self::validate) already requires be a positive finite number,
+    /// so this never invents a limit the contract did not itself declare.
+    pub fn bounds(&self) -> Vec<elohim_epr_rea::Bound> {
+        if let Some(raw) = self.value.get("bounds") {
+            if let Ok(bounds) = serde_json::from_value(raw.clone()) {
+                return bounds;
+            }
+        }
+        self.value
+            .get("limits")
+            .and_then(Value::as_object)
+            .map(|limits| {
+                limits
+                    .iter()
+                    .filter_map(|(name, raw)| {
+                        raw.as_f64().map(|limit| elohim_epr_rea::Bound {
+                            limit,
+                            unit: name.clone(),
+                            threshold_pct: 100.0,
+                            sense: None,
+                            source: None,
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
 }
 
 fn hex(bytes: &[u8]) -> String {

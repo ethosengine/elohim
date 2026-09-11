@@ -2949,3 +2949,23 @@ fn a_refusal_about_an_input_names_the_flags_that_operation_accepts() {
         .to_string();
     assert!(message.contains("--next-action"), "{message}");
 }
+
+/// The contract is a `ProcessSpec` whose stages equal its composition, and a `Bound` for every
+/// declared budget — the same recipe, read as VF knowledge-level shapes rather than bespoke JSON.
+#[test]
+fn the_contract_is_a_process_spec_whose_stages_equal_its_composition() {
+    let contract = Contract::load(&repo_root().join(recall::CONTRACT_REL)).unwrap();
+    let spec = contract.process_spec();
+    let names: Vec<&str> = spec.stages.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["scope", "discover", "filter", "group", "select", "read", "judge"]
+    );
+    let bounds = contract.bounds();
+    let body = bounds
+        .iter()
+        .find(|b| b.unit == "body_scan_bytes")
+        .expect("declared");
+    assert_eq!(body.limit, 65536.0);
+    assert!(matches!(body.sense, Some(elohim_epr_rea::Sense::Ceiling)));
+}

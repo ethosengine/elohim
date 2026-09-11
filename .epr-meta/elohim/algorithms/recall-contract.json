@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 9,
+  "version": 10,
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
   "limits": {
@@ -106,6 +106,36 @@
     "select",
     "read",
     "judge"
+  ],
+  "process_spec": {
+    "id": "bounded-evidence-recall",
+    "version": 10,
+    "stages": [
+      { "name": "scope", "artifactKind": "Scope" },
+      { "name": "discover", "artifactKind": "Window" },
+      { "name": "filter", "artifactKind": "Window" },
+      { "name": "group", "artifactKind": "Window" },
+      { "name": "select", "artifactKind": "Candidate" },
+      { "name": "read", "artifactKind": "Receipt" },
+      { "name": "judge", "artifactKind": "Verdict" }
+    ],
+    "edges": []
+  },
+  "bounds": [
+    {
+      "limit": 65536,
+      "unit": "body_scan_bytes",
+      "thresholdPct": 100,
+      "sense": "ceiling",
+      "source": { "kind": "declared" }
+    },
+    {
+      "limit": 20000,
+      "unit": "source_bytes",
+      "thresholdPct": 100,
+      "sense": "ceiling",
+      "source": { "kind": "declared" }
+    }
   ],
   "discovery": {
     "exclude_directories": [
