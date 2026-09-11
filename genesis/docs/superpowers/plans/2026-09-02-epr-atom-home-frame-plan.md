@@ -168,6 +168,8 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 
 ### Task 2: Extract `EprFocalComponent` from content-delivery (count-neutral)
 
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
+
 **Files:**
 - Create: `app/elohim-app/src/app/elohim/components/epr-focal/epr-focal.component.ts`
 - Create: `app/elohim-app/src/app/elohim/components/epr-focal/epr-focal.component.html`
@@ -181,7 +183,7 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 - Produces: `EprFocalComponent` (selector `app-epr-focal`) with `@Input({ required: true }) slug: string`, `@Output() nodeLoaded: EventEmitter<FocalNode>`, `@Output() notFound: EventEmitter<string>`, `@Output() failed: EventEmitter<string>`; exported `type FocalNode` (alias of lamad's `ContentNode` — consumers import the alias from this file, never the lamad model).
 - Consumes: lamad `ContentService.getContentBySlug(slug): Observable<ContentNode | null>`, `RendererRegistryService.getRenderer(node)`, `RendererInitializerService` (side-effect registration).
 
-- [ ] **Step 1: Write the failing focal spec**
+- [x] **Step 1: Write the failing focal spec**
 
 `app/elohim-app/src/app/elohim/components/epr-focal/epr-focal.component.spec.ts`:
 ```ts
@@ -276,12 +278,12 @@ describe('EprFocalComponent', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to confirm it fails**
+- [x] **Step 2: Run it to confirm it fails**
 
 Run from `app/elohim-app`: `pnpm exec vitest run --config vite.config.ts epr-focal`
 Expected: FAIL — cannot resolve `./epr-focal.component`.
 
-- [ ] **Step 3: Write the focal component**
+- [x] **Step 3: Write the focal component**
 
 `app/elohim-app/src/app/elohim/components/epr-focal/epr-focal.component.ts`:
 ```ts
@@ -463,12 +465,12 @@ export class EprFocalComponent implements OnChanges, AfterViewChecked, OnDestroy
 
 `app/elohim-app/src/app/elohim/components/epr-focal/epr-focal.component.css` — move the `.loading-state`, `.spinner`, `.plaintext-content`, `.html-content`, `.fallback-content` rules out of `content-delivery.component.css` (rename `.loading-state` → `.epr-focal__loading`; keep the others byte-identical so the delivery page does not change).
 
-- [ ] **Step 4: Run the focal spec**
+- [x] **Step 4: Run the focal spec**
 
 Run: `pnpm exec vitest run --config vite.config.ts epr-focal`
 Expected: 5 PASS.
 
-- [ ] **Step 5: Make content-delivery compose the focal**
+- [x] **Step 5: Make content-delivery compose the focal**
 
 `content-delivery.component.ts` — replace the four `@app/lamad/*` imports and the renderer machinery:
 ```ts
@@ -692,7 +694,7 @@ describe('ContentDeliveryComponent', () => {
 });
 ```
 
-- [ ] **Step 6: Run both specs and the ratchet**
+- [x] **Step 6: Run both specs and the ratchet**
 
 Run from `app/elohim-app`:
 ```bash
@@ -701,7 +703,7 @@ node ../scripts/lint-workspace-imports.mjs . ; echo "EXIT=$?"
 ```
 Expected: all PASS; the ratchet prints no `NEW` or `DEEPENED` edge and `EXIT=0`. If it reports a *shrink* (a count went DOWN because a delivery-spec import vanished), that is allowed but must be re-baselined: run `node ../scripts/lint-workspace-imports.mjs . --write-baseline` and include `app/scripts/workspace-import-baseline.json` in the commit with the reason "content-delivery spec no longer provides lamad services; the focal spec provides them".
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/elohim-app/src/app/elohim/components/epr-focal app/elohim-app/src/app/elohim/components/content-delivery
@@ -715,6 +717,8 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 
 ### Task 3: `EprHomeComponent` — atom, identity, focal, gate, address; route switch
 
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
+
 **Files:**
 - Create: `app/elohim-app/src/app/elohim/components/epr-home/epr-home.model.ts`
 - Create: `app/elohim-app/src/app/elohim/components/epr-home/epr-home.component.ts`
@@ -727,7 +731,7 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 - Produces: `EprHomeAtom` view model and `toAtom(raw: Record<string, unknown>): EprHomeAtom`, `focalShape(format: string): 'immersive' | 'reading'`, `reachSubtitle(reach: string): string`, `anchorWords(trust, dhtAnchorState): string`.
 - Consumes: `StorageClientService.getContent(id): Observable<StorageContentNode | null>` (raw wire shape; read as a record like `epr-raw-node` does), `EprFocalComponent` (Task 2).
 
-- [ ] **Step 1: Write the model with its unit tests**
+- [x] **Step 1: Write the model with its unit tests**
 
 `app/elohim-app/src/app/elohim/components/epr-home/epr-home.model.ts`:
 ```ts
@@ -879,12 +883,12 @@ describe('epr-home.model', () => {
 });
 ```
 
-- [ ] **Step 2: Run the model tests**
+- [x] **Step 2: Run the model tests**
 
 Run: `pnpm exec vitest run --config vite.config.ts epr-home`
 Expected: model tests PASS (the component describe does not exist yet).
 
-- [ ] **Step 3: Write the failing component spec**
+- [x] **Step 3: Write the failing component spec**
 
 Append to `epr-home.component.spec.ts`:
 ```ts
@@ -1004,12 +1008,12 @@ describe('EprHomeComponent', () => {
 });
 ```
 
-- [ ] **Step 4: Run to confirm it fails**
+- [x] **Step 4: Run to confirm it fails**
 
 Run: `pnpm exec vitest run --config vite.config.ts epr-home`
 Expected: FAIL — cannot resolve `./epr-home.component`.
 
-- [ ] **Step 5: Write the component**
+- [x] **Step 5: Write the component**
 
 `app/elohim-app/src/app/elohim/components/epr-home/epr-home.component.ts`:
 ```ts
@@ -1352,7 +1356,7 @@ export class EprHomeComponent {
 }
 ```
 
-- [ ] **Step 6: Switch the route**
+- [x] **Step 6: Switch the route**
 
 `app/elohim-app/src/app/app.routes.ts` lines 68–78 — replace the comment and the `loadComponent`:
 ```ts
@@ -1368,7 +1372,7 @@ export class EprHomeComponent {
 ```
 Then run the routes spec: `pnpm exec vitest run --config vite.config.ts app.routes` — if it asserts the old target for `epr/:resourceId`, update that assertion to `EprHomeComponent` (the spec pins route shape, not the lamad component).
 
-- [ ] **Step 7: Run the specs and the ratchet**
+- [x] **Step 7: Run the specs and the ratchet**
 
 ```bash
 pnpm exec vitest run --config vite.config.ts "epr-home|app.routes"
@@ -1377,7 +1381,7 @@ node ../scripts/lint-route-literals.mjs src ; echo "EXIT=$?"
 ```
 Expected: all PASS; both lints `EXIT=0`. Note: the baseline entry `@app/lamad/components/content-viewer/content-viewer.component: 2` may now read 1 (the route no longer imports it) — that is a shrink; re-baseline with `--write-baseline` and include the baseline in the commit.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/elohim-app/src/app/elohim/components/epr-home app/elohim-app/src/app/app.routes.ts app/elohim-app/src/app/app.routes.spec.ts app/scripts/workspace-import-baseline.json
@@ -1390,6 +1394,8 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 ---
 
 ### Task 4: The four legs (rail) + the held-by chip
+
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
 
 **Files:**
 - Create: `app/elohim-app/src/app/elohim/components/epr-home/epr-home-legs.component.ts`
@@ -1404,7 +1410,7 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 - Produces in the model: `interface StewardRow { stewardPresenceId: string; contributionType: string; effectiveFrom: string }`, `interface HoldingWords { headline: string; has: number; wants: number; warm: boolean; households: string[]; action: string }`, `holdingWords(snapshot: ResilienceSnapshotView | null): HoldingWords`.
 - Consumes: `ResilienceService.getSnapshot(id)` and `DistributionService.getDetails(blobHash)` from `@elohim/service`; `StorageApiService.getStewardshipAllocations({ contentId, activeOnly: true })` (shell); `EprResolverService.resolveEprHead(id)` (shell); `GovernanceApiService.getChallengesForEntity('content', id)` (`@elohim/service`); `ChallengeView` from `@elohim/storage-client/generated`; `EprRelationship` from `../../models/epr-head.model`; `EprRelationshipsPanelComponent` (shell, `app-epr-relationships-panel`, `@Input() relationships`).
 
-- [ ] **Step 1: Add the holding words to the model with tests**
+- [x] **Step 1: Add the holding words to the model with tests**
 
 Append to `epr-home.model.ts`:
 ```ts
@@ -1480,7 +1486,7 @@ Append to the model describe in `epr-home.component.spec.ts`:
 ```
 (add `heldChip, holdingWords` to that spec's model import.)
 
-- [ ] **Step 2: Write the failing legs spec**
+- [x] **Step 2: Write the failing legs spec**
 
 `epr-home-legs.component.spec.ts`:
 ```ts
@@ -1589,12 +1595,12 @@ describe('EprHomeLegsComponent', () => {
 });
 ```
 
-- [ ] **Step 3: Run to confirm it fails**
+- [x] **Step 3: Run to confirm it fails**
 
 Run: `pnpm exec vitest run --config vite.config.ts epr-home-legs`
 Expected: FAIL — cannot resolve `./epr-home-legs.component`.
 
-- [ ] **Step 4: Write the legs component**
+- [x] **Step 4: Write the legs component**
 
 `epr-home-legs.component.ts`:
 ```ts
@@ -1919,12 +1925,12 @@ export class EprHomeLegsComponent {
 }
 ```
 
-- [ ] **Step 5: Run the legs spec**
+- [x] **Step 5: Run the legs spec**
 
 Run: `pnpm exec vitest run --config vite.config.ts epr-home-legs`
 Expected: 6 PASS. (`ChallengeView` field names `state`, `grounds_primary`, `id` come from `elohim/elohim-views/src/qahal.rs:52-74` as generated; if the generated TS is camelCase — `groundsPrimary` — use the generated spelling.)
 
-- [ ] **Step 6: Wire the legs into the frame**
+- [x] **Step 6: Wire the legs into the frame**
 
 `epr-home.component.ts` — add the imports and loaders:
 ```ts
@@ -2083,7 +2089,7 @@ In the immersive shape the focal spans the full width ABOVE the grid (move the `
   });
 ```
 
-- [ ] **Step 7: Run all epr-home specs, the ratchet, and the route-literal lint**
+- [x] **Step 7: Run all epr-home specs, the ratchet, and the route-literal lint**
 
 ```bash
 pnpm exec vitest run --config vite.config.ts "epr-home"
@@ -2092,7 +2098,7 @@ node ../scripts/lint-route-literals.mjs src ; echo "EXIT=$?"
 ```
 Expected: all PASS, both `EXIT=0`.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add app/elohim-app/src/app/elohim/components/epr-home
@@ -2106,13 +2112,15 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 
 ### Task 5: Arrival strip, gate referrer, and "Your mark on it"
 
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
+
 **Files:**
 - Modify: `epr-home.component.ts/.html/.css/.spec.ts`
 
 **Interfaces:**
 - Consumes: `SessionNavStackService.previous(): NavStackEntry | null` (`{ url, cid, label?, ts }`, shell), `EprNavService.navigate(url)` (shell), `AuthService.isAuthenticated: Signal<boolean>` (shell, `imagodei/services/auth.service`), `AffinityTrackingService.getAffinity(id): number`, `.setAffinity(id, value)`, `.trackView(id)` (shell), `affinity$` (BehaviorSubject stream).
 
-- [ ] **Step 1: Write the failing specs**
+- [x] **Step 1: Write the failing specs**
 
 Add to `epr-home.component.spec.ts` providers in `mount()`:
 ```ts
@@ -2165,12 +2173,12 @@ and tests:
 ```
 (import `signal` from `@angular/core`, `SessionNavStackService` from `../../services/session-nav-stack.service`, `AuthService` from `../../../imagodei/services/auth.service`, `AffinityTrackingService` from `../../services/affinity-tracking.service`.)
 
-- [ ] **Step 2: Run to confirm they fail**
+- [x] **Step 2: Run to confirm they fail**
 
 Run: `pnpm exec vitest run --config vite.config.ts "epr-home.component"`
 Expected: the four new tests FAIL (no arrival chip, no gate-back, no your-mark).
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 `epr-home.component.ts` additions:
 ```ts
@@ -2369,12 +2377,12 @@ Add `trackView` on load: an `effect(() => { const a = this.atom(); if (a) this.a
 }
 ```
 
-- [ ] **Step 4: Run the specs**
+- [x] **Step 4: Run the specs**
 
 Run: `pnpm exec vitest run --config vite.config.ts "epr-home"`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/elohim-app/src/app/elohim/components/epr-home
@@ -2388,6 +2396,8 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 
 ### Task 6: "Open in Lamad" from generated all-bundle claims
 
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
+
 **Files:**
 - Modify: `elohim/sdk/schemas/scripts/codegen-route-claims.mjs` (`generateBundleFile`)
 - Regenerate: `app/elohim-app/src/app/generated/route-claims.ts` (via `pnpm run route-claims:codegen` at repo root)
@@ -2399,7 +2409,7 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 - Produces (generated, universal owner only): `export const BUNDLE_ROUTE_CLAIMS: readonly { bundle: string; claims: readonly RouteClaimTemplate[] }[]`.
 - Produces: `openInBundle(contentType: string, id: string, claims = BUNDLE_ROUTE_CLAIMS, mounts = BUNDLE_MOUNTS): { href: string; bundleName: string } | null`.
 
-- [ ] **Step 1: Write the failing lens spec**
+- [x] **Step 1: Write the failing lens spec**
 
 `bundle-lens.spec.ts`:
 ```ts
@@ -2429,11 +2439,11 @@ describe('openInBundle', () => {
 });
 ```
 
-- [ ] **Step 2: Run to confirm it fails**
+- [x] **Step 2: Run to confirm it fails**
 
 Run: `pnpm exec vitest run --config vite.config.ts bundle-lens` → FAIL (module missing).
 
-- [ ] **Step 3: Extend the codegen**
+- [x] **Step 3: Extend the codegen**
 
 In `codegen-route-claims.mjs`, change `generateBundleFile(domain)` to `generateBundleFile(domain, domains)` and append, only when `domain.ownsUniversalRoute`:
 ```js
@@ -2460,7 +2470,7 @@ and return `${…}${universal}`. Update the call in `main()`: `generateBundleFil
 Run from repo root: `pnpm run route-claims:codegen && pnpm run route-claims:codegen:verify && git diff --stat app/lamad/src/app/generated/route-claims.ts genesis/seeder/src/generated/route-claims.ts`
 Expected: verify passes; the lamad and seeder files show NO diff (only the elohim file changed).
 
-- [ ] **Step 4: Write the lens**
+- [x] **Step 4: Write the lens**
 
 `bundle-lens.ts`:
 ```ts
@@ -2509,7 +2519,7 @@ export function openInBundle(
 ```
 (Plain href: cross-bundle CONTENT links are full doorway loads, never routerLink — the epr-link interceptor records the handoff.)
 
-- [ ] **Step 5: Run specs and lints**
+- [x] **Step 5: Run specs and lints**
 
 ```bash
 pnpm exec vitest run --config vite.config.ts "bundle-lens|epr-home"
@@ -2518,7 +2528,7 @@ node ../scripts/lint-workspace-imports.mjs . ; echo "EXIT=$?"
 ```
 Expected: PASS, `EXIT=0` twice. If `lint-route-literals` still refuses the `/lamad` literal despite the trailing comment, read its accepted marker syntax at the top of `app/scripts/lint-route-literals.mjs` and use that exact form.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/sdk/schemas/scripts/codegen-route-claims.mjs app/elohim-app/src/app/generated/route-claims.ts app/elohim-app/src/app/elohim/components/epr-home
@@ -2532,6 +2542,8 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 
 ### Task 7: a2o steps for the frame scenarios
 
+> LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
+
 **Files:**
 - Create: `genesis/a2o/src/framework/pages/epr-home.page.ts`
 - Modify: `genesis/a2o/src/framework/pages/index.ts` (export)
@@ -2541,7 +2553,7 @@ Claude-Session: https://claude.ai/code/session_017GZH6i7cHvKanCC7R32jFh"
 **Interfaces:**
 - Consumes: `E2EWorld.getHuman(name).devices` → `PlaywrightDevice` (`device.page`, `device.client.url`), `doorwayToAppUrl(url)` (`src/framework/utils/url.ts`), the test ids from Global Constraints.
 
-- [ ] **Step 1: Page object**
+- [x] **Step 1: Page object**
 
 `src/framework/pages/epr-home.page.ts`:
 ```ts
@@ -2650,7 +2662,7 @@ export class EprHomePage {
 ```
 Add `export * from './epr-home.page.js';` to `src/framework/pages/index.ts` (match the existing export style in that file).
 
-- [ ] **Step 2: Steps**
+- [x] **Step 2: Steps**
 
 `steps/ui/epr-atom-home.steps.ts`:
 ```ts
@@ -2900,13 +2912,13 @@ Then(
 ```
 (`this.getDoorway('alpha')` — confirm the accessor name in `src/framework/world.ts`; the Background step `Given doorway "alpha" at …` registers it. If the world exposes it under another name, use that name.)
 
-- [ ] **Step 3: Drop `@wip` on scenarios 1–6 and 10 and dry-run**
+- [x] **Step 3: Drop `@wip` on scenarios 1–6 and 10 and dry-run**
 
 Edit the feature: remove `@wip` from the tag lines of the seven frame scenarios (keep it on "The conversation opens empty…", "A message carries…", "Where people stand surfaces…").
 Run from `genesis/a2o`: `npx cucumber-js --dry-run --tags '@concern:epr-atom-home' ; echo "EXIT=$?"`
 Expected: `EXIT=0`, no undefined steps (the `@wip` three report as skipped/pending only).
 
-- [ ] **Step 4: Run the seven scenarios against the local shell on live alpha data**
+- [x] **Step 4: Run the seven scenarios against the local shell on live alpha data**
 
 Terminal A, from `app/elohim-app`: `pnpm start:alpha` (local UI at `http://localhost:4200` over live alpha data; read-mostly).
 Terminal B, from `genesis/a2o`:
@@ -2916,7 +2928,7 @@ E2E_DEVICE_MODE=playwright E2E_APP_URL=http://localhost:4200 E2E_DOORWAY_ALPHA=h
 ```
 Expected: 7 passed, 0 failed. Scenario 10 needs `foundations-christian-technology` to be a `path` on alpha (it is: `/db/content/foundations-christian-technology`); if the lens click lands on the doorway rather than the dev server, assert on the URL path only (the step already does). Record the run's output tail in the commit body.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add genesis/a2o/src/framework/pages/epr-home.page.ts genesis/a2o/src/framework/pages/index.ts genesis/a2o/steps/ui/epr-atom-home.steps.ts genesis/a2o/features/content/epr-atom-home.feature
