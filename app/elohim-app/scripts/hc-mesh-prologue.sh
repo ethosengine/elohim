@@ -334,6 +334,15 @@ run_seed_leg "seed-conductor-identities" hard \
   'CONDUCTOR_URLS="$CONDUCTOR_URLS" npx tsx src/seed-conductor-identities.ts'
 run_seed_leg "seed-humans" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-humans.ts'
+# seed-hosted-humans (D4): casts N=3 hosted registrants through the doorway's
+# own POST /auth/register — never inserted as rows, never via admin. Runs
+# AFTER seed-humans for the same reason the comment above gives: each
+# household conductor must embody its own canonical human-<name> id before a
+# hosted registration can mint a UUID onto it. soft, not hard: a doorway with
+# no pool must not fail the whole Prologue. Roster:
+# $MESH_DIR/prologue-hosted-humans.json (Task 4's steps read it).
+run_seed_leg "seed-hosted-humans" soft \
+  'DOORWAY_URL="$DOORWAY_A_URL" MESH_DIR="$MESH_DIR" npx tsx src/seed-hosted-humans.ts'
 run_seed_leg "seed-presences" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-presences.ts'
 run_seed_leg "seed-collectives" soft \
