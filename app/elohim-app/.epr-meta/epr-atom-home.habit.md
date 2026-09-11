@@ -6,7 +6,7 @@ invariant: >
   actually came from, identity, a focal render shaped by format, the four legs in household
   words, and the commons around it — with no pillar chrome; an unreachable EPR renders the
   designed gate, never a wall and never the controls of a thing that cannot be seen.
-status: red
+status: green
 active: false
 checks:
   - "a2o @concern:epr-atom-home (genesis/a2o/features/content/epr-atom-home.feature — @browser-only @act:i; 7 frame scenarios live, 3 commons scenarios @wip for the commons plan; runnable locally against the shell on alpha data: cd app/elohim-app && pnpm start:alpha, then cd genesis/a2o && ELOHIM_CAP_OWNED_SUBSTRATE_STATUS=available E2E_DEVICE_MODE=playwright E2E_APP_URL=http://localhost:4200 E2E_DOORWAY_ALPHA=https://doorway-alpha.elohim.host npx cucumber-js --tags '@concern:epr-atom-home and not @wip')"
@@ -56,3 +56,13 @@ DELTA 2026-09-02: declared RED on measured violation — `pnpm look https://alph
 viewer-back-home present, affinity/mastery controls above the content, tabs hiding the legs, and
 /epr/concept-bidirectional-trust renders the full learner chrome for a node no peer holds. The a2o
 concern is written (10 scenarios, all @wip); the shell component and step defs are Slice 1 of the spec.
+
+DELTA 2026-09-11 (GREEN — fleet render): doorway-alpha.elohim.host serves build stamp 228fe686 (`/version.json`,
+built 2026-09-11T16:19:03Z by elohim/dev #1706's build+alpha-staging stages; the run later failed on the APEX
+leg, which does not touch alpha's served shell). `@concern:epr-atom-home and not @wip` against
+E2E_APP_URL=https://doorway-alpha.elohim.host (playwright, read-only): **7 scenarios / 46 steps, all passed**
+(`genesis/a2o/reports/epr-atom-home-fleet-228fe686.json`). The prior fleet measure at face02de was 6/7 with the
+lamad blob resolving to localhost:8090; e09eec608 (origin-relative blob URLs in doorway/SSR) is the change
+between them. Apex (elohim.host) still serves face02de with an unverified landing anchor — the same address
+there renders the old shell; that is dataplane-convergence's red, not this habit's. The 3 commons scenarios stay
+@wip for the commons plan.
