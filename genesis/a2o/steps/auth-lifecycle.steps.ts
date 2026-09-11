@@ -11,6 +11,8 @@ import { randomUUID } from 'node:crypto';
 
 import { When, Then } from '@cucumber/cucumber';
 
+import { request } from 'undici';
+
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { namesHuman, expectedIdentifiersFor } from '../src/framework/doorway-identity.js';
 import { getFixture } from '../src/framework/fixtures/humans.js';
@@ -18,6 +20,106 @@ import { Human } from '../src/framework/human.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 import type { AuthResponse, HealthResponse } from '../src/framework/api/doorway-client.js';
+
+// ---------------------------------------------------------------------------
+// Ephemeral-human cleanup — product path first, admin soft-delete fallback
+// ---------------------------------------------------------------------------
+
+/** Shape of the `POST /auth/close-account` response (doorway-federation Task 9). */
+interface CloseAccountResponse {
+  closed?: boolean;
+  cellUninstalled?: boolean;
+  alreadyClosed?: boolean;
+}
+
+/**
+ * Admin soft-delete — the pre-Task-9 cleanup path, kept as a fallback for a
+ * build where `POST /auth/close-account` hasn't landed yet (404/405) or a
+ * genuine request-level failure reaching it. Never throws.
+ */
+async function adminSoftDeleteFallback(
+  world: E2EWorld,
+  doorwayUrl: string,
+  identifier: string,
+  reason: 'route-absent' | 'request-error'
+): Promise<void> {
+  try {
+    const admin = await world.getAdminClient(doorwayUrl);
+    const list = await admin.adminListUsers({ search: identifier, limit: 1 });
+    const match = list.users.find(u => u.identifier === identifier);
+    if (!match) {
+      console.warn(
+        `[auth-lifecycle cleanup] admin fallback (${reason}) found no user matching ${identifier}`
+      );
+      return;
+    }
+    await admin.adminDeleteUser(match.id);
+    console.warn(
+      `[auth-lifecycle cleanup] ${identifier} closed via admin soft-delete fallback (${reason})`
+    );
+  } catch (err) {
+    // Best-effort: cleanup must never throw out of the hook.
+    console.warn(
+      `[auth-lifecycle cleanup] admin fallback for ${identifier} failed: ${String(err)}`
+    );
+  }
+}
+
+/**
+ * Close an ephemeral human's account through the product path:
+ * `POST /auth/close-account` with the human's own bearer, falling back to
+ * the admin soft-delete only when the route itself is absent (404/405).
+ * A second close is expected to be harmless (idempotent per 05-leaving) —
+ * the route answers `200 { alreadyClosed: true }`, never a rethrow here.
+ */
+async function closeAccountCleanup(
+  world: E2EWorld,
+  doorwayUrl: string,
+  identifier: string,
+  humanToken: string
+): Promise<void> {
+  try {
+    const { statusCode, body } = await request(`${doorwayUrl}/auth/close-account`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${humanToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ confirmIdentifier: identifier }),
+    });
+
+    if (statusCode === 404 || statusCode === 405) {
+      await adminSoftDeleteFallback(world, doorwayUrl, identifier, 'route-absent');
+      return;
+    }
+
+    const text = await body.text();
+    if (statusCode < 200 || statusCode >= 300) {
+      // A genuine close-account failure (not route-absence) is left as
+      // evidence rather than silently papered over by the fallback.
+      console.warn(
+        `[auth-lifecycle cleanup] POST /auth/close-account for ${identifier} returned ` +
+          `${statusCode}, leaving the row as-is: ${text}`
+      );
+      return;
+    }
+
+    const result = JSON.parse(text) as CloseAccountResponse;
+    console.warn(
+      `[auth-lifecycle cleanup] ${identifier} closed via POST /auth/close-account ` +
+        `(closed=${String(result.closed)} alreadyClosed=${String(result.alreadyClosed)} ` +
+        `cellUninstalled=${String(result.cellUninstalled)})`
+    );
+  } catch (err) {
+    // Network-level failure reaching the route at all (not a route-absent
+    // 404/405) — still fall back so the household user count converges.
+    console.warn(
+      `[auth-lifecycle cleanup] close-account request for ${identifier} failed ` +
+        `(${String(err)}); falling back to admin soft-delete`
+    );
+    await adminSoftDeleteFallback(world, doorwayUrl, identifier, 'request-error');
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Registration (ephemeral human)
@@ -53,18 +155,13 @@ When(
     // Store auth response for subsequent assertions
     this.contentIds.set('lastAuthResponse', JSON.stringify(auth));
 
-    // Register cleanup to soft-delete the ephemeral user after the scenario
+    // Register cleanup to close the ephemeral human's account after the
+    // scenario, through the product path (see closeAccountCleanup above).
     const identifier = creds.identifier;
     const doorwayUrl = doorway.url;
+    const humanToken = auth.token;
     this.onCleanup(async () => {
-      try {
-        const admin = await this.getAdminClient(doorwayUrl);
-        const list = await admin.adminListUsers({ search: identifier, limit: 1 });
-        const match = list.users.find(u => u.identifier === identifier);
-        if (match) await admin.adminDeleteUser(match.id);
-      } catch {
-        // best-effort cleanup
-      }
+      await closeAccountCleanup(this, doorwayUrl, identifier, humanToken);
     });
   }
 );
