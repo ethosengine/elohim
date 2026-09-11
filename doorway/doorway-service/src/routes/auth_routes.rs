@@ -2506,29 +2506,10 @@ async fn handle_account(
         .map(|k| k.exported)
         .unwrap_or(false);
 
-    // Who is hosting this person — the household, named by itself. The chain
-    // and every `None` in it live in `routes::hosted_cell`; all that happens
-    // here is supplying the Human read it needs. A failed read is `None`, never
-    // a substitute name.
-    let hosted_by_household = crate::routes::hosted_cell::hosted_by_household(
-        user.hosted_cell_grant_cid.as_deref(),
-        user.hosted_cell_provider.as_deref(),
-        |steward_key| async move {
-            match crate::routes::zome_helpers::call_get_human_by_agent_key(&state, &steward_key)
-                .await
-            {
-                Ok(found) => found.map(|h| h.human.display_name),
-                Err(e) => {
-                    warn!(
-                        steward_key = %steward_key,
-                        "account: could not read the hosting household's Human: {}", e
-                    );
-                    None
-                }
-            }
-        },
-    )
-    .await;
+    // Who is hosting this person — the household, named by itself. The whole
+    // chain and every `None` in it live in `routes::hosted_cell`.
+    let hosted_by_household =
+        crate::routes::hosted_cell::hosted_by_household_for(&state, &user).await;
 
     json_response(
         StatusCode::OK,

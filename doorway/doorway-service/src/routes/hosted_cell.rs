@@ -343,6 +343,39 @@ where
     household_display_name(name.as_deref())
 }
 
+/// [`hosted_by_household`] bound to the live surfaces, for the account route.
+///
+/// Lives here rather than in `auth_routes` so the whole "who is hosting this
+/// person" concern stays in one module and the route reads as one line. The
+/// Human read is an `imagodei::get_human_by_agent_key` call on the doorway's
+/// conductor; a read that FAILS answers `None` and warns — a household the
+/// doorway could not look up goes unnamed, and is never replaced by a name the
+/// doorway could supply from its own configuration.
+pub async fn hosted_by_household_for(
+    state: &crate::server::AppState,
+    user: &crate::db::UserDoc,
+) -> Option<String> {
+    hosted_by_household(
+        user.hosted_cell_grant_cid.as_deref(),
+        user.hosted_cell_provider.as_deref(),
+        |steward_key| async move {
+            match crate::routes::zome_helpers::call_get_human_by_agent_key(state, &steward_key)
+                .await
+            {
+                Ok(found) => found.map(|h| h.human.display_name),
+                Err(e) => {
+                    warn!(
+                        steward_key = %steward_key,
+                        "account: could not read the hosting household's Human: {}", e
+                    );
+                    None
+                }
+            }
+        },
+    )
+    .await
+}
+
 // =============================================================================
 // humansServed — the doorway's own hosting count (D3)
 // =============================================================================
