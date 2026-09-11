@@ -8,6 +8,15 @@ import { request } from 'undici';
 
 import { BrowserDevice } from '../../src/framework/devices/browser-device.js';
 import { PlaywrightDevice, type PWPage } from '../../src/framework/devices/playwright-device.js';
+import {
+  NON_POOL_PEER_NAME,
+  commitmentField,
+  commitmentIsLive,
+  doorwayServiceIdentityAgentPubKey,
+  readHostedCellCommitment,
+  stewardAgentPubKeyForConductorOrigin,
+  type CommitmentBody,
+} from '../../src/framework/fixtures/hosted-cell.js';
 import { Human } from '../../src/framework/human.js';
 import {
   ACCOUNT,
@@ -34,6 +43,9 @@ const TEST_ID = {
   closeInput: 'account-close-confirm-input',
   closeConfirm: 'account-close-confirm',
   closeError: 'account-close-error',
+  /** S2 Task 11 adds these to the account page; agreed here per S1 plan Task 4 Step 2. */
+  hostedByHousehold: 'account-hosted-by-household',
+  hostedUntil: 'account-hosted-until',
 } as const;
 
 type Json = Record<string, unknown>;
@@ -69,6 +81,12 @@ interface HostedHuman {
   registrationDisplayName?: string;
   preClosureToken?: string;
   attempt?: Attempt;
+  /** `hostedCellGrantCid` from `/auth/account` (S2 Task 13) — the notary's read key. */
+  grantCid?: string;
+  /** Last commitment body read back from a household peer that is not the doorway's pool. */
+  commitment?: CommitmentBody;
+  /** Cached Decision-2 steward resolution, once found, for this person's pool conductor. */
+  stewardAgentPubKey?: string;
 }
 interface PipelineStep {
   label: string;
@@ -565,3 +583,435 @@ Then('the doorway answers that the account is already closed', function (this: E
   assert.equal(attempt.status, 200);
   assert.equal(attempt.body['alreadyClosed'], true);
 });
+
+// ---------------------------------------------------------------------------
+// Station 7 — "Hosted by a household" (07-hosted-by-a-household.feature).
+//
+// Reuses every primitive above (remember, registerThroughPortal, cellsFor,
+// browserWhen/browserThen, api, the close-account helpers) rather than
+// re-minting them. The notary-read and steward-key primitives this needs live
+// in src/framework/fixtures/hosted-cell.ts (Decisions 1 and 2, S1 plan Task 4
+// "Chief decisions on the S1 blind-reader findings", 2026-09-11): a
+// `hosted-cell` commitment is read back BY CID from jessica's storage — a
+// household peer that is not this doorway's pool — never through the doorway;
+// and a pool conductor's steward key resolves from that peer's OWN storage
+// self-identity, never from the doorway's opinion about who it is.
+//
+// This runs RED until S2 Task 13 issues the grant and S3 Task 15/16 land its
+// scope + provider-side revoke — the correct state for a story-first check.
+// ---------------------------------------------------------------------------
+
+/** `alpha` is the only doorway this station's Background ever declares. */
+const STATION_7_DOORWAY_ID = 'alpha';
+
+async function ensurePlaywrightPortalOpen(
+  world: E2EWorld,
+  doorwayId: string
+): Promise<PlaywrightDevice> {
+  const existing = portal(world).device;
+  if (existing) return existing;
+  const doorway = world.getDoorway(doorwayId);
+  const base = withoutTrailingSlash(doorway.url);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+  const browser = await world.getBrowser();
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+  const device = new PlaywrightDevice('newcomer-pw', base, base, browser);
+  await device.init();
+  Object.assign(portal(world), { device, doorwayUrl: base });
+  world.onCleanup(async () => device.close());
+  return device;
+}
+
+/**
+ * A newcomer's registration, mode-aware: through the real portal in Playwright
+ * mode (so a later browser step can navigate the SAME authenticated session),
+ * through the HTTP API otherwise. Mirrors `05-leaving`'s own split between
+ * `registerThroughPortal` and the plain `BrowserDevice` register — this just
+ * enters it from one combined phrase instead of two separate ones.
+ */
+async function registerNewcomer(
+  world: E2EWorld,
+  displayName: string,
+  doorwayId: string = STATION_7_DOORWAY_ID
+): Promise<HostedHuman> {
+  if (world.deviceMode === 'playwright') {
+    const device = await ensurePlaywrightPortalOpen(world, doorwayId);
+    await device.navigate(`${portal(world).doorwayUrl}${REGISTER_PATH}`);
+    await device.page.getByTestId(THRESHOLD_REGISTER.DISPLAY_NAME).waitFor({ state: 'visible' });
+    await registerThroughPortal(world, displayName);
+    return human(world);
+  }
+  const doorway = world.getDoorway(doorwayId);
+  const localPart = `hh-${randomUUID()}`;
+  const device = new BrowserDevice(`${localPart}-api`, doorway.url);
+  const auth = await device.register({ identifier: localPart, password: PASSWORD, displayName });
+  remember(world, displayName, localPart, doorwayId, withoutTrailingSlash(doorway.url), auth, device);
+  return human(world);
+}
+
+/** Read `hostedCellGrantCid` off `/auth/account` and cache it on the person. */
+async function captureGrantCid(person: HostedHuman): Promise<string> {
+  const result = await api(`${person.doorwayUrl}/auth/account`, person.token);
+  assert.equal(
+    result.status,
+    200,
+    `GET /auth/account for "${person.human.credentials.identifier}" returned ${result.status}.`
+  );
+  const cid = result.body['hostedCellGrantCid'];
+  assert.ok(
+    typeof cid === 'string' && cid.length > 0,
+    'GET /auth/account carries no hostedCellGrantCid — S2 Task 13 (issue the hosted-cell grant ' +
+      'on register) has not landed on this doorway yet.'
+  );
+  person.grantCid = cid;
+  return cid;
+}
+
+async function grantCidFor(person: HostedHuman): Promise<string> {
+  return person.grantCid ?? captureGrantCid(person);
+}
+
+/** Decision 1: read the commitment back by cid from a peer that is not the doorway's pool. */
+async function readBackCommitment(person: HostedHuman): Promise<CommitmentBody> {
+  const cid = await grantCidFor(person);
+  const { status, body } = await readHostedCellCommitment(cid);
+  assert.equal(
+    status,
+    200,
+    `GET /api/v1/commitments/${cid} on ${NON_POOL_PEER_NAME}'s storage (not the doorway's pool) ` +
+      `returned ${status}.`
+  );
+  person.commitment = body;
+  return body;
+}
+
+/** Decision 2: the steward key the pool conductor's own peer names as itself. */
+async function resolveStewardAgentPubKey(world: E2EWorld, person: HostedHuman): Promise<string> {
+  if (person.stewardAgentPubKey) return person.stewardAgentPubKey;
+  const admin = await world.getAdminClient(person.doorwayUrl);
+  const agentConductor = await admin.adminAgentConductor(person.agentPubKey);
+  const steward = stewardAgentPubKeyForConductorOrigin(agentConductor.conductorUrl);
+  assert.ok(
+    steward,
+    "no household fixture storage peer matches the pool conductor's origin " +
+      `(${agentConductor.conductorUrl}) — set agentPubKey on that peer in ` +
+      'E2E_HOUSEHOLD_FIXTURE_PATH (stamped by hc-mesh.sh refresh_fixture_pids).'
+  );
+  person.stewardAgentPubKey = steward as string;
+  return person.stewardAgentPubKey;
+}
+
+Given('a newcomer who has never registered at this doorway', function (this: E2EWorld) {
+  // Sentinel only — the account itself is created by the paired "When ...
+  // creates an account" step below. Recorded so the scenario reads naturally;
+  // there is nothing to arrange yet for someone who does not exist.
+});
+
+When(
+  'they create an account at this doorway with the display name {string}',
+  async function (this: E2EWorld, displayName: string) {
+    await registerNewcomer(this, displayName);
+  }
+);
+
+Given('a newcomer who has created an account at this doorway', async function (this: E2EWorld) {
+  await registerNewcomer(this, `Newcomer ${randomUUID().slice(0, 8)}`);
+});
+
+Given(
+  'a second newcomer who has created an account at this doorway',
+  async function (this: E2EWorld) {
+    await registerNewcomer(this, `Second newcomer ${randomUUID().slice(0, 8)}`);
+  }
+);
+
+Then(
+  'the doorway hosts a cell for them on one of its pool conductors',
+  async function (this: E2EWorld) {
+    assert.equal((await cellsFor(this, human(this))).length, 1);
+  }
+);
+
+Then("no other account at this doorway shares that cell's agent key", async function (this: E2EWorld) {
+  const person = human(this);
+  const admin = await this.getAdminClient(person.doorwayUrl);
+  const token = admin.session?.token;
+  assert.ok(token, 'The admin client has no session.');
+  const result = await api(`${person.doorwayUrl}/admin/hosted-users`, token);
+  assert.equal(result.status, 200);
+  assert.ok(Array.isArray(result.body['users']), 'The hosted-user listing omitted users.');
+  const owners = (result.body['users'] as Json[]).filter(
+    row => row['agentPubKey'] === person.agentPubKey
+  );
+  assert.deepEqual(
+    owners.map(row => row['identifier']),
+    [person.human.credentials.identifier]
+  );
+});
+
+Then(
+  'the notary records a live {string} delegates-compute commitment naming that agent key as recipient',
+  async function (this: E2EWorld, scope: string) {
+    const person = human(this);
+    const body = await readBackCommitment(person);
+    assert.ok(
+      commitmentIsLive(body),
+      `commitment ${String(person.grantCid)} is not live: ${JSON.stringify(body)}`
+    );
+    assert.equal(commitmentField(body, 'scope'), scope);
+    assert.equal(commitmentField(body, 'recipient', 'receiver'), person.agentPubKey);
+  }
+);
+
+Then(
+  'that commitment names the steward of that pool conductor as provider',
+  async function (this: E2EWorld) {
+    const person = human(this);
+    assert.ok(person.commitment, 'No commitment has been read back yet.');
+    const steward = await resolveStewardAgentPubKey(this, person);
+    assert.equal(commitmentField(person.commitment as CommitmentBody, 'provider'), steward);
+  }
+);
+
+Then('that commitment carries an end date in the future', function (this: E2EWorld) {
+  const person = human(this);
+  assert.ok(person.commitment, 'No commitment has been read back yet.');
+  const raw = commitmentField(
+    person.commitment as CommitmentBody,
+    'validUntil',
+    'valid_until',
+    'hasEnd',
+    'has_end'
+  );
+  assert.equal(
+    typeof raw,
+    'string',
+    `commitment carries no end-date field: ${JSON.stringify(person.commitment)}`
+  );
+  const until = Date.parse(raw as string);
+  assert.ok(
+    !Number.isNaN(until) && until > Date.now(),
+    `end date "${String(raw)}" is not in the future`
+  );
+});
+
+browserWhen('they open their doorway account page', async (world, device) => {
+  await device.navigate(`${human(world).doorwayUrl}${ACCOUNT_PATH}`);
+  await device.page.getByTestId(ACCOUNT.BACK).waitFor({ state: 'visible' });
+});
+
+browserThen('the page names the household hosting them', async (_world, device) => {
+  const el = device.page.getByTestId(TEST_ID.hostedByHousehold);
+  await el.waitFor({ state: 'visible' });
+  assert.ok((await el.innerText()).trim().length > 0, 'The hosted-by-household element is empty.');
+});
+
+browserThen('the page names the date their hosting is promised until', async (_world, device) => {
+  const el = device.page.getByTestId(TEST_ID.hostedUntil);
+  await el.waitFor({ state: 'visible' });
+  assert.ok((await el.innerText()).trim().length > 0, 'The hosted-until element is empty.');
+});
+
+browserThen(
+  "the page never shows the raw commitment identifier as the household's name",
+  async (world, device) => {
+    const person = human(world);
+    const el = device.page.getByTestId(TEST_ID.hostedByHousehold);
+    const text = (await el.innerText()).trim();
+    let grantCid: string | undefined;
+    try {
+      grantCid = await grantCidFor(person);
+    } catch {
+      grantCid = undefined; // S2 Task 13 not landed yet — the shape check below still applies.
+    }
+    if (grantCid) {
+      assert.notEqual(text, grantCid, 'The household name shows the raw commitment cid.');
+    }
+    assert.ok(
+      !/^u[A-Za-z0-9_-]{40,}$/.test(text),
+      `"${text}" looks like a raw notarized hash, not a household's name.`
+    );
+  }
+);
+
+When("the doorway names that human's hosting commitment", async function (this: E2EWorld) {
+  await captureGrantCid(human(this));
+});
+
+When(
+  "that commitment is read back, by its identifier, from a household peer that is not the doorway's pool",
+  async function (this: E2EWorld) {
+    await readBackCommitment(human(this));
+  }
+);
+
+Then("the read-back commitment's scope is {string}", function (this: E2EWorld, scope: string) {
+  const person = human(this);
+  assert.ok(person.commitment, 'No commitment has been read back yet.');
+  assert.equal(commitmentField(person.commitment as CommitmentBody, 'scope'), scope);
+});
+
+Then(
+  "its provider is the agent key that the pool conductor's own peer names as its steward",
+  async function (this: E2EWorld) {
+    const person = human(this);
+    assert.ok(person.commitment, 'No commitment has been read back yet.');
+    const steward = await resolveStewardAgentPubKey(this, person);
+    assert.equal(commitmentField(person.commitment as CommitmentBody, 'provider'), steward);
+  }
+);
+
+Then("its provider is not the doorway's own service identity", function (this: E2EWorld) {
+  const person = human(this);
+  assert.ok(person.commitment, 'No commitment has been read back yet.');
+  const provider = commitmentField(person.commitment as CommitmentBody, 'provider');
+  assert.ok(
+    typeof provider === 'string' && provider.length > 0,
+    `commitment carries no provider field: ${JSON.stringify(person.commitment)}`
+  );
+  const serviceIdentity = doorwayServiceIdentityAgentPubKey(STATION_7_DOORWAY_ID);
+  if (serviceIdentity) {
+    assert.notEqual(provider, serviceIdentity);
+  }
+});
+
+Then("its recipient is that human's own agent key", function (this: E2EWorld) {
+  const person = human(this);
+  assert.ok(person.commitment, 'No commitment has been read back yet.');
+  assert.equal(
+    commitmentField(person.commitment as CommitmentBody, 'recipient', 'receiver'),
+    person.agentPubKey
+  );
+});
+
+When(
+  "both of their hosting commitments are read back from a household peer that is not the doorway's pool",
+  async function (this: E2EWorld) {
+    await readBackCommitment(human(this, 0));
+    await readBackCommitment(human(this, 1));
+  }
+);
+
+Then('the two humans hold different cells', async function (this: E2EWorld) {
+  const first = human(this, 0);
+  const second = human(this, 1);
+  assert.notEqual(first.agentPubKey, second.agentPubKey);
+  assert.equal((await cellsFor(this, first)).length, 1);
+  assert.equal((await cellsFor(this, second)).length, 1);
+});
+
+Then('each holds their own {string} commitment', function (this: E2EWorld, scope: string) {
+  for (const index of [0, 1]) {
+    const person = human(this, index);
+    assert.ok(person.commitment, `Human ${index + 1} has no commitment read back yet.`);
+    assert.equal(commitmentField(person.commitment as CommitmentBody, 'scope'), scope);
+  }
+  assert.notEqual(human(this, 0).grantCid, human(this, 1).grantCid);
+});
+
+Then('neither commitment names the other human as recipient', function (this: E2EWorld) {
+  const first = human(this, 0);
+  const second = human(this, 1);
+  const firstRecipient = commitmentField(first.commitment as CommitmentBody, 'recipient', 'receiver');
+  const secondRecipient = commitmentField(
+    second.commitment as CommitmentBody,
+    'recipient',
+    'receiver'
+  );
+  assert.notEqual(firstRecipient, second.agentPubKey);
+  assert.notEqual(secondRecipient, first.agentPubKey);
+});
+
+Given('the agent key of the cell the doorway runs for them', function (this: E2EWorld) {
+  assert.ok(human(this).agentPubKey, 'The newcomer has no agent key yet.');
+});
+
+Given(
+  'the identifier of their live {string} commitment',
+  async function (this: E2EWorld, _scope: string) {
+    await captureGrantCid(human(this));
+  }
+);
+
+Given(
+  'the notary records a live {string} commitment for them',
+  async function (this: E2EWorld, scope: string) {
+    const person = human(this);
+    const body = await readBackCommitment(person);
+    assert.ok(
+      commitmentIsLive(body),
+      `commitment ${String(person.grantCid)} is not live: ${JSON.stringify(body)}`
+    );
+    assert.equal(commitmentField(body, 'scope'), scope);
+  }
+);
+
+browserWhen('they close their account through the portal', async (world, device) => {
+  const person = human(world);
+  await beginClosure(device);
+  person.attempt = await submitClosure(device, person.human.credentials.identifier);
+  assert.equal(person.attempt.status, 200);
+  assert.equal(person.attempt.body['closed'], true);
+});
+
+Then('no pool conductor holds a cell for that agent key', async function (this: E2EWorld) {
+  assert.equal((await cellsFor(this, human(this))).length, 0);
+});
+
+Then(
+  'the notary records no live {string} commitment for that agent key',
+  async function (this: E2EWorld, scope: string) {
+    const person = human(this);
+    assert.ok(person.grantCid, 'No commitment identifier was captured before closing.');
+    const { status, body } = await readHostedCellCommitment(person.grantCid);
+    if (status === 404) return; // no record under this cid at all is also "no live commitment".
+    assert.equal(status, 200, `GET /api/v1/commitments/${person.grantCid} returned ${status}.`);
+    assert.equal(commitmentField(body, 'scope'), scope);
+    assert.ok(
+      !commitmentIsLive(body),
+      `commitment ${person.grantCid} is still live after closing: ${JSON.stringify(body)}`
+    );
+  }
+);
+
+Then(
+  "a household peer that is not the doorway's pool still reads the commitment with that " +
+    'identifier back, carrying the date it was made and the date it ended',
+  async function (this: E2EWorld) {
+    const person = human(this);
+    assert.ok(person.grantCid, 'No commitment identifier was captured before closing.');
+    const { status, body } = await readHostedCellCommitment(person.grantCid);
+    assert.equal(
+      status,
+      200,
+      `GET /api/v1/commitments/${person.grantCid} on ${NON_POOL_PEER_NAME}'s storage returned ` +
+        `${status} — the notary must still answer for a withdrawn commitment.`
+    );
+    const made = commitmentField(
+      body,
+      'issuedAt',
+      'issued_at',
+      'createdAt',
+      'created_at',
+      'signedAt',
+      'signed_at'
+    );
+    const ended = commitmentField(
+      body,
+      'revokedAt',
+      'revoked_at',
+      'endedAt',
+      'ended_at',
+      'validUntil',
+      'valid_until'
+    );
+    assert.ok(
+      typeof made === 'string' && made.length > 0,
+      `commitment carries no "made" timestamp: ${JSON.stringify(body)}`
+    );
+    assert.ok(
+      typeof ended === 'string' && ended.length > 0,
+      `commitment carries no "ended" timestamp: ${JSON.stringify(body)}`
+    );
+  }
+);

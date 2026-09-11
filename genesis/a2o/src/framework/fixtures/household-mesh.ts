@@ -356,6 +356,41 @@ export function requireFixtureStoragePeer(
   return { ...peer, url: withoutTrailingSlashes(peer.url) };
 }
 
+/**
+ * Which named household peer's storage self-identity a given HTTP origin belongs
+ * to, matched by origin (protocol+host+port) against `storagePeers[name].url`.
+ *
+ * Two steward-key resolutions need exactly this (S1 plan, doorway-federation
+ * 2026-09-10, Task 4's "Chief decisions" — Decision 2): a `hosted-cell` grant's
+ * PROVIDER is the pool peer's own elohim-storage acting for itself
+ * (`POST /api/v1/compute/grants` on that peer, gated on `same_actor` —
+ * `elohim/elohim-storage/src/api/compute_grants.rs`), so "the pool conductor's
+ * own peer" is the origin the doorway's conductor registry names for that
+ * conductor (`GET /admin/agents/{key}/conductor` → conductorUrl); and "the
+ * doorway's own service identity" is the origin the household fixture names as
+ * that doorway's `primaryStorageUrl`. Both resolve to a named peer's own
+ * `agentPubKey` (`storagePeers[name].agentPubKey`, stamped by `hc-mesh.sh`
+ * `refresh_fixture_pids` from the running process's AGENT_PUBKEY) — the peer's
+ * OWN self-identity, never the doorway's opinion about who it is.
+ */
+export function storagePeerForOrigin(
+  fixture: HouseholdMeshFixture,
+  origin: string
+): { name: string; peer: StoragePeerFixture } | undefined {
+  const originOf = (value: string): string => {
+    try {
+      return new URL(value).origin;
+    } catch {
+      return withoutTrailingSlashes(value);
+    }
+  };
+  const target = originOf(origin);
+  for (const [name, peer] of Object.entries(fixture.storagePeers ?? {})) {
+    if (peer.url && originOf(peer.url) === target) return { name, peer };
+  }
+  return undefined;
+}
+
 export function requireFixturePeerPid(fixture: HouseholdMeshFixture, name: string): number {
   const peer = fixture.storagePeers?.[name];
   let fromFile: string | undefined;
