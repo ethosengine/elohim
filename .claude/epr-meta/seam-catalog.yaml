@@ -23,7 +23,7 @@
 #
 # WHY THIS HOME. It sits beside the two canon homes it is read with (`policies.yaml`,
 # `concerns.yaml`) and is loaded by the same tooling (`_lib/seam_matrix.py`, wired into
-# `placement-audit.py --epr-meta`). It carries NO contentHash pin: pins exist so a BINDING can
+# `.claude/scripts/seam-audit.py --matrix`). It carries NO contentHash pin: pins exist so a BINDING can
 # declare which version of a guarantee applies (resolution mode 2), and nothing binds this file —
 # it is an axis, not a Precedent. Its correctness is checked structurally (every `registry_crates`
 # entry must resolve to a real registry; every `charter_articles` entry to a real habit) by
@@ -267,10 +267,12 @@ seams:
     t1_routing: >
       The content_store zome (select_canonical_winner, declare_canonical_head_inner) is the
       T1-notary/control side of this seam's record family and routes here, per the §4 "T1 notary
-      floor (under 3.11)" precedent applied to content heads.
+      floor (under 3.11)" precedent applied to content heads. The imagodei zome (agent/peer bindings,
+      hosted-agent binding round-trips) routes here on the same precedent: its T1 records are the
+      identity side of the record family this dataplane projects (peer_identity_bindings).
     tracks: [T1, T2, T3]
     reach_tier: familiar
-    registry_crates: [elohim-storage, content_store]
+    registry_crates: [elohim-storage, content_store, imagodei]
     habits: [dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty,
                   reach-enforced-everywhere]
     n_a_concerns: []
@@ -313,7 +315,10 @@ seams:
       actor. Assigned to data because what it meters is byte/request flow.
     tracks: [T2, T3, T4]
     reach_tier: community
-    registry_crates: []
+    # mishpat (delegates-compute / custody grant notary, bounded commitments) and rakia-executor
+    # (prebuilt task execution inside a native runtime's admitted envelope) are the T1 and runtime
+    # sides of admission: what may be asked, of whom, within which budget.
+    registry_crates: [mishpat, rakia-executor]
     habits: [doorway-failover, operator-runtime-surface]
     n_a_concerns: []
 

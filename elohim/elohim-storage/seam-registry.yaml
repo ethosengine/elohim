@@ -3789,6 +3789,7 @@ decisionPoints:
     sourceLocation:
       file: src/api/compute_tasks.rs
       modulePath: api::compute_tasks::handle
+      line: 280
     summary: >
       Opt-in node-local compute SDK adapter, absent from doorway manifest. Requires
       a local capability secret and exact local cell actor. Native grant signature,
@@ -3797,6 +3798,34 @@ decisionPoints:
   # =========================================================================
   # Accountable correction — slice 1 (contract 2026-09-06, revision 3)
   # =========================================================================
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The grant it admits is the notarized delegates-compute commitment (DHT truth); the
+          adapter re-reads signature, provider, requester, scope, bounds and revocation from
+          that record, never from a projection row.
+      - id: C5
+        status: answered
+        justification: >
+          Native grant signature and observed DHT revocation are verified before one-use
+          launch accounting; a caller's body is matched, never believed.
+      - id: C12
+        status: answered
+        justification: >
+          Gated twice: ELOHIM_COMPUTE_LOCAL_API opt-in (absent from the doorway manifest) and a
+          node-local capability secret bound to the exact local cell actor.
+      - id: C14
+        status: partial
+        justification: >
+          Exercised only on the household mesh (hosted-cell lane, 2026-09-11); no in-crate
+          unit test pins the admission order, and no capsule records a refused launch.
+    contractTests: null
+    gapNote: >
+      Not unit-tested in this crate: admission needs a live conductor for the signature and
+      revocation reads and this crate has no in-process double. The household lane
+      (genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature) is the only
+      witness today; a unit test over the pure ordering of the checks is the bounded gap.
 
   - name: FeedbackActRef
     kind: boundary-answer-type
@@ -3859,7 +3888,7 @@ decisionPoints:
     sourceLocation:
       file: src/services/feedback_projector.rs
       modulePath: services::feedback_projector::verify_acceptance
-      line: 0
+      line: 583
     summary: >
       Acceptance of a correction is a STORAGE-VERIFIED PROJECTION CLASSIFICATION, not an
       integrity guarantee: the integrity validator admits any vouch by anyone. This verdict
@@ -3906,7 +3935,7 @@ decisionPoints:
     sourceLocation:
       file: src/services/feedback_projector.rs
       modulePath: services::feedback_projector::commit_group
-      line: 0
+      line: 754
     summary: >
       The ONE write that moves a standing aggregate. Registrable claim is the SHAPE OF ITS
       EFFECT under REPEATED application: the application row, its member rows and the
@@ -3973,7 +4002,7 @@ decisionPoints:
     sourceLocation:
       file: src/services/feedback_projector/rebuild.rs
       modulePath: services::feedback_projector::rebuild::start
-      line: 0
+      line: 8
     summary: >
       Rebuild derived standing in a fresh generation under the published policy, retaining
       the prior generation and its action references. The HTTP caller and tick share a writer
