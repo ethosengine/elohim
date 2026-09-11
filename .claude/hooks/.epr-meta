@@ -56,6 +56,35 @@ rules:
       which every `run:correction` / `run:failed-approach` note in .eprfs/status/flows.jsonl was
       authored in a session where this rule did not fire first (the nudge is describing a habit,
       not producing one)
+  - id: bootstrapping-head-is-recall-open
+    class: inject
+    when:
+      # `*project*.py` matches exactly `load-project-context.py` and `run-projection.py` in this
+      # directory (no other hook filename here contains "project" — "run-projection.py" carries
+      # it as the prefix of "projection"). The task brief named these two files with a
+      # `a|b` alternation; this manifest's `when.write` is matched by `fnmatch` (plain glob), which
+      # has no alternation operator, so a literal pipe pattern would never match either filename.
+      # This glob is the working equivalent within the file's existing grammar — verified against
+      # `epr-meta-resolver.py` on synthesized payloads for both filenames (task-2.2-report.md).
+      write: "*project*.py"
+    dedupe-of: "epr flow memory recall open --purpose bootstrap (the bootstrapping head; rendered by .claude/hooks/load-project-context.py at `minimal` and .claude/hooks/run-projection.py at `simple`)"
+    why: >
+      the bootstrapping head is `epr flow memory recall open --purpose bootstrap`; a hook renders
+      it at a lens and never derives a second orientation. Station two of the governed-discovery
+      plan (2026-09-11) retired both hooks' bespoke habits.yaml / flows.jsonl derivations (the
+      former `get_habits_status` re-scan, and `run-projection.py`'s whole habits/saga/stocks
+      derivation plus its private cache) — the SessionStart headline and the per-turn run-plane
+      line are now thin renderers of ONE native recall session, at `minimal` and `simple`
+      respectively. Re-deriving a top-red, WIP-fence, saga or commitments-stock reading inside
+      either hook body — even a small one, even "just this one field" — is exactly the
+      second-orientation drift this rule exists to catch before it regrows the cache/derivation
+      pair station two just removed.
+    retire-when: >
+      when these two hook bodies are deleted or merged into a single thin transport (the per-hook
+      distinction this rule polices no longer exists to drift), or when the harness itself
+      resolves the bootstrapping head natively per turn and neither file shells to `epr flow
+      memory recall open` at all — at which point there is no hook body left for the rule to
+      keep honest
 ---
 
 `.claude/hooks/` — the thin hook-transport layer: PreToolUse gates (epr-meta compose-gate,

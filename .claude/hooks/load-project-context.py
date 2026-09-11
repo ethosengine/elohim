@@ -12,6 +12,8 @@ import json
 import sys
 import os
 
+RECALL_TIMEOUT_S = 6  # the measured budget the BOOTSTRAP block's `recall open` call must fit inside
+
 def load_relationships(project_dir: str) -> dict:
     """Load the file relationships configuration."""
     rel_path = os.path.join(project_dir, '.claude', 'file-relationships.json')
@@ -123,26 +125,66 @@ def get_memory_budget(project_dir: str) -> str:
     return out
 
 
-def get_habits_status(project_dir: str) -> str:
-    """Delivery-habits headline (deterministic; from habits-status.py --headline).
-    The habits (genesis/manifests/habits.yaml) is the session's selection surface:
-    open on the top red contract instead of re-synthesizing the corpus."""
+def _bootstrap_session_id(data: dict, project_dir: str) -> str:
+    """The one session label the bootstrap view carries for this session.
+
+    Prefers the harness payload's own `session_id` (so the SessionStart `open` and every later
+    per-turn `open` in run-projection.py address the SAME recall session and its continuation
+    state accumulates). Absent that, falls back to a short hash of the project dir + today's
+    date — deterministic across both hooks for the same tree on the same day, which is the
+    best available continuity without a harness-supplied id.
+    """
+    sid = data.get('session_id')
+    if sid:
+        return str(sid)[:64]
+    import hashlib
+    from datetime import date
+    basis = f"{project_dir}:{date.today().isoformat()}"
+    return hashlib.sha256(basis.encode()).hexdigest()[:16]
+
+
+def _epr_bootstrap_block(project_dir: str, session_id: str) -> str:
+    """The SessionStart BOOTSTRAP block: the `minimal` lens of
+    `epr flow memory recall open --purpose bootstrap` — the bootstrapping head declared in
+    `.claude/hooks/.epr-meta` (rule `bootstrapping-head-is-recall-open`).
+
+    This is the ONLY orientation this hook renders. The former `get_habits_status` (a bespoke
+    `habits-status.py --headline` re-scan) is RETIRED, not kept beside this: the `open` call's
+    `minimal` lens already carries a `Bootstrap: top red: <id> — <check>` line drawn from the
+    same habits register, and keeping both would be exactly the "a hook renders it at a lens
+    and never derives a second orientation" drift the rule exists to catch.
+
+    Honest absence, never a fallback renderer: a missing binary, a non-zero exit, or a run past
+    the 6-second budget all print exactly one line, `bootstrap: skipped — <reason>`.
+    """
     import subprocess
-    habits = os.path.join(project_dir, '.claude', 'scripts', 'habits-status.py')
-    if not os.path.exists(habits):
-        return ""
+    obs = _observation_module(project_dir)
+    binary = obs.resolve_bin() if obs else None
+    if not binary:
+        return "bootstrap: skipped — no epr binary resolved ($EPR_BIN, gate target, PATH)"
     try:
-        r = subprocess.run([sys.executable, habits, '--headline'],
-                           capture_output=True, text=True, timeout=10)
-        return r.stdout.strip()
-    except Exception:
-        return ""
+        r = subprocess.run(
+            [binary, 'flow', 'memory', 'recall', 'open',
+             '--purpose', 'bootstrap', '--lens', 'minimal',
+             '--session', f'bootstrap-{session_id}', '--root', project_dir],
+            capture_output=True, text=True, timeout=RECALL_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return f"bootstrap: skipped — recall open exceeded the {RECALL_TIMEOUT_S}s budget"
+    except Exception as exc:  # noqa: BLE001 — a SessionStart hook must never crash the session
+        return f"bootstrap: skipped — {exc}"
+    if r.returncode != 0:
+        reason_lines = (r.stderr or r.stdout or "").strip().splitlines()
+        reason = reason_lines[0] if reason_lines else f"exit {r.returncode}"
+        return f"bootstrap: skipped — {reason}"
+    return r.stdout.rstrip("\n")
 
 
 def get_saga_status(project_dir: str) -> str:
     """Resiliency-saga headline (deterministic; from saga-status.py, no args = one-liner).
-    Sibling of get_habits_status: same subprocess/timeout/silent-failure posture — a failed
-    or slow saga-status.py emits nothing rather than blocking session start."""
+    A DIFFERENT derivation from the bootstrap block (the ten dataplane chapters' green/frontier
+    state, not the habits register's top red) — same subprocess/timeout/silent-failure posture:
+    a failed or slow saga-status.py emits nothing rather than blocking session start."""
     import subprocess
     saga = os.path.join(project_dir, '.claude', 'scripts', 'saga-status.py')
     if not os.path.exists(saga):
@@ -179,7 +221,8 @@ def main():
         # Get project directory
         project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '/projects/elohim')
 
-        seed_memory_injection_flag(str(data.get('session_id') or 'nosess'))
+        session_id = str(data.get('session_id') or 'nosess')
+        seed_memory_injection_flag(session_id)
 
         context_parts = []
 
@@ -189,13 +232,6 @@ def main():
         budget = get_memory_budget(project_dir)
         if budget:
             context_parts.append(budget)
-            context_parts.append("")
-
-        # Delivery habits — the selection surface (top red contract) that makes
-        # session start a selection problem, not a synthesis problem.
-        habits = get_habits_status(project_dir)
-        if habits:
-            context_parts.append(habits)
             context_parts.append("")
 
         # Resiliency-saga headline — the ten dataplane chapters' green/frontier state
@@ -218,18 +254,26 @@ def main():
             )
             context_parts.append("")
 
-        if not context_parts:
-            sys.exit(0)
-
-        # Output context for Claude
-        output = {
-            "hookSpecificOutput": {
-                "hookEventName": "SessionStart",
-                "additionalContext": "\n".join(context_parts)
+        if context_parts:
+            # Output context for Claude
+            output = {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": "\n".join(context_parts)
+                }
             }
-        }
+            print(json.dumps(output))
 
-        print(json.dumps(output))
+        # The bootstrap block: the `minimal` lens of `epr flow memory recall open --purpose
+        # bootstrap` (the bootstrapping head; see `.claude/hooks/.epr-meta`). Printed as its own
+        # plain-text section AFTER the JSON block above — the same plain-stdout-lands-at-
+        # SessionStart shape `durability-guard.py` already uses — so this hook derives no
+        # second orientation of its own (no habits.yaml re-scan; see the retired
+        # `get_habits_status`, replaced by `_epr_bootstrap_block`).
+        bootstrap_session_id = _bootstrap_session_id(data, project_dir)
+        bootstrap_block = _epr_bootstrap_block(project_dir, bootstrap_session_id)
+        print("BOOTSTRAP:")
+        print(bootstrap_block)
 
     except json.JSONDecodeError:
         sys.exit(0)
