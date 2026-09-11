@@ -31,6 +31,21 @@ retire-when: >
   reclaims by construction) — at that point the doorway cannot keep hosting a closed human,
   and the practice under watch has become a property of the substrate.
 ---
+DELTA 2026-09-11 (S1+S2 of plan 2026-09-10-doorway-federation-three-reds-to-green LANDED LOCALLY; stays RED —
+nothing measured on a mesh yet). Stories: 07-hosted-by-a-household (@concern:hosted-compute-contracted, 7 blind-reader
+rounds, 3× READY, steward binding declared self-asserted) and dataplane/doorway-humans-served (@concern:humans-served,
+READY); both attached as checks; glue for all 77 steps defined (279398f0e, 26d0f0d43); 05-leaving's 69 steps intact.
+Prologue casts 3 hosted registrants through POST /auth/register (7e0c75130). Doorway: provisioning no longer keys on
+dev_mode (60fb28a39 `should_provision`; synthetic fallback Simulacra-only), signal subscriber keys on projection_writer
+(f64d8c5bf), POST /auth/close-account (4a7145814), hosted cell notarized as a delegates-compute commitment scope
+hosted-cell — issued on register, revoked on close, account-closed self-revocation coordinator-only (b71b6d66e),
+humansServed derived from live hosted-cell rows (a33e3876a; backlog doorway-landing-humans-served-source CLOSED).
+Storage: hosted-cell scope + provider-side revoke (c9318d121, 9957e6369; gate 3712 tests). doorway-app: close surface
++ hosting strip, eyes-on render (9cf94c6c8). Harness cleanup through the product path (cb5fbeae6, 3d54c89af).
+Gates: doorway 1230 tests EXIT=0 ×2, elohim-app 4596, doorway-app 52. OPEN before a flip: hostedByHousehold still
+names the arranger (Task 13b in flight), schema codegen, DNA gate for the coordinator change, then the household run
+(Task 17) — a run id, not this note.
+
 DELTA 2026-09-04 (DECLARED red — the check exists and measures nothing passing): baseline against https://doorway-alpha.elohim.host — a
 fresh POST /auth/register answered with the operator's own Human profile (display name, bio,
 affinities), because every deployed doorway runs DEV_MODE=true and the hosted branch skips
