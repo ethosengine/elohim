@@ -31,6 +31,7 @@
  */
 
 import { getRaw } from '../dataplane/surfaces.js';
+import { retry } from '../utils/retry.js';
 
 import {
   loadHouseholdMeshFixture,
@@ -78,6 +79,57 @@ export async function readHostedCellCommitment(
     }
   }
   return { status, body };
+}
+
+/**
+ * Missing node between "the doorway names the commitment" and "a non-pool
+ * peer reads it back": the doorway mints a `hosted-cell` grant and hands out
+ * its cid before the non-authoring peer's own DHT view has necessarily
+ * converged on it. Evidence (household run 20260911T065255Z-d48f3b69): cid
+ * `uhCEkGZL39t92HHWVEb4cYa…` 404'd on jessica mid-run and answered 200 on
+ * all three peers minutes later — the storage fallback chain (projection ->
+ * mishpat projection -> one bounded DHT get, fb4d10c7d) works; a fresh
+ * off-pool read simply lands inside the convergence window sometimes.
+ */
+const CONVERGENCE_POLL_INTERVAL_MS = 2000;
+
+/** Used only when the fixture declares no `convergenceWindowMs` of its own. */
+const DEFAULT_CONVERGENCE_WINDOW_MS = 60_000;
+
+/**
+ * `readHostedCellCommitment`, retried every ~2s until it answers 200 or the
+ * household fixture's declared `convergenceWindowMs` elapses (default 60s).
+ * On timeout throws, naming the cid, the peer, the window, and the last
+ * status seen — never loosens the 200 expectation, only gives convergence
+ * its declared window before failing. Mirrors the wait pattern in
+ * `steps/dataplane/resiliency-saga.steps.ts` (poll-for-anchor-convergence).
+ */
+export async function readHostedCellCommitmentConverged(
+  cid: string,
+  fixture: HouseholdMeshFixture = loadHouseholdMeshFixture()
+): Promise<CommitmentReadResult> {
+  const peer = nonPoolPeerUrl(fixture);
+  const windowMs = fixture.convergenceWindowMs ?? DEFAULT_CONVERGENCE_WINDOW_MS;
+  return retry(
+    async () => {
+      const result = await readHostedCellCommitment(cid, fixture);
+      if (result.status !== 200) {
+        throw new Error(
+          `GET /api/v1/commitments/${cid} on ${peer} (peer "${NON_POOL_PEER_NAME}", not the ` +
+            `doorway's pool) had not converged to 200 within the ${windowMs}ms convergence window ` +
+            `the household fixture declares — last status ${result.status}.`
+        );
+      }
+      return result;
+    },
+    {
+      initialDelayMs: CONVERGENCE_POLL_INTERVAL_MS,
+      backoffFactor: 1,
+      maxDelayMs: CONVERGENCE_POLL_INTERVAL_MS,
+      timeoutMs: windowMs,
+      maxAttempts: Math.max(1, Math.ceil(windowMs / CONVERGENCE_POLL_INTERVAL_MS) + 2),
+    }
+  );
 }
 
 /** First present field among camelCase/snake_case candidates — see module doc. */

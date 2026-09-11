@@ -74,7 +74,7 @@ import { DoorwayClient } from '../../src/framework/api/doorway-client.js';
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import {
   commitmentIsLive,
-  readHostedCellCommitment,
+  readHostedCellCommitmentConverged,
 } from '../../src/framework/fixtures/hosted-cell.js';
 import { fixtureCredentials } from '../../src/framework/fixtures/humans.js';
 
@@ -251,8 +251,19 @@ async function hostedCellPopulationCheck(
   const allCids = [...rosterCids, ...castCids];
   const liveFlags = await Promise.all(
     allCids.map(async cid => {
-      const { status, body } = await readHostedCellCommitment(cid);
-      return status === 200 && commitmentIsLive(body);
+      // Convergence-bounded read (the off-pool read-back gap, S1 plan
+      // 2026-09-11): give each cid the household fixture's declared window to
+      // reach 200 on the non-pool peer before counting it not-live — a cid
+      // that never converges within the window IS the off-pool read defect
+      // this check exists to surface (the `live !== minted` diagnostic
+      // below), so a timeout here still resolves to `false`, never a thrown
+      // rejection that would abort the whole population check.
+      try {
+        const { body } = await readHostedCellCommitmentConverged(cid);
+        return commitmentIsLive(body);
+      } catch {
+        return false;
+      }
     })
   );
 
@@ -560,7 +571,13 @@ Then(
     ).trim();
     const shown = Number(text);
     assert.ok(Number.isFinite(shown), `humans-served card shows "${text}", not a number.`);
-    const status = statusFor(this, s.lastLandingDoorwayId);
+    // The sentence asserts against a LIVE status read: this scenario never
+    // runs a separate "When the status of doorway ... is read" step, so read
+    // it here (lazily, once, with the same reader the When step uses) rather
+    // than requiring a precondition the Gherkin itself doesn't state.
+    const status = s.byDoorway.has(s.lastLandingDoorwayId)
+      ? statusFor(this, s.lastLandingDoorwayId)
+      : await readStatus(this, s.lastLandingDoorwayId);
     assert.equal(shown, humansServedOf(status));
   }
 );

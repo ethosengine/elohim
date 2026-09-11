@@ -14,6 +14,7 @@ import {
   commitmentIsLive,
   doorwayServiceIdentityAgentPubKey,
   readHostedCellCommitment,
+  readHostedCellCommitmentConverged,
   stewardAgentPubKeyForConductorOrigin,
   type CommitmentBody,
 } from '../../src/framework/fixtures/hosted-cell.js';
@@ -110,7 +111,6 @@ function portal(world: E2EWorld): PortalBridge {
   return extended.__portal;
 }
 
-// eslint-disable-next-line sonarjs/function-return-type -- null is the documented HTTP-mode guard
 function requirePlaywright(world: E2EWorld): PlaywrightDevice | null {
   if (world.deviceMode !== 'playwright') return null;
   const device = portal(world).device;
@@ -604,6 +604,9 @@ Then('the doorway answers that the account is already closed', function (this: E
 /** `alpha` is the only doorway this station's Background ever declares. */
 const STATION_7_DOORWAY_ID = 'alpha';
 
+/** Guard message for every step that assumes `readBackCommitment` already ran. */
+const NO_COMMITMENT_READ_YET = 'No commitment has been read back yet.';
+
 async function ensurePlaywrightPortalOpen(
   world: E2EWorld,
   doorwayId: string
@@ -645,7 +648,15 @@ async function registerNewcomer(
   const localPart = `hh-${randomUUID()}`;
   const device = new BrowserDevice(`${localPart}-api`, doorway.url);
   const auth = await device.register({ identifier: localPart, password: PASSWORD, displayName });
-  remember(world, displayName, localPart, doorwayId, withoutTrailingSlash(doorway.url), auth, device);
+  remember(
+    world,
+    displayName,
+    localPart,
+    doorwayId,
+    withoutTrailingSlash(doorway.url),
+    auth,
+    device
+  );
   return human(world);
 }
 
@@ -671,16 +682,17 @@ async function grantCidFor(person: HostedHuman): Promise<string> {
   return person.grantCid ?? captureGrantCid(person);
 }
 
-/** Decision 1: read the commitment back by cid from a peer that is not the doorway's pool. */
+/**
+ * Decision 1: read the commitment back by cid from a peer that is not the
+ * doorway's pool — convergence-bounded (the off-pool read-back gap, S1 plan
+ * 2026-09-11): a freshly-minted grant's cid can 404 on the non-authoring
+ * peer for a while before its DHT view catches up, so this polls the same
+ * GET within the household fixture's declared `convergenceWindowMs` rather
+ * than asserting 200 on a single attempt.
+ */
 async function readBackCommitment(person: HostedHuman): Promise<CommitmentBody> {
   const cid = await grantCidFor(person);
-  const { status, body } = await readHostedCellCommitment(cid);
-  assert.equal(
-    status,
-    200,
-    `GET /api/v1/commitments/${cid} on ${NON_POOL_PEER_NAME}'s storage (not the doorway's pool) ` +
-      `returned ${status}.`
-  );
+  const { body } = await readHostedCellCommitmentConverged(cid);
   person.commitment = body;
   return body;
 }
@@ -697,7 +709,7 @@ async function resolveStewardAgentPubKey(world: E2EWorld, person: HostedHuman): 
       `(${agentConductor.conductorUrl}) — set agentPubKey on that peer in ` +
       'E2E_HOUSEHOLD_FIXTURE_PATH (stamped by hc-mesh.sh refresh_fixture_pids).'
   );
-  person.stewardAgentPubKey = steward as string;
+  person.stewardAgentPubKey = steward;
   return person.stewardAgentPubKey;
 }
 
@@ -732,22 +744,25 @@ Then(
   }
 );
 
-Then("no other account at this doorway shares that cell's agent key", async function (this: E2EWorld) {
-  const person = human(this);
-  const admin = await this.getAdminClient(person.doorwayUrl);
-  const token = admin.session?.token;
-  assert.ok(token, 'The admin client has no session.');
-  const result = await api(`${person.doorwayUrl}/admin/hosted-users`, token);
-  assert.equal(result.status, 200);
-  assert.ok(Array.isArray(result.body['users']), 'The hosted-user listing omitted users.');
-  const owners = (result.body['users'] as Json[]).filter(
-    row => row['agentPubKey'] === person.agentPubKey
-  );
-  assert.deepEqual(
-    owners.map(row => row['identifier']),
-    [person.human.credentials.identifier]
-  );
-});
+Then(
+  "no other account at this doorway shares that cell's agent key",
+  async function (this: E2EWorld) {
+    const person = human(this);
+    const admin = await this.getAdminClient(person.doorwayUrl);
+    const token = admin.session?.token;
+    assert.ok(token, 'The admin client has no session.');
+    const result = await api(`${person.doorwayUrl}/admin/hosted-users`, token);
+    assert.equal(result.status, 200);
+    assert.ok(Array.isArray(result.body['users']), 'The hosted-user listing omitted users.');
+    const owners = (result.body['users'] as Json[]).filter(
+      row => row['agentPubKey'] === person.agentPubKey
+    );
+    assert.deepEqual(
+      owners.map(row => row['identifier']),
+      [person.human.credentials.identifier]
+    );
+  }
+);
 
 Then(
   'the notary records a live {string} delegates-compute commitment naming that agent key as recipient',
@@ -767,22 +782,16 @@ Then(
   'that commitment names the steward of that pool conductor as provider',
   async function (this: E2EWorld) {
     const person = human(this);
-    assert.ok(person.commitment, 'No commitment has been read back yet.');
+    assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
     const steward = await resolveStewardAgentPubKey(this, person);
-    assert.equal(commitmentField(person.commitment as CommitmentBody, 'provider'), steward);
+    assert.equal(commitmentField(person.commitment, 'provider'), steward);
   }
 );
 
 Then('that commitment carries an end date in the future', function (this: E2EWorld) {
   const person = human(this);
-  assert.ok(person.commitment, 'No commitment has been read back yet.');
-  const raw = commitmentField(
-    person.commitment as CommitmentBody,
-    'validUntil',
-    'valid_until',
-    'hasEnd',
-    'has_end'
-  );
+  assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
+  const raw = commitmentField(person.commitment, 'validUntil', 'valid_until', 'hasEnd', 'has_end');
   assert.equal(
     typeof raw,
     'string',
@@ -847,24 +856,24 @@ When(
 
 Then("the read-back commitment's scope is {string}", function (this: E2EWorld, scope: string) {
   const person = human(this);
-  assert.ok(person.commitment, 'No commitment has been read back yet.');
-  assert.equal(commitmentField(person.commitment as CommitmentBody, 'scope'), scope);
+  assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
+  assert.equal(commitmentField(person.commitment, 'scope'), scope);
 });
 
 Then(
   "its provider is the agent key that the pool conductor's own peer names as its steward",
   async function (this: E2EWorld) {
     const person = human(this);
-    assert.ok(person.commitment, 'No commitment has been read back yet.');
+    assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
     const steward = await resolveStewardAgentPubKey(this, person);
-    assert.equal(commitmentField(person.commitment as CommitmentBody, 'provider'), steward);
+    assert.equal(commitmentField(person.commitment, 'provider'), steward);
   }
 );
 
 Then("its provider is not the doorway's own service identity", function (this: E2EWorld) {
   const person = human(this);
-  assert.ok(person.commitment, 'No commitment has been read back yet.');
-  const provider = commitmentField(person.commitment as CommitmentBody, 'provider');
+  assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
+  const provider = commitmentField(person.commitment, 'provider');
   assert.ok(
     typeof provider === 'string' && provider.length > 0,
     `commitment carries no provider field: ${JSON.stringify(person.commitment)}`
@@ -877,11 +886,8 @@ Then("its provider is not the doorway's own service identity", function (this: E
 
 Then("its recipient is that human's own agent key", function (this: E2EWorld) {
   const person = human(this);
-  assert.ok(person.commitment, 'No commitment has been read back yet.');
-  assert.equal(
-    commitmentField(person.commitment as CommitmentBody, 'recipient', 'receiver'),
-    person.agentPubKey
-  );
+  assert.ok(person.commitment, NO_COMMITMENT_READ_YET);
+  assert.equal(commitmentField(person.commitment, 'recipient', 'receiver'), person.agentPubKey);
 });
 
 When(
@@ -904,7 +910,7 @@ Then('each holds their own {string} commitment', function (this: E2EWorld, scope
   for (const index of [0, 1]) {
     const person = human(this, index);
     assert.ok(person.commitment, `Human ${index + 1} has no commitment read back yet.`);
-    assert.equal(commitmentField(person.commitment as CommitmentBody, 'scope'), scope);
+    assert.equal(commitmentField(person.commitment, 'scope'), scope);
   }
   assert.notEqual(human(this, 0).grantCid, human(this, 1).grantCid);
 });
@@ -912,7 +918,11 @@ Then('each holds their own {string} commitment', function (this: E2EWorld, scope
 Then('neither commitment names the other human as recipient', function (this: E2EWorld) {
   const first = human(this, 0);
   const second = human(this, 1);
-  const firstRecipient = commitmentField(first.commitment as CommitmentBody, 'recipient', 'receiver');
+  const firstRecipient = commitmentField(
+    first.commitment as CommitmentBody,
+    'recipient',
+    'receiver'
+  );
   const secondRecipient = commitmentField(
     second.commitment as CommitmentBody,
     'recipient',
