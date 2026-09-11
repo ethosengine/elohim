@@ -41,6 +41,16 @@ committing C4 (honest absence) and C7 (advertise/serve) against its own findings
                                                 consecutive-observation pattern _lib/runtime_harvest.py already uses
                                                 for projector lag; kept in this shell file rather than the pure core
                                                 so multi-doorway B-side coverage lands without touching _lib)
+  • harvester-blind                          — SELF-CHECK, not a node predicate: fires when this poller has run
+                                                >= HARVESTER_BLIND_MIN_POLLS times (cursor.poll_index) and every
+                                                watched node's sample window is STILL empty — the poller ran but
+                                                never actually sampled anything, which is the exact failure named
+                                                in genesis/data/timeline/backlog/
+                                                runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
+                                                (66 polls, empty windows, a week of un-alerted saturation). Node
+                                                "harvester" (not a NODE_BASES entry — this finding is about the
+                                                poller, not a peer). Closes by the ordinary disappearance rule the
+                                                moment a later poll stores a real sample for any watched node.
 
 Nodes (dict, node -> base URL): "alpha" -> doorway-alpha (storage peer matthew, A-side) and
 "alpha-b" -> elohim.host (storage peer adam, B-side) — added so the B-side doorway is polled too;
@@ -203,6 +213,38 @@ def p2p_status_findings(node, samples):
     return findings
 
 
+HARVESTER_BLIND_CLASS = "harvester-blind"
+HARVESTER_BLIND_MIN_POLLS = 3
+HARVESTER_BLIND_ATOM = (
+    "genesis/data/timeline/backlog/"
+    "runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md"
+)
+
+
+def harvester_blind_finding(cursor, nodes):
+    """PURE: the poller's own self-check. `cursor` is this poll's post-append cursor (so a
+    sample stored THIS poll already counts). If we have run >= HARVESTER_BLIND_MIN_POLLS times
+    and STILL have not stored a single sample for any watched node, the harvester itself is
+    blind — a scheduling gap, not an honest per-node absence (poll_node already degrades quiet
+    per-node via D3; this predicate is the layer above that, over the cursor as a whole). Stable
+    provenance -> one fingerprint regardless of how high poll_index climbs (mirrors
+    rh.fingerprint's count-churn invariance). Closes by the ordinary reconcile disappearance rule
+    once any later poll stores a real sample — no special-case needed here."""
+    poll_index = cursor.get("poll_index", 0)
+    if poll_index < HARVESTER_BLIND_MIN_POLLS:
+        return None
+    windows = cursor.get("windows", {})
+    if any(len(windows.get(n, [])) > 0 for n in nodes):
+        return None
+    return {
+        "node": "harvester", "class": HARVESTER_BLIND_CLASS,
+        "provenance": "cursor:all-windows-empty",
+        "line": f"runtime-harvest has polled {poll_index} time(s) "
+                f"(nodes={','.join(nodes)}) and stored ZERO samples for any of them — the "
+                f"harvester itself is blind, not the nodes. See {HARVESTER_BLIND_ATOM}.",
+    }
+
+
 def load_cursor():
     try:
         with open(CURSOR_PATH, encoding="utf-8") as fh:
@@ -262,6 +304,10 @@ def harvest(nodes, base_override, as_hook):
             for f in produced:
                 f["fp"] = rh.fingerprint(f["node"], f["class"], f["provenance"])
                 active.append(f)
+        hb = harvester_blind_finding(cursor, nodes)
+        if hb is not None:
+            hb["fp"] = rh.fingerprint(hb["node"], hb["class"], hb["provenance"])
+            active.append(hb)
         new, bumped, closed = rh.reconcile(entries, active, poll_index)
         for e in new:  # stamp wall-clock first-capture time
             e.setdefault("ts", datetime.now(timezone.utc).isoformat(timespec="seconds"))

@@ -106,3 +106,78 @@ spec:
               doorway_membrane_verdict_total{verdict="deny"} for the source mix before
               retuning DOORWAY_MEMBRANE_*_THRESHOLD.
             dashboard: "https://grafana.ethosengine.com/explore?left=%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22expr%22%3A%22up%7Bjob%3D~%5C%22.%2Adoorway.%2A%5C%22%7D%22%2C%22refId%22%3A%22A%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_bans_active%22%2C%22refId%22%3A%22B%22%7D%2C%7B%22expr%22%3A%22doorway_membrane_verdict_total%22%2C%22refId%22%3A%22C%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D"
+
+    - name: elohim-conductor-saturation
+      rules:
+        # Sustained CFS throttle on the conductor containers only (`container="elohim-conductor"`
+        # — the elohim-storage sidecar is `container="elohim-node"` in the same pod and is
+        # deliberately EXCLUDED, both labels verified live 2026-09-11 via
+        # container_cpu_cfs_throttled_periods_total{namespace="elohim-alpha"}). Ratio, not raw
+        # count: rate(...throttled...[5m]) / rate(...periods...[5m]) over the two cgroup CFS
+        # counters normalizes for how busy each conductor is, so a ratio near 1.0 means the
+        # container spent nearly every accounting period waiting on its CPU quota — it is
+        # CPU-bound against its cgroup limit, not merely active.
+        #
+        # Two rungs on the SAME predicate (>= 0.95), split only by `for:` duration, per the
+        # backlog atom this rule closes:
+        # genesis/data/timeline/backlog/runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
+        # ("Prometheus has carried container_cpu_cfs_throttled_periods_total /
+        # container_cpu_cfs_periods_total = 1.0 on gertrude/susan/eve conductors for 7 days and on
+        # adam for ~24h. No alert rule, no ledger finding, no notification."). VERIFIED live
+        # 2026-09-11 via query_prometheus (instant): jessica 0.984, james 1.0, susan 1.0, adam
+        # 0.999, matthew 0.998, eve 1.0, gertrude 1.0 — all 7 alpha conductors were at or above
+        # 0.95 at evaluation time, corroborating the atom's "week of 100% saturation" claim.
+        - alert: ConductorCfsThrottleSustained
+          expr: |
+            (
+              rate(container_cpu_cfs_throttled_periods_total{namespace="elohim-alpha", container="elohim-conductor"}[5m])
+              /
+              rate(container_cpu_cfs_periods_total{namespace="elohim-alpha", container="elohim-conductor"}[5m])
+            ) >= 0.95
+          for: 30m
+          labels:
+            severity: warning
+            app: elohim-conductor
+            environment: alpha
+          annotations:
+            summary: "Conductor {{ $labels.pod }} CFS-throttled >= 95% for 30m"
+            description: >-
+              {{ $labels.pod }} (container {{ $labels.container }}) has spent >= 95% of its CFS
+              accounting periods throttled for over 30 minutes (current ratio {{ $value | printf
+              "%.2f" }}). It is CPU-bound against its cgroup limit, not merely busy. Next step:
+              check `just mesh status` / conductor-diagnostics for this pod and consider
+              CONDUCTOR_ARC_FACTOR or the pool's cargo/CPU resource cap before it compounds into
+              the 6h critical rung.
+            runbook: >-
+              genesis/data/timeline/backlog/runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
+            atom: "runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11"
+            dashboard: "https://grafana.ethosengine.com/explore?left=%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22expr%22%3A%22rate%28container_cpu_cfs_throttled_periods_total%7Bnamespace%3D%5C%22elohim-alpha%5C%22%2Ccontainer%3D%5C%22elohim-conductor%5C%22%7D%5B5m%5D%29%20%2F%20rate%28container_cpu_cfs_periods_total%7Bnamespace%3D%5C%22elohim-alpha%5C%22%2Ccontainer%3D%5C%22elohim-conductor%5C%22%7D%5B5m%5D%29%22%2C%22refId%22%3A%22A%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D"
+
+        # Same predicate, `for: 6h` — the rung the backlog atom names explicitly ("a week of 100%
+        # saturation reached no human and no agent"). This is the one an operator (or the
+        # runtime-harvest/runtime-triage automation reading Alertmanager, per the atom's Fix step
+        # 2) should treat as ongoing structural saturation, not a transient spike.
+        - alert: ConductorCfsThrottleSaturated
+          expr: |
+            (
+              rate(container_cpu_cfs_throttled_periods_total{namespace="elohim-alpha", container="elohim-conductor"}[5m])
+              /
+              rate(container_cpu_cfs_periods_total{namespace="elohim-alpha", container="elohim-conductor"}[5m])
+            ) >= 0.95
+          for: 6h
+          labels:
+            severity: critical
+            app: elohim-conductor
+            environment: alpha
+          annotations:
+            summary: "Conductor {{ $labels.pod }} CFS-throttled >= 95% for 6h (structural saturation)"
+            description: >-
+              {{ $labels.pod }} (container {{ $labels.container }}) has held >= 95% CFS throttle
+              for over 6 hours (current ratio {{ $value | printf "%.2f" }}) — this is the
+              structural-saturation rung, not a spike. Next step: raise the conductor's CPU limit
+              or arc factor for this peer, or shed load onto other peers; a week at this level
+              previously went un-alerted and un-triaged per the atom below.
+            runbook: >-
+              genesis/data/timeline/backlog/runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
+            atom: "runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11"
+            dashboard: "https://grafana.ethosengine.com/explore?left=%7B%22datasource%22%3A%22prometheus%22%2C%22queries%22%3A%5B%7B%22expr%22%3A%22rate%28container_cpu_cfs_throttled_periods_total%7Bnamespace%3D%5C%22elohim-alpha%5C%22%2Ccontainer%3D%5C%22elohim-conductor%5C%22%7D%5B5m%5D%29%20%2F%20rate%28container_cpu_cfs_periods_total%7Bnamespace%3D%5C%22elohim-alpha%5C%22%2Ccontainer%3D%5C%22elohim-conductor%5C%22%7D%5B5m%5D%29%22%2C%22refId%22%3A%22A%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-6h%22%2C%22to%22%3A%22now%22%7D%7D"

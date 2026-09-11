@@ -365,6 +365,18 @@ CLASS_FRAMING = {
         "intake. Recovery is restored capability (Mishpat), never punishment: the node that "
         "surfaced this did the fleet a service."
     ),
+    "harvester-blind": (
+        "This is NOT a node self-report — no node said anything, because the poller never "
+        "reached one long enough to sample it. The runtime-harvest poller itself has run "
+        "several times with every watched node's window still empty (see the atom named in the "
+        "finding line: genesis/data/timeline/backlog/"
+        "runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md). Check WHY it "
+        "isn't sampling before touching any exhaustion predicate: is the poller being invoked at "
+        "all (no cron/loop scheduling it), is CLAUDE_PROJECT_DIR wrong so it reads/writes the "
+        "wrong cursor, or are the node base URLs unreachable from wherever it runs. Fix the "
+        "scheduling/reachability gap; this finding self-closes the moment a later poll stores a "
+        "real sample for any node — do not hand-delete it."
+    ),
 }
 
 DEFAULT_FRAMING = ("The node self-REPORTED exhaustion; scope the cause, canonicalize by concern, "

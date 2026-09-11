@@ -34,6 +34,11 @@ The findings-sentinel pattern (flag → agent → canon → stasis) is only as g
 2. Add a Prometheus alert rule (repo-owned under `genesis/manifests/` monitoring rules): conductor CFS throttle ratio ≥ 0.95 for 30 min → warning; ≥ 0.95 for 6 h → the runtime ledger (via the harvester reading Alertmanager, keeping the no-runtime-write rule).
 3. Add `conductor-throttle-sustained` as a harvester class fed from Prometheus, so the same ledger carries both self-reports and external saturation.
 
+## Progress 2026-09-11 (evening)
+- Fix 1 landed in the repo's own pattern: `runtime-harvest.py --hook` (fail-safe, exit 0, SessionStart-hook JSON) is wired as an async SessionStart hook beside `ci-harvest.py` in `.claude/settings.json`; a `harvester-blind` finding class fires when the cursor has ≥3 polls and every node window is empty, and closes by the ledger's normal disappearance rule (fixture test `_lib/__tests__/harvester_blind_test.py`, 16 assertions). First real poll under the new shell: cursor `poll_index 77, windows alpha=5 / alpha-b=5` — the harvester is no longer blind, and it filed `6cdded115d74` (projector lag, folds into the matthew-rekey concern) and `2b4761b2eaf6` (apex provide loop) on its own.
+- Fix 2 landed as repo-owned rules: `ConductorCfsThrottleSustained` (≥0.95 for 30m, warning) and `ConductorCfsThrottleSaturated` (≥0.95 for 6h, critical) in `genesis/orchestrator/manifests/infra/alpha-doorway-alerts.yaml`, group `elohim-conductor-saturation`, conductor containers only. Live evaluation at authoring time: all 7 alpha conductors at or above 0.95 (jessica 0.984 … james/susan/eve/gertrude 1.0). The rules reach Alertmanager on the next orchestrator reconcile; the "fires against live state" line below is not yet observed.
+- Fix 3 (a Prometheus-fed `conductor-throttle-sustained` harvester class) is still open.
+
 ## Done when
 
 - `runtime-cursor.json` windows are non-empty on every poll for a week; the harvester files a finding within one poll of a synthetic stuck state on the household mesh.
