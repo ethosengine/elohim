@@ -417,7 +417,7 @@ git commit -m "habit(hosted-human-lifecycle): attach hosted-compute-contracted +
 - Consumes: `doorway {string} at {string}` (`steps/mode-aware.steps.ts:95`); the portal primitives in `steps/ui/doorway-portal-login.steps.ts`; the close-account helper already in `steps/ui/hosted-human.steps.ts:133` (`POST {doorwayUrl}/auth/close-account`).
 - Produces: nothing other tasks import — a2o step files are loaded by glob.
 
-- [ ] **Step 1: Verify hosted-human plan Task 1 (5 minutes) — do not re-implement it**
+- [x] **Step 1: Verify hosted-human plan Task 1 (5 minutes) — do not re-implement it**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -428,17 +428,23 @@ rm -f ./.cuke-scope-tmp.json
 ```
 Expected (measured 2026-09-10): `0` `@wip`, and `6 scenarios (6 skipped) / 69 steps (69 skipped)` — **zero undefined**. That is hosted-human plan Task 1 landed, in `genesis/a2o/steps/ui/hosted-human.steps.ts` rather than the `hosted-human-lifecycle.steps.ts` the plan named. Tick that plan's Task 1 box with this evidence line and move on. **If the output shows undefined steps instead**, the glue regressed: write it into `steps/ui/hosted-human.steps.ts` per the drained plan's Task 1 text and only then continue.
 
-- [ ] **Step 2: Define the `07-hosted-by-a-household.feature` phrases**
+Re-verified 2026-09-11 with `npx cucumber-js --dry-run --tags '@concern:hosted-human-lifecycle'` (dispatch used `--tags`, never a positional feature path, per the standing trap that a profile's `paths` merges with CLI positionals): `0` `@wip`; `6 scenarios (6 skipped) / 69 steps (69 skipped)` — zero undefined, unchanged by the new glue below.
+
+- [x] **Step 2: Define the `07-hosted-by-a-household.feature` phrases**
 
 Append to `genesis/a2o/steps/ui/hosted-human.steps.ts`. Reuse, do not re-mint: the registration helper the file already uses for `05-leaving`, and the close-account helper at line 133. New definitions needed, one per undefined phrase from Task 1 Step 2 — for the doorway-side assertions, read the commitment through the doorway's existing proxy of storage's commitment read (`GET /api/v1/commitments/{id}` by the `grantCid` the register response carries; see S2 Task 13, which puts `hostedCellGrantCid` on the register and account responses). For the pool-side assertion, read `GET /admin/agents/{agentPubKey}/conductor` (`admin_conductors.rs:164`), which is the same route `05-leaving` already uses for "no pool conductor holds a cell".
 
 Every browser selector must be a real `data-testid` (page-model skill). The two `@browser-only` scenarios need `account-hosted-by-household` and `account-hosted-until` on the account page — S2 Task 11 adds them; agree the names here and use them verbatim on both sides.
 
-- [ ] **Step 3: Define the `doorway-humans-served.feature` phrases**
+Landed 2026-09-11, appended to `genesis/a2o/steps/ui/hosted-human.steps.ts` (no existing lines edited): all 30 undefined phrases from the dry-run against `07-hosted-by-a-household.feature` (the file had grown a blind-reader revision since Step 1 was authored — the feature text quotes `hosted-cell` scope and steward-key language verbatim, and the read-back-from-a-non-pool-peer phrasing already matches Decision 1). Two new local helpers carry the wiring the Chief decisions require, in a new file `genesis/a2o/src/framework/fixtures/hosted-cell.ts` (Decision 1: `readHostedCellCommitment(cid)` — `GET {peer}/api/v1/commitments/{cid}` on jessica's storage, never the doorway; Decision 2: `stewardAgentPubKeyForConductorOrigin` / `doorwayServiceIdentityAgentPubKey`, both riding a new `storagePeerForOrigin` export added to `household-mesh.ts`). `account-hosted-by-household` / `account-hosted-until` are declared in the file's existing local `TEST_ID` object (the established pattern here for UI still being built in parallel), matching the names above verbatim.
+
+- [x] **Step 3: Define the `doorway-humans-served.feature` phrases**
 
 Create `genesis/a2o/steps/dataplane/humans-served.steps.ts`. The status read is `GET {doorwayUrl}/status.json` → `humansServed`. "the number of live hosted-cell commitments its pool provides" is read the same way `07`'s doorway-side scenario reads a commitment, summed over the doorway's own hosted rows via `GET /admin/users` (admin-authorised; the household lane already holds the admin bearer — see `steps/ui/hosted-human.steps.ts` for how it obtains one). The threshold-landing scenario asserts on the landing's existing card; add a `data-testid` if the card has none, agreed with S2 Task 14.
 
-- [ ] **Step 4: Dry-run both new features to zero undefined**
+Landed 2026-09-11 in a new file, `genesis/a2o/steps/dataplane/humans-served.steps.ts` (step files are loaded by glob and do not import each other, so its small amount of local state/helpers is its own — it reuses only the shared `hosted-cell.ts` fixture primitives, same as `hosted-human.steps.ts`). Independent verification of "that count equals the number of live hosted-cell commitments" walks the Prologue roster (Task 5's `${MESH_DIR}/prologue-hosted-humans.json`, read with a clear failure naming that path when Task 5 has not landed yet) and reads each entry's commitment back from jessica's storage — the same Decision-1 peer, not `GET /admin/users` as originally sketched here, since the roster already carries each entry's `hostedCellGrantCid` and a peer-side notary read is the more direct, doorway-independent check. The threshold-landing card's `data-testid` is `landing-humans-served` (declared locally in the new step file per the same "UI is being built in parallel" convention `hosted-human.steps.ts` already uses) — agreed here for S2 Task 14 to use verbatim. One dependency this step surfaced that Task 5 does not yet name: the "closes their account through the doorway's own close path" scenario needs to sign back in as a roster human, so the roster JSON must also carry that human's `password` (not in Task 5's own printed-line list) — the step fails naming exactly that gap if it is absent, rather than guessing one.
+
+- [x] **Step 4: Dry-run both new features to zero undefined**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -450,6 +456,8 @@ rm -f ./.cuke-scope-tmp.json
 ```
 Expected: `10 scenarios`, **0 undefined**.
 
+Run 2026-09-11 with `--tags '@concern:hosted-compute-contracted or @concern:humans-served'` instead of the config-tmp/positional-path form above (dispatch instructions: a positional feature path merges with the default profile and runs the whole suite — use `--tags`): `10 scenarios (10 skipped)` / `77 steps (77 skipped)` — zero undefined. Re-ran `--tags '@concern:hosted-human-lifecycle'` alongside it: `6 scenarios (6 skipped)` / `69 steps (69 skipped)` — 05-leaving's glue is unchanged. `pnpm exec tsc --noEmit -p tsconfig.json` — clean, `EXIT=0`.
+
 - [ ] **Step 5: Lint the Gherkin and run the a2o unit gate**
 
 ```bash
@@ -458,12 +466,15 @@ just gate genesis-a2o; echo "EXIT=$?"
 ```
 Expected: `EXIT=0`.
 
-- [ ] **Step 6: Commit**
+Not run in this pass — the dispatching instructions for this slice named three verifications only (both dry-runs + `tsc --noEmit`, above) and explicitly withheld the live suite; `just gate genesis-a2o` is left for whoever next touches this tree to run before it lands on `dev`/`main`.
+
+- [x] **Step 6: Commit**
 
 ```bash
 cd /projects/elohim
-git add genesis/a2o/steps/ui/hosted-human.steps.ts genesis/a2o/steps/dataplane/humans-served.steps.ts
-git commit -m "test(a2o): step glue for hosted-by-a-household and humans-served"
+git add genesis/a2o/steps/ui/hosted-human.steps.ts genesis/a2o/steps/dataplane/humans-served.steps.ts \
+        genesis/a2o/src/framework/fixtures/hosted-cell.ts genesis/a2o/src/framework/fixtures/household-mesh.ts
+git commit -m "feat(a2o): step glue for hosted-compute-contracted and humans-served (runs red until S2/S3)"
 ```
 
 **Habit delta line this produces:** `hosted-human-lifecycle` — "hosted-human plan Task 1 verified LANDED (05-leaving: 0 @wip, 0 undefined, scoped dry-run 2026-09-10); glue for stories 07 and humans-served defined, both dry-run 0 undefined."
