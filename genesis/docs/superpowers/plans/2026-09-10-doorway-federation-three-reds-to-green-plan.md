@@ -1374,6 +1374,30 @@ git commit -m "habit(epr-atom-home): RED -> GREEN on the deployed fleet render a
 
 ---
 
+## Task 18b — lamad blob URLs leak the local sidecar address (found by Task 18, 2026-09-11)
+
+**Drains:** new — surfaced by the Task 18 measure. **Tier:** Opus (angular-architect). **Slice:** app (lamad bundle).
+
+Task 18 Step 3 ran twice against alpha (`face02de`): 5 passed / 2 failed both times. One failure was the
+`"1 of 3"` custody literal (fixed, `06bafc316` — the floor is now read from the doorway's own household
+report). The other is real: scenario "The learning app is one lens away" passes but its After-hook fails on
+`net::ERR_CONNECTION_REFUSED` for `http://localhost:8090/blob/sha256-c5dcc24c…`. A `pnpm look` of
+`https://alpha.elohim.host/lamad/path/foundations-christian-technology` reproduces it as the page's one
+failed request: the lamad bundle resolves blob references through `ILamadStorageClient.getBlobUrl`
+(`app/lamad/src/app/services/blob-manager.service.ts:162`) to `environment.client.storageUrl` — the
+local-sidecar address — with lamad carrying one `environment.ts` and no build-time replacement. Every visitor
+on alpha gets that blob refused. Rule: in doorway mode a blob URL is origin-relative (`/blob/{hash}` on the
+serving origin), never `storageUrl`; `storageUrl` is direct/native mode only. Same bundle must serve from
+both doorways (doorway-failover: "whichever serves resolves the same declared head").
+
+- [ ] **Step 1:** failing lamad unit test — doorway mode + served origin → origin-relative blob URL, never `localhost:8090`; direct mode unchanged.
+- [ ] **Step 2:** implement in the concrete `ILamadStorageClient`; lamad gate + direct `ng build`; pathspec commit.
+- [ ] **Step 3:** rides the Task 19 app deploy; then Task 18 Step 3 re-runs against alpha — **that** run is the flip evidence (expected 7/7).
+
+**Habit delta line this produces:** `epr-atom-home` — "lamad blob URLs origin-relative in doorway mode (was localhost:8090 on alpha, found by the Task 18 measure); flip waits on the app build that carries it."
+
+---
+
 ## Task 19 — (c) ONE fleet push, then read the build
 
 **Drains:** doorway-failover plan **§Operator menu** (the deploy decision) and D7(ii).
