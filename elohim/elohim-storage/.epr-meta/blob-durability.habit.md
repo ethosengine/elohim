@@ -4,7 +4,7 @@ id: blob-durability
 invariant: >
   Blob bytes survive peer loss and churn: custody commitments honored,
   RS-quilt placement household-diverse, salvage re-places without data loss.
-status: green
+status: red
 active: false
 checks:
   - "a2o @concern:blob-durability — 9 scenarios across genesis/a2o/features/resilience/ (governed-distribution, salvage-placement, chaos-peer-churn, grandma-photos-survive-node-loss, app-blob-heal-on-read, observable-distribution, resilience-dimensions, household-diversity-dataplane)"
@@ -225,3 +225,4 @@ the flip-to-green measurement. Sibling reds in #1147 (peer-mesh
 caughtUp=false on elohim.host) and app #1585 (Upload SPA Blob /lamad
 syncing) were the 2026-07-03 shem network-degradation window — live-probed
 recovered 17:0x UTC (caughtUp=true both doorways, /lamad 200)."
+DELTA 2026-09-11 (green -> RED on fleet evidence, covenant rule 4): the only @concern:blob-durability scenario the edge Dataplane Validation stage measures on the alpha fleet — household-diversity-dataplane, "a standard-tier content item with 3+ distinct stewarding collectives … the response contains coverageShortfall with value 0" — is RED on two consecutive fleet measures, edge #1452 (deploy f7cfa7e6) and edge #1454 (validate-only, 617d85866): `"coverageShortfall" is ABSENT from the snapshot`, i.e. GET /api/v1/resilience/{cid}/household never computes the household floor on the deployed build, and a reader cannot tell "never measured" from "met". The 13 sibling scenarios are HELD @act:i, so the fleet has ONE measured assertion for this habit and it fails; the register carried green from the 2026-08-20 measure while the observed status was not-measured for 2 days. Flip-to-green needs the shortfall field present on a fleet build (the "1a+1b landed; prod join dormant" seam — backlog dataplane-peer-fallback-and-blob-replication.md) and this scenario green on the next validate-only measure.
