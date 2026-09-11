@@ -850,12 +850,12 @@ git commit -m "fix(doorway): a projection writer subscribes to signals under eve
 
 **Acceptance evidence (restated from the drained plan, not paraphrased away):** bearer-authorised; `confirmIdentifier` mismatch → `400 CONFIRMATION_MISMATCH` **and nothing changes**; on match, in this order — (1) revoke every session-transfer token and OAuth code for the human and drop the custodial key from the session cache; (2) if the row has a conductor assignment, `deprovision_agent` (uninstall + unregister), failure logged and reported in the response, **not fatal**; (3) set `is_active=false`, `metadata.is_deleted=true`, `closed_at=now`. A second call on a closed row answers `200` with `alreadyClosed: true`, **never 404**. `handle_login` already refuses inactive rows and `handle_me` already refuses suspended rows — assert both in a unit test. Declare the route in the auth discovery document and keep the `AUTH_OWNED_PATHS` symmetry guard passing.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Four unit tests in `auth_routes.rs`'s test module:
 `close_account_mismatched_confirmation_changes_nothing`, `close_account_is_idempotent_and_never_404s`, `closed_row_cannot_log_in`, `closed_row_is_refused_by_handle_me`. Plus extend the existing auth-discovery contract test to require the `closeAccount` key.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -863,11 +863,11 @@ RUSTFLAGS="" CARGO_TARGET_DIR=/tmp/doorway-target cargo test close_account 2>&1 
 ```
 Expected: FAIL — handler not found.
 
-- [ ] **Step 3: Implement the handler, the discovery entry and the dispatch arm**
+- [x] **Step 3: Implement the handler, the discovery entry and the dispatch arm**
 
 Follow the acceptance evidence above exactly, including the ordering and the non-fatal deprovision.
 
-- [ ] **Step 4: Green and gate**
+- [x] **Step 4: Green and gate**
 
 ```bash
 cd /projects/elohim/doorway/doorway-service
@@ -876,7 +876,7 @@ cd /projects/elohim && just gate doorway; echo "EXIT=$?"
 ```
 Expected: both `EXIT=0`, and the discovery-document contract test passes with `closeAccount` present.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim
@@ -898,7 +898,7 @@ git commit -m "feat(doorway): POST /auth/close-account — reclaim sessions, cel
 **Files:**
 - Verify (no edit expected): `doorway/doorway-service/src/routes/admin_conductors.rs:164`
 
-- [ ] **Step 1: Verify the route exists**
+- [x] **Step 1: Verify the route exists**
 
 ```bash
 cd /projects/elohim
@@ -906,7 +906,7 @@ grep -n "admin/agents\|agent_pub_key.*conductor" doorway/doorway-service/src/rou
 ```
 Expected (measured 2026-09-10): `GET /admin/agents/{agent_pub_key}/conductor` documented at line 10, response type at 66, handler at 164. Tick hosted-human plan Task 4 with this line.
 
-- [ ] **Step 2: If and only if it is absent, add it**
+- [x] **Step 2: If and only if it is absent, add it** — NOT NEEDED: the route is present at the measured lines (10 / 66 / 164), so this task produced no code and no commit of its own. Recorded in the Task 9 commit (`4a7145814`) instead.
 
 Add `GET /admin/conductors/agents/{agentPubKey}` returning the registry entry or 404, with one unit test, per the drained plan's Task 4 text. Then `just gate doorway; echo "EXIT=$?"` → `EXIT=0` and commit. Otherwise this task produces no commit.
 
