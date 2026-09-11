@@ -114,7 +114,7 @@
     },
     "hostedByHousehold": {
       "type": "string",
-      "description": "Human-readable name of the household hosting this person — what a portal SHOWS. Never the commitment cid: a person should read who is hosting them, not an address. Travels with hostedCellGrantCid or not at all (serde skip_serializing_if)"
+      "description": "The DISPLAY NAME of the steward of the pool peer that notarized this person's hosted cell — the household that is actually lending the machine, in the words a person uses. Resolved at read time from A-class facts: hostedCellGrantCid (the promise exists) plus the provider the POOL PEER named itself by on its own grant answer (elohim-storage api/compute_grants.rs writes it as that peer's own conductor cell key, and the grant surface refuses any other performer), resolved through imagodei get_human_by_agent_key to that Human's displayName. Absent when any link is missing. It is NEVER the doorway's own name, id or gateway hostname: the doorway ARRANGES hosting and a household PERFORMS it, and naming the arranger here is exactly what genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature forbids. It is never the commitment cid or the conductor id either — those name an address and a machine. Travels with hostedCellGrantCid or not at all (serde skip_serializing_if)"
     }
   }
 }

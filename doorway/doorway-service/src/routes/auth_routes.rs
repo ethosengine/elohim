@@ -398,6 +398,9 @@ pub fn close_account_row_update(now: bson::DateTime) -> bson::Document {
             // doorway counting a promise it has already given back.
             "hosted_cell_grant_cid": bson::Bson::Null,
             "hosted_cell_valid_until": bson::Bson::Null,
+            // And the row stops naming the household that was keeping it: the
+            // promise is back, so there is no longer anyone to name.
+            "hosted_cell_provider": bson::Bson::Null,
         }
     }
 }
@@ -1743,6 +1746,10 @@ async fn handle_register(
     if let Some(ref grant) = hosted_cell {
         user.hosted_cell_grant_cid = Some(grant.grant_cid.clone());
         user.hosted_cell_valid_until = Some(grant.valid_until.clone());
+        // The performing household's own word about who it is. Stored beside
+        // the promise because it arrived with it, and because the account page
+        // must never reach for the doorway's own identity in its place.
+        user.hosted_cell_provider = grant.provider.clone();
     }
 
     // If agent was provisioned on a conductor, set conductor_id and override agent key
@@ -2499,6 +2506,30 @@ async fn handle_account(
         .map(|k| k.exported)
         .unwrap_or(false);
 
+    // Who is hosting this person — the household, named by itself. The chain
+    // and every `None` in it live in `routes::hosted_cell`; all that happens
+    // here is supplying the Human read it needs. A failed read is `None`, never
+    // a substitute name.
+    let hosted_by_household = crate::routes::hosted_cell::hosted_by_household(
+        user.hosted_cell_grant_cid.as_deref(),
+        user.hosted_cell_provider.as_deref(),
+        |steward_key| async move {
+            match crate::routes::zome_helpers::call_get_human_by_agent_key(&state, &steward_key)
+                .await
+            {
+                Ok(found) => found.map(|h| h.human.display_name),
+                Err(e) => {
+                    warn!(
+                        steward_key = %steward_key,
+                        "account: could not read the hosting household's Human: {}", e
+                    );
+                    None
+                }
+            }
+        },
+    )
+    .await;
+
     json_response(
         StatusCode::OK,
         &AccountResponse {
@@ -2522,32 +2553,13 @@ async fn handle_account(
             // The household name is shown only when there is a promise to name.
             // A portal can paint a name; only the commitment makes it checkable,
             // so the two travel together or not at all.
-            hosted_by_household: user
-                .hosted_cell_grant_cid
-                .as_ref()
-                .and_then(|_| household_label(&state)),
+            hosted_by_household,
             hosted_cell_grant_cid: user.hosted_cell_grant_cid,
             hosted_cell_valid_until: user.hosted_cell_valid_until,
             created_at: user.metadata.created_at.map(|d| d.to_string()),
             last_login_at: user.last_login_at.map(|d| d.to_string()),
         },
     )
-}
-
-/// The name a person should READ when told who is hosting them.
-///
-/// The doorway's configured id, falling back to its gateway hostname. Never the
-/// commitment cid: a cid is an address, and showing an address where a name
-/// belongs is how "hosted by a household" degrades into "hosted by uhCEk…".
-/// `None` when the doorway declares neither — better absent than a placeholder
-/// that reads like a name and is not one.
-fn household_label(state: &AppState) -> Option<String> {
-    state
-        .args
-        .doorway_id
-        .clone()
-        .filter(|id| !id.is_empty())
-        .or_else(|| gateway_domain(state.args.doorway_url.as_deref()))
 }
 
 /// POST /auth/close-account
@@ -5968,11 +5980,50 @@ mod tests {
             "a closed row must stop naming a commitment the household no longer owes"
         );
         assert_eq!(set.get("hosted_cell_valid_until"), Some(&bson::Bson::Null));
+        assert_eq!(
+            set.get("hosted_cell_provider"),
+            Some(&bson::Bson::Null),
+            "a closed row must stop naming the household that was keeping it"
+        );
         // And the cleared row is exactly the row live_hosted_cell_filter excludes.
         let filter = crate::routes::hosted_cell::live_hosted_cell_filter(chrono::Utc::now());
         assert!(
             filter.get_document("hosted_cell_grant_cid").is_ok(),
             "humansServed counts on the field this update nulls"
         );
+    }
+
+    /// `hostedByHousehold` names the PERFORMER, and the doorway is the arranger.
+    ///
+    /// Before 13b this field was filled from `doorway_id`, falling back to the
+    /// gateway hostname — the arranger's name in the performer's slot, which
+    /// `07-hosted-by-a-household.feature`'s vocabulary block forbids outright.
+    /// The cure is structural: the only root the resolver accepts is the
+    /// steward key the POOL PEER named on its own grant answer, so nothing the
+    /// doorway knows about itself can reach the field. This pins the structure
+    /// — a row carrying a promise but no peer-named provider goes UNNAMED even
+    /// though `doorway_id` and `doorway_url` are both set and both non-empty.
+    #[test]
+    fn a_doorways_own_name_can_never_stand_in_for_the_household() {
+        use crate::routes::hosted_cell::household_steward_key;
+        use clap::Parser;
+
+        let args = crate::config::Args::parse_from([
+            "doorway",
+            "--doorway-id",
+            "doorway-alpha",
+            "--doorway-url",
+            "https://doorway-alpha.elohim.host",
+        ]);
+        assert_eq!(args.doorway_id.as_deref(), Some("doorway-alpha"));
+        assert_eq!(
+            gateway_domain(args.doorway_url.as_deref()).as_deref(),
+            Some("alpha.elohim.host"),
+            "both of the old fallbacks are available in this fixture"
+        );
+
+        // A real promise, but the peer never named itself: unnamed, not
+        // "doorway-alpha" and not "alpha.elohim.host".
+        assert_eq!(household_steward_key(Some("uhCEkHostedCell"), None), None);
     }
 }

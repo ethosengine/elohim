@@ -131,6 +131,37 @@ pub async fn call_get_my_human(state: &AppState) -> Result<Option<HumanOutput>> 
     Ok(result)
 }
 
+/// Call `imagodei::get_human_by_agent_key` — whose Human is this key?
+///
+/// The read behind `hostedByHousehold`: a pool peer named itself as provider of
+/// a hosting promise with a `uhCAk…` cell key, and a person should be told the
+/// NAME behind that key, not the key. Answers `Ok(None)` for a key with no
+/// Human (a household that has not published a profile is unnamed, not an
+/// error), and `Err` only when the conductor itself could not be asked.
+///
+/// The key is parsed here rather than by the caller so an unparseable string
+/// can never be sent to the conductor as an agent key.
+pub async fn call_get_human_by_agent_key(
+    state: &AppState,
+    agent_key: &str,
+) -> Result<Option<HumanOutput>> {
+    let zome_caller = state.zome_caller.as_ref().ok_or_else(|| {
+        DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
+    })?;
+
+    let parsed = holo_hash::AgentPubKey::try_from(agent_key)
+        .map_err(|e| DoorwayError::Internal(format!("not an agent key: {agent_key} ({e})")))?;
+
+    debug!(agent_key = %agent_key, "Calling get_human_by_agent_key on imagodei zome");
+
+    let result: Option<HumanOutput> = zome_caller
+        .call("imagodei", "imagodei", "get_human_by_agent_key", &parsed)
+        .await
+        .map_err(|e| DoorwayError::Holochain(format!("get_human_by_agent_key failed: {e}")))?;
+
+    Ok(result)
+}
+
 /// Call imagodei::create_human on a specific conductor (not the singleton ZomeCaller).
 ///
 /// Used for `hosted` registrations where the human's identity is created on

@@ -227,6 +227,22 @@ pub struct UserDoc {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hosted_cell_valid_until: Option<String>,
 
+    /// The steward agent key the POOL PEER named as provider of that promise,
+    /// copied verbatim from the peer's own grant answer at issue time.
+    ///
+    /// This is the household's own word about who it is — the peer writes it as
+    /// its own conductor cell key, and the grant surface refuses any performer
+    /// that is not that key. It is the ONLY admissible root for
+    /// `hostedByHousehold`: the doorway arranges hosting, a household performs
+    /// it, and the account page must name the performer
+    /// (`routes::hosted_cell::household_steward_key`).
+    ///
+    /// Absent on rows written before 13b, and on any grant whose answer named
+    /// no provider. Absent means the household goes UNNAMED — never that the
+    /// doorway names itself instead.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hosted_cell_provider: Option<String>,
+
     /// When this human closed their OWN account via `POST /auth/close-account`.
     ///
     /// Distinct from `metadata.deleted_at`, which an operator's soft-delete
@@ -281,6 +297,7 @@ impl UserDoc {
             display_name: None,
             hosted_cell_grant_cid: None,
             hosted_cell_valid_until: None,
+            hosted_cell_provider: None,
             closed_at: None,
         }
     }

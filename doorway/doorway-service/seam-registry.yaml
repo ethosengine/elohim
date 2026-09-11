@@ -2856,3 +2856,121 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/hosted_cell.rs
         testName: humans_served_is_none_without_a_pool
         kind: unit
+
+  - name: household_steward_key
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::household_steward_key
+      line: 302
+    summary: >
+      Decides whether a hosting household may be NAMED at all, and with whose key: Some only
+      when a hosted-cell promise exists AND the pool peer named itself as that promise's
+      provider; None on either missing link, and never a substitute drawn from the doorway's
+      own identity.
+    notes: >
+      Forced by Task 11's finding (2026-09-11): GET /auth/account filled hostedByHousehold
+      from `doorway_id`, falling back to the gateway hostname — the ARRANGER's name in the
+      PERFORMER's slot, which the vocabulary block of
+      genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature forbids
+      outright. The a2o assertion (non-empty, not an agent key) would have passed on it and
+      the story would have been lying. The cure is structural rather than corrective: the
+      only root this predicate accepts is `hosted_cell_provider`, copied verbatim from the
+      pool peer's own grant answer (elohim-storage api/compute_grants.rs:261 writes it as
+      that peer's own conductor cell key, and the grant surface refuses any other verified
+      performer), so nothing the doorway knows about ITSELF can reach the field.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          Evidence-not-authority at transfer: the household's name is admitted only on the
+          household's own word, carried with the promise it made. The doorway is the courier
+          — it may not substitute its own identity for the performer's, and
+          a_doorways_own_name_can_never_stand_in_for_the_household pins that a row with a
+          real promise but no peer-named provider goes UNNAMED even when `doorway_id` and
+          `doorway_url` are both set and both non-empty.
+      - id: C4
+        status: answered
+        justification: >
+          Absence is honest and distinguishable: no promise, a promise the peer never signed
+          its name to, and a steward key that resolves to no Human all answer None rather
+          than a placeholder that reads like a name
+          (naming_a_household_needs_both_the_promise_and_the_peers_own_word,
+          a_steward_key_with_no_human_answers_null). Task 11's strip renders the
+          promised-until row alone in that case — absent, never blank.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: naming_a_household_needs_both_the_promise_and_the_peers_own_word
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: a_hosted_account_reads_the_stewards_display_name
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: an_unhosted_account_names_no_household_and_asks_nobody
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: a_steward_key_with_no_human_answers_null
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: a_doorways_own_name_can_never_stand_in_for_the_household
+        kind: unit
+
+  - name: household_display_name
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::household_display_name
+      line: 315
+    summary: >
+      The last hop of hostedByHousehold: a Human's display name becomes the shown household
+      name only when it is non-blank after trimming; whitespace-only answers None so the row
+      is absent rather than an empty "Hosted by" value.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          a_blank_human_name_renders_absent_not_empty pins that a blank name is treated as
+          absence, not as a name. An empty rendered value would claim a household exists to
+          be read while showing nothing — the exact false-reassurance shape this whole
+          decision point exists to refuse.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: a_blank_human_name_renders_absent_not_empty
+        kind: unit
+
+  - name: provider_named_by_peer
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/hosted_cell.rs
+      modulePath: routes::hosted_cell::provider_named_by_peer
+      line: 232
+    summary: >
+      Extracts the steward key the pool peer named itself by from its own grant answer; a
+      missing or blank `provider` is None, never an empty string.
+    notes: >
+      The single admissible source of the household identity the account page shows. A blank
+      provider leaves the promise standing and the household unnamed — issuance never fails
+      on it, because a missing NAME must not cost a person their cell.
+    concernIds:
+      - id: C5
+        status: answered
+        justification: >
+          The peer's own word, read off the peer's own answer, never computed by the doorway
+          — issue_records_the_steward_key_the_peer_names_not_the_doorways mocks a provider
+          that is deliberately NOT the configured performer, so a doorway echoing its own
+          configuration back would fail.
+      - id: C4
+        status: answered
+        justification: >
+          a_grant_without_a_named_provider_is_still_a_promise pins the split: the grant cid
+          is recorded and the provider is None. Unnamed is distinguishable from unpromised.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: issue_records_the_steward_key_the_peer_names_not_the_doorways
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: a_grant_without_a_named_provider_is_still_a_promise
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: hosted_register_records_the_grant_cid_when_the_pool_answers
+        kind: unit

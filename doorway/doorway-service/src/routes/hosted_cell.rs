@@ -118,6 +118,19 @@ pub struct HostedCellGrant {
     pub grant_cid: String,
     /// RFC3339 UTC, seconds precision. See [`rfc3339_utc_secs`].
     pub valid_until: String,
+    /// The steward agent key the POOL PEER named as provider of this promise.
+    ///
+    /// Read straight off the peer's own answer (`provider` on
+    /// `POST /api/v1/compute/grants`), where it is written as
+    /// `hc.agent_key_uhcak()` — the peer's OWN conductor cell key
+    /// (`elohim/elohim-storage/src/api/compute_grants.rs:261`). The doorway
+    /// never computes it and never substitutes its own identity for it: this is
+    /// the performing household naming itself, which is the only reason the
+    /// account page may say who is hosting someone.
+    ///
+    /// `None` when the peer answered without one — the promise still stands,
+    /// the household just goes unnamed rather than mis-named.
+    pub provider: Option<String>,
 }
 
 /// Canonical stamp format for every hosted-cell time this doorway writes.
@@ -197,15 +210,32 @@ pub async fn issue_hosted_cell_grant(
         .filter(|c| !c.is_empty())
         .ok_or_else(|| format!("grant answer carried no grantCid: {value}"))?
         .to_string();
+    let provider = provider_named_by_peer(&value);
     debug!(
         recipient = %recipient_agent_pub_key,
         grant_cid = %grant_cid,
+        provider = provider.as_deref().unwrap_or("<unnamed>"),
         "hosted-cell promise notarized"
     );
     Ok(HostedCellGrant {
         grant_cid,
         valid_until,
+        provider,
     })
+}
+
+/// The steward agent key the pool peer named as the promise's provider.
+///
+/// Pure. A blank or missing `provider` is `None`, never an empty string: an
+/// empty name is worse than no name, because the row would then claim a
+/// household exists to be looked up.
+pub fn provider_named_by_peer(grant_answer: &Value) -> Option<String> {
+    grant_answer
+        .get("provider")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
 }
 
 /// Withdraw a hosted-cell promise. `Ok(true)` means the provider had already
@@ -244,6 +274,73 @@ async fn post_grant(cfg: &PoolComputeConfig, body: &Value) -> Result<Value, Stri
         return Err(format!("pool compute answered {status}: {text}"));
     }
     serde_json::from_str(&text).map_err(|e| format!("pool compute answer was not JSON: {e}"))
+}
+
+// =============================================================================
+// hostedByHousehold — naming the household, never the machine (13b)
+// =============================================================================
+
+/// Which steward key, if any, may be looked up to NAME the hosting household.
+///
+/// Pure, and deliberately a conjunction of two facts that must travel together:
+///
+/// 1. `grant_cid` — this doorway's pool actually made a hosting promise for
+///    this human. Without it there is nothing to name a household *about*, and
+///    a name with no checkable promise is a portal painting reassurance.
+/// 2. `provider` — the pool PEER named itself as that promise's provider
+///    ([`provider_named_by_peer`]). This is the household's own word about who
+///    it is, recorded at the moment it took the obligation on.
+///
+/// `None` on either missing link. The one thing this function must never do is
+/// substitute the doorway's own identity — `doorway_id`, the gateway hostname,
+/// anything the doorway knows about itself. The doorway ARRANGES hosting; a
+/// household PERFORMS it, and
+/// `genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature`
+/// is explicit that they are not the same party. It must also never fall back
+/// to `conductor_id` or the commitment cid: those name a machine and an
+/// address, and the story asks for the name a person would use.
+pub fn household_steward_key(grant_cid: Option<&str>, provider: Option<&str>) -> Option<String> {
+    let _promise = grant_cid.map(str::trim).filter(|c| !c.is_empty())?;
+    provider
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+}
+
+/// The name a person READS, from the `Human` the steward key resolved to.
+///
+/// Pure. A blank or whitespace-only display name answers `None` so the strip
+/// renders the promised-until row alone rather than an empty "Hosted by" value
+/// — absent, never blank (Task 11's rendering contract).
+pub fn household_display_name(human_display_name: Option<&str>) -> Option<String> {
+    human_display_name
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_string)
+}
+
+/// `hostedByHousehold` on `GET /auth/account`, end to end.
+///
+/// Hops, in order, each one shorting to `None`:
+/// grant cid + peer-named provider ([`household_steward_key`]) → the Human that
+/// key belongs to (`lookup`, an `imagodei::get_human_by_agent_key` call at the
+/// one live call site) → that Human's display name
+/// ([`household_display_name`]).
+///
+/// `lookup` is injected rather than called directly so the whole chain is
+/// testable without a conductor, and so this module stays free of zome plumbing.
+pub async fn hosted_by_household<F, Fut>(
+    grant_cid: Option<&str>,
+    provider: Option<&str>,
+    lookup: F,
+) -> Option<String>
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = Option<String>>,
+{
+    let steward_key = household_steward_key(grant_cid, provider)?;
+    let name = lookup(steward_key).await;
+    household_display_name(name.as_deref())
 }
 
 // =============================================================================
@@ -390,6 +487,155 @@ mod tests {
             .expect("the pool answered");
         assert_eq!(grant.grant_cid, "uhCEkHostedCell");
         assert_eq!(grant.valid_until, "2026-10-11T09:00:00Z");
+        assert_eq!(
+            grant.provider.as_deref(),
+            Some("uhCAkPoolPeer"),
+            "the promise carries the key the PEER named itself by"
+        );
+    }
+
+    /// The peer's own word is the only source for who is hosting.
+    ///
+    /// The mocked answer here carries a `provider` the doorway could not have
+    /// invented, and the grant records exactly that. Nothing in the doorway's
+    /// own configuration contributes to it.
+    #[tokio::test]
+    async fn issue_records_the_steward_key_the_peer_names_not_the_doorways() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(GRANTS_PATH))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "grantCid": "uhCEkHostedCell",
+                // NOT cfg().performer — a different key, so a doorway echoing
+                // its own configuration back would fail this test.
+                "provider": "uhCAkJessicaHousehold",
+                "state": "active"
+            })))
+            .mount(&server)
+            .await;
+
+        let config = PoolComputeConfig {
+            url: server.uri(),
+            ..cfg()
+        };
+        let grant = issue_hosted_cell_grant(&config, "uhCAkNewcomer", at("2026-09-11T09:00:00Z"))
+            .await
+            .expect("the pool answered");
+        assert_eq!(grant.provider.as_deref(), Some("uhCAkJessicaHousehold"));
+    }
+
+    /// A peer that answers without naming itself still makes the promise.
+    #[tokio::test]
+    async fn a_grant_without_a_named_provider_is_still_a_promise() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path(GRANTS_PATH))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "grantCid": "uhCEkHostedCell",
+                "provider": "   ",
+                "state": "active"
+            })))
+            .mount(&server)
+            .await;
+
+        let config = PoolComputeConfig {
+            url: server.uri(),
+            ..cfg()
+        };
+        let grant = issue_hosted_cell_grant(&config, "uhCAkNewcomer", at("2026-09-11T09:00:00Z"))
+            .await
+            .expect("the pool answered");
+        assert_eq!(grant.grant_cid, "uhCEkHostedCell");
+        assert_eq!(
+            grant.provider, None,
+            "a blank provider is unnamed, never an empty household name"
+        );
+    }
+
+    // ── hostedByHousehold (13b) ──────────────────────────────────────────────
+
+    #[test]
+    fn naming_a_household_needs_both_the_promise_and_the_peers_own_word() {
+        assert_eq!(
+            household_steward_key(Some("uhCEkHostedCell"), Some("uhCAkJessica")),
+            Some("uhCAkJessica".to_string())
+        );
+        assert_eq!(
+            household_steward_key(None, Some("uhCAkJessica")),
+            None,
+            "no promise, no household to name"
+        );
+        assert_eq!(
+            household_steward_key(Some("uhCEkHostedCell"), None),
+            None,
+            "a promise whose provider the peer never named stays unnamed"
+        );
+        assert_eq!(
+            household_steward_key(Some("  "), Some("uhCAkJessica")),
+            None
+        );
+        assert_eq!(
+            household_steward_key(Some("uhCEkHostedCell"), Some("")),
+            None
+        );
+    }
+
+    #[test]
+    fn a_blank_human_name_renders_absent_not_empty() {
+        assert_eq!(
+            household_display_name(Some("  The Ellis Household ")),
+            Some("The Ellis Household".to_string())
+        );
+        assert_eq!(household_display_name(Some("   ")), None);
+        assert_eq!(household_display_name(None), None);
+    }
+
+    /// The whole chain, with the Human read stubbed: a hosted account whose
+    /// pool peer named steward X reads X's display name.
+    #[tokio::test]
+    async fn a_hosted_account_reads_the_stewards_display_name() {
+        let seen = std::cell::RefCell::new(None);
+        let name = hosted_by_household(Some("uhCEkHostedCell"), Some("uhCAkJessica"), |key| {
+            *seen.borrow_mut() = Some(key);
+            async { Some("The Ellis Household".to_string()) }
+        })
+        .await;
+        assert_eq!(name.as_deref(), Some("The Ellis Household"));
+        assert_eq!(
+            seen.into_inner().as_deref(),
+            Some("uhCAkJessica"),
+            "the Human read is keyed by the steward key the PEER named"
+        );
+    }
+
+    /// An unhosted account answers `null`, and never reaches the Human read.
+    #[tokio::test]
+    async fn an_unhosted_account_names_no_household_and_asks_nobody() {
+        let asked = std::cell::Cell::new(false);
+        let name = hosted_by_household(None, None, |_key| {
+            asked.set(true);
+            async { Some("doorway-alpha".to_string()) }
+        })
+        .await;
+        assert_eq!(name, None);
+        assert!(!asked.get(), "no promise means no lookup at all");
+    }
+
+    /// A steward key that resolves to no Human answers `null` — the strip then
+    /// renders the promised-until row alone, which Task 11 already handles.
+    #[tokio::test]
+    async fn a_steward_key_with_no_human_answers_null() {
+        let name = hosted_by_household(Some("uhCEkHostedCell"), Some("uhCAkGhost"), |_key| async {
+            None
+        })
+        .await;
+        assert_eq!(name, None);
     }
 
     #[tokio::test]
