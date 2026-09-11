@@ -483,7 +483,7 @@ git commit -m "test(a2o): step glue for hosted-by-a-household and humans-served"
 - Consumes: `DOORWAY_A_URL`, `DOORWAY_B_URL` (already exported by the Prologue); the doorway's `POST /auth/register` with `agencyPhase` hosted.
 - Produces: three hosted registrants whose identifiers Task 4's steps read back; and, once S2 Task 13 lands, three live `hosted-cell` commitments.
 
-- [ ] **Step 1: Read how the Prologue already registers through the portal**
+- [x] **Step 1: Read how the Prologue already registers through the portal**
 
 ```bash
 cd /projects/elohim
@@ -492,7 +492,7 @@ grep -n "auth/register" genesis/seeder/src/seed-humans.ts | head
 ```
 Expected: the section-5 comment block explaining why `seed-conductor-identities` runs before `seed-humans`, and `seed-humans.ts`'s own `POST /auth/register` call. Your new leg must run **after** `seed-humans` for the same reason the comment gives: each household conductor must embody its own canonical `human-<name>` id before a hosted registration can mint a UUID onto it.
 
-- [ ] **Step 2: Write the caster**
+- [x] **Step 2: Write the caster**
 
 `genesis/seeder/src/seed-hosted-humans.ts` — three registrants, idempotent (a re-run against an existing identifier reports `exists` and does not fail), through `POST {DOORWAY_URL}/auth/register` with the hosted agency phase, exactly the call a stranger's browser makes:
 
@@ -504,7 +504,7 @@ Expected: the section-5 comment block explaining why `seed-conductor-identities`
 
 All three register at doorway **A** so the "sibling's count is its own" scenario has a doorway (B) hosting none. Print one line per registrant: `identifier`, `agentPubKey`, `conductorId`, and `hostedCellGrantCid` when the response carries one (it will once S2 Task 13 lands; before that, print `-`). Write the roster to `${MESH_DIR}/prologue-hosted-humans.json` so Task 4's steps read it rather than guessing names.
 
-- [ ] **Step 3: Wire the leg**
+- [x] **Step 3: Wire the leg**
 
 In `app/elohim-app/scripts/hc-mesh-prologue.sh`, immediately after the `seed-humans` leg:
 
@@ -526,7 +526,9 @@ curl -s http://localhost:8888/status.json | python3 -m json.tool | grep -i human
 ```
 Expected: three registrant lines with three **distinct** `agentPubKey` values (this is also the first live proof of S2 Task 7 — before that task lands, expect three registrations sharing one key, which is the measured red). `humansServed` is `null` until S2 Task 14.
 
-- [ ] **Step 5: Commit**
+**Not run in this session** — the executing session's own instructions explicitly withheld a live-mesh proof ("Do NOT start a mesh and do NOT run against alpha"). Verified instead against a closed/unreachable doorway: `cd genesis/seeder && DOORWAY_URL="http://localhost:1" MESH_DIR=<scratch> npx tsx src/seed-hosted-humans.ts` prints one soft-failure line per registrant (`doorway http://localhost:1 unreachable (fetch failed) — soft failure, continuing.`), still writes the roster (3 entries, `result: "unreachable"`), and exits non-zero without a stack trace; `pnpm exec tsc --noEmit` is clean. Step 4's live-mesh proof (three distinct/shared `agentPubKey` values, `humansServed`) remains open for the next session that runs `just mesh start`.
+
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim
