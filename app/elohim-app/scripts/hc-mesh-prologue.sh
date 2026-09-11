@@ -128,6 +128,59 @@ for d in "$LANDING_BROWSER_DIST" "$LANDING_SERVER_DIST" "$LAMAD_BROWSER_DIST"; d
   fi
 done
 say "landing browser/server + lamad-spa browser dist dirs all present"
+
+# ---------------------------------------------------------------------------
+# Build stamp (version.json) — the staging precondition a local build never meets.
+#
+# package-angular-check.py REFUSES an archive whose version.json is absent or whose
+# `commit` is empty (check_browser / check_server, elohim/sdk/scripts/
+# package-angular-check.py:34-56), and for kind=server it additionally requires the
+# server stamp to EQUAL the browser one (stage-spa-blob.sh passes
+# `--version <browser>/version.json`). Only two things write that file: the CI
+# Jenkinsfile (Jenkinsfile:1238-1250) and `package-angular.mjs build`, which stamps
+# as a side effect of running the whole `pnpm run build`. A plain `ng build` /
+# `pnpm build` — what a household dist is built with — never writes it, so all three
+# stage legs are refused before a byte is uploaded and every scenario that reaches
+# the landing or lamad bundle reds on an absent bundle rather than on anything it
+# meant to test (measured 2026-09-11, run 20260911T0319Z: doorway-failover 4 reds
+# + apex 404).
+#
+# Re-running `package-angular.mjs build` here is not the fix: its stamp is a side
+# effect of a FULL rebuild of the app (elohim/sdk/scripts/package-angular.mjs:53-117,
+# which `just dev package` drives), and the Prologue must never rebuild the dists it
+# is staging. So mirror its stamp exactly — same five fields, same values
+# (`commit` = full `git rev-parse HEAD`, not a short sha; `dirty`; `buildTime`;
+# `service` = the Angular application name in angular.json, which is what
+# `bundles[0].name` resolves to; `environment` = "local").
+#
+# Never overwrite a stamp that is already there: a dist packaged by `just dev package`
+# (or unpacked from CI) carries the authoritative bytes, and re-stamping would make a
+# household run claim a commit the artifact was not built at. When ANY of one app's
+# dists lacks a stamp, write the SAME stamp to all of them — browser and server must
+# agree byte-for-byte or the server archive is refused on that comparison instead.
+# ---------------------------------------------------------------------------
+stamp_build_version() { # <service> <dist-dir>...
+  local service="$1"; shift
+  local dists=("$@") d missing=0
+  for d in "${dists[@]}"; do [ -f "$d/version.json" ] || missing=1; done
+  if [ "$missing" -eq 0 ]; then
+    say "build stamp ($service): version.json already present in ${#dists[@]} dist dir(s) — left as authored"
+    return 0
+  fi
+  local commit dirty stamp
+  commit="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+  if [ -n "$(git -C "$REPO_ROOT" status --porcelain --untracked-files=no)" ]; then dirty=true; else dirty=false; fi
+  stamp="$(printf '{\n  "commit": "%s",\n  "dirty": %s,\n  "buildTime": "%s",\n  "service": "%s",\n  "environment": "local"\n}\n' \
+    "$commit" "$dirty" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$service")"
+  # printf '%s\n': command substitution above stripped the trailing newline that
+  # package-angular.mjs's `JSON.stringify(...) + "\n"` writes. The check compares
+  # PARSED json, so this is fidelity, not correctness.
+  for d in "${dists[@]}"; do printf '%s\n' "$stamp" > "$d/version.json"; done
+  say "build stamp ($service): wrote version.json to ${#dists[@]} dist dir(s) (commit=${commit:0:12} dirty=$dirty) — a plain \`pnpm build\` leaves none and staging refuses the archive"
+}
+stamp_build_version elohim-app "$LANDING_BROWSER_DIST" "$LANDING_SERVER_DIST"
+stamp_build_version lamad "$LAMAD_BROWSER_DIST"
+
 say "CONDUCTOR_URLS=$CONDUCTOR_URLS"
 
 # ---------------------------------------------------------------------------
