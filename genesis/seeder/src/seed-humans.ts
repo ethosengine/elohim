@@ -88,6 +88,96 @@ function loadSuspendedNames(): Set<string> {
 }
 
 // =============================================================================
+// Household-mesh hosted cast — the allow-list
+// =============================================================================
+
+/**
+ * WHY THIS EXISTS (measured 2026-09-11, household run 20260911T0319Z).
+ *
+ * Registering a human at `POST /auth/register` now PROVISIONS: the doorway
+ * installs and enables a 5-cell app for that identifier on a conductor
+ * (doorway-service `AgentProvisioner::provision_agent`). Until 60fb28a39 a
+ * `--dev-mode` doorway skipped provisioning entirely and every hosted
+ * registration rode one shared singleton Human — free, and wrong. `should_provision`
+ * removed that path ON PURPOSE, so the standing cast's cost became real:
+ * ~157 MB of conductor heap per cell × 5 cells ≈ 786 MB per registered human.
+ * Casting the 29 standing personas took matthew's conductor from 1.1 GB to
+ * 22.8 GB and the workspace RAM guard shed the whole lane (`exit 143`).
+ *
+ * The cast was designed under a bug. This is the corrected declaration for a
+ * HOUSEHOLD mesh: provision only the humans the a2o household lane actually
+ * signs in as. Everyone else is not registered here at all — NOT a silent drop:
+ * every skipped persona is printed with the reason. There is deliberately no
+ * "register without a cell" middle path: both register branches that a
+ * conductor-registry-configured doorway can take (`hosted`, and `node`/`device`)
+ * call `provision_agent`, which INSTALLS the app when it finds none
+ * (doorway-service/src/conductor/provisioner.rs — "Find (or create)"). A
+ * credential with no cell is not something the doorway can currently mint, so
+ * the honest household answer is absence, not a fake.
+ *
+ * DERIVATION — do not edit this list by intuition; re-derive it. A name belongs
+ * here iff some scenario under genesis/a2o/features/ that the household lane can
+ * run — `@e2e`, act I or untagged, per the `mesh` / `mesh-browser` cucumber
+ * profiles — contains a step of the form `human "<Name>" is logged in` (or
+ * registers / signs in). Names referenced only as DATA ("Jessica holds a valid
+ * record") need a row, not a cell, and are not here. Names that appear only under
+ * `@act:ii`/`@act:iii` (the deployed-fleet acts) are not here either — the fleet
+ * has the conductors for them; one household does not.
+ *
+ * The three `prologue-hosted-*` registrants are cast separately by
+ * seed-hosted-humans.ts and are part of the same heap budget (they are what
+ * hc-mesh.sh's MESH_DOORWAY_MAX_AGENTS default is sized against, together with
+ * this list).
+ *
+ * MESH_HOSTED_CAST=all restores the full standing cast for someone who has the
+ * RAM; MESH_HOSTED_CAST=lane forces the allow-list even against a remote doorway.
+ * Unset, the allow-list applies only when DOORWAY_URL is loopback — a doorway on
+ * localhost IS this host's own household mesh, and a deployed fleet (alpha) keeps
+ * the full cast byte-for-byte as before.
+ */
+const HOUSEHOLD_HOSTED_CAST: readonly string[] = [
+  // Everywhere. agencyPhase=doorway, so the operator alone costs NO provisioned
+  // cell — the doorway branch calls the singleton ZomeCaller on its own conductor.
+  'Matthew',
+  // features/auth/fixture-humans.feature "Core family — Matthew's household" (@act:i)
+  'Susan',
+  'James',
+  'Gertrude',
+  // features/auth/fixture-humans.feature "Newcomers" (@act:i)
+  'Maria',
+  'Ronald',
+  // features/auth/fixture-humans.feature "Red-team humans can login" (@act:i)
+  'Charlie',
+  'Sam',
+  'Dr. Dolittle',
+  // features/content/stewardship-allocation.feature (@act:i)
+  'Jessica',
+  // features/lms/know-thyself-discovery.feature (@act:i)
+  'Terrance',
+  // features/elohim/content-reach-negotiation.feature (@act:i @wip) — the lane runs
+  // these under A2O_RUN_WIP=1, which is the documented local red loop, so they are
+  // cast. Drop them here first if a household ever needs the heap back.
+  'Miriam',
+  'Ezra',
+  'Levi',
+];
+
+function hostedCastMode(doorwayUrl: string): 'all' | 'lane' {
+  const declared = (process.env.MESH_HOSTED_CAST || '').trim().toLowerCase();
+  if (declared === 'all') return 'all';
+  if (declared === 'lane') return 'lane';
+  let host = '';
+  try {
+    host = new URL(doorwayUrl).hostname;
+  } catch {
+    return 'all';
+  }
+  return host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]'
+    ? 'lane'
+    : 'all';
+}
+
+// =============================================================================
 // Credential derivation — MUST stay in sync with a2o fixtures/humans.ts
 // =============================================================================
 
@@ -340,14 +430,29 @@ async function main(): Promise<void> {
   //  - Humans with no explicit agencyPhase default to "hosted" at
   //    registration — doorway-managed account, no dedicated infra archetype.
   const suspendedNames = loadSuspendedNames();
+  // Household-mesh hosted cast (see HOUSEHOLD_HOSTED_CAST above): on a loopback
+  // doorway, registering is PROVISIONING, so the cast is the lane's allow-list.
+  const castMode = hostedCastMode(doorwayUrl);
+  const castAllowed = new Set(HOUSEHOLD_HOSTED_CAST.map(n => n.toLowerCase()));
   const active = humansJson.humans.filter(h => {
     if (h.category === 'visitor' || h.agencyPhase === 'visitor') return false;
     if (suspendedNames.has(h.displayName.toLowerCase())) return false;
+    if (castMode === 'lane' && !castAllowed.has(h.displayName.toLowerCase())) return false;
     return true;
   });
   const skippedSuspended = humansJson.humans.filter(h =>
     suspendedNames.has(h.displayName.toLowerCase())
   );
+  const skippedOffCast =
+    castMode === 'lane'
+      ? humansJson.humans.filter(
+          h =>
+            h.category !== 'visitor' &&
+            h.agencyPhase !== 'visitor' &&
+            !suspendedNames.has(h.displayName.toLowerCase()) &&
+            !castAllowed.has(h.displayName.toLowerCase())
+        )
+      : [];
 
   console.log('=== Seed Humans ===\n');
   console.log(`Doorway:  ${doorwayUrl}`);
@@ -356,6 +461,28 @@ async function main(): Promise<void> {
     console.log(
       `Skipping: ${skippedSuspended.length} suspended (${skippedSuspended.map(h => h.displayName).join(', ')}) — see deployments.json`
     );
+  }
+  if (castMode === 'lane') {
+    console.log(
+      `Cast:     household allow-list (${HOUSEHOLD_HOSTED_CAST.length} names) — registering IS provisioning (~786 MB of conductor heap per human, 5 cells at ~157 MB)`
+    );
+    // Only a registration that PROVISIONS costs heap. agencyPhase=doorway uses the
+    // singleton ZomeCaller on the doorway's own conductor and installs nothing, so
+    // counting it would overstate the projection by one human.
+    const provisioning = active.filter(h => (h.agencyPhase ?? 'hosted') !== 'doorway');
+    console.log(
+      `          projected conductor heap: ${provisioning.length} provisioning registrations x 786 MB ~= ${((provisioning.length * 786) / 1024).toFixed(1)} GB` +
+        ` (+3 for the prologue-hosted-* registrants; ${active.length - provisioning.length} agencyPhase=doorway registration(s) provision nothing)`
+    );
+    if (skippedOffCast.length > 0) {
+      console.log(
+        `Skipping: ${skippedOffCast.length} off-cast — no household-lane scenario signs in as them, and a registration here would install a 5-cell app for a persona nothing exercises:`
+      );
+      console.log(`          ${skippedOffCast.map(h => h.displayName).join(', ')}`);
+      console.log(
+        '          MESH_HOSTED_CAST=all registers the full standing cast (needs ~23 GB of conductor heap for 29).'
+      );
+    }
   }
   console.log(`Admin key: ${adminBootstrapKey ? 'provided' : 'not set'}`);
   console.log('');
