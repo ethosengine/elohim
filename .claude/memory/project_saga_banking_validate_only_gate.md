@@ -2,6 +2,7 @@
 index: false
 name: saga-banking-validate-only-gate
 title: "Saga banking = validate-only run; gate reads matthew"
+id: project-saga-banking-validate-only-gate
 description: "validate-only gate (edge:validate-only) records measure without deploying; bakes PREVIOUS happ hash, no DNA reinstall."
 metadata: 
   node_type: memory

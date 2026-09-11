@@ -2,6 +2,7 @@
 index: false
 name: reference_io_guard_berth_rails
 title: io-guard and berth rails
+id: reference-io-guard-berth-rails
 description: "I/O guard berth rails: hard NFS deadlock recovery pattern for devspace and container ops."
 metadata: 
   node_type: memory

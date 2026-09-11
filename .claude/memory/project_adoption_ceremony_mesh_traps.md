@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_adoption_ceremony_mesh_traps
 title: "Rung-5 adoption ceremony: mesh traps + refusal map"
+id: project-adoption-ceremony-mesh-traps
 description: "Rung-5 adoption ceremony (local mesh 2026-09-02): preconditions, candidate shape, typed-refusal map. Use before release/election measures."
 metadata:
   type: project

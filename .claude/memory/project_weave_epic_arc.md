@@ -3,6 +3,7 @@ index: false
 carried_by: "genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
 name: weave-epic-arc
 title: The Weave Epic arc
+id: project-weave-epic-arc
 description: "Weave lens seeds 4 subsystems (VSM recursion, tier-capability, compute contracts, replica encryption); compose-don't-fork, one new DHT entry."
 metadata: 
   node_type: memory

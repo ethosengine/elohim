@@ -2,6 +2,7 @@
 index: false
 name: project-sync-state-contract
 title: Sync-state contract — epoch, position, caught-up
+id: project-sync-state-contract
 description: "Sync-plane state durable: inventory gossip, Automerge gossip, DHT entries. Canonical channels alone move heads."
 metadata:
   type: project

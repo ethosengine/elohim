@@ -1,6 +1,7 @@
 ---
 name: project_devspace_recovery
 title: Devspace/container recovery (umbrella)
+id: project-devspace-recovery
 description: "Devspace recovery: container restarts kill mesh + wipe /tmp/~/bin; ethosengine I/O = hard NFS deadlocks; pod swaps drop secrets — stop/start heals."
 metadata:
   node_type: memory
@@ -65,3 +66,5 @@ two commands after any restart: `git config --global --add safe.directory '*'` a
 `HOLOCHAIN_BIN` export is needed anymore.
 Operator 2026-09-07: do NOT pin codex/claude CLI versions in the image — "that version changes all the time";
 expect both CLIs to need an auto-update on every workspace restart, and treat that as routine, not a backlog item.
+
+- [[project_host_psu_power_interrupts_2026_09]] — folded (index: false); Sept 2026 dev-host PSU power interrupts: a WHOLE-HOST cut, not a container recycle — mesh, a running pre-push gate, every background agent and watch die at once, /tmp is wiped, /projects survives and `berth` leases stay held by dead agents. Run long legs re-entrant from durable state (logs under /projects/.claude-config/jobs/), commit early and path-limited, `berth release` stale leases first thing after a restart; a sudden RAM-guard "committed 1.7G" at session start is the fingerprint. 750 W replacement ordered 2026-09-07.

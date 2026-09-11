@@ -2,6 +2,7 @@
 index: false
 name: project-ssr-first-deploy-seed-then-restart
 title: SSR first deploy — seed, then restart doorway
+id: project-ssr-first-deploy-seed-then-restart
 description: "First SSR deploy: seed then restart doorway. Stale shell pins slug-fetched shell under empty head."
 metadata: 
   node_type: memory

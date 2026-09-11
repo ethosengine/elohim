@@ -1,6 +1,7 @@
 ---
 name: project-two-premises-dns-beacon-owned
 title: Two-premises DNS — beacon-owned apex/alpha split
+id: project-two-premises-dns-beacon-owned
 description: "apex=shem/adam, alpha.elohim.host=operations/matthew, both beacon-owned; bites when debugging DNS/TURN/signal routing or record drift."
 metadata: 
   node_type: memory

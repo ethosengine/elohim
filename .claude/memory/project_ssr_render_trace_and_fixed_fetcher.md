@@ -2,6 +2,7 @@
 index: false
 name: project_ssr_render_trace_and_fixed_fetcher
 title: SSR render-trace + per-request fetcher swap (elohim-render)
+id: project-ssr-render-trace-and-fixed-fetcher
 description: "SSR render trace shows which routes hot-swap cache; fetcher fixed to never deserialize before serving."
 metadata: 
   node_type: memory

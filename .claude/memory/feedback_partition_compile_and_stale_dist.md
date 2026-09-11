@@ -2,6 +2,7 @@
 index: false
 name: feedback-partition-compile-and-stale-dist
 title: Commit partitions respect compile deps
+id: feedback-partition-compile-and-stale-dist
 description: "Commit partitions must respect COMPILE deps; local dist/ presence doesn't prove CI coverage."
 metadata:
   type: feedback

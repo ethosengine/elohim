@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_household_space_partition_blocks_and_round_deadline
 title: Household space partition blocks
+id: project-household-space-partition-blocks-and-round-deadline
 description: "0.7: one rejected op blocks author's cell forever → storageArc null on every peer, no authorities; bites when ONE space reds."
 metadata: 
   node_type: memory

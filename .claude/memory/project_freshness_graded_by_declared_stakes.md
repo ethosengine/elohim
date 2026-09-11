@@ -2,6 +2,7 @@
 index: false
 name: project_freshness_graded_by_declared_stakes
 title: Freshness graded by declared stakes
+id: project-freshness-graded-by-declared-stakes
 description: "Freshness graded by declared stakes; staleness is a measure axis; reach vocabulary has canonical spec."
 metadata:
   type: project

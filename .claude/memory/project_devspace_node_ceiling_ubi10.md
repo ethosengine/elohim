@@ -2,6 +2,7 @@
 index: false
 name: project_devspace_node_ceiling_ubi10
 title: Devspace node is capped at 22.x by UBI10; CI runs 24
+id: project-devspace-node-ceiling-ubi10
 description: "udi-plus lineage gets node from UBI10 appstream (only 22.23.1, no 24 stream) — CI's ci-builder is node:24-bookworm, so dev/CI skew is structural, not drift."
 metadata: 
   node_type: memory

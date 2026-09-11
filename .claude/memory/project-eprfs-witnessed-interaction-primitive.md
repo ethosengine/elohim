@@ -2,6 +2,7 @@
 name: project-eprfs-witnessed-interaction-primitive
 description: "Light-runtime witnesses interaction events on object CIDs — peer-validated, REA-aggregated, attention-denominated; governance classifier is instance #1."
 title: eprfs witnessed-interaction primitive + sense-respond classifier
+id: project-eprfs-witnessed-interaction-primitive
 metadata: 
   node_type: memory
   sovereignty-frame: descriptive

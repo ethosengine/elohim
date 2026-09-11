@@ -2,6 +2,7 @@
 index: false
 name: project_brynjolfsson_wemustactnow_outreach
 title: Brynjolfsson / We Must Act Now outreach thread
+id: project-brynjolfsson-wemustactnow-outreach
 description: "Cold email to Erik Brynjolfsson + the We Must Act Now team (Elohim Protocol as a working example of their \"build the institutions\" call); sent 2026-07-17."
 metadata: 
   node_type: memory

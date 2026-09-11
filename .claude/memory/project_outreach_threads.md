@@ -2,6 +2,7 @@
 name: project_outreach_threads
 description: "Lewis (canteen), Richardson (Polity/Ethelo), Monty Lynn, AI-future-of-work, Audrey Tang, Andy Crouch, Brynjolfsson."
 title: Outreach threads (umbrella)
+id: project-outreach-threads
 metadata: 
   node_type: memory
   type: project

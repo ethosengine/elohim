@@ -2,6 +2,7 @@
 index: false
 name: project_polity_ethelo_outreach_thread
 title: Polity/Ethelo outreach thread (John Richardson)
+id: project-polity-ethelo-outreach-thread
 description: Data-coop wanting Elohim as P2P-storage+provenance substrate; wallets→agent-scoped DHT, lake→projection+OPAL; coop model resolves the self-sovereign tension.
 metadata: 
   node_type: memory

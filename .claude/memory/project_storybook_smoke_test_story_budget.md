@@ -2,6 +2,7 @@
 index: false
 name: project_storybook_smoke_test_story_budget
 title: Storybook smoke-test story-budget
+id: project-storybook-smoke-test-story-budget
 description: "Smoke-Test Stories share a cumulative timeout budget — a fat matrix fails the WHOLE build; keep Library A+B to ~3-4 trimmed-fixture stories."
 metadata: 
   node_type: memory

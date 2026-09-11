@@ -2,6 +2,7 @@
 index: false
 name: reference_gh_cli_install
 title: gh CLI not preinstalled
+id: reference-gh-cli-install
 description: "Install gh CLI in devspace when first needed via a postStart command with version pinning."
 metadata: 
   node_type: memory

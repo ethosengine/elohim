@@ -1,6 +1,7 @@
 ---
 name: project_earned_reach_governance_pr_ceremony_vision
 title: Earned-reach governance = story+REA+council PR-ceremony
+id: project-earned-reach-governance-pr-ceremony-vision
 description: "Earned reach for high-stakes artifacts = a story+REA governance PR-ceremony affirmed by councils of Elohim; sub-commons peers fork/merge/compete."
 metadata: 
   node_type: memory

@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_local_mesh_binary_slot_and_restart
 title: Local mesh binary slot, restart & prologue traps
+id: project-local-mesh-binary-slot-and-restart
 description: "Local mesh: doorway-family DEBUG slot, rebuild + hc-mesh.sh storage-restart; procfs copyFile is 0 bytes."
 metadata: 
   node_type: memory
@@ -101,3 +103,12 @@ the shell that issued it — bracket a char (`cucumber-j[s]`). Mesh pacing: `ACQ
 **Scoped a2o runs need the recipe env (2026-09-05):** a bare `cucumber-js --config <scoped.mjs> --name …` dies in the Before hook with `E2E_STORAGE_<PEER> is not set`; the peer URLs, doorway URLs, fixture path and cluster-state override are exported by the `just test mesh` recipe (`source hc-mesh.sh; mesh_seed_env; export E2E_…`). Run scoped stations through `just test mesh <feature>` (whole feature) or reproduce that env block first; a relative `ELOHIM_CLUSTER_STATE_PATH_OVERRIDE` resolves against genesis/a2o, not the repo root.
 
 **2026-09-07 (slice-1 mesh run):** two binary traps in one night. (1) The mesh wants the UPLIFTED `debug/doorway` in the dev doorway slot; a `cargo test` there leaves only `deps/doorway-<hash>` and `just mesh start` fails "missing binary" — a plain `cargo build --bin doorway` (RUSTFLAGS="") restores it in ~5 min. (2) `hc-mesh.sh start` refuses a storage binary built without `--features "p2p p2p-iroh"` ("binary lacks the p2p-iroh marker") — build the mesh storage with those features into the branch slot. Also `just mesh prologue` needs Angular dists (EXIT=2) and is NOT required for dataplane stations that take no fixture.
+
+**2026-09-08 addition (verified live):** `just gate elohim-storage` on a `sprint/*` branch
+builds into `family/sprint/elohim__elohim-storage/dev/debug` with DEFAULT features (p2p_iroh
+marker count 2, vs 98 in a feature-full binary) — a green gate puts NOTHING on the mesh. The
+mesh runs `family/dev/elohim__elohim-storage/dev/debug/elohim-storage` (hc-mesh.sh:144 POOL).
+To measure a storage cure: after every agent's gate is done (pool admits one build), one
+`CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/dev cargo build
+--bin elohim-storage --features "p2p p2p-iroh"` from the worktree, then
+`STORAGE_BIN=<that binary> just mesh storage-restart <peers>`. Batch cures into ONE such build.

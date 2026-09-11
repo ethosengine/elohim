@@ -3,6 +3,7 @@ index: false
 carried_by: "genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md"
 name: project-seam-concern-architecture-landed
 title: Seam-concern architecture P0-P4 landed 2026-08-02
+id: project-seam-concern-architecture-landed
 description: "Seam-concern canon+crate+registries+census+cascade+matrix+birth-rule live; P5 held; graduation = supersession, never in-place edit."
 metadata: 
   node_type: memory

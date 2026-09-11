@@ -2,6 +2,7 @@
 index: false
 name: project_ghost_declaration_deadlock_batch3
 title: "Batch-3 = ghost-declaration deadlock, not missing anchors"
+id: project-ghost-declaration-deadlock-batch3
 description: "Batch-3 deadlock: ghost declared heads stay unjournaled — replay cannot resurrect, merge cannot converge."
 metadata: 
   node_type: memory

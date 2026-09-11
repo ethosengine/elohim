@@ -2,6 +2,7 @@
 index: false
 name: feedback-subagent-disjointness-read-write
 title: Subagent disjointness = read-set ∩ write-set
+id: feedback-subagent-disjointness-read-write
 description: "Parallel subagents are disjoint only if neither's read-set intersects the other's write-set; a porter reading source another task deletes is NOT disjoint."
 metadata: 
   node_type: memory

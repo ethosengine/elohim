@@ -2,6 +2,7 @@
 index: false
 name: project_monty_lynn_outreach_thread
 title: Monty Lynn outreach thread (ACU)
+id: project-monty-lynn-outreach-thread
 description: Three-audience pitch (theology/business/CS) to ACU prof; Observer (local AI→REA ledger) + Beer freedom-machine + Stargate hooks; sent ~2026-06-18.
 metadata:
   type: project

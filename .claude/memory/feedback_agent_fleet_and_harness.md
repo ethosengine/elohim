@@ -1,6 +1,7 @@
 ---
 name: feedback_agent_fleet_and_harness
 title: Agent fleet, delegation & harness traps (umbrella)
+id: feedback-agent-fleet-and-harness
 description: "Keep 3 agents max; delegate narrow tasks to cheaper tiers; avoid subagent read-set ∩ write-set overlap; trap: orphan cargo locks, StructuredOutput hangs."
 metadata:
   node_type: memory
@@ -29,7 +30,9 @@ parallel committers in one tree: commit by PATHSPEC (`git commit -m … -- <path
 commits only the named paths regardless of what else is staged; or give each agent its own
 worktree. Put the rule in every implementer dispatch that shares a tree.
 
-**Subagents parked on a Monitor never resume (2026-09-04, verified twice):** an implementer that "waits for the monitor to signal the other build finished" stops its turn and is never re-invoked when the thing it waits for was already gone — two seats sat idle ~3 h with uncommitted edits while cargo was free. Rule: seats never wait on a Monitor for a shared resource; they retry in the foreground (`sleep 60`, bounded ≤20×) or report BLOCKED; the controller checks `berth who` + `ps` for cargo when a seat is silent > 30 min and nudges with SendMessage.
+**Subagents parked on a Monitor never resume (2026-09-04, verified twice):** an implementer that "waits for the monitor to signal the other build finished" stops its turn and is never re-invoked when the thing it waits for was already gone — two seats sat idle ~3 h with uncommitted edits while cargo was free. Rule: seats never wait on a Monitor for a shared resource; they retry in the foreground (`sleep 60`, bounded ≤20×) or report BLOCKED; the controller checks `berth who` + `ps` for cargo when a seat is silent > 30 min and nudges with SendMessage. RECURRED 2026-09-07 (T7b 2 h, T11 50 min, both holding a berth lease) because the rule was not in the dispatch prompt — put "never park on a Monitor; foreground 600 s + tail-poll" in EVERY agent prompt that touches a shared lease, and release a lease you claimed on an agent's behalf the moment its run ends.
 **Root cause (2026-09-04):** the waiters used `pgrep -f 'cargo (build|test|check|clippy)'` — which matches OTHER waiter shells whose command line contains that very pattern — so the loops never exited (the one-build-at-a-time hook's suggested loop has the same bug). Use `pgrep -x cargo` / `pgrep -x rustc` (exact process names), never `pgrep -f` with a pattern that appears in the waiter's own command line.
 
 **berth cannot separate seats of one session (2026-09-05):** the lease is keyed on session id, so a subagent`s `berth claim` succeeds while a sibling seat of the same session holds the resource. Rule: the controller holds mesh/cargo leases on behalf of its seats and sequences them by message; a seat never claims the mesh on its own initiative when told another seat may be measuring.
+
+- [[feedback_delegate_research_to_opus_sonnet_codex]] — folded (index: false); delegate research legwork AND plan-implementation to Opus/Sonnet/Codex; the top model spends only on decisions, coherence, judgment and delegation.

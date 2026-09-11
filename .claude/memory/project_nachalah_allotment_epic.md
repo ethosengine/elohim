@@ -1,6 +1,7 @@
 ---
 name: project_nachalah_allotment_epic
 title: Nachalah allotment epic
+id: project-nachalah-allotment-epic
 description: "Nachalah allotment companion to crossing: HOLDING tiers, earned arcs, block governance, conductor rung-5."
 metadata: 
   node_type: memory

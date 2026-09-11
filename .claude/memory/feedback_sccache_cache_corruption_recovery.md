@@ -2,6 +2,7 @@
 index: false
 name: sccache-cache-corruption-recovery
 title: sccache cache corruption recovery
+id: feedback-sccache-cache-corruption-recovery
 description: "sccache 'unclosed delimiter'/null-byte = .sccache_check 404 leaked into rustc probe; empty bucket (a wipe!) triggers it; fix RUSTC_WRAPPER='' or heal sentinel."
 metadata: 
   node_type: memory

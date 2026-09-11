@@ -2,6 +2,7 @@
 index: false
 name: project_track4_projected_head_coherence
 title: Track-4 projected-head coherence arc
+id: project-track4-projected-head-coherence
 description: "Track 4: doorway projects heads for every content tier; coherence wire is the reach declaration."
 metadata: 
   node_type: memory

@@ -1,6 +1,7 @@
 ---
 name: story-maintainer-atom-perspective
 title: Story-maintainer role — seams are mintable nodes
+id: feedback-story-maintainer-atom-perspective
 description: "Mid-flight seams are missing NODES between named atoms — report as chain/between/assertion/state, never prose; home = story-harvest skill."
 metadata: 
   node_type: memory

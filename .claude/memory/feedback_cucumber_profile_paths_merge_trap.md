@@ -1,6 +1,7 @@
 ---
 name: feedback_cucumber_profile_paths_merge_trap
 title: Cucumber profile paths MERGE with positionals
+id: feedback-cucumber-profile-paths-merge-trap
 description: "Cucumber profile paths MERGE with positionals — `cucumber-js -p local <files>` runs whole suite; scope via `--config <empty>` or `--name`."
 metadata:
   type: feedback

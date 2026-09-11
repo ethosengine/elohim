@@ -2,6 +2,7 @@
 index: false
 name: feedback_work_stays_in_operator_visible_tree
 title: Work stays in the operator-visible tree
+id: feedback-work-stays-in-operator-visible-tree
 description: "Work lands in /projects/elohim (operator's VS Code mount). Never create sibling worktrees — invisible work is unreviewable."
 metadata: 
   node_type: memory

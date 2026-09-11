@@ -1,6 +1,7 @@
 ---
 name: project_ci_build_infra
 title: CI build infra — images, caches, registries (umbrella)
+id: project-ci-build-infra
 description: "CI substrate: ci-playwright on ci-builder; cache PVCs node-pinned; devspace node22 vs CI24 is structural; pull policy Always; Nexus needs read token."
 metadata:
   node_type: memory
@@ -38,3 +39,5 @@ credential helpers. Rule: any CI fetch of an ethosengine repo other than the mai
 credential (process-local `git -c url.…insteadOf` in a `scripts/ci/*.sh`, token via withCredentials env, never argv);
 and a step that only feeds an ADVISORY test (the rakia schema mirror) must be warn-only — print `RAKIA-UNAVAILABLE` and
 exit 0 — so it can never take the deploy path down.
+
+- [[feedback_sccache_failure_classes]] — folded (index: false); three distinct sccache failures, not one: cache corruption (null-byte / unclosed-delimiter in a cached object), spawn ENOENT, and AccessDenied against a dead Garage key — the last turns the DNA pipeline red in ~85s.

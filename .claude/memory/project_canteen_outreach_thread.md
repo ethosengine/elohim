@@ -2,6 +2,7 @@
 index: false
 name: canteen-outreach-thread
 title: Canteen outreach thread (Stephen Lewis)
+id: project-canteen-outreach-thread
 description: "Creator-payments hackathon invite 2026-06-06 sparked the Beer arc; reply sent 2026-06-10 (engage, don't commit); Beer critique §6 = outreach phrasing source."
 metadata: 
   node_type: memory

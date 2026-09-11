@@ -1,6 +1,7 @@
 ---
 name: feedback_inherit_substrate_ontology
 title: Inherit substrate ontology, never duplicate it
+id: feedback-inherit-substrate-ontology
 description: "Inherit Meadows/Beer/Ashby/ValueFlows ontology from elohim-epr, epr-rea, elohim-compute before minting any record in a new crate — bites at every new type"
 metadata:
   type: feedback

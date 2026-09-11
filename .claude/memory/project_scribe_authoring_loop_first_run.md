@@ -3,6 +3,7 @@ index: false
 carried_by: ".claude/agents/scribe.md (agent definition carries the role split)"
 name: scribe-authoring-loop-first-run
 title: Scribe authoring loop — first run complete
+id: project-scribe-authoring-loop-first-run
 description: "scribe (writer) + dispatcher technical review + fresh blind-reader ran end-to-end on backlog rows 16/16a; storyteller conversion awaits sign-off."
 metadata: 
   node_type: memory

@@ -2,6 +2,7 @@
 index: false
 name: project_doorway_wedge_unbounded_mongo_await
 title: Doorway wedge — blocking getaddrinfo parks tokio workers
+id: project-doorway-wedge-unbounded-mongo-await
 description: "Doorway-alpha SIGKILL crashloop root = blocking getaddrinfo in holochain_client connect parking tokio workers during DNS flaps; fixed via async DNS + watchdog."
 metadata: 
   node_type: memory

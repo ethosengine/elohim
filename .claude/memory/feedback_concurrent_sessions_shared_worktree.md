@@ -2,6 +2,7 @@
 index: false
 name: concurrent-sessions-shared-worktree
 title: Concurrent sessions share the worktree
+id: feedback-concurrent-sessions-shared-worktree
 description: "Sessions co-commit on shift/* in ONE worktree — never bulk-revert ambient mods; commit path-limited (-m … -- paths); never amend without re-checking HEAD."
 metadata: 
   node_type: memory

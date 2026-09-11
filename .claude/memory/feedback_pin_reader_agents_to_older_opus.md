@@ -2,6 +2,7 @@
 index: false
 name: pin-reader-agents-to-older-opus
 title: Pin legibility-judging agents to an explicit Opus ID
+id: feedback-pin-reader-agents-to-older-opus
 description: "Opus 5 handles complexity well but writes less accessibly — pin blind-reader to a full model ID, not the floating `opus` alias."
 metadata: 
   node_type: memory

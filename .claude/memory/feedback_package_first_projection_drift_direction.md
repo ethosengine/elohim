@@ -1,6 +1,7 @@
 ---
 name: package-first-projection-drift-direction
 title: "Projection-drift gate: read the diff before projecting"
+id: feedback-package-first-projection-drift-direction
 description: "project --write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md; if runtime is newer, fold runtime→package first or content is lost."
 metadata: 
   node_type: memory
@@ -22,4 +23,3 @@ the root `CLAUDE.md` are PROJECTIONS of `.epr-meta/elohim/packages/*` — editin
 makes the pre-push `package-projections.mjs verify` leg report it stale and refuse the whole batch. Edit the
 package JSON body, then `pnpm run elohim-agent:packages:project`; never hand-edit the runtime SKILL.md /
 gospel line. The `dev-lifecycle-script-sync` hook nag on hc-mesh.sh routes to the PACKAGE, not to SKILL.md.
-

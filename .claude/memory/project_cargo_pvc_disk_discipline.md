@@ -1,6 +1,7 @@
 ---
 name: project_cargo_pvc_disk_discipline
 title: Cargo/PVC disk + native build-env discipline (umbrella)
+id: project-cargo-pvc-disk-discipline
 description: "Cargo disk + build-env: act at 85% PVC, cargo-pool reclaim, disk-guard hook; CARGO_TARGET_DIR per workspace, no nextest here, sweettest needs RUSTFLAGS=\"\"."
 metadata:
   type: project
@@ -106,3 +107,7 @@ harness; a watcher that must outlive a turn goes through `setsid nohup <script> 
 **The box's honest storage gate (2026-09-05):** `just gate elohim-storage` links ~170 integration binaries in its bare `cargo test` leg (12–14.5 GB) and is shed at 80% RAM whenever anything else is alive; it is not a test failure. On this box run instead, sequentially at `CARGO_BUILD_JOBS=2 --config profile.dev.package.elohim-storage.debug=0`: the lib filters you touched, `cargo clippy --features "p2p p2p-iroh" --all-targets -- -D warnings` (compiles every integration target without linking them), `cargo fmt --check`. Reserve the full gate for a fresh-conductor, nothing-else-building window.
 
 - [[project_storage_build_under_ram_guard_debuginfo_off]] — folded (index: false); build-flag and ram-guard detail subsumed by this umbrella + conductor-arc.
+
+- [[feedback_pvc_deferral_hides_gate_debt]] — folded (index: false); chronic 85%+ disk pressure DEFERS the heavy Rust gates behind a `DEFERRED-BY-PVC` banner, so a dev 'green' can mean deferred rather than passed — triage an integration red by checking origin/dev byte-identity before blaming the branch.
+
+**The `just gate doorway` run does NOT refresh the mesh's runnable binary (2026-09-11).** The gate's `cargo test --lib --bins` links test harnesses under `deps/`, not `debug/doorway`; `hc-mesh.sh` launches `<pool-slot>/debug/doorway`, which stayed at 02:16 through three green gates while the mesh "measured" commits it did not contain. Before any household run after a doorway source change: `cd doorway/doorway-service && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/doorway__doorway-service/dev RUSTFLAGS="" cargo build --bin doorway` (~40 s incremental). Storage has the same shape plus features: `cargo build --features "p2p p2p-iroh" --bin elohim-storage` in its slot (preflight refuses without the marker; doorway preflight has no such check — being added). Check `stat -c %y <bin>` against `git log -1 --format=%ci -- <crate>/src` before trusting a run.

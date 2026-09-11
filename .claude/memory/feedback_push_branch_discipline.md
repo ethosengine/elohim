@@ -1,6 +1,7 @@
 ---
 name: feedback_push_branch_discipline
 title: Push, branch & worktree discipline (umbrella)
+id: feedback-push-branch-discipline
 description: "Commit-only; one push per batch; never during builds — a superseding run cancels roll mid-rollout. Shared worktree: path-limited; sprint/* not CI-indexed."
 metadata:
   node_type: memory
@@ -117,3 +118,5 @@ reviewing it. Outcome fine, discipline not. Rule: when forks run alongside the i
 `berth claim push` (a lease the fork can see) and every fork prompt states "commit only; never push" up front, not
 mid-flight. Forks also sweep the parent's STAGED files into their own commits (two habit commits carried 90+ of my
 in-progress memory edits) — stage only what you are about to commit, immediately.
+
+- [[project_fresh_worktree_install_state_traps]] — folded (index: false); a fresh `git worktree add` is NOT gate-ready and fails on INSTALL STATE, not code — missing deps, uninitialised submodules, gitignored generated TS, absent app dists; the mechanical fix list is in the entry (measured 2026-09-07).

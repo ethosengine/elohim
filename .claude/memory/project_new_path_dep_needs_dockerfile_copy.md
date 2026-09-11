@@ -2,6 +2,7 @@
 index: false
 name: project_new_path_dep_needs_dockerfile_copy
 title: New path-dep needs Dockerfile COPY
+id: project-new-path-dep-needs-dockerfile-copy
 description: "A new path-dep (even transitive) needs COPY+sed in BOTH edge Dockerfiles, workspace-field inline for storage, and manifest watch-path — else edge breaks at dev."
 metadata: 
   node_type: memory

@@ -3,11 +3,11 @@ index: false
 name: reach-enum-drift-reconciliation
 title: Reach reconciliation — canonical spec exists
 description: "Reach enum nomenclature drifted; scope-reconcile.py reconciles cluster-state ↔ deployments.json held/live."
+id: project-reach-enum-drift-reconciliation
 metadata:
   node_type: memory
   id: project-reach-enum-drift-reconciliation
   title: "Reach reconciliation — canonical spec EXISTS, plan against it"
-id: project-reach-enum-drift-reconciliation
   cites:
     - genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
     - genesis/research/ontology-systems-survey-reach-reconciliation-2026-07-22.md

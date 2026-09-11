@@ -1,6 +1,8 @@
 ---
+index: false
 name: feedback_sccache_failure_classes
 description: "Three sccache failures: cache-corruption null-byte/unclosed-delimiter, spawn ENOENT, AccessDenied on dead Garage key (DNA red ~85s)."
+id: feedback-sccache-failure-classes
 metadata: 
   node_type: memory
   title: sccache failure classes (umbrella)

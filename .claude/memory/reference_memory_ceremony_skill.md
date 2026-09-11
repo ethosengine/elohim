@@ -2,6 +2,7 @@
 index: false
 name: reference_memory_ceremony_skill
 title: /memory-ceremony skill
+id: reference-memory-ceremony-skill
 description: "Four-agent memory team (librarian, historian, cartographer, storyteller) substrate-currency ceremony."
 metadata:
   node_type: memory

@@ -2,6 +2,7 @@
 index: false
 name: ethosengine-wedge-nfs-hardmount
 title: ethosengine I/O wedge = NFS hard-mount deadlock
+id: project-ethosengine-wedge-nfs-hardmount
 description: ethosengine wedge root cause = hard NFS4 mounts to in-cluster ClusterIP (server pod on SAME node); bites when diagnosing node hangs or rebooting ethosengine
 metadata: 
   node_type: memory

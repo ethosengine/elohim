@@ -1,6 +1,7 @@
 ---
 name: project_cross_pollination_surveys
 title: Cross-pollination surveys (umbrella)
+id: project-cross-pollination-surveys
 description: "Holepunch/Hypercore transport, Hypha DAO holonics, p2panda crate-discipline; borrow mechanics, reject truth-chain."
 metadata:
   type: project

@@ -1,6 +1,7 @@
 ---
 name: feedback-role-coherence-orchestration-operator-executes
 title: "Role split: I orchestrate, the operator executes"
+id: feedback-role-coherence-orchestration-operator-executes
 description: Operator-set role split (2026-09-01) — I own coherence/design/self-governance/verifiable-delivery planning/orchestration; the operator helps execute
 metadata: 
   node_type: memory

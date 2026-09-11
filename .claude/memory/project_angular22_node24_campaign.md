@@ -2,6 +2,7 @@
 index: false
 name: project_angular22_node24_campaign
 title: Angular 22 + Node 24 campaign — state and lessons
+id: project-angular22-node24-campaign
 description: "Angular22+Node24 landed on dev and deployed to alpha; SSR follow-ups settled (shim sort() stall, trust-scoped cache); OnPush/vitest-blindness lessons."
 metadata: 
   node_type: memory

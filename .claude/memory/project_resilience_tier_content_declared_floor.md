@@ -2,6 +2,7 @@
 index: false
 name: project_resilience_tier_content_declared_floor
 title: Resilience tier = content-declared floor, not reach
+id: project-resilience-tier-content-declared-floor
 description: "Content self-declares its durability FLOOR (tier), orthogonal to reach; deriving tier from reach (reach_to_resilience_tier) is the conflation to correct."
 metadata: 
   node_type: memory

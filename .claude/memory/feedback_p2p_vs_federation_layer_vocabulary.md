@@ -1,6 +1,7 @@
 ---
 name: feedback_p2p_vs_federation_layer_vocabulary
 title: p2p vs federation/fediverse layer vocabulary
+id: feedback-p2p-vs-federation-layer-vocabulary
 description: "p2p = DHT conductor + iroh/libp2p blob stores; federation = doorways riding OVER p2p; route WAN-NAT gaps by layer."
 metadata: 
   node_type: memory

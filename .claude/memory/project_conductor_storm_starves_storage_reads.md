@@ -2,6 +2,7 @@
 index: false
 name: conductor-storm-starves-storage-reads
 title: Conductor CPU storm starves storage reads — triage order
+id: project-conductor-storm-starves-storage-reads
 description: All-A-side saga reds + catching-up 503 + caughtUp flap = check CFS throttle/breaker BEFORE the identity plane; conductor spawns nice-10 since 3146ebdc5
 metadata: 
   node_type: memory

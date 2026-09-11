@@ -1,6 +1,7 @@
 ---
 name: project_lamad_local_dev_serve_traps
 title: Lamad local dev-serve traps
+id: project-lamad-local-dev-serve-traps
 description: Rendering app/lamad locally needs --serve-path /lamad/ and DOORWAY_TARGET=localhost:8888 (mesh doorway); anonymous alpha content reads are reach-gated.
 metadata: 
   node_type: memory

@@ -2,6 +2,7 @@
 index: false
 name: concurrent-push-mutual-abort
 title: Concurrent-push mutual abort
+id: feedback-concurrent-push-mutual-abort
 description: "Dev pushes minutes apart kill each other's builds (abort-previous), even same-session; one push per batch, wait until COMPLETE; escalate silent webhook loss."
 metadata: 
   node_type: memory

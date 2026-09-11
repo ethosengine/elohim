@@ -1,6 +1,7 @@
 ---
 name: project_mishpat_commitment_cid_is_entry_hash
 title: Mishpat commitment CID = entry_hash
+id: project-mishpat-commitment-cid-is-entry-hash
 description: "Commitment cid = entry_hash (keys bounded_by/graduate/revoke/fetch); action_hash is only dht_anchor_hash — returning it breaks every bounds-gate."
 metadata: 
   node_type: memory

@@ -1,4 +1,5 @@
 ---
+index: false
 id: project-alpha-topology-bootstrap-pair
 name: Alpha cluster topology — 7 active peers, cast directive, bootstrap pair
 title: Alpha cluster — 7 active peers

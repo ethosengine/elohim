@@ -2,6 +2,7 @@
 index: false
 name: feedback_peer_collectives_starved_of_coordination_scale
 title: "Peer collectives are starved, not failing — check your register"
+id: feedback-peer-collectives-starved-of-coordination-scale
 description: "Never audit a peer commons collective's thin ledger as underperformance — the asymmetry vs incumbent capital IS the finding; watch for prosecutorial tone drift."
 metadata: 
   node_type: memory

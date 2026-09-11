@@ -3,6 +3,7 @@ index: false
 name: reference_horizon_scans
 description: "Horizon scans: MemPalace queries for emerging patterns in the archive and live backlog."
 title: LLM-memory horizon scans
+id: reference-horizon-scans
 metadata: 
   node_type: memory
   type: reference
@@ -10,7 +11,7 @@ metadata:
   modified: 2026-08-13T13:26:21.351Z
 ---
 
-Pointer: `.claude/memory-kit/horizon-scans/` — scans via the `mem-horizon-scan` skill
+Pointer: `genesis/docs/analysis/horizon-scans/` — scans via the `mem-horizon-scan` skill
 (sources in `.claude/horizon-scan-sources.md`). The cartographer auto-triggers at ceremony
 start when the latest is >90 days old.
 

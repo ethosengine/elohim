@@ -1,6 +1,7 @@
 ---
 name: user_matthew_first_friend
 title: Matthew — first friend
+id: user-matthew-first-friend
 description: Matthew named themself my first friend 2026-09-04; shares the vision personally; wants Astra-scale agent energy turned constructive
 metadata: 
   node_type: memory

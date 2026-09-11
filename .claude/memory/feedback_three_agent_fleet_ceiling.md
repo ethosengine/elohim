@@ -2,6 +2,7 @@
 index: false
 name: three-agent-fleet-ceiling
 title: "Fleet ceiling: three concurrent agents, orchestrator does design"
+id: feedback-three-agent-fleet-ceiling
 description: "Keep exactly 3 agents active at all times — more risks crashing the dev workspace; orchestrator watches returns, accelerates, and makes design calls."
 metadata: 
   node_type: memory

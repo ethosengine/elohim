@@ -2,6 +2,7 @@
 index: false
 name: commit-only-integrator-pushes
 title: Commit-only; integrator pushes
+id: feedback-commit-only-integrator-pushes
 description: "Autonomous mode ends at committed-on-shift-branch; never git push or merge to dev — the integrator is the single push/merge authority."
 metadata: 
   node_type: memory

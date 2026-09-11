@@ -2,6 +2,7 @@
 index: false
 name: versioned-entity-head-is-declared-dependency
 title: Versioned-entity HEAD is a declared dependency
+id: project-versioned-entity-head-is-declared-dependency
 description: "Which version applies is a DECLARED dependency (cid-pin=lockfile), not recency; versions are a DAG (fork/revert/merge); binding picks head, not the query layer."
 metadata: 
   node_type: memory

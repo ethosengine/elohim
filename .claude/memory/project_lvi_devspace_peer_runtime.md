@@ -1,6 +1,7 @@
 ---
 name: project_lvi_devspace_peer_runtime
 title: lvi — elohim-native devspace peer-runtime
+id: project-lvi-devspace-peer-runtime
 description: lvi = P2P Eclipse-Che-killer devspace runtime (elohim/lvi/); confluence of brit/rakia/eprfs/pod/doorway; spec+roadmap planted 2026-07-20.
 metadata: 
   node_type: memory

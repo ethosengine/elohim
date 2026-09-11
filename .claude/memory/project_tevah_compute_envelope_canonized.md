@@ -2,6 +2,7 @@
 index: false
 name: project_tevah_compute_envelope_canonized
 title: Tevah compute envelope canonized
+id: project-tevah-compute-envelope-canonized
 description: "Compute envelope: CPU/RAM limits, happ selection, mesh topology; durable ledger, prose ratification reconciled."
 metadata: 
   node_type: memory

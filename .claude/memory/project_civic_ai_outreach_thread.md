@@ -3,6 +3,7 @@ index: false
 name: project_civic_ai_outreach_thread
 description: "Warm outreach to Audrey Tang (au@civic.ai) + Caroline Green (Oxford Ethics in AI), cc Nicky Case + Amber Hu — civic.ai '6-Pack of Care'/Kami ↔ Elohim commons."
 title: civic.ai outreach thread (Audrey Tang + Caroline Green)
+id: project-civic-ai-outreach-thread
 metadata: 
   node_type: memory
   type: project

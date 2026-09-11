@@ -2,6 +2,7 @@
 index: false
 name: project_doorway_shell_stale_head_incident_2026_09_04
 title: Doorway stale-shell incident 2026-09-04
+id: project-doorway-shell-stale-head-incident-2026-09-04
 description: "2026-09-04: warm-shell cache pinned slug-fetched shell under empty head. Fleet doorways never project app rows."
 metadata: 
   node_type: memory

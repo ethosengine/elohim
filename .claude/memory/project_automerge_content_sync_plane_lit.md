@@ -2,6 +2,7 @@
 index: false
 name: project_automerge_content_sync_plane_lit
 title: Automerge content-sync plane LIT
+id: project-automerge-content-sync-plane-lit
 description: "Automerge plane lit; iroh dual-stack; ghost declared heads deadlocked batch-3."
 metadata: 
   node_type: memory

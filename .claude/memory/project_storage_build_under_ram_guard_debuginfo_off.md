@@ -2,6 +2,7 @@
 index: false
 name: project_storage_build_under_ram_guard_debuginfo_off
 title: Storage builds under the RAM guard
+id: project-storage-build-under-ram-guard-debuginfo-off
 description: "Storage elohim-storage build: debuginfo off, ram-guard sheds builds. Glibc leak, CPU storm from sys-validation."
 metadata: 
   node_type: memory

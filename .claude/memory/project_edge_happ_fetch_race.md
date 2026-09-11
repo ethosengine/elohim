@@ -2,6 +2,7 @@
 index: false
 name: project-edge-happ-fetch-race
 title: Edge happ fetch races DNA publish in same wave
+id: project-edge-happ-fetch-race
 description: Edge bakes elohim-happ:dev-latest fetched mid-build; same-wave dispatch with the DNA pipeline ships the PREVIOUS bundle — dependsOn is not wave-ordered.
 metadata: 
   node_type: memory

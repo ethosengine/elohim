@@ -1,6 +1,8 @@
 ---
+index: false
 name: feedback_delegate_research_to_opus_sonnet_codex
 title: Delegate research legwork to Opus/Sonnet/Codex
+id: feedback-delegate-research-to-opus-sonnet-codex
 description: "Delegate research and plan-implementation to Opus/Sonnet/Codex; top model spends only on decisions, coherence, judgment, delegation."
 metadata: 
   node_type: memory

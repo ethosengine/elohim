@@ -1,6 +1,8 @@
 ---
+index: false
 name: alpha-substrate-probe-rails
 title: Alpha substrate probe rails
+id: project-alpha-substrate-probe-rails
 description: "Doorway reads are per-doorway single-target (A→matthew, B→adam); conductor projection fans the pool; Loki 502s = untrustworthy zeros."
 metadata: 
   node_type: memory

@@ -1,6 +1,7 @@
 ---
 name: project_conductor_arc_resources
 title: Conductor arc, memory & CPU incidents (umbrella)
+id: project-conductor-arc-resources
 description: "Conductor incidents: sys-validation CPU spin; CPU storm starves storage reads; glibc leak cured by jemalloc; RAM ∝ corpus at full arc."
 metadata:
   node_type: memory
@@ -19,3 +20,5 @@ Folds the conductor resource/arc incident cluster. Members:
 - [[project_conductor_signal_msgpack_decode_class]] — holo_hash in conductor msgpack signals = raw bytes; Value pre-pass or String mirrors silently drop the signal — decode typed HoloHashB64 (closed 2026-06-13).
 
 **Stock 0.7 conductors on the local mesh grow ~1 GB/h each under continuous a2o ceremonies** (measured 2026-09-04: 292 MB at restart → ~4.6 GB two hours later → ~14 GB overnight; the fork's jemalloc is why alpha does not). With three conductors the RAM guard sheds every cargo build at 80%, so a long mesh shift needs `just mesh conductors-restart` (in place under their arks) roughly every 2 h, negotiated with whoever is mid-measure — never mid-run. Filed on the arc-shrink backlog row.
+
+**Hosted-human heap cost (measured 2026-09-11, household mesh):** real hosted provisioning installs the full 5-role bundle per registrant ≈ 5 cells × ~157 MB ≈ **786 MB conductor heap per hosted human** at genesis corpus size; 29 hosted personas → 22.8 GB RssAnon, RAM guard shed the lane. Until 60fb28a39 hosted personas were free (dev_mode singleton path never provisioned). Risk row: `arch-scale-risk-backlog` row 7. Design direction: light app per hosted human + spoke arc; interim: cast allow-list on the mesh.

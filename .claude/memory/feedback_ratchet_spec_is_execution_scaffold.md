@@ -1,6 +1,7 @@
 ---
 name: feedback_ratchet_spec_is_execution_scaffold
 title: "Ratchet spec is an execution scaffold, not canon"
+id: feedback-ratchet-spec-is-execution-scaffold
 description: Cite the 2026-08-28 ratchet spec for moves/rungs only; design from canon; bias every plan toward the smallest slice that flips a named red
 metadata: 
   node_type: memory

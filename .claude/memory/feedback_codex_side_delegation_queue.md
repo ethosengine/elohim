@@ -2,6 +2,7 @@
 index: false
 name: agent-agnostic-backlog-delegation
 title: Disjoint side-tasks go to the shared backlog
+id: feedback-codex-side-delegation-queue
 description: "Disjoint tasks in genesis/data/timeline/backlog (not session lists) let ANY agent — Claude, Codex, Gemini — claim them during CI waits."
 metadata: 
   node_type: memory

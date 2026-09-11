@@ -1,6 +1,7 @@
 ---
 name: project_content_sync_plane
 title: Content sync / replication plane (umbrella)
+id: project-content-sync-plane
 description: "Sync-plane: metadata-only gossip, Automerge lit, iroh dual-stack, ghost heads deadlocked, local seed never DHT-anchors."
 metadata:
   node_type: memory

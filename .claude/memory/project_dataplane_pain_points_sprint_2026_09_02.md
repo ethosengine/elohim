@@ -2,6 +2,7 @@
 index: false
 name: project_dataplane_pain_points_sprint_2026_09_02
 title: Dataplane pain-points sprint 2026-09-02
+id: project-dataplane-pain-points-sprint-2026-09-02
 description: "2026-09-02: quiesce leg bounded, federation Act II re-acted, device-peer launcher streamlined, wave 2 = handshake."
 metadata: 
   node_type: memory

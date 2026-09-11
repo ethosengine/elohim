@@ -2,6 +2,7 @@
 index: false
 name: project_workspace_berth_io_guard
 title: Workspace berth + io-guard
+id: project-workspace-berth-io-guard
 description: "workspace/berth I/O guard: hard NFS deadlock recovery; devspace container restart kills mesh + wipes /tmp."
 metadata: 
   node_type: memory

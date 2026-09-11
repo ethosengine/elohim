@@ -2,6 +2,7 @@
 index: false
 name: project_alpha_conductor_spin_root_cause
 title: Alpha conductor spin — sys-validation retry loop
+id: project-alpha-conductor-spin-root-cause
 description: "2026-08-21: Alpha pods pegged CPU — sys-validation on unfetchable deps. Root: unbounded local re-lookup."
 metadata:
   type: project

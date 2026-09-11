@@ -1,6 +1,7 @@
 ---
 name: reviewer-issue-admissibility
 title: Reviewer issue admissibility
+id: feedback-reviewer-issue-admissibility
 description: "Autonomous review loops deadlock on tree-unfixable complaints (history rewrites, TDD evidence) — reviewer prompts need an admissibility clause."
 metadata: 
   node_type: memory

@@ -1,7 +1,8 @@
 ---
 name: project_dna_hash_depends_on_build_path
 title: DNA hash depends on the absolute build path, not only source
-description: A DNA packed from a worktree hashes differently than the same source packed at /projects/elohim — Cargo's per-crate metadata hash includes the package path; bites on every local "hash unchanged" check and on the hot-swap rule.
+id: project-dna-hash-depends-on-build-path
+description: "Cargo metadata includes package paths: identical source in different worktrees changes DNA hashes — check before hash comparisons or coordinator hot-swap."
 metadata:
   type: project
 ---

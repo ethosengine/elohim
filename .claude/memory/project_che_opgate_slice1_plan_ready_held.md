@@ -1,6 +1,7 @@
 ---
 name: project_che_opgate_slice1_plan_ready_held
 title: Che op-gate Slice-1 — offline spine landed, live legs held
+id: project-che-opgate-slice1-plan-ready-held
 description: "Che op-gate offline spine landed (fail-closed); all doorway deploys run DEV_MODE=true — no Che-facing enforce node; live-mesh legs held."
 metadata:
   node_type: memory

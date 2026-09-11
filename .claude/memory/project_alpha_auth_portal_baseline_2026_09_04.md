@@ -1,6 +1,8 @@
 ---
+index: false
 name: project_alpha_auth_portal_baseline_2026_09_04
 title: Alpha auth-portal baseline — DEV_MODE registration + held act:i
+id: project-alpha-auth-portal-baseline-2026-09-04
 description: "Alpha DEV_MODE binds new registrants to Matthew's Human; act:i a2o HELD unless cluster-state overridden."
 metadata: 
   node_type: memory

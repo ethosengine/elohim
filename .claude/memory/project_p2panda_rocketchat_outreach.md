@@ -2,6 +2,7 @@
 index: false
 name: project_p2panda_rocketchat_outreach
 title: p2panda Rocket.Chat intro post (first public dev outreach)
+id: project-p2panda-rocketchat-outreach
 description: "Outreach to p2panda/Rocketchat community on shared history + P2P substrate."
 metadata: 
   node_type: memory

@@ -1,6 +1,7 @@
 ---
 name: feedback_multi_agent_coherence_take_leave
 title: "Multi-agent integration = coherence, not a hedge (take/leave)"
+id: feedback-multi-agent-coherence-take-leave
 description: "Integrating a Codex/Gemini branch: judge take/leave/reshape against the trajectory; compose-don't-reinvent; done = composes, not compiles."
 metadata: 
   node_type: memory

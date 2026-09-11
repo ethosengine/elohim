@@ -1,6 +1,7 @@
 ---
 name: feedback_shift_drive_cure_not_stage
 title: Shift = drive the cure end-to-end, not stage it
+id: feedback-shift-drive-cure-not-stage
 description: "In a /shift you own the cure end-to-end — stabilize, then implement the confirmed fix; 'staged/gated' past diagnosis is timidity."
 metadata:
   type: feedback

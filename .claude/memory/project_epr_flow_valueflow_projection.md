@@ -1,6 +1,7 @@
 ---
 name: project-epr-flow-valueflow-projection
 title: epr flow — developer valueflow projected from the repo
+id: project-epr-flow-valueflow-projection
 description: "epr flow project/walk/status + seal/reseal/hold over recipes.yaml + .eprfs sidecars — dev valueflow projected from the filesystem; walk is seal-aware."
 metadata: 
   node_type: memory

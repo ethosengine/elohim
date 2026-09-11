@@ -2,6 +2,7 @@
 index: false
 name: project_workspace_stewarded_device_peer_batch
 title: "Workspace as matthew's device — native-sync batch"
+id: project-workspace-stewarded-device-peer-batch
 description: "Stewarded device peer batch: lvi (P2P Che killer), holochain 0.7 parity, upgrade propagation north star."
 metadata: 
   node_type: memory

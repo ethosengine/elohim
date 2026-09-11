@@ -1,7 +1,8 @@
 ---
 name: feedback_atomic_wins_compound_velocity
 title: "Careful \"how we SHOULD do it\" slices are atomic wins th…"
-description: "Operator 2026-09-06 — wall-clock velocity comes from incremental atomic wins done the right way, each benefiting every subsequent cycle; don't trade correctness for a one-off speedup."
+id: feedback-atomic-wins-compound-velocity
+description: "Operator 2026-09-06 — velocity comes from atomic wins done the right way; never trade correctness for a one-off speedup."
 metadata: 
   node_type: memory
   title: "Careful \"how we SHOULD do it\" slices are atomic wins that compound velocity"
