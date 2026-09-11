@@ -22,6 +22,13 @@ retire-when: >
   settings surface on a released steward build, with no developer-shaped tool in the path.
   The habit then describes a product, not a practice.
 ---
+DELTA 2026-09-11 (correction to the 2026-09-10 delta below; no status change): the SUBSCRIBERS-0 cause named
+there (`main.rs:~1221`, DEV_MODE without --dev-signal-subscriber) is cured — f64d8c5bf keys the conductor
+signal subscriber on `projection_writer` alone (`should_subscribe_to_signals`, main.rs:79, seam-registry row,
+2 contract tests); `--dev-signal-subscriber` parses but reads nothing. Tile relabeled "Conductor signal
+subscriptions". Provisioning likewise no longer keys on dev_mode (60fb28a39, `should_provision`). Both are
+local (gate doorway 1215 tests EXIT=0); the tile reading 4/4 on apex needs the next edge deploy.
+
 DELTA 2026-09-10 (doorway /status audit, uncommitted, gate doorway EXIT=0, 1212 tests):
 apex /status tiles audited against status.json — 4 disconnected (uptime strip hard-coded
 nodata; REQUESTS counted one route; federation consensus stub "0/0 unknown"; no dataplane
