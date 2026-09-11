@@ -929,11 +929,11 @@ Add `GET /admin/conductors/agents/{agentPubKey}` returning the registry entry or
 
 **Acceptance evidence (restated from the drained plan):** on `/threshold/account`, a "Close this account" section below the graduation CTA, shown for every signed-in human; it explains what is reclaimed and what the network keeps, asks the human to type their identifier, calls the route, then signs out locally and navigates to `/threshold/`. Also show the display name from `GET /auth/account`; if the wire does not carry it, add `displayName` to `AccountResponse` in doorway-service (the story asserts the name the human typed).
 
-- [ ] **Step 1: Write the failing component tests**
+- [x] **Step 1: Write the failing component tests**
 
 In the spec: the section renders for a signed-in human; a wrong identifier surfaces `account-close-error` and calls nothing; the right identifier calls the route once and navigates to `/threshold/`; `account-hosted-by-household` renders the household name and `account-hosted-until` the promised-until date when the account response carries them, and both are absent (not blank) when it does not.
 
-- [ ] **Step 2: Run them and watch them fail**
+- [x] **Step 2: Run them and watch them fail**
 
 ```bash
 cd /projects/elohim
@@ -941,11 +941,11 @@ just gate doorway-app; echo "EXIT=$?"
 ```
 Expected: FAIL naming the new spec cases.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Angular 19 standalone, `ChangeDetectionStrategy.OnPush`, async state as signals — a plain field mutated from a callback will not re-render under implicit OnPush.
 
-- [ ] **Step 4: Green the gate and look at it**
+- [x] **Step 4: Green the gate and look at it**
 
 ```bash
 cd /projects/elohim
@@ -954,7 +954,7 @@ cd genesis/a2o && pnpm look http://localhost:8888/threshold/account
 ```
 Expected: `EXIT=0`; the shot at `genesis/a2o/reports/look/<slug>/shot.png` shows the close section and, once Task 13 has run against this mesh, the hosting strip.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /projects/elohim
