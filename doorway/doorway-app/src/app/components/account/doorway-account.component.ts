@@ -22,18 +22,10 @@ import { DoorwayAdminService } from '../../services/doorway-admin.service';
 import {
   AccountResponse,
   AgencyStep,
-  HostedCellFacts,
   PortalHostResponse,
   quotaGaugeColor,
   formatBytes,
 } from '../../models/doorway.model';
-
-/**
- * What `GET /auth/account` answers a hosted human: the generated wire view
- * plus the hosting facts S2 Task 13 adds to it, read optionally so the page
- * renders correctly against a doorway whose wire has not caught up.
- */
-type HostedAccount = AccountResponse & HostedCellFacts;
 
 /**
  * Say back what the doorway refused, in the human's own terms. The doorway
@@ -407,7 +399,7 @@ export class DoorwayAccountComponent implements OnInit {
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
-  readonly account = signal<HostedAccount | null>(null);
+  readonly account = signal<AccountResponse | null>(null);
 
   /** Closure is a deliberate two-step: begin, then type the identifier back. */
   readonly closeRequested = signal(false);
@@ -456,22 +448,18 @@ export class DoorwayAccountComponent implements OnInit {
   readonly displayName = computed(() => this.account()?.displayName ?? null);
 
   /**
-   * The household lending the machine this human's cell runs on.
+   * The household lending the machine this human's cell runs on, by NAME.
    *
-   * eslint-disable-next-line sonarjs/todo-tag -- names the backend contract this waits on
-   * TODO(hosted-household-name-wire): `GET /auth/account` carries NO household
-   * name — `conductorId` (the pool conductor the cell was placed on) is the
-   * only wire-true fact about who is hosting, so it stands in here. The honest
-   * value is the pool conductor's steward's own display name, which the truth
-   * layer owes: the doorway knows the conductor, the conductor names its
-   * steward, and `07-hosted-by-a-household.feature` asks for that name "in the
-   * words a person uses". Until then this row names the machine, not the
-   * household. Do NOT substitute the doorway's own name — the doorway arranges
-   * the hosting, the steward's machine performs it, and the story is explicit
-   * that they are not the same party. Never render `hostedCellGrantCid` here:
-   * it is the notary's opaque handle, never a name to show a person.
+   * Read straight off the wire (S2 Task 13b): `hostedByHousehold` is the
+   * display name of the steward of the pool peer that notarized this person's
+   * hosted cell — the household that is actually lending the machine, in the
+   * words a person uses. The doorway resolves it from the steward key that
+   * PEER named itself by; it is never the doorway's own name, never the
+   * conductor id (a machine), and never `hostedCellGrantCid` (the notary's
+   * opaque handle). Absent when any link in that chain is missing, in which
+   * case the strip renders the promised-until row alone.
    */
-  readonly hostedByHousehold = computed(() => this.account()?.conductorId ?? null);
+  readonly hostedByHousehold = computed(() => this.account()?.hostedByHousehold ?? null);
 
   /** RFC3339 instant the hosting is promised until (S2 Task 13's grant bound). */
   readonly hostedUntil = computed(() => this.account()?.hostedCellValidUntil ?? null);

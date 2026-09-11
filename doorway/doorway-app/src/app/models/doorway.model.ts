@@ -533,31 +533,6 @@ export interface PortalHostResponse {
 export type { AccountResponse } from '../generated/account-response';
 
 /**
- * Hosting facts the doorway adds to `GET /auth/account` when it runs a cell
- * for this human (three-reds plan S2 Task 13: `displayName`,
- * `hostedCellGrantCid`, `hostedCellValidUntil` — the delegates-compute promise
- * behind `hosted-human/07-hosted-by-a-household.feature`).
- *
- * They are declared here as an OPTIONAL overlay rather than edited into
- * `../generated/account-response.ts`, which is generated from
- * `elohim/sdk/schemas/v1/views/account-response.schema.json` and must never be
- * hand-edited. Reading them optionally is what lets the hosting strip be
- * ABSENT (not blank) on a doorway whose wire has not caught up.
- *
- * eslint-disable-next-line sonarjs/todo-tag -- names the backend contract this waits on
- * TODO(wire-codegen): delete this overlay once the view schema carries the
- * hosted-cell fields and `pnpm run schema:codegen:ts` regenerates AccountResponse.
- */
-export interface HostedCellFacts {
-  /** The name the human asked to be known by. */
-  displayName?: string;
-  /** Opaque notary handle for the delegates-compute promise. NEVER shown to a human. */
-  hostedCellGrantCid?: string;
-  /** RFC3339 instant the hosting is promised until. */
-  hostedCellValidUntil?: string;
-}
-
-/**
  * Response to `POST /auth/close-account` (three-reds plan S2 Task 9 /
  * hosted-human plan Task 3). Bearer-authorised; the body is
  * `{ confirmIdentifier }` and a mismatch is refused by the DOORWAY with

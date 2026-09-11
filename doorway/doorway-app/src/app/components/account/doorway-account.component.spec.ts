@@ -169,10 +169,13 @@ describe('DoorwayAccountComponent — closing an account and the hosting strip',
   let navigate: ReturnType<typeof vi.fn>;
   let originalLocation: Location;
 
-  /** Fields S2 Task 13 adds to GET /auth/account; not yet in the generated view. */
-  type AccountWire = AccountResponse & { hostedCellValidUntil?: string; displayName?: string };
-
-  const HOSTED: AccountWire = {
+  /**
+   * The generated wire view itself (S2 Task 13b): `displayName`,
+   * `hostedCellGrantCid`, `hostedCellValidUntil` and `hostedByHousehold` are
+   * all schema-carried now, so the page reads them directly instead of through
+   * a hand-written overlay.
+   */
+  const HOSTED: AccountResponse = {
     humanId: 'human-stranger',
     identifier: 'stranger@alpha.elohim.host',
     permissionLevel: 'AUTHENTICATED',
@@ -193,7 +196,7 @@ describe('DoorwayAccountComponent — closing an account and the hosting strip',
     return fixture.nativeElement.querySelector(`[data-testid="${id}"]`);
   }
 
-  async function renderAccount(account: AccountWire): Promise<void> {
+  async function renderAccount(account: AccountResponse): Promise<void> {
     TestBed.resetTestingModule();
     closeAccount = vi.fn().mockResolvedValue({
       closed: true,
@@ -316,15 +319,31 @@ describe('DoorwayAccountComponent — closing an account and the hosting strip',
       await renderAccount({
         ...HOSTED,
         conductorId: 'conductor-alpha-1',
+        hostedByHousehold: 'The Ellis Household',
+        hostedCellGrantCid: 'uhCEkHostedCellGrantHandleThatIsNotAName0000',
         hostedCellValidUntil: '2026-10-11T00:00:00Z',
       });
 
       const household = testId('account-hosted-by-household');
       const until = testId('account-hosted-until');
-      expect(household?.textContent?.trim()).toBeTruthy();
+      expect(household?.textContent?.trim()).toBe('The Ellis Household');
       expect(until?.textContent?.trim()).toBeTruthy();
       // Never the opaque notary handle for the promise.
       expect(household?.textContent?.trim()).not.toMatch(/^u[A-Za-z0-9_-]{40,}$/);
+    });
+
+    it('names the household, never the machine it runs on', async () => {
+      await renderAccount({
+        ...HOSTED,
+        conductorId: 'conductor-alpha-1',
+        hostedCellValidUntil: '2026-10-11T00:00:00Z',
+      });
+
+      // A conductor id is a MACHINE. The wire carries no household name here,
+      // so the row is absent rather than standing in the machine's name —
+      // `07-hosted-by-a-household.feature` asks for the name a person uses.
+      expect(testId('account-hosted-by-household')).toBeNull();
+      expect(testId('account-hosted-until')?.textContent?.trim()).toBeTruthy();
     });
 
     it('is absent — not blank — when the account response carries no hosting facts', async () => {

@@ -77,4 +77,20 @@ export interface AccountResponse {
    * ISO-8601 timestamp of the last login. Absent when never logged in (serde skip_serializing_if)
    */
   lastLoginAt?: string;
+  /**
+   * The name this human registered under — a doorway-local projection of their Human profile on the DHT, so an account page can greet a person rather than an identifier. Absent on rows that predate the field (serde skip_serializing_if)
+   */
+  displayName?: string;
+  /**
+   * CID (entry hash) of the live hosted-cell delegates-compute commitment this doorway's pool peer notarized for the human — readable back from ANY peer projecting the substrate, which is the point: the promise is checkable by someone other than the doorway reporting it. Absent when no promise was recorded (serde skip_serializing_if)
+   */
+  hostedCellGrantCid?: string;
+  /**
+   * When the hosting is promised until (RFC3339 UTC, seconds precision). Absent when no promise was recorded (serde skip_serializing_if)
+   */
+  hostedCellValidUntil?: string;
+  /**
+   * The DISPLAY NAME of the steward of the pool peer that notarized this person's hosted cell — the household that is actually lending the machine, in the words a person uses. Resolved at read time from A-class facts: hostedCellGrantCid (the promise exists) plus the provider the POOL PEER named itself by on its own grant answer (elohim-storage api/compute_grants.rs writes it as that peer's own conductor cell key, and the grant surface refuses any other performer), resolved through imagodei get_human_by_agent_key to that Human's displayName. Absent when any link is missing. It is NEVER the doorway's own name, id or gateway hostname: the doorway ARRANGES hosting and a household PERFORMS it, and naming the arranger here is exactly what genesis/a2o/features/auth/hosted-human/07-hosted-by-a-household.feature forbids. It is never the commitment cid or the conductor id either — those name an address and a machine. Travels with hostedCellGrantCid or not at all (serde skip_serializing_if)
+   */
+  hostedByHousehold?: string;
 }

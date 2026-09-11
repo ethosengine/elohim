@@ -46,6 +46,14 @@ export interface AuthResponse {
    * First reachable portal host URL for this human, when isSteward is true and at least one registered host responds to a health probe. Absent when not a steward or no host is reachable (serde skip_serializing_if)
    */
   portalHostUrl?: string;
+  /**
+   * CID (entry hash) of the hosted-cell delegates-compute commitment the pool peer notarized for this human at registration. Present only on a hosted registration whose doorway notarizes what its pool hosts; absent on every login and refresh (serde skip_serializing_if)
+   */
+  hostedCellGrantCid?: string;
+  /**
+   * When that hosting promise runs out (RFC3339 UTC, seconds precision). Absent when no promise was recorded (serde skip_serializing_if)
+   */
+  hostedCellValidUntil?: string;
 }
 /**
  * Human profile (returned on registration). Absent otherwise (serde skip_serializing_if)

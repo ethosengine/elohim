@@ -51,5 +51,9 @@ export interface AuthDiscovery {
      * An origin-relative path. Must begin with a single '/' — a protocol-relative '//host/x' names ANOTHER origin while passing a naive leading-slash check, so it is excluded by pattern rather than by convention.
      */
     portalHost: string;
+    /**
+     * An origin-relative path. Must begin with a single '/' — a protocol-relative '//host/x' names ANOTHER origin while passing a naive leading-slash check, so it is excluded by pattern rather than by convention.
+     */
+    closeAccount: string;
   };
 }

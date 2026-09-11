@@ -25,10 +25,16 @@ interface HealthResponse {
  *
  * `contentAvailable` is the count of substrate entries this doorway has projected
  * through its conductor — a doorway-local projection measure, always available.
- * `humansServed` is a federation-wide social aggregate (sum of self-reported node
- * counts); it is null until that figure is surfaced at this layer. Nulls render as
- * "—" (unknown, never 0 — unmeasured ≠ zero). `federatedPeers` is this doorway's own
- * web2-projection layer and is always measurable. */
+ * `humansServed` is the number of humans THIS doorway is hosting: the count of
+ * live, unexpired, unrevoked `hosted-cell` delegates-compute commitments its own
+ * pool provides (three-reds plan D3 / S2 Task 14, derived in
+ * `doorway-service/src/routes/status.rs::build_status_data`). It is NOT a
+ * federation-wide aggregate — a federation-wide number would be a separate,
+ * separately-labelled figure. `null` means this doorway operates no conductor
+ * pool at all, so the question does not apply to it; a doorway that runs a pool
+ * and hosts nobody answers `0`. Nulls render as "—" (unknown, never 0 —
+ * unmeasured ≠ zero). `federatedPeers` is this doorway's own web2-projection
+ * layer and is always measurable. */
 interface StatusResponse {
   name?: string;
   region: string | null;
@@ -109,7 +115,15 @@ type LoadingState = 'loading' | 'ready' | 'error';
             <span class="stat-label">Federated Doorways</span>
           </div>
           <div class="stat" [class.unmeasured]="humansUnmeasured()">
-            <span class="stat-value">{{ status()?.humansServed ?? '—' }}</span>
+            <!--
+              landing-humans-served marks the VALUE span, not the card: the a2o
+              step reads innerText() off this testid and parses it as a number
+              (genesis/a2o/steps/dataplane/humans-served.steps.ts), so including
+              the "Humans Served" label would make every assertion read NaN.
+            -->
+            <span class="stat-value" data-testid="landing-humans-served">
+              {{ status()?.humansServed ?? '—' }}
+            </span>
             <span class="stat-label">Humans Served</span>
           </div>
           <div class="stat" [class.unmeasured]="contentUnmeasured()">
