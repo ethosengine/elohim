@@ -68,37 +68,33 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
         }
     }
 
-    // The content floor is computed BEFORE the floor line prints, because the floor line's own
-    // `omissions` count must include what THIS render pass itself left out under the lens's
-    // `choice_count` — a number the view's JSON cannot carry in advance, since it is a property
-    // of the rendering, not of the discovery that produced the candidates.
-    let (candidates_block, dropped_by_choice) = if minimal {
-        match view["first_screen"]["candidates"].as_array() {
-            Some(candidates) => render_candidates_bounded(candidates, lens, floor),
-            None => (String::new(), 0),
-        }
+    // The content floor's SELECTION is computed BEFORE the floor line prints, because the floor
+    // line's own `omissions` count must include what THIS render pass itself left out under the
+    // lens's `choice_count` — a number the view's JSON cannot carry in advance, since it is a
+    // property of the rendering, not of the discovery that produced the candidates. Rendering the
+    // candidate BLOCK (the density cap) and choosing the Linked choices both read this same
+    // `shown` selection, so the two never disagree about which candidates the reader was actually
+    // offered — fix round 1's finding: a `[floor]` candidate past `choice_count` must be one
+    // command away too, and a dropped candidate's command must never leak in as a "choice."
+    let empty_candidates: Vec<Value> = Vec::new();
+    let candidates = if minimal {
+        view["first_screen"]["candidates"]
+            .as_array()
+            .unwrap_or(&empty_candidates)
     } else {
-        (String::new(), 0)
+        &empty_candidates
     };
+    let (shown, dropped_by_choice) =
+        select_shown_candidates(candidates, lens.choice_count as usize, floor);
 
     out.push_str(&render_floor_line(view, lens, floor, dropped_by_choice));
 
     if minimal {
-        out.push_str(&candidates_block);
-        out.push_str("\nLinked choices:\n");
-        for choice in view["actions"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default()
-            .into_iter()
-            .take(lens.choice_count as usize)
-        {
-            out.push_str(&format!(
-                "{}\n  {}\n",
-                choice["label"].as_str().unwrap_or_default(),
-                choice["command"].as_str().unwrap_or_default()
-            ));
-        }
+        out.push_str(&render_candidate_block(&shown, lens));
+        let actions = view["actions"].as_array().cloned().unwrap_or_default();
+        let chosen = select_linked_choices(&actions, &shown, lens.choice_count as usize);
+        let limit = chosen.len();
+        out.push_str(&render_linked_choices(&chosen, limit));
         return out;
     }
 
@@ -144,14 +140,9 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
             }
         }
     }
-    out.push_str("\nLinked choices:\n");
-    for choice in view["actions"].as_array().cloned().unwrap_or_default() {
-        out.push_str(&format!(
-            "{}\n  {}\n",
-            choice["label"].as_str().unwrap_or_default(),
-            choice["command"].as_str().unwrap_or_default()
-        ));
-    }
+    let standard_actions = view["actions"].as_array().cloned().unwrap_or_default();
+    let unbounded = standard_actions.len();
+    out.push_str(&render_linked_choices(&standard_actions, unbounded));
     out
 }
 
@@ -252,24 +243,19 @@ fn receipts_count(view: &Value) -> usize {
     0
 }
 
-/// The content floor applied to `minimal`/`simple`: the first screen's candidates, cut to the
-/// lens's `choice_count` — except a candidate whose frontmatter `content_class` names one of
-/// `floor.unfilterable`, which survives the cut regardless of position, marked `[floor]`. The
-/// lens's `density_bytes` is then a SEPARATE soft cap layered on top, dropping ordinary lines
-/// (never a `[floor]`-marked one, and never the floor line itself, which this function never
-/// touches) once the block would exceed it, and naming exactly how many more exist at a wider
-/// lens. Returns the printed block (empty when there is nothing to show) and how many ORDINARY
-/// candidates the `choice_count` cut alone left out — the density cut is named in the block's own
-/// trailing note instead, a second and separately honest signal rather than one blended number.
-fn render_candidates_bounded(
-    candidates: &[Value],
-    lens: &LensView,
+/// The content floor's SELECTION, applied to `minimal`/`simple`: the first screen's candidates,
+/// cut to `choice_count` — except a candidate whose frontmatter `content_class` names one of
+/// `floor.unfilterable`, which survives the cut regardless of position, marked `is_floor`. Kept
+/// separate from RENDERING (see [`render_candidate_block`]) so both the candidate block and
+/// [`select_linked_choices`] read the exact same set — fix round 1's finding: the two must never
+/// disagree about which candidates the reader was actually offered. Order is preserved from
+/// `candidates`' own rank order. Returns `(shown, dropped_by_choice)` — the latter counts only
+/// ORDINARY candidates the cut left out, and feeds the floor line's `omissions`.
+fn select_shown_candidates<'a>(
+    candidates: &'a [Value],
+    choice_count: usize,
     floor: &RenderFloor,
-) -> (String, usize) {
-    if candidates.is_empty() {
-        return (String::new(), 0);
-    }
-    let choice_count = lens.choice_count as usize;
+) -> (Vec<(&'a Value, bool)>, usize) {
     let mut shown: Vec<(&Value, bool)> = Vec::new();
     let mut dropped_by_choice = 0usize;
     for (index, candidate) in candidates.iter().enumerate() {
@@ -283,14 +269,24 @@ fn render_candidates_bounded(
             dropped_by_choice += 1;
         }
     }
+    (shown, dropped_by_choice)
+}
+
+/// The content floor's RENDERING: the `shown` candidates (see [`select_shown_candidates`]), one
+/// line each, `[floor]`-marked where `is_floor`. `lens.density_bytes` is a SEPARATE soft cap
+/// layered on top of the selection, dropping ordinary lines (never a `[floor]`-marked one, and
+/// never the floor line itself, which this function never touches) once the block would exceed
+/// it, and naming exactly how many more exist at a wider lens. Empty string when `shown` is
+/// empty — no header printed over nothing.
+fn render_candidate_block(shown: &[(&Value, bool)], lens: &LensView) -> String {
     if shown.is_empty() {
-        return (String::new(), dropped_by_choice);
+        return String::new();
     }
     let mut out = String::from("\nCandidate sources:\n");
     let mut printed = 0usize;
     let mut over_budget = false;
     let mut dropped_by_density = 0usize;
-    for (candidate, is_floor) in &shown {
+    for (candidate, is_floor) in shown {
         let marker = if *is_floor { " [floor]" } else { "" };
         let line = format!(
             "  {}. {} — {}{marker}\n",
@@ -312,7 +308,92 @@ fn render_candidates_bounded(
             lens.level.next().as_str()
         ));
     }
-    (out, dropped_by_choice)
+    out
+}
+
+/// The `--path <p>` an action's `argv` names, or `None` for an action that does not reference a
+/// candidate path at all (a session action: recipe/history/resume/measure, or an edge `select`,
+/// which names `--edge` instead). The action-building side (`journey.rs`'s `action()`) always
+/// spells the flag this way (`format!("--{}", key.replace('_', "-"))` on the `"path"` option key),
+/// so this is a read of that same convention, not a re-derivation of it.
+fn action_path(action: &Value) -> Option<&str> {
+    let argv = action["argv"].as_array()?;
+    let index = argv
+        .iter()
+        .position(|item| item.as_str() == Some("--path"))?;
+    argv.get(index + 1)?.as_str()
+}
+
+/// The first action in `actions` whose `--path` names exactly `path` — `None` for an empty path
+/// or no match, rather than guessing. Linear scan: the action lists this walks are single-digit
+/// to low-dozens long (one action per candidate plus a handful of session actions), never a hot
+/// path worth indexing.
+fn action_for_path<'a>(actions: &'a [Value], path: &str) -> Option<&'a Value> {
+    if path.is_empty() {
+        return None;
+    }
+    actions
+        .iter()
+        .find(|action| action_path(action) == Some(path))
+}
+
+/// `minimal`/`simple` ONLY: the Linked choices actually offered, built from `shown` (see
+/// [`select_shown_candidates`]) rather than the view's raw unbounded action list — fix round 1's
+/// finding. Order: EVERY `[floor]`-marked shown candidate's command first, unconditionally (the
+/// anti-capture invariant: floor content is one command away at every lens, never bumped by rank
+/// or by the choice budget); then ordinary shown candidates' commands while the running total is
+/// still under `choice_count`; then the view's own session actions (recipe/history/resume/measure
+/// — anything with no `--path`, so a dropped candidate's command can never leak in as a "session"
+/// filler) in their existing order, filling whatever budget remains. A command naming a candidate
+/// the content floor did NOT keep never appears here, by construction: only `shown`'s own
+/// candidates are ever looked up.
+fn select_linked_choices(
+    actions: &[Value],
+    shown: &[(&Value, bool)],
+    choice_count: usize,
+) -> Vec<Value> {
+    let mut chosen: Vec<Value> = Vec::new();
+    for (candidate, _) in shown.iter().filter(|(_, is_floor)| *is_floor) {
+        let path = candidate["path"].as_str().unwrap_or_default();
+        if let Some(action) = action_for_path(actions, path) {
+            chosen.push(action.clone());
+        }
+    }
+    for (candidate, _) in shown.iter().filter(|(_, is_floor)| !*is_floor) {
+        if chosen.len() >= choice_count {
+            break;
+        }
+        let path = candidate["path"].as_str().unwrap_or_default();
+        if let Some(action) = action_for_path(actions, path) {
+            chosen.push(action.clone());
+        }
+    }
+    for action in actions {
+        if chosen.len() >= choice_count {
+            break;
+        }
+        if action_path(action).is_none() {
+            chosen.push(action.clone());
+        }
+    }
+    chosen
+}
+
+/// The Linked choices block: `label\n  command\n` for each of the first `limit` actions — the
+/// literal printing loop shared by `minimal`/`simple` (called with [`select_linked_choices`]'s
+/// already-bounded list and its own length — "print everything selected") and `standard`+
+/// (called with the view's full unbounded action list and its own length — today's "print
+/// everything" behaviour, unchanged). Fix round 1's deferred-duplication finding.
+fn render_linked_choices(actions: &[Value], limit: usize) -> String {
+    let mut out = String::from("\nLinked choices:\n");
+    for choice in actions.iter().take(limit) {
+        out.push_str(&format!(
+            "{}\n  {}\n",
+            choice["label"].as_str().unwrap_or_default(),
+            choice["command"].as_str().unwrap_or_default()
+        ));
+    }
+    out
 }
 
 /// WHO is reading, resolved and contestable on sight: the level, its stated and revealed

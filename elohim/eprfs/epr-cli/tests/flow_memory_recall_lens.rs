@@ -241,10 +241,24 @@ fn minimal_prints_the_five_floor_fields_on_one_line_and_at_most_one_choice() {
 #[test]
 fn a_correction_candidate_renders_at_every_lens() {
     let dir = repo();
+    // Two ordinary candidates that outrank the correction on term coverage (both "stale" and
+    // "index" DECLARED, worth 2x a body hit) — the correction only declares "stale" and carries
+    // "index" in its body only, so it scores strictly lower and ranks past `minimal`'s
+    // `choice_count` of 1 (fix round 1's scenario: a floor candidate ranked past the cut, not
+    // merely a lone candidate that would have been kept by rank alone).
+    for name in ["rank1", "rank2"] {
+        write(
+            dir.path(),
+            &format!("docs/{name}.md"),
+            &format!(
+                "---\ntitle: {name}\ndescription: stale index leader\n---\nordinary candidate\n"
+            ),
+        );
+    }
     write(
         dir.path(),
         "docs/correction.md",
-        "---\ntitle: correction\ndescription: correction of the stale index claim\ncontent_class: correction\n---\nthe index command changed\n",
+        "---\ntitle: correction\ndescription: correction of the stale claim\ncontent_class: correction\n---\nthe index command changed\n",
     );
     for (model, level) in [
         ("claude-haiku-4-5", "minimal"),
@@ -258,6 +272,22 @@ fn a_correction_candidate_renders_at_every_lens() {
             &["open", "--need", "stale index", "--scope", "docs"],
         );
         assert!(text.contains("docs/correction.md"), "{level}: {text}");
+        if level == "minimal" {
+            // Fix round 1: at `minimal` (`choice_count` 1) the correction ranks past the cut and
+            // is kept only by the content floor — the anti-capture invariant requires its command
+            // be one command away too, and a candidate the floor did NOT keep (`rank2.md`, which
+            // outranks the correction but still falls outside `choice_count`) must never leak a
+            // command into the list a reader is actually offered.
+            let linked = text.split("Linked choices:").nth(1).unwrap_or_default();
+            assert!(
+                linked.contains("correction.md"),
+                "a floor candidate ranked past choice_count must still get a Linked choice:\n{text}"
+            );
+            assert!(
+                !linked.contains("rank2.md"),
+                "a candidate the content floor did not keep must never appear as a Linked choice:\n{text}"
+            );
+        }
     }
 }
 
@@ -300,11 +330,20 @@ fn no_rendered_view_prints_a_numeric_standing_or_score_token() {
 
 /// A tiny stand-in for `regex::is_match(&format!("{name}[:=]\\s*\\d"))` — this workspace declares
 /// no `regex` dependency, and the check is narrow enough not to need one.
+///
+/// Fix round 1: the original version matched `name[:=]\s*\d` only, which missed a quoted
+/// JSON-shaped key (`"match_score": 3`, the generic key-dump path's `serde_json::
+/// to_string_pretty` fallback for an unhandled object value) — the closing quote sat where a
+/// `:`/`=` was expected, so the scan moved past without matching. Also matches `"name":\s*\d` now
+/// (skips one closing `"` immediately after `name`, if present, before the `:`/`=` check).
 fn contains_numeric_field(text: &str, name: &str) -> bool {
     let bytes = text.as_bytes();
     let mut start = 0;
     while let Some(offset) = text[start..].find(name) {
         let mut cursor = start + offset + name.len();
+        if bytes.get(cursor) == Some(&b'"') {
+            cursor += 1;
+        }
         if matches!(bytes.get(cursor), Some(b':') | Some(b'=')) {
             cursor += 1;
             while bytes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
