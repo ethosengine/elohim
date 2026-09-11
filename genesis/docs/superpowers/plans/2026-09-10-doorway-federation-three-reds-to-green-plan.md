@@ -1316,7 +1316,7 @@ Expected: a file newer than every dataplane source change in this batch. Pre-pus
 
 **No deploy is needed.** Alpha already carries **face02de** (2026-09-09), which is after `cc9cbe385`. This is a measure task.
 
-- [ ] **Step 1: Verify epr-atom-home plan Task 1 (5 minutes)**
+- [x] **Step 1: Verify epr-atom-home plan Task 1 (5 minutes)**
 
 ```bash
 cd /projects/elohim
@@ -1326,7 +1326,7 @@ grep -n "fontsource" app/elohim-app/package.json
 ```
 Expected (measured 2026-09-10): `styles.css` line 3 is `@import './styles/brand.css';`, `brand.css` exists, and all four `@fontsource-variable/*` deps are present at lines 58–61. That is Task 1 landed — tick it with this evidence line. If any is missing, execute that plan's Task 1 before continuing.
 
-- [ ] **Step 2: Tick Tasks 2–7 with the ledger's shas — do not re-implement**
+- [x] **Step 2: Tick Tasks 2–7 with the ledger's shas — do not re-implement**
 
 In `genesis/docs/superpowers/plans/2026-09-02-epr-atom-home-frame-plan.md`, tick every step checkbox under Tasks 2–7 and add one line under each task heading:
 
@@ -1334,7 +1334,7 @@ In `genesis/docs/superpowers/plans/2026-09-02-epr-atom-home-frame-plan.md`, tick
 > LANDED on dev per `app/elohim-app/.epr-meta/epr-atom-home.habit.md` DELTA 2026-09-02b: fb0117114 … cc9cbe385 (a2o tail b8b30686a). Verified, not re-implemented, 2026-09-10.
 ```
 
-- [ ] **Step 3: Run the concern against the deployed origin**
+- [x] **Step 3: Run the concern against the deployed origin**
 
 ```bash
 cd /projects/elohim/genesis/a2o
@@ -1346,7 +1346,7 @@ pnpm exec cucumber-js --tags '@concern:epr-atom-home and not @wip'; echo "EXIT=$
 ```
 Expected: `7 passed / 0 failed`, `EXIT=0`. (The `--tags` filter is what scopes this run — a bare positional would merge with the default profile's `features/**` paths.) The three `@wip` commons scenarios stay excluded; they belong to the commons plan.
 
-- [ ] **Step 4: Take the render shot and file it durably**
+- [x] **Step 4: Take the render shot and file it durably**
 
 ```bash
 cd /projects/elohim/genesis/a2o
