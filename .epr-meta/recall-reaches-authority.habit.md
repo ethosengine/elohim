@@ -38,6 +38,15 @@ retire-when: >
   metered bytes inside the SessionStart budget and no unmetered direct read — an entry that
   reliably serves the next agent no longer needs a reader watching it.
 ---
+DELTA 2026-09-11 (station 1 — reader lens; GREEN preserved, one more reader-sample): governed-discovery stations 0–1
+landed on branch sprint/2026-09-11-governed-discovery (recall.rs split into eight seams under an 1,800-line ceiling with a
+declared seam rule; Provider trait; contract as ProcessSpec+Bounds v10; reader lens from the actor sidecar with a declared
+lens_table v11; render per lens with the honesty floor line and the content floor; print-never-sum asserted). Fresh reader 5
+(sonnet claim → lens `simple`, binary 51bcb6c7…): authority reached, shape on screen 1, 6 operations, 16,116 metered bytes,
+0 unmetered, 0 mistaken — all four recall-journey ceilings pass. Defect surfaced and queued (Task 1.2 fix round 2): at `simple`
+a read/source/history rendered no primary payload and no `lens:` line, so the reader had to widen to `detail`; ruling: an
+operation's own result and the lens line render at every lens, density bounds only candidate lists. Sequence on one question:
+14 screens (Fable bootstrap) → 12 (reader 1, not reached) → 14 (reader 2, not reached) → 3 (reader 3) → 6 (reader 5 at simple).
 GREEN 2026-09-11 (RED → GREEN on evidence, one reader-sample): contract v9, binary sha256 37cae28e…
 (gate-built and installed at /opt/rust/cargo/bin/epr). Checks: (1) a2o @concern:recall-reaches-authority
 passes inside `cucumber-js --profile ceremony` 6/6 scenarios, 34/34 steps; (2) `just gate memory-ceremony`
