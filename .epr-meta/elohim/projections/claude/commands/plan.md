@@ -77,7 +77,7 @@ linked to its domain D# + roadmap rung, so it queues as a future sprint instead 
 stays scoped to *one* rung; the complementary work plays nice as the roadmap's next entry.
 
 **Staleness guard (mirror of Step 1b §4.4):** both maps regenerate each ceremony, not live. If the roadmap
-body disagrees with today's `placement-audit.py --ledger` / `--focus` (Step 1 already ran them), **trust the
+body disagrees with today's `epr flow report placement --ledger` / `--focus` (Step 1 already ran them), **trust the
 ledger/focus numbers over the roadmap prose** and say so — the audit is the live source; the roadmap is its
 readout. Never plan a rebuild of CLAIMED-ONLY work the verification track owns, or a HELD item, off stale prose.
 

@@ -50,7 +50,7 @@ conveyor mis-steers everything downstream).
 | ranking stale / next unclear | /converge | free |
 | CLAIMED-unverified items | /deliver | free |
 | dev-intent uncaptured, scenario drift | /close-loop, /story-harvest | free |
-| scope drift | `scope-reconcile.py --apply` | free |
+| scope drift | `epr flow hold --scope --apply` | free |
 | open dep/sec findings | deprecation-triage dispatch (background) | free |
 | `code-red`/`attention` CI verdicts | ci-failure-triage dispatch (background) | free |
 | `⚠ gate-error` on any instrument | repair the instrument FIRST | free |

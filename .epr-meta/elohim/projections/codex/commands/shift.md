@@ -50,7 +50,7 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
      rung, so it queues as a future shift. The executed shift stays
      genuine; the complementary work plays nice as the next roadmap entry.
    - **Staleness guard:** both maps regenerate each ceremony, not live —
-     if the roadmap prose disagrees with `placement-audit.py --ledger` /
+     if the roadmap prose disagrees with `epr flow report placement --ledger` /
      `--focus`, trust the audit numbers and say so. Never let a stale
      ranking authorize rebuilding verified work or picking a HELD
      Objective.

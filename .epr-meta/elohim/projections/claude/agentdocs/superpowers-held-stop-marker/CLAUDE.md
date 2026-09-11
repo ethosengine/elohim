@@ -15,6 +15,6 @@ partial availability is the steady state.
 
 - Do NOT edit or "fix" these as if broken. They are correct; the hardware is absent.
 - Inbound `cites:` to these resolve as **HELD-CITE** (content-addressed; not dead) — do not delete the link.
-- They move back automatically when their capability returns: `scope-reconcile.py --apply`.
+- They move back automatically when their capability returns: `epr flow hold --scope --apply`.
 
 Managed by `epr flow hold --scope`. The mover, not a human, files things here.

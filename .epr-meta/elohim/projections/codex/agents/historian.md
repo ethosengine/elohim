@@ -42,7 +42,7 @@ not yet cover — each row tagged OPEN / STRADDLE / CODE-NO-DOC / GUIDE-GAP and 
 1. **Closed-gap → history distillation.** When a gap row *closes* (a pillar guide written, a seed
    authored, a straddle reconciled), the lesson of how it was open — the path not taken, the decision
    settled — is often worth a `history/` record before the row is struck. This is your existing
-   distillation lever (`placement-audit.py --ledger` SUPERSEDED → `content/elohim-protocol/history/`)
+   distillation lever (`epr flow report placement --ledger` SUPERSEDED → `content/elohim-protocol/history/`)
    applied to the MAP's own gaps: a closed gap that just disappears loses the "why it was a gap" lesson.
    Surface closed gaps to the librarian (who strikes the row) with a one-line history-record proposal
    where the closing taught something re-spec-worthy.

@@ -6,7 +6,7 @@ Fail-open: a guard bug never blocks dev."""
 # The intervenor's removal condition (Meadows' shifting-the-burden trap;
 # counted by _lib/intervenor_census.py). A condition, never a date.
 RETIRE_WHEN = (
-    "when the intervenor census (placement-audit --epr-meta) reaches zero live rules — this is "
+    "when the intervenor census (`epr flow report placement --stasis`, the `epr_meta_coverage` dimension) reaches zero live rules — this is "
     "the EVALUATOR for the compose gate, not a rule of its own, so it retires with the last "
     "rule it evaluates and never before. Removing it earlier would silently un-enforce every "
     "manifest at once, which is the fail-open direction this hook already guards against "
@@ -281,7 +281,7 @@ def _coverage_nudge(target: Path):
                 f"rule if there's a recurring, mechanizable drift here, else rules-free with a `why:` "
                 f"recording the considered 'no edit-time gate needed' decision. See the "
                 f"`elohim-epr-metafile` skill. (In-flight remediation; full queue: "
-                f"`placement-audit.py --epr-meta`.)")
+                f"`epr flow report placement --stasis` (the `epr_meta_coverage` dimension).)")
     except Exception:  # noqa: BLE001 — the nudge is advisory; never let it block or crash the hook
         return None
 

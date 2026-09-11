@@ -122,7 +122,7 @@ rung, so it plays nice with whatever brainstorm → spec → plan → sprint act
 *one thing*; the complementary work becomes a future roadmap entry, not a tangent that derails this one.
 
 **Staleness guard (mirror of Step 1b §4.4):** both maps are regenerated each ceremony, not live. If the
-roadmap body is stale against today's `placement-audit.py --ledger` / `--focus`, or MAP's stanza predates the
+roadmap body is stale against today's `epr flow report placement --ledger` / `--focus`, or MAP's stanza predates the
 last seed that landed, treat the orientation as **degraded — trust the ledger/focus numbers over the prose**
 and say so. Never let a stale ranking wave through a rebuild of verified work or a pick of a HELD item.
 
@@ -179,7 +179,7 @@ informed-by: [<process gospel/seed — NOT an architecture seed>]
 ---
 ```
 
-decompose.py (the BACK gate) re-reads `class:`, reconciles `provisional`, and fails loud if the residue
+`epr flow project` (the BACK gate) re-reads `class:`, reconciles `provisional`, and fails loud if the residue
 contradicts the stamp (e.g. `domain: D#` + all-`.claude/` targets — the mis-class the gate catches).
 
 **BORN LINKED (§4.3):** `cites:` is **not** a retroactive afterthought — it is **front-loaded** from the seeds
@@ -219,4 +219,4 @@ It writes `.eprfs/status/gap-items/<slug>.json` — the bounded, cited gap list 
 targets (**OPEN** = implement, **CLAIMED** = verify; a checked box is a claim, never trusted as done). If it
 reports "needs AGENT decomposition" (a prose design spec with no checkboxes/requirements), extract the
 spec's components yourself: 5–15 bounded items, each citing a spec line, `OPEN` unless already
-implemented-and-verified. Then `placement-audit.py --ledger` shows the gaps rolled into the budget.
+implemented-and-verified. Then `epr flow report placement --ledger` shows the gaps rolled into the budget.

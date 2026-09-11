@@ -1,6 +1,6 @@
 ---
 name: converge
-description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert the memkit reports (cleanup-backlog-refresh, dedupe-clusters, sprint-digest, path-update-proposals) into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
+description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert the lens reports (cleanup-backlog-refresh, dedupe-clusters, sprint-digest, path-update-proposals) into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
 metadata:
   runtime: codex
   sourceRuntime: claude
@@ -45,7 +45,7 @@ python3 .claude/scripts/converge/converge-apply.py    # Phase 3: operator-approv
 
 `/converge` is the cartographer's seat, and the cartographer owns the **standing prioritization home**
 — `genesis/data/timeline/roadmap/vision-readiness-sprint-roadmap.md`. Before producing a "what's next"
-menu, **regenerate that roadmap** from the three live inputs (`placement-audit.py --ledger` × `--focus`
+menu, **regenerate that roadmap** from the three live inputs (`epr flow report placement --ledger` × `--focus`
 × the re-mined vision axis) per the cartographer's `ROADMAP-CURRENCY mandate`. A stale roadmap poisons
 the menu it feeds, so this runs **first**:
 
