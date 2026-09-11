@@ -2172,28 +2172,41 @@ restore_binary_for() {
 # a hosted human's key on every storage restart, desyncing the fixture from
 # the grant surface it's meant to describe (2026-09-11: uhCAkRB5x3… then
 # uhCAkRCJpuO1… vs the steward key uhCAkwZmnsxA… the grants actually use).
+#
+# Each peer also gets its CONDUCTOR coordinates — `conductorAdminPort` and
+# `conductorAppUrl` (`ws://127.0.0.1:<app port>`). A peer's storage `url` is an
+# HTTP origin (`http://localhost:809x`) and its conductor's app interface is a
+# WebSocket origin (`ws://localhost:444x`): they never share an origin, so a
+# harness handed a conductor origin by the doorway's registry
+# (`GET /admin/agents/{key}/conductor` → conductorUrl) could not name which
+# household peer that conductor belongs to (2026-09-11: story 07's provider
+# assertions failed with "no household fixture storage peer matches the pool
+# conductor's origin (ws://localhost:4445)"). Stamping both origins beside the
+# peer's own agentPubKey makes the join structural instead of coincidental.
 refresh_fixture_pids() {
   local fixture="$MESH_DIR/household-fixture.json"
   [ -s "$fixture" ] || return 0
-  local i=0 name keys=""
+  local i=0 name keys="" conductors=""
   for name in "${PEERS[@]}"; do
     keys="${keys}${name}=$(peer_agent_key "$i" "$name"),"
+    conductors="${conductors}${name}=$(admin_port "$i"):$(app_port "$i"),"
     i=$((i + 1))
   done
-  python3 - "$fixture" "$MESH_PEERS" "$keys" <<'PY'
+  python3 - "$fixture" "$MESH_PEERS" "$keys" "$conductors" <<'PY'
 import json, subprocess, sys
-fixture, peers, keys_raw = sys.argv[1], sys.argv[2].split(','), sys.argv[3]
+fixture, peers, keys_raw, conductors_raw = sys.argv[1], sys.argv[2].split(','), sys.argv[3], sys.argv[4]
 keys = dict(kv.split('=', 1) for kv in keys_raw.split(',') if '=' in kv)
+conductors = dict(kv.split('=', 1) for kv in conductors_raw.split(',') if '=' in kv)
 d = json.load(open(fixture))
 sp = d.setdefault('storagePeers', {})
 changed = []
 for i, name in enumerate(peers):
+    if name not in sp:
+        continue
     port = 8090 + i
     out = subprocess.run(['bash', '-c', f"ss -ltnp | grep ':{port} ' | sed -n 's/.*pid=\\([0-9]*\\).*/\\1/p' | head -1"],
                          capture_output=True, text=True).stdout.strip()
-    if not out or name not in sp:
-        continue
-    if sp[name].get('pid') != int(out):
+    if out and sp[name].get('pid') != int(out):
         changed.append(f"{name}:{sp[name].get('pid')}->{out}")
         sp[name]['pid'] = int(out)
     # The peer's agent key, in the namespace custody commitments name providers
@@ -2203,6 +2216,19 @@ for i, name in enumerate(peers):
     if key and sp[name].get('agentPubKey') != key:
         changed.append(f"{name}:agentPubKey={key[:12]}…")
         sp[name]['agentPubKey'] = key
+    # This peer's conductor, in the namespace the doorway's conductor registry
+    # answers in (a ws:// app-interface origin), so a conductor origin resolves
+    # back to the named household peer that owns it.
+    ports = conductors.get(name, '')
+    if ':' in ports:
+        admin_port, app_port = ports.split(':', 1)
+        app_url = f'ws://127.0.0.1:{app_port}'
+        if admin_port.isdigit() and sp[name].get('conductorAdminPort') != int(admin_port):
+            changed.append(f"{name}:conductorAdminPort={admin_port}")
+            sp[name]['conductorAdminPort'] = int(admin_port)
+        if app_port.isdigit() and sp[name].get('conductorAppUrl') != app_url:
+            changed.append(f"{name}:conductorAppUrl={app_url}")
+            sp[name]['conductorAppUrl'] = app_url
 if changed:
     json.dump(d, open(fixture, 'w'), indent=2)
     print('fixture pids refreshed: ' + ' '.join(changed))
