@@ -280,63 +280,73 @@ impl Contract {
     /// than a bespoke JSON array. A contract carrying a declared `process_spec` deserializes it
     /// directly; an older contract (pre-v10) that only declared `composition` gets one minted from
     /// it, so `Contract::load` never fails on a contract this executor already accepts.
-    pub fn process_spec(&self) -> elohim_epr_rea::ProcessSpec {
-        if let Some(raw) = self.value.get("process_spec") {
-            if let Ok(spec) = serde_json::from_value(raw.clone()) {
-                return spec;
-            }
-        }
-        elohim_epr_rea::ProcessSpec {
-            id: self
-                .value
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or("bounded-evidence-recall")
-                .to_string(),
-            version: self
-                .value
-                .get("version")
-                .and_then(Value::as_u64)
-                .unwrap_or(0) as u32,
-            stages: COMPOSITION
-                .iter()
-                .map(|name| elohim_epr_rea::StageSpec {
-                    name: (*name).to_string(),
-                    artifact_kind: "Window".to_string(),
-                })
-                .collect(),
-            edges: Vec::new(),
+    pub fn process_spec(&self) -> FlowResult<elohim_epr_rea::ProcessSpec> {
+        match self.value.get("process_spec") {
+            // Present but malformed is a hand-edit error, not a shape to silently paper over with
+            // a minted default — a caller reading a wrong `ProcessSpec` back would never learn the
+            // declared one was broken.
+            Some(raw) => serde_json::from_value(raw.clone()).map_err(|e| {
+                refused(format!(
+                    "recall contract `process_spec` is declared but malformed: {e}"
+                ))
+            }),
+            // Genuinely absent (pre-v10 contract) is the only case the v9 fallback covers.
+            None => Ok(elohim_epr_rea::ProcessSpec {
+                id: self
+                    .value
+                    .get("id")
+                    .and_then(Value::as_str)
+                    .unwrap_or("bounded-evidence-recall")
+                    .to_string(),
+                version: self
+                    .value
+                    .get("version")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as u32,
+                stages: COMPOSITION
+                    .iter()
+                    .map(|name| elohim_epr_rea::StageSpec {
+                        name: (*name).to_string(),
+                        artifact_kind: "Window".to_string(),
+                    })
+                    .collect(),
+                edges: Vec::new(),
+            }),
         }
     }
 
     /// The contract's declared budgets read as VF [`elohim_epr_rea::Bound`]s. A declared `bounds`
-    /// array deserializes directly; an older contract without one gets a `Bound` folded from every
-    /// `limits.*` entry [`validate`](Self::validate) already requires be a positive finite number,
-    /// so this never invents a limit the contract did not itself declare.
-    pub fn bounds(&self) -> Vec<elohim_epr_rea::Bound> {
-        if let Some(raw) = self.value.get("bounds") {
-            if let Ok(bounds) = serde_json::from_value(raw.clone()) {
-                return bounds;
-            }
-        }
-        self.value
-            .get("limits")
-            .and_then(Value::as_object)
-            .map(|limits| {
-                limits
-                    .iter()
-                    .filter_map(|(name, raw)| {
-                        raw.as_f64().map(|limit| elohim_epr_rea::Bound {
-                            limit,
-                            unit: name.clone(),
-                            threshold_pct: 100.0,
-                            sense: None,
-                            source: None,
+    /// array deserializes directly, and a malformed one is REFUSED rather than silently replaced by
+    /// the folded fallback. A contract with no `bounds` key at all (pre-v10) gets one `Bound` folded
+    /// from every `limits.*` entry [`validate`](Self::validate) already requires be a positive
+    /// finite number, so the fallback never invents a limit the contract did not itself declare.
+    pub fn bounds(&self) -> FlowResult<Vec<elohim_epr_rea::Bound>> {
+        match self.value.get("bounds") {
+            Some(raw) => serde_json::from_value(raw.clone()).map_err(|e| {
+                refused(format!(
+                    "recall contract `bounds` is declared but malformed: {e}"
+                ))
+            }),
+            None => Ok(self
+                .value
+                .get("limits")
+                .and_then(Value::as_object)
+                .map(|limits| {
+                    limits
+                        .iter()
+                        .filter_map(|(name, raw)| {
+                            raw.as_f64().map(|limit| elohim_epr_rea::Bound {
+                                limit,
+                                unit: name.clone(),
+                                threshold_pct: 100.0,
+                                sense: None,
+                                source: None,
+                            })
                         })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default()
+                        .collect()
+                })
+                .unwrap_or_default()),
+        }
     }
 }
 

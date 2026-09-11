@@ -2955,17 +2955,65 @@ fn a_refusal_about_an_input_names_the_flags_that_operation_accepts() {
 #[test]
 fn the_contract_is_a_process_spec_whose_stages_equal_its_composition() {
     let contract = Contract::load(&repo_root().join(recall::CONTRACT_REL)).unwrap();
-    let spec = contract.process_spec();
+    let spec = contract.process_spec().unwrap();
     let names: Vec<&str> = spec.stages.iter().map(|s| s.name.as_str()).collect();
     assert_eq!(
         names,
         ["scope", "discover", "filter", "group", "select", "read", "judge"]
     );
-    let bounds = contract.bounds();
+    let bounds = contract.bounds().unwrap();
     let body = bounds
         .iter()
         .find(|b| b.unit == "body_scan_bytes")
         .expect("declared");
     assert_eq!(body.limit, 65536.0);
     assert!(matches!(body.sense, Some(elohim_epr_rea::Sense::Ceiling)));
+}
+
+/// A pre-v10 contract carrying no `process_spec`/`bounds` at all still loads: the fallback mints a
+/// `ProcessSpec` from `composition` and a `Bound` per `limits.*` entry, exactly the v9 shape.
+#[test]
+fn a_contract_with_no_process_spec_or_bounds_key_falls_back_to_composition_and_limits() {
+    let mut value = contract_value(false);
+    value
+        .as_object_mut()
+        .expect("object")
+        .remove("process_spec");
+    value.as_object_mut().expect("object").remove("bounds");
+    let contract = Contract::from_value(value).unwrap();
+
+    let spec = contract.process_spec().unwrap();
+    let names: Vec<&str> = spec.stages.iter().map(|s| s.name.as_str()).collect();
+    assert_eq!(
+        names,
+        ["scope", "discover", "filter", "group", "select", "read", "judge"]
+    );
+
+    let bounds = contract.bounds().unwrap();
+    assert_eq!(
+        bounds.len(),
+        18,
+        "one Bound per declared limits.* entry, unit-for-unit"
+    );
+    let body = bounds
+        .iter()
+        .find(|b| b.unit == "body_scan_bytes")
+        .expect("folded from limits.body_scan_bytes");
+    assert_eq!(body.limit, 65536.0);
+    assert_eq!(body.sense, None, "the folded fallback declares no sense");
+}
+
+/// A `process_spec` that IS present but does not deserialize is a hand-edit error — refused with a
+/// named cause, never silently swapped for the minted default.
+#[test]
+fn a_present_but_malformed_process_spec_is_refused_not_defaulted() {
+    let mut value = contract_value(false);
+    value["process_spec"] = json!({"stages": "nope"});
+    let contract = Contract::from_value(value).unwrap();
+
+    let error = contract.process_spec().unwrap_err().to_string();
+    assert!(
+        error.contains("malformed"),
+        "refusal must name the malformed field: {error}"
+    );
 }
