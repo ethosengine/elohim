@@ -317,7 +317,7 @@ files until it hits a `root: true` base, bounded by a hardcoded depth cap of 32 
   — "this subtree's governance has no anchor"; add a `root: true` parent.
 - **`covers: subtree` claims downward responsibility (the coverage signal).** The dual of `root` (which
   terminates the cascade *up*): a manifest with `covers: subtree` is *fully responsible* for everything
-  beneath it, so the **coverage walk** (`placement-audit.py --epr-meta`) terminates there and that region
+  beneath it, so the **coverage walk** (`epr flow report placement --stasis`, the `epr_meta_coverage` dimension) terminates there and that region
   counts as OWNED — integrity by construction, never re-audited (seam-map §3.7: the core never re-checks an
   app-manifest's vocabulary). It feeds the `epr_meta_coverage` stasis dimension + the `epr-meta:` headline
   token. Opt-in: an incidental manifest (a `ci-trigger` config) without it never trivially "covers" the
