@@ -263,7 +263,10 @@ if echo "$CHANGED" | grep -qE "^\.claude/scripts/"; then
     for lib_test in .claude/scripts/_lib/__tests__/*_test.py .claude/scripts/_lib/__tests__/test_*.py; do
       [ -f "$lib_test" ] || continue
       lib_tests_ran=$((lib_tests_ran + 1))
-      if ! python3 "$lib_test" >/dev/null 2>&1; then
+      # git exports GIT_DIR/GIT_WORK_TREE/GIT_INDEX_FILE/GIT_PREFIX into hooks; a harness that
+      # spawns git inside a temp repo would then act on THIS repo (epr_habits_test red only under
+      # the hook, 2026-09-11) — the same scrub gate-runner.mjs applies to gate children.
+      if ! env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_PREFIX python3 "$lib_test" >/dev/null 2>&1; then
         lib_failed="$lib_failed $lib_test"
       fi
     done
