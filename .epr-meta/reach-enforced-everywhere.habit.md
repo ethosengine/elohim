@@ -40,3 +40,4 @@ retire-when: >
   someone remembers to gate it. The per-plane gate is what this habit is really watching.
 ---
 DELTA 2026-09-05: `nachalah-allotment.feature` now declares household outsider exclusion, blind custody without plaintext/metadata access, witnessed promotion, and selective carry boundaries; all are @wip, so no additional egress enforcement is claimed and RED is preserved.
+DELTA 2026-09-11 (household re-measure; RED preserved): scoped household lane 20260911T223432Z-466536cb (3 peers, dual transport, storage sut sha256:371d348555e6d37f, report genesis/a2o/reports/sprint-report-household-20260911T223432Z-466536cb.md) — reach-enforced-http 3/3 green (unverifiable bearer, self-asserted X-Agent-Cid, legacy X-Agent-Id each return exactly the anonymous listing). The HTTP plane holds on the current binary; the byte-route scenario and the four other planes are unchanged, so the invariant is still red.

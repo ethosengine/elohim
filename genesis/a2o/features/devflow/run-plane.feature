@@ -1,19 +1,26 @@
-# STEP DEFINITIONS ARE NOT WIRED YET — this feature is honestly @wip, not green.
+# SECTIONS 1 AND 3 ARE WIRED AND EXECUTING; SECTION 2 IS STILL @wip.
+#
+# `steps/devflow/run-plane.steps.ts` drives the eight scenarios of sections 1 and
+# 3 against the `epr flow` CLI, in the register steps/seeder.steps.ts established
+# for a process-driven scenario: mint a scratch git repository, run the real
+# command against it as its own process, and assert on the exit status and on what
+# it wrote. Each scenario owns its repository and removes it afterwards, so nothing
+# here reads or writes this repository's own flow store.
+#
+# Section 2's four scenarios still carry @wip at the scenario line, and the reason
+# is unchanged: they drive the run-projection EMITTER, not the CLI, and that needs
+# a fixture capability nobody has built — a scratch habit register, a scratch saga
+# register and a scratch .claude/settings.json the hook is registered in, plus a
+# way to make one register's read hang. @wip is therefore the honest state for
+# those four, and they are skipped rather than failed.
 #
 # BLIND-READER LOOP: five fresh-context cycles ran 2026-08-13 (a2o-story profile).
-# Two findings are OPERATOR-DEFERRED (2026-08-13) to the step-def wiring follow-up,
-# where the emitter contract is exercised for real; one final reader runs after
-# that wiring lands: (1) whether a block MARKS a line it could not derive rather
+# Two findings are OPERATOR-DEFERRED (2026-08-13) to the section-2 wiring, where
+# the emitter contract is exercised for real; one final reader runs after that
+# wiring lands: (1) whether a block MARKS a line it could not derive rather
 # than silently omitting it — a real emitter design choice, the reader's
 # false-green argument is recorded and unrebutted; (2) a cold-start scenario for
 # a session whose start-of-session check produced no reading.
-# No step definition in genesis/a2o/steps/ drives either surface below today. The
-# wiring is a named follow-up: a `steps/devflow/run-plane.steps.ts` in the register
-# that steps/seeder.steps.ts already established for a process-driven scenario
-# (spawn the process against a scratch repository root, assert on its exit status
-# and on what it wrote). Until that lands, every scenario below reads as pending —
-# which is the honest state, and is why the feature carries @wip at the feature
-# line rather than a claimed green.
 #
 # The tags are suite-routing labels, not behaviour: @e2e and @devflow route this
 # file into the end-to-end devflow suite, and each @concern:<name> joins its
@@ -41,7 +48,7 @@
 # Habit: dev-system-equilibrium (genesis/manifests/habits.yaml) — the equilibrium
 #        scenarios below are the story form of that habit's runnable check.
 
-@e2e @devflow @wip @requires:epr-cli @act:host
+@e2e @devflow @requires:epr-cli @act:host
 Feature: The run plane — what a long run remembers, and whether the work is draining
   As an agentic developer working one objective across many sessions, where the
   conversation between sessions is summarised away and cannot be relied on
@@ -253,7 +260,7 @@ Feature: The run plane — what a long run remembers, and whether the work is dr
   #    habit register.
   # ══════════════════════════════════════════════════════════════════════════
 
-  @concern:run-plane-projection
+  @concern:run-plane-projection @wip
   Scenario: Every turn opens with the fence, the frontier, and the newest correction
     # The block is re-derived, never remembered. That is what stops the state an
     # agent is steering by from sinking deeper into the conversation as the
@@ -274,7 +281,7 @@ Feature: The run plane — what a long run remembers, and whether the work is dr
     And that block names the newest correction, which is the last one appended to the flow store
     And the block's final line is the exact command that writes a correction
 
-  @concern:run-plane-projection
+  @concern:run-plane-projection @wip
   Scenario: A register already over the fence is shown as exceeded, not renormalised
     # The fence line is only worth printing if it can read as broken. A block
     # that can only ever say "two or fewer" reports the rule back to itself and
@@ -287,7 +294,7 @@ Feature: The run plane — what a long run remembers, and whether the work is dr
     And that block marks the fence as exceeded
     And the emitter reports success, so a breached fence never fails the turn
 
-  @concern:run-plane-projection
+  @concern:run-plane-projection @wip
   Scenario: An input the block cannot read costs one line, never the turn
     # A state summary that can fail the turn it is summarising is a worse deal
     # than no summary. Partial sight, plainly partial, is the contract.
@@ -299,7 +306,7 @@ Feature: The run plane — what a long run remembers, and whether the work is dr
     And the emitter finishes within the five-second budget declared for it in .claude/settings.json rather than waiting on the failed read
     And the emitter reports success, so the turn is never failed by it
 
-  @concern:run-plane-projection
+  @concern:run-plane-projection @wip
   Scenario: A stale equilibrium reading says so instead of reporting an old rate
     # "We have not measured since the record changed" and "the work is draining"
     # are different claims, and the block must never let the first pass as the
