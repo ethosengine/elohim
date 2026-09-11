@@ -14,9 +14,10 @@ Feature: The deployed doorway portal signs a hosted human in (Act II twin)
   What the Background leaves behind, plainly: it registers one throwaway hosted human through
   the doorway's HTTP API, exactly as the household twin does. That is a row in the doorway's own
   account store — never a DHT entry, never replicated to peers — so the run rewrites nothing the
-  neighbourhood contract protects. It is not swept afterwards: the fleet accrues one such account
-  per pipeline run. If that ever reads as noise, the cure is a sweeper for test-registered
-  accounts, not a weaker proof.
+  neighbourhood contract protects. Cleanup goes through the product path: the registration step
+  closes that account itself, with the bearer it was just issued, through `POST
+  /auth/close-account`; only if the deployed doorway lacks that route does it fall back to an
+  admin soft-delete.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"

@@ -33,6 +33,7 @@ import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
 import { ThresholdLoginPage } from '../../src/framework/pages/threshold-login.page.js';
+import { closeAccountCleanup } from '../auth-lifecycle.steps.js';
 
 import type { E2EWorld } from '../../src/framework/world.js';
 
@@ -54,6 +55,12 @@ interface PortalState {
   password: string;
   device: PlaywrightDevice;
   doorwayUrl: string;
+}
+
+/** Shape of the fields this file reads off `POST /auth/register`'s body. */
+interface RegisterResponseBody {
+  identifier?: string;
+  token?: string;
 }
 
 function portal(world: E2EWorld): PortalState {
@@ -145,7 +152,7 @@ Given(
 
     // The doorway names the human it just stored. Which spelling that is depends
     // on how THIS doorway is deployed, so it is read rather than derived.
-    const registered = JSON.parse(body) as { identifier?: string };
+    const registered = JSON.parse(body) as RegisterResponseBody;
     const canonicalIdentifier = registered.identifier;
     assert.ok(
       typeof canonicalIdentifier === 'string' && canonicalIdentifier.length > 0,
@@ -167,6 +174,22 @@ Given(
     s.canonicalIdentifier = canonicalIdentifier;
     s.password = password;
     s.doorwayUrl = base;
+
+    // Cleanup goes through the product path, same as the API-registered ephemeral
+    // humans in auth-lifecycle.steps.ts: close the account with the bearer this
+    // registration just minted, falling back to the admin soft-delete only if
+    // `POST /auth/close-account` itself is absent. Captured now — at registration
+    // — because the portal never surfaces this bearer; it mints its own session
+    // token when the human signs in, which is a different credential.
+    const registrationToken = registered.token;
+    assert.ok(
+      typeof registrationToken === 'string' && registrationToken.length > 0,
+      `the doorway registered "${canonicalIdentifier}" without a bearer token, so this ` +
+        `step cannot close the account through the product path afterwards: ${body}`
+    );
+    this.onCleanup(async () => {
+      await closeAccountCleanup(this, base, canonicalIdentifier, registrationToken);
+    });
   }
 );
 

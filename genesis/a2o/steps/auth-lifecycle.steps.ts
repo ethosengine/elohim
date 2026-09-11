@@ -71,8 +71,12 @@ async function adminSoftDeleteFallback(
  * the admin soft-delete only when the route itself is absent (404/405).
  * A second close is expected to be harmless (idempotent per 05-leaving) —
  * the route answers `200 { alreadyClosed: true }`, never a rethrow here.
+ *
+ * Exported: shared with `steps/ui/doorway-portal-login.steps.ts`, whose
+ * portal-registration Background needs the same product-path cleanup rather
+ * than a second hand-maintained copy of it.
  */
-async function closeAccountCleanup(
+export async function closeAccountCleanup(
   world: E2EWorld,
   doorwayUrl: string,
   identifier: string,
