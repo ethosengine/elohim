@@ -79,13 +79,14 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
     And the page names the date their hosting is promised until
     And the page never shows the raw commitment identifier as the household's name
 
-  Scenario: Asked directly, the doorway returns the promise and not a claim about itself
+  Scenario: Asked directly, a peer that is not the doorway returns the promise, not the doorway's claim about itself
     Given a newcomer who has created an account at this doorway
-    When the doorway is asked for that human's hosting commitment
-    Then the commitment's scope is "hosted-cell"
-    And the commitment's provider is the steward of the pool conductor running that cell
-    And the commitment's provider is not the doorway's own service identity
-    And the commitment's recipient is that human's own agent key
+    When the doorway names that human's hosting commitment
+    And that commitment is read back, by its name, from a household peer that is not the doorway's pool
+    Then the read-back commitment's scope is "hosted-cell"
+    And its provider is the agent key that the pool conductor's own peer names as its steward
+    And its provider is not the doorway's own service identity
+    And its recipient is that human's own agent key
 
   Scenario: Two newcomers are lent two cells under two promises
     Given a newcomer who has created an account at this doorway

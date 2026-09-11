@@ -399,6 +399,12 @@ git commit -m "habit(hosted-human-lifecycle): attach hosted-compute-contracted +
 
 ## Task 4 — Step glue: verify 05-leaving, then define the new phrases
 
+> **Chief decisions on the S1 blind-reader findings (2026-09-11), binding for this task:**
+> 1. *Notary-side read.* Story 07 scenario 3 now reads the commitment back **by cid from a household peer that is not the hosting doorway's pool** (on the mesh: jessica's storage, `:8091`, via its commitment read — the commitment is DHT-notarized, so any peer holding the mishpat cell answers). The step must NOT go through the doorway for the read-back; the doorway only supplies the cid.
+> 2. *Steward-key resolution.* "the agent key that the pool conductor's own peer names as its steward" resolves from the pool peer's storage self-identity (the mesh roster / its `/p2p/status` `peerId`→agent binding), never from the doorway. Circular resolution = the assertion is void.
+> 3. *Series order.* The story is station **7** (after "Being hosted", before "The operator and me"); Leaving is station 9. README renumbered; habit `checks:` cite file paths and are unaffected.
+
+
 **Drains:** hosted-human plan **Task 1 verbatim** — but see the verdict below; plus new glue for Tasks 1 and 2 of this plan.
 **Tier:** Sonnet (step definition wiring is explicitly Sonnet work).
 

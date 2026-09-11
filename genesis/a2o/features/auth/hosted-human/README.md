@@ -56,9 +56,9 @@ number counts only the stories born here. So station 8 is `05-leaving.feature` a
 | 4 | Reaching the app: the doorway tells the app where I sign in, and hands me over | `06-reaching-the-app.feature` (the crossing, from the person's side), `../auth-discovery.feature`, `../oauth-authorization-code.feature`, `../session-handoff.feature`, `../agency-context-labels.feature` | partly live, `06` written, @wip |
 | 5 | My account: who I am here, what I use, and where I stand on the agency pipeline | `../agency-pipeline-coherence.feature` (Hosted is current), `03-my-account.feature` | partly live, rest written, @wip |
 | 6 | Being hosted: the doorway keeps my cell for me, and gets it back to me when its pool changes | `../conductor-pool-recovery.feature` | live (@wip) |
-| 7 | The operator and me: suspension, quota, and what I am told when they act | `../user-management.feature` (operator side), `04-the-operator-and-me.feature` (my side) | partly live, rest written, @wip |
-| 8 | Leaving: I close my account from the portal and the doorway stops hosting me | `05-leaving.feature` | live (steps wired; red until the close-account route and UI land) |
-| 9 | Hosted by a household: whose machine runs my cell, and the promise that says so | `07-hosted-by-a-household.feature` | live, failing (steps undefined until the glue lands) |
+| 7 | Hosted by a household: whose machine runs my cell, and the promise that says so | `07-hosted-by-a-household.feature` | live, failing (steps undefined until the glue lands) |
+| 8 | The operator and me: suspension, quota, and what I am told when they act | `../user-management.feature` (operator side), `04-the-operator-and-me.feature` (my side) | partly live, rest written, @wip |
+| 9 | Leaving: I close my account from the portal and the doorway stops hosting me | `05-leaving.feature` | live (steps wired; red until the close-account route and UI land) |
 
 ## What is deliberately not here
 
