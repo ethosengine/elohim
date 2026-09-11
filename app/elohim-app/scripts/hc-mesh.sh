@@ -2036,10 +2036,32 @@ storage_ark_env() { # <peer-name>
 # moved the admin call to `hc client call --port <admin> list-apps`; hc 0.6 had
 # `hc sandbox call --running <admin> list-apps`. Prints nothing when neither
 # answers (the storage then derives its own key over the admin socket).
+#
+# MUST select the STEWARD's own app, never `head -1` of whatever list-apps
+# returns first: a pool conductor (e.g. matthew) also hosts OTHER people's
+# apps, named `elohim-conductor-<n>-<hash>` (POOL_COMPUTE_PERFORMER must be
+# the pool peer's own actor, or the grant surface 403s local-cell-actor-
+# required). `hc sandbox generate --app-id elohim` is what this script installs
+# for the peer's own cells, so `elohim` (exact, never containing `-conductor-`)
+# is the one id that is always the steward — filter list-apps down to it
+# (2026-09-11: `head -1` picked a hosted human's key on matthew twice).
+STEWARD_APP_ID="elohim"
 sandbox_agent_key() { # <admin-port> -> prints uhCAk…, or nothing
   { hc client call --port "$1" list-apps 2>/dev/null \
       || hc sandbox call --running "$1" list-apps 2>/dev/null; } \
-    | grep -o '"agent_pub_key":"[^"]*"' | head -1 | cut -d'"' -f4
+    | STEWARD_APP_ID="$STEWARD_APP_ID" python3 -c '
+import json, os, sys
+steward = os.environ["STEWARD_APP_ID"]
+try:
+    apps = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for a in apps:
+    app_id = a.get("installed_app_id", "")
+    if app_id == steward and "-conductor-" not in app_id:
+        print(a.get("agent_pub_key", ""))
+        break
+' 2>/dev/null
 }
 
 # The same key, CACHED to disk. The doorways boot BEFORE the conductors (doorway A is
@@ -2056,6 +2078,9 @@ peer_agent_key() { # <peer-index> <peer-name> -> prints uhCAk…, or nothing
     mkdir -p "$MESH_DIR/$2"; printf '%s\n' "$key" > "$cache"
   elif [ -s "$cache" ]; then
     key="$(head -1 "$cache")"
+  fi
+  if [ -z "$key" ]; then
+    echo "peer_agent_key: no steward ($STEWARD_APP_ID) key for $2 from list-apps AND no cache at $cache" >&2
   fi
   printf '%s' "$key"
 }
