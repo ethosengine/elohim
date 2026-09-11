@@ -101,6 +101,7 @@ Feature: A hosted human's whole life at a doorway, from the portal, leaving noth
 
   Scenario: Closing the account asks the human to confirm, then signs them out
     Given a hosted human "Stranger" is registered on doorway "alpha"
+    When the browser opens the doorway sign-in portal
     And the human signs in through the portal
     When the human opens their doorway account page
     And the human begins closing their account
