@@ -12,8 +12,24 @@
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
+use super::agent_key::{canonical_agent_key, lookup_forms};
 use super::registry::ConductorRegistry;
 use super::typed_admin::TypedAdminClient;
+
+/// The EXACT string a freshly provisioned agent is known by — the one value
+/// that becomes [`ProvisionedAgent::agent_pub_key`], and from there the JWT
+/// claim, the account response, and the `recipient` of the hosted-cell compute
+/// grant.
+///
+/// Split out as a pure function precisely so that last hop can be pinned by a
+/// test without a conductor: `elohim-storage`'s grant surface does
+/// `AgentPubKey::try_from(recipient)` and refuses anything that is not the
+/// canonical HoloHash form. This used to be bare base64 (`hCAk…`), which made
+/// every hosted registration's promise leg a 500 while every other reader —
+/// all of them pass-through — stayed silent about it.
+pub fn provisioned_agent_key(raw: &[u8]) -> String {
+    canonical_agent_key(raw)
+}
 
 /// Default app ID prefix for provisioned agents.
 const DEFAULT_APP_ID: &str = "elohim";
@@ -127,10 +143,7 @@ impl AgentProvisioner {
             )
         })?;
 
-        let agent_pub_key_b64 = base64::Engine::encode(
-            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-            &agent_key,
-        );
+        let agent_pub_key_b64 = provisioned_agent_key(&agent_key);
 
         // 4. Install app
         if let Err(e) = admin
@@ -222,14 +235,18 @@ impl AgentProvisioner {
             }
         }
 
-        // 7. Register agent→conductor mapping (both encodings for format compat)
+        // 7. Register agent→conductor mapping under EVERY string form a reader
+        // might hold — canonical first, then the legacy bare encodings a JWT or
+        // a pre-canonical Mongo row can still carry. These are lookup aliases
+        // for ONE agent, not one agent each: the registry counts capacity by
+        // distinct install, so the alias fan-out cannot inflate the count.
+        let key_forms = lookup_forms(&agent_key);
+        let (canonical_form, alias_forms) = key_forms
+            .split_first()
+            .expect("lookup_forms always yields at least the canonical form");
         if let Err(e) = self
             .registry
-            .register_agent(
-                &agent_pub_key_b64,
-                &conductor.conductor_id,
-                &installed_app_id,
-            )
+            .register_agent(canonical_form, &conductor.conductor_id, &installed_app_id)
             .await
         {
             warn!(
@@ -242,16 +259,10 @@ impl AgentProvisioner {
             return Err(format!("Failed to register agent mapping: {e}"));
         }
 
-        let agent_pub_key_std =
-            base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &agent_key);
-        if agent_pub_key_std != agent_pub_key_b64 {
+        for alias in alias_forms {
             let _ = self
                 .registry
-                .register_agent(
-                    &agent_pub_key_std,
-                    &conductor.conductor_id,
-                    &installed_app_id,
-                )
+                .register_agent(alias, &conductor.conductor_id, &installed_app_id)
                 .await;
         }
 
@@ -290,10 +301,11 @@ impl AgentProvisioner {
 
             match admin.get_app_info(&app_id).await {
                 Ok(existing) => {
-                    let agent_pub_key_b64 = base64::Engine::encode(
-                        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
-                        &existing.agent_pub_key,
-                    );
+                    // SAME form as the fresh-provision path above — an
+                    // idempotent re-provision must hand back a key the grant
+                    // surface accepts, or a returning human's promise leg fails
+                    // where a newcomer's succeeds.
+                    let agent_pub_key_b64 = provisioned_agent_key(&existing.agent_pub_key);
 
                     info!(
                         conductor = %conductor.conductor_id,
@@ -303,11 +315,15 @@ impl AgentProvisioner {
                         "Reusing existing app installation (idempotent provision)"
                     );
 
-                    // Re-register in case the registry lost the mapping
-                    let _ = self
-                        .registry
-                        .register_agent(&agent_pub_key_b64, &conductor.conductor_id, &app_id)
-                        .await;
+                    // Re-register in case the registry lost the mapping, under
+                    // every lookup form (aliases for ONE agent — capacity is
+                    // counted by distinct install, never by form count).
+                    for form in lookup_forms(&existing.agent_pub_key) {
+                        let _ = self
+                            .registry
+                            .register_agent(&form, &conductor.conductor_id, &app_id)
+                            .await;
+                    }
 
                     return Some(ProvisionedAgent {
                         agent_pub_key: agent_pub_key_b64,

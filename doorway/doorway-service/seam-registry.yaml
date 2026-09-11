@@ -2975,6 +2975,95 @@ decisionPoints:
         testName: hosted_register_records_the_grant_cid_when_the_pool_answers
         kind: unit
 
+  - name: normalize_agent_key
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor/agent_key.rs
+      modulePath: conductor::agent_key::normalize_agent_key
+      line: 89
+    summary: >
+      Maps any recognizable encoding of a 39-byte Holochain agent key onto the canonical
+      HoloHash multibase form (`u` + base64url-nopad, i.e. `uhCAk…`), and passes anything it
+      does not recognize through byte-for-byte. Sibling `canonical_agent_key` is the
+      producer-side half: the one answer for a caller holding raw key bytes.
+    notes: >
+      The doorway minted BARE base64 (`hCAk…`) at provisioning. Every doorway-internal reader
+      is a pass-through and tolerated it silently; elohim-storage's compute-grant surface does
+      `AgentPubKey::try_from(recipient)` and refused with "recipient must be a Holochain agent
+      key", so every hosted registration's promise leg 500'd while nothing else complained.
+      Bare base64 is the drift; the canonical form is the protocol's. Tolerance runs one way
+      only — a legacy spelling is repaired on read, and a string that is not a key in any
+      encoding (the dev-mode `uhCAk-dev-mode-agent-key` placeholder) is never rewritten,
+      because turning an honest miss into a plausible-looking wrong match is the worse failure.
+    concernIds:
+      - id: C9
+        status: answered
+        justification: >
+          Identity-lineage continuity across a change of string form. A row persisted under the
+          pre-canonical spelling still resolves to the same agent rather than being orphaned:
+          any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it stores ONLY the legacy
+          form and then resolves it by the canonical one, and
+          bare_base64_is_normalized_onto_the_canonical_form proves the repaired string
+          satisfies the exact parse the grant surface makes.
+      - id: C10
+        status: answered
+        justification: >
+          Contract-evolution honesty — an unrecognized input is passed through unchanged, never
+          defaulted or coerced into a key-shaped guess.
+          a_non_key_string_is_passed_through_untouched and
+          a_wrong_length_decode_is_not_treated_as_a_key pin both halves; the length check is
+          what stops a cleanly-decodable 32-byte string from being re-emitted as a 39-byte key.
+      - id: C7
+        status: answered
+        justification: >
+          Advertise/serve symmetry across the doorway/storage boundary: what the doorway
+          advertises as an agent key is now exactly what the grant surface accepts.
+          a_provisioned_agents_grant_recipient_parses_as_a_holochain_agent_key runs the
+          provisioner's own minting function into the grant body and through
+          `AgentPubKey::try_from`, and
+          the_drifted_bare_base64_form_is_refused_by_the_same_parse proves that assertion has
+          teeth by showing the pre-fix form really is refused.
+      - id: C6b
+        status: answered
+        justification: >
+          normalization_is_idempotent and an_already_canonical_key_is_returned_unchanged — a
+          replay over already-normalized state changes nothing, which is what lets readers
+          normalize freely without tracking whether a value has been through it before.
+    contractTests:
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: canonical_form_is_multibase_tagged_and_parses_as_an_agent_key
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: bare_base64_is_normalized_onto_the_canonical_form
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: standard_alphabet_bare_keys_normalize_too
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: an_already_canonical_key_is_returned_unchanged
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: normalization_is_idempotent
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: a_non_key_string_is_passed_through_untouched
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: a_wrong_length_decode_is_not_treated_as_a_key
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/agent_key.rs
+        testName: is_agent_key_form_recognizes_both_vintages_and_refuses_placeholders
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: a_provisioned_agents_grant_recipient_parses_as_a_holochain_agent_key
+        kind: unit
+      - path: doorway/doorway-service/src/routes/hosted_cell.rs
+        testName: the_drifted_bare_base64_form_is_refused_by_the_same_parse
+        kind: unit
+      - path: doorway/doorway-service/src/conductor/registry.rs
+        testName: any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it
+        kind: unit
+
   - name: count_distinct_agents_by_conductor
     kind: pure-decision-predicate
     sourceLocation:

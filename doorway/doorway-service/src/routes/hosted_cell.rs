@@ -442,6 +442,68 @@ mod tests {
             .with_timezone(&Utc)
     }
 
+    /// A REAL 39-byte agent key with a valid DHT-location trailer — minted the
+    /// way a conductor mints one, because `AgentPubKey::try_from` checks that
+    /// trailer and a hand-rolled fixture would be refused for the wrong reason.
+    fn raw_agent_key() -> Vec<u8> {
+        holo_hash::AgentPubKey::from_raw_32(vec![0x5Au8; 32])
+            .get_raw_39()
+            .to_vec()
+    }
+
+    /// THE defect this task closes, pinned end to end without a conductor.
+    ///
+    /// The chain is: the provisioner mints a key → that exact string becomes
+    /// `ProvisionedAgent::agent_pub_key` → `issue_hosted_cell_grant` puts it in
+    /// the body as `recipient` → elohim-storage's grant surface does
+    /// `AgentPubKey::try_from(recipient)` and refuses on failure
+    /// (`elohim/elohim-storage/src/api/compute_grants.rs`). Every link is pure
+    /// except the conductor's key generation, so the whole thing is testable
+    /// from the raw bytes.
+    ///
+    /// A bare-base64 recipient made this refusal a 500 on EVERY hosted
+    /// registration's promise leg, while every intermediate reader — all of
+    /// them pass-through — stayed silent.
+    #[test]
+    fn a_provisioned_agents_grant_recipient_parses_as_a_holochain_agent_key() {
+        let minted = crate::conductor::provisioner::provisioned_agent_key(&raw_agent_key());
+        let (body, _) = hosted_cell_grant_body(&minted, at("2026-09-11T09:00:00Z"));
+        let recipient = body["recipient"].as_str().expect("recipient is a string");
+        assert_eq!(
+            recipient, minted,
+            "the grant carries the minted key verbatim"
+        );
+        holo_hash::AgentPubKey::try_from(recipient).unwrap_or_else(|e| {
+            panic!(
+                "grant surface would refuse this recipient: {recipient} ({e}) — \
+                 the provisioner is not minting the canonical HoloHash form"
+            )
+        });
+    }
+
+    /// The teeth behind the test above: the pre-fix form really is refused.
+    ///
+    /// Without this, a normalizer that quietly accepted everything would let the
+    /// contract test pass while the fleet kept 500ing.
+    #[test]
+    fn the_drifted_bare_base64_form_is_refused_by_the_same_parse() {
+        use base64::Engine as _;
+        let bare = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(raw_agent_key());
+        assert!(
+            bare.starts_with("hCAk"),
+            "fixture is the drifted form: {bare}"
+        );
+        assert!(
+            holo_hash::AgentPubKey::try_from(bare.as_str()).is_err(),
+            "bare base64 must NOT parse — if it did, this whole defect class would be invisible"
+        );
+        // ...and the normalizer is the documented repair path for a fleet row
+        // already written in that form.
+        let repaired = crate::conductor::normalize_agent_key(&bare);
+        holo_hash::AgentPubKey::try_from(repaired.as_str())
+            .expect("normalize_agent_key must repair a legacy bare row");
+    }
+
     #[test]
     fn hosted_cell_grant_body_carries_the_d2_bounds() {
         let (body, valid_until) =

@@ -2841,7 +2841,14 @@ async fn write_account_closed_revocation(state: &AppState, user: &UserDoc) -> Op
     let registry = state.conductor_registry.as_ref()?;
     let entry = registry.get_conductor_for_agent(&user.agent_pub_key)?;
     let conductor = registry.get_conductor_info(&entry.conductor_id)?;
-    let revoked_key = holo_hash::AgentPubKey::try_from(user.agent_pub_key.as_str()).ok()?;
+    // Normalize before parsing: a UserDoc written by a pre-canonical doorway
+    // carries the bare base64 form, which `try_from` refuses — and `.ok()?`
+    // turns that refusal into a SILENT skip, so the closed account's revocation
+    // simply never reached the DHT.
+    let revoked_key = holo_hash::AgentPubKey::try_from(
+        crate::conductor::normalize_agent_key(&user.agent_pub_key).as_str(),
+    )
+    .ok()?;
 
     let caller =
         crate::services::ZomeCaller::new(&conductor.admin_url, &entry.conductor_url, &entry.app_id);

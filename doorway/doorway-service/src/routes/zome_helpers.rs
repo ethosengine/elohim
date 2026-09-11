@@ -149,7 +149,11 @@ pub async fn call_get_human_by_agent_key(
         DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
     })?;
 
-    let parsed = holo_hash::AgentPubKey::try_from(agent_key)
+    // Normalized first so a key written in a legacy bare-base64 spelling (an
+    // older doorway's row, an operator-supplied string) resolves instead of
+    // being reported as "not an agent key" when it plainly is one.
+    let canonical = crate::conductor::normalize_agent_key(agent_key);
+    let parsed = holo_hash::AgentPubKey::try_from(canonical.as_str())
         .map_err(|e| DoorwayError::Internal(format!("not an agent key: {agent_key} ({e})")))?;
 
     debug!(agent_key = %agent_key, "Calling get_human_by_agent_key on imagodei zome");
