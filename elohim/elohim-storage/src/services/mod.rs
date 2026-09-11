@@ -25,10 +25,7 @@ pub mod agreement_service;
 pub mod anomaly_detection;
 pub mod arc_actuator; // conductor authority-arc actuation core — {0,1} coverage gate + config render (spec §5)
 pub mod arc_policy; // conductor authority-arc Auto policy — pure derive() (2026-06-13-conductor-authority-arc-auto-policy.md)
-pub(crate) mod authenticated_record;
 pub mod back_prop;
-pub(crate) mod rea_commitment_projection;
-pub(crate) mod rea_commitment_record;
 
 pub mod behavioral_trust;
 pub mod boot_registration;

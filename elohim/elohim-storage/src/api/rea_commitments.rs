@@ -74,14 +74,6 @@ pub async fn handle(
 
         // GET /api/v1/commitments/{id}
         (&Method::GET, id) if !id.contains('/') => {
-            let refresh = parse_refresh(req.uri().query().unwrap_or(""))?;
-            if refresh {
-                let hc = hc_lamad.as_ref().ok_or_else(|| {
-                    StorageError::Conductor("REA refresh requires own lamad conductor".into())
-                })?;
-                crate::services::rea_commitment_projection::refresh_by_id(hc, pool, ctx, id)
-                    .await?;
-            }
             handle_get_by_id(id, pool, ctx, hc_lamad.as_ref()).await
         }
 
@@ -276,18 +268,6 @@ fn normalize_create_input(
             .map(String::from);
     }
     Ok(input)
-}
-
-// Operational query only; reconstructs the existing notarized projection.
-fn parse_refresh(query: &str) -> Result<bool, StorageError> {
-    #[derive(serde::Deserialize, Default)]
-    struct ReadQuery {
-        #[serde(default)]
-        refresh: bool,
-    }
-    serde_urlencoded::from_str::<ReadQuery>(query)
-        .map(|q| q.refresh)
-        .map_err(|e| StorageError::InvalidInput(format!("Invalid commitment read query: {e}")))
 }
 
 /// GET /api/v1/commitments/{id} — read one commitment back BY ITS IDENTIFIER.
@@ -527,25 +507,5 @@ mod tests {
             Some(r#"["compute","storage"]"#)
         );
         assert_eq!(input.in_scope_of.as_deref(), Some(r#"["[not json"]"#));
-    }
-}
-
-#[cfg(test)]
-mod refresh_query_tests {
-    use super::parse_refresh;
-
-    #[test]
-    fn refresh_requires_explicit_valid_boolean() {
-        assert!(!parse_refresh("").unwrap());
-        assert!(!parse_refresh("refresh=false").unwrap());
-        assert!(parse_refresh("refresh=true").unwrap());
-        for invalid in [
-            "refresh=1",
-            "refresh=",
-            "refresh=notary",
-            "refresh=true&refresh=false",
-        ] {
-            assert!(parse_refresh(invalid).is_err(), "{invalid}");
-        }
     }
 }
