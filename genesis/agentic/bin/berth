@@ -168,9 +168,8 @@ class Berth:
         return m
 
     def unmoor(self, session):
-        for res, lease in list(self.leases().items()):
-            if lease.get("holder") == session:
-                self.release(res, session, reason="unmoor")
+        for res in {key.removesuffix("/slots") for key in self.leases()}:
+            self.release(res, session, reason="unmoor")
         try:
             os.remove(self._moor_path(session))
         except FileNotFoundError:
@@ -198,6 +197,11 @@ class Berth:
             return False
         return self.is_live(self.mooring(lease.get("holder")))
 
+    def live_leases(self, leases, resource):
+        """Both storage shapes count, even after the declared capacity changes."""
+        candidates = [leases.get(resource)] + leases.get(resource + "/slots", [])
+        return [lease for lease in candidates if self.holder_is_live(lease)]
+
     def claim(self, resource, session, note=None, ttl_s=None):
         """Returns (ok, lease, reason). A live holder that is not us ⇒ refused (exit 3): the honest
         answer is 'held by X since T', never a silent queue. Capacity > 1 is modelled as slots."""
@@ -205,6 +209,18 @@ class Berth:
             self.capacities[resource] = 1
         leases = self.leases()
         cap = self.capacities[resource]
+        live = self.live_leases(leases, resource)
+        mine = [lease for lease in live if lease.get("holder") == session]
+        if mine:
+            for lease in mine:
+                lease["since"] = round(self.now(), 3)
+                lease["note"] = note or lease.get("note")
+            self._write_leases(leases)
+            return True, mine[0], "renewed"
+        if len(live) >= cap:
+            holders = ",".join(lease["holder"] for lease in live)
+            self.record("refuse", resource=resource, session=session, holder=holders)
+            return False, live, f"all {cap} slots held by {holders}"
         slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)] if cap > 1 else None
         if cap == 1:
             cur = leases.get(resource)
@@ -225,13 +241,6 @@ class Berth:
             self.record("claim", resource=resource, session=session, note=note,
                         took_over_from=takeover if takeover and takeover != session else None)
             return True, lease, "taken over from a stale holder" if takeover and takeover != session else "claimed"
-        mine = [l for l in slots if l.get("holder") == session]
-        if mine:
-            return True, mine[0], "renewed"
-        if len(slots) >= cap:
-            holders = ",".join(l["holder"] for l in slots)
-            self.record("refuse", resource=resource, session=session, holder=holders)
-            return False, slots, f"all {cap} slots held by {holders}"
         lease = {"resource": resource, "holder": session, "since": round(self.now(), 3),
                  "note": note, "ttl_s": ttl_s, "action": "use"}
         slots.append(lease)
@@ -260,11 +269,10 @@ class Berth:
 
     def who(self, resource):
         leases = self.leases()
-        cur = leases.get(resource)
-        if cur and self.holder_is_live(cur):
-            return cur
-        slots = [l for l in leases.get(resource + "/slots", []) if self.holder_is_live(l)]
-        return slots or None
+        live = self.live_leases(leases, resource)
+        if len(live) == 1 and live[0] is leases.get(resource):
+            return live[0]
+        return live or None
 
     # ------------------------------------------------------------ notes
     def say(self, session, text, to=None):
