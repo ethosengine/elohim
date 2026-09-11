@@ -189,3 +189,195 @@ fn an_unrecognized_lens_level_refuses_and_names_the_six_accepted() {
         );
     }
 }
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Task 1.2: `Render` per lens with the honesty and content floors
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// `minimal` collapses the orientation to two lines (intent, worthwhile finish) and folds the
+/// honesty floor's five fields — recipe CID, lens CID, selection rule, omissions, receipts —
+/// onto ONE line (rule 3: never spelled out as five, never dropped), then hands exactly
+/// `choice_count` (1, at `minimal`) Linked choices: a scaffold that hands one command, not a
+/// menu. `--scope tooling` matches no declared source root here, so this exercises the
+/// whole-scope door (no `first_screen`) — the leaner of the two doors, and the harder one to
+/// keep under budget since nothing bounds "Linked choices" but the lens itself.
+#[test]
+fn minimal_prints_the_five_floor_fields_on_one_line_and_at_most_one_choice() {
+    let dir = repo();
+    claim_actor(dir.path(), "agent:reader@claude-haiku-4-5", "lens-d");
+    let text = text_in(
+        dir.path(),
+        "lens-d",
+        &[
+            "open",
+            "--need",
+            "which command rebuilds the stale index",
+            "--scope",
+            "tooling",
+        ],
+    );
+    assert!(text.len() < 1600, "{}: {text}", text.len());
+    assert!(
+        text.contains("recipe bafk")
+            && text.contains("lens bafk")
+            && text.contains("selection:")
+            && text.contains("omissions:")
+            && text.contains("receipts:"),
+        "{text}"
+    );
+    assert_eq!(
+        text.matches("\n  epr flow memory recall ").count(),
+        1,
+        "one handed command at minimal:\n{text}"
+    );
+}
+
+/// A `content_class: correction` candidate is UNFILTERABLE — the anti-bubble content floor — and
+/// renders at every lens, from `minimal`'s one-command budget to `detail`'s full candidate list.
+/// (The brief's own fixture named this file `tooling/correction.md`; `tooling/` is outside this
+/// fixture's declared `source_roots` (`["docs"]`, see `common::contract_value`), which would
+/// leave it undiscoverable by either lens rather than proving the floor — so it is written under
+/// `docs/`, the fixture's one declared source root, with the scope named to match.)
+#[test]
+fn a_correction_candidate_renders_at_every_lens() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "docs/correction.md",
+        "---\ntitle: correction\ndescription: correction of the stale index claim\ncontent_class: correction\n---\nthe index command changed\n",
+    );
+    for (model, level) in [
+        ("claude-haiku-4-5", "minimal"),
+        ("claude-fable-5-1", "detail"),
+    ] {
+        let session = format!("lens-e-{level}");
+        claim_actor(dir.path(), &format!("agent:reader@{model}"), &session);
+        let text = text_in(
+            dir.path(),
+            &session,
+            &["open", "--need", "stale index", "--scope", "docs"],
+        );
+        assert!(text.contains("docs/correction.md"), "{level}: {text}");
+    }
+}
+
+/// The red-team's "standing is a shape, not a score" invariant, made a test: no rendered view —
+/// at any lens — ever prints a numeric `standing`/`score` token. `render()` prints WHERE a term
+/// hit and HOW OFTEN (a line range, a per-term hit count); it never sums a candidate's provenance
+/// into a ranking number a reader could mistake for authority.
+#[test]
+fn no_rendered_view_prints_a_numeric_standing_or_score_token() {
+    let dir = repo();
+    for (model, level) in [
+        ("claude-haiku-4-5", "minimal"),
+        ("claude-sonnet-5", "simple"),
+        ("claude-opus-5", "standard"),
+        ("claude-fable-5-1", "detail"),
+    ] {
+        let session = format!("print-never-sum-{level}");
+        claim_actor(dir.path(), &format!("agent:reader@{model}"), &session);
+        let text = text_in(
+            dir.path(),
+            &session,
+            &[
+                "open",
+                "--need",
+                "which command rebuilds the stale index",
+                "--scope",
+                "docs",
+            ],
+        );
+        assert!(
+            !contains_numeric_field(&text, "standing"),
+            "{level}: rendered a numeric `standing` token:\n{text}"
+        );
+        assert!(
+            !contains_numeric_field(&text, "score"),
+            "{level}: rendered a numeric `score` token:\n{text}"
+        );
+    }
+}
+
+/// A tiny stand-in for `regex::is_match(&format!("{name}[:=]\\s*\\d"))` — this workspace declares
+/// no `regex` dependency, and the check is narrow enough not to need one.
+fn contains_numeric_field(text: &str, name: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut start = 0;
+    while let Some(offset) = text[start..].find(name) {
+        let mut cursor = start + offset + name.len();
+        if matches!(bytes.get(cursor), Some(b':') | Some(b'=')) {
+            cursor += 1;
+            while bytes.get(cursor).is_some_and(u8::is_ascii_whitespace) {
+                cursor += 1;
+            }
+            if bytes.get(cursor).is_some_and(u8::is_ascii_digit) {
+                return true;
+            }
+        }
+        start += offset + 1;
+        if start >= text.len() {
+            break;
+        }
+    }
+    false
+}
+
+/// The lens's `density_bytes` is a SEPARATE soft cap from `choice_count` and the content floor:
+/// even a candidate the choice-count cut would have kept can still be dropped once the rendered
+/// candidate block would exceed the byte budget — but a `[floor]`-marked candidate never is, and
+/// the block names exactly how many more exist at a wider lens. `simple`'s `density_bytes` is
+/// overridden to an unrealistic `1` so the drop is deterministic to assert on, rather than
+/// depending on the exact byte length of a rendered line.
+#[test]
+fn density_drops_ordinary_candidates_but_never_a_floor_one() {
+    let dir = repo();
+    let mut contract = contract_value(false);
+    contract["lens_table"]["levels"]["simple"]["density_bytes"] = json!(1);
+    // `discovery.rs`'s own `limits.search_results` (3, live contract) already caps how many
+    // candidates a question ever SEES before a lens gets a say — raised here so six equally
+    // scored candidates all reach `first_screen.candidates`, and the truncation this test
+    // actually asserts on is the lens's, not discovery's.
+    contract["limits"]["search_results"] = json!(10);
+    save_contract(dir.path(), contract);
+    for name in ["w1", "w2", "w3", "w4", "w5"] {
+        write(
+            dir.path(),
+            &format!("docs/{name}.md"),
+            &format!(
+                "---\ntitle: widget {name}\ndescription: widget candidate\n---\nwidget body\n"
+            ),
+        );
+    }
+    // Alphabetically last among the seven equally-scored candidates (path is the final tie-break
+    // in `discover_scored`), so it lands past `simple`'s `choice_count` of 3 and only the content
+    // floor — never an accident of rank — is why it still renders.
+    write(
+        dir.path(),
+        "docs/zzz-correction.md",
+        "---\ntitle: widget correction\ndescription: widget candidate\ncontent_class: correction\n---\nwidget body\n",
+    );
+    claim_actor(dir.path(), "agent:reader@claude-sonnet-5", "lens-density");
+    let text = text_in(
+        dir.path(),
+        "lens-density",
+        &["open", "--need", "widget", "--scope", "docs"],
+    );
+    let candidates_section = text
+        .split("Candidate sources:")
+        .nth(1)
+        .and_then(|rest| rest.split("\nLinked choices:").next())
+        .unwrap_or_default();
+    assert!(
+        candidates_section.contains("docs/zzz-correction.md")
+            && candidates_section.contains("[floor]"),
+        "the floor candidate must still render even under a 1-byte density cap:\n{candidates_section}"
+    );
+    assert!(
+        !candidates_section.contains("docs/w1.md"),
+        "an ordinary candidate within choice_count must still be dropped by the density cap:\n{candidates_section}"
+    );
+    assert!(
+        candidates_section.contains("more candidate(s) at a wider lens (--lens standard)"),
+        "{candidates_section}"
+    );
+}

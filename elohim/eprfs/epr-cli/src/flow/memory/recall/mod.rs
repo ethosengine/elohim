@@ -1227,8 +1227,8 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
 
     let began = Instant::now();
     let result = execute(&args, &contract, &mut execution, &method);
-    let mut view = match result {
-        Ok(view) => view,
+    let (mut view, resolved_lens) = match result {
+        Ok(pair) => pair,
         Err(error) => {
             let message = error.to_string();
             execution.state["last_error"] = json!(message);
@@ -1282,7 +1282,10 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     let usage = view["usage"].clone();
     view["cumulative"] = execution.charge(&usage)?;
 
-    let mut raw = encode(&view, args.json)?;
+    // The honesty floor is a constant, never read from a flag or the contract — one instance
+    // covers every rendering this call produces, the narrow fallback below included.
+    let render_floor = lens::RenderFloor::declared();
+    let mut raw = encode(&view, &resolved_lens, &render_floor, args.json)?;
     if raw.len() > output_limit {
         let retry = match args.operation.as_str() {
             "context" | "history" | "open" => args.operation.clone(),
@@ -1301,7 +1304,7 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
             ])],
         });
         narrow["usage"] = json!({});
-        raw = encode(&narrow, args.json)?;
+        raw = encode(&narrow, &resolved_lens, &render_floor, args.json)?;
         view = narrow;
     }
     if raw.len() > output_limit {
@@ -1327,11 +1330,16 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     )
 }
 
-fn encode(view: &Value, json_output: bool) -> FlowResult<String> {
+fn encode(
+    view: &Value,
+    lens: &lens::LensView,
+    floor: &lens::RenderFloor,
+    json_output: bool,
+) -> FlowResult<String> {
     Ok(if json_output {
         serde_json::to_string(view)? + "\n"
     } else {
-        render(view)
+        render(view, lens, floor)
     })
 }
 

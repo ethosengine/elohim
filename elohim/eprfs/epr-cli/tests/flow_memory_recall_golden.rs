@@ -61,10 +61,14 @@ fn digest(s: &str) -> String {
 // every rendered view — see tests/fixtures/recall-golden/README.md. Re-baselined AGAIN in fix
 // round 1 of Task 1.1's review: the `lens:` line gained a short CID and a `renew:` slot, and the
 // fixture contract now declares an explicit `lens_table` (see tests/common/mod.rs
-// `contract_value`) rather than only inheriting the live one. GOLDEN_REFUSAL is unchanged across
-// both rounds: a refusal never reaches `render()`'s orientation/lens preamble.
-const GOLDEN_FOCUSED: &str = "78d4a0bc492390c356e99418cd78f75f5093de2e648450a69775b2a8812f10e9";
-const GOLDEN_WHOLE: &str = "bd599c7295bfa07164001bd6f09805ecb8ff7d34e7d678eede82eb2406561d06";
+// `contract_value`) rather than only inheriting the live one. Re-baselined a THIRD time for
+// Task 1.2: the honesty floor adds one `recipe … · lens … · selection: … · omissions: … ·
+// receipts: …` line immediately after `lens:` on every view, at every lens — see
+// tests/fixtures/recall-golden/README.md's "station 1, Task 1.2" entry. GOLDEN_REFUSAL is
+// unchanged across all three rounds: a refusal never reaches `render()`'s orientation/lens/floor
+// preamble.
+const GOLDEN_FOCUSED: &str = "2b830dac46a98cfb06c865063e365f45e800a0cadcf2a640361133a1625feddf";
+const GOLDEN_WHOLE: &str = "9b5477e4eeac2a003a13fd51e3895bb868fc81ed10ff6349ef66a8c2fd09482e";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

@@ -1,6 +1,7 @@
 //! Rendering — the human screen an agent can act from.
 use cid::Cid;
 
+use super::lens::{LensLevel, LensView, RenderFloor};
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -14,39 +15,93 @@ use super::*;
 /// inline JSON, which put roughly 8 KB of nested objects between the reader and the only part of
 /// the view that is executable — the Linked choices. `--json` still carries every field; a human
 /// gets the magnitudes and the commands.
-pub(super) fn render(view: &Value) -> String {
+///
+/// Governed-discovery station 1.2 adds two floors, checked here and never elsewhere:
+/// `floor.always_printed` (the honesty floor — recipe CID, lens CID, selection rule, omissions
+/// and receipts, collapsed onto one `render_floor_line`, at EVERY lens including `minimal`) and
+/// `floor.unfilterable` (the content floor — a candidate whose frontmatter `content_class` names
+/// one of `floor.unfilterable` survives the lens's own `choice_count` cut, marked `[floor]`, at
+/// `minimal`/`simple`). `Standard` and above are otherwise BYTE-IDENTICAL to the pre-1.2
+/// rendering — only the floor line is new — because nothing in that rendering ever dropped a
+/// candidate to begin with; the truncation this task adds only bites where a lens actually
+/// narrows (`minimal`/`simple`).
+pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> String {
     let mut out = String::new();
     let orientation = &view["orientation"];
+    let minimal = matches!(lens.level, LensLevel::Minimal | LensLevel::Simple);
+
     out.push_str(&format!(
         "Intent: {}\n",
         orientation["intent"].as_str().unwrap_or_default()
     ));
-    out.push_str(&format!(
-        "Scope: {}\n",
-        orientation["scope"].as_str().unwrap_or_default()
-    ));
+    if !minimal {
+        out.push_str(&format!(
+            "Scope: {}\n",
+            orientation["scope"].as_str().unwrap_or_default()
+        ));
+    }
     out.push_str(&format!(
         "Worthwhile finish: {}\n",
         orientation["worthwhile_finish"]
             .as_str()
             .unwrap_or_default()
     ));
-    for value in orientation["guiding_context"]
-        .as_array()
-        .cloned()
-        .unwrap_or_default()
-    {
-        out.push_str(&format!(
-            "Guiding context: {} — {}\n",
-            value["value"].as_str().unwrap_or_default(),
-            value["source"].as_str().unwrap_or_default()
-        ));
+    if !minimal {
+        for value in orientation["guiding_context"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+        {
+            out.push_str(&format!(
+                "Guiding context: {} — {}\n",
+                value["value"].as_str().unwrap_or_default(),
+                value["source"].as_str().unwrap_or_default()
+            ));
+        }
+        // WHO is reading, printed right after the guiding context it bounds — contestable on
+        // sight, never buried among the generic key dump below (excluded there explicitly). Only
+        // at `standard`+: `minimal`/`simple` fold WHO-is-reading into the floor line's own `lens
+        // <cid>` token instead of also carrying this fuller provenance line — the honesty floor
+        // asks for one line, not two, when the budget is one command.
+        if !view["lens"].is_null() {
+            out.push_str(&render_lens(&view["lens"]));
+        }
     }
-    // WHO is reading, printed right after the guiding context it bounds — contestable on sight,
-    // never buried among the generic key dump below (excluded there explicitly).
-    if !view["lens"].is_null() {
-        out.push_str(&render_lens(&view["lens"]));
+
+    // The content floor is computed BEFORE the floor line prints, because the floor line's own
+    // `omissions` count must include what THIS render pass itself left out under the lens's
+    // `choice_count` — a number the view's JSON cannot carry in advance, since it is a property
+    // of the rendering, not of the discovery that produced the candidates.
+    let (candidates_block, dropped_by_choice) = if minimal {
+        match view["first_screen"]["candidates"].as_array() {
+            Some(candidates) => render_candidates_bounded(candidates, lens, floor),
+            None => (String::new(), 0),
+        }
+    } else {
+        (String::new(), 0)
+    };
+
+    out.push_str(&render_floor_line(view, lens, floor, dropped_by_choice));
+
+    if minimal {
+        out.push_str(&candidates_block);
+        out.push_str("\nLinked choices:\n");
+        for choice in view["actions"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .take(lens.choice_count as usize)
+        {
+            out.push_str(&format!(
+                "{}\n  {}\n",
+                choice["label"].as_str().unwrap_or_default(),
+                choice["command"].as_str().unwrap_or_default()
+            ));
+        }
+        return out;
     }
+
     // The focused door's first screen comes BEFORE the concern groups, because a reader who named
     // an area asked "what is the shape here and what do I do first", and the stale-edge scan is
     // the answer to a different question.
@@ -98,6 +153,166 @@ pub(super) fn render(view: &Value) -> String {
         ));
     }
     out
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The honesty floor and the content floor
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// A CID string, shortened for the floor line — honest about a fingerprint's existence without
+/// paying 59 characters for it twice on the same screen (the detailed `lens:` line already pays
+/// that cost at `standard`+; `minimal`/`simple` pay it exactly once, here).
+fn short(raw: &str) -> String {
+    raw.parse::<Cid>()
+        .map(|parsed| crate::flow::short_cid(&parsed))
+        .unwrap_or_default()
+}
+
+/// The honesty floor, one line, every lens: `floor.always_printed`'s five labels folded together
+/// rather than spelled out as five separate lines — `minimal` has no budget for five, and rule 3
+/// requires the same five fields be named at every lens, not a subset. The labels are read FROM
+/// `floor.always_printed` (index order: recipe, lens, selection, omissions, receipts) rather than
+/// hand-duplicated as string literals, so the declared constant actually drives what prints —
+/// not merely document it. `extra_omissions` is what THIS render pass left out under the lens's
+/// own `choice_count` (always 0 at `standard`+, where nothing is cut); [`nested_omissions_count`]
+/// adds what discovery itself already reported as unshown.
+fn render_floor_line(
+    view: &Value,
+    lens: &LensView,
+    floor: &RenderFloor,
+    extra_omissions: usize,
+) -> String {
+    let recipe = short(
+        view["execution_method"]["method"]
+            .as_str()
+            .unwrap_or_default(),
+    );
+    let lens_cid = short(&lens.cid);
+    let selection = clip(&selection_rule_for(view), 120);
+    let omissions = nested_omissions_count(view) + extra_omissions;
+    let receipts = receipts_count(view);
+    let [recipe_label, lens_label, selection_label, omissions_label, receipts_label] =
+        floor.always_printed;
+    format!(
+        "{recipe_label} {recipe} · {lens_label} {lens_cid} · {selection_label}: {selection} · \
+         {omissions_label}: {omissions} · {receipts_label}: {receipts}\n"
+    )
+}
+
+/// The rule this view actually ranked candidates by, from whichever door produced them — the
+/// focused door's `first_screen.ranking` (itself `discover_scored`'s own `selection` text) when a
+/// question named an area, else the whole-scope door's `concerns.selection_rule`. Honest absence
+/// (neither door ranked anything) when this view is a `recipe`/`source`/`history` projection with
+/// no candidate list of its own.
+fn selection_rule_for(view: &Value) -> String {
+    if let Some(rule) = view["first_screen"]["ranking"].as_str() {
+        return rule.to_string();
+    }
+    if let Some(rule) = view["concerns"]["selection_rule"].as_str() {
+        return rule.to_string();
+    }
+    "no candidates ranked in this view".to_string()
+}
+
+/// Omissions already named by discovery itself, summed across every door this view carries —
+/// `first_screen` (the focused door), `concerns` (the whole-scope door) and `source_outline` (a
+/// located passage). Each door already bounds and NAMES what it left out (`discovery.rs`,
+/// `concerns.rs`); this only totals those named counts for the one-line floor, it never discovers
+/// a new omission of its own.
+fn nested_omissions_count(view: &Value) -> usize {
+    ["first_screen", "concerns", "source_outline"]
+        .iter()
+        .map(|key| {
+            view[*key]["omissions"]
+                .as_array()
+                .map(Vec::len)
+                .unwrap_or(0)
+        })
+        .sum()
+}
+
+/// What this view is standing on, receipt-wise — the session's accumulated evidence count when
+/// this operation carries a `continuation` (`open`/`resume`/`adopt`), else whichever
+/// operation-specific receipt list this view carries (`source`'s `receipt_keys`, `finish`'s
+/// `outcome.receipts`, `context`'s `evidence`). Honest zero for a view with none of these
+/// (`recipe`, `search`, `measure`).
+fn receipts_count(view: &Value) -> usize {
+    if let Some(n) = view["continuation"]["counts"]["evidence"].as_u64() {
+        return n as usize;
+    }
+    if let Some(items) = view["receipt_keys"].as_array() {
+        return items.len();
+    }
+    if let Some(items) = view["outcome"]["receipts"].as_array() {
+        return items.len();
+    }
+    if let Some(items) = view["evidence"].as_array() {
+        return items.len();
+    }
+    0
+}
+
+/// The content floor applied to `minimal`/`simple`: the first screen's candidates, cut to the
+/// lens's `choice_count` — except a candidate whose frontmatter `content_class` names one of
+/// `floor.unfilterable`, which survives the cut regardless of position, marked `[floor]`. The
+/// lens's `density_bytes` is then a SEPARATE soft cap layered on top, dropping ordinary lines
+/// (never a `[floor]`-marked one, and never the floor line itself, which this function never
+/// touches) once the block would exceed it, and naming exactly how many more exist at a wider
+/// lens. Returns the printed block (empty when there is nothing to show) and how many ORDINARY
+/// candidates the `choice_count` cut alone left out — the density cut is named in the block's own
+/// trailing note instead, a second and separately honest signal rather than one blended number.
+fn render_candidates_bounded(
+    candidates: &[Value],
+    lens: &LensView,
+    floor: &RenderFloor,
+) -> (String, usize) {
+    if candidates.is_empty() {
+        return (String::new(), 0);
+    }
+    let choice_count = lens.choice_count as usize;
+    let mut shown: Vec<(&Value, bool)> = Vec::new();
+    let mut dropped_by_choice = 0usize;
+    for (index, candidate) in candidates.iter().enumerate() {
+        let is_floor = candidate["content_class"]
+            .as_str()
+            .map(|class| floor.unfilterable.contains(&class))
+            .unwrap_or(false);
+        if index < choice_count || is_floor {
+            shown.push((candidate, is_floor));
+        } else {
+            dropped_by_choice += 1;
+        }
+    }
+    if shown.is_empty() {
+        return (String::new(), dropped_by_choice);
+    }
+    let mut out = String::from("\nCandidate sources:\n");
+    let mut printed = 0usize;
+    let mut over_budget = false;
+    let mut dropped_by_density = 0usize;
+    for (candidate, is_floor) in &shown {
+        let marker = if *is_floor { " [floor]" } else { "" };
+        let line = format!(
+            "  {}. {} — {}{marker}\n",
+            printed + 1,
+            candidate["path"].as_str().unwrap_or_default(),
+            clip(candidate["title"].as_str().unwrap_or_default(), 100),
+        );
+        if !is_floor && (over_budget || out.len() + line.len() > lens.density_bytes) {
+            over_budget = true;
+            dropped_by_density += 1;
+            continue;
+        }
+        out.push_str(&line);
+        printed += 1;
+    }
+    if dropped_by_density > 0 {
+        out.push_str(&format!(
+            "  · {dropped_by_density} more candidate(s) at a wider lens (--lens {})\n",
+            lens.level.next().as_str()
+        ));
+    }
+    (out, dropped_by_choice)
 }
 
 /// WHO is reading, resolved and contestable on sight: the level, its stated and revealed

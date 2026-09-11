@@ -115,7 +115,11 @@ impl LensLevel {
     }
 
     /// One rung wider; saturates at `trace` rather than wrapping past the declared vocabulary.
-    fn next(self) -> Self {
+    ///
+    /// `pub(super)` (not private, like [`Self::prev`]): the density floor's "N more candidate(s)
+    /// at a wider lens" note in `render.rs` names the next rung explicitly, so a reader knows
+    /// exactly which `--lens` value widens past this render's soft cap.
+    pub(super) fn next(self) -> Self {
         Self::ALL[(self.index() + 1).min(Self::ALL.len() - 1)]
     }
 
@@ -259,6 +263,44 @@ impl LensView {
             "expires_at": self.expires_at,
             "tended_at": self.tended_at,
         })
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// RenderFloor — the honesty floor and the content floor, never configurable
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Floors a lens may narrow past but never erase (design doc "Interfaces that guide
+/// implementation", rule 2 and rule 3; "Anti-capture invariants" §Filter bubble).
+///
+/// `unfilterable` is the content-class floor: a candidate whose declared frontmatter
+/// `content_class` names one of these renders regardless of the lens's `choice_count`, marked
+/// `[floor]` — a correction, a counter-argument, an accountability record or an own-community
+/// fact is never the thing a narrow lens quietly drops. `always_printed` is the honesty floor:
+/// the five fields `render()` folds into one line at every lens, `minimal` included, never as
+/// nothing — see [`super::render::render`].
+///
+/// Both fields are DECLARED HERE, not read from a flag or the contract: [`RenderFloor::declared`]
+/// is the sole constructor, and it is a fixed set of literals, not a table lookup. A floor a
+/// caller could widen or narrow by argument would not be a floor.
+pub(super) struct RenderFloor {
+    pub unfilterable: Vec<&'static str>,
+    pub always_printed: [&'static str; 5],
+}
+
+impl RenderFloor {
+    /// The constant floor every rendering is checked against. Values verbatim from the design
+    /// doc and the station 1.2 brief — never read from `Contract`, never a CLI flag.
+    pub(super) fn declared() -> Self {
+        RenderFloor {
+            unfilterable: vec![
+                "correction",
+                "counter-evidence",
+                "accountability",
+                "own-community",
+            ],
+            always_printed: ["recipe", "lens", "selection", "omissions", "receipts"],
+        }
     }
 }
 

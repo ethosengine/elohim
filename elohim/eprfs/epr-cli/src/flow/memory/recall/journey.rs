@@ -658,13 +658,16 @@ fn prior_state(args: &Args, state_limit: usize) -> FlowResult<Value> {
     Ok(serde_json::from_slice(&raw)?)
 }
 
+/// `(view, resolved_lens)`: `render()` (station 1.2) takes the resolved [`lens::LensView`]
+/// itself, not a re-parse of `view["lens"]`, so the honesty floor renders correctly even for the
+/// output-budget "narrow" fallback in `mod.rs::run`, whose trimmed view drops the `lens` key.
 #[allow(clippy::too_many_lines)]
 pub(super) fn execute(
     args: &Args,
     contract: &Contract,
     execution: &mut Execution,
     method: &str,
-) -> FlowResult<Value> {
+) -> FlowResult<(Value, lens::LensView)> {
     let recipe = contract.recipe().clone();
     let session_limit = contract
         .value
@@ -1576,5 +1579,5 @@ pub(super) fn execute(
     view["frontier"] =
         json!({"latest": last_one(&questions), "total": questions.len(), "expand": "history"});
     execution.state["ceremony"] = state;
-    Ok(view)
+    Ok((view, resolved_lens))
 }

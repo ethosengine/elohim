@@ -25,8 +25,8 @@ digest, that is either a real regression (fix the split) or an intentional rende
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `78d4a0bc492390c356e99418cd78f75f5093de2e648450a69775b2a8812f10e9` |
-| Whole open | `whole_open_is_byte_identical` | `bd599c7295bfa07164001bd6f09805ecb8ff7d34e7d678eede82eb2406561d06` |
+| Focused open | `focused_open_is_byte_identical` | `2b830dac46a98cfb06c865063e365f45e800a0cadcf2a640361133a1625feddf` |
+| Whole open | `whole_open_is_byte_identical` | `9b5477e4eeac2a003a13fd51e3895bb868fc81ed10ff6349ef66a8c2fd09482e` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -83,3 +83,17 @@ happens to carry, so `provenance.defaults` on these two golden fixtures reads `"
 instead of the earlier round's `"builtin"` — a value that appears in the line and therefore in
 the digest, even though neither fixture's resolved level, choices, density or scaffold changed.
 `GOLDEN_REFUSAL` is unchanged again, for the same reason as round 1.
+
+## 2026-09-11 — station 1, Task 1.2
+
+`render()` gained the honesty floor: one new line inserted immediately after the `lens:` line at
+every lens — `recipe <short cid> · lens <short cid> · selection: <rule, clipped> · omissions: N
+· receipts: N` (see `src/flow/memory/recall/render.rs`'s `render_floor_line`, and
+`src/flow/memory/recall/lens.rs`'s `RenderFloor::declared`, a fixed constant never read from a
+flag or the contract). Both golden fixtures resolve to `standard` (neither session claims an
+actor), so they exercise the "keep today's rendering, insert one floor line" path — the
+`minimal`/`simple` two-line-orientation collapse and the content-floor candidate truncation
+this task also adds are untouched by these two fixtures and are covered instead by
+`flow_memory_recall_lens.rs`'s new tests. `GOLDEN_FOCUSED` and `GOLDEN_WHOLE` re-baselined;
+`GOLDEN_REFUSAL` is unchanged, for the same reason as both earlier rounds — a refusal never
+reaches `render()`'s orientation/lens/floor preamble at all.

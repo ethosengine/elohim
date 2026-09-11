@@ -239,6 +239,14 @@ pub fn discover_scored(
             let description = field("description")
                 .and_then(|v| v.as_str().map(str::to_string))
                 .unwrap_or_default();
+            // The content floor's own field (governed-discovery station 1.2, `render.rs`
+            // `RenderFloor::declared`'s `unfilterable`): a correction/counter-evidence/
+            // accountability/own-community candidate is read here, from declared frontmatter
+            // only, so the render layer can keep it past a narrow lens's `choice_count` without
+            // re-reading the source. Absent frontmatter is honest absence (`None`), never a
+            // guessed default — an ordinary document with no opinion on its own class is not
+            // silently classed as unfilterable.
+            let content_class = field("content_class").and_then(|v| v.as_str().map(str::to_string));
             // The bytes after the closing delimiter were ALREADY READ under `metadata_bytes`.
             // Matching them costs no second read and no wider budget, and it is where an agent's
             // own words actually live: a fresh reader asking "re-mine", "marker", "stamp" on
@@ -321,6 +329,7 @@ pub fn discover_scored(
                 "path": relative,
                 "title": title,
                 "tags": actual_tags,
+                "content_class": content_class,
                 "term_hits": declared_hits + body_only_hits,
                 "declared_hits": declared_hits,
                 "match": kinds.iter().collect::<Vec<_>>(),
