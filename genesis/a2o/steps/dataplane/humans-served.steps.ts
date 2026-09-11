@@ -9,12 +9,17 @@
  * until then this fails honestly naming that gap, never a fabricated pass).
  *
  * The people this story counts come from the Prologue's own caster
- * (`genesis/seeder/src/seed-hosted-humans.ts`, S1 Task 5), which registers
- * three hosted humans through the doorway's own `POST /auth/register` and
- * writes their roster to `${MESH_DIR}/prologue-hosted-humans.json`. This file
- * reads that roster rather than re-deriving names — it is fine for that path
- * not to exist yet; the read fails with a clear message naming it (Task 5
- * has not landed in this slice).
+ * (`genesis/seeder/src/seed-hosted-humans.ts`, S1 Task 5, landed 2026-09-11),
+ * which registers three hosted humans through the doorway's own
+ * `POST /auth/register` and writes their roster to
+ * `${MESH_DIR}/prologue-hosted-humans.json` as `{ doorwayUrl, generatedAt,
+ * registrants: RosterEntry[] }`. This file reads that roster rather than
+ * re-deriving names, and mirrors `RosterEntry`'s shape locally below (a2o step
+ * files don't import the seeder). A registrant whose `result` is not
+ * `registered`/`exists` (a soft-failed or no-pool row) cast nobody —
+ * `liveRosterEntries()` is the one place that filter lives. If the roster
+ * file itself is absent (`just mesh prologue` has not run), the read fails
+ * with a clear message naming that path.
  *
  * Independent verification of "that count equals the number of live
  * hosted-cell commitments" reads each roster entry's commitment back from
@@ -57,23 +62,30 @@ const CASTER_ENTRY = resolve(REPO_ROOT, 'genesis/seeder/src/seed-hosted-humans.t
 // Roster (Task 5's caster output)
 // ---------------------------------------------------------------------------
 
+/**
+ * Byte-for-byte the wire shape `genesis/seeder/src/seed-hosted-humans.ts`
+ * writes (S1 Task 5, landed 2026-09-11) — `RosterEntry` there, mirrored here
+ * rather than imported because a2o step files are loaded by glob and the
+ * seeder is a standalone script, not a package this workspace resolves.
+ * `'-'` is that script's own sentinel for "no live value" (a soft-failed or
+ * no-pool registrant), not `undefined` — every reader here must check for it.
+ */
+type RosterOutcome = 'registered' | 'exists' | 'no-pool' | 'unreachable' | 'failed';
+
 interface HostedRosterEntry {
   identifier: string;
-  doorwayId?: string;
-  agentPubKey?: string;
-  conductorId?: string;
-  hostedCellGrantCid?: string;
-  /**
-   * Not in Task 5's own printed-line list (identifier/agentPubKey/conductorId/
-   * hostedCellGrantCid) but needed for the LAST scenario here, which signs
-   * back in as a roster human to close their own account through the
-   * product path — a self-service close needs that human's own bearer, never
-   * an admin's. The caster registers each human itself, so it is the only
-   * place this password can come from; if it is absent from the roster file
-   * this step fails naming exactly that gap rather than guessing one.
-   */
-  password?: string;
+  displayName: string;
+  doorwayUrl: string;
+  intendedPool: string;
+  result: RosterOutcome;
+  agentPubKey: string;
+  conductorId: string;
+  hostedCellGrantCid: string;
+  error?: string;
 }
+
+/** The seeder's own fixed credential for every roster registrant (DEFAULT_PASSWORD there). */
+const ROSTER_PASSWORD = 'Prologue2026!';
 
 function rosterPath(): string {
   const meshDir = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
@@ -88,23 +100,32 @@ function loadRoster(): HostedRosterEntry[] {
   } catch {
     throw new Error(
       `no Prologue hosted-human roster at ${path} — run \`just mesh prologue\` first ` +
-        "(it writes this file once S1 Task 5's seed-hosted-humans caster lands)."
+        '(seed-hosted-humans.ts writes this file).'
     );
   }
   const parsed: unknown = JSON.parse(raw);
-  const list = Array.isArray(parsed)
-    ? parsed
-    : Array.isArray((parsed as Json)['registrants'])
-      ? ((parsed as Json)['registrants'] as unknown[])
-      : Array.isArray((parsed as Json)['humans'])
-        ? ((parsed as Json)['humans'] as unknown[])
-        : undefined;
+  const list = Array.isArray((parsed as Json)['registrants'])
+    ? ((parsed as Json)['registrants'] as unknown[])
+    : Array.isArray(parsed)
+      ? parsed
+      : undefined;
   assert.ok(
     list,
-    `roster at ${path} is not an array (or {registrants:[...]} / {humans:[...]}): ` +
-      raw.slice(0, 200)
+    `roster at ${path} is not {registrants:[...]} (or a bare array): ${raw.slice(0, 200)}`
   );
   return list as HostedRosterEntry[];
+}
+
+/** Entries the doorway actually registered — a soft-failed/no-pool row casts nobody. */
+function liveRosterEntries(roster: HostedRosterEntry[]): HostedRosterEntry[] {
+  return roster.filter(entry => entry.result === 'registered' || entry.result === 'exists');
+}
+
+/** A live entry's grant cid, or `undefined` when this doorway has no pool-compute wiring yet. */
+function grantCidOf(entry: HostedRosterEntry): string | undefined {
+  return entry.hostedCellGrantCid && entry.hostedCellGrantCid !== '-'
+    ? entry.hostedCellGrantCid
+    : undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,11 +271,10 @@ Then(
     assert.equal(typeof served, 'number');
     assert.ok(roster.length > 0, 'No Prologue roster loaded — run the cast Given first.');
     let live = 0;
-    for (const entry of roster) {
-      if (!entry.hostedCellGrantCid) continue;
-      const { status: httpStatus, body } = await readHostedCellCommitment(
-        entry.hostedCellGrantCid
-      );
+    for (const entry of liveRosterEntries(roster)) {
+      const cid = grantCidOf(entry);
+      if (!cid) continue;
+      const { status: httpStatus, body } = await readHostedCellCommitment(cid);
       if (httpStatus === 200 && commitmentIsLive(body)) live += 1;
     }
     assert.equal(
@@ -288,14 +308,14 @@ Then('it does not answer with a dash', function (this: E2EWorld) {
 });
 
 Then("neither doorway's count includes a human hosted only by the other", function (this: E2EWorld) {
-  const { roster } = state(this);
+  const live = liveRosterEntries(state(this).roster);
   const alpha = statusFor(this, 'alpha');
   const beta = statusFor(this, 'beta');
   assert.equal(
     humansServedOf(alpha),
-    roster.length,
+    live.length,
     `doorway "alpha" reports humansServed=${String(humansServedOf(alpha))} but the Prologue cast ` +
-      `${roster.length} humans at alpha only.`
+      `${live.length} humans at alpha only.`
   );
   assert.equal(
     humansServedOf(beta),
@@ -313,13 +333,13 @@ Then(
       castId,
       'This story only casts humans at one doorway; the two names must name the same one.'
     );
-    const { roster } = state(this);
+    const live = liveRosterEntries(state(this).roster);
     const status = statusFor(this, hostId);
     assert.equal(
       humansServedOf(status),
-      roster.length,
+      live.length,
       `doorway "${hostId}" reports humansServed=${String(humansServedOf(status))} but the ` +
-        `Prologue cast ${roster.length}.`
+        `Prologue cast ${live.length}.`
     );
   }
 );
@@ -400,20 +420,21 @@ When(
   "one of those humans closes their account through the doorway's own close path",
   async function (this: E2EWorld) {
     const s = state(this);
-    assert.ok(s.roster.length > 0, 'No Prologue roster loaded — run the cast Given first.');
-    const entry = s.roster[0];
+    const live = liveRosterEntries(s.roster);
     assert.ok(
-      entry.password,
-      `roster entry "${entry.identifier}" carries no password — the Prologue caster (S1 Task 5) ` +
-        'must record one so this scenario can sign back in as the human it created and close its ' +
-        'own account through the product path.'
+      live.length > 0,
+      'No live Prologue registrant to close — run the cast Given first (or every registrant is ' +
+        'soft-failed/no-pool on this doorway).'
     );
-    const doorwayId = entry.doorwayId ?? 'alpha'; // Task 5 casts every roster human at doorway A.
-    const doorway = this.getDoorway(doorwayId);
+    const entry = live[0];
+    // Task 5 casts every roster human at doorway A with the same fixed
+    // ROSTER_PASSWORD (seed-hosted-humans.ts's own DEFAULT_PASSWORD) — a
+    // self-service close needs that human's own bearer, never an admin's.
+    const doorway = this.getDoorway('alpha');
     const base = doorway.url.replace(/\/+$/, '');
     const login = await doorway.client.login({
       identifier: entry.identifier,
-      password: entry.password,
+      password: ROSTER_PASSWORD,
     });
     const result = await authedPost(`${base}/auth/close-account`, login.token, {
       confirmIdentifier: entry.identifier,
@@ -440,7 +461,7 @@ Then('the humans-served count is one lower than the recorded count', function (t
 When('the household mesh casts that human again', function (this: E2EWorld) {
   const s = state(this);
   assert.ok(s.closed, 'No human has been closed yet in this scenario.');
-  const doorway = this.getDoorway(s.closed.doorwayId ?? 'alpha');
+  const doorway = this.getDoorway('alpha'); // Task 5 casts every roster human at doorway A.
   const result = spawnSync('npx', ['tsx', CASTER_ENTRY], {
     cwd: resolve(REPO_ROOT, 'genesis/seeder'),
     encoding: 'utf8',
