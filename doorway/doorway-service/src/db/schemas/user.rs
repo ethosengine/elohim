@@ -250,6 +250,17 @@ pub struct UserDoc {
     /// "I was removed" are not the same fact about a person.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub closed_at: Option<DateTime>,
+
+    /// The identifier this row used while it was a live account.
+    ///
+    /// Closing RELEASES the name: `identifier` is rewritten to a
+    /// `closed:<millis>:<name>` tombstone so the unique index stops holding it,
+    /// and the name the human actually used is kept here. History therefore
+    /// still says who this was, while the name itself is free for a new
+    /// registration — which is a new account, never this one resurrected.
+    /// Absent on rows that were never closed, and on rows closed before 17c.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub closed_identifier: Option<String>,
 }
 
 fn default_identifier_type() -> String {
@@ -299,6 +310,7 @@ impl UserDoc {
             hosted_cell_valid_until: None,
             hosted_cell_provider: None,
             closed_at: None,
+            closed_identifier: None,
         }
     }
 

@@ -2664,9 +2664,15 @@ decisionPoints:
       line: 367
     summary: >
       The $set that ENDS a credential row: is_active false, metadata.is_deleted true,
-      closed_at stamped. Its registrable claim is the shape of the effect — a settled
-      terminal state written by assignment, never an accreting log — so a repeated close
-      converges on the same row rather than double-applying.
+      closed_at stamped, the hosting promise nulled — and (Task 17c) the LIVE identifier
+      RELEASED to a tombstone while `closed_identifier` keeps the name the human used. Its
+      registrable claim is the shape of the effect — a settled terminal state written by
+      assignment, never an accreting log — so a repeated close converges on the same row
+      rather than double-applying. The release is what makes "a closed row is not an
+      account" true of the unique index and not merely of a filter: without it, registering
+      a closed identifier again passes the duplicate check (MongoCollection::find_one
+      already excludes soft-deleted rows) and then dies E11000 at insert, AFTER a
+      hosted-cell grant has been notarized for an agent whose row never lands.
     concernIds:
       - id: C6b
         status: answered
@@ -2674,6 +2680,12 @@ decisionPoints:
           closed_row_cannot_log_in reads the update document itself and pins the three
           terminal fields. Every field is an assignment to a fixed value, so replaying the
           update against an already-closed row is a no-op on the row's meaning.
+      - id: C2
+        status: answered
+        justification: >
+          a_closed_identifier_is_released_so_it_can_be_registered_again pins that the
+          released handle is derived from the caller-supplied close instant, so the update
+          document is a pure function of its inputs rather than of the writing process.
       - id: C9
         status: partial
         justification: >
@@ -2685,6 +2697,81 @@ decisionPoints:
       - path: doorway/doorway-service/src/routes/auth_routes.rs
         testName: closed_row_cannot_log_in
         kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: a_closed_identifier_is_released_so_it_can_be_registered_again
+        kind: unit
+
+  - name: closed_identifier_tombstone
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::closed_identifier_tombstone
+    summary: >
+      The name a closed credential row answers to instead of the one it released.
+      `closed:<close-instant-millis>:<identifier>`, chosen so the row stays findable as
+      history, so a tombstone is unmistakable on sight, and so two closings of the same
+      name can never collide on the `identifier_unique` index.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          Pure in (identifier, close instant) — the instant is supplied by the caller, never
+          read from the writing process's clock inside this function, so the same close
+          produces the same tombstone wherever it is replayed.
+      - id: C4
+        status: answered
+        justification: >
+          A tombstoned row is still PRESENT and still carries `closed_identifier`; the name
+          becomes unclaimed, which is a different fact from the account never having
+          existed. Nothing is deleted to make room.
+      - id: C6b
+        status: answered
+        justification: >
+          tombstones_are_distinct_per_closing pins that distinct closings yield distinct
+          handles, so the close update can never fail the unique index it is trying to free.
+      - { id: C13, status: n-a, justification: "Releases a name; it grants no authority and serves no lower social tier." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: tombstones_are_distinct_per_closing
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: a_closed_identifier_is_released_so_it_can_be_registered_again
+        kind: unit
+
+  - name: account_stamp
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::account_stamp
+    summary: >
+      The ONE time dialect `AccountResponse` speaks. Routes every `bson::DateTime` on the
+      account wire through `routes::hosted_cell::rfc3339_utc_secs` — the same formatter
+      `hostedCellValidUntil` already used — instead of `bson::DateTime`'s `Display`, which
+      is the `time` crate's own (`2026-09-11 4:36:34.217 +00:00:00`) and is not RFC3339.
+    concernIds:
+      - id: C2
+        status: answered
+        justification: >
+          Pure in its instant; seconds precision and a literal Z, so the stamp is
+          byte-identical wherever it is produced.
+      - id: C4
+        status: answered
+        justification: >
+          every_account_timestamp_is_rfc3339 pins the FORMAT on the wire rather than on any
+          client's tolerance. The measured failure was a client that refused the string
+          (Angular DatePipe NG02100) and abandoned every template node below it, so the
+          account page reported a missing hosted section when the data behind it was
+          correct — a display absence standing in for a wire defect.
+      - { id: C14, status: partial, justification: "The format is now pinned by test; nothing yet reports a row whose stored instant is unrepresentable." }
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: every_account_timestamp_is_rfc3339
+        kind: unit
+    notes: >
+      The account page's own guard (`instantOrNull`, doorway-app, dfd2c8932) deliberately
+      does NOT re-implement the convention in TypeScript; its `TODO(rust-fix)` names this
+      function's absence as the defect. With the stamp landed, that guard becomes a
+      belt-and-braces rail rather than the thing holding the page up.
 
   - name: pool_compute_config
     kind: pure-decision-predicate

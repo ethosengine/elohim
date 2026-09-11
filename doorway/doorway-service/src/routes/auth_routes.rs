@@ -376,17 +376,66 @@ pub fn close_account_verdict(
     }
 }
 
+/// The name a closed row answers to instead of the one it released.
+///
+/// Pure and collision-free in practice: a given row is closed exactly once, and
+/// the close instant is part of the key. Prefixed so a tombstone is obvious on
+/// sight and can never be mistaken for a name a human could have chosen (`:` is
+/// not admissible in a registered identifier).
+pub fn closed_identifier_tombstone(identifier: &str, at: bson::DateTime) -> String {
+    format!("closed:{}:{}", at.timestamp_millis(), identifier)
+}
+
+/// The filter that finds a closed row still HOLDING a name it gave back.
+///
+/// A row closed before Task 17c kept its `identifier`, so the unique index is
+/// still holding a name the doorway no longer hosts anyone under — and no
+/// amount of filtering on the read side frees it. Narrow on purpose: only rows
+/// the human closed THEMSELVES (`closed_at` present), only rows not already
+/// released (`closed_identifier` absent), and never an active row.
+pub fn unreleased_closed_row_filter(identifier: &str) -> bson::Document {
+    doc! {
+        "identifier": identifier,
+        "is_active": false,
+        "closed_at": { "$exists": true },
+        "closed_identifier": { "$exists": false },
+    }
+}
+
+/// The `$set` that releases such a row — the same two fields a close writes
+/// now, and nothing else. It re-states no part of the closure: the row is
+/// already closed, and re-closing it would be a second, later act.
+pub fn release_closed_identifier_update(identifier: &str, at: bson::DateTime) -> bson::Document {
+    doc! {
+        "$set": {
+            "identifier": closed_identifier_tombstone(identifier, at),
+            "closed_identifier": identifier,
+        }
+    }
+}
+
 /// The `$set` document that ENDS an account.
 ///
 /// One builder so the closure stamp cannot drift between the close route and
 /// anything that later audits it: `is_active` false (this is what `handle_login`
 /// and `session_revoked_by_user_doc` already refuse on), `metadata.is_deleted`
-/// true (what the admin listing filters on), and `closed_at` — the human's own
+/// true (what the admin listing filters on), `closed_at` — the human's own
 /// act, distinct from `metadata.deleted_at`, which an operator's soft-delete
-/// writes.
-pub fn close_account_row_update(now: bson::DateTime) -> bson::Document {
+/// writes — and the LIVE identifier released to a
+/// [`closed_identifier_tombstone`], with `closed_identifier` keeping the name
+/// the human actually used.
+pub fn close_account_row_update(now: bson::DateTime, identifier: &str) -> bson::Document {
     doc! {
         "$set": {
+            // History keeps the name the human used; the LIVE handle is
+            // released. `identifier` carries a unique index, so a closed row
+            // that kept it would hold the name hostage forever — re-registering
+            // would pass the (now active-filtered) duplicate check and then die
+            // E11000 at insert. Tombstoning frees the key WITHOUT resurrecting
+            // or deleting the row, and keeps every `find_one({identifier})` in
+            // this file single-valued: at most one row ever answers to a name.
+            "identifier": closed_identifier_tombstone(identifier, now),
+            "closed_identifier": identifier,
             "is_active": false,
             "metadata.is_deleted": true,
             "metadata.deleted_at": now,
@@ -413,6 +462,23 @@ pub fn close_account_row_update(now: bson::DateTime) -> bson::Document {
 /// never registered a closed human.
 pub fn active_user_filter(identifier: &str) -> bson::Document {
     doc! { "identifier": identifier, "is_active": true }
+}
+
+/// Every timestamp `AccountResponse` puts on the wire, in ONE format.
+///
+/// `bson::DateTime`'s `Display` is the `time` crate's own
+/// (`2026-09-11 4:36:34.217 +00:00:00`) — a space instead of `T`, an unpadded
+/// hour, and a `+00:00:00` offset. It is not RFC3339, so Angular's `DatePipe`
+/// throws `NG02100` on it and every row BELOW the offending one stops
+/// rendering: three `.to_string()` calls were enough to blank the hosted
+/// section of the account page while the data behind it was correct.
+///
+/// `hosted_cell_valid_until` on the same response was already RFC3339 (written
+/// through [`crate::routes::hosted_cell::rfc3339_utc_secs`]), so this reuses
+/// that exact helper rather than minting a second stamp format — one response
+/// must not speak two dialects of time.
+fn account_stamp(at: bson::DateTime) -> String {
+    crate::routes::hosted_cell::rfc3339_utc_secs(at.to_chrono())
 }
 
 #[derive(Debug, Serialize)]
@@ -1053,8 +1119,19 @@ async fn handle_register(
             };
 
             // Check if identifier already exists — BEFORE we create anything.
+            //
+            // A CLOSED row is not an account. Story 05-leaving is explicit that
+            // closing means "the doorway keeps nothing that would host it", so
+            // registering that identifier again is a NEW registration — new
+            // cell, new agent key, new grant — and the closed row stays where
+            // it is, as history, never resurrected. Filtering on `is_active`
+            // here is what makes that true of the CHECK; releasing the
+            // identifier in `close_account_row_update` is what makes it true of
+            // the unique index underneath (the two travel together — without
+            // the release this check would pass and the insert would still
+            // fail E11000).
             match collection
-                .find_one(doc! { "identifier": &body.identifier })
+                .find_one(active_user_filter(&body.identifier))
                 .await
             {
                 Ok(Some(_)) => {
@@ -1076,6 +1153,25 @@ async fn handle_register(
                         },
                     )
                 }
+            }
+
+            // No LIVE account holds this name — but a row closed before 17c
+            // kept its `identifier`, and the unique index is still holding it.
+            // Release it here, in the shape a close writes now, so a closure
+            // that predates the fix cannot make a name permanently
+            // unregistrable. One targeted update, matching only already-closed
+            // unreleased rows; a no-op on every ordinary registration.
+            if let Err(e) = collection
+                .update_one(
+                    unreleased_closed_row_filter(&body.identifier),
+                    release_closed_identifier_update(&body.identifier, bson::DateTime::now()),
+                )
+                .await
+            {
+                warn!(
+                    identifier = %body.identifier,
+                    "register: could not release a closed row's held identifier: {}", e
+                );
             }
 
             Some(collection)
@@ -2528,7 +2624,7 @@ async fn handle_account(
             bandwidth_percent,
             conductor_id: user.conductor_id,
             is_steward: user.is_steward,
-            stewardship_at: user.stewardship_at.map(|d| d.to_string()),
+            stewardship_at: user.stewardship_at.map(account_stamp),
             key_exported,
             display_name: user.display_name,
             // The household name is shown only when there is a promise to name.
@@ -2537,8 +2633,8 @@ async fn handle_account(
             hosted_by_household,
             hosted_cell_grant_cid: user.hosted_cell_grant_cid,
             hosted_cell_valid_until: user.hosted_cell_valid_until,
-            created_at: user.metadata.created_at.map(|d| d.to_string()),
-            last_login_at: user.last_login_at.map(|d| d.to_string()),
+            created_at: user.metadata.created_at.map(account_stamp),
+            last_login_at: user.last_login_at.map(account_stamp),
         },
     )
 }
@@ -2790,7 +2886,7 @@ async fn handle_close_account(
     if let Err(e) = collection
         .update_one(
             doc! { "identifier": &session_identifier },
-            close_account_row_update(bson::DateTime::now()),
+            close_account_row_update(bson::DateTime::now(), &session_identifier),
         )
         .await
     {
@@ -5914,13 +6010,143 @@ mod tests {
             Some("ruth@alpha.elohim.host")
         );
         // And the update the close route writes is the thing that filter excludes.
-        let update = close_account_row_update(bson::DateTime::now());
+        let update = close_account_row_update(bson::DateTime::now(), "ruth@alpha.elohim.host");
         let set = update.get_document("$set").expect("$set");
         assert_eq!(set.get_bool("is_active").ok(), Some(false));
         assert_eq!(set.get_bool("metadata.is_deleted").ok(), Some(true));
         assert!(
             set.get("closed_at").is_some(),
             "the human's own closing act is stamped distinctly from an operator soft-delete"
+        );
+    }
+
+    /// **Task 17c (2).** A CLOSED account's identifier can be registered again,
+    /// and the new registration is a NEW account — not a resurrection.
+    ///
+    /// The measured red: `humans-served`'s "casts that human again" re-registered
+    /// `prologue-hosted-1` after a close and got `exists` with no
+    /// `hostedCellGrantCid`. Two things had to be true for that to be a lie, and
+    /// this pins both halves:
+    ///
+    /// 1. the duplicate CHECK must not see a closed row (it filters on
+    ///    `is_active` now — `closed_row_cannot_log_in` pins the flag itself); and
+    /// 2. the unique index underneath must not still be holding the name, which
+    ///    is what releasing the identifier on close achieves.
+    ///
+    /// Without (2), (1) alone just moves the refusal from a 409 in the check to
+    /// an E11000 at the insert — the same `exists`, one layer down.
+    #[test]
+    fn a_closed_identifier_is_released_so_it_can_be_registered_again() {
+        let ident = "prologue-hosted-1@alpha.elohim.host";
+        let at = bson::DateTime::now();
+        let update = close_account_row_update(at, ident);
+        let set = update.get_document("$set").expect("$set");
+
+        let released = set
+            .get_str("identifier")
+            .expect("close rewrites the live handle");
+        assert_ne!(
+            released, ident,
+            "a closed row must stop holding the name — the unique index is on `identifier`"
+        );
+        assert_eq!(released, closed_identifier_tombstone(ident, at));
+        assert!(
+            released.starts_with("closed:"),
+            "a tombstone must be unmistakable: {released}"
+        );
+
+        // The row stays as history, under the name the human actually used.
+        assert_eq!(
+            set.get_str("closed_identifier").ok(),
+            Some(ident),
+            "history keeps the name; only the LIVE handle is released"
+        );
+        assert_eq!(set.get_bool("is_active").ok(), Some(false));
+        assert_eq!(set.get_bool("metadata.is_deleted").ok(), Some(true));
+
+        // And the released name is free: the filter registration checks with
+        // no longer matches the closed row on either clause.
+        let check = active_user_filter(ident);
+        assert_eq!(check.get_str("identifier").ok(), Some(ident));
+        assert_eq!(check.get_bool("is_active").ok(), Some(true));
+    }
+
+    /// A closure that PREDATES 17c still held its name; registering that name
+    /// again releases it first, so the fix reaches rows already in the archive
+    /// rather than only ones closed from here on.
+    #[test]
+    fn a_legacy_closed_row_releases_its_held_name_on_re_registration() {
+        let ident = "prologue-hosted-1@alpha.elohim.host";
+        let filter = unreleased_closed_row_filter(ident);
+        assert_eq!(filter.get_str("identifier").ok(), Some(ident));
+        assert_eq!(
+            filter.get_bool("is_active").ok(),
+            Some(false),
+            "an ACTIVE row must never be released out from under its human"
+        );
+        assert!(
+            filter.get_document("closed_at").is_ok(),
+            "only a row the human closed themselves — not an operator soft-delete"
+        );
+        assert!(
+            filter.get_document("closed_identifier").is_ok(),
+            "an already-released row must not be released a second time"
+        );
+
+        let at = bson::DateTime::now();
+        let set = release_closed_identifier_update(ident, at)
+            .get_document("$set")
+            .expect("$set")
+            .clone();
+        assert_eq!(
+            set.get_str("identifier").ok(),
+            Some(closed_identifier_tombstone(ident, at).as_str())
+        );
+        assert_eq!(set.get_str("closed_identifier").ok(), Some(ident));
+        assert_eq!(
+            set.len(),
+            2,
+            "releasing a name re-states no other part of the closure"
+        );
+    }
+
+    /// Two closes of the same name never collide on the unique index.
+    #[test]
+    fn tombstones_are_distinct_per_closing() {
+        let ident = "ruth@alpha.elohim.host";
+        let first = bson::DateTime::from_millis(1_757_500_000_000);
+        let second = bson::DateTime::from_millis(1_757_500_000_001);
+        assert_ne!(
+            closed_identifier_tombstone(ident, first),
+            closed_identifier_tombstone(ident, second)
+        );
+    }
+
+    /// **Task 17c (A).** Every timestamp on `AccountResponse` parses as RFC3339.
+    ///
+    /// `bson::DateTime`'s `Display` is the `time` crate's
+    /// (`2026-09-11 4:36:34.217 +00:00:00`), which Angular's `DatePipe` refuses
+    /// with `NG02100` — and one refusal blanks every row below it, which is how
+    /// the account page lost its whole hosted section while the data behind it
+    /// was correct. Asserting on the FORMAT here (not on the page) is what keeps
+    /// the wire honest whatever the client does with it.
+    #[test]
+    fn every_account_timestamp_is_rfc3339() {
+        let at = bson::DateTime::from_millis(1_757_500_594_217);
+        let stamped = account_stamp(at);
+        assert!(
+            chrono::DateTime::parse_from_rfc3339(&stamped).is_ok(),
+            "account timestamps must parse as RFC3339, got {stamped:?}"
+        );
+        assert!(
+            !stamped.contains(' '),
+            "the time-crate Display leaks a space instead of the RFC3339 `T`: {stamped:?}"
+        );
+        assert!(stamped.ends_with('Z'), "{stamped:?}");
+        // The SAME dialect the hosted-cell stamps already speak.
+        assert_eq!(
+            stamped,
+            crate::routes::hosted_cell::rfc3339_utc_secs(at.to_chrono())
         );
     }
 
@@ -5960,7 +6186,7 @@ mod tests {
             "a hosted human with a live promise closes like anyone else"
         );
 
-        let set = close_account_row_update(bson::DateTime::now());
+        let set = close_account_row_update(bson::DateTime::now(), ident);
         let set = set.get_document("$set").expect("$set");
         assert_eq!(
             set.get("hosted_cell_grant_cid"),
