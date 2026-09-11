@@ -85,6 +85,33 @@ rules:
       resolves the bootstrapping head natively per turn and neither file shells to `epr flow
       memory recall open` at all — at which point there is no hook body left for the rule to
       keep honest
+  - id: capability-tier-gate-owns-destructive-git
+    class: inject
+    when:
+      write: "*.py"
+      contains-any:
+        - "git reset --hard"
+        - "git push --force"
+        - "git branch -D"
+        - "git worktree remove --force"
+        - "destructive-git-requires-tier"
+    dedupe-of: ".claude/epr-meta/policies.yaml row `destructive-git-requires-tier@1` (the declared pattern / tier-order / tier-floor / remedy table; read directly by .claude/hooks/capability-tier-gate.py, the ONE PreToolUse enforcer)"
+    why: >
+      this edit is writing destructive-git command text into a `.py` file in this tree — exactly
+      the shape of a second, hand-authored copy of the pattern table
+      `capability-tier-gate.py` already reads from `destructive-git-requires-tier@1`. Task 2.4
+      (2026-09-11, after a Haiku subagent's `git reset --hard` wiped another lane's uncommitted
+      work on the shared `dev` checkout) put the table in exactly one place on purpose: a second
+      copy — in a new hook, a helper, a test fixture standing in for the real table — can drift
+      from the registry silently, and a drifted copy that under-lists patterns is a silent
+      widening of what any tier may run. If this edit is the registry row itself or the gate
+      hook's own tests, it is fine as written; if it is a NEW enforcer or a helper re-deriving
+      the pattern/tier list, bind `.claude/epr-meta/policies.yaml`'s
+      `destructive-git-requires-tier@1` instead of re-typing the patterns.
+    retire-when: >
+      when there is exactly one enforcer of the destructive-git table for four consecutive
+      months with no second hand-authored copy found by this rule or by a drift audit — the
+      nudge is describing a habit, not producing one
 ---
 
 `.claude/hooks/` — the thin hook-transport layer: PreToolUse gates (epr-meta compose-gate,

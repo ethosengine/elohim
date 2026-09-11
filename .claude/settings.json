@@ -12,7 +12,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-project-context.py\"",
-            "timeout": 5
+            "timeout": 8
           },
           {
             "type": "command",
@@ -92,7 +92,7 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-projection.py\" --event prompt",
-            "timeout": 5
+            "timeout": 8
           },
           {
             "type": "command",
@@ -149,6 +149,11 @@
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/cargo-disk-guard.py\"",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/capability-tier-gate.py\"",
             "timeout": 5
           },
           {

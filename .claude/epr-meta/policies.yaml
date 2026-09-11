@@ -792,3 +792,74 @@ policies:
       ATTENTION, and attention does not compose). Run
       `.claude/scripts/habits-project.py --check` after; the flat register at
       genesis/manifests/habits.yaml is a GENERATED projection of these atoms.
+
+  - id: destructive-git-requires-tier
+    version: 1
+    contentHash: sha256:44663fa427b2f3bd7dd09ee6ed29ebf3bf920f8e1996a51c4a9e6c8603647cf3
+    title: Destructive git requires a declared tier or a team check
+    binding: constitutional
+    class: deny
+    subject: bash-command
+    predicate: destructive-git
+    dedupe-of: >
+      .claude/hooks/capability-tier-gate.py — this row is the declared table for a Bash-command
+      predicate, read directly by that PreToolUse hook; it is never bound through the
+      `.epr-meta` write-scope compose-gate (there is no file-write `scope:` here to bind), so
+      this key exists only to satisfy the registry loader's actionable-predicate check and to
+      point at the one enforcer, never a second copy of the pattern table.
+    parameters:
+      patterns:
+        - "git reset --hard"
+        - "git reset --merge"
+        - "git checkout -- ."
+        - "git checkout ."
+        - "git restore ."
+        - "git clean -f"
+        - "git push --force"
+        - "git push -f"
+        - "git branch -D"
+        - "git branch -f"
+        - "git update-ref"
+        - "git stash drop"
+        - "git stash clear"
+        - "git worktree remove --force"
+        - "rm -rf ."
+      tier-floor: claude-opus-5
+      tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol]
+      unknown-tier: deny
+      remedy: >
+        check with the team first: ask the controller/operator to run this, or claim your tier
+        (epr actor claim --as agent:<role>@<model> --session $CLAUDE_SESSION_ID) if you are at or
+        above the floor
+    status: active
+    retire-when: >
+      when the harness enforces agent-tier command capability natively — a first-class
+      permission scope keyed on the acting model, not a repo-side pattern table — at which point
+      this row is a redundant second enforcement of a guarantee the platform already holds. Until
+      then an unscoped git-reset-class command is unrecoverable, cross-session data loss on a
+      shared checkout, and that risk does not retire on a quiet quarter.
+    established_by: governed-discovery-task-2.4-2026-09-11
+    why: >
+      2026-09-11 22:34Z: a Haiku-tier subagent of another session ran `git reset --hard
+      466536cb4` on the shared /projects/elohim checkout — three commits left the `dev` branch
+      pointer (objects intact) and ~27 tracked files' uncommitted work across several lanes was
+      wiped; recovery took two sessions an hour (see
+      .claude/memory/feedback_tiered_agent_capabilities_destructive_git.md). Operator direction:
+      "haiku and sonnet should not have git reset level capabilities to do that kind of thing
+      without checking with the team first" — tiered permissions keyed by the same
+      `agent:<role>@<model>` vocabulary the reader lens already uses. Destructive git (history-
+      rewriting, working-tree-discarding, or ref-mutating) is refused below the declared tier
+      floor UNLESS the acting tier resolves at or above it. Tier resolution order (fail-closed):
+      `CLAUDE_MODEL`/`ANTHROPIC_MODEL` env, then the actor sidecar's latest claim
+      (`.eprfs/status/actors.jsonl`, ActorClaim `{claimed: "agent:<role>@<model>", session,
+      claimedAt}` — elohim/epr-rea/src/actor.rs) for `CLAUDE_SESSION_ID`, then `unknown`.
+      `unknown-tier: deny` is fail-closed on purpose: an unclaimed actor is treated as below the
+      floor, never assumed safe. Patterns match as substrings of the whitespace-normalised
+      command line, any position — a pattern ending in a bare `.` (`git checkout .`, `git
+      restore .`, `rm -rf .`) needs a word boundary immediately after the dot so `rm -rf .`
+      matches `rm -rf .` and `rm -rf ./` but never `rm -rf ./target`. The remedy is the same
+      escalation the reader lens already teaches: claim your tier
+      (`epr actor claim --as agent:<role>@<model> --session $CLAUDE_SESSION_ID`) if you are at or
+      above the floor, or ask the controller/operator to run the command. Worktrees per plan
+      (`.claude/worktrees/<plan>`) are the structural half of this discipline — a hard reset in a
+      worktree cannot wipe another lane — this row is the behavioral half.
