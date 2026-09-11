@@ -2490,3 +2490,52 @@ decisionPoints:
       - path: doorway/doorway-service/src/render/warm_shell.rs
         testName: once_the_head_moves_and_the_shell_is_evicted_the_fetch_is_addressed_by_the_new_head
         kind: unit
+
+  - name: should_provision
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::should_provision
+      line: 758
+    summary: >
+      Whether a hosted registrant is provisioned their own cell. Depends only on whether a
+      conductor pool is configured; dev_mode is explicitly not read, because it is true on
+      every deployed manifest.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          should_provision_is_true_whenever_a_pool_is_configured pins (true,true) — the case
+          that silently produced a shared singleton Human on every deployed doorway. A flag
+          that is true everywhere is not a mode gate; reading it as one made "no pool
+          configured" and "pool configured but dev_mode on" return the same answer.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: should_provision_is_true_whenever_a_pool_is_configured
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: should_provision_is_false_without_a_pool
+        kind: unit
+
+  - name: synthetic_identity_fallback_allowed
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::synthetic_identity_fallback_allowed
+      line: 776
+    summary: >
+      Whether an unreachable imagodei zome may degrade to a SHA256-derived synthetic
+      human_id/agent_pub_key instead of returning IDENTITY_CREATION_FAILED. Keyed on the
+      DECLARED network stage (Simulacra only), never dev_mode, so it retires itself the
+      moment a doorway declares Bootstrap or above.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          synthetic_identity_fallback_is_simulacra_only proves an unreachable zome stays an
+          honest failure at Bootstrap/Coordinated/Enforced rather than degrading into an
+          unbindable identity that reads as a successful registration.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: synthetic_identity_fallback_is_simulacra_only
+        kind: unit

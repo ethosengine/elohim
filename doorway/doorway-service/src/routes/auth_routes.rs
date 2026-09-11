@@ -738,6 +738,47 @@ fn password_too_weak(password: &str) -> bool {
     password.len() < MIN_PASSWORD_LEN
 }
 
+/// Whether a hosted registrant gets their own provisioned cell.
+///
+/// WHY NOT `dev_mode`: that flag is `"true"` on every deployed manifest
+/// (alpha, alpha-b, prod, staging, staging-read) — the same fact that made the
+/// anonymous-caller gate ungated in practice (`auth/http_permission.rs:73`,
+/// citing `2026-08-25-doorway-auth-posture-declared-stage.md`). Keying
+/// provisioning on it meant every DEPLOYED doorway skipped per-registrant
+/// provisioning and handed every hosted registrant the singleton conductor's
+/// existing Human — the shared-`human_id` collision that
+/// `revocation_targets_unique_identifier_not_human_id` had to work around, and
+/// the 2026-09-04 measured red.
+///
+/// Provisioning depends on ONE fact: does this doorway operate a conductor
+/// pool? A doorway with no pool keeps the singleton fallback unchanged.
+///
+/// `dev_mode` is taken as a parameter and deliberately not read, so the
+/// refusal is visible at every call site rather than implied by absence.
+pub(crate) fn should_provision(registry_configured: bool, dev_mode: bool) -> bool {
+    let _ = dev_mode; // deliberately unread: see above
+    registry_configured
+}
+
+/// Whether the cheap synthetic-identity fallback is reachable when the imagodei
+/// zome cannot be called.
+///
+/// The fallback mints a SHA256-derived `human_id` / `agent_pub_key` that no
+/// conductor ever authored. Gated on `dev_mode` it was reachable on every
+/// deployed doorway, so an unreachable zome degraded silently into an
+/// unbindable identity instead of an honest `IDENTITY_CREATION_FAILED`.
+///
+/// It is now reachable only under a DECLARED `Simulacra` stage
+/// (`AppState::network_stage`, fail-closed to `Bootstrap`), which means it
+/// retires itself the moment a doorway declares `Bootstrap` or above — no flag
+/// to remember to unset, mirroring the designed expiry of the pre-coordination
+/// loopback grant.
+pub(crate) fn synthetic_identity_fallback_allowed(
+    stage: seam_contracts::freshness::NetworkStage,
+) -> bool {
+    matches!(stage, seam_contracts::freshness::NetworkStage::Simulacra)
+}
+
 /// Re-qualify an identifier's local-part with the doorway's gateway domain. Idempotent
 /// for an already-own-domain identifier (no double-qualify); converges bare,
 /// full-own-domain, and full-foreign-domain inputs all to `localpart@gateway`.
@@ -1037,9 +1078,10 @@ async fn handle_register(
                                 );
                             }
                         }
-                    } else if state.args.dev_mode {
+                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
-                            "Doorway: imagodei zome unavailable, using dev fallback: {}",
+                            "Doorway: imagodei zome unavailable, using the Simulacra \
+                             synthetic-identity fallback (declared stage only): {}",
                             e
                         );
                         use sha2::{Digest, Sha256};
@@ -1078,7 +1120,7 @@ async fn handle_register(
         "hosted" => {
             // Step 1: provision an agent cell on a conductor
             let provisioner_result = if let Some(registry) = &state.conductor_registry {
-                if !state.args.dev_mode {
+                if should_provision(true, state.args.dev_mode) {
                     let provisioner = AgentProvisioner::new(Arc::clone(registry))
                         .with_app_id(state.args.installed_app_id.clone())
                         .with_bundle_path(state.args.happ_bundle_path.clone());
@@ -1300,9 +1342,10 @@ async fn handle_register(
                                 );
                             }
                         }
-                    } else if state.args.dev_mode {
+                    } else if synthetic_identity_fallback_allowed(state.network_stage) {
                         warn!(
-                            "Hosted: imagodei zome unavailable, using dev fallback: {}",
+                            "Hosted: imagodei zome unavailable, using the Simulacra \
+                             synthetic-identity fallback (declared stage only): {}",
                             e
                         );
                         use sha2::{Digest, Sha256};
@@ -1338,7 +1381,7 @@ async fn handle_register(
         "node" | "device" => {
             // Find (or create) the existing app via provisioner — idempotent.
             let provisioner_result = if let Some(registry) = &state.conductor_registry {
-                if !state.args.dev_mode {
+                if should_provision(true, state.args.dev_mode) {
                     let provisioner = AgentProvisioner::new(Arc::clone(registry))
                         .with_app_id(state.args.installed_app_id.clone())
                         .with_bundle_path(state.args.happ_bundle_path.clone());
@@ -1826,7 +1869,7 @@ async fn handle_login(
     let (final_agent_pub_key, installed_app_id, login_conductor_id) = if user.conductor_id.is_none()
     {
         if let Some(ref registry) = state.conductor_registry {
-            if !state.args.dev_mode {
+            if should_provision(true, state.args.dev_mode) {
                 let provisioner = AgentProvisioner::new(Arc::clone(registry))
                     .with_app_id(state.args.installed_app_id.clone())
                     .with_bundle_path(state.args.happ_bundle_path.clone());
@@ -5144,5 +5187,52 @@ mod tests {
             PortalProbeDecision::ProbeLive,
             "dev_mode OFF must ignore an unhealthy override too"
         );
+    }
+
+    // ── Provisioning keys on the pool, never on `dev_mode` (D1a) ────────────
+    //
+    // Mirrors `auth/http_permission.rs`'s `remote_anonymous_is_public_even_with_dev_mode`
+    // / `loopback_grant_does_not_depend_on_dev_mode`: a predicate that must ignore
+    // `dev_mode` is pinned by a test that PASSES `dev_mode = true` and proves the
+    // answer does not move.
+
+    /// The case that was silently broken on every deployed doorway: a pool IS
+    /// configured and `dev_mode` is `"true"` (as it is on alpha, alpha-b, prod,
+    /// staging and staging-read), so the registrant must still get their own cell.
+    #[test]
+    fn should_provision_is_true_whenever_a_pool_is_configured() {
+        assert!(
+            super::should_provision(true, true),
+            "dev_mode must not suppress provisioning"
+        );
+        assert!(super::should_provision(true, false));
+    }
+
+    /// The no-pool doorway keeps its singleton fallback: nothing to provision on.
+    #[test]
+    fn should_provision_is_false_without_a_pool() {
+        assert!(!super::should_provision(false, true));
+        assert!(!super::should_provision(false, false));
+    }
+
+    /// The synthetic-identity fallback is reachable ONLY under a DECLARED
+    /// `Simulacra` stage, and retires itself at `Bootstrap` and above — the same
+    /// designed expiry as the pre-coordination loopback grant.
+    #[test]
+    fn synthetic_identity_fallback_is_simulacra_only() {
+        use seam_contracts::freshness::NetworkStage;
+        assert!(super::synthetic_identity_fallback_allowed(
+            NetworkStage::Simulacra
+        ));
+        for stage in [
+            NetworkStage::Bootstrap,
+            NetworkStage::Coordinated,
+            NetworkStage::Enforced,
+        ] {
+            assert!(
+                !super::synthetic_identity_fallback_allowed(stage),
+                "{stage:?} must not reach the synthetic-identity fallback"
+            );
+        }
     }
 }
