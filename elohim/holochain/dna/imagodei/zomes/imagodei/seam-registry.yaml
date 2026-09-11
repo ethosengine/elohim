@@ -1,7 +1,12 @@
 seamRegistryVersion: 1
 crate: imagodei
 crateRoot: elohim/holochain/dna/imagodei/zomes/imagodei
-seamLocus: Bounded readback of the caller's original notarized AgentPeerBinding records.
+seamLocus: >
+  Bounded readback of the caller's original notarized AgentPeerBinding records, plus the
+  coordinator-zome admission predicates for identity-integrity writes on a human's own source
+  chain (src/lib.rs: self_revocation_reason_accepted) — deliberately the COORDINATOR plane,
+  because the integrity zome's REVOCATION_REASONS array is covered by the DNA hash and
+  extending it there would cost a reinstall and a re-key on every conductor.
 decisionPoints:
   - name: recoverable_own_bindings
     kind: verdict-fn
@@ -33,3 +38,27 @@ decisionPoints:
     contractTests:
       - { path: elohim/holochain/dna/imagodei/zomes/imagodei/src/agent_peer_binding.rs, testName: binding_recovery_query_preserves_legacy_string_and_explicit_own_mode, kind: unit }
       - { path: elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs, testName: binding_creates_and_is_readable, kind: sweettest }
+
+  - name: self_revocation_reason_accepted
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/lib.rs
+      modulePath: imagodei::self_revocation_reason_accepted
+      line: 2849
+    summary: >
+      Accepts a self-revocation reason iff it is in the integrity zome's REVOCATION_REASONS or in
+      this zome's COORDINATOR_ONLY_REVOCATION_REASONS — a closed vocabulary, so an unrecognized
+      reason is refused outright rather than recorded as free text.
+    notes: >
+      Scoped to SELF-revocation only. The emergency-contact path (create_revocation_request) and the
+      specialist path (submit_specialist_revocation) keep the integrity list unextended: closing your
+      own account is something only you can say about yourself. The coordinator/integrity split is
+      the load-bearing design choice — it is what makes "account-closed" a hot-swap via
+      update_coordinators rather than a DNA-hash move.
+    concernIds:
+      - { id: C0, status: answered, justification: "The plane choice IS this point's design: the extension lives in the coordinator zome, never the integrity zome, and account_closed_is_an_accepted_revocation_reason asserts BOTH halves — the coordinator accepts it AND REVOCATION_REASONS (the DNA-hash-covered array) does not contain it. A future edit that 'simplified' this by moving the string into integrity fails that test." }
+      - { id: C4, status: answered, justification: "An unrecognized reason is a refusal, not a silent default: the predicate answers false for the empty string and for arbitrary text (the_integrity_vocabulary_still_applies), and create_self_revocation turns that false into an explicit error rather than writing a revocation under a blank or invented reason." }
+      - { id: C2, status: n-a, justification: "Pure vocabulary membership over two compile-time arrays — no clock, no ordering, no stamp, nothing that could move backwards. Monotonicity is a property of the revocation RECORD's placement on the source chain, not of this predicate." }
+    contractTests:
+      - { path: elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs, testName: account_closed_is_an_accepted_revocation_reason, kind: unit }
+      - { path: elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs, testName: the_integrity_vocabulary_still_applies, kind: unit }
