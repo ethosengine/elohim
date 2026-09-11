@@ -774,10 +774,19 @@ pub const FLOWS_REL: &str = ".eprfs/status/flows.jsonl";
 /// A bounded whole-file read of one FIXED, well-known register — never gated by `source_roots`
 /// (those bound what a QUESTION may traverse; `habits.yaml` and `flows.jsonl` are cross-cutting
 /// paths this executor already knows by name, the same way `HABITS_REL` is read unconditionally
-/// above) but still confined under the repository root and capped by the habit register's own
-/// declared budget, the only one either file has. Absence, an escape, or a budget overrun is
-/// **named** in `omissions` rather than silently dropped — ruling: "missing files are named in
-/// omissions, never silently skipped."
+/// above) but still confined under the repository root. Whole-file-or-nothing, never the bounded
+/// EXCERPT reader `receipts.rs` uses for a source passage: the bytes returned here are hashed into
+/// a content-address (`BlobCid::compute_raw`), and a CID over a partial read would misrepresent
+/// the file it claims to identify — there is no excerpt-CID concept anywhere else in this
+/// executor either.
+///
+/// Capped by `habit_register_bytes` for BOTH files (`usage_key` only labels which counter the
+/// bytes are charged to, fix round 1 finding 3 — the budget itself is intentionally shared: it is
+/// the only byte limit either small register has, and the contract's bytes must not move for this
+/// fix). Absence, an escape, or a budget overrun is **named** in `omissions` rather than silently
+/// dropped — ruling: "missing files are named in omissions, never silently skipped." This is
+/// `flows.jsonl`'s reader; `habits.yaml` is fail-closed instead (fix round 1 finding 2) and reads
+/// through [`read_bootstrap_habits`], never this function.
 fn read_bootstrap_input(
     root: &Path,
     contract: &Contract,
@@ -818,6 +827,52 @@ fn read_bootstrap_input(
     Ok(Some(data))
 }
 
+/// `genesis/manifests/habits.yaml`, fail-closed (fix round 1, finding 2): unlike
+/// [`read_bootstrap_input`], there is no "proceed without it" for the register itself — an absent,
+/// unreadable, or over-budget register REFUSES the whole `open`, naming the path and the fault, so
+/// a caller re-projects it rather than being silently oriented by a register this executor could
+/// not actually read. A register that reads fine but genuinely parses to no red habit is a
+/// DIFFERENT case (`top_red_habit` returning `Ok(None)`) and is not refused — see
+/// [`bootstrap_projection`].
+fn read_bootstrap_habits(
+    root: &Path,
+    contract: &Contract,
+    usage: &mut Value,
+) -> FlowResult<Vec<u8>> {
+    let path = confine_under(root, &root.join(HABITS_REL))
+        .map_err(|_| bootstrap_register_refusal("escapes the repository"))?;
+    if !path.is_file() {
+        return Err(bootstrap_register_refusal("absent"));
+    }
+    let budget = contract.limit_usize("habit_register_bytes");
+    let mut data = Vec::new();
+    File::open(&path)
+        .and_then(|file| {
+            file.take(budget as u64 + 1)
+                .read_to_end(&mut data)
+                .map(|_| ())
+        })
+        .map_err(|source| {
+            refused(format!(
+                "bootstrap cannot read the habit register: {HABITS_REL}: {source}"
+            ))
+        })?;
+    if data.len() > budget {
+        return Err(bootstrap_register_refusal("exceeds its declared budget"));
+    }
+    add_usage(usage, &json!({"habit_register_bytes": data.len()}));
+    Ok(data)
+}
+
+/// One `bootstrap cannot read the habit register` refusal, named the same way whichever reason
+/// fired — `remedy_for` (`refusal.rs`) matches on this exact prefix to name
+/// `.claude/scripts/habits-project.py` as the `next:` line.
+fn bootstrap_register_refusal(reason: &str) -> FlowError {
+    refused(format!(
+        "bootstrap cannot read the habit register: {HABITS_REL}: {reason}"
+    ))
+}
+
 /// The register's own first check line for one habit, from its `checks:` sequence — the FIRST
 /// entry only, exactly as declared order names it. `None` when the habit carries no checks.
 fn first_check(habit: &serde_yaml::Value) -> String {
@@ -840,14 +895,21 @@ pub(super) struct TopRedHabit {
 }
 
 /// The register's own top red — never a term match. First habit in DECLARED order with
-/// `active: true` and `status: red`; else the first with `status: red`; else `None`. A full parse
-/// (not the hand-rolled line scan `matching_habits` uses to stay cheap under a term filter) because
-/// this reads the whole small register exactly once and needs its real structure, including the
-/// inline-array `checks:` shape a fixture may use as well as the block-folded shape the generated
-/// register actually carries.
-fn top_red_habit(text: &str) -> Option<TopRedHabit> {
-    let doc: serde_yaml::Value = serde_yaml::from_str(text).ok()?;
-    let habits = doc.get("habits")?.as_sequence()?;
+/// `active: true` and `status: red`; else the first with `status: red`; else `Ok(None)` for a
+/// register that parses fine and genuinely carries no red habit (an honest orient, not a fault).
+/// `Err` only when the bytes do not parse as the register's own shape at all — a malformed
+/// document, or one with no `habits:` sequence — which [`bootstrap_projection`] turns into a
+/// fail-closed refusal (fix round 1, finding 2) rather than the same "no red habit; orient" an
+/// all-green register earns honestly. A full parse (not the hand-rolled line scan
+/// `matching_habits` uses to stay cheap under a term filter) because this reads the whole small
+/// register exactly once and needs its real structure, including the inline-array `checks:` shape
+/// a fixture may use as well as the block-folded shape the generated register actually carries.
+fn top_red_habit(text: &str) -> Result<Option<TopRedHabit>, String> {
+    let doc: serde_yaml::Value = serde_yaml::from_str(text).map_err(|error| error.to_string())?;
+    let habits = doc
+        .get("habits")
+        .and_then(serde_yaml::Value::as_sequence)
+        .ok_or_else(|| "no `habits:` sequence".to_string())?;
     let mut first_red: Option<TopRedHabit> = None;
     let mut first_active_red: Option<TopRedHabit> = None;
     for habit in habits {
@@ -874,7 +936,7 @@ fn top_red_habit(text: &str) -> Option<TopRedHabit> {
             first_active_red = Some(TopRedHabit { id, check });
         }
     }
-    first_active_red.or(first_red)
+    Ok(first_active_red.or(first_red))
 }
 
 /// `--purpose bootstrap`'s whole contribution: the session's [`TopRedHabit`], the
@@ -890,6 +952,13 @@ pub(super) struct BootstrapProjection {
 /// `collective: FileRef` field has no meaning for a bootstrap orientation (no collective-memory
 /// request is being authored), so this returns [`BootstrapProjection`]'s three fields
 /// (`purpose`/`audience` are constants the caller adds) instead of a partially-populated struct.
+///
+/// Fail-closed on the register itself (fix round 1, finding 2): `habits.yaml` reads through
+/// [`read_bootstrap_habits`], which refuses rather than returning `None`, and a register that
+/// reads but does not PARSE as the register's own shape refuses here too — never orienting a
+/// reader from a broken register the same way an honest all-green one would. `flows.jsonl` keeps
+/// the earlier best-effort behaviour: absent or unreadable is named in `omissions`, never a
+/// refusal, because it is supplementary evidence, not the register itself.
 pub(super) fn bootstrap_projection(
     root: &Path,
     contract: &Contract,
@@ -897,19 +966,14 @@ pub(super) fn bootstrap_projection(
 ) -> FlowResult<BootstrapProjection> {
     let mut omissions: Vec<String> = Vec::new();
     let mut inputs: Vec<Value> = Vec::new();
-    let mut top_red: Option<TopRedHabit> = None;
 
-    if let Some(data) = read_bootstrap_input(
-        root,
-        contract,
-        HABITS_REL,
-        "habit_register_bytes",
-        usage,
-        &mut omissions,
-    )? {
-        inputs.push(json!({"path": HABITS_REL, "cid": BlobCid::compute_raw(&data).to_string()}));
-        top_red = top_red_habit(&String::from_utf8_lossy(&data));
-    }
+    let habits_data = read_bootstrap_habits(root, contract, usage)?;
+    let top_red = top_red_habit(&String::from_utf8_lossy(&habits_data)).map_err(|error| {
+        refused(format!(
+            "bootstrap cannot read the habit register: {HABITS_REL}: {error}"
+        ))
+    })?;
+    inputs.push(json!({"path": HABITS_REL, "cid": BlobCid::compute_raw(&habits_data).to_string()}));
 
     if let Some(data) = read_bootstrap_input(
         root,

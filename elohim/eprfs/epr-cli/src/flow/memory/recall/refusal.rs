@@ -80,6 +80,11 @@ pub(super) fn one_line(text: &str) -> String {
 /// are matched on the refusal's own words, which is exactly as durable as the words are — and they
 /// are constants in this module, not prose that drifts.
 pub(super) fn remedy_for(message: &str, session: &str) -> String {
+    if message.contains("cannot read the habit register") {
+        return "The register is a GENERATED projection, never hand-edited — re-project it, then \
+                retry: python3 .claude/scripts/habits-project.py"
+            .into();
+    }
     if message.contains("algorithm bytes changed") || message.contains("executor bytes changed") {
         return format!(
             "The pinned method changed. Retain this receipt and continue explicitly: \

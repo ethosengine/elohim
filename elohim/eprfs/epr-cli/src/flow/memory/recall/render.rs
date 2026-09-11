@@ -236,6 +236,11 @@ fn render_floor_line(
 /// the same "print it once, as a line" rule the floor itself follows. `None` for every other view
 /// (`view["projection"]["purpose"]` absent from a plain `open`/`resume`/`select`/… view indexes to
 /// `Value::Null`, so this is a no-op there, not a panic).
+///
+/// Fix round 1, finding 1: `projection.omissions` render as `· <omission>` bullets directly under
+/// the `Bootstrap:` line — they were previously carried in `--json` only, invisible to a human
+/// reader at every lens even though the same omissions now also count toward the floor line's own
+/// `omissions: N` ([`nested_omissions_count`]).
 fn render_bootstrap_line(view: &Value) -> Option<String> {
     if view["projection"]["purpose"].as_str() != Some("bootstrap") {
         return None;
@@ -244,7 +249,17 @@ fn render_bootstrap_line(view: &Value) -> Option<String> {
     let check = view["bootstrap"]["check"]
         .as_str()
         .unwrap_or("no red habit; orient");
-    Some(format!("Bootstrap: top red: {id} — {}\n", clip(check, 120)))
+    let mut line = format!("Bootstrap: top red: {id} — {}\n", clip(check, 120));
+    for omission in view["projection"]["omissions"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+    {
+        if let Some(text) = omission.as_str() {
+            line.push_str(&format!("· {}\n", clip(text, 160)));
+        }
+    }
+    Some(line)
 }
 
 /// The rule this view actually ranked candidates by, from whichever door produced them — the
@@ -263,12 +278,15 @@ fn selection_rule_for(view: &Value) -> String {
 }
 
 /// Omissions already named by discovery itself, summed across every door this view carries —
-/// `first_screen` (the focused door), `concerns` (the whole-scope door) and `source_outline` (a
-/// located passage). Each door already bounds and NAMES what it left out (`discovery.rs`,
+/// `first_screen` (the focused door), `concerns` (the whole-scope door), `source_outline` (a
+/// located passage) and `projection` (`--purpose bootstrap`'s own omissions — fix round 1, finding
+/// 1: these previously named an absent `flows.jsonl` in `view["projection"]["omissions"]` but
+/// never counted toward this floor, so the honesty floor's own `omissions: N` undercounted a
+/// bootstrap view). Each door already bounds and NAMES what it left out (`discovery.rs`,
 /// `concerns.rs`); this only totals those named counts for the one-line floor, it never discovers
 /// a new omission of its own.
 fn nested_omissions_count(view: &Value) -> usize {
-    ["first_screen", "concerns", "source_outline"]
+    ["first_screen", "concerns", "source_outline", "projection"]
         .iter()
         .map(|key| {
             view[*key]["omissions"]

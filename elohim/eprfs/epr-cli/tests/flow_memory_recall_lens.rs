@@ -444,6 +444,108 @@ fn bootstrap_purpose_carries_the_top_red_as_intent_and_declares_its_inputs() {
     assert!(!v["projection"]["inputs"].as_array().unwrap().is_empty());
 }
 
+// ── station 2.1, fix round 1 (controller review) ───────────────────────────────────────────────────
+
+/// The floor line's own `omissions: N` field: extracts the integer following the label, so an
+/// assertion on it survives the label text itself changing.
+fn floor_omissions_count(text: &str) -> usize {
+    let line = text
+        .lines()
+        .find(|line| line.contains("omissions:"))
+        .unwrap_or_else(|| panic!("no floor line in rendering:\n{text}"));
+    line.split("omissions:")
+        .nth(1)
+        .and_then(|rest| rest.trim().split(|c: char| !c.is_ascii_digit()).next())
+        .and_then(|digits| digits.parse().ok())
+        .unwrap_or_else(|| panic!("floor line has no parseable omissions count: {line}"))
+}
+
+/// Finding 1: `projection.omissions` were carried in `--json` only — invisible in the human
+/// rendering, and not counted in the floor line's own `omissions: N`. An absent `flows.jsonl`
+/// (removed here even though `repo()`'s fixture edges create one by default) now renders a bullet
+/// naming it directly under the `Bootstrap:` line, and the floor's `omissions:` count grows to
+/// include it.
+#[test]
+fn an_absent_flows_sidecar_renders_a_bullet_and_counts_on_the_floor() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: alpha\n  status: red\n  active: true\n  checks: ['a2o @concern:alpha']\n  invariant: alpha holds\n",
+    );
+    let flows_path = dir.path().join(".eprfs/status/flows.jsonl");
+    if flows_path.exists() {
+        std::fs::remove_file(&flows_path).expect("remove flows sidecar");
+    }
+    let text = text_in(dir.path(), "boot-omit", &["open", "--purpose", "bootstrap"]);
+    assert!(
+        text.contains("· .eprfs/status/flows.jsonl is absent"),
+        "no bullet naming the absent flows sidecar:\n{text}"
+    );
+    assert!(
+        floor_omissions_count(&text) >= 1,
+        "floor omissions must count the projection's own omission:\n{text}"
+    );
+}
+
+/// Finding 2: a malformed/unparseable `habits.yaml` previously collapsed to the SAME `no red
+/// habit; orient` an honest all-green register earns — fail-closed now: bootstrap REFUSES rather
+/// than orienting a reader from a register it could not actually read, naming the path and
+/// pointing at the projector.
+#[test]
+fn a_malformed_habit_register_refuses_rather_than_orienting() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "genesis/manifests/habits.yaml",
+        "habits:\n  - id: [this is not valid yaml\n",
+    );
+    let result = run_in(
+        dir.path(),
+        "boot-malformed",
+        &["open", "--purpose", "bootstrap"],
+    );
+    assert_eq!(result.code, 2, "{}{}", result.stdout, result.stderr);
+    let failure = result.json();
+    let message = failure["unresolved"][0].as_str().unwrap_or_default();
+    assert!(
+        message.contains("cannot read the habit register")
+            && message.contains("genesis/manifests/habits.yaml"),
+        "{failure}"
+    );
+    let next = failure["next"].as_str().unwrap_or_default();
+    assert!(
+        next.contains("habits-project.py"),
+        "next: must point at the projector: {next}"
+    );
+}
+
+/// Finding 2, the other half: a register that PARSES fine and genuinely carries no red habit is
+/// not a fault — it keeps the honest `no red habit; orient` intent with its own omission, never
+/// the refusal a broken register now earns.
+#[test]
+fn an_all_green_register_still_orients_honestly() {
+    let dir = repo();
+    write(
+        dir.path(),
+        "genesis/manifests/habits.yaml",
+        "habits:\n- id: alpha\n  status: green\n  active: false\n  checks: ['a2o @concern:alpha']\n  invariant: alpha holds\n",
+    );
+    let v = view_in(
+        dir.path(),
+        "boot-green",
+        &["open", "--purpose", "bootstrap"],
+    );
+    assert_eq!(v["orientation"]["intent"], "no red habit; orient", "{v}");
+    let omissions: Vec<&str> = v["projection"]["omissions"]
+        .as_array()
+        .expect("omissions array")
+        .iter()
+        .filter_map(|item| item.as_str())
+        .collect();
+    assert!(omissions.contains(&"no red habit; orient"), "{v}");
+}
+
 // ── fix round 2: an operation's own result renders at every lens, not just standard+ ──────────────
 //
 // A fresh reader found `read`, `source` and `history` printing NO primary payload at `simple`/
