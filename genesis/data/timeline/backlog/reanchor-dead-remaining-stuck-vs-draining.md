@@ -130,3 +130,25 @@ of an eternal "still healing".
   is persistence of the previous sweep's `dead_remaining` + a comparison window.
 - Do NOT relax the pending arithmetic itself — the tightening is the point; this is an
   observability split, not a gate loosening.
+
+## 2026-09-11 — runtime-observed, but the "Done when" predicate needs splitting
+
+The surface is LIVE on alpha-b (storage peer adam): `GET https://elohim.host/p2p/status`
+publishes `deadRemainingStuck: true`, `stuckSweeps: 168`, `reanchorDeadRemaining: 9`. The
+cross-sweep memory, the threshold and the wire fields all work as designed, and the
+poller's `provide-loop-dead-remaining-stuck` classifier
+(`.claude/scripts/runtime-harvest.py`) turned that self-report into ledger fingerprint
+`2b4761b2eaf6` — the whole elevate chain end-to-end.
+
+But the **"Done when" above is not satisfied and cannot be by this instance**: it requires
+the stuck verdict to arrive "with a non-zero `reanchorSkippedReach` or
+`reanchorSkippedContentType`", and the first live wedge reports BOTH at 0. The stuck
+population is not skip-guarded — it is settled every sweep by the adopt-before-author
+pre-flight and never has its `dht_anchor_state = 'dead'` verdict cleared. Root cause and
+fix path: `dataplane-reanchor-dead-remaining-rekeyed-peer.md` §"2026-09-11 — triage of
+ledger fingerprint `2b4761b2eaf6`".
+
+Consequence for this entry: the skip-guard arm of the done-when is still unproven (no live
+node has produced one), and the surface's own doc-comments over-attribute the verdict to
+that arm. Keep `status: fixed-pending-runtime-proof` and split the predicate into the two
+causes the field actually has to tell apart.
