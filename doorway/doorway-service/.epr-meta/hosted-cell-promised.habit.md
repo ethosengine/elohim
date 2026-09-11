@@ -23,6 +23,17 @@ retire-when: >
   of installing the cell and the doorway only relays it — so a hosted cell without a notarized
   promise cannot exist by construction, and the count is a fold over the DHT, not a doorway row.
 ---
+DELTA 2026-09-11b (final sprint measure; RED, causes narrowed): glue now waits the fixture's convergenceWindowMs
+(60 s) on the off-pool read and the browser count scenario reads status itself (dc38ed3e5). Runs 20260911T0708{32}Z
+/ 070905Z / 070928Z / 071014Z-dc38ed3e: humans-served browser **1/1 GREEN**; humans-served mesh 1/4 — 11 of 17
+minted commitments read back live from jessica within 60 s, 6 do not (commitment convergence to a non-authoring peer
+exceeds the declared window for some — dataplane-convergence territory, measured for the first time); 07 mesh 0/3 and
+07 browser 0/2 — every failure is conductor-0's admin API dying under install_app (`ConnectionAborted`, `BrokenPipe`;
+earlier `database is locked`) before any read-back ran: the conductor-contention ceiling of real hosting on one
+conductor (runtime-death-witnessed's liveness gap wears this face). 07 scenario 4 (two newcomers, two promises) and
+05-leaving 6/6 passed on the same binaries when the conductor was fresh. Flip needs: a run where the conductor is
+recycled before the lane AND the 6 slow commitments converge — or the window raised on evidence, not hope.
+
 DELTA 2026-09-11 (BORN red — split out of hosted-human-lifecycle on the day that habit went green, so
 its two extension checks stop masking a proven invariant): the promise chain WORKS end to end on the
 household mesh — real cell, canonical key, grant cid minted on register (b71b6d66e, 13c), provider = the

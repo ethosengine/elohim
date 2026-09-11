@@ -1534,6 +1534,10 @@ Step C, on the same live doorway: `GET /auth/account` now answers `"createdAt":"
 
 ---
 
+## Task 17 — closing note (chief, 2026-09-11 07:15)
+
+Step 2 stays unticked on its own terms (seven runs green, 0 skipped). What the household lane proved and where the register now stands: `hosted-human-lifecycle` **GREEN** (05-leaving 6/6, run 20260911T065537Z-d48f3b69, real hosted provisioning); `doorway-failover` steady-state **10/10** three times on three binaries (RED by its apex-transition rule; apex-transition now a MEASURED red at the named step); `hosted-cell-promised` born RED with three named causes (commitment convergence > 60 s for 6 of 17 to a non-authoring peer; conductor-0 admin socket drops under install_app load; closed-identifier recast). Register: 21 habits, 10 green · 9 red · 2 unwired. The push (Task 19) carries all of it; the fleet confirms.
+
 ## Task 18 — (b) The epr-atom-home measure against the deployed alpha, now
 
 **Drains:** epr-atom-home plan **Task 8** (fleet half) and verifies **Task 1**.
