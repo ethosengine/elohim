@@ -125,6 +125,10 @@ spec:
                 set -euo pipefail
                 export RUSTFLAGS=""
                 export RUSTC_WRAPPER=""
+                # The live-checkout tests (flow_gap_fallback, flow_cites) ask git about the
+                # workspace; checkout ran as a different UID, so without this git answers
+                # "dubious ownership" (exit 128) and the test reads it as an error.
+                git config --global --add safe.directory "*"
                 cargo nextest run --workspace --all-targets
               '
             '''
