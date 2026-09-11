@@ -189,8 +189,9 @@ def render_residual_panel(repo_root, ledger_path=None, *, limit: int = 8) -> str
     unanticipated; this panel is what remains, and putting them side by side is the point: an
     unexamined matrix cell and a live residual at the same seam are the same finding twice.
 
-    WIRING (coordinate-by-contract, not by collision): `placement-audit.py --epr-meta` is owned by
-    another leg this phase, so this is a standalone renderer with a one-line call site::
+    WIRING (coordinate-by-contract, not by collision): the census render (formerly
+    `placement-audit.py --epr-meta`, retired 2026-09-11) was owned by another leg this phase,
+    so this is a standalone renderer with a one-line call site::
 
         from _lib.residual_channel import render_residual_panel
         print(render_residual_panel(repo_root))

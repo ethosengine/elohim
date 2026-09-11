@@ -33,7 +33,8 @@
 //! a stderr. That is the one usage-key divergence from the Python view, and it is a divergence of
 //! honesty rather than of shape.
 
-use std::collections::BTreeSet;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::os::unix::fs::OpenOptionsExt;
@@ -94,6 +95,10 @@ const SECOND_LIMITS: [&str; 3] = ["scan_seconds", "provider_seconds", "native_ti
 /// `memory-project`, `memory-contribute`, `memory-feedback`, `memory-graduate`) are NOT here: they
 /// are already native verbs (`epr flow memory collective|project|contribute|feedback|graduate`) and
 /// re-exposing them through a second front door would give one act two addresses.
+/// Subtrees that are INSIDE a declared source root and still refused: a sibling checkout is not
+/// this repository's source, however reachable its path happens to be.
+const FOREIGN_TREES: [&str; 1] = [".claude/worktrees"];
+
 const OPERATIONS: [&str; 16] = [
     "open",
     "select",
@@ -130,14 +135,24 @@ fn refused(message: impl Into<String>) -> FlowError {
 /// actually hand to a memory verb.
 pub fn refuse_private_import(root: &Path, candidate: &str) -> FlowResult<()> {
     let normalized = candidate.trim_start_matches("./").replace('\\', "/");
-    let private = [RECALL_DIR_REL, LEGACY_RECEIPTS_REL];
-    let absolute = root.join(&normalized);
-    let inside = private.iter().any(|dir| {
-        normalized == *dir
+    let under = |dir: &str| {
+        normalized == dir
             || normalized.starts_with(&format!("{dir}/"))
-            || absolute.starts_with(root.join(dir))
-    });
-    if inside {
+            || root.join(&normalized).starts_with(root.join(dir))
+    };
+    // `.claude/` became a declared source root on 2026-09-11 so the tooling layer is reachable
+    // through the entry. That widening admitted ONE subtree it must not: a sibling checkout is
+    // another repository's working tree, and reading it here would attribute its bytes and its
+    // assertions to this one.
+    if FOREIGN_TREES.iter().any(|dir| under(dir)) {
+        return Err(refused(format!(
+            "`{candidate}` is another checkout's working tree, not this repository's declared              source. Name the path inside this tree that carries the same concern."
+        )));
+    }
+    if [RECALL_DIR_REL, LEGACY_RECEIPTS_REL]
+        .iter()
+        .any(|dir| under(dir))
+    {
         return Err(refused(format!(
             "`{candidate}` is a private recall record: receipts and continuations are never \
              imported, projected, witnessed or targeted by feedback \
@@ -535,6 +550,16 @@ pub fn contained(root: &Path, relative: &str, allowed: &[String]) -> FlowResult<
     if !inside {
         return Err(refused("outside declared source scope"));
     }
+    // The refusal that a widened root cannot lift. `contained` is what every bounded read and
+    // every discovery traversal passes through, so the exclusion is stated once, here.
+    if FOREIGN_TREES
+        .iter()
+        .any(|dir| path.starts_with(root.join(dir)))
+    {
+        return Err(refused(format!(
+            "`{relative}` is another checkout's working tree, not this repository's declared              source. Name the path inside this tree that carries the same concern."
+        )));
+    }
     Ok(path)
 }
 
@@ -692,6 +717,27 @@ pub fn discover(
     group_by: &str,
     name: &str,
 ) -> FlowResult<Value> {
+    discover_scored(root, contract, scope, query, &[], tags, group_by, name)
+}
+
+/// The same bounded traversal, ranked by how many of `terms` a row's declared metadata carries.
+///
+/// One traversal serves both doors. `search` and `source --tag` pass no terms and get today's
+/// deterministic window; the focused first screen passes the question's terms and gets the rows
+/// that mention the most of them first. Ranking is over DECLARED metadata only — it is candidate
+/// discovery, never authority, which is why every row still arrives with a `read` command rather
+/// than an excerpt.
+#[allow(clippy::too_many_arguments)]
+pub fn discover_scored(
+    root: &Path,
+    contract: &Contract,
+    scope: &str,
+    query: &str,
+    terms: &[String],
+    tags: &[String],
+    group_by: &str,
+    name: &str,
+) -> FlowResult<Value> {
     let base = contained(root, scope, &contract.source_roots())?;
     if !base.is_dir() {
         return Err(refused("discovery scope must be a directory"));
@@ -715,13 +761,50 @@ pub fn discover(
         contract.limit_usize("scan_entries"),
     );
     let metadata_bytes = contract.limit_usize("metadata_bytes");
+    // The per-file window term matching may read. It is NOT the frontmatter window: membership is
+    // still established from `metadata_bytes` of byte-exact header, and a wider body window never
+    // widens what qualifies a document. It is spent only when there is something to match — a pure
+    // tag filter reads no more than it ever did, so tag discovery keeps its file coverage.
+    let body_scan_bytes = contract
+        .value
+        .pointer("/limits/body_scan_bytes")
+        .and_then(Value::as_u64)
+        .map_or(metadata_bytes, |value| value as usize)
+        .max(metadata_bytes);
+    let matching = !terms.is_empty() || !query.is_empty();
+    let per_file = if matching {
+        body_scan_bytes
+    } else {
+        metadata_bytes
+    };
     let scan_seconds = contract.limit_secs("scan_seconds");
     let search_results = contract.limit_usize("search_results");
+    // With terms the window is not closed early AT ALL: every row the scan budget allows is
+    // collected, ranked, and only then truncated to the declared result count. Stopping at a small
+    // multiple of `search_results` made the ranking a ranking of whatever the traversal happened to
+    // reach first — which, once body text became searchable and nearly every document matched
+    // SOMETHING, was indistinguishable from no ranking. The traversal is still bounded by
+    // scan_bytes/scan_files/scan_entries/scan_seconds exactly as before; only the RESULT window
+    // moved, and the frontier still names the budget that stopped the walk.
+    let collect_cap = if terms.is_empty() {
+        search_results
+    } else {
+        scan_files_limit.max(search_results)
+    };
 
     let began = Instant::now();
     let mut stack = vec![base];
     let mut candidates: Vec<Value> = Vec::new();
     let mut frontier: Vec<String> = Vec::new();
+    // Candidates whose frontmatter would not parse. They are SKIPPED, COUNTED and NAMED rather
+    // than aborting the traversal (2026-09-11 ruling): the honesty rule exists so a window never
+    // hides what it could not read, and naming each one satisfies that, while stopping on the first
+    // one made the whole screen useless because of a handful of documents nobody chose.
+    let mut unreadable: Vec<String> = Vec::new();
+    let mut budget_cut = false;
+    // Eligible documents bigger than the window they were read with. A term past the window is
+    // invisible, and invisible is not absent — so the count is reported rather than implied.
+    let mut partially_scanned = 0usize;
     let (mut scan_bytes, mut scanned_files, mut scanned_entries) = (0usize, 0usize, 0usize);
 
     'outer: while let Some(directory) = stack.pop() {
@@ -765,7 +848,7 @@ pub fn discover(
                 continue;
             }
             scanned_files += 1;
-            let budget = metadata_bytes.min(scan_bytes_limit.saturating_sub(scan_bytes));
+            let budget = per_file.min(scan_bytes_limit.saturating_sub(scan_bytes));
             let mut data = Vec::new();
             let opened = File::open(entry.path())
                 .and_then(|f| f.take(budget as u64).read_to_end(&mut data).map(|_| ()));
@@ -774,22 +857,50 @@ pub fn discover(
                 break 'outer;
             }
             scan_bytes += data.len();
-            let Ok(text) = String::from_utf8(data.clone()) else {
-                frontier.push("metadata read failed: UnicodeError".into());
-                break 'outer;
+            let relative = rel_to_root(root, &entry.path());
+            let truncated = meta.len() as usize > data.len();
+            // A BOUNDED read ends wherever the budget says, which is very often mid-character. The
+            // cut is an artifact of this reader, not a fault in the document, so the tail is
+            // trimmed back to the last complete character rather than condemning the file: on
+            // 2026-09-11 that mistake reported `.claude/skills/converge/SKILL.md` — 708 bytes of
+            // perfectly valid frontmatter — as unparseable, because an em dash sat across byte
+            // 8192. The frontmatter itself is still EXACT bytes: if the trim lands before the
+            // closing delimiter the header simply cannot be proven and the row is skipped as
+            // incomplete, which is true.
+            // Membership is read from the METADATA window only, whatever the body window read.
+            let head_len = metadata_bytes.min(data.len());
+            let Some(head) = trim_to_character_boundary(&data[..head_len]) else {
+                unreadable.push(relative);
+                continue;
             };
-            let Some(header) = frontmatter_header(&text, data.len(), meta.len() as usize) else {
-                if text.starts_with("---\n") {
-                    frontier.push(format!(
-                        "incomplete frontmatter within metadata budget: {file_name}"
-                    ));
-                    break 'outer;
+            let Some(header) = frontmatter_header(&head, head.len(), meta.len() as usize) else {
+                // A document that opens `---` and whose boundary this read could not prove is a
+                // candidate we could not read. A file with no frontmatter at all is not a candidate
+                // in the first place, and is passed over as it always was.
+                if head.starts_with("---\n") {
+                    // Only a read that actually hit its cap can be blamed on the budget; anything
+                    // shorter simply has no closing delimiter.
+                    budget_cut |= head_len >= metadata_bytes;
+                    unreadable.push(relative);
                 }
                 continue;
             };
+            if truncated {
+                partially_scanned += 1;
+            }
+            // The body window is the whole read, trimmed the same way; the header slice above is a
+            // prefix of it, so `header.len()` still indexes correctly.
+            let text = if head_len == data.len() {
+                head
+            } else {
+                match trim_to_character_boundary(&data) {
+                    Some(text) => text,
+                    None => head,
+                }
+            };
             let Ok(meta_value) = serde_yaml::from_str::<serde_yaml::Value>(&header[4..]) else {
-                frontier.push("metadata read failed: YAMLError".into());
-                break 'outer;
+                unreadable.push(relative);
+                continue;
             };
             let Some(mapping) = meta_value.as_mapping() else {
                 continue;
@@ -815,32 +926,199 @@ pub fn discover(
             let Some(actual_tags) = actual_tags else {
                 continue;
             };
-            let relative = rel_to_root(root, &entry.path());
             let title = field("title")
                 .and_then(|v| v.as_str().map(str::to_string))
                 .unwrap_or_else(|| file_name.clone());
-            let mut searchable = vec![relative.clone(), title.clone()];
-            searchable.extend(actual_tags.iter().cloned());
-            let searchable = searchable.join(" ").to_lowercase();
+            let description = field("description")
+                .and_then(|v| v.as_str().map(str::to_string))
+                .unwrap_or_default();
+            // The bytes after the closing delimiter were ALREADY READ under `metadata_bytes`.
+            // Matching them costs no second read and no wider budget, and it is where an agent's
+            // own words actually live: a fresh reader asking "re-mine", "marker", "stamp" on
+            // 2026-09-11 got zero candidates over a corpus whose bodies say all three, because
+            // discovery only ever looked at declared metadata.
+            let body_prefix = text
+                .get(header.len()..)
+                .and_then(|rest| rest.split_once('\n'))
+                .map(|(_, body)| body)
+                .unwrap_or_default();
+            let declared = [
+                relative.as_str(),
+                title.as_str(),
+                description.as_str(),
+                &actual_tags.join(" "),
+            ]
+            .join(" ")
+            .to_lowercase();
+            let body = body_prefix.to_lowercase();
             if !tags.iter().all(|t| actual_tags.contains(t))
-                || (!query.is_empty() && !searchable.contains(&query.to_lowercase()))
+                || (!query.is_empty() && {
+                    let needle = query.to_lowercase();
+                    !declared.contains(&needle) && !body.contains(&needle)
+                })
             {
+                continue;
+            }
+            // Where a term was found is evidence about how strong the hit is, so it is reported
+            // rather than folded into one number. A declared hit outranks a body-only hit; both
+            // remain candidate discovery, never authority.
+            let (mut declared_hits, mut body_only_hits) = (0usize, 0usize);
+            let mut kinds: BTreeSet<&str> = BTreeSet::new();
+            let mut matched_terms: Map<String, Value> = Map::new();
+            for term in terms {
+                let needle = term.to_lowercase();
+                let in_path = relative.to_lowercase().contains(&needle);
+                let in_title = title.to_lowercase().contains(&needle);
+                let in_description = description.to_lowercase().contains(&needle);
+                let in_tag = actual_tags
+                    .iter()
+                    .any(|t| t.to_lowercase().contains(&needle));
+                let in_body = body.contains(&needle);
+                if in_path {
+                    kinds.insert("path");
+                }
+                if in_title {
+                    kinds.insert("title");
+                }
+                if in_description {
+                    kinds.insert("description");
+                }
+                if in_tag {
+                    kinds.insert("tag");
+                }
+                if in_body {
+                    kinds.insert("body");
+                }
+                // How OFTEN, not merely whether: a document that names the concern once in
+                // passing and one that is about it are not equal evidence, and the occurrences are
+                // already inside the bytes this read covered.
+                let occurrences = declared.matches(&needle).count() + body.matches(&needle).count();
+                if in_path || in_title || in_description || in_tag {
+                    declared_hits += 1;
+                    matched_terms.insert(
+                        needle,
+                        json!({"found_in": "declared", "occurrences": occurrences}),
+                    );
+                } else if in_body {
+                    body_only_hits += 1;
+                    matched_terms.insert(
+                        needle,
+                        json!({"found_in": "body", "occurrences": occurrences}),
+                    );
+                }
+            }
+            if !terms.is_empty() && declared_hits + body_only_hits == 0 {
                 continue;
             }
             candidates.push(json!({
                 "path": relative,
                 "title": title,
                 "tags": actual_tags,
+                "term_hits": declared_hits + body_only_hits,
+                "declared_hits": declared_hits,
+                "match": kinds.iter().collect::<Vec<_>>(),
+                "matched_terms": matched_terms,
+                "match_scope": "declared frontmatter and the bounded body prefix this read already \
+                                covered; a body hit beyond the metadata budget is not visible here",
                 "metadata_fingerprint": hex(&Sha256::digest(header.as_bytes())),
             }));
-            if candidates.len() >= search_results {
+            if candidates.len() >= collect_cap {
                 frontier.push("result window reached; remaining corpus not inspected".into());
                 break 'outer;
             }
         }
     }
 
+    // The account of what was skipped, said once and never silently: a named list bounded the same
+    // way every other list in this view is, plus a count on the frontier so a reader scanning only
+    // the unresolved lines still learns that candidates went unread.
+    let mut omissions: Vec<Value> = Vec::new();
+    if partially_scanned > 0 {
+        omissions.push(json!(format!(
+            "{partially_scanned} candidate(s) scanned to the body-scan window only"
+        )));
+    }
+    if !unreadable.is_empty() {
+        unreadable.sort();
+        let shown = unreadable.len().min(8);
+        let mut named = unreadable[..shown].join(", ");
+        if unreadable.len() > shown {
+            named.push_str(&format!(", +{} more", unreadable.len() - shown));
+        }
+        omissions.push(json!(format!(
+            "{} candidate(s) unreadable (frontmatter did not parse) and were skipped: {named}",
+            unreadable.len()
+        )));
+        frontier.push(format!("unreadable candidates: {}", unreadable.len()));
+        if budget_cut {
+            frontier.push(
+                "some candidate frontmatter exceeded the metadata budget; raise                  limits.metadata_bytes to read it"
+                    .into(),
+            );
+        }
+    }
+
     candidates.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+    if !terms.is_empty() {
+        // Two rules, and the second is what makes the first useful.
+        //
+        // A declared hit outranks a body hit ON THE SAME TERM — weighted per term (declared ×2)
+        // rather than as a lexicographic override, so one hit on a word every document shares can
+        // never outrank several hits on the words that name the concern.
+        //
+        // And a term is worth what it distinguishes. Counting matched terms equally made
+        // `commands` and `index` — carried by forty of forty-four skills — worth as much as
+        // `mempalace` and `re-mine`, carried by two, which is how the document that answered the
+        // reader's question came fifth with the window already wide enough to hold the answer. The
+        // weight is the term's rarity IN THE SCANNED WINDOW, so it is derived from what this call
+        // actually read and needs no corpus statistics kept anywhere.
+        let total = candidates.len().max(1) as f64;
+        let mut frequency: BTreeMap<String, usize> = BTreeMap::new();
+        for row in &candidates {
+            for term in row["matched_terms"].as_object().into_iter().flatten() {
+                *frequency.entry(term.0.clone()).or_insert(0) += 1;
+            }
+        }
+        let score = |row: &Value| -> f64 {
+            row["matched_terms"]
+                .as_object()
+                .map(|matched| {
+                    matched
+                        .iter()
+                        .map(|(term, hit)| {
+                            let occurrences =
+                                hit["occurrences"].as_u64().unwrap_or(1).max(1) as f64;
+                            // Sublinear in the count: the tenth mention says less than the second.
+                            let weight = 1.0 + occurrences.ln();
+                            let shared = *frequency.get(term).unwrap_or(&1) as f64;
+                            // A term nearly every candidate carries distinguishes nothing. The
+                            // floor keeps it contributing a little rather than nothing, so a
+                            // reader's ordinary words are not simply discarded.
+                            let rarity = (total / shared).ln().max(0.01);
+                            let placement = if hit["found_in"] == "declared" {
+                                2.0
+                            } else {
+                                1.0
+                            };
+                            weight * rarity * placement
+                        })
+                        .sum()
+                })
+                .unwrap_or(0.0)
+        };
+        candidates.sort_by(|a, b| {
+            score(b)
+                .partial_cmp(&score(a))
+                .unwrap_or(Ordering::Equal)
+                .then_with(|| {
+                    b["declared_hits"]
+                        .as_u64()
+                        .cmp(&a["declared_hits"].as_u64())
+                })
+                .then_with(|| a["path"].as_str().cmp(&b["path"].as_str()))
+        });
+        candidates.truncate(search_results);
+    }
     let mut groups: Map<String, Value> = Map::new();
     for row in &candidates {
         let keys: Vec<String> = if group_by == "tag" {
@@ -869,13 +1147,318 @@ pub fn discover(
     Ok(json!({
         "candidates": candidates,
         "groups": groups,
+        "omissions": omissions,
+        "unreadable_candidates": unreadable.len(),
+        "partially_scanned_candidates": partially_scanned,
         "aggregation_scope": "returned candidates only",
-        "selection": "bounded filesystem traversal; sorted returned window, no relevance ranking",
+        "selection": if terms.is_empty() {
+            "bounded filesystem traversal; sorted returned window, no relevance ranking"
+        } else {
+            "bounded filesystem traversal ranked by term overlap over declared metadata and the bounded body window already read, each term weighted by how often it occurs and how rare it is in that window, a declared hit worth twice a body hit; candidate discovery, not authority"
+        },
         "usage": {"scan_bytes": scan_bytes, "scanned_files": scanned_files,
                   "scanned_entries": scanned_entries, "search_queries": 1},
         "unresolved": frontier,
         "next": "Select a path and explicit --source/--lines; membership does not establish authority.",
     }))
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The focused door — the area's habits, its last delta, and the competing sources
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Where the habit register is projected. Read, never written, by this executor.
+pub const HABITS_REL: &str = "genesis/manifests/habits.yaml";
+
+/// Words that carry no area, so they never select a habit or a source.
+const STOPWORDS: [&str; 40] = [
+    "about", "after", "again", "against", "because", "before", "being", "between", "could", "does",
+    "doing", "down", "from", "does", "have", "here", "how", "into", "just", "like", "make", "more",
+    "most", "much", "must", "only", "other", "over", "same", "should", "some", "such", "than",
+    "that", "them", "then", "there", "this", "were", "what",
+];
+
+/// The question's distinctive terms: what an area match is made of.
+fn question_terms(need: &str) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    for raw in need.split(|c: char| {
+        !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/' || c == '.')
+    }) {
+        let term = raw
+            .trim_matches(|c| c == '.' || c == '/')
+            .to_ascii_lowercase();
+        if term.len() < 4 || STOPWORDS.contains(&term.as_str()) || seen.contains(&term) {
+            continue;
+        }
+        seen.push(term);
+        if seen.len() >= 12 {
+            break;
+        }
+    }
+    seen
+}
+
+/// One habit as the first screen needs it: what it promises, whether it holds, and what moved last.
+fn habit_row(id: &str, status: &str, invariant: &str, evidence: &str, score: usize) -> Value {
+    // The FIRST line of the ledger is the newest entry — the atoms are written newest-first — so
+    // "what moved last" is one line, never the whole ledger.
+    let delta = evidence
+        .split("\n\n")
+        .map(one_line)
+        .find(|paragraph| !paragraph.is_empty())
+        .map(|paragraph| clip(&paragraph, 240))
+        .unwrap_or_default();
+    json!({
+        "id": id,
+        "status": status,
+        "delta": delta,
+        "invariant": truncate(invariant, 400),
+        "match_score": score,
+    })
+}
+
+/// The habits whose id or invariant words the question's terms touch.
+///
+/// The register is a GENERATED projection of the habit atoms, read here by a bounded line scan
+/// rather than a whole-document YAML load: it is 400 KB of evidence ledgers, and the first screen
+/// needs four fields per habit. Its bytes are charged under their own declared budget, because
+/// they are neither source evidence the reader quoted nor a native projection.
+fn matching_habits(
+    root: &Path,
+    contract: &Contract,
+    terms: &[String],
+    usage: &mut Value,
+) -> FlowResult<(Vec<Value>, Vec<String>)> {
+    let mut unresolved: Vec<String> = Vec::new();
+    let path = match contained(root, HABITS_REL, &contract.source_roots()) {
+        Ok(path) => path,
+        Err(_) => return Ok((Vec::new(), unresolved)),
+    };
+    if !path.is_file() {
+        return Ok((Vec::new(), unresolved));
+    }
+    let budget = contract
+        .value
+        .pointer("/limits/habit_register_bytes")
+        .and_then(Value::as_u64)
+        .unwrap_or(1_048_576) as usize;
+    let mut data = Vec::new();
+    File::open(&path)
+        .and_then(|file| {
+            file.take(budget as u64 + 1)
+                .read_to_end(&mut data)
+                .map(|_| ())
+        })
+        .map_err(|source| FlowError::Read { path, source })?;
+    if data.len() > budget {
+        data.truncate(budget);
+        unresolved.push(
+            "habit register exceeds its declared budget; only the leading rows were inspected"
+                .into(),
+        );
+    }
+    add_usage(usage, &json!({"habit_register_bytes": data.len()}));
+    let text = String::from_utf8_lossy(&data).into_owned();
+
+    let (mut id, mut status, mut invariant, mut evidence) =
+        (String::new(), String::new(), String::new(), String::new());
+    let mut folding: Option<&'static str> = None;
+    let mut rows: Vec<Value> = Vec::new();
+    let mut flush = |id: &str, status: &str, invariant: &str, evidence: &str| {
+        if id.is_empty() {
+            return;
+        }
+        let lowered = id.to_ascii_lowercase();
+        let parts: Vec<&str> = lowered.split('-').collect();
+        let in_id = terms
+            .iter()
+            .filter(|term| lowered.contains(term.as_str()) || parts.contains(&term.as_str()))
+            .count();
+        let in_invariant = terms
+            .iter()
+            .filter(|term| invariant.to_ascii_lowercase().contains(term.as_str()))
+            .count();
+        let score = in_id * 3 + in_invariant;
+        if score >= 3 {
+            rows.push(habit_row(id, status, invariant, evidence, score));
+        }
+    };
+    for line in text.lines() {
+        if let Some(rest) = line.strip_prefix("  - id: ") {
+            flush(&id, &status, &invariant, &evidence);
+            id = rest.trim().to_string();
+            status.clear();
+            invariant.clear();
+            evidence.clear();
+            folding = None;
+            continue;
+        }
+        if folding.is_some() && line.trim().is_empty() {
+            let target = match folding {
+                Some("invariant") => &mut invariant,
+                _ => &mut evidence,
+            };
+            target.push_str("\n\n");
+            continue;
+        }
+        if let Some(rest) = line.strip_prefix("    ") {
+            if !rest.starts_with(' ') && !rest.starts_with('-') {
+                folding = None;
+                if let Some(value) = rest.strip_prefix("status:") {
+                    status = value.trim().to_string();
+                } else if rest.starts_with("invariant:") {
+                    folding = Some("invariant");
+                } else if rest.starts_with("evidence:") {
+                    folding = Some("evidence");
+                }
+                continue;
+            }
+            // The register folds these scalars with `>`, so a wrapped line is a continuation and
+            // a BLANK line is the paragraph break. Reassembling that way is what makes "the first
+            // line of the newest delta" a sentence rather than the first 100 columns of one.
+            let target = match folding {
+                Some("invariant") => &mut invariant,
+                Some("evidence") => &mut evidence,
+                _ => continue,
+            };
+            if rest.trim().is_empty() {
+                target.push_str("\n\n");
+            } else {
+                target.push_str(rest.trim());
+                target.push(' ');
+            }
+        }
+    }
+    flush(&id, &status, &invariant, &evidence);
+    rows.sort_by(|a, b| b["match_score"].as_u64().cmp(&a["match_score"].as_u64()));
+    rows.truncate(3);
+    Ok((rows, unresolved))
+}
+
+/// The directory this question is about, or `None` when it is about the whole tree.
+fn focus_area(root: &Path, contract: &Contract, scope: &str, terms: &[String]) -> Option<String> {
+    let roots = contract.source_roots();
+    let named = |candidate: &str| {
+        contained(root, candidate, &roots)
+            .ok()
+            .filter(|path| path.is_dir())
+            .map(|_| candidate.trim_end_matches('/').to_string())
+    };
+    if scope != "." {
+        if let Some(area) = named(scope) {
+            return Some(area);
+        }
+    }
+    terms
+        .iter()
+        .filter(|term| term.contains('/'))
+        .find_map(|term| named(term))
+}
+
+/// The first screen a focused question gets: the area's habits and the sources competing to answer
+/// it, before any stale-edge group.
+///
+/// Whole-scope opens get `None` — the convergence question is answered by the grouped stale-edge
+/// view, and putting a ranked source list in front of it would answer a question nobody asked.
+fn first_screen(
+    args: &Args,
+    contract: &Contract,
+    state: &Value,
+    usage: &mut Value,
+) -> FlowResult<Option<Value>> {
+    if !args.need_explicit {
+        return Ok(None);
+    }
+    let terms = question_terms(args.need.trim());
+    if terms.is_empty() {
+        return Ok(None);
+    }
+    let scope = state["scope"].as_str().unwrap_or(".");
+    let (habits, mut unresolved) = matching_habits(&args.root, contract, &terms, usage)?;
+    let area = focus_area(&args.root, contract, scope, &terms);
+    if area.is_none() && habits.is_empty() {
+        return Ok(None);
+    }
+    let mut candidates: Vec<Value> = Vec::new();
+    let mut omissions: Vec<String> = Vec::new();
+    let mut ranking = Value::Null;
+    if let Some(area) = &area {
+        // A term that names the area itself matches every file under it, so it ranks nothing. The
+        // discriminating terms are the ones the area does NOT already carry.
+        let lowered = area.to_ascii_lowercase();
+        let ranking_terms: Vec<String> = terms
+            .iter()
+            .filter(|term| !term.contains('/') && !lowered.contains(term.as_str()))
+            .cloned()
+            .collect();
+        let mut found = discover_scored(
+            &args.root,
+            contract,
+            area,
+            "",
+            &ranking_terms,
+            &[],
+            "directory",
+            "*.md",
+        )?;
+        let charged = found["usage"].take();
+        add_usage(usage, &charged);
+        candidates = found["candidates"].as_array().cloned().unwrap_or_default();
+        // Each candidate is located, not merely named: the section its terms land in, and a read
+        // range bounded to one excerpt. The outline scan is charged to the scan counters.
+        for candidate in candidates.iter_mut() {
+            let Some(path) = candidate["path"].as_str().map(str::to_string) else {
+                continue;
+            };
+            if let Some(section) = best_section(args, contract, &path, &terms) {
+                add_usage(usage, &section["usage"]);
+                candidate["best_section"] = json!({
+                    "title": section["title"],
+                    "lines": section["read_lines"],
+                    "hits": section["hits"],
+                    "window_complete": section["window_complete"],
+                });
+            }
+        }
+        ranking = found["selection"].take();
+        for message in found["omissions"].as_array().cloned().unwrap_or_default() {
+            omissions.push(message.as_str().unwrap_or_default().to_string());
+        }
+        for message in found["unresolved"].as_array().cloned().unwrap_or_default() {
+            unresolved.push(message.as_str().unwrap_or_default().to_string());
+        }
+    } else {
+        unresolved.push(
+            "no directory scope in this question; name --scope <dir> for ranked candidate sources"
+                .into(),
+        );
+    }
+    Ok(Some(json!({
+        "area": area.clone().unwrap_or_else(|| scope.to_string()),
+        "terms": terms,
+        "habits": habits,
+        "candidates": candidates,
+        "provider": "local",
+        "ranking": ranking,
+        "authority": "Candidate discovery over declared metadata. Membership and rank establish \
+                      neither authority nor currency; read the passage.",
+        "omissions": omissions,
+        "unresolved": unresolved,
+    })))
+}
+
+/// Decode a bounded read, discarding a character the budget cut in half.
+///
+/// A byte budget ends wherever it ends, very often mid-character; that is a property of the reader,
+/// not a fault in the document. `None` means not even the first character survived.
+fn trim_to_character_boundary(data: &[u8]) -> Option<String> {
+    match std::str::from_utf8(data) {
+        Ok(text) => Some(text.to_string()),
+        Err(error) => match error.valid_up_to() {
+            0 => None,
+            boundary => Some(String::from_utf8_lossy(&data[..boundary]).into_owned()),
+        },
+    }
 }
 
 /// The complete `---` fenced header, or `None` when the budget could not prove one is complete.
@@ -1441,6 +2024,8 @@ pub struct Args {
     pub contract_path: PathBuf,
     pub session: String,
     pub need: String,
+    /// Whether `--need` was actually typed, as opposed to the standing default below.
+    pub need_explicit: bool,
     pub operation: String,
     pub scope: Option<String>,
     pub intent: Option<String>,
@@ -1485,6 +2070,7 @@ impl Args {
             contract_path,
             session: String::new(),
             need: "Orient and choose the next justified reconciliation action".into(),
+            need_explicit: false,
             operation: String::new(),
             scope: None,
             intent: None,
@@ -2125,7 +2711,22 @@ fn native_context(args: &Args, edge: &Value, view: &mut Value, section: &str) ->
 }
 
 /// Bounded table of contents, so the agent chooses a passage before loading it.
+/// One section of an outline, with where the question's terms actually land inside it.
+///
+/// Naming a document is half an answer. A reader that opens a 24,000-byte skill and is handed six
+/// headings, none of which mentions its question, closes the file — which is exactly what happened
+/// on 2026-09-11: the answer was under "Phase 4 — verify the experience, reconcile and retain
+/// learning", a heading that says nothing about re-mining an index.
 fn outline(args: &Args, contract: &Contract, path: &str) -> FlowResult<Value> {
+    outline_with_terms(args, contract, path, &question_terms(args.need.trim()))
+}
+
+fn outline_with_terms(
+    args: &Args,
+    contract: &Contract,
+    path: &str,
+    terms: &[String],
+) -> FlowResult<Value> {
     let source = contained(&args.root, path, &contract.source_roots())?;
     let bound = contract.limit_usize("scan_bytes");
     let mut raw = Vec::new();
@@ -2158,15 +2759,89 @@ fn outline(args: &Args, contract: &Contract, path: &str) -> FlowResult<Value> {
         };
         headings[index]["end_line"] = json!(end);
     }
+    // Where the question's terms land, section by section, plus a read range bounded to what one
+    // excerpt may return. The bytes counted here are scan bytes; only `read` charges source_bytes.
+    let source_bytes = contract.limit_usize("source_bytes");
+    let mut oversized_sections = 0usize;
+    for heading in headings.iter_mut() {
+        let start = heading["line"].as_u64().unwrap_or(1) as usize;
+        let end = (heading["end_line"].as_u64().unwrap_or(1) as usize).max(start);
+        let section: String = lines[start.saturating_sub(1)..end.min(lines.len())]
+            .join("\n")
+            .to_lowercase();
+        let mut hits: Map<String, Value> = Map::new();
+        let mut total = 0usize;
+        for term in terms {
+            let count = section.matches(&term.to_lowercase()).count();
+            if count > 0 {
+                hits.insert(term.clone(), json!(count));
+                total += count;
+            }
+        }
+        // The emitted range never promises more than one excerpt can carry: lines are taken from
+        // the section's start until the byte budget is spent, and a section that does not fit says
+        // so rather than handing over a range `read` would refuse.
+        let (mut window_end, mut bytes) = (start, 0usize);
+        for (offset, line) in lines[start.saturating_sub(1)..end.min(lines.len())]
+            .iter()
+            .enumerate()
+        {
+            let next = bytes + line.len() + 1;
+            if next > source_bytes && window_end > start {
+                break;
+            }
+            bytes = next;
+            window_end = start + offset;
+        }
+        heading["hits"] = json!(hits);
+        heading["hit_total"] = json!(total);
+        heading["read_lines"] = json!(format!("{start}:{window_end}"));
+        heading["window_complete"] = json!(window_end >= end);
+        if window_end < end {
+            oversized_sections += 1;
+        }
+    }
     let truncated = !complete || headings.len() > 40;
     headings.truncate(40);
+    let mut omissions: Vec<Value> = Vec::new();
+    if truncated {
+        omissions.push(json!("outline incomplete; use an explicit range"));
+    }
+    if oversized_sections > 0 {
+        omissions.push(json!(format!(
+            "{oversized_sections} section(s) exceed the per-excerpt byte budget; the offered range \
+             is the first window of each — continue with an explicit later range"
+        )));
+    }
     Ok(json!({
         "path": path,
         "headings": headings,
         "line_count": lines.len(),
-        "omissions": if truncated { json!(["outline incomplete; use an explicit range"]) } else { json!([]) },
+        "terms": terms,
+        "hit_scope": "term occurrences inside each section of this outline; scan bytes, not evidence",
+        "omissions": omissions,
         "usage": {"scan_bytes": raw.len(), "scanned_files": 1},
     }))
+}
+
+/// The section of `path` whose text carries most of the question's terms, if any does.
+fn best_section(args: &Args, contract: &Contract, path: &str, terms: &[String]) -> Option<Value> {
+    let outline = outline_with_terms(args, contract, path, terms).ok()?;
+    let mut best: Option<Value> = None;
+    for heading in outline["headings"].as_array()? {
+        if heading["hit_total"].as_u64().unwrap_or(0) == 0 {
+            continue;
+        }
+        let better = best
+            .as_ref()
+            .is_none_or(|current| heading["hit_total"].as_u64() > current["hit_total"].as_u64());
+        if better {
+            best = Some(heading.clone());
+        }
+    }
+    let mut section = best?;
+    section["usage"] = outline["usage"].clone();
+    Some(section)
 }
 
 fn continuation_page(args: &Args, state: &Value) -> Value {
@@ -2557,8 +3232,26 @@ fn execute(
         {
             return Err(refused("scope must remain inside the repository"));
         }
+        // The agent's OWN question is the session's intent whenever it did not name one. The
+        // documented entry is `open --need '<question>'`; before this, that question was recorded
+        // nowhere and every later receipt, finish and measurement was accounted against the
+        // recipe's generic purpose — an intent nobody carried.
+        let intent = args
+            .intent
+            .clone()
+            .or_else(|| {
+                args.need_explicit
+                    .then(|| args.need.trim().to_string())
+                    .filter(|need| !need.is_empty())
+            })
+            .unwrap_or_else(|| {
+                contract.value["purpose"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string()
+            });
         state = json!({
-            "intent": args.intent.clone().unwrap_or_else(|| contract.value["purpose"].as_str().unwrap_or_default().to_string()),
+            "intent": intent,
             "scope": scope,
             "provider": recipe["defaults"]["provider"],
             "evidence": {}, "findings": [], "frontier": [], "selected": Value::Null,
@@ -2637,6 +3330,45 @@ fn execute(
                 );
             } else {
                 let mut usage = view["usage"].take();
+                // The focused door first. A reader who named an area or asked a question whose
+                // terms touch a habit gets that habit, its last delta and the sources competing to
+                // answer, BEFORE the stale-edge groups — the two doors are the same journey with
+                // different first screens.
+                if args.operation == "open" {
+                    if let Some(screen) = first_screen(args, contract, &state, &mut usage)? {
+                        for candidate in
+                            screen["candidates"].as_array().cloned().unwrap_or_default()
+                        {
+                            let path = candidate["path"].as_str().unwrap_or_default().to_string();
+                            // Straight to the passage its terms land in when one was located; the
+                            // outline only when nothing was.
+                            match (
+                                candidate["best_section"]["lines"].as_str(),
+                                candidate["best_section"]["title"].as_str(),
+                            ) {
+                                (Some(lines), Some(title)) => push_action(
+                                    &mut view,
+                                    action(
+                                        args,
+                                        &format!("Read {path} — {title} ({lines})"),
+                                        "read",
+                                        &[("path", json!(path)), ("lines", json!(lines))],
+                                    ),
+                                ),
+                                _ => push_action(
+                                    &mut view,
+                                    action(
+                                        args,
+                                        &format!("Outline {path}"),
+                                        "source",
+                                        &[("path", json!(path))],
+                                    ),
+                                ),
+                            }
+                        }
+                        view["first_screen"] = screen;
+                    }
+                }
                 let projection = native_concerns(args, &state, args.offset, &mut usage)?;
                 view["usage"] = usage;
                 if !projection["groups"].is_array() || projection["counts"].is_null() {
@@ -2926,20 +3658,36 @@ fn execute(
                 let headings = contents["headings"].as_array().cloned().unwrap_or_default();
                 let line_count = contents["line_count"].as_u64().unwrap_or(0);
                 view["source_outline"] = contents;
-                for heading in headings.iter().take(8) {
+                // Sections the question's terms actually land in come FIRST, with a range bounded
+                // to what one excerpt may return. A reader handed six headings in document order,
+                // none of which names its question, closes the file.
+                let mut ordered: Vec<(usize, Value)> =
+                    headings.iter().cloned().enumerate().collect();
+                ordered.sort_by(|a, b| {
+                    b.1["hit_total"]
+                        .as_u64()
+                        .cmp(&a.1["hit_total"].as_u64())
+                        .then_with(|| a.0.cmp(&b.0))
+                });
+                for (_, heading) in ordered.iter().take(8) {
+                    let hits = heading["hit_total"].as_u64().unwrap_or(0);
+                    let title = heading["title"].as_str().unwrap_or_default();
+                    let label = if hits > 0 {
+                        format!("Read {title} — {}", render_hits(&heading["hits"]))
+                    } else {
+                        format!("Inspect {title}")
+                    };
+                    let lines = heading["read_lines"]
+                        .as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| format!("{}:{}", heading["line"], heading["end_line"]));
                     push_action(
                         &mut view,
                         action(
                             args,
-                            &format!("Inspect {}", heading["title"].as_str().unwrap_or_default()),
+                            &label,
                             "read",
-                            &[
-                                ("path", json!(path)),
-                                (
-                                    "lines",
-                                    json!(format!("{}:{}", heading["line"], heading["end_line"])),
-                                ),
-                            ],
+                            &[("path", json!(path)), ("lines", json!(lines))],
                         ),
                     );
                 }
@@ -2995,10 +3743,16 @@ fn execute(
             );
         }
         "remember" => {
-            let (finding, question, next_action) = match (&args.finding, &args.question, &args.next_action) {
+            let (finding, question, next_action) = match (
+                &args.finding,
+                &args.question,
+                &args.next_action,
+            ) {
                 (Some(f), Some(q), Some(n)) => (f.clone(), q.clone(), n.clone()),
                 _ => return Err(refused(
-                    "remember needs --finding, --question and --next-action; uncertainty cannot be omitted",
+                    "remember takes --finding --question --next-action --evidence path:START:END; \
+                     --finding, --question and --next-action are all required and uncertainty \
+                     cannot be omitted",
                 )),
             };
             let references = args.evidence.clone();
@@ -3196,10 +3950,31 @@ fn execute(
             let (outcome_text, question) = match (&args.outcome, &args.question) {
                 (Some(o), Some(q)) => (o.clone(), q.clone()),
                 _ => return Err(refused(
-                    "finish requires --outcome and --question naming the unresolved frontier or its evidenced absence",
+                    "finish takes --outcome --question; both are required, and --question names \
+                     the unresolved frontier or its evidenced absence",
                 )),
             };
-            let keys = selected_evidence(&state);
+            // A FOCUSED journey has no concern edge to select — it answered a question from
+            // passages. Refusing it left the reader unable to close a session it had done the work
+            // of, so the standing requirement is now: an outcome, a question, and either a selected
+            // concern OR at least one inspected passage.
+            let all_receipts: Vec<String> = state["evidence"]
+                .as_object()
+                .map(|m| m.keys().cloned().collect())
+                .unwrap_or_default();
+            let focused = state["selected"].is_null();
+            let keys = if focused {
+                all_receipts.clone()
+            } else {
+                selected_evidence(&state)
+            };
+            if focused && keys.is_empty() {
+                return Err(refused(
+                    "finish needs --outcome and --question (both given) and either a selected \
+                     concern or at least one inspected passage; this session has 0 receipts — \
+                     read a passage first: recall read --path <p> --lines START:END",
+                ));
+            }
             let mut usage = view["usage"].take();
             view["evidence_check"] = revalidate(
                 args,
@@ -3212,14 +3987,13 @@ fn execute(
             )?;
             view["usage"] = usage;
             evidence_continuation(args, &mut view, Some(&keys));
-            if state["selected"].is_null() {
-                return Err(refused("finish needs an inspected concern"));
+            if !focused {
+                let edge = selected_edge(&state)?;
+                view["reconciliation"] = native_context(args, &edge, &mut view, "reconciliation")?;
+                let mut usage = view["usage"].take();
+                view["current_edges"] = refresh_selected(args, contract, &mut state, &mut usage)?;
+                view["usage"] = usage;
             }
-            let edge = selected_edge(&state)?;
-            view["reconciliation"] = native_context(args, &edge, &mut view, "reconciliation")?;
-            let mut usage = view["usage"].take();
-            view["current_edges"] = refresh_selected(args, contract, &mut state, &mut usage)?;
-            view["usage"] = usage;
             if has_measurements {
                 view["measurement"] = measure(args, contract, &mut state, "close", method)?;
             }
@@ -3230,6 +4004,15 @@ fn execute(
                 "intent": state["intent"],
                 "findings": last_one(&relevant_findings(&state, false)),
                 "next_action": state["next_action"],
+                "receipts": keys,
+                "reconciled_edges": u64::from(!focused),
+                "reconciliation_scope": if focused {
+                    "No concern edge was selected or reconciled: this journey answered a question \
+                     from inspected passages. The receipts above are what it stands on."
+                } else {
+                    "One selected concern edge was reconciled; its native standing is reported \
+                     above."
+                },
             });
             state["last_outcome"] = view["outcome"].clone();
             if let Some(list) = state["frontier"].as_array_mut() {
@@ -3297,6 +4080,13 @@ fn execute(
 // Rendering
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
+/// The human rendering: one screen an agent can act from.
+///
+/// The rule is that every accounting structure gets exactly ONE line. Before 2026-09-11 this
+/// function pretty-printed `continuation`, `cumulative`, `frontier`, `measurement` and `usage` as
+/// inline JSON, which put roughly 8 KB of nested objects between the reader and the only part of
+/// the view that is executable — the Linked choices. `--json` still carries every field; a human
+/// gets the magnitudes and the commands.
 fn render(view: &Value) -> String {
     let mut out = String::new();
     let orientation = &view["orientation"];
@@ -3325,54 +4115,45 @@ fn render(view: &Value) -> String {
             value["source"].as_str().unwrap_or_default()
         ));
     }
+    // The focused door's first screen comes BEFORE the concern groups, because a reader who named
+    // an area asked "what is the shape here and what do I do first", and the stale-edge scan is
+    // the answer to a different question.
+    if !view["first_screen"].is_null() {
+        out.push_str(&render_first_screen(&view["first_screen"]));
+    }
     if let Some(map) = view.as_object() {
         for (key, value) in map {
-            if matches!(key.as_str(), "orientation" | "actions" | "execution_method") {
+            if matches!(
+                key.as_str(),
+                "orientation" | "actions" | "execution_method" | "first_screen"
+            ) {
+                continue;
+            }
+            if key == "source_outline" {
+                out.push_str(&render_outline(value));
+                continue;
+            }
+            if key == "concerns" {
+                out.push_str(&render_concerns(value));
+                continue;
+            }
+            if let Some(line) = summary_line(key, value) {
+                out.push_str(&line);
                 continue;
             }
             let mut heading = key.replace('_', " ");
             if let Some(first) = heading.get_mut(0..1) {
                 first.make_ascii_uppercase();
             }
-            out.push_str(&format!("\n{heading}:\n"));
-            if key == "concerns" {
-                out.push_str(&format!("Measured scope: {}\n", value["counts"]));
-                out.push_str(&format!("Page: {}\n", value["page"]));
-                let mut number = 0;
-                for group in value["groups"].as_array().cloned().unwrap_or_default() {
-                    out.push_str(&format!(
-                        "Shared source: {}\n",
-                        group["source"].as_str().unwrap_or_default()
-                    ));
-                    for edge in group["edges"].as_array().cloned().unwrap_or_default() {
-                        number += 1;
-                        out.push_str(&format!(
-                            "  {number}. {} [{}, {}] — {}\n",
-                            edge["slot"]["from"].as_str().unwrap_or_default(),
-                            edge["verdict"].as_str().unwrap_or_default(),
-                            edge["slot"]["plane"].as_str().unwrap_or_default(),
-                            edge["slot"]["description"]
-                                .as_str()
-                                .unwrap_or("Purpose unstated; inspect source")
-                        ));
-                    }
-                }
-                out.push_str(&format!(
-                    "Selection: {}\n",
-                    value["selection_rule"]
-                        .as_str()
-                        .unwrap_or("native fixture selection")
-                ));
-                out.push_str(&format!("Omissions: {}\n", value["omissions"]));
+            if let Some(text) = value.as_str() {
+                out.push_str(&format!("\n{heading}: {text}\n"));
             } else if value.is_object() || value.is_array() {
                 out.push_str(&format!(
-                    "{}\n",
+                    "\n{heading}:\n{}\n",
                     serde_json::to_string_pretty(value).unwrap_or_default()
                 ));
-            } else if let Some(text) = value.as_str() {
-                out.push_str(&format!("{text}\n"));
             } else {
-                out.push_str(&format!("{value}\n"));
+                out.push_str(&format!("\n{heading}: {value}\n"));
             }
         }
     }
@@ -3385,6 +4166,345 @@ fn render(view: &Value) -> String {
         ));
     }
     out
+}
+
+/// The focused door: the area's habits with their last delta, then the competing sources.
+fn render_first_screen(screen: &Value) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "\nArea: {}\n",
+        screen["area"].as_str().unwrap_or_default()
+    ));
+    let habits = screen["habits"].as_array().cloned().unwrap_or_default();
+    if habits.is_empty() {
+        out.push_str("Habits: none in the register match this question's terms\n");
+    }
+    for habit in &habits {
+        out.push_str(&format!(
+            "Habit: {} [{}] — {}\n",
+            habit["id"].as_str().unwrap_or_default(),
+            habit["status"].as_str().unwrap_or_default(),
+            habit["delta"]
+                .as_str()
+                .unwrap_or("no evidence ledger entry")
+        ));
+    }
+    let candidates = screen["candidates"].as_array().cloned().unwrap_or_default();
+    if candidates.is_empty() {
+        out.push_str("Candidate sources: none in scope matched this question's terms\n");
+    } else {
+        out.push_str(&format!(
+            "Candidate sources ({}, {}):\n",
+            screen["provider"].as_str().unwrap_or("local"),
+            screen["ranking"]
+                .as_str()
+                .unwrap_or("term overlap over declared metadata; not authority")
+        ));
+        for (index, candidate) in candidates.iter().enumerate() {
+            let kinds: Vec<&str> = candidate["match"]
+                .as_array()
+                .map(|items| items.iter().filter_map(Value::as_str).collect())
+                .unwrap_or_default();
+            let matched = if kinds.is_empty() {
+                String::new()
+            } else {
+                format!(" [matched in {}]", kinds.join(", "))
+            };
+            out.push_str(&format!(
+                "  {}. {} — {}{matched}\n",
+                index + 1,
+                candidate["path"].as_str().unwrap_or_default(),
+                truncate(candidate["title"].as_str().unwrap_or_default(), 100)
+            ));
+            if let (Some(title), Some(lines)) = (
+                candidate["best_section"]["title"].as_str(),
+                candidate["best_section"]["lines"].as_str(),
+            ) {
+                out.push_str(&format!(
+                    "       § {title} ({lines}) {}\n",
+                    render_hits(&candidate["best_section"]["hits"])
+                ));
+            }
+        }
+    }
+    for message in screen["omissions"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .chain(
+            screen["unresolved"]
+                .as_array()
+                .cloned()
+                .unwrap_or_default()
+                .iter(),
+        )
+    {
+        out.push_str(&format!(
+            "  · {}\n",
+            bullet(message.as_str().unwrap_or_default())
+        ));
+    }
+    out
+}
+
+/// One line per section: where it starts, where the question's terms land, and what to read.
+fn render_outline(value: &Value) -> String {
+    let mut out = format!(
+        "\nOutline: {} ({} lines)\n",
+        value["path"].as_str().unwrap_or_default(),
+        value["line_count"].as_u64().unwrap_or(0)
+    );
+    for heading in value["headings"].as_array().cloned().unwrap_or_default() {
+        let hits = render_hits(&heading["hits"]);
+        out.push_str(&format!(
+            "  {} {}{}{}\n",
+            heading["read_lines"].as_str().unwrap_or_default(),
+            truncate(heading["title"].as_str().unwrap_or_default(), 110),
+            if hits.is_empty() {
+                String::new()
+            } else {
+                format!("  {hits}")
+            },
+            if heading["window_complete"].as_bool() == Some(false) {
+                "  (first window only)"
+            } else {
+                ""
+            }
+        ));
+    }
+    for message in value["omissions"].as_array().cloned().unwrap_or_default() {
+        out.push_str(&format!(
+            "  · {}\n",
+            bullet(message.as_str().unwrap_or_default())
+        ));
+    }
+    out
+}
+
+/// The whole-scope door: the stale edges grouped by shared source, with its accounting in lines.
+fn render_concerns(value: &Value) -> String {
+    let mut out = String::from("\nConcerns:\n");
+    let counts = &value["counts"];
+    out.push_str(&format!(
+        "Measured scope: {} stale · {} dangling · {} group(s) · {} edge(s) indexed\n",
+        count_of(counts, "stale"),
+        count_of(counts, "dangling"),
+        count_of(counts, "groups"),
+        count_of(counts, "total_edges"),
+    ));
+    let page = &value["page"];
+    out.push_str(&format!(
+        "Page: {} shown from offset {} · {} omitted\n",
+        count_of(page, "returned_edges"),
+        count_of(page, "offset"),
+        count_of(page, "omitted_edges"),
+    ));
+    let mut number = 0;
+    for group in value["groups"].as_array().cloned().unwrap_or_default() {
+        out.push_str(&format!(
+            "Shared source: {}\n",
+            group["source"].as_str().unwrap_or_default()
+        ));
+        for edge in group["edges"].as_array().cloned().unwrap_or_default() {
+            number += 1;
+            out.push_str(&format!(
+                "  {number}. {} [{}, {}] — {}\n",
+                edge["slot"]["from"].as_str().unwrap_or_default(),
+                edge["verdict"].as_str().unwrap_or_default(),
+                edge["slot"]["plane"].as_str().unwrap_or_default(),
+                edge["slot"]["description"]
+                    .as_str()
+                    .unwrap_or("Purpose unstated; inspect source")
+            ));
+        }
+    }
+    out.push_str(&format!(
+        "Selection: {}\n",
+        value["selection_rule"]
+            .as_str()
+            .unwrap_or("native fixture selection")
+    ));
+    let omissions = value["omissions"].as_array().cloned().unwrap_or_default();
+    if !omissions.is_empty() {
+        out.push_str("Omissions:\n");
+        for message in omissions {
+            out.push_str(&format!(
+                "  · {}\n",
+                bullet(message.as_str().unwrap_or_default())
+            ));
+        }
+    }
+    out
+}
+
+/// The compact line for one accounting structure, or `None` when the key has no summary shape.
+fn summary_line(key: &str, value: &Value) -> Option<String> {
+    match key {
+        "continuation" => {
+            let counts = &value["counts"];
+            let mut line = format!(
+                "\nContinuation: {} finding(s) · {} evidence · {} question(s) · next: {}\n",
+                count_of(counts, "findings"),
+                count_of(counts, "evidence"),
+                count_of(counts, "questions"),
+                value["next_action"].as_str().unwrap_or("choose a concern"),
+            );
+            if let Some(selected) = value["selected"]["slot"]["from"].as_str() {
+                line.push_str(&format!("Selected: {selected}\n"));
+            }
+            Some(line)
+        }
+        "cumulative" => {
+            let totals = &value["totals"];
+            let mut parts = vec![format!("attempt {}", count_of(value, "attempts"))];
+            parts.push(format!("{} source bytes", count_of(totals, "source_bytes")));
+            if number_of(totals, "source_files") > 0.0 {
+                parts.push(format!("{} file(s)", count_of(totals, "source_files")));
+            }
+            if number_of(totals, "native_raw_bytes") > 0.0 {
+                parts.push(format!(
+                    "{} native bytes",
+                    count_of(totals, "native_raw_bytes")
+                ));
+            }
+            parts.push(format!("{:.1}s", number_of(totals, "elapsed_seconds")));
+            parts.push(format!(
+                "unmetered {}",
+                count_of(value, "unmetered_attempts")
+            ));
+            Some(format!("\nAccounting: {}\n", parts.join(" · ")))
+        }
+        "frontier" => {
+            let latest = value["latest"].as_array().cloned().unwrap_or_default();
+            let newest = latest
+                .first()
+                .and_then(|item| item["question"].as_str().or_else(|| item.as_str()))
+                .map(|text| format!(" · latest: {}", bullet(text)))
+                .unwrap_or_default();
+            Some(format!(
+                "\nFrontier: {} unresolved question(s){newest}\n",
+                count_of(value, "total")
+            ))
+        }
+        "measurement" => {
+            if value["observed"].is_null() {
+                return Some(
+                    "\nMeasurement: original baseline retained; resuming does not resample it\n"
+                        .into(),
+                );
+            }
+            Some(format!(
+                "\nMeasurement: {} {} B over {} file(s) sampled; receipt {} B{}\n",
+                value["phase"].as_str().unwrap_or("baseline"),
+                count_of(&value["observed"], "bytes"),
+                count_of(&value["observed"], "files"),
+                count_of(&value["evidence"], "bytes"),
+                if value["complete"].as_bool() == Some(true) {
+                    ""
+                } else {
+                    " (incomplete)"
+                },
+            ))
+        }
+        "usage" => {
+            let Some(map) = value.as_object() else {
+                return Some("\nUsage: none charged\n".into());
+            };
+            if map.is_empty() {
+                return Some("\nUsage: none charged\n".into());
+            }
+            let parts: Vec<String> = map
+                .iter()
+                .filter_map(|(name, item)| {
+                    numeric(item).map(|number| format!("{name} {}", thousands(number)))
+                })
+                .collect();
+            Some(format!("\nUsage: {}\n", parts.join(" · ")))
+        }
+        "unresolved" => {
+            let items = value.as_array().cloned().unwrap_or_default();
+            if items.is_empty() {
+                return Some("\nUnresolved: none named by this view\n".into());
+            }
+            let mut line = String::from("\nUnresolved:\n");
+            for item in items {
+                line.push_str(&format!(
+                    "  · {}\n",
+                    bullet(item.as_str().unwrap_or_default())
+                ));
+            }
+            Some(line)
+        }
+        _ => None,
+    }
+}
+
+/// `[hits: mempalace ×3, re-mine ×1]`, or nothing when the section carries none of the terms.
+fn render_hits(hits: &Value) -> String {
+    let Some(map) = hits.as_object().filter(|m| !m.is_empty()) else {
+        return String::new();
+    };
+    let mut rows: Vec<(&String, u64)> = map
+        .iter()
+        .map(|(term, count)| (term, count.as_u64().unwrap_or(0)))
+        .collect();
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(b.0)));
+    format!(
+        "[hits: {}]",
+        rows.iter()
+            .map(|(term, count)| format!("{term} ×{count}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
+}
+
+/// A bounded bullet: one line, cut at a word boundary, with the cut named by an ellipsis.
+fn bullet(text: &str) -> String {
+    clip(&one_line(text), 160)
+}
+
+/// Cut `text` to `limit` characters at a word boundary, naming the cut with an ellipsis.
+fn clip(text: &str, limit: usize) -> String {
+    if text.chars().count() <= limit {
+        return text.to_string();
+    }
+    let cut: String = text.chars().take(limit).collect();
+    let trimmed = match cut.rfind(' ') {
+        Some(index) if index > limit / 2 => cut[..index].to_string(),
+        _ => cut,
+    };
+    format!("{trimmed}…")
+}
+
+fn number_of(value: &Value, key: &str) -> f64 {
+    value.get(key).and_then(numeric).unwrap_or(0.0)
+}
+
+fn count_of(value: &Value, key: &str) -> String {
+    thousands(number_of(value, key))
+}
+
+/// Group a magnitude in threes. Byte counts are the whole point of this view, and `3377184` and
+/// `337718` read identically at a glance.
+fn thousands(number: f64) -> String {
+    if number.fract().abs() > f64::EPSILON {
+        return format!("{number}");
+    }
+    let negative = number < 0.0;
+    let digits = format!("{}", number.abs() as u64);
+    let mut grouped = String::new();
+    for (index, digit) in digits.chars().enumerate() {
+        if index > 0 && (digits.len() - index) % 3 == 0 {
+            grouped.push(',');
+        }
+        grouped.push(digit);
+    }
+    if negative {
+        format!("-{grouped}")
+    } else {
+        grouped
+    }
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -3484,7 +4604,10 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
             }
             "--tag" => args.tags.push(value),
             "--session" => args.session = value,
-            "--need" => args.need = value,
+            "--need" => {
+                args.need = value;
+                args.need_explicit = true;
+            }
             "--scope" => args.scope = Some(value),
             "--intent" => args.intent = Some(value),
             "--path" => args.path = Some(value),
@@ -3529,7 +4652,17 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
                     .parse()
                     .map_err(|_| refused("--limit needs a count"))?
             }
-            other => return Err(refused(format!("unknown recall option {other}"))),
+            other => {
+                return Err(refused(format!(
+                    "unknown flag {other}; {} takes {}",
+                    if args.operation.is_empty() {
+                        "recall"
+                    } else {
+                        &args.operation
+                    },
+                    accepted_flags(&args.operation)
+                )))
+            }
         }
         i += 2;
     }
@@ -3595,13 +4728,16 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     // and another when it rejects a source, and a refusal that arrives as bare stderr carries no
     // `next` line at all — which is precisely where a caller most needs one.
     let named_session = take_flag(argv, "--session").unwrap_or_default();
+    // Read before parsing, because the rendering mode has to be known for a refusal the parser
+    // itself produces.
+    let wants_json = argv.iter().any(|a| a == "--json");
     let (args, adopt, dry_run, from_dir) = match parse_args(argv) {
         Ok(parsed) => parsed,
-        Err(error) => return print_refusal(&error.to_string(), &named_session, None),
+        Err(error) => return print_refusal(&error.to_string(), &named_session, None, wants_json),
     };
     let contract = match Contract::load(&args.contract_path) {
         Ok(contract) => contract,
-        Err(error) => return print_refusal(&error.to_string(), &args.session, None),
+        Err(error) => return print_refusal(&error.to_string(), &args.session, None, args.json),
     };
     let method = contract.method_cid();
 
@@ -3615,17 +4751,24 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
         return Ok(ExitCode::SUCCESS);
     }
     if args.operation.is_empty() {
-        return Err(refused(usage()));
+        println!("{}", usage());
+        return Ok(ExitCode::SUCCESS);
     }
     if !OPERATIONS.contains(&args.operation.as_str()) {
-        return Err(refused(format!(
+        let message = format!(
             "unknown recall operation `{}` — the set is {}",
             args.operation,
             OPERATIONS.join("|")
-        )));
+        );
+        return print_refusal(&message, &args.session, None, args.json);
     }
     if args.session.is_empty() {
-        return Err(refused("recall needs --session <id>"));
+        return print_refusal(
+            "recall needs --session <id>",
+            &args.session,
+            None,
+            args.json,
+        );
     }
 
     let session_limit = contract
@@ -3653,7 +4796,12 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     ) {
         Ok(execution) => execution,
         Err(error) => {
-            return print_refusal(&error.to_string(), &args.session, Some(output_limit));
+            return print_refusal(
+                &error.to_string(),
+                &args.session,
+                Some(output_limit),
+                args.json,
+            );
         }
     };
 
@@ -3665,6 +4813,13 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
             let message = error.to_string();
             execution.state["last_error"] = json!(message);
             let _ = execution.save();
+            if !args.json {
+                print!(
+                    "{}",
+                    refusal_lines(&message, &remedy_for(&message, &args.session))
+                );
+                return Ok(ExitCode::from(2));
+            }
             let mut failure = json!({
                 "unresolved": [truncate(&message, 1000)],
                 "session": args.session,
@@ -3752,6 +4907,30 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     )
 }
 
+/// The flags an operation actually accepts, so a refusal teaches the surface instead of ending it.
+///
+/// A reader guessing flag names pays a refusal per guess, and the guess it needed was never in the
+/// message. Naming them is one line of prose against an unbounded number of wrong tries.
+fn accepted_flags(operation: &str) -> &'static str {
+    match operation {
+        "open" => "--need --intent --scope --limit --offset",
+        "select" => "--edge --need",
+        "read" => "--path --lines START:END --need",
+        "source" => "--path --tag --query --search-scope --name --need",
+        "search" => "--provider --query --tag --search-scope --name --need",
+        "remember" => {
+            "--finding --question --next-action --evidence path:START:END --classification"
+        }
+        "finish" => "--outcome --question",
+        "prepare" => "--kind --finding",
+        "measure" => "--phase baseline|close --measure-scope",
+        "resume" | "context" => "--need --section --context-pin --evidence --evidence-offset",
+        "adopt" => "--from-session --need",
+        "history" | "compare" => "--limit --offset",
+        _ => "--session --need --json --root --contract (see `recall --help`)",
+    }
+}
+
 /// Read a `--flag value` out of a raw argv without parsing the rest.
 ///
 /// Used only to name the session in a refusal that happened BEFORE the arguments could be parsed —
@@ -3764,15 +4943,26 @@ fn take_flag(argv: &[String], flag: &str) -> Option<String> {
 }
 
 /// The one refusal envelope: what went wrong, which session it concerns, and what to do about it.
+///
+/// Two renderings of ONE fact. `--json` keeps the envelope a machine reader parses; a human (or an
+/// agent reading a terminal) gets exactly two lines, because the remedy is the only part of a
+/// refusal that changes what the caller does next, and it was previously buried under ~900 bytes
+/// of re-printed orientation the caller had already read.
 fn print_refusal(
     message: &str,
     session: &str,
     output_limit: Option<usize>,
+    json_output: bool,
 ) -> FlowResult<ExitCode> {
+    let remedy = remedy_for(message, session);
+    if !json_output {
+        print!("{}", refusal_lines(message, &remedy));
+        return Ok(ExitCode::from(2));
+    }
     let failure = json!({
         "unresolved": [truncate(message, 1000)],
         "session": session,
-        "next": remedy_for(message, session),
+        "next": remedy,
         "accounting": "Session unavailable; refusal outside session accounting.",
     });
     let mut encoded = serde_json::to_string(&failure)?;
@@ -3783,6 +4973,20 @@ fn print_refusal(
     }
     println!("{encoded}");
     Ok(ExitCode::from(2))
+}
+
+/// The human refusal: the fault, then the one thing to do about it. Nothing else.
+fn refusal_lines(message: &str, remedy: &str) -> String {
+    format!(
+        "refused: {}\nnext: {}\n",
+        one_line(&truncate(message, 1000)),
+        one_line(remedy)
+    )
+}
+
+/// Collapse authored whitespace so a multi-line constant still prints as one line.
+fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// The `next` line for a refusal: the remedy for the fault that ACTUALLY fired.
@@ -3801,6 +5005,18 @@ fn remedy_for(message: &str, session: &str) -> String {
     }
     if message.contains("private recall record") {
         return "Recall exposes what was read and what was concluded. A receipt or continuation is                 never an input to any verb; name the source it was taken from instead."
+            .into();
+    }
+    if message.contains("unknown flag") {
+        return "The message names the flags this operation accepts. Re-run with one of them, or                 `epr flow memory recall --help` for the whole surface."
+            .into();
+    }
+    if message.contains("this session has 0 receipts") {
+        return "Read the passage the answer rests on first, then finish:                 recall read --path <path> --lines START:END, then                 recall finish --outcome <what you found> --question <what is still open>."
+            .into();
+    }
+    if message.contains("another checkout's working tree") {
+        return "`.claude/` is in scope so the tooling layer is reachable, but a sibling checkout                 is not this repository's source. Name the path inside this tree."
             .into();
     }
     if message.contains("outside declared source scope") {

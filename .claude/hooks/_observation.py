@@ -2,7 +2,7 @@
 """Structured-observation emitter for the drift-signal hooks.
 
 Station one of the memory-kit replacement (genesis/docs/superpowers/plans/
-2026-09-10-memory-kit-replacement-finish.md). Each drift-signal hook keeps a private JSON
+2026-09-10-memory-kit-replacement-finish.md). Each drift-signal hook used to keep a private JSON
 accumulator under `.claude/memory-kit/`; the replacement shape is:
 
     bound declared in .claude/epr-meta/{measures,policies}.yaml

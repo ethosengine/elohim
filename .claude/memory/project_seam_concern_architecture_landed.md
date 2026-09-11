@@ -16,7 +16,7 @@ The seam-concern-contract architecture plan (genesis/docs/superpowers/plans/2026
 
 - **Concern canon**: `.claude/epr-meta/policies.yaml` (enforcement rows; C2@2 + C6a@2 with validators) + `.claude/epr-meta/concerns.yaml` (Precedent rows; two-home rule in its header). Pins via `epr-meta-pin.py --registry`. A class graduates by supersession lineage, never in-place edit.
 - **`crates/seam-contracts`** (published `elohim-seam-contracts`): `Answer<T>`, `ReasonLabel`, `Arbitrated`/`Quiescent`/`Liveness` harnesses, `canon.rs` PolicyPins (deprecation cascade), `residual.rs` ResidualWitness (C14). Leaf crate, wasm-clean; pre-push gate exists but NO CI pipeline coverage yet (ledgered).
-- **Decision-point registries**: `seam-registry.yaml` in elohim-storage, content_store zome, doorway-service, steward/node (schema: `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json`); census + cascade + concern×seam matrix + seeded forecast + calibration ledger all surface in `placement-audit.py --epr-meta`; standalone runner `.claude/scripts/seam-audit.py`.
+- **Decision-point registries**: `seam-registry.yaml` in elohim-storage, content_store zome, doorway-service, steward/node (schema: `elohim/sdk/schemas/v1/manifest/seam-registry.schema.json`); census + cascade + concern×seam matrix + seeded forecast + calibration ledger all surface via `.claude/scripts/seam-audit.py` (formerly `placement-audit.py --epr-meta`, retired 2026-09-11).
 - **Birth rule**: p2p-design-gate Step 4 (package-rooted) + seam-birth-rule injects in doorway/steward/seam-contracts `.epr-meta`.
 - **Storage liveness regression**: `elohim/elohim-storage/src/liveness_contract.rs` FAILs the pre-wave-5 and 2026-07-11 historical predicate sets, PASSes live.
 

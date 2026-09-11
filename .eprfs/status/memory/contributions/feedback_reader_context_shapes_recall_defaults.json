@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_reader_context_shapes_recall_defaults",
+  "claim": "Operator 2026-09-11: who is searching (agent tier haiku→fable, human capability, stated/revealed intent) must shape recall defaults via the actor sidecar ↔ recipe seam; unintentional defaults breed audience capture, filter bubbles, rabbit holes, epistemic bifurcation.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_reader_context_shapes_recall_defaults.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_reader_context_shapes_recall_defaults.md",
+        "cid": "bafkreih52avwcscep7hn62r2atmy6kgey4zzcvojdlmbafknmfv42mug7u"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Reader context shapes recall defaults — a negotiated preset, never a fixed default",
+    "file": "feedback_reader_context_shapes_recall_defaults.md",
+    "scopePath": ".claude/memory/feedback_reader_context_shapes_recall_defaults.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

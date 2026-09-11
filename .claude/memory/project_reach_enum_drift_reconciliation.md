@@ -2,7 +2,7 @@
 index: false
 name: reach-enum-drift-reconciliation
 title: Reach reconciliation — canonical spec exists
-description: "Reach enum nomenclature drifted; scope-reconcile.py reconciles cluster-state ↔ deployments.json held/live."
+description: "Reach enum nomenclature drifted; `epr flow hold --scope` reconciles cluster-state ↔ deployments.json held/live."
 id: project-reach-enum-drift-reconciliation
 metadata:
   node_type: memory

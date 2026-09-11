@@ -1,7 +1,7 @@
 """Git-native adapter for the .epr-meta compose-gate — the harness-agnostic binding surface.
 
 The 4th adapter over _lib.epr_meta (after the Claude PreToolUse hook, ci-ignore-projector, and
-placement-audit). Governs ANY author's commit/push — Codex, Gemini, a human, or Claude driving git
+the now-retired placement-audit.py). Governs ANY author's commit/push — Codex, Gemini, a human, or Claude driving git
 via Bash — by evaluating the SAME pure rule engine over files derived from git (staged blobs / a
 rev-range) rather than Claude tool_input. Collaboration THROUGH the protocol: no agent drives
 another; the shared substrate governs every author equally.

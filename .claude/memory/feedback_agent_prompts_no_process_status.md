@@ -20,4 +20,4 @@ stands. Sprint-state belongs in memory topic files, timeline backlog entries, or
 
 Gospel home (graduated 2026-06-03, restored as a citable slug 2026-07-02): the "Gospel surfaces
 describe stable architecture, not where-we-are" operating principle in
-`.claude/scripts/memory-kit/CLAUDE.md`.
+`.epr-meta/elohim/lenses/CLAUDE.md`.

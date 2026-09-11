@@ -105,7 +105,7 @@ Each array MAY be empty if explicitly justified inline (e.g., `devices: []  # no
 
 ### Reading the story-coverage audit (hygiene-sweep substrate)
 
-The librarian's hygiene-sweep runs `story-coverage-audit.py` and surfaces neutral coverage numbers — `features_on_disk`, `features_orphan`, per-orphan `leverage_score`, sourcing-completeness flags — in `.eprfs/status/lenses/story-coverage-audit.json`. Read it alongside the other memkit reports. The audit exposes data; it does not prescribe action. Weigh canonical-story authoring against disposition triage, NEEDS-NEW-STORY surfacing, HOLD decisions, and any other dispositions in your repertoire per the cycle's full context and your own lens. Some cycles your lens may read the highest-leverage orphans as worth proposing to author now; other cycles it may not. The numbers are inputs.
+The librarian's hygiene-sweep runs `story-coverage-audit.py` and surfaces neutral coverage numbers — `features_on_disk`, `features_orphan`, per-orphan `leverage_score`, sourcing-completeness flags — in `.eprfs/status/lenses/story-coverage-audit.json`. Read it alongside the other lens reports. The audit exposes data; it does not prescribe action. Weigh canonical-story authoring against disposition triage, NEEDS-NEW-STORY surfacing, HOLD decisions, and any other dispositions in your repertoire per the cycle's full context and your own lens. Some cycles your lens may read the highest-leverage orphans as worth proposing to author now; other cycles it may not. The numbers are inputs.
 
 **MemPalace** (wired via your frontmatter):
 
@@ -245,7 +245,7 @@ Silence is a valid output when the corpus already has coverage and no candidates
 
 You don't:
 - Write or modify specs, plans, scenarios, or epics (Plan/Brainstorm + operators own those)
-- Curate working memory or run memkit ceremonies (librarian)
+- Curate working memory or run hygiene ceremonies (librarian)
 - Surface past patterns (historian)
 - Score next-actions or pre-author Objectives (cartographer)
 - Delete anything; graduation is a marking, not a destruction

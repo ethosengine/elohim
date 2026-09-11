@@ -2,17 +2,16 @@
 #
 # THE PARENT CONSTITUTION (repo scope). Read at the brainstorm/plan FRONT-fire to bind
 #   class -> {write_location, decomposition_flow, discard_rule}
-# and stamped into spec/plan frontmatter as `class:`. The BACK-fire (decompose.py) reads it to route
-# residue per-class. One parent, two readers (the FRONT gate + decompose.py), two prose surfaces that
+# and stamped into spec/plan frontmatter as `class:`. The BACK-fire (`epr flow project`) reads it to route
+# residue per-class. One parent, two readers (the FRONT gate + `epr flow project`), two prose surfaces that
 # cite it (PLACEMENT.md, MAP.md) — mirroring how cluster-state.yaml is the env axis read by both the
-# pipeline and placement-audit.
+# pipeline and the native placement report (`epr flow report placement`).
 #
 # HAND-TUNED CONFIG (tracked, NOT generated). Lives at .claude/ root — alongside settings.json /
-# file-relationships.json — NOT in memory-kit/ (which is only one consumer; root placement also
-# preserves memory-kit's "only context-coverage.yaml is hand-edited" rule).
+# file-relationships.json.
 #
 # FOCUS BASELINE — its GENERATED sibling: .claude/subject-focus.md (written by
-# .claude/scripts/memory-kit/focus-baseline.py, refreshed on every scope-reconcile --apply/--set flip).
+# `epr flow report placement --focus --brief`, refreshed on every `epr flow hold --scope` flip).
 # This manifest answers "which CLASS does this work route to"; subject-focus.md answers, for a subject
 # that IS in scope, "what within it is IN FOCUS vs HELD right now, WHY, and the options to baseline or
 # pivot." NO narrowing in a subject ⇒ it is FAIR-GAME (everything in focus, like ranging over plans/specs
@@ -76,7 +75,7 @@ classes:
 
   process-meta:
     why: >
-      Deliverable changes a DEVELOPER's or AGENT's experience — the machinery of BUILDING (memory-kit,
+      Deliverable changes a DEVELOPER's or AGENT's experience — the machinery of BUILDING (the hygiene lenses,
       skills, agents, CI/orchestrator, the brainstorm/decompose/converge/stasis loops, hooks, commands,
       doc-lifecycle/placement, schema/codegen tooling, BDD-authoring). NO honest D#, NO pillar. The
       .claude/ or CI artifact IS the implementation; there is usually no a2o scenario and no
@@ -90,7 +89,7 @@ classes:
       gospel_homes:                  # pick by process_subdomain (the durable operating-discipline residue)
         root:          /CLAUDE.md
         build-and-test: /CLAUDE.md
-        memory:        [.claude/scripts/memory-kit/CLAUDE.md, .claude/memory-kit/CLAUDE.md, .claude/scripts/memory-kit/LIFECYCLE.md]
+        memory:        [.epr-meta/elohim/lenses/CLAUDE.md, .epr-meta/elohim/lenses/LIFECYCLE.md]
         doc-lifecycle: [genesis/docs/PLACEMENT.md, genesis/docs/_state/README.md]
         ci:            [genesis/orchestrator/README.md, /CLAUDE.md]       # + root CLAUDE.md CI section
         a2o:           genesis/a2o/CLAUDE.md
@@ -103,14 +102,14 @@ classes:
         command:  .claude/commands/<name>.md
         hook:     .claude/hooks/<name>.py            # deterministic enforcement (PLACEMENT.md routes "the fire" here)
         workflow: .claude/workflows/<name>.js
-        script:   .claude/scripts/{memory-kit,converge,_lib}/
+        script:   .claude/scripts/{converge,dev-dashboard,_lib}/ or .epr-meta/elohim/lenses/<family>/
         schema:   .claude/schemas/<name>.json
         prompt:   .claude/prompts/<name>.md
     decomposition_flow:
       gospel_diff: <gospel_home by process_subdomain>
       tool:        <tool_home by kind>
       history:     genesis/docs/content/elohim-protocol/history/     # LIVE (judgment-gated) — type:history-gotcha for a tried-and-failed mechanism or tool-design rationale; NOT auto-skipped
-      reports:     .claude/memory-kit/TRAJECTORY.md                  # comet retention (generated reports; does NOT decompose-to-zero)
+      reports:     .eprfs/status/lenses/<date>/                     # derived lens reports (regenerable; does NOT decompose-to-zero)
       backlog:     genesis/data/timeline/backlog/
       canonical:   NULL                                              # no architecture/ seed — DO NOT FORCE
       a2o:         NULL                                              # no <pillar> scenario — DO NOT FORCE
@@ -128,7 +127,7 @@ provisional:
     of brainstorming). `class: provisional` is RECONCILED at the BACK-fire from the actual residue
     landing site (mirroring PLACEMENT.md "scope is reconciled, not assigned"). domain:/informed-by: are
     conditional on a resolved class, NEVER required at the front — a spike is not blocked by a domain it
-    cannot yet answer. decompose.py reconciles provisional -> {protocol-canonical | process-meta} and
+    cannot yet answer. `epr flow project` reconciles provisional -> {protocol-canonical | process-meta} and
     fails loud if the residue contradicts a hand-stamped class.
 
 # ── The unifying keep/discard principle (lossless by construction) ────────────────────────────────
@@ -152,9 +151,9 @@ artifact_kind:
     why: "shift-results / horizon-scans / ceremony-rewrites / story-harvest scaffolds / audit reports are loop outputs, never design->plan->land docs; they must NOT default into a fake D# + pillar a2o leg"
     homes:
       shift-result:     .claude/shifts/                              # (+ genesis/docs/superpowers/sprints/)
-      horizon-scan:     .claude/memory-kit/horizon-scans/            # comet
+      horizon-scan:     genesis/docs/analysis/horizon-scans/            # comet
       ceremony-rewrite: [genesis/docs/content/elohim-protocol/architecture/, MEMORY.md]   # the one run-output whose deliverable IS an architecture rewrite (do not false-fire forced-architecture-seed)
-      audit-report:     .claude/memory-kit/TRAJECTORY.md             # comet
+      audit-report:     .eprfs/status/lenses/<date>/                  # derived; regenerable by re-running its lens
 
 # ── Deterministic mis-class detectors (the FRONT/BACK gate runs these fail-loud) ──────────────────
 gate_signals:

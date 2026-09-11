@@ -57,9 +57,10 @@ for _ in range(8):
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import _observation as _obs  # noqa: E402  (structured-observation emitter; fail-open, never blocks)
 
-# ACTIVE homes (repo-relative dir prefixes) — must mirror placement-audit.py's
-# ACTIVE_HOMES surfaces. A terminal-status doc here is plan-shaped residue that
-# should have dissolved.
+# ACTIVE homes (repo-relative dir prefixes) — mirrored placement-audit.py's (retired
+# 2026-09-11) ACTIVE_HOMES surfaces and should stay in step with the native
+# `epr flow report placement` equivalent. A terminal-status doc here is plan-shaped
+# residue that should have dissolved.
 ACTIVE_HOME_PREFIXES = (
     "genesis/docs/superpowers/specs/",
     "genesis/docs/superpowers/plans/",
@@ -68,14 +69,16 @@ ACTIVE_HOME_PREFIXES = (
 
 # Terminal status words. The spec asks one question (§10.1): does this ACTIVE-home
 # doc carry a terminal status (landed | superseded | abandoned) yet still live
-# plan-shaped? We mirror placement-audit.py's DEAD_WORDS (superseded family) and
-# the landed family so the hook's classification matches the audit's verdict.
+# plan-shaped? We mirrored placement-audit.py's (retired 2026-09-11) DEAD_WORDS
+# (superseded family) and the landed family so the hook's classification matches
+# the native placement report's verdict.
 DEAD_WORDS = {"superseded", "abandoned", "cancelled", "canceled", "deprecated", "retired"}
 LANDED_WORDS = {"landed", "stable", "done", "complete", "completed", "shipped", "accepted",
                 "latest-stable"}
 TERMINAL_WORDS = DEAD_WORDS | LANDED_WORDS
 
-# Frontmatter `status:` and a markdown `**Status:**` fallback (mirrors placement-audit.py).
+# Frontmatter `status:` and a markdown `**Status:**` fallback (mirrored placement-audit.py,
+# retired 2026-09-11).
 FM_STATUS_RE = re.compile(r"^status:\s*(.+?)\s*$", re.M | re.I)
 MD_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*(.+?)\s*$", re.M)
 

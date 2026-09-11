@@ -14,6 +14,16 @@ fn main() -> ExitCode {
     // `flow` is its own command family (value-chain projection + walk); it renders its own
     // output rather than a Report, so it is dispatched before the Report-shaped commands.
     let raw: Vec<String> = env::args().skip(1).collect();
+    // `--help` is a QUESTION, not a malformed command. It is answered on stdout with a zero exit
+    // at every layer of this CLI, because an agent discovering the surface should not pay a
+    // refusal per layer to find out what the layer offers.
+    if matches!(
+        raw.first().map(String::as_str),
+        Some("--help" | "-h" | "help")
+    ) {
+        println!("{}", usage());
+        return ExitCode::SUCCESS;
+    }
     if raw.first().map(String::as_str) == Some("flow") {
         return match flow::run(&raw[1..]) {
             Ok(code) => code,

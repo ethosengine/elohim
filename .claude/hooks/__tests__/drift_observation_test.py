@@ -536,11 +536,11 @@ class GoldenReportCase(unittest.TestCase):
         """No observation is appended at all, and five slots still render.
 
         This is what retired the producer bridge: `cleanup` and `scope` derive, `mempalace`
-        walks the tree, and `memkit` is a RETIRED bound. A slot that needed a kit reading
-        would report `skipped` here.
+        walks the tree, and `recall` (the retired `memkit` slot's successor, 2026-09-11) reads the
+        latest recall-journey fold. A slot that needed a kit reading would report `skipped` here.
         """
         out = self.headline()
-        for label in ("memkit", "mempalace", "cleanup", "scope", "memory-budget"):
+        for label in ("recall", "mempalace", "cleanup", "scope", "memory-budget"):
             self.assertTrue(
                 any(l.strip().startswith(f"{label}:") for l in out.splitlines()),
                 f"no `{label}:` line in:\n{out}")
@@ -548,10 +548,19 @@ class GoldenReportCase(unittest.TestCase):
     def test_a_retired_bound_says_retired_not_skipped(self):
         """`memkit-report-tier-mb@1` is `status: superseded`, and that is NOT the same claim
         as `skipped`. Skipped means nobody measured it; retired means there is nothing left to
-        measure — the report tier it bounded was removed at station six round (b)."""
-        got = self.line("memkit")
-        self.assertIn("retired", got, got)
-        self.assertNotIn("skipped", got, got)
+        measure — the report tier it bounded was removed at station six round (b).
+        Since 2026-09-11 the `memkit` slot is gone from the headline (its position is `recall`),
+        so the retirement is read from the JSON `retired` list, never from a headline line and
+        never from `outcomes`."""
+        r = self.epr("flow", "report", "--bound", "memkit-report-tier-mb-ceiling", "--json")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        payload = json.loads(r.stdout)
+        recipe = payload["recipes"][0] if "recipes" in payload else payload
+        retired = [row["bound"] for row in recipe.get("retired", [])]
+        self.assertIn("memkit-report-tier-mb-ceiling@1", retired, payload)
+        self.assertEqual(recipe.get("outcomes", []), [], "a retired bound is not an outcome")
+        self.assertNotIn("skipped", json.dumps(recipe.get("retired")), recipe.get("retired"))
+        self.assertNotIn("memkit:", self.headline())
 
     def test_a_bound_with_no_fold_is_skipped_never_zero(self):
         """A live bound nobody has observed. `sovereignty-landings-ceiling@1` reads folds

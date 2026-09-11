@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:implementer@claude-opus-5",
+  "author": "agent:orchestrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_fresh_worktree_install_state_traps.md",
-        "cid": "bafkreiat7r36ah7omyqvbq6opafmlusweqalhuffxohoxgoz5bvsg3d65m"
+        "cid": "bafkreihxwgxowq6dcbx4fvytsnqheslvigxg2a7ejg2t325rniafup6vya"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "project_fresh_worktree_install_state_traps",
     "file": "project_fresh_worktree_install_state_traps.md",
     "scopePath": ".claude/memory/project_fresh_worktree_install_state_traps.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
     "indexed": false
   }

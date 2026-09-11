@@ -127,12 +127,13 @@ resolver: **runnable = requirements ⊆ available.** Anything requiring an unava
 returns. This lets planning focus on what's actually testable without lying about what regressed
 (`project_placement_signals_are_shefa_inputs`: a gap is a signal, not an alarm).
 
-## Enforcement (deterministic — to build, extends memory-kit)
+## Enforcement (deterministic — implemented natively)
 
-A PostToolUse hook (extending the existing memory-kit drift accumulators) flags, on any genesis-doc write:
-an ACTIVE-home doc whose `status` says landed/superseded (= **placement drift**), and surfaces the count at
-SessionStart. Superpowers writes; the hook + ceremony agents file. This is the deterministic fire that keeps
-the memory surface in balance — owned by us, not superpowers' defaults.
+A PostToolUse hook (`.claude/hooks/placement-drift-signal.py`, folding into the native
+`placement-drift-due@1` measure) flags, on any genesis-doc write: an ACTIVE-home doc whose `status`
+says landed/superseded (= **placement drift**), and surfaces the count at SessionStart via
+`epr flow report --headline`. Superpowers writes; the hook + ceremony agents file. This is the
+deterministic fire that keeps the memory surface in balance — owned by us, not superpowers' defaults.
 
 ## Re-equip cartographer (decision pending)
 

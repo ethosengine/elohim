@@ -63,11 +63,18 @@ const OBSERVATION_TAG: &str = "run:observation";
 /// `cleanup:` and `scope:` as triggers an agent reads at session start. Renaming or reordering
 /// them would silently retire two gospel-declared triggers, which is a worse outcome than any
 /// tidier vocabulary is worth.
-const HEADLINE_ORDER: [&str; 5] = ["memkit", "mempalace", "cleanup", "scope", "budget"];
+/// Slot 0 was `memkit` until 2026-09-11: the kit it measured was deleted, and the question that
+/// slot answered — "is the memory layer paying for itself?" — is now asked of the governed recall
+/// journey, whose honesty reading is the first thing a session should see.
+const HEADLINE_ORDER: [&str; 5] = ["recall", "mempalace", "cleanup", "scope", "budget"];
 
 /// The line prefix each slot prints under.
 fn slot_prefix(slot: &str) -> &'static str {
     match slot {
+        "recall" => "recall",
+        // `memkit` left HEADLINE_ORDER on 2026-09-11 but stays in the VOCABULARY: its retired bound
+        // still declares that slot, and a reader asking for it by name must get its own word back
+        // rather than the fallback's.
         "memkit" => "memkit",
         "mempalace" => "mempalace",
         "cleanup" => "cleanup",
@@ -88,6 +95,9 @@ fn headline_slot(bound: &Bound) -> Option<&'static str> {
     if let Some(declared) = &bound.headline {
         let declared = declared.trim().to_ascii_lowercase();
         return match declared.as_str() {
+            "recall" => Some("recall"),
+            // The retired kit rows still declare their old slot; naming it here keeps them out of
+            // the stderr "unknown slot" path without putting them back in the headline.
             "memkit" => Some("memkit"),
             "mempalace" => Some("mempalace"),
             "cleanup" => Some("cleanup"),
@@ -110,7 +120,12 @@ fn headline_slot(bound: &Bound) -> Option<&'static str> {
 
 fn derived_slot(measure: &MeasureRef) -> Option<&'static str> {
     let id = measure.id.as_str();
-    if id.starts_with("memkit") {
+    // ONE of the four recall-journey middot owns the slot. The other three are measured against
+    // their own ceilings and reported by `--bound`; folding them all into the headline would make
+    // the line mean "whichever recall row the registry happens to list first".
+    if id.starts_with("recall-unmetered-bytes") {
+        Some("recall")
+    } else if id.starts_with("memkit") {
         Some("memkit")
     } else if id.starts_with("mempalace") {
         Some("mempalace")
@@ -1476,6 +1491,14 @@ impl ReportPayload {
             return format!("{prefix}: skipped (no bound declared)");
         };
         match outcome.outcome {
+            // The recall slot's absence has one meaning and deserves its own words: no journey has
+            // been folded yet. "no fold for recall-unmetered-bytes@1" names the row; a session
+            // reader needs to be told that nobody has walked the entry since the last reset.
+            OutcomeStatus::Skipped
+                if slot == "recall" && outcome.summary.starts_with("no fold") =>
+            {
+                format!("{prefix}: skipped — no journey fold")
+            }
             OutcomeStatus::Skipped => format!("{prefix}: skipped ({})", outcome.summary),
             OutcomeStatus::Failed => format!("{prefix}: ⚠ failed — {}", outcome.summary),
             OutcomeStatus::Passed if outcome.summary.starts_with("warn: ") => {
@@ -1528,7 +1551,9 @@ fn headline_slot_of(bound: &Bound) -> Option<String> {
 
 /// The slot a bare measure id implies.
 fn slot_of_measure(id: &str) -> Option<&'static str> {
-    if id.starts_with("memkit") {
+    if id.starts_with("recall-unmetered-bytes") {
+        Some("recall")
+    } else if id.starts_with("memkit") {
         Some("memkit")
     } else if id.starts_with("mempalace") {
         Some("mempalace")
@@ -1572,8 +1597,9 @@ mod tests {
     fn the_headline_order_is_the_gospel_declared_order() {
         assert_eq!(
             HEADLINE_ORDER,
-            ["memkit", "mempalace", "cleanup", "scope", "budget"]
+            ["recall", "mempalace", "cleanup", "scope", "budget"]
         );
+        assert_eq!(slot_prefix("recall"), "recall");
         assert_eq!(slot_prefix("cleanup"), "cleanup");
         assert_eq!(slot_prefix("scope"), "scope");
         assert_eq!(slot_prefix("budget"), "memory-budget");
@@ -1587,6 +1613,10 @@ mod tests {
                 version: 1,
             })
         };
+        assert_eq!(derive("recall-unmetered-bytes"), Some("recall"));
+        // The other three journey middot are measured, never headlined.
+        assert_eq!(derive("recall-metered-bytes"), None);
+        assert_eq!(derive("recall-screens-to-shape"), None);
         assert_eq!(derive("memkit-report-tier-mb"), Some("memkit"));
         assert_eq!(derive("mempalace-currency-days"), Some("mempalace"));
         assert_eq!(derive("cleanup-pressure"), Some("cleanup"));

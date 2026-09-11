@@ -51,11 +51,46 @@ pub struct Options<'a> {
     pub out: Option<&'a str>,
 }
 
+/// The operations this shell dispatches, in the order `usage` names them.
+const OPERATIONS: [&str; 8] = [
+    "collective",
+    "pin",
+    "contribute",
+    "project",
+    "feedback",
+    "graduate",
+    "import",
+    "recall",
+];
+
+/// What `epr flow memory` offers, printed as an ANSWER rather than a refusal.
+pub fn usage() -> String {
+    format!(
+        "usage: epr flow memory <{}> [--input FILE] [--session ID] [--json] [--root DIR]\n\n  \
+         collective    read the declared collective and its contracts\n  \
+         pin           pin one governed source file by reference\n  \
+         contribute    file a governed contribution request\n  \
+         project       project a contribution receipt, or --index the memory index\n  \
+         feedback      file governed feedback on a contribution\n  \
+         graduate      rehearse local repository reach for a contribution\n  \
+         import        adopt an authored directory of requests\n  \
+         recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n",
+        OPERATIONS.join("|")
+    )
+}
+
 /// All command inputs are strict versioned objects in explicitly named local files.
 pub fn run(args: &[String]) -> FlowResult<ExitCode> {
-    let operation = args.first().ok_or_else(|| {
-        refused("needs collective|pin|contribute|project|feedback|graduate|import|recall")
-    })?;
+    // A caller who named no operation, or asked what the operations ARE, gets the list on stdout
+    // with a zero exit. Discovering a surface is a question; only a WRONG operation is an error.
+    let Some(operation) = args.first() else {
+        println!("{}", usage());
+        return Ok(ExitCode::SUCCESS);
+    };
+    if operation == "--help" || operation == "-h" {
+        println!("{}", usage());
+        return Ok(ExitCode::SUCCESS);
+    }
     // The recall executor owns its whole argument surface (sixteen ceremony operations, paging,
     // evidence keys, measurement scopes). Routing it through this parser would mean teaching the
     // memory shell every recall flag, so the raw tail is handed over intact instead.

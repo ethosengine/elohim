@@ -16,8 +16,9 @@ Two harness surfaces, one once-per-session gate:
                    tool pattern.
 
 Engine is the MemPalace CLI, NOT the MCP (absent in main session — §4b.2): staleness check via
-mempalace-currency.py --status --json (stdlib, ms), then `mempalace search` (~3 s, once per
-session at most). Injection contract (§4b.3): cosine floor 0.35 → silent no-op; DEGRADED banner
+`epr flow report --bound mempalace-surfaces-changed-ceiling --json` (stdlib, ms), then `mempalace
+search` (~3 s, once per session at most). Injection contract (§4b.3): cosine floor 0.35 → silent
+no-op; DEGRADED banner
 always surfaced when the index is behind the front-link; top-4 hits; recall-hints-not-truth
 footer. Always exit 0 — surfacing must never block a prompt or a tool call.
 """

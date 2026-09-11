@@ -5,10 +5,12 @@ Thin shell over `_lib/seam_{cascade,matrix,forecast}.py`, exactly the split
 `runtime-harvest.py` uses over `_lib/runtime_harvest.py`: the modules are pure logic and this file
 owns the I/O and the mutations.
 
-WHY A SEPARATE SCRIPT FROM placement-audit. `placement-audit.py --epr-meta` RENDERS the census,
-cascade and matrix — it is a scoreboard and must stay read-only; an audit that mutates state as a
-side effect of being read is how a scoreboard quietly becomes an actor. Every write in this
-program is behind an explicit verb (`--file`, `--write`, `--record`, `--record-miss-of-canon`).
+WHY A SEPARATE SCRIPT FROM placement-audit. Before `placement-audit.py` was retired 2026-09-11,
+`placement-audit.py --epr-meta` RENDERED the census, cascade and matrix from one scoreboard
+entrypoint. This script keeps that same discipline on its own: it is a scoreboard and must stay
+read-only; an audit that mutates state as a side effect of being read is how a scoreboard quietly
+becomes an actor. Every write in this program is behind an explicit verb (`--file`, `--write`,
+`--record`, `--record-miss-of-canon`).
 
   --cascade [--file]          pin-keyed cascade; --file appends new findings to
                               .claude/data/cascade-findings.jsonl and prints dispatch directives

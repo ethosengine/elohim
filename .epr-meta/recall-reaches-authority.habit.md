@@ -1,0 +1,71 @@
+---
+epr-habit-version: 1
+id: recall-reaches-authority
+invariant: >
+  One governed journey serves every agent question — a ceremony's "understand this assertion
+  and its changed evidence" and a session's "what is the shape of this concern and what do I
+  do first" are the same experience through the same algorithm (recall-contract.json), bounded
+  by the same mishpat (the recall-journey ceilings) and measured by the same middot
+  (recall-metered-bytes, recall-unmetered-bytes, recall-mistaken-assertions,
+  recall-screens-to-shape). A context-reset agent carrying a concrete question reaches the
+  current authoritative source through the entry alone: the session records the agent's own
+  question as its intent, every surface an agent must recall (docs, code, skills, hooks,
+  commands, measures, memory) is inside the declared scope, the bytes it read are metered, the
+  first screen fits its door — whole-scope: stale edges grouped by shared source so specs can be
+  converged and a head chosen; focused: the area's habit, its last delta and the competing
+  sources ranked with the commands to compare, choose and file the residue — and the agent concludes without a mistaken assertion. Bytes saved
+  never substitute for a correct decision; an unmetered direct read is a defect of the entry,
+  not of the agent.
+status: green
+active: false
+checks:
+  - "a2o @concern:recall-reaches-authority (genesis/a2o/features/devflow/ceremony-reconciliation.feature — a fresh agent opens with its own question, the orientation carries it, a passage under .claude/skills/ is readable and receipted, and finish reports the question with bounded bytes)"
+  - "just gate memory-ceremony (the native recall executor, corrections view and footprint suites plus the hook, lens and cucumber legs)"
+  - "epr flow report --bound recall-unmetered-bytes-ceiling (and its three siblings recall-metered-bytes / recall-mistaken-assertions / recall-screens-to-shape): the latest journey's folds against the declared ceilings — a fold is written per journey by the reader's own honest account and by `recall measure --phase close`; no fold is `skipped`, never green"
+guard: >
+  Regression risks: (1) greening by widening source_roots to everything — the private recall
+  store and other worktrees stay refused, and a scope that admits scratch is not a governed
+  entry; (2) greening by shrinking the human view until the Linked choices are gone — the
+  emitted next-choice commands are the progressive-discovery payload, never optional; (3) a
+  fresh-reader observation taken by the agent that made the change is not a fresh reader.
+refs:
+  - "genesis/docs/superpowers/plans/2026-09-11-bounded-recall-mastery-sprint.md"
+  - "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md — the verdict rule this habit inherits from dev-system-equilibrium, where it never belonged"
+  - "genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md — the five fresh-start questions"
+  - ".epr-meta/elohim/algorithms/recall-contract.json — the method every receipt pins"
+retire-when: >
+  when the fresh-reader observation has been green for a full quarter of ceremonies with
+  metered bytes inside the SessionStart budget and no unmetered direct read — an entry that
+  reliably serves the next agent no longer needs a reader watching it.
+---
+GREEN 2026-09-11 (RED → GREEN on evidence, one reader-sample): contract v9, binary sha256 37cae28e…
+(gate-built and installed at /opt/rust/cargo/bin/epr). Checks: (1) a2o @concern:recall-reaches-authority
+passes inside `cucumber-js --profile ceremony` 6/6 scenarios, 34/34 steps; (2) `just gate memory-ceremony`
+EXIT=0 — 51/9/10 native recall/corrections/footprint tests, 34 hook tests, both cucumber profiles;
+(3) fresh-reader 3 (context-reset Sonnet, entry-only, question "what commands re-mine the MemPalace index
+and when may the marker be stamped"): authority reached at .claude/skills/memory-ceremony/SKILL.md:192-207
+in 3 operations, shape on screen 1, metered 8,058 B over 2 files, unmetered 0, mistaken assertions 0 —
+all four recall-journey ceilings pass (folds on the plan, env reader=fresh-reader-3-sonnet). Sequence
+that earned it on the same question: orchestrator bootstrap 14 screens/~100 KB unmetered/1 mistaken →
+reader 1 (v6) zero candidates → reader 2 (v8) candidate present, passage not located → reader 3 (v9)
+passage located on screen 1. What changed (native seat rounds 1-5): `open --need` is the intent; `.claude/`
+in source_roots; two-line refusals with remedies; compact human view (12.6 KB → 4.5 KB); help answers on
+stdout; focused first screen with habit lines + ranked candidates; `recall` headline slot replaces `memkit`;
+UTF-8-safe metadata read; body-term discovery with a declared body_scan_bytes=65536 budget and
+occurrence/rarity-weighted ranking; section hit annotation + located `read` choices; `finish` on a focused
+journey without a concern edge. Integration seat: 393→122 kit-script mentions, all remaining historical;
+package verifier 1972/0. Bounded by: ONE reader-sample on ONE question; retire-when needs a quarter.
+Held frontiers on the plan: reader-context presets (lens per reader, imagodei↔sophia negotiation); the
+focused door still prints empty ceremony blocks; the authoritative doc ranks second on lexical evidence
+(an authority decision); six specs with unquoted `cites:` entries are unreadable to discovery.
+RED WRITTEN 2026-09-11 (born red; the orchestrator's own bootstrapping into this sprint is the
+first journey sample — 14 probe rounds and ~100 KB of unmetered direct reads before the concern's
+shape was nameable, 1 mistaken assertion (looked for a memory habit that did not exist), 62,939
+metered bytes from the test-drive baseline; folded on the four recall-journey measures, evidence from the memory-kit replacement's station six and the
+2026-09-11 test-drive): two isolated after-readers reached authority 5/5 with 0 and 1 mistaken
+assertions, tooling-scoped bytes 18,178 and 24,524, but honest totals with direct reads outside
+source_roots were 85.2 KB and 49.1 KB — the byte leg fails for one reader because `.claude/` is
+outside the entry's scope. Test-drive session `test-drive-20260911`: `open --need` dropped the
+question (intent = recipe default), `search`/`read` under `.claude/skills` refused, three refusals
+each re-printed ~900 B of orientation, the human `open` view was 12.6 KB of inline JSON. The a2o
+scenario is not yet written; the gate is green on the pre-sprint binary.

@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:implementer@claude-opus-5",
+  "author": "agent:orchestrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback-identity-sovereignty-ontology-guard.md",
-        "cid": "bafkreicnod4a3nax5xeakyox7jdbv4qg7vemo4um2bdpjej5hzjq52ppmu"
+        "cid": "bafkreibktxem62nybzdwdxijnmwpcguoq2iekydrv7sov3mchl23sglq34"
       },
       "reach": "repository"
     }

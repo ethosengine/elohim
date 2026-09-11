@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
@@ -15,6 +23,10 @@ interface Fixture {
   unavailable?: RecordValue;
   receipt?: string;
   inspectedSource?: string;
+  genericPurpose?: string;
+  refusal?: RecordValue;
+  skillRead?: RecordValue;
+  packetLimit?: number;
 }
 
 const fixtures = new WeakMap<object, Fixture>();
@@ -22,6 +34,10 @@ const repository = resolve('../..');
 const binary = process.env.EPR_BIN ?? 'epr';
 // The footprint measurement is native to `epr flow memory recall`; `--lens <script>` remains only
 // as an explicit override for an external lens and is never needed here.
+/// Named once: the fixture's copy of the live algorithm artifact, and the flag that carries an
+/// unresolved question into a note or a completion.
+const contractFile = 'contract.json';
+const questionFlag = '--question';
 const upstream = 'genesis/source.md';
 const repaired = 'genesis/repair.md';
 const contested = 'genesis/conflict.md';
@@ -88,7 +104,7 @@ function journey(
           '--root',
           state.root,
           '--contract',
-          join(state.root, 'contract.json'),
+          join(state.root, contractFile),
           '--session',
           'reader',
           '--json',
@@ -135,7 +151,7 @@ function inspect(state: Fixture, classification = 'unreviewed'): void {
     classification === 'evidence-ready'
       ? 'The report records that the trial reader opened a cited passage.'
       : 'The report states whole-workflow acceptance remains undecided.',
-    '--question',
+    questionFlag,
     question,
     '--next-action',
     nextAction,
@@ -176,9 +192,9 @@ function createFixture(world: object): Fixture {
   const contract = JSON.parse(
     readFileSync(join(repository, '.epr-meta/elohim/algorithms/recall-contract.json'), 'utf8')
   ) as RecordValue;
-  write(state, 'contract.json', JSON.stringify(contract));
+  write(state, contractFile, JSON.stringify(contract));
   invoke(state, ['git', 'init', '-q']);
-  invoke(state, ['git', 'add', upstream, repaired, contested, 'contract.json']);
+  invoke(state, ['git', 'add', upstream, repaired, contested, contractFile]);
   invoke(state, [
     'git',
     '-c',
@@ -373,7 +389,7 @@ When('the agent updates only the supported reference and checks the affected ent
   journey(state, 'remember', [
     '--finding',
     'The supported reference now matches the report; independent acceptance remains unresolved.',
-    '--question',
+    questionFlag,
     question,
     '--next-action',
     nextAction,
@@ -383,7 +399,7 @@ When('the agent updates only the supported reference and checks the affected ent
   journey(state, 'finish', [
     '--outcome',
     'Observed one supported edge resealed; acceptance is not established.',
-    '--question',
+    questionFlag,
     question,
   ]);
 });
@@ -421,6 +437,201 @@ Then(
       )
     );
     assert.equal(native(fixture(this), ['status']).edges_stale, 1);
+  }
+);
+
+// ── the recall journey: the agent's own question, and the tooling layer ──────────────────────────
+
+const skill = '.claude/skills/memory-ceremony/SKILL.md';
+// A path the fixture's declared source roots do not cover — the contrast that proves the scope.
+const outside = 'outside-every-root.md';
+const agentQuestion = 'Which command rebuilds the stale index now the old scripts are gone?';
+
+Given('a ceremony whose declared source scope covers the tooling directory', function () {
+  const state = createFixture(this);
+  // The fixture writes the LIVE algorithm artifact as its contract, so the scope this step names
+  // is the declared one and not a fixture convenience.
+  const contract = JSON.parse(readFileSync(join(state.root, contractFile), 'utf8')) as Record<
+    string,
+    unknown
+  >;
+  assert.ok(
+    (contract.source_roots as string[]).some(root => skill.startsWith(root.replace(/\/$/, '/'))),
+    'the declared source roots cover the tooling directory'
+  );
+});
+
+Given(
+  'the recall entry, the one command that opens an investigation, reads a bounded passage and reports a purpose and a byte count',
+  function () {
+    // The entry answers for itself: its own usage names the three operations this story uses, so
+    // "one command" is a fact the story checks rather than a term the narrative asserts.
+    const usage = invoke(fixture(this), [binary, 'flow', 'memory', 'recall', '--help']);
+    for (const operation of ['open', 'read', 'finish'])
+      assert.ok(usage.includes(operation), `the entry's usage names ${operation}: ${usage}`);
+    assert.match(usage, /--session/);
+  }
+);
+
+Given('a skill file in that directory naming the command that rebuilds a stale index', function () {
+  write(
+    fixture(this),
+    skill,
+    '---\ntitle: Memory ceremony\n---\n# Phase 4\nRebuild the stale index with the three indexing commands, then stamp the marker.\n'
+  );
+});
+
+Given(
+  'the standing description that entry states as its purpose when nobody brings a question',
+  function () {
+    const state = fixture(this);
+    // Observed, not quoted: a throwaway session opened with NO question is what the generic purpose
+    // looks like in the view the agent reads. Without this the final Then would assert a
+    // distinction from something the story never shows.
+    const generic = record(
+      JSON.parse(
+        invoke(state, [
+          binary,
+          'flow',
+          'memory',
+          'recall',
+          'open',
+          '--root',
+          state.root,
+          '--contract',
+          join(state.root, contractFile),
+          '--session',
+          'unnamed',
+          '--json',
+        ])
+      )
+    );
+    state.genericPurpose = String(record(generic.orientation).intent);
+    assert.ok(state.genericPurpose.length > 0, 'the algorithm states some purpose of its own');
+    // "A standing description naming no question" is checkable, not decorative: it carries none of
+    // the distinctive words of the question this agent is about to bring.
+    const distinctive = agentQuestion
+      .toLowerCase()
+      .split(/[^a-z]+/)
+      .filter(word => word.length > 5);
+    assert.ok(distinctive.length > 0);
+    for (const word of distinctive)
+      assert.ok(
+        !state.genericPurpose.toLowerCase().includes(word),
+        `the standing description already names "${word}", so it is not question-free`
+      );
+  }
+);
+
+Given(
+  'a declared packet limit wider than that skill passage and far narrower than the repository',
+  function () {
+    const state = fixture(this);
+    const contract = JSON.parse(
+      readFileSync(join(state.root, contractFile), 'utf8')
+    ) as RecordValue;
+    const limit = Number(record(contract.limits).source_bytes);
+    const passage = statSync(join(state.root, skill)).size;
+    assert.ok(Number.isFinite(limit) && limit > passage, 'the passage fits inside one packet');
+    // Far narrower than the corpus it is drawn from: a limit that admitted the whole tree would
+    // make the closing assertion true of a journey that read everything.
+    assert.ok(limit < 100_000, 'the packet limit bounds a pass, not the repository');
+    state.packetLimit = limit;
+  }
+);
+
+When(
+  'a fresh agent with no prior ceremony context opens the recall entry carrying the question {string}',
+  function (asked: string) {
+    const state = fixture(this);
+    // The session name below has no continuation yet, which is what "no prior context" means here:
+    // nothing is inherited, so whatever purpose the view states was decided by this call alone.
+    // No --intent either: the documented entry is `open --need '<question>'`.
+    assert.equal(asked, agentQuestion, 'the story and the fixture ask the same question');
+    const opened = journey(state, 'open', ['--need', agentQuestion]);
+    state.opened = opened;
+    const choice = rows(opened.actions).find(item => String(item.label).includes(`${repaired} →`));
+    assert.ok(choice, `the entry offers navigation to ${repaired}`);
+    follow(state, choice);
+  }
+);
+
+When('it reads the passage of that skill file which names the command', function () {
+  const state = fixture(this);
+  const view = journey(state, 'read', ['--path', skill, '--lines', '4:5', '--need', agentQuestion]);
+  const receipt = rows(record(view.evidence).sources)[0];
+  state.receipt = `${String(receipt.path)}:${String(receipt.lines)}`;
+  // Held on the fixture rather than read back from `state.view`: the next step deliberately runs a
+  // SECOND read, and an assertion about the first one must not silently move to the second.
+  state.skillRead = view;
+});
+
+Then(
+  "the investigation's stated purpose is that question, not the standing description",
+  function () {
+    const state = fixture(this);
+    assert.equal(record(record(state.opened!).orientation).intent, agentQuestion);
+    assert.notEqual(agentQuestion, state.genericPurpose);
+  }
+);
+
+Then(
+  'the skill passage is preserved as a receipt recording the exact bytes the agent read',
+  function () {
+    const read = record(fixture(this).skillRead);
+    const source = rows(record(read.evidence).sources)[0];
+    assert.equal(source.path, skill);
+    assert.match(String(source.content), /Rebuild the stale index/);
+    assert.match(String(source.fingerprint), /^sha256:/);
+    assert.ok((read.receipt_keys as string[]).includes(fixture(this).receipt!));
+  }
+);
+
+When('it attempts the same read against a path outside the declared scope', function () {
+  // The same verb and the same session as the read above — one path inside the declared scope and
+  // one outside it. Running it as a declared ACTION is what lets the assertion below be about an
+  // outcome rather than about a probe the story never mentions.
+  const state = fixture(this);
+  state.refusal = journey(state, 'read', ['--path', outside, '--lines', '1:1'], 2);
+});
+
+Then(
+  'the out-of-scope read was refused, so the declared scope is what put the skill in reach',
+  function () {
+    // The skill was readable BECAUSE its directory is named, not because reads succeed generally.
+    const refused = record(fixture(this).refusal);
+    assert.match(String((refused.unresolved as string[])[0]), /outside declared source scope/);
+    assert.match(String(refused.next), /declared source_roots/);
+  }
+);
+
+Then(
+  "the investigation's completion report names that same question, and the counted bytes stay under the packet limit",
+  function () {
+    const state = fixture(this);
+    journey(state, 'remember', [
+      '--finding',
+      'The skill names the re-mine step; the verb it names must be checked against the shipped CLI.',
+      questionFlag,
+      agentQuestion,
+      '--next-action',
+      'Check the named verb against the shipped CLI before quoting it',
+      '--evidence',
+      state.receipt!,
+    ]);
+    const finished = journey(state, 'finish', [
+      '--outcome',
+      'Read the skill passage that names the re-mine step; the verb itself is unverified.',
+      questionFlag,
+      agentQuestion,
+    ]);
+    const outcome = record(finished.outcome);
+    assert.equal(outcome.intent, agentQuestion);
+    assert.equal(outcome.unresolved_frontier, agentQuestion);
+    const limit = state.packetLimit!;
+    const read = Number(record(record(finished.cumulative).totals).source_bytes ?? 0);
+    assert.ok(read > 0, 'the journey counted the bytes it read');
+    assert.ok(read <= limit, `${read} source bytes exceeded the declared packet limit ${limit}`);
   }
 );
 

@@ -16,7 +16,7 @@ epr flow note --on <surface path> --kind correction --reason 'STALE (<date>): "<
 
 One note per stale CLAIM, claim quoted verbatim, replacement truth in the same note. The
 memory-ceremony's Phase 0 reads the whole record across surfaces with
-`python3 .claude/scripts/memory-kit/stale-record.py [--since <date>]` and treats every surface
+`epr flow concerns --corrections [--since <date>]` and treats every surface
 with a witnessed correction as a pre-triaged candidate BEFORE the population-wide audit.
 
 **Why:** the operator (2026-09-06): the ceremony is "way overdue" but "expensive" and "not

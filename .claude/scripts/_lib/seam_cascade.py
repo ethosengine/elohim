@@ -40,9 +40,10 @@ never double-file), one line per LIVE fingerprint, and the row DELETED when the 
 through the SAME `.claude/data/epr-meta-advice.json` store the resolver hook uses, under a
 `cascade-fp:` key prefix — one advisory per ~working session, never per run.
 
-WHO FILES. `placement-audit.py --epr-meta` RENDERS the cascade read-only (it is a scoreboard and
-must stay one); `.claude/scripts/seam-audit.py --cascade --file` is the runnable surface that
-appends to the ledger and prints the dispatch directives. Deliberate split: an audit that mutates
+WHO FILES. `.claude/scripts/seam-audit.py --cascade` RENDERS the cascade read-only (it is a
+scoreboard and must stay one; before 2026-09-11 that render was reached via `placement-audit.py
+--epr-meta`, since retired); `.claude/scripts/seam-audit.py --cascade --file` is the runnable
+surface that appends to the ledger and prints the dispatch directives. Deliberate split: an audit that mutates
 state as a side effect of being read is how a scoreboard becomes an actor.
 
 FAIL-LOUD, DEGRADE PER ROW. A binding manifest that will not parse is ONE finding naming that file;

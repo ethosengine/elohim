@@ -1293,7 +1293,7 @@ fn usage() -> String {
      measures+policies pair read over the same folds, grouped side by side and never merged; the \
      first is primary. The default recipe is DECLARED — .epr-meta/manifest.md `policy-recipe:` if \
      present, else the .claude/epr-meta pair. --headline prints the primary's \
-     memkit:/mempalace:/cleanup:/scope:/memory-budget: lines, a trailing recipe: <name>@<short-cid>, \
+     recall:/mempalace:/cleanup:/scope:/memory-budget: lines, a trailing recipe: <name>@<short-cid>, \
      then one alt: count line per extra recipe. \
      Never exits non-zero — enforcement class lives on the row, not on this process)\n  \
      | report placement [--ledger] [--coverage] [--stasis [--fold]] \

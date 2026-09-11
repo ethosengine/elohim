@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project_recall_reaches_authority_habit",
+  "claim": "Declared 2026-09-11 (born red): one governed recall journey serves ceremony and sprint doors; middot recall-{metered,unmetered}-bytes/mistaken-assertions/screens-to-shape; graduates to p2p when humans discover meaning in communities through the same inspectable artifact.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_recall_reaches_authority_habit.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_recall_reaches_authority_habit.md",
+        "cid": "bafkreifzfk4eaqd62jid3yrfazmtm56ahqkipe4nyvq3wlbclcnlsh7cha"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "recall-reaches-authority habit — bounded recall graduates from eprfs to p2p",
+    "file": "project_recall_reaches_authority_habit.md",
+    "scopePath": ".claude/memory/project_recall_reaches_authority_habit.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

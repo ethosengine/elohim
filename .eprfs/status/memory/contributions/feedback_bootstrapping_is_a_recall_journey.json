@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_bootstrapping_is_a_recall_journey",
+  "claim": "Operator 2026-09-11: session bootstrapping and the memory ceremony are one journey through one algorithm (recall-contract.json) with shared mishpat/middot; fold your own bootstrapping sample; two doors — whole-system review vs focused sprint.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_bootstrapping_is_a_recall_journey.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_bootstrapping_is_a_recall_journey.md",
+        "cid": "bafkreiexct4o6v3ucopek366swgt2sgt5v4fxcfwrt4t2xy7ovkq7brc6m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Bootstrapping into a concern IS a recall journey — measure it, one door of two",
+    "file": "feedback_bootstrapping_is_a_recall_journey.md",
+    "scopePath": ".claude/memory/feedback_bootstrapping_is_a_recall_journey.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

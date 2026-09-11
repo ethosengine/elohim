@@ -1,6 +1,6 @@
 """subject_routing — the shared cascade-resolver + class-reconciler for subject-routed decomposition.
 
-Read by BOTH gates (the brainstorm/plan FRONT gate via `_lib.subject_routing`, and decompose.py at the
+Read by BOTH gates (the brainstorm/plan FRONT gate via `_lib.subject_routing`, and `epr flow project` at the
 BACK fire), so the single `class:` field flows front->back and the decompose router is multi-flow instead
 of single-flow.
 

@@ -2,7 +2,7 @@
 id: feedback-managed-surface-edit-discipline
 name: feedback-managed-surface-edit-discipline
 title: Managed-surface edit discipline
-description: "CLAUDE.md/spec/plan edits go through the cite tooling (seal/describe/propagate/refresh); scope lives ONLY in _lib/managed_surfaces.py."
+description: "CLAUDE.md/spec/plan edits go through the cite tooling (`epr flow cites seal|describe|stamp`); scope lives ONLY in _lib/managed_surfaces.py."
 metadata:
   type: feedback
 cites:
@@ -11,7 +11,7 @@ cites:
 ---
 
 Editing any project-managed memory surface (gospel CLAUDE.mds, specs/plans, doc-roots, memory entries) means
-using the cite tooling — `cite-gen --seal`, `cite-describe`, `cite-propagate`, `--refresh` — never hand-writing
+using the cite tooling — `epr flow cites seal`, `describe`, `stamp` — never hand-writing
 a slug, fingerprint, or path. The 2026-06-05 episode: rails were hand-cited into 4 CLAUDE.mds and needed two
 operator corrections, because every hook hardcoded its own scope (doc-roots only) and nothing fired pre-edit.
 
@@ -21,4 +21,4 @@ enforcement surface privately re-encoded a narrower scope. Scope must live in ON
 **How to apply:** trust the PreToolUse injection (`managed-surface-context.py`) — when it names a discipline +
 tool, use that tool. When adding a new managed home, add it to `_lib/managed_surfaces.py` (the cross-check test
 fails if it diverges from `subject-routing.yaml`), never to an individual hook. `status: stale` on a cite is a
-re-verify queue → `cite-gen --refresh <doc>` after re-verifying, not a thing to hand-edit.
+re-verify queue → `epr flow cites stamp <doc>` after re-verifying, not a thing to hand-edit.

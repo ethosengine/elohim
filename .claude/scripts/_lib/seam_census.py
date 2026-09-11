@@ -1,9 +1,10 @@
 """seam_census.py — the decision-point census (seam-concern-contract-architecture plan,
 task P3.2): the DERIVED read-model over the four (today) `seam-registry.yaml` files plus
 the two concern-canon homes (`.claude/epr-meta/policies.yaml` enforcement rows +
-`.claude/epr-meta/concerns.yaml` Precedent rows). Wired thin into
-`placement-audit.py --epr-meta`; this module owns all the logic, the CLI just prints
-`render_census(census_data(ROOT))`.
+`.claude/epr-meta/concerns.yaml` Precedent rows). Wired thin into `.claude/scripts/seam-audit.py` (via `seam_matrix.py`'s import of this module);
+this module owns all the logic. Its own `render_census(census_data(ROOT))` block was formerly
+printed by `placement-audit.py --epr-meta` (retired 2026-09-11) and has no runnable caller today
+— exercised only by `__tests__/seam_census_test.py`.
 
 WHAT IT CHECKS (both directions, per the plan's own P3.2 task text):
   (a) point -> concern: every registered decision point's `contractTests` citations are

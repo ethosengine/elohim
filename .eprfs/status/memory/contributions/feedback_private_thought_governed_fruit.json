@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:implementer@claude-opus-5",
+  "author": "agent:orchestrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_private_thought_governed_fruit.md",
-        "cid": "bafkreibbvzr5tavhdzqixx5ogu7lrw2o4rah3ocv5spm4pp2r4wfgvtkpi"
+        "cid": "bafkreicirgr6vfbpfoa6vrfma6lk6zllc3lyuhxs2it3smj5g2jwl4gv2a"
       },
       "reach": "repository"
     }
@@ -25,10 +25,10 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "feedback_private_thought_governed_fruit",
+    "display": "Thoughts private, fruit judged (constitutional)",
     "file": "feedback_private_thought_governed_fruit.md",
     "scopePath": ".claude/memory/feedback_private_thought_governed_fruit.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": true
   }

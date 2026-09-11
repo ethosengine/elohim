@@ -2,7 +2,7 @@
 name: reference_memory_system
 title: Memory-system references (umbrella)
 id: reference-memory-system
-description: "Memory: MEMORY.md (index), memory/*.md (entries), MemPalace (ChromaDB+SQLite, per-subagent scoped), CLAUDE.md (gospel); horizon scans in memory-kit/."
+description: "Memory: MEMORY.md (index), memory/*.md (entries), MemPalace (ChromaDB+SQLite, per-subagent scoped), CLAUDE.md (gospel); horizon scans in genesis/docs/analysis/horizon-scans/."
 metadata:
   node_type: memory
   type: reference

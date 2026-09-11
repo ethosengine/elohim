@@ -69,7 +69,7 @@ hook is dead code, and registration is the review surface; (2) hooks are fail-op
 (any internal error exits 0 silently) with per-entry `timeout` in SECONDS (normalized
 2026-07-02 — values had been written as milliseconds, making the declared 2-15s budgets
 33min-4h no-ops); (3) hooks stay THIN — real logic lives in `.claude/scripts/_lib/` (tested
-under `_lib/__tests__/`) or `.claude/scripts/memory-kit/` (tested under its `__tests__/`),
+under `_lib/__tests__/`) or `.epr-meta/elohim/lenses/` (tested under its own `__tests__/`),
 so the transport can be swapped (the brit/eprfs direction) without losing the rules. None of
 those three is expressible as an enforced `.epr-meta` predicate, and none has been made one.
 

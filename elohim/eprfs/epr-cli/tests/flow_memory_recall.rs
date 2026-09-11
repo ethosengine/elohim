@@ -22,8 +22,8 @@ use std::process::Command;
 
 use elohim_epr_cli::flow::memory::footprint;
 use elohim_epr_cli::flow::memory::recall::{
-    self, adopt_receipts, discover, excerpt, refuse_private_import, save_receipt, Contract,
-    Execution,
+    self, adopt_receipts, discover, discover_scored, excerpt, refuse_private_import, save_receipt,
+    Contract, Execution,
 };
 use elohim_epr_rea::{AgentRef, DepEdge, FlowRecord, FlowStore, Governor, SidecarFlowStore};
 use eprfs_core::BlobCid;
@@ -207,6 +207,21 @@ fn begin(root: &Path) {
     ok(
         root,
         &["select", "--edge", "1", "--need", "Check the dependency"],
+    );
+}
+
+/// Open a session with a question and no concern selection — the FOCUSED door.
+///
+/// `begin` selects a concern edge, which is the ceremony door; a focused journey has no edge to
+/// select and is the shape several assertions below are about.
+fn begin_focused(root: &Path, about: &str) {
+    ok(
+        root,
+        &[
+            "open",
+            "--need",
+            &format!("where does the pelican nest in {about}"),
+        ],
     );
 }
 
@@ -449,7 +464,11 @@ fn provider_substitution_and_refusal_preserve_intent() {
     // The local default reports what it inspected and claims no ranking.
     // The chosen provider PERSISTS in the continuation, so returning to the default is an explicit
     // act rather than an omission — naming it is what the next operation would have to do too.
-    let local = ok(
+    // `view` rather than `ok`: since 2026-09-11 a query reaches the body prefix too, so `purpose`
+    // now matches all three fixture documents (their bodies carry a `# Purpose` heading), the
+    // three-result window fills, and the executor exits 2 on an honest frontier line. A filled
+    // window is an answered question with a named limit, not a failure.
+    let local = view(
         root,
         &[
             "search",
@@ -464,6 +483,14 @@ fn provider_substitution_and_refusal_preserve_intent() {
     assert_eq!(
         local["retrieval"]["selection"],
         "bounded filesystem traversal; sorted returned window, no relevance ranking"
+    );
+    assert_eq!(
+        local["retrieval"]["candidates"]
+            .as_array()
+            .expect("candidates")
+            .len(),
+        3,
+        "a body-only query term is reached now that the prefix already read is searched"
     );
     // MemPalace is declared optional and says its ranking is unknown rather than implying one.
     let declared = ok(root, &["recipe"]);
@@ -1388,10 +1415,26 @@ fn only_a_complete_frontmatter_boundary_establishes_membership() {
     );
     let cut = discover(root, &contract, "docs", "", &[], "directory", "*.md").expect("discover");
     assert!(cut["candidates"].as_array().expect("candidates").is_empty());
-    assert!(cut["unresolved"][0]
+    // Skipped, counted and NAMED — the budget cut is reported as its own remedy, not swallowed.
+    assert_eq!(cut["unreadable_candidates"], 1);
+    assert!(cut["omissions"][0]
         .as_str()
+        .expect("omission")
+        .contains("docs/cut.md"));
+    let frontier: Vec<String> = cut["unresolved"]
+        .as_array()
         .expect("frontier")
-        .starts_with("incomplete frontmatter within metadata budget"));
+        .iter()
+        .map(|m| m.as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        frontier.contains(&"unreadable candidates: 1".to_string()),
+        "{frontier:?}"
+    );
+    assert!(
+        frontier.iter().any(|m| m.contains("limits.metadata_bytes")),
+        "{frontier:?}"
+    );
 
     // A `---` that is not a whole line is not a document boundary.
     std::fs::remove_file(root.join("docs/cut.md")).expect("rm");
@@ -2076,4 +2119,934 @@ fn the_paired_lens_pins_both_halves_and_refuses_an_unpaired_close() {
         .as_str()
         .expect("reason")
         .contains("cannot reuse evidence"));
+}
+
+// ── station one: the agent's question, and the tooling layer ─────────────────────────────────────
+
+/// The documented entry is `open --need '<question>'`. Before 2026-09-11 that question was
+/// recorded nowhere: the session adopted the recipe's generic purpose and every later receipt,
+/// finish and measurement was accounted against an intent nobody carried.
+#[test]
+fn the_agents_own_question_becomes_the_session_intent() {
+    let dir = repo();
+    let root = dir.path();
+    let question = "Which verb re-mines the MemPalace index now the kit is gone?";
+    let opened = ok(root, &["open", "--need", question]);
+    assert_eq!(opened["orientation"]["intent"], question);
+
+    // An explicit --intent still wins: the need is the FALLBACK, not an override.
+    let other = repo();
+    let named = ok(
+        other.path(),
+        &["open", "--need", question, "--intent", "Preserve meaning"],
+    );
+    assert_eq!(named["orientation"]["intent"], "Preserve meaning");
+
+    // And a session opened with neither still falls back to the contract's declared purpose.
+    let bare = repo();
+    let purpose = live_contract()["purpose"].clone();
+    let defaulted = ok(bare.path(), &["open"]);
+    assert_eq!(defaulted["orientation"]["intent"], purpose);
+}
+
+/// `.claude/` is a declared source root so the tooling layer is readable THROUGH the entry — and a
+/// sibling checkout inside it is still refused, because a widened root is not an unbounded one.
+#[test]
+fn the_tooling_layer_is_readable_and_a_sibling_checkout_is_not() {
+    let dir = repo();
+    let root = dir.path();
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["docs", ".claude"]);
+    save_contract(root, contract);
+    write(
+        root,
+        ".claude/skills/memory-ceremony/SKILL.md",
+        "---\ntitle: Memory ceremony\n---\n# Phase 4\nRe-mine the index.\n",
+    );
+    write(
+        root,
+        ".claude/worktrees/sprint-x/docs/a.md",
+        "---\ntitle: Another tree\n---\n# Purpose\nnot ours\n",
+    );
+    ok(root, &["open", "--need", "Where is the re-mine step?"]);
+
+    let read = ok(
+        root,
+        &[
+            "read",
+            "--path",
+            ".claude/skills/memory-ceremony/SKILL.md",
+            "--lines",
+            "4:5",
+        ],
+    );
+    assert_eq!(
+        read["evidence"]["sources"][0]["content"],
+        "# Phase 4\nRe-mine the index.\n"
+    );
+    assert!(!read["receipt_keys"]
+        .as_array()
+        .expect("receipt keys")
+        .is_empty());
+
+    for path in [
+        ".claude/worktrees/sprint-x/docs/a.md",
+        ".eprfs/status/recall/other/continuation.json",
+    ] {
+        let refused = run(root, &["read", "--path", path, "--lines", "1:1"]);
+        assert_eq!(
+            refused.code, 2,
+            "{path} was not refused: {}",
+            refused.stdout
+        );
+    }
+    // The worktree refusal names its own class rather than borrowing the private-record one.
+    let refused = run(
+        root,
+        &[
+            "read",
+            "--path",
+            ".claude/worktrees/sprint-x/docs/a.md",
+            "--lines",
+            "1:1",
+        ],
+    );
+    assert!(
+        refused.json()["next"]
+            .as_str()
+            .expect("next")
+            .contains("sibling checkout"),
+        "{}",
+        refused.stdout
+    );
+}
+
+/// The live artifact — not a fixture — declares the tooling layer, and the receipt pins ITS bytes.
+#[test]
+fn the_live_contract_declares_the_tooling_layer_and_receipts_pin_its_bytes() {
+    let live = live_contract();
+    let roots: Vec<String> = live["source_roots"]
+        .as_array()
+        .expect("source roots")
+        .iter()
+        .map(|r| r.as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(roots.contains(&".claude/".to_string()), "{roots:?}");
+    assert!(live["version"].as_u64().expect("version") >= 5);
+    assert!(live["limits"]["habit_register_bytes"].as_u64().is_some());
+
+    // A session opened under a contract carrying the new roots pins that contract's raw CID, so a
+    // receipt written before the widening cannot be mistaken for one written after it.
+    let dir = repo();
+    let root = dir.path();
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["docs", ".claude"]);
+    save_contract(root, contract);
+    let raw = std::fs::read(root.join("contract.json")).expect("bytes");
+    let expected = BlobCid::compute_raw(&raw).to_string();
+    let opened = ok(root, &["open", "--need", "Which method is pinned?"]);
+    assert_eq!(opened["execution_method"]["method"], expected);
+    assert_eq!(continuation(root, SESSION)["method"], expected);
+}
+
+// ── station two: legible refusals and a compact human view ───────────────────────────────────────
+
+/// A human refusal is the fault and the remedy. Nothing else — no JSON, no re-printed orientation.
+#[test]
+fn a_human_refusal_is_two_lines_and_the_json_envelope_is_unchanged() {
+    let dir = repo();
+    let root = dir.path();
+    begin(root);
+    let human = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["flow", "memory", "recall", "read"])
+        .args(["--path", "outside.md", "--lines", "1:1"])
+        .args(["--root", &root.to_string_lossy()])
+        .args(["--contract", "contract.json", "--session", SESSION])
+        .output()
+        .expect("epr runs");
+    let stdout = String::from_utf8_lossy(&human.stdout).to_string();
+    assert_eq!(human.status.code(), Some(2), "{stdout}");
+    assert!(!stdout.contains('{'), "{stdout}");
+    let lines: Vec<&str> = stdout.trim_end().lines().collect();
+    assert_eq!(lines.len(), 2, "{stdout}");
+    assert!(lines[0].starts_with("refused: "), "{stdout}");
+    assert!(lines[1].starts_with("next: "), "{stdout}");
+    assert!(lines[1].contains("declared source_roots"), "{stdout}");
+
+    // `--json` keeps the envelope every machine reader already parses.
+    let structured = run(root, &["read", "--path", "outside.md", "--lines", "1:1"]);
+    assert_eq!(structured.code, 2);
+    assert!(structured.json()["next"].is_string());
+    assert!(structured.json()["unresolved"][0].is_string());
+}
+
+/// The human view is a screen an agent acts from; `--json` stays the full payload.
+#[test]
+fn the_human_view_is_compact_and_the_json_view_is_whole() {
+    let dir = repo();
+    let root = dir.path();
+    ok(root, &["open", "--need", "What is stale here?"]);
+    let human = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["flow", "memory", "recall", "open"])
+        .args(["--root", &root.to_string_lossy()])
+        .args(["--contract", "contract.json", "--session", SESSION])
+        .output()
+        .expect("epr runs");
+    let stdout = String::from_utf8_lossy(&human.stdout).to_string();
+    assert!(stdout.len() < 6000, "human view is {} bytes", stdout.len());
+    // The accounting structures are LINES, not inline JSON dumps.
+    for heading in ["Continuation: ", "Accounting: ", "Frontier: "] {
+        assert!(stdout.contains(heading), "{heading} missing:\n{stdout}");
+    }
+    assert!(!stdout.contains("\"totals\""), "{stdout}");
+    // The Linked choices — the progressive-discovery payload — are untouched.
+    assert!(stdout.contains("\nLinked choices:\n"), "{stdout}");
+    assert!(
+        stdout.contains("epr flow memory recall select --session"),
+        "{stdout}"
+    );
+
+    // And the machine view still carries everything the compact lines summarize.
+    let structured = view(root, &["open"]);
+    assert!(structured["cumulative"]["totals"].is_object());
+    assert!(structured["continuation"]["counts"].is_object());
+}
+
+// ── station five: the first screen at its door ───────────────────────────────────────────────────
+
+/// A focused question gets the area's habit, its last delta and the sources competing to answer,
+/// BEFORE any stale-edge group. A whole-scope question keeps the grouped convergence view.
+#[test]
+fn a_focused_question_gets_its_habit_its_delta_and_ranked_sources() {
+    let dir = repo();
+    let root = dir.path();
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["docs", "genesis"]);
+    contract["ceremony"]["defaults"]["scope"] = json!(".");
+    save_contract(root, contract);
+    write(
+        root,
+        "genesis/manifests/habits.yaml",
+        r#"habits:
+  - id: recall-reaches-authority
+    invariant: >
+      One governed journey serves every agent question through the same algorithm.
+    status: red
+    active: false
+    evidence: >
+      RED WRITTEN 2026-09-11: the entry dropped the question and refused the tooling layer.
+
+      An older delta nobody should see first.
+  - id: blob-durability
+    invariant: >
+      Blobs survive a peer loss.
+    status: green
+    evidence: >
+      GREEN 2026-08-01.
+"#,
+    );
+    write(
+        root,
+        "genesis/notes/remine.md",
+        "---\ntitle: Re-mine the index\ndescription: how a stale palace index is re-mined\n---\n# Body\ntext\n",
+    );
+    write(
+        root,
+        "genesis/notes/unrelated.md",
+        "---\ntitle: Conductor arc factor\n---\n# Body\ntext\n",
+    );
+
+    let focused = view(
+        root,
+        &[
+            "open",
+            "--scope",
+            "genesis",
+            "--need",
+            "Does recall-reaches-authority hold, and how is the index re-mined?",
+        ],
+    );
+    let screen = &focused["first_screen"];
+    assert_eq!(screen["area"], "genesis");
+    let habits = screen["habits"].as_array().expect("habits");
+    assert_eq!(habits.len(), 1, "{habits:?}");
+    assert_eq!(habits[0]["id"], "recall-reaches-authority");
+    assert_eq!(habits[0]["status"], "red");
+    assert!(
+        habits[0]["delta"]
+            .as_str()
+            .expect("delta")
+            .starts_with("RED WRITTEN 2026-09-11"),
+        "{:?}",
+        habits[0]["delta"]
+    );
+    assert!(
+        !habits[0]["delta"]
+            .as_str()
+            .expect("delta")
+            .contains("older delta"),
+        "the ledger's newest entry is the delta, not the whole ledger"
+    );
+
+    // The candidates are inside the declared roots, ranked, and charged to this session.
+    let candidates = screen["candidates"].as_array().expect("candidates");
+    assert!(!candidates.is_empty(), "{screen}");
+    for candidate in candidates {
+        let path = candidate["path"].as_str().expect("path");
+        assert!(path.starts_with("genesis/"), "{path} escaped the roots");
+    }
+    assert_eq!(candidates[0]["path"], "genesis/notes/remine.md");
+    assert!(candidates[0]["term_hits"].as_u64().expect("hits") > 0);
+    assert_eq!(screen["provider"], "local");
+    assert!(screen["ranking"]
+        .as_str()
+        .expect("ranking")
+        .contains("term overlap"));
+    assert!(
+        focused["usage"]["habit_register_bytes"]
+            .as_u64()
+            .expect("register bytes charged")
+            > 0
+    );
+    assert!(focused["usage"]["scanned_files"].as_u64().expect("scan") > 0);
+    // Every ranked source arrives as an executable choice, never as an excerpt.
+    let labels: Vec<String> = focused["actions"]
+        .as_array()
+        .expect("actions")
+        .iter()
+        .map(|a| a["label"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        labels
+            .iter()
+            .any(|l| l == "Outline genesis/notes/remine.md"),
+        "{labels:?}"
+    );
+
+    // A whole-scope question that names no area and touches no habit keeps the grouped view.
+    let wide = repo();
+    let mut plain = contract_value(false);
+    plain["ceremony"]["defaults"]["scope"] = json!(".");
+    save_contract(wide.path(), plain);
+    let whole = view(
+        wide.path(),
+        &["open", "--need", "What is stale everywhere?"],
+    );
+    assert!(whole["first_screen"].is_null(), "{}", whole["first_screen"]);
+    assert!(whole["concerns"]["groups"].is_array());
+}
+
+/// One unparseable document is not a reason to stop reading the rest.
+///
+/// Until 2026-09-11 `discover` pushed a frontier line and `break 'outer` on the first frontmatter
+/// it could not parse. The honesty rule behind that — a window never hides what it could not read —
+/// is satisfied by NAMING each skipped candidate, and the abort made the focused first screen
+/// useless in the live corpus: seven malformed documents in one directory capped every search over
+/// it, none of them chosen by the reader.
+#[test]
+fn an_unparseable_candidate_is_skipped_counted_and_named_not_a_full_stop() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let contract = Contract::load(&root.join("contract.json")).expect("contract");
+
+    // Sorted traversal puts the bad document BETWEEN the two good ones, so an abort on it would
+    // lose one of them and a silent skip would lose the account of it.
+    write(root, "docs/1-good.md", "---\ntitle: First\n---\nbody\n");
+    write(
+        root,
+        "docs/2-bad.md",
+        "---\ntitle: Second: with a colon\n---\nbody\n",
+    );
+    write(root, "docs/3-good.md", "---\ntitle: Third\n---\nbody\n");
+
+    let found = discover(root, &contract, "docs", "", &[], "directory", "*.md").expect("discover");
+    let paths: Vec<String> = found["candidates"]
+        .as_array()
+        .expect("candidates")
+        .iter()
+        .map(|c| c["path"].as_str().unwrap_or_default().to_string())
+        .collect();
+    assert_eq!(paths, vec!["docs/1-good.md", "docs/3-good.md"], "{found}");
+    assert_eq!(found["unreadable_candidates"], 1);
+    let omission = found["omissions"][0].as_str().expect("omission");
+    assert!(
+        omission.starts_with("1 candidate(s) unreadable"),
+        "{omission}"
+    );
+    assert!(omission.contains("docs/2-bad.md"), "{omission}");
+    assert!(found["unresolved"]
+        .as_array()
+        .expect("frontier")
+        .iter()
+        .any(|m| m.as_str() == Some("unreadable candidates: 1")));
+
+    // A scope where NOTHING parses answers with zero candidates and a loud account, never silence.
+    std::fs::remove_file(root.join("docs/1-good.md")).expect("rm");
+    std::fs::remove_file(root.join("docs/3-good.md")).expect("rm");
+    let none = discover(root, &contract, "docs", "", &[], "directory", "*.md").expect("discover");
+    assert!(none["candidates"]
+        .as_array()
+        .expect("candidates")
+        .is_empty());
+    assert_eq!(none["unreadable_candidates"], 1);
+    assert!(!none["omissions"].as_array().expect("omissions").is_empty());
+    assert!(!none["unresolved"].as_array().expect("frontier").is_empty());
+
+    // And a clean scope says nothing at all — the account appears only when something was skipped.
+    std::fs::remove_file(root.join("docs/2-bad.md")).expect("rm");
+    write(root, "docs/clean.md", "---\ntitle: Clean\n---\nbody\n");
+    let clean = discover(root, &contract, "docs", "", &[], "directory", "*.md").expect("discover");
+    assert_eq!(clean["unreadable_candidates"], 0);
+    assert!(clean["omissions"].as_array().expect("omissions").is_empty());
+    assert!(clean["unresolved"].as_array().expect("frontier").is_empty());
+}
+
+/// The focused first screen carries the skip account, so a ranked list that is short because of
+/// malformed documents says so rather than looking like a thin corpus.
+#[test]
+fn the_first_screen_names_the_candidates_it_could_not_read() {
+    let dir = repo();
+    let root = dir.path();
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["docs", "genesis"]);
+    contract["ceremony"]["defaults"]["scope"] = json!(".");
+    save_contract(root, contract);
+    write(
+        root,
+        "genesis/notes/remine.md",
+        "---\ntitle: Re-mine the index\n---\nbody\n",
+    );
+    write(
+        root,
+        "genesis/notes/broken.md",
+        "---\ntitle: Re-mine: broken\n---\nbody\n",
+    );
+
+    let focused = view(
+        root,
+        &[
+            "open",
+            "--scope",
+            "genesis",
+            "--need",
+            "How is the index re-mined?",
+        ],
+    );
+    let screen = &focused["first_screen"];
+    let omissions: Vec<String> = screen["omissions"]
+        .as_array()
+        .expect("omissions")
+        .iter()
+        .map(|m| m.as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(
+        omissions
+            .iter()
+            .any(|m| m.contains("genesis/notes/broken.md")),
+        "{omissions:?}"
+    );
+    // The readable candidate still arrives — that is the whole point of skipping rather than
+    // aborting.
+    assert!(screen["candidates"]
+        .as_array()
+        .expect("candidates")
+        .iter()
+        .any(|c| c["path"] == "genesis/notes/remine.md"));
+}
+
+/// A multibyte character straddling the read cap is the READER's cut, not the document's fault.
+///
+/// Measured 2026-09-11: `.claude/skills/converge/SKILL.md` carries 708 bytes of valid frontmatter
+/// in a 19,886-byte file whose byte 8190 begins an em dash. The `metadata_bytes` read stopped at
+/// 8192, `from_utf8` failed, and discovery reported the whole document as unparseable frontmatter.
+#[test]
+fn a_character_cut_by_the_metadata_budget_does_not_condemn_the_document() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let contract = Contract::load(&root.join("contract.json")).expect("contract");
+    let budget = contract_value(false)["limits"]["metadata_bytes"]
+        .as_u64()
+        .expect("metadata budget") as usize;
+
+    // The em dash starts three bytes before the cap, so the read ends INSIDE it.
+    let header = "---\ntitle: Boundary\ndescription: cut mid character\n";
+    let opening = format!("{header}---\n");
+    let pad = budget - 2 - opening.len();
+    let document = format!(
+        "{opening}{}\u{2014} needle-beyond-the-window\n",
+        "a".repeat(pad)
+    );
+    assert_eq!(
+        document.as_bytes()[budget - 2],
+        0xe2,
+        "the cut lands mid-character"
+    );
+    write(root, "docs/boundary.md", &document);
+
+    let found = discover(
+        root,
+        &contract,
+        "docs",
+        "boundary",
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    assert_eq!(found["unreadable_candidates"], 0, "{found}");
+    let candidate = &found["candidates"][0];
+    assert_eq!(candidate["path"], "docs/boundary.md");
+    // The frontmatter is still EXACT bytes: the trim only ever removes tail.
+    assert_eq!(
+        candidate["metadata_fingerprint"],
+        format!("{:x}", Sha256::digest(header.as_bytes()))
+    );
+
+    // The METADATA window is still what gates membership, whatever the wider body window read:
+    // this document's header was proven from the first `metadata_bytes` and nothing else.
+    assert!(found["partially_scanned_candidates"].as_u64().is_some());
+}
+
+/// An agent's own words live in prose, not in frontmatter.
+///
+/// Measured 2026-09-11: a context-reset reader asking about "re-mine", "marker" and "stamp" got
+/// zero candidates from two searches, because discovery only ever matched declared metadata. The
+/// body bytes were already read under the same budget and were simply not looked at.
+#[test]
+fn a_term_carried_only_by_the_body_is_found_and_ranked_under_a_declared_hit() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let contract = Contract::load(&root.join("contract.json")).expect("contract");
+    write(
+        root,
+        "docs/declared.md",
+        "---\ntitle: Widget handbook\n---\nunrelated prose\n",
+    );
+    write(
+        root,
+        "docs/prose.md",
+        "---\ntitle: Unrelated\n---\nthe widget is described here and nowhere else\n",
+    );
+
+    let found = discover_scored(
+        root,
+        &contract,
+        "docs",
+        "",
+        &["widget".into()],
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    let rows = found["candidates"].as_array().expect("candidates");
+    assert_eq!(rows.len(), 2, "{found}");
+    // The same term: declared beats body.
+    assert_eq!(rows[0]["path"], "docs/declared.md");
+    assert_eq!(rows[0]["match"], json!(["title"]));
+    assert_eq!(rows[0]["declared_hits"], 1);
+    assert_eq!(rows[1]["path"], "docs/prose.md");
+    assert_eq!(rows[1]["match"], json!(["body"]));
+    assert_eq!(rows[1]["declared_hits"], 0);
+    assert_eq!(rows[1]["term_hits"], 1);
+
+    // A plain `--query` reaches the body too — that is the path the fresh reader actually used.
+    let queried =
+        discover(root, &contract, "docs", "widget", &[], "directory", "*.md").expect("discover");
+    let paths: Vec<&str> = queried["candidates"]
+        .as_array()
+        .expect("candidates")
+        .iter()
+        .map(|c| c["path"].as_str().unwrap_or_default())
+        .collect();
+    assert!(paths.contains(&"docs/prose.md"), "{paths:?}");
+
+    // The traversal is still bounded, and still says which budget stopped it.
+    let mut narrow = contract_value(false);
+    narrow["limits"]["scan_files"] = json!(1);
+    save_contract(root, narrow);
+    let bounded = Contract::load(&root.join("contract.json")).expect("contract");
+    let capped = discover_scored(
+        root,
+        &bounded,
+        "docs",
+        "",
+        &["widget".into()],
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    assert!(capped["usage"]["scanned_files"].as_u64().expect("scanned") <= 1);
+    assert!(capped["unresolved"]
+        .as_array()
+        .expect("frontier")
+        .iter()
+        .any(|m| m.as_str().unwrap_or_default().contains("budget exhausted")));
+}
+
+/// The body-scan window is wide enough to hold an ordinary document, and it is still a WINDOW.
+///
+/// Declared 2026-09-11 as `limits.body_scan_bytes` after measurement: the answer a fresh reader
+/// needed sat at byte 22,903 of a 24,273-byte skill, and an 8 KB window could not see it. A wider
+/// window does not make the bound go away — it moves it, and a candidate bigger than the window is
+/// counted and named so a term past it reads as invisible rather than as absent.
+#[test]
+fn the_body_scan_window_holds_a_document_and_is_still_a_window() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let contract = Contract::load(&root.join("contract.json")).expect("contract");
+    let window = contract_value(false)["limits"]["body_scan_bytes"]
+        .as_u64()
+        .expect("body scan budget") as usize;
+    assert!(
+        window > 8_192,
+        "the body window is wider than the metadata one"
+    );
+
+    let header = "---\ntitle: Ordinary document\n---\n";
+    write(
+        root,
+        "docs/inside.md",
+        &format!(
+            "{header}{}\nhapaxlegomenon lives here\n",
+            "x ".repeat(10_000)
+        ),
+    );
+    write(
+        root,
+        "docs/beyond.md",
+        &format!(
+            "{header}{}\nhapaxlegomenon lives here\n",
+            "y ".repeat(window)
+        ),
+    );
+
+    let found = discover_scored(
+        root,
+        &contract,
+        "docs",
+        "",
+        &["hapaxlegomenon".into()],
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    let paths: Vec<&str> = found["candidates"]
+        .as_array()
+        .expect("candidates")
+        .iter()
+        .map(|c| c["path"].as_str().unwrap_or_default())
+        .collect();
+    // 20,000 bytes in: inside the window, so it is found and labelled by where it matched.
+    assert_eq!(paths, vec!["docs/inside.md"], "{found}");
+    assert_eq!(found["candidates"][0]["match"], json!(["body"]));
+    // Past the window: NOT found, and the view says how many documents it only half read.
+    assert_eq!(found["partially_scanned_candidates"], 1);
+    assert!(found["omissions"]
+        .as_array()
+        .expect("omissions")
+        .iter()
+        .any(|m| m.as_str() == Some("1 candidate(s) scanned to the body-scan window only")));
+
+    // The whole-traversal budget still bounds the walk, and still names itself.
+    let mut narrow = contract_value(false);
+    narrow["limits"]["scan_bytes"] = json!(4_096);
+    save_contract(root, narrow);
+    let bounded = Contract::load(&root.join("contract.json")).expect("contract");
+    let capped = discover_scored(
+        root,
+        &bounded,
+        "docs",
+        "",
+        &["hapaxlegomenon".into()],
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    assert!(capped["usage"]["scan_bytes"].as_u64().expect("scan bytes") <= 4_096);
+    assert!(capped["unresolved"]
+        .as_array()
+        .expect("frontier")
+        .iter()
+        .any(|m| m.as_str().unwrap_or_default().contains("budget exhausted")));
+}
+
+/// Ranking is over what the window read, and it is about which words DISTINGUISH a document.
+///
+/// Counting matched terms equally made `commands` and `index` — carried by forty of forty-four
+/// skills — worth as much as `mempalace`, carried by three, so the document that answered the
+/// reader's question ranked fifth with the answer sitting inside the window all along.
+#[test]
+fn a_rare_term_outranks_a_word_every_candidate_shares() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let contract = Contract::load(&root.join("contract.json")).expect("contract");
+    // Eight documents all carry `common`; exactly one carries `pelican`, and it carries it often.
+    for index in 0..8 {
+        write(
+            root,
+            &format!("docs/shared-{index}.md"),
+            "---\ntitle: Shared\n---\ncommon common common common common common\n",
+        );
+    }
+    write(
+        root,
+        "docs/rare.md",
+        "---\ntitle: Rare\n---\ncommon. pelican pelican pelican nests here.\n",
+    );
+
+    let found = discover_scored(
+        root,
+        &contract,
+        "docs",
+        "",
+        &["common".into(), "pelican".into()],
+        &[],
+        "directory",
+        "*.md",
+    )
+    .expect("discover");
+    assert_eq!(
+        found["candidates"][0]["path"], "docs/rare.md",
+        "the distinguishing term must win: {found}"
+    );
+    // The evidence for the ranking is reported, not just the order.
+    let matched = &found["candidates"][0]["matched_terms"];
+    assert_eq!(matched["pelican"]["found_in"], "body");
+    assert_eq!(matched["pelican"]["occurrences"], 3);
+    assert_eq!(matched["common"]["occurrences"], 1);
+}
+
+/// Naming a document is half an answer: the outline says WHERE the question's terms land.
+///
+/// Measured 2026-09-11: a fresh reader reached the answering skill, opened it with `source`, and
+/// moved on — the answer was under "Phase 4 — verify the experience, reconcile and retain
+/// learning", a heading that says nothing about re-mining an index.
+#[test]
+fn the_outline_says_which_section_the_question_lands_in() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    // Six sections; the term lives only in the fourth, under a heading that does not name it.
+    let mut document = String::from("---\ntitle: Six sections\n---\n");
+    for section in 1..=6 {
+        document.push_str(&format!(
+            "# Phase {section} — an unrelated heading\nfiller\n"
+        ));
+        if section == 4 {
+            document.push_str("the pelican nests here, and the pelican returns\n");
+        }
+    }
+    write(root, "docs/sections.md", &document);
+    begin_focused(root, "docs/sections.md");
+
+    let view = ok(
+        root,
+        &[
+            "source",
+            "--path",
+            "docs/sections.md",
+            "--need",
+            "where does the pelican nest",
+        ],
+    );
+    let headings = view["source_outline"]["headings"]
+        .as_array()
+        .expect("headings");
+    assert_eq!(headings.len(), 6);
+    let marked: Vec<usize> = headings
+        .iter()
+        .enumerate()
+        .filter(|(_, h)| h["hit_total"].as_u64().unwrap_or(0) > 0)
+        .map(|(index, _)| index)
+        .collect();
+    assert_eq!(marked, vec![3], "only section 4 carries the term: {view}");
+    assert_eq!(headings[3]["hits"]["pelican"], 2);
+
+    // The emitted choice reads THAT section, and it is the first one offered.
+    let choice = view["actions"]
+        .as_array()
+        .expect("actions")
+        .iter()
+        .find(|a| a["label"].as_str().unwrap_or_default().contains("[hits:"))
+        .expect("a located read choice");
+    assert!(choice["label"]
+        .as_str()
+        .expect("label")
+        .contains("pelican ×2"));
+    let argv: Vec<String> = choice["argv"]
+        .as_array()
+        .expect("argv")
+        .iter()
+        .map(|a| a.as_str().unwrap_or_default().to_string())
+        .collect();
+    assert!(argv.contains(&"read".to_string()), "{argv:?}");
+    let range = headings[3]["read_lines"].as_str().expect("range");
+    assert!(argv.contains(&range.to_string()), "{argv:?} wanted {range}");
+    let (start, end) = range.split_once(':').expect("range");
+    let (start, end): (usize, usize) = (start.parse().expect("n"), end.parse().expect("n"));
+    let body = std::fs::read_to_string(root.join("docs/sections.md")).expect("read");
+    let covered = body.lines().collect::<Vec<_>>()[start - 1..end].join("\n");
+    assert!(covered.contains("the pelican nests here"), "{covered}");
+}
+
+/// A section bigger than one excerpt is offered as a bounded FIRST window, and says so.
+#[test]
+fn an_oversized_section_is_offered_as_a_bounded_window_and_named() {
+    let dir = repo();
+    let root = dir.path();
+    for name in ["a", "b", "source"] {
+        std::fs::remove_file(root.join(format!("docs/{name}.md"))).expect("rm");
+    }
+    let excerpt_budget = contract_value(false)["limits"]["source_bytes"]
+        .as_u64()
+        .expect("source budget") as usize;
+    let mut document = String::from("---\ntitle: One long section\n---\n# Everything\n");
+    // Comfortably past one excerpt's worth, with the term at the very top so it is found.
+    document.push_str("the pelican opens this section\n");
+    for index in 0..excerpt_budget / 10 {
+        document.push_str(&format!("filler line {index}\n"));
+    }
+    write(root, "docs/long.md", &document);
+    begin_focused(root, "docs/long.md");
+
+    let view = ok(
+        root,
+        &[
+            "source",
+            "--path",
+            "docs/long.md",
+            "--need",
+            "where does the pelican nest",
+        ],
+    );
+    let section = &view["source_outline"]["headings"][0];
+    assert_eq!(section["window_complete"], json!(false), "{view}");
+    let range = section["read_lines"].as_str().expect("range");
+    let (start, end) = range.split_once(':').expect("range");
+    let (start, end): (usize, usize) = (start.parse().expect("n"), end.parse().expect("n"));
+    assert!(end > start, "the first window is not empty");
+    assert!(
+        end < section["end_line"].as_u64().expect("end") as usize,
+        "the window stops short of the whole section"
+    );
+    assert!(view["source_outline"]["omissions"]
+        .as_array()
+        .expect("omissions")
+        .iter()
+        .any(|m| m
+            .as_str()
+            .unwrap_or_default()
+            .contains("exceed the per-excerpt byte budget")));
+    // And the offered range is one `read` actually accepts.
+    ok(root, &["read", "--path", "docs/long.md", "--lines", range]);
+}
+
+/// A focused journey answers from passages and must be able to CLOSE.
+///
+/// Measured 2026-09-11: a reader that had read the answer could not finish — `finish needs an
+/// inspected concern` on a journey with zero concern edges, and the `next:` line named no input.
+#[test]
+fn a_focused_journey_finishes_on_its_receipts_and_says_it_reconciled_nothing() {
+    let dir = repo();
+    let root = dir.path();
+    write(
+        root,
+        "docs/answer.md",
+        "---\ntitle: Answer\n---\n# Body\nthe pelican nests on the ledge\n",
+    );
+    begin_focused(root, "docs/answer.md");
+
+    // With nothing read, the refusal names the missing input and counts what the session holds.
+    let empty = run(root, &["finish", "--outcome", "o", "--question", "q"]);
+    assert_eq!(empty.code, 2);
+    let message = empty.json()["unresolved"][0]
+        .as_str()
+        .expect("reason")
+        .to_string();
+    assert!(message.contains("this session has 0 receipts"), "{message}");
+    assert!(message.contains("read a passage first"), "{message}");
+    assert!(empty.json()["next"]
+        .as_str()
+        .expect("next")
+        .contains("--lines START:END"));
+
+    ok(
+        root,
+        &["read", "--path", "docs/answer.md", "--lines", "4:5"],
+    );
+    let finished = ok(
+        root,
+        &[
+            "finish",
+            "--outcome",
+            "The ledge is where it nests.",
+            "--question",
+            "Which ledge?",
+        ],
+    );
+    let outcome = &finished["outcome"];
+    assert_eq!(outcome["reconciled_edges"], 0);
+    assert_eq!(
+        outcome["receipts"],
+        json!(["docs/answer.md:4:5"]),
+        "a focused finish stands on the passages it read"
+    );
+    assert!(outcome["reconciliation_scope"]
+        .as_str()
+        .expect("scope")
+        .contains("No concern edge was selected or reconciled"));
+    // It is a finish, not a reconciliation: no edge standing is claimed.
+    assert!(finished["reconciliation"].is_null());
+}
+
+/// A refusal about an input NAMES that input, and a wrong flag teaches the right ones.
+#[test]
+fn a_refusal_about_an_input_names_the_flags_that_operation_accepts() {
+    let dir = repo();
+    let root = dir.path();
+    begin(root);
+    let unknown = run(root, &["remember", "--foo", "bar"]);
+    assert_eq!(unknown.code, 2);
+    let message = unknown.json()["unresolved"][0]
+        .as_str()
+        .expect("reason")
+        .to_string();
+    assert!(message.contains("unknown flag --foo"), "{message}");
+    for flag in ["--finding", "--question", "--next-action", "--evidence"] {
+        assert!(message.contains(flag), "{flag} unnamed in: {message}");
+    }
+    assert!(unknown.json()["next"]
+        .as_str()
+        .expect("next")
+        .contains("recall --help"));
+
+    // The same discipline on a missing input rather than a wrong one.
+    let incomplete = run(root, &["remember", "--finding", "f"]);
+    assert_eq!(incomplete.code, 2);
+    let message = incomplete.json()["unresolved"][0]
+        .as_str()
+        .expect("reason")
+        .to_string();
+    assert!(message.contains("--next-action"), "{message}");
 }

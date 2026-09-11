@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:implementer@claude-opus-5",
+  "author": "agent:orchestrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_agent_prompts_no_process_status.md",
-        "cid": "bafkreiht4jpydpplmcemrj5cz3khvp2ijsgyvjlbvxhuzuq4dbjk5ird7a"
+        "cid": "bafkreigwqi5uzbbi4r2yfh3dfv2ls7q7ymwexrdgcbaq67ymzn2ofeswp4"
       },
       "reach": "repository"
     }

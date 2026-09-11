@@ -20,10 +20,15 @@
 
 use std::collections::BTreeMap;
 
-/// The projector's generated-file header, byte-for-byte
-/// (`memory-index-projector.py:57` `HEADER`). It is part of the projected bytes, so the byte
-/// budget and the unloaded-row offset both start after it.
-pub const HEADER: &str = "<!-- GENERATED — do not hand-edit. MEMORY.md is projected from .claude/memory/*.md\n     frontmatter (title: + description:) by memory-index-projector.py --apply. -->\n";
+/// The generated-file header. It is part of the projected bytes, so the byte budget and the
+/// unloaded-row offset both start after it.
+///
+/// It NAMES THE VERB THAT REGENERATES IT. Until 2026-09-11 it named `memory-index-projector.py
+/// --apply`, a kit script the replacement deleted: every re-projection reproduced an instruction
+/// that could not be followed, in the one file a session reads first. The header diverging from
+/// the Python original is why `EXPECTED_INDEX_SHA256` in `flow_memory_import.rs` was re-baselined
+/// on that date — the RULE the oracle proves is unchanged, only this instruction line moved.
+pub const HEADER: &str = "<!-- GENERATED — do not hand-edit. MEMORY.md is projected from .claude/memory/*.md\n     frontmatter (title: + description:) by\n     epr flow memory project --index --budget memory-index-bytes@1 --out .claude/memory/MEMORY.md -->\n";
 
 /// `memory-index-projector.py:56` `TITLE_MAX`. A render-time bound, not an import-time one: an
 /// overlong title is a violation the projector REPORTS and still renders, truncated.

@@ -21,7 +21,7 @@ unreconciled scope — they can drift from the `available` flag with nothing cat
 is a *requirement* tag: when `<cap>` is available it means **satisfiable now**, never "blocked."
 
 **How to apply:** when any source says a capability is down/held, confirm against the LIVE signal before
-believing it — `cluster-state.yaml` `available:` + `scope-reconcile.py` (held/live counts) + the focus
+believing it — `cluster-state.yaml` `available:` + `epr flow hold --scope` (held/live counts) + the focus
 baseline — in that order of authority; the prose `note` and your own memory are the LEAST authoritative and
 the most likely stale. If they disagree, the flag wins, and fix the note. The wished-for automated check is
 [[scope-prose-coherence-switch]] (the note↔flag + prose↔live lint). Don't gate cross-node work on shem

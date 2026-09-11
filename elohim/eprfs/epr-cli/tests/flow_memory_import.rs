@@ -24,13 +24,19 @@ use tempfile::TempDir;
 
 /// The digest of the index this fixture corpus projects.
 ///
-/// Taken 2026-09-10 from `.claude/scripts/memory-kit/memory-index-projector.py --apply` run over
-/// `tests/fixtures/memory-entries/` — 98 indexed rows of 229 entries, 23,993 bytes. It is the
+/// First taken 2026-09-10 from `.claude/scripts/memory-kit/memory-index-projector.py --apply` run
+/// over `tests/fixtures/memory-entries/` — 98 indexed rows of 229 entries, 23,993 bytes. It is the
 /// harness's non-vacuous half: the oracle proves the RULE, this constant proves the BYTES, and a
 /// fixture edit that changes either one has to be re-baselined deliberately.
+///
+/// RE-BASELINED 2026-09-11 to 24,056 bytes: the generated-file header named the deleted kit script
+/// as the way to regenerate the index, so every projection reproduced an instruction nobody could
+/// follow. It now names `epr flow memory project --index`. Only that header line moved — the row
+/// rule, the row count and every rendered row are unchanged, which is why the oracle leg (when a
+/// Python projector is present at all) is expected to differ on the header alone.
 const EXPECTED_INDEX_SHA256: &str =
-    "8ee2e07eac63f45594cf18b6ab5f996594c5c25b0e511fd20bba198a627a83dd";
-const EXPECTED_INDEX_BYTES: usize = 23_993;
+    "841513f54186efc6192c04aaf53b0f4b19c16fb079f27486959700062fb8cd05";
+const EXPECTED_INDEX_BYTES: usize = 24_056;
 const EXPECTED_INDEX_ROWS: usize = 98;
 
 /// The fixture corpus is the live corpus's frontmatter, snapshotted. 226 of its 229 entries carry

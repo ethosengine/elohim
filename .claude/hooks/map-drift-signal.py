@@ -9,7 +9,7 @@ moved the territory the developer's WALK describes. The hook increments a
 `map-currency-drift` accumulator: it signals "MAP.md may be stale vs the seeds."
 It never moves or mutates the doc — the MAP refresh is operator/cartographer-gated
 (the LEGIBILITY/PATH discipline's ceremony). All judgment is deferred to the
-script that reads the accumulator (placement-audit.py --headline currency line).
+native reader of the accumulator (`epr flow report --headline`'s currency line).
 
 This is the LEGIBILITY/PATH discipline's in-flight tripwire — the standing,
 continuously-maintained twin of the BACK fire point's decompose tripwire. It
@@ -21,7 +21,7 @@ accumulator is reset to zero — the seeds and the walk are back in sync as far 
 this cheap signal can tell. The currency line then reads "0 seed(s) changed".
 
 The drift count surfaces at SessionStart through the existing budget headline
-(placement-audit.py --headline) as a "path:" currency line:
+(`epr flow report --headline`) as a "path:" currency line:
     "path: N seed(s) changed since MAP update | roadmap: refreshed <date>"
 
 Storage: ONE thing — a fold via `epr flow note --kind observation --measure
@@ -29,8 +29,7 @@ map-currency-drift@1`, routed to `map-currency-drift-reset@1` when MAP.md itself
 (a bulk clear). The private JSON accumulator under `.claude/memory-kit/` was deleted with the
 kit at station six round (b) (2026-09-11); the accumulated count is DERIVED from the folds by
 map-currency-drift-ceiling@1's `derive: distinct-subjects-since-reset`.
-The JSON is not a fallback: cleanup-pressure.py counts its `changed` collection, so the kit
-still produces the accumulated number the SessionStart bridge folds. Station six deletes it.
+There is no JSON fallback: the fold plane is the only accumulator now.
 
 Hook Type: PostToolUse
 Matcher: Edit|Write
@@ -64,7 +63,8 @@ import _observation as _obs  # noqa: E402  (structured-observation emitter; fail
 # The CANONICAL architecture surface — the seeds the MAP walks over. Repo-relative
 # dir prefix. A *.md created/changed here (other than the two map artifacts) is a
 # potential currency drift between the seeds (territory) and MAP.md (the walk).
-# Must mirror placement-audit.py's SURFACES["CANONICAL"].
+# This prefix used to have to mirror placement-audit.py's SURFACES["CANONICAL"]; that script
+# was retired 2026-09-11, and this hook is now this prefix's sole definition.
 ARCHITECTURE_PREFIX = "genesis/docs/content/elohim-protocol/architecture/"
 
 # The two MAP artifacts themselves are NOT seeds — they ARE the map. Editing them

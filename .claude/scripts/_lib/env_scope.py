@@ -1,4 +1,7 @@
-"""env_scope — the gap-granular substrate-scope resolver (shared by decompose / placement-audit / scope-reconcile).
+"""env_scope — the gap-granular substrate-scope resolver. The native port lives at
+`elohim/eprfs/epr-cli/src/flow/scope.rs`; this Python module is exercised only by its own tests
+today — its former callers decompose.py / placement-audit.py / scope-reconcile.py were all
+retired 2026-09-11.
 
 The scope model is gap-granular, isomorphic with a2o's per-scenario `@requires:<cap>` tags: a plan's gaps each
 resolve a `requires_env`, defaulting to the document-level frontmatter value and overridable per gap. A gap is
@@ -84,8 +87,8 @@ def gap_blocked(resolved, available, known) -> bool:
 def feature_act(text: str) -> str | None:
     """The `@act:<i|ii|iii|host>` tag a .feature file declares, or None if it declares none. Scans only
     the tag line(s) ABOVE the first `Feature:` keyword (gherkin `#` comments skipped, so prose mentioning
-    the tag isn't read as one) — mirrors scope-reconcile.py's `_feature_requires` tag-line walk and
-    substrate-scope.ts's `actFromTags()`/ACT_TAG. First tag wins if a doc mistakenly declares two (an
+    the tag isn't read as one) — mirrored the now-retired scope-reconcile.py's `_feature_requires` tag-line walk and
+    mirrors substrate-scope.ts's `actFromTags()`/ACT_TAG (still live). First tag wins if a doc mistakenly declares two (an
     authoring error the a2o runtime warns about; the planning layer just takes the first, same as the
     runtime)."""
     for ln in (text or "").splitlines():

@@ -820,6 +820,55 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-6b-2026-09-11
 
+  # ── bounded recall journey (2026-09-11) ────────────────────────────────────────────────
+  # The efficacy analysis's five fresh-start questions as middot. One journey through the
+  # governed recall entry — whether a ceremony's "understand this assertion" or a session's
+  # "what is the shape of this concern and what do I do first" — is one sample of each. The
+  # algorithm is .epr-meta/elohim/algorithms/recall-contract.json; the mishpat are the ceilings
+  # in `lenses:` below; these rows are the teeth-free measures. Folds arrive from
+  # `epr flow memory recall measure --phase close` (metered) and from the reader's own honest
+  # account (unmetered, screens, mistakes) via `epr flow note --kind observation --measure`.
+
+  - id: recall-metered-bytes
+    version: 1
+    family: recall-journey
+    unit: bytes
+    procedure: "epr flow memory recall measure --session <id> --phase close — source bytes the executor read and receipted for one journey"
+    provenance: "genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md — question 3 (files, bytes and tokens consumed); recall-contract.json limits.source_bytes=20000 per packet"
+    default-authority: observation
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-unmetered-bytes
+    version: 1
+    family: recall-journey
+    unit: bytes
+    procedure: "the reader's honest account: bytes read through shell/MCP/direct tools outside the executor during one journey (station six recorded 85.2 KB and 49.1 KB against 18 KB and 24 KB metered)"
+    provenance: "genesis/docs/superpowers/plans/memory-kit-replacement/task-6-integration-report.md — the byte leg of the conjunctive verdict rule"
+    default-authority: observation
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-mistaken-assertions
+    version: 1
+    family: recall-journey
+    unit: count
+    procedure: "the reader's answers checked against the authoritative source by a second seat: assertions that were wrong when made"
+    provenance: "genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md — question 2 (mistaken assertions avoided)"
+    default-authority: observation
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-screens-to-shape
+    version: 1
+    family: recall-journey
+    unit: count
+    procedure: "views (tool rounds or recall operations) the reader needed before it could name the concern's shape — its habit, its last delta and its first justified action"
+    provenance: "orchestrator bootstrapping sample 2026-09-11: 14 rounds of parallel probes before the shape was nameable; the SessionStart surface is a dashboard, not a path"
+    default-authority: observation
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
 lenses:
   - id: review-lint-lens
     version: 1
@@ -1267,3 +1316,56 @@ lenses:
     hard: 1
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
+
+  # ── bounded recall journey ceilings (2026-09-11) — the mishpat over the journey middot ──
+  # `recall-unmetered-bytes-ceiling` renders into the `recall` headline slot (the retired
+  # `memkit` slot's successor in report.rs HEADLINE_ORDER): the SessionStart surface's first line
+  # becomes the last journey's honesty reading. Until the native slot lands the report names the
+  # unknown slot on stderr and keeps the rest of the headline.
+
+  - id: recall-metered-bytes-ceiling
+    version: 1
+    binding: binding-local
+    class: measure
+    consumes: [recall-metered-bytes@1]
+    context: recall-journey
+    soft: 20000
+    hard: 60000
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-unmetered-bytes-ceiling
+    version: 1
+    headline: recall
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    consumes: [recall-unmetered-bytes@1]
+    context: session-headline
+    soft: 1
+    hard: 20000
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-mistaken-assertions-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: measure
+    consumes: [recall-mistaken-assertions@1]
+    context: recall-journey
+    hard: 1
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  - id: recall-screens-to-shape-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: measure
+    consumes: [recall-screens-to-shape@1]
+    context: recall-journey
+    soft: 3
+    hard: 6
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11

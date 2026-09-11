@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 4,
+  "version": 9,
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
   "limits": {
@@ -10,19 +10,21 @@
     "search_results": 3,
     "native_projection_bytes": 12000,
     "native_timeout_seconds": 15,
-    "scan_bytes": 262144,
+    "scan_bytes": 2097152,
     "scan_files": 128,
     "scan_entries": 4096,
     "metadata_bytes": 8192,
-    "scan_seconds": 3,
+    "body_scan_bytes": 65536,
+    "scan_seconds": 5,
     "output_bytes": 32768,
     "provider_bytes": 8192,
     "provider_seconds": 15,
     "native_raw_bytes": 262144,
-    "session_bytes": 1048576
+    "session_bytes": 1048576,
+    "habit_register_bytes": 1048576
   },
   "source_roots": [
-    ".claude/memory/",
+    ".claude/",
     "genesis/",
     "elohim/",
     "doorway/",
@@ -38,9 +40,11 @@
     "If routes are absent or insufficient, make at most one MemPalace search per packet with limit 3; verify returned sources within that packet’s remaining file/byte budget.",
     "Treat service ranking as candidate discovery, not authority; it may combine semantic and lexical scores. Record query, source locators and unknown ranking/version details.",
     "If useful evidence does not fit this packet, report its unresolved frontier. Autonomously open another focused packet with an explicit evidence question when expected value justifies it; carry cumulative cost forward and do not reset accounting to conceal repeated fruitless searches.",
+    "An open with no --intent adopts the caller's own --need as the session intent: the question the agent actually carried is what every later operation, receipt and finish is accounted against. An explicit --intent still wins.",
     "Use native scoped reconciliation for current evidence; never infer acceptance from a test, date, similarity score or checkbox.",
     "Clean adjacent evidence-backed issues in flight. Continue successive batches while useful authorized work remains; no one-item ceremony cap. Preserve independent verification and genuine authority boundaries.",
     "Current native evidence is read in-process by the executor itself: the concern, context and reconciliation projections are calls, not a second process, so there is no separate executable to pin and no second stderr budget. Oversized or missing projections are refused. Record native output separately from source-file bytes.",
+    "The tooling layer is inside scope: .claude/ (skills, hooks, commands, agents, epr-meta, scripts, workflows, memory) is a declared source root, because a surface an agent must recall and cannot read through the entry is read outside it and goes unmetered. Two subtrees stay refused inside it: the private recall store .eprfs/status/recall/ and .claude/worktrees/, a sibling checkout that is not this repository's declared source.",
     "Use one --session across CLI calls and an explicit --need each time. The executor pins algorithm bytes, charges cumulative operations and refuses oversized output. Discover returns metadata candidates; --lines reads an explicit bounded excerpt. External shell/MCP reads are outside enforcement.",
     "The initial native-reconciliation packet supplies usage and causal context; its growing plan is an explicit follow-up route, read by selected excerpt or native scope rather than silently widening the initial packet."
   ],
@@ -110,6 +114,7 @@
       "target",
       ".mempalace",
       ".eprfs",
+      "worktrees",
       ".venv",
       "__pycache__",
       "holochain-conductor",
@@ -117,6 +122,10 @@
       "kitsune2",
       "tx5"
     ],
+    "unreadable_candidates": "A candidate whose frontmatter does not parse is SKIPPED, COUNTED and NAMED \u2014 never silently dropped, and never a reason to abandon the rest of the traversal. The view carries an omissions line naming the skipped paths (first 8, then a remainder count) and a frontier entry `unreadable candidates: N`, so a reader learns exactly what the window could not read. Aborting the whole scan on the first unparseable document satisfied the same honesty rule and made the returned window useless.",
+    "body_scan_window": "limits.body_scan_bytes (65536) is the per-file window term discovery may read for MATCHING, and it is spent only when there is a query or terms to match; a pure tag filter still reads limits.metadata_bytes. The frontmatter read stays metadata_bytes and byte-exact \u2014 a wider body window never widens what establishes membership. limits.scan_bytes (2097152) and scan_seconds (5) bound the traversal as a whole, so a scope the size of .claude/skills is one call. Every byte read here is charged to the scan counters, never to source_bytes: discovery is not evidence, and an excerpt receipt is still the only thing that quotes a document. A candidate larger than the window is scanned to it and COUNTED \u2014 the omissions line says how many were only partially scanned \u2014 because a term past the window is invisible, which is not evidence of its absence.",
+    "bounded_prefix_match": "Query terms are matched against the declared frontmatter AND the body bytes the SAME bounded read already covered (limits.body_scan_bytes per file when matching) \u2014 no second read and no wider budget. Each candidate reports where its terms were found (path, title, description, tag, body); a declared hit scores twice a body hit ON THE SAME TERM, so frontmatter outranks body without letting one hit on a word every document shares outrank several hits on the words that name the concern. A body hit BEYOND the per-file prefix is invisible to discovery and is not evidence of absence.",
+    "boundary_cut_is_not_a_parse_failure": "A bounded read routinely ends mid-character. The tail is trimmed back to the last complete UTF-8 boundary before parsing; the frontmatter header itself is still exact bytes, and a trim landing before the closing delimiter reports an unproven boundary rather than a malformed document. Condemning a file because the budget cut a multibyte character is a fault of the reader, not the document.",
     "semantic_provider": "mempalace",
     "semantic_output": "unverified provider text; exact tag filtering requires source metadata",
     "group_scope": "returned candidate window"
@@ -125,7 +134,7 @@
     "version": 3,
     "entry": "epr flow memory recall <operation> --session <id>",
     "purpose": "Reconcile a concern so the next agent can act from current evidence without losing purpose or concealing uncertainty.",
-    "finish": "A reviewed, evidence-backed outcome addressing the intent, with per-edge reconciliation and an explicit unresolved frontier. Responsible stopping is valid.",
+    "finish": "A reviewed, evidence-backed outcome addressing the intent and an explicit unresolved frontier, standing on either per-edge reconciliation (the ceremony door) or the inspected passages alone (the focused door, which reconciles no edge and says so). Responsible stopping is valid.",
     "guiding_context": [
       {
         "value": "Sacred Attention: correct decisions and preserved uncertainty before byte savings",
@@ -149,6 +158,7 @@
       "limit": 12,
       "provider": "local"
     },
+    "passage_location": "Discovery locates a PASSAGE, not only a document. When the session carries a need, an outline annotates each section with the need-term occurrences inside it and offers a read range bounded to limits.source_bytes, top-hit sections first; a section larger than one excerpt is offered as its first window and named as such. A focused candidate carries the section its terms land in, and its linked choice reads that range rather than the file head. Naming a document whose headings answer nothing is half an answer, and the reader pays the other half in guesses.",
     "selection": "Native stale/dangling edge projection; stable native slot order, grouped by upstream source. Drift is not a substantive judgment.",
     "omissions": [
       "Only the declared scope and returned page are shown.",

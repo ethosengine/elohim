@@ -318,7 +318,9 @@ def reverse_index(docs) -> dict:
     return rev
 
 
-# ── frontmatter line-rewrite helpers (shared by cite-gen, cites-migrate, cite-propagate) ──
+# ── frontmatter line-rewrite helpers (used by the retired cite-gen / cites-migrate / cite-propagate
+# scripts, deleted 2026-09-11; the native `epr flow cites seal|describe|stamp|migrate` doesn't call
+# this module) ──
 _FM_LIST_ITEM = re.compile(r"^\s*-\s+")
 
 

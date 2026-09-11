@@ -16,7 +16,7 @@ plan …/plans/2026-09-05-valueflow-authoring-surface-plan.md, closed through it
   note kinds `ruling` (control) and `verdict --verdict approved|changes-requested` (audit).
 - **Skills** (native packages, master=package): `valueflow-authoring` (the 7-verb method + dispatch prompt shape "Invoke skill X. Brief: <path>. Commitment: <gap-id>. Rulings in force: … Base: <sha>."), `valueflow-implementer`, `valueflow-reviewer` (each ends in ONE verb). Root `.epr-meta` inject rules fire on basenames `task-*-brief.md`, `task-*-report.md`, `progress.md`.
 - **Actor convention:** full model ids (`agent:implementer@claude-opus-5`, `agent:reviewer@claude-opus-5`, `agent:orchestrator@claude-fable-5-1`).
-- **Process:** decompose.py <plan> → `epr flow project` → claim → dispatch seats → fulfil → rule → habit DELTA + habits-project.py. Habits = the fabric's STANDARD layer (REA scope / VSM S5), see spec §3.
+- **Process:** `epr flow project` <plan> → claim → dispatch seats → fulfil → rule → habit DELTA + habits-project.py. Habits = the fabric's STANDARD layer (REA scope / VSM S5), see spec §3.
 
 
 **Current claim pinning and acceptance:** register the actor, then claim by session only:
@@ -29,7 +29,7 @@ epr flow claim --on <gap-id> --session implementation-session --brief <plan-path
 Omit `--as` on `flow claim`: an explicit name takes precedence and loses the exact registered actor pin. An unpinned earlier claim remains historical uncertainty even after `--supersede`. Read `epr flow context <source-path> --json` (or its human view) to distinguish fulfillment, independent technical review and appointed experiential acceptance; technical approval does not establish acceptance. Follow [the scoped reconciliation and acceptance usage guide](../../genesis/docs/superpowers/plans/acceptance-aware-reconciliation/usage.md) for exact appointment, evidence and acceptance commands. Resolve the exercised binary from that guide before querying: PATH may still select the older CLI, whose context lacks the `reconciliation` facet. The September 5 command forms above are retained as historical evidence.
 
 **Traps learned:**
-- A `cites:` edge is DOC-PLANE (fingerprint in the envelope): `epr flow context` can show it stale while `reseal --all-stale` finds nothing — heal with `cite-gen.py --refresh <doc>` then `--verify`. Quoted cite list items read as DANGLING before 9665aa4c2; now fixed in the parser.
+- A `cites:` edge is DOC-PLANE (fingerprint in the envelope): `epr flow context` can show it stale while `reseal --all-stale` finds nothing — heal with `epr flow cites stamp <doc>` then `epr flow cites verify`. Quoted cite list items read as DANGLING before 9665aa4c2; now fixed in the parser.
 - Cargo lease etiquette: `berth who cargo`; never release another session's lease (permission layer refuses it, correctly) — ask the holder session by cross-session message; a "leases:" line clipped by `head` reads as free when it is not.
 - Unquoted `title:` with `: ` inside = invalid YAML → native evaluator refuses, Python permits (governance-plane-single-evaluator finding).
 - Blind-reader loops drift (READY → REVISE with disjoint majors); cap at ~3 rounds, take the structural finding, defer the rest by note ([[feedback_reviewer_issue_admissibility]]).

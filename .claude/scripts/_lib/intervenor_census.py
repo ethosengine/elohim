@@ -237,7 +237,8 @@ def lacking_measure(data: dict) -> dict:
 
 
 def render_census(data: dict) -> str:
-    """One block for `placement-audit.py --epr-meta`. Deliberately NOT a new session-start
+    """One block for the intervenor census — formerly printed by `placement-audit.py --epr-meta`
+    (retired 2026-09-11); has no runnable caller today. Deliberately NOT a new session-start
     headline line: the repo covenant's own warning is that this layer grows instruments with no
     reader, and a census of un-retired intervenors that mints a new always-on surface would be
     the joke telling itself."""

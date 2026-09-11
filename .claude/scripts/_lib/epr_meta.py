@@ -1822,7 +1822,7 @@ def resolve_write(target: Path, write: dict, root: Path, *, verdict_filter=None)
 
 
 # ── Subtree-coverage walk: the `.epr-meta` self-responsibility claim + the deterministic coverage
-# signal that placement-audit.py reads as a stasis dimension (the downward dual of claude-md-audit's
+# signal that `epr flow report placement --stasis` reads as a stasis dimension (the downward dual of claude-md-audit's
 # missing-CLAUDE.md census). An `.epr-meta` that declares `covers: subtree` is FULLY RESPONSIBLE for
 # everything beneath it — the walk terminates there (integrity by construction; a claimed subtree's
 # internals are never re-audited, exactly as the core never re-validates an app-manifest's vocabulary).
@@ -1972,8 +1972,10 @@ def coverage_advice(target: Path, *, repo_root: Path = None, min_files: int = 15
 def governance_cfg(repo_root: Path) -> dict:
     """The SINGLE config source for epr-meta coverage — coverage tunables + the exclusion globs
     (git submodules, auto-discovered, PLUS the yaml `epr_meta_governance.exclude` list). Shared by the
-    descending census (`placement-audit.py --epr-meta`) and the ascending in-flight nudge (the resolver
-    hook) so the two can never disagree about which dirs are governable. Fail-open to code defaults if
+    descending census (`subtree_coverage()` below — exercised only by its own test today; its former
+    runnable caller `placement-audit.py --epr-meta` was retired 2026-09-11, and the SessionStart-facing
+    `epr_meta_coverage` stasis dimension is now a separate native Rust port) and the ascending in-flight
+    nudge (the resolver hook) so the two can never disagree about which dirs are governable. Fail-open to code defaults if
     `.gitmodules` / PyYAML / the yaml block is absent. Returns {min_files, min_subdirs, min_exts,
     exclude_globs}."""
     repo_root = Path(repo_root)

@@ -16,8 +16,9 @@ target for the heavy discipline below, and durable knowledge does not pile up he
 
 **`MEMORY.md` is a GENERATED projection** (decided 2026-07-02, after a hand-maintained index bloated past
 the harness ~24.4KB load cap and loaded truncated): each topic file carries `title:` + `description:`
-frontmatter (the one-line recall hook), and `memory-index-projector.py` renders the index from them —
-PostToolUse-wired, budget-signaled into the `cleanup:` gate via `memory-index-drift.json`, compose-gated by
+frontmatter (the one-line recall hook), and `epr flow memory project --index` renders the index from them —
+PostToolUse-wired (`.claude/hooks/memory-index-projection.py`), budget-signaled into the `cleanup:` gate via the
+native `memory-index-drift@1` fold, compose-gated by
 `.claude/memory/.epr-meta` (deny at birth without name/title/description; ask on hand-edits of the index).
 Budget relief is population work — umbrella entries (`index: false` on folded members) and graduation —
 never index hand-editing.
@@ -40,7 +41,7 @@ not a fixed count: native memory stays light by graduating outward, not by cappi
 |---|---|---|---|
 | **Past** | [`historian`](../../agents/historian.md) | MemPalace MCP (wired) + archive walks + git log | Surface precedent/risk patterns from mined corpus (shifts/memory/plans/elohim-protocol wings) + archive + epic git history into present work |
 | **Present** | [`librarian`](../../agents/librarian.md) | this directory's scripts + MemPalace MCP curate-grade | Keep the native `MEMORY.md` index light; tend the CLAUDE.md surfaces + skill catalog. `mempalace_sync` complements `cleanup-scan`; `mempalace_check_duplicate` replaces the TF-IDF dedupe approximation. |
-| **Future** | [`cartographer`](../../agents/cartographer.md) | `/converge` skill + scripts at `.claude/scripts/converge/` | Synthesize memkit reports into a ranked next-actions menu, hand off to `/shift` |
+| **Future** | [`cartographer`](../../agents/cartographer.md) | `/converge` skill + scripts at `.claude/scripts/converge/` | Synthesize lens reports into a ranked next-actions menu, hand off to `/shift` |
 
 All four agents — the three temporal perspectives above plus the **storyteller** (meaning axis, below) — are
 Opus-tier subagents. The mechanical work (running scripts, parsing reports) is cheap; the orchestration + judgment
@@ -241,7 +242,7 @@ found it, and the smart move on hitting a wall is to encode the wall, not just r
 **`managed-surface-context.py` — discipline injected before the edit.** Editing a gospel surface (this file, any
 CLAUDE.md, spec, or plan) is itself a governed emission. The `managed-surface-context` PreToolUse Edit/Write hook
 injects the touched surface's discipline + tooling BEFORE the edit lands, so you flow the change through the cite
-tooling (`cite-gen` / `cite-describe` / `cite-propagate` / `cites-migrate`) rather than hand-writing a slug,
+tooling (`epr flow cites seal` / `describe` / `stamp` / `migrate`) rather than hand-writing a slug,
 fingerprint, or path — a hand-written cite silently drifts the content-addressed graph. Managed-surface scope lives
 in ONE place, `_lib/managed_surfaces.py`, never per-hook (per-hook scope is how cite-seal drift recurred).
 [[feedback_managed_surface_edit_discipline]]
@@ -268,7 +269,7 @@ scripts (this dir)  cleanup-{scan,apply}.py              ← archive stale specs
                     skill-audit.py                       ← always-loaded skill descriptions
                     claude-md-audit.py                   ← CLAUDE.md drift + fit + missing + opted-out
                     memory-coherence-audit.py            ← memory↔code cites: edge; DEAD-CITE/CITE-CANDIDATE; builds cites-index
-                    cite-{gen,describe,propagate}.py + cites-migrate.py ← content-addressed cite envelopes (slug|desc|sha256|status:|path:)
+                    (cite envelopes are native: `epr flow cites seal|describe|stamp|migrate` — content-addressed slug|desc|sha256|status:|path:)
                     _lib/                                ← shared helpers (paths, store, frontmatter, drift_score, cite_graph, managed_surfaces, env_scope, subject_routing, epr_meta, ci_trigger, runtime_harvest, bootstrap)
 
 hooks               .claude/hooks/pre-tool-memory.py     ← PreToolUse * — injects MEMORY.md across subagents
@@ -352,8 +353,8 @@ Pure-stdlib modules used by scripts AND hooks. Bootstrap pattern: walk up from `
 | `_lib.signal_measure` | The ONE place a kit signal becomes a declared measure (kind / confidence / basis, mirroring `elohim/epr/src/measure.rs`). These signals decide **when the ceremony fires**, so a mis-denominated one is Meadows' perception-delay sitting on the loop that exists to prevent overshoot. Carries `ratio_of_rates` — the respite/response controllability index, refusing a level in either position and a period mismatch |
 | `_lib.cite_graph` | Content-addressed cite envelopes (`slug \| desc \| fingerprint \| status \| path`); slug-identity survives file moves |
 | `_lib.managed_surfaces` | Edit-time SURFACE axis: given a touched file, which managed-surface class + discipline + tooling apply (ONE registry, never per-hook) |
-| `_lib.env_scope` | Gap-granular substrate-scope resolver — the BLOCKED-BY-ENV / `requires_env` discriminator (honors `iroh ≠ shem`); shared by decompose / placement-audit / scope-reconcile / focus-baseline |
-| `_lib.cluster_state` | The ONE parser for `genesis/manifests/cluster-state.yaml` (line-based, not pyyaml — the file's multi-line unquoted `note:` scalars reject strict YAML). `load(path) -> ClusterState` with `.available_names()` / `.available_map()` / `.roles()` / `.provides_map()`; shared by scope-reconcile / placement-audit / focus-baseline so the budget reader and the mover can never disagree about what's available |
+| `_lib.env_scope` | Gap-granular substrate-scope resolver — the BLOCKED-BY-ENV / `requires_env` discriminator (honors `iroh ≠ shem`); native port at `elohim/eprfs/epr-cli/src/flow/scope.rs` — this Python module is exercised only by its own tests today, its former callers decompose/placement-audit/scope-reconcile/focus-baseline all retired 2026-09-11 |
+| `_lib.cluster_state` | The ONE parser for `genesis/manifests/cluster-state.yaml` (line-based, not pyyaml — the file's multi-line unquoted `note:` scalars reject strict YAML). `load(path) -> ClusterState` with `.available_names()` / `.available_map()` / `.roles()` / `.provides_map()`; native port at `elohim/eprfs/epr-cli/src/flow/scope.rs` — this Python module is exercised only by its own tests today, its former callers scope-reconcile/placement-audit/focus-baseline all retired 2026-09-11 |
 | `_lib.subject_routing` | Cascade-resolver for `.claude/subject-routing.yaml` — routes a durable fact to its managed home by deliverable-target |
 | `_lib.epr_meta` | `.epr-meta` manifest cascade/merge (nearest-wins ancestor walk) — the compose-gate's author-time rule engine |
 | `_lib.ci_trigger` | The `ci-trigger:` leg of `.epr-meta`, projected into the flat `.ci-ignore` (build-time; orthogonal to the rule engine) |

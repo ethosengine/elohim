@@ -23,7 +23,7 @@
 # does. The reverse move does not exist: a predicate is not un-invented.
 #
 # NAMED CONSUMERS (a consumer-less registry is a silently-unloaded one by another name):
-#   1. the decision-point CENSUS — `placement-audit.py --epr-meta` (plan P3.2): reads BOTH homes;
+#   1. the decision-point CENSUS — `python3 .claude/scripts/seam-audit.py --matrix` (plan P3.2): reads BOTH homes;
 #      every concern must list its bound decision points, every registered point must cite passing
 #      contract tests. A row here with no consumer fails the census.
 #   2. the CANON PROJECTION — `elohim/sdk/schemas/v1/registries/concern-classes.json` (plan P4.6):

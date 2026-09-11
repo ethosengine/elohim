@@ -65,7 +65,7 @@ def get_sync_relationships_summary(relationships: dict) -> str:
 
 def _headline_cache_path(project_dir: str) -> str:
     """A per-project /tmp path both this hook and delivery-gate.py agree on, so the heavy
-    placement-audit --headline runs ONCE per SessionStart instead of once per consumer."""
+    `epr flow report --headline` runs ONCE per SessionStart instead of once per consumer."""
     import re
     slug = re.sub(r'[^A-Za-z0-9]+', '-', project_dir).strip('-')
     return f"/tmp/claude-headline-{slug}.txt"

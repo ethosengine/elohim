@@ -12,5 +12,5 @@ metadata:
 Pointer: `.claude/skills/memory-ceremony/SKILL.md` — the four-agent, four-phase
 substrate-currency ceremony. Invoke when substrate-currency-audit ranks a gospel-tier
 surface high-drift, after a major substrate landing the gospel hasn't absorbed, or on
-operator request. Byte-budget/audit-number hygiene is NOT its job — that's `/hygiene-sweep`
-(memory-kit).
+operator request. Byte-budget/audit-number hygiene is NOT its job — that's the librarian's hygiene
+pass (the `/hygiene-sweep` cadence, absorbed into `/memory-ceremony` 2026-09-11).

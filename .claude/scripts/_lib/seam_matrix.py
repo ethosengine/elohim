@@ -535,7 +535,9 @@ def spot_check(repo_root: Path, n: int = 8, *, seed: str = "") -> dict:
 # ───────────────────────────── rendering ─────────────────────────────
 
 def render_matrix(data: dict, *, as_json: bool = False, top: int = 12) -> str:
-    """The compact terminal section surfaced beside the census in `placement-audit --epr-meta`."""
+    """The compact terminal section surfaced beside the census — formerly rendered together by
+    `placement-audit --epr-meta` (retired 2026-09-11); today's runnable caller is
+    `.claude/scripts/seam-audit.py --matrix`."""
     if as_json:
         return json.dumps(data, indent=1)
     lines: list[str] = []

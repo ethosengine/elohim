@@ -72,6 +72,12 @@ measures:
     unit: seconds
     default-authority: observation
     status: active
+  - id: recall-unmetered-bytes
+    version: 1
+    family: recall-journey
+    unit: bytes
+    default-authority: observation
+    status: active
 
 lenses:
   - id: memory-index-bytes-ceiling
@@ -130,6 +136,17 @@ lenses:
     consumes: [mempalace-mine-grace-seconds@1]
     context: mempalace
     hard: 604800
+    status: active
+  - id: recall-unmetered-bytes-ceiling
+    version: 1
+    headline: recall
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    consumes: [recall-unmetered-bytes@1]
+    context: session-headline
+    soft: 1
+    hard: 20000
     status: active
 "#;
 
@@ -692,12 +709,12 @@ fn the_headline_prints_five_lines_in_the_gospel_declared_order() {
     let root = dir.path();
     let payload = report(root, &options(root)).unwrap();
 
-    let lines: Vec<String> = ["memkit", "mempalace", "cleanup", "scope", "budget"]
+    let lines: Vec<String> = ["recall", "mempalace", "cleanup", "scope", "budget"]
         .iter()
         .map(|slot| payload.headline_line(slot))
         .collect();
 
-    assert!(lines[0].starts_with("memkit:"), "{:?}", lines);
+    assert!(lines[0].starts_with("recall:"), "{:?}", lines);
     assert!(lines[1].starts_with("mempalace:"), "{:?}", lines);
     assert!(lines[2].starts_with("cleanup:"), "{:?}", lines);
     assert!(lines[3].starts_with("scope:"), "{:?}", lines);
@@ -715,6 +732,20 @@ fn a_headline_slot_with_no_fold_says_skipped_naming_its_measure() {
     let payload = report(root, &options(root)).unwrap();
     let line = payload.headline_line("cleanup");
     assert_eq!(line, "cleanup: skipped (no fold for cleanup-pressure@1)");
+}
+
+/// Slot 0's absence has ONE meaning: nobody has walked the governed recall entry since the last
+/// reset. "no fold for recall-unmetered-bytes@1" names the registry row; it does not tell a session
+/// reader what to do, which is the whole job of the first line it reads.
+#[test]
+fn the_recall_slot_names_a_missing_journey_rather_than_a_missing_row() {
+    let dir = fixture();
+    let root = dir.path();
+    let payload = report(root, &options(root)).unwrap();
+    assert_eq!(
+        payload.headline_line("recall"),
+        "recall: skipped — no journey fold"
+    );
 }
 
 #[test]

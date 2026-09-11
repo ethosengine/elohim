@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:implementer@claude-opus-5",
+  "author": "agent:orchestrator@claude-fable-5-1",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_seam_concern_architecture_landed.md",
-        "cid": "bafkreieusfywidgoelyb7ixyww6q4qf5hfwhb6y42jewrag6k3ww77ktme"
+        "cid": "bafkreif46x54rcufn5medxffuuqqqo6fnnzbj66r2oyjug24tweyt4nvhi"
       },
       "reach": "repository"
     }
