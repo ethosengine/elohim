@@ -32,6 +32,74 @@ seamLocus: >
   (src/p2p/shard_protocol.rs).
 
 decisionPoints:
+  - name: recover_before_mint
+    kind: verdict-fn
+    sourceLocation:
+      file: src/p2p/binding_recovery.rs
+      modulePath: p2p::binding_recovery::recover_before_mint
+    summary: >
+      Replays an existing A2 agent-to-transport binding through the live signal
+      controller after checking its original signed action, entry, author, two-sided
+      transport proof and validity window. The replay capability is Category C,
+      process-local and forbidden on external serde wire; it creates no DHT head.
+      Projection acknowledgement retains the exact original anchor and proof.
+      Recovery preserves stored supersession transactionally and does not gossip
+      a failed or superseded projection. The existing bounded boot retry owns
+      retry timing; this is not a perpetual recovery or revocation service.
+    concernIds:
+      - { id: C0, status: answered, justification: "Existing notarized binding remains authority; recovery only repairs its derived local projection." }
+      - { id: C1, status: n-a, justification: "Replay does not elect an author or create a content head." }
+      - { id: C2, status: answered, justification: "The original signed action and entry hashes are pinned; queued replay cannot clear a supersession persisted before controller application." }
+      - { id: C3, status: partial, justification: "Reconnect refreshes a weak capability without retaining dead streams; recovery stops when the existing bounded boot retry expires and is not continuous anti-entropy." }
+      - { id: C4, status: answered, justification: "Malformed or unavailable records and full or closed queues defer; queued work is not acknowledged and failure is not reported as absence." }
+      - { id: C5, status: partial, justification: "Exact records and cross-signatures are verified locally; the bounded own-agent index does not establish globally complete binding or revocation knowledge." }
+      - { id: C6a, status: answered, justification: "At most 64 records of at most 256KiB each are admitted per existing bounded boot attempt; no source-chain scan or new polling loop." }
+      - { id: C6b, status: answered, justification: "A second recovery attempt acknowledges the unchanged original without re-enqueue; expired originals are not projected as current." }
+      - { id: C7, status: partial, justification: "The same controller persists and gossips an accepted replay; unit controller tests do not establish remote runtime convergence." }
+      - { id: C8, status: partial, justification: "Deferred errors and existing controller logs expose outcomes; no new dedicated replay telemetry is claimed." }
+      - { id: C9, status: partial, justification: "Own action author, agent and transport proof agree; globally current agent lineage and unseen revocations remain outside this local recovery boundary." }
+      - { id: C10, status: answered, justification: "Existing A2 entry and coordinator read path are reused; the internal recovery signal is explicitly excluded from external JSON and MessagePack serialization." }
+      - { id: C11, status: answered, justification: "Controller transaction and readback preserve supersession and suppress stale recovery gossip; a weak sender cannot keep disconnected streams alive." }
+      - { id: C12, status: answered, justification: "Only a locally verified own original can enter the recovery capability; foreign authors, tampered signatures and external recovery discriminators are refused." }
+      - { id: C13, status: n-a, justification: "Recovery grants no additional social tier or custody permission." }
+      - { id: C14, status: partial, justification: "Seven source tests name the boundary; live recovery of original anchors and remote projection require separate runtime receipts, not intention." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: signed_original_is_acknowledged_only_after_actual_controller_projection, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: supersession_before_enqueue_or_after_enqueue_is_never_cleared, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: closed_or_full_signal_queue_defers_instead_of_claiming_absence, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: malformed_foreign_tampered_and_superseded_originals_never_enqueue, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: expired_authentic_original_does_not_recover_as_current, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: recovery_capability_cannot_be_serialized_or_claimed_by_external_signal, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/binding_recovery_tests.rs, testName: reconnect_refreshes_existing_weak_capability_without_retaining_old_stream, kind: unit }
+
+  - name: refresh_by_id
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/rea_commitment_projection.rs
+      modulePath: services::rea_commitment_projection::refresh_by_id
+    summary: Explicit non-authoring observation of an existing Commitment through authenticated monotone projection.
+    concernIds:
+      - { id: C0, status: answered, justification: "Existing notarized Commitment projected locally, never SQL as authority." }
+      - { id: C1, status: n-a, justification: "No authoring or election." }
+      - { id: C2, status: answered, justification: "Shared signed same-root author sequence and atomic snapshot CAS." }
+      - { id: C3, status: partial, justification: "Explicit request recovers missing or universally stale projections; universal automated discovery remains absent." }
+      - { id: C4, status: answered, justification: "Missing or unavailable authority and CAS races cannot return stale success." }
+      - { id: C5, status: answered, justification: "Exact action and entry hashes plus author signatures verified locally." }
+      - { id: C6a, status: answered, justification: "One existing bounded observation and at most 64 shared exact-record reads." }
+      - { id: C6b, status: answered, justification: "Same or older observations preserve current state and author nothing." }
+      - { id: C7, status: answered, justification: "Existing manifested GET and existing response view." }
+      - { id: C8, status: partial, justification: "HTTP errors and tracing remain; no new typed outcome counter." }
+      - { id: C9, status: partial, justification: "Exact author/root continuity; cross-key rotation remains outside scope." }
+      - { id: C10, status: answered, justification: "Invalid refresh values fail parsing." }
+      - { id: C11, status: partial, justification: "Existing conductor admission controls; no additional aggregate HTTP cap." }
+      - { id: C12, status: answered, justification: "Public read confers no permission and cannot bypass authenticated projection." }
+      - { id: C13, status: n-a, justification: "No new social-tier authority gate." }
+      - { id: C14, status: partial, justification: "Existing errors carry failure evidence; no new residual capsule." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/api/rea_commitments.rs, testName: refresh_requires_explicit_valid_boolean, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs, testName: explicit_refresh_recovers_missing_and_universally_stale_projection, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs, testName: explicit_refresh_missing_or_refused_authority_never_falls_back, kind: unit }
+
   - name: take_replication_dispatches
     kind: verdict-fn
     sourceLocation:
