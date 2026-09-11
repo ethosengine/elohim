@@ -1,0 +1,61 @@
+---
+epr-meta-version: 1
+id: eprfs-epr-cli-src-recall-seams
+purpose: >
+  The native `epr-cli` crate source. One concrete concern is placed here rather than lifted to
+  a policy: `flow/memory/recall/` (the bounded-evidence recall executor) is split by SEAM, never
+  left to regrow as one file — Task 0.5 (2026-09-11) carved `journey.rs` out of a ~2,800-line
+  `mod.rs`, and the `no_recall_module_exceeds_the_soft_line_ceiling` shape test
+  (`recall::shape`, `mod.rs`) now pins every recall module under a 1,800-line soft ceiling.
+rules:
+  - id: recall-seams-stay-split
+    class: inject
+    when:
+      write: "*.rs"
+      contains-any:
+        - "fn discover("
+        - "trait Provider"
+        - "fn render_first_screen("
+        - "fn print_refusal("
+        - "fn measure("
+        - "fn excerpt("
+        - "fn revalidate("
+        - "fn refresh_selected("
+        - "fn native_context("
+        - "fn evidence_continuation("
+    dedupe-of: "elohim/eprfs/epr-cli/src/flow/memory/recall/mod.rs (module doc) + each seam file's own top-of-file `//!` purpose line — the seam boundaries are already named where they live"
+    why: >
+      This is the recall executor (`src/flow/memory/recall/`) — a new function belongs where its
+      concern already lives, not back into `mod.rs`. JOURNEY/STANDING (`journey.rs`, and a sibling
+      `standing.rs` the day journey.rs itself would cross the 1,800-line ceiling): the session
+      state machine — `execute`'s per-operation dispatch, `revalidate`, `refresh_selected`,
+      `native_context`, `evidence_continuation`, continuation/receipt-retention helpers, orientation
+      and edge lookups. DISCOVERY (`discovery.rs`): the deterministic local traversal — `discover`,
+      `discover_scored`, outline/heading and question-term machinery. PROVIDERS (`providers.rs`):
+      the `Provider` trait and its implementations (`local`, `mempalace`, `fixture`) — recipe-
+      selected, never a source of authority. LENS (`lens.rs`, station 1): the `role@model ->
+      LensLevel` table and lens resolution — not yet split out; a function shaping that table
+      belongs there once it exists. RENDER (`render.rs`): turning a view into the human screen —
+      `render`, `render_first_screen`, `render_outline`, `render_hits`. REFUSAL (`refusal.rs`): the
+      one refusal envelope — what went wrong, which session, what to do. MEASURE (`measure.rs`):
+      the paired deterministic footprint lens and the `measure` op. RECEIPTS (`receipts.rs`):
+      bounded reads and receipt adoption — the only code that touches source bytes on a reader's
+      behalf. `mod.rs` itself stays dispatch-only: `Contract`, `Execution`, `Args`, `parse_args`,
+      `run`, `usage`, the small `command`/`action`/`push_*` helpers, `encode`, `truncate`. Grep the
+      target seam file's existing top-of-file `//!` purpose line before adding a function anywhere
+      in this tree — that comment names the seam's boundary in its own words.
+    retire-when: >
+      never (a structural guardrail, not a teaching rule): the shape test enforces the ceiling on
+      every module every test run, so a function still needs a seam to land in for as long as the
+      split exists. Re-scope this rule's `why:` in place — don't retire it — the day a new seam
+      file (`lens.rs`, `standing.rs`) is born, so the placement guide stays complete.
+---
+
+# `epr-cli/src` — the native CLI implementation
+
+Everything `epr` runs natively lives under here. The one concrete rule bound at this level is the
+recall executor's seam split (`flow/memory/recall/`): a session-state helper, a discovery
+traversal, a provider implementation, a render, a refusal, a measure, and a receipt each have a
+home file, and the shape test keeps every one of those files under a 1,800-line soft ceiling. See
+`.claude/skills/elohim-epr-metafile/SKILL.md` for the governance vocabulary this manifest uses, and
+`flow/memory/recall/mod.rs`'s own module doc for what the executor as a whole is for.
