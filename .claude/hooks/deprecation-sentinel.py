@@ -697,7 +697,17 @@ _CMD_TOOLING_SOURCE_READ_RE = re.compile(
     r"[^;&\n]*?"
     r"(?:\.claude/(?:hooks|scripts|skills|agents|data|memory)/"
     r"|(?:^|/|\s)\.epr-meta/"
-    r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/)",
+    r"|(?:^|/|\s)\.codex/(?:skills|agents|commands)/"
+    # Guard Q2 (2026-09-11, fp ce93d7acfefe) — the memory-kit's NATIVE port.
+    # The kit under `.claude/scripts/memory-kit/` is being transcribed into Rust
+    # under `epr-cli/src/flow/` (placement.rs carries the literal comment
+    # "Transcribed from the kit"), which carried the kit's status vocabulary —
+    # Guard Q's OWN dispatching constant, DEAD_WORDS — outside every path gate
+    # above. Same first-party tooling source, same zero-true-positive class, new
+    # address. Scoped to `flow/` (the ported kit) rather than all of epr-cli,
+    # and READ-gated like the rest of Guard Q, so a `cargo build` warning about
+    # this crate still captures on the live-channel residual.
+    r"|elohim/eprfs/epr-cli/src/flow/)",
 )
 
 # Guard A2 — the FINDINGS LEDGERS read through the command, in ANY word order.
@@ -775,6 +785,64 @@ _CMD_EPHEMERAL_SCRIPT_RE = re.compile(
     r"(?:/tmp/|/var/tmp/|/private/tmp/|/scratchpad/)"
     r"[^\s;&|]*\.(?:py|mjs|js|sh)\b"
 )
+
+# Guard U (2026-09-11) — SOURCE STRING-LITERAL self-capture: a line whose ONLY
+#   deprecation signal is a bare token INSIDE a quoted string literal, with
+#   nothing but syntax punctuation outside the quotes. This is a source-code
+#   VOCABULARY element or a config KEY, never an emission.
+#   Dispatching capture: fp `ce93d7acfefe` (2026-09-11) —
+#   `sed -n '35,106p' elohim/eprfs/epr-cli/src/flow/placement.rs` emitted the
+#   single array element `    "deprecated",` from `DEAD_WORDS`, the
+#   document-status vocabulary the placement kit classifies docs with. Guard Q
+#   dismisses that exact constant at its PYTHON home (`.claude/scripts/
+#   memory-kit/placement-audit.py`, see Guard Q's fp trio 3054d0cb4bd7 /
+#   802862c393b2 / 5723985e3232) — the native Rust port of the kit relocated the
+#   same string outside every `.claude/` path gate, and the class re-opened.
+#   Keying on the LINE's structure rather than on the file's address closes it
+#   for every language and every future relocation at once.
+#   Second live row, same shape, different language and different command:
+#   `ffbd56793ff7` (`cat eslint.config.js` →
+#   `'@typescript-eslint/no-deprecated': 'warn',`) — a lint RULE NAME, i.e. the
+#   config that CONFIGURES the live TS deprecation channel, mistaken for the
+#   channel's output. Both rows sat `open`; the class has never had a `triaged`.
+#   THREE conditions, and the narrowness is all in the first: the token-bearing
+#   literal must contain NO SPACE. A real warning quoted whole
+#   (`"title": "The foo option is deprecated"`, an `npm audit --json` row) has
+#   spaces inside its literal and is untouched, so this guard cannot eat prose —
+#   it can only eat an identifier. Deprecation class only, for the same reason
+#   Guards O and P are: the security class arrives as JSON often enough that a
+#   quoted GHSA/CVE identifier with a punctuation-only residual is a real
+#   finding, not a vocabulary word.
+_LINE_NUM_PREFIX_RE = re.compile(r"^(?:[^\s:]*:)?\d+[:-]\s*")
+_QUOTED_LITERAL_RE = re.compile(r"\"[^\"]*\"|'[^']*'|`[^`]*`")
+# What may remain outside the quotes: list/map/assignment/attribute syntax only.
+_SYNTAX_ONLY_RE = re.compile(r"^[\s,;:=>\-\[\]{}()|&+*.#!@$]*$")
+
+
+def _is_source_string_literal_line(line: str) -> bool:
+    """True iff the deprecation token lives in a SPACE-FREE quoted literal and
+    everything outside the quotes is bare syntax punctuation."""
+    body = _LINE_NUM_PREFIX_RE.sub("", line.strip())
+    if not body:
+        return False
+    bare_token_literal = False
+
+    def _swallow(match: "re.Match[str]") -> str:
+        nonlocal bare_token_literal
+        inner = match.group(0)[1:-1]
+        if " " not in inner and DEPRECATION_PATTERNS.search(inner):
+            bare_token_literal = True
+        return ""
+
+    residual = _QUOTED_LITERAL_RE.sub(_swallow, body)
+    if not bare_token_literal:
+        return False
+    # Any deprecation signal left OUTSIDE the quotes means the line carries its
+    # own prose — a real warning that merely happens to quote an identifier.
+    if DEPRECATION_PATTERNS.search(residual):
+        return False
+    return bool(_SYNTAX_ONLY_RE.match(residual))
+
 
 
 def _is_echo_line(
@@ -876,6 +944,16 @@ def _is_echo_line(
          marker; writing the same code to a scratch file defeats it. Dominant
          shape is self-amplifying: a triage run verifying an echo guard must
          print a warning-shaped fixture corpus. Unconditional, residual-free.
+      U) Source STRING-LITERAL self-capture (deprecation class only) — the
+         token appears only inside a SPACE-FREE quoted literal and everything
+         outside the quotes is bare syntax punctuation: a status-vocabulary
+         element (`"deprecated",`) or a lint-rule config key
+         (`'@typescript-eslint/no-deprecated': 'warn',`). Guard Q's class,
+         re-keyed from the file's ADDRESS to the line's STRUCTURE, after the
+         placement kit's Rust port moved the same constant outside every
+         `.claude/` path gate. The no-space rule is the whole safety argument:
+         a warning quoted whole has spaces, so this guard can eat an
+         identifier but never prose.
     """
     # Guard A — ledger self-capture
     if ECHO_LEDGER_PATH.search(line):
@@ -984,6 +1062,15 @@ def _is_echo_line(
         and not _LIVE_TOOLCHAIN_CHANNEL_RE.search(line)
         and not _LIVE_VITEST_BANNER_RE.search(line)
     ):
+        return True
+
+    # Guard U — source string-literal self-capture: the deprecation token lives
+    # inside a space-free quoted literal (vocabulary element or config key) and
+    # nothing but syntax punctuation sits outside the quotes. Structural, so it
+    # holds across languages and across relocations of the same constant —
+    # which is exactly how this class re-opened after the placement kit was
+    # transcribed from Python into Rust, out from under Guard Q's path gate.
+    if cls == "deprecation" and _is_source_string_literal_line(line):
         return True
 
     # Guard L — derived/generated artifact tree (node_modules, dist, .angular/
