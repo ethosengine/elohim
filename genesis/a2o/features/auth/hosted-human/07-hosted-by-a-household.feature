@@ -27,7 +27,8 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   steward is not the doorway: the doorway arranges the hosting, the steward's machine
   performs it, and it is the steward's key the promise must carry — the doorway's own
   PORTAL, the account pages it shows a person in a browser, is a face on the arranger, not
-  on the machine. An AGENT KEY is a cell's cryptographic identity, the key that makes one
+  on the machine. A CELL is one person's own record chain, hosted inside a conductor — the
+  thing that makes their writes theirs. An AGENT KEY is a cell's cryptographic identity, the key that makes one
   person's writes theirs; it is what a promise names when it says who is being hosted, and
   it is not a username. A COMMITMENT is a promise the notary recorded: it names who
   promised, to whom, what, and until when, and the notary knows it by an opaque identifier —
@@ -75,7 +76,7 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
     When they create an account at this doorway with the display name "Ada of no fixed machine"
     Then the doorway hosts a cell for them on one of its pool conductors
     And no other account at this doorway shares that cell's agent key
-    And the doorway holds a live "hosted-cell" delegates-compute commitment naming that agent key as recipient
+    And the notary records a live "hosted-cell" delegates-compute commitment naming that agent key as recipient
     And that commitment names the steward of that pool conductor as provider
     And that commitment carries an end date in the future
 
@@ -90,7 +91,7 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   Scenario: Asked directly, a peer that is not the doorway returns the promise, not the doorway's claim about itself
     Given a newcomer who has created an account at this doorway
     When the doorway names that human's hosting commitment
-    And that commitment is read back, by its name, from a household peer that is not the doorway's pool
+    And that commitment is read back, by its identifier, from a household peer that is not the doorway's pool
     Then the read-back commitment's scope is "hosted-cell"
     And its provider is the agent key that the pool conductor's own peer names as its steward
     And its provider is not the doorway's own service identity
@@ -99,7 +100,7 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   Scenario: Two newcomers are lent two cells under two promises
     Given a newcomer who has created an account at this doorway
     And a second newcomer who has created an account at this doorway
-    When both of their hosting commitments are read
+    When both of their hosting commitments are read back from a household peer that is not the doorway's pool
     Then the two humans hold different cells
     And each holds their own "hosted-cell" commitment
     And neither commitment names the other human as recipient
@@ -108,8 +109,8 @@ Feature: Hosted by a household — the compute a newcomer is lent is promised ou
   Scenario: Closing the account withdraws the promise
     Given a newcomer who has created an account at this doorway
     And the agent key of the cell the doorway runs for them
-    And the doorway holds a live "hosted-cell" commitment for them
+    And the notary records a live "hosted-cell" commitment for them
     When they close their account through the portal
     Then no pool conductor holds a cell for that agent key
-    And the doorway holds no live "hosted-cell" commitment for that agent key
+    And the notary records no live "hosted-cell" commitment for that agent key
     And a household peer that is not the doorway's pool still reads that commitment back, carrying the date it was made and the date it ended
