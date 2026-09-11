@@ -2139,12 +2139,26 @@ restore_binary_for() {
 # `kill ESRCH` / "/proc/<pid> is gone" (2026-08-22: 3 chaos-peer-churn reds from
 # one storage-restart). Re-resolve every peer's pid from its listening port,
 # and stamp its AGENT_PUBKEY beside it.
+#
+# The stamp must be the peer's OWN conductor sandbox key (peer_agent_key,
+# same source the pool grants' `provider` / POOL_COMPUTE_PERFORMER use), never
+# the storage PROCESS's AGENT_PUBKEY env var: on a host whose conductor also
+# hosts the doorway pool's hosted cells (matthew), that env value drifts to
+# a hosted human's key on every storage restart, desyncing the fixture from
+# the grant surface it's meant to describe (2026-09-11: uhCAkRB5x3… then
+# uhCAkRCJpuO1… vs the steward key uhCAkwZmnsxA… the grants actually use).
 refresh_fixture_pids() {
   local fixture="$MESH_DIR/household-fixture.json"
   [ -s "$fixture" ] || return 0
-  python3 - "$fixture" "$MESH_PEERS" <<'PY'
+  local i=0 name keys=""
+  for name in "${PEERS[@]}"; do
+    keys="${keys}${name}=$(peer_agent_key "$i" "$name"),"
+    i=$((i + 1))
+  done
+  python3 - "$fixture" "$MESH_PEERS" "$keys" <<'PY'
 import json, subprocess, sys
-fixture, peers = sys.argv[1], sys.argv[2].split(',')
+fixture, peers, keys_raw = sys.argv[1], sys.argv[2].split(','), sys.argv[3]
+keys = dict(kv.split('=', 1) for kv in keys_raw.split(',') if '=' in kv)
 d = json.load(open(fixture))
 sp = d.setdefault('storagePeers', {})
 changed = []
@@ -2158,12 +2172,9 @@ for i, name in enumerate(peers):
         changed.append(f"{name}:{sp[name].get('pid')}->{out}")
         sp[name]['pid'] = int(out)
     # The peer's agent key, in the namespace custody commitments name providers
-    # in (a2o drills match either this or the libp2p peerId).
-    try:
-        env = open(f'/proc/{out}/environ', 'rb').read().split(b'\0')
-        key = next((e.split(b'=', 1)[1].decode() for e in env if e.startswith(b'AGENT_PUBKEY=')), '')
-    except OSError:
-        key = ''
+    # in (a2o drills match either this or the libp2p peerId). Sourced from the
+    # conductor sandbox itself (peer_agent_key), not the storage process env.
+    key = keys.get(name, '')
     if key and sp[name].get('agentPubKey') != key:
         changed.append(f"{name}:agentPubKey={key[:12]}…")
         sp[name]['agentPubKey'] = key
