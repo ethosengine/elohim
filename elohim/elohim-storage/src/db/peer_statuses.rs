@@ -131,6 +131,32 @@ pub fn list_by_household(
         .load(conn)
 }
 
+/// Fetch peer-status rows for an explicit peer-id set.
+///
+/// The household-resilience fold resolves its peer set from TWO junctions
+/// (`stewarded_nodes.household_id` and `humans.agent_pub_key`) before asking about
+/// liveness, so it needs a by-peer-id read rather than
+/// [`list_by_household`]'s single-junction join — which silently reported zero
+/// live peers on a mesh whose devices were never registered.
+///
+/// Chunked under `SQLITE_MAX_VARIABLE_NUMBER`; a household-scale set never
+/// approaches it, but the fold is also reachable for collective-scale groups.
+pub fn list_by_peer_ids(
+    conn: &mut SqliteConnection,
+    peer_ids: &[String],
+) -> QueryResult<Vec<PeerStatusRow>> {
+    const CHUNK: usize = 500;
+    let mut out = Vec::new();
+    for chunk in peer_ids.chunks(CHUNK) {
+        out.extend(
+            peer_statuses::table
+                .filter(peer_statuses::peer_id.eq_any(chunk))
+                .load::<PeerStatusRow>(conn)?,
+        );
+    }
+    Ok(out)
+}
+
 /// List peers currently advertising themselves as general-pool members and
 /// either online or degraded. Consumed by the doorway forwarder's
 /// candidate-selection step.

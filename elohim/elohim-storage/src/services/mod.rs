@@ -81,6 +81,7 @@ pub mod head_batch_resolver; // L1 — batched head-plane reads (round-trip coll
 pub mod heal_backoff; // drain lever 2 — replay a known conductor-missing answer instead of re-paying for it (bounded, always-expiring)
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
+pub mod household_identity; // cid↔slug household vocabulary bridge — the CONVERGENT grouping key the resilience fold and its sibling joins share
 pub mod household_resilience;
 pub mod hub_capacity_service;
 pub mod hub_resolver; // Wave 2 T2 — agent→hub resolver (CID-canonical, slug-alias, seed-compatible)

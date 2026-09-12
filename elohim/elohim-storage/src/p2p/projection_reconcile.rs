@@ -5617,6 +5617,24 @@ pub(crate) enum CollectiveGap {
     /// no cid at all (a NULL-cid row should never be advertised — see ruling 1 —
     /// but an empty value is treated as no evidence, never as a gap).
     InSync,
+    /// The cid IS held locally, but under a DIFFERENT routing alias than the peer
+    /// advertises (peer: `family-dowell`, local: `collective:uhCkk…`).
+    ///
+    /// 2026-09-12 (doorway-footprint-convergence): this state was silently
+    /// `InSync`, because the arm's convergence contract is "I hold this cid under
+    /// SOME id, regardless of alias". That contract is correct for the arm — the
+    /// cid IS the DHT identity — but it made a REAL divergence invisible to
+    /// anything downstream that keys on the alias. The household-resilience fold
+    /// did exactly that, and two doorways testified different footprints while
+    /// every peer reported `divergent{collectives} 0` and `converged: true`.
+    ///
+    /// The fold has since moved onto the cid (`services::household_identity`), so
+    /// this is no longer a correctness gap — but it stays NAMED and counted,
+    /// because "converged" reporting that cannot see a live alias split is the
+    /// thing that cost the diagnosis. Heal is deliberately NOT enqueued: the cid
+    /// is present, there is nothing to fetch, and `collectives` carries no
+    /// declaration ordering that could prove which alias should win.
+    AliasDivergent,
 }
 
 /// Pure diff for ONE advertised `(id, peer_cid)` pair.
@@ -5640,7 +5658,13 @@ pub(crate) fn classify_collective_gap(
         return CollectiveGap::InSync;
     };
     if local_cids.contains(cid) {
-        return CollectiveGap::InSync;
+        // The cid is held. Whether it sits under the SAME routing alias the peer
+        // advertises is a separate question — and one this arm used to discard.
+        return if local_cid_by_id.get(id).map(String::as_str) == Some(cid) {
+            CollectiveGap::InSync
+        } else {
+            CollectiveGap::AliasDivergent
+        };
     }
     if !present.contains(id) {
         return CollectiveGap::AbsentLocal;
@@ -5826,6 +5850,7 @@ async fn discover_collectives(
     let mut discovered_by: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     let mut divergent_cid = 0usize;
+    let mut alias_divergent = 0usize;
     let mut undecodable = 0usize;
 
     for (id, cid) in &advertised {
@@ -5837,6 +5862,32 @@ async fn discover_collectives(
             &local_cid_by_id,
         ) {
             CollectiveGap::InSync => {}
+            CollectiveGap::AliasDivergent => {
+                // NOT folded into `divergent_cid`: that counter feeds
+                // `divergent_actionable` and the `converged` predicate, and this
+                // state is not actionable (the cid is present; nothing to fetch,
+                // and no declaration ordering could prove which alias wins).
+                // Counting it there would pin `converged: false` forever on any
+                // fleet with a legitimate alias split. It is NAMED and logged so
+                // the split is visible — which is exactly what was missing when
+                // two doorways testified different footprints while every peer
+                // reported `divergent{collectives} 0`.
+                alias_divergent += 1;
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    collective_id = %id,
+                    peer_cid = %cid,
+                    local_alias = %local_cid_by_id
+                        .iter()
+                        .find(|(_, c)| c.as_str() == cid.as_str())
+                        .map(|(i, _)| i.as_str())
+                        .unwrap_or(""),
+                    "projection-reconcile[collectives]: ALIAS-DIVERGENT — the cid is \
+                     held locally under a DIFFERENT routing alias than the peer \
+                     advertises; the cid IS converged, but any consumer keying on \
+                     the alias will disagree across peers"
+                );
+            }
             CollectiveGap::Divergent => {
                 divergent_cid += 1;
                 tracing::warn!(
@@ -5879,6 +5930,16 @@ async fn discover_collectives(
             target: "elohim_storage::projection_reconcile",
             undecodable,
             "projection-reconcile[collectives]: dropped undecodable peer cids this sweep"
+        );
+    }
+
+    if alias_divergent > 0 {
+        tracing::warn!(
+            target: "elohim_storage::projection_reconcile",
+            alias_divergent,
+            "projection-reconcile[collectives]: cids held under a DIFFERENT local routing \
+             alias than the advertising peer this sweep — converged on the cid, split on \
+             the alias; downstream folds MUST key on the cid (services::household_identity)"
         );
     }
 
@@ -6172,14 +6233,46 @@ mod collectives_gap_tests {
     }
 
     /// The identity is the CID, not the routing alias: holding the cid under a
-    /// DIFFERENT local id is still in-sync — healing would duplicate the row.
+    /// DIFFERENT local id is NOT a heal gap — healing would duplicate the row.
+    ///
+    /// But it is not silence either. Until 2026-09-12 this returned `InSync`, and
+    /// the arm's "converged" reporting therefore could not see a live alias split:
+    /// every peer reported `divergent{collectives} 0` and `converged: true` while
+    /// the household-resilience fold — which keyed on the alias — had two doorways
+    /// testifying different footprints. The state is now NAMED
+    /// ([`CollectiveGap::AliasDivergent`]), counted, and logged; it is still never
+    /// enqueued for heal.
     #[test]
-    fn in_sync_when_the_cid_is_held_under_a_different_alias() {
+    fn alias_divergent_when_the_cid_is_held_under_a_different_alias() {
         let (cids, present, by_id) = fixture(&[(CID_A, CID_A)], &[]);
         assert_eq!(
             classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::AliasDivergent,
+            "a cid-keyed local row satisfies the cid but NOT the advertised alias — \
+             observable, never silent"
+        );
+    }
+
+    /// The alias split is symmetric: a slug-keyed local row against a cid-keyed
+    /// peer advertisement reads the same way.
+    #[test]
+    fn alias_divergent_is_symmetric() {
+        let (cids, present, by_id) = fixture(&[("household-dowell", CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap(CID_A, Some(CID_A), &cids, &present, &by_id),
+            CollectiveGap::AliasDivergent
+        );
+    }
+
+    /// Alias agreement stays plain `InSync` — the new state must not fire on the
+    /// healthy shape.
+    #[test]
+    fn same_alias_same_cid_is_not_alias_divergent() {
+        let (cids, present, by_id) = fixture(&[("household-dowell", CID_A), (CID_A, CID_A)], &[]);
+        assert_eq!(
+            classify_collective_gap("household-dowell", Some(CID_A), &cids, &present, &by_id),
             CollectiveGap::InSync,
-            "cid-keyed local row must satisfy a slug-keyed peer advertisement"
+            "the advertised alias IS anchored to this cid locally"
         );
     }
 

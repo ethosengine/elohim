@@ -213,6 +213,53 @@ fn seed_collective(conn: &mut diesel::SqliteConnection, id: &str, region: Option
         .unwrap();
 }
 
+/// As [`seed_collective`], but stamps the DHT-canonical `collective_cid` — the
+/// anchor the convergent household grouping key is derived from.
+fn seed_collective_with_cid(
+    conn: &mut diesel::SqliteConnection,
+    id: &str,
+    region: Option<&str>,
+    collective_cid: Option<&str>,
+) {
+    diesel::insert_into(db::diesel_schema::collectives::table)
+        .values(&NewCollective {
+            id,
+            h_app_id: "lamad",
+            name: id,
+            description: None,
+            governance_layer: "family",
+            constitutional_parent_id: None,
+            reach: "trusted",
+            region,
+            metadata_json: None,
+            created_by: None,
+            collective_cid,
+            slug: None,
+        })
+        .execute(conn)
+        .unwrap();
+}
+
+/// The a2o footprint judge, in Rust.
+///
+/// Mirrors `genesis/a2o/src/framework/fixtures/household-mesh.ts`
+/// `normalizeHouseholdFootprint`: the ONLY things two doorways must agree on are
+/// `commitmentBackedCollectives` and the order-insensitive set of holder
+/// `kind:id` strings. Everything else in the snapshot (regions, intra-hub counts,
+/// placement-gap ids) is a per-host observation the judge deliberately ignores.
+fn footprint(snapshot: &elohim_storage::views::ResilienceSnapshotView) -> (i32, Vec<String>) {
+    let mut holders: Vec<String> = snapshot
+        .details
+        .as_ref()
+        .expect("snapshot exposes details")
+        .stewarding_collectives
+        .iter()
+        .map(|entry| format!("{}:{}", entry.kind, entry.id))
+        .collect();
+    holders.sort();
+    (snapshot.commitment_backed_collectives, holders)
+}
+
 /// D1 fixture builder: `households` lists (household_id, online_peer_count).
 /// Each household gets one human stewarding the content's shard (the
 /// junction) plus N peers bound via stewarded_nodes with online
@@ -485,7 +532,16 @@ fn d2_snapshot_reports_live_over_known_denominator() {
     let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
     let details = snapshot.details.expect("details present");
     assert_eq!(details.online_peers.live, 1, "online peer in home-a");
-    assert_eq!(details.online_peers.known, 2, "stewarded nodes in home-a");
+    // AMENDED 2026-09-12: `known` now resolves peers from BOTH junctions —
+    // `stewarded_nodes.household_id` (peer-live, peer-dark) AND
+    // `humans.agent_pub_key` (the member row `seed_protection_case` laid so that
+    // home-a stewards the content). Three distinct peers genuinely belong to
+    // home-a; the prior 2 under-counted by ignoring the member junction, which is
+    // the same omission that pinned the live mesh at `known: 0`.
+    assert_eq!(
+        details.online_peers.known, 3,
+        "2 stewarded nodes + the stewarding member, deduplicated"
+    );
 }
 
 // =============================================================================
@@ -1291,11 +1347,24 @@ fn golden_resilience_snapshot_json_baseline() {
     // pre-existing key and value is byte-identical to the Phase-0 capture.
     const GOLDEN_LIT_CARD: &str = r#"{"contentId":"lit-card-content","distributionState":"measured","stewardingCollectives":3,"commitmentBackedCollectives":3,"diversityScore":0.42857143,"regionalDistribution":{"local":0,"regional":0,"global":3,"unknown":0},"placementGaps":[],"protectionStatus":"protected","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"onlinePeers":{"live":3,"known":3},"healthScore":1.0},"feltStatus":{"headline":"Held by 3 households: church-bethel, home-dowell, home-ruth","reassurance":"protected","heldBy":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":3}},"coverageShortfall":0,"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":1,"totalPledgedBytes":0}}"#;
     const GOLDEN_UNMEASURED: &str = r#"{"contentId":"content-never-seeded","distributionState":"unmeasured","stewardingCollectives":0,"commitmentBackedCollectives":0,"diversityScore":0.0,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":0},"placementGaps":[],"protectionStatus":"at-risk","reciprocatingCollectives":0,"details":{"stewardingCollectives":[],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"We can't confirm these are backed up yet","reassurance":"not-yet-seen","heldBy":[],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":0},"suggestedAction":"Invite a household to help hold these"},"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
+    // AMENDED 2026-09-12 — third sanctioned drift, same honesty rule: the intra
+    // golden's `onlinePeers.known` moves 0 → 3. `known` used to read ONLY
+    // `stewarded_nodes.household_id`, so a fixture (and a whole live mesh) whose
+    // devices were never registered reported zero KNOWN peers for households that
+    // demonstrably had members holding shards. It now resolves peers from both
+    // junctions — `stewarded_nodes` AND `humans.agent_pub_key` — so the intra
+    // case's 3 member peers (2 in home-multi, 1 in home-solo) are counted. `live`
+    // stays 0 because the fixture seeds no peer_statuses: known-but-dark is the
+    // honest reading, and it is exactly the gap the denominator exists to show.
+    // Every other key and value is byte-identical to the Phase-0 capture —
+    // `coverageShortfall` (1), `stewardingCollectives` (2), `diversityScore`, and
+    // the whole `feltStatus` block are untouched.
+    //
     // diversityScore = 2/7 (0.2857143): the intra case has 2 distinct household
     // fault domains (home-multi, home-solo). Under the OLD commitment-clamped proxy
     // this read 1/7 (0.14285715) — 0 commitments capped it; the fault-domain fold
     // corrects it to the real distinct-household count over the RS baseline.
-    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.2857143,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}},"coverageShortfall":1,"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
+    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.2857143,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":3},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}},"coverageShortfall":1,"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
 
     assert_eq!(
         lit, GOLDEN_LIT_CARD,
@@ -1308,5 +1377,389 @@ fn golden_resilience_snapshot_json_baseline() {
     assert_eq!(
         intra, GOLDEN_INTRA,
         "intra-hub snapshot JSON drifted from the Phase-0 golden baseline"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Footprint convergence (2026-09-12 doorway-footprint-convergence)
+// ---------------------------------------------------------------------------
+
+/// The DHT-canonical household identity every peer holds — the ONE fact that is
+/// genuinely replicated (`p2p::projection_reconcile`'s collectives arm converges
+/// exactly this, under whatever local routing alias each peer happens to use).
+const DOWELL_CID: &str = "collective:uhCkkD5Z9cTKCB9b2gbuAriONHz9TFBIoqP3WQoxn_dFVTaPMSpnD";
+const K_JESSICA: &str = "uhCAkbciV6YEVgcySQXakaQwzGQ0s_YAzNPvWYKt3U09p_fcZLCZq";
+const K_JAMES: &str = "uhCAkk2lvx1mkSBfCUlMRhusXMcKNl6-X6e_jXSOnTILn9KHsVEQ3";
+const SHARD: &str = "sha256-footprint-shard-1";
+const FOOTPRINT_CONTENT: &str = "elohim-host-landing";
+
+/// Seed the DHT-side facts every peer shares: the shard manifest, the custody
+/// observation, and one commons provide commitment.
+fn seed_shared_dht_facts(conn: &mut diesel::SqliteConnection) {
+    seed_shard_manifest(conn, FOOTPRINT_CONTENT, &format!("[\"{SHARD}\"]"));
+    seed_shard_location(conn, SHARD, K_JESSICA);
+    seed_shard_location(conn, SHARD, K_JAMES);
+    seed_commitment(
+        conn,
+        "commitment-dowell-commons",
+        K_JESSICA,
+        "provide",
+        "active",
+        "content:commons",
+    );
+}
+
+/// **The convergence bar, as a unit test.**
+///
+/// Three peers hold IDENTICAL DHT facts (one `Collective` cid, one shard
+/// manifest, the same two custody observations, the same commons commitment) but
+/// the three DIVERGENT local shapes measured on the household mesh on
+/// 2026-09-12:
+///
+/// - **matthew** (the seeding peer) alias-merged the cid onto the seeded
+///   `family-dowell` row, so the slug its members actually carry
+///   (`household-dowell`) is UN-ANCHORED. All its humans are slug-vocabulary.
+/// - **jessica** never had a `family-dowell` row, so `project_collective` minted
+///   a cid-KEYED placeholder; the B1 membership gap-fill has since stamped the
+///   cid onto `household-dowell` too. One human is slug-vocabulary, the other is
+///   the `identity_fill` CREATE shape (`id = agent:{key}`, `household_id = cid`).
+/// - **james** is jessica's mirror image, with the agent keys swapped.
+///
+/// Before the fix these answered `stewardingCollectives` 1 / 2 / 2 and holder
+/// sets `{household-dowell}` / `{household-dowell, collective:uhCkk…}` /
+/// `{household-dowell, collective:uhCkk…}` — two doorways, two truths, from the
+/// same custody facts.
+///
+/// The fold now groups on the DHT cid and PRESENTS the human-facing slug, so all
+/// three testify the same footprint. This covers the migration window too:
+/// matthew's bucket is un-anchored and jessica's is cid-keyed, and they still
+/// agree, because the presented id is resolved from the household vocabulary the
+/// members speak — which is seed data, identical everywhere.
+#[test]
+fn footprint_converges_across_divergent_local_alias_inventories() {
+    // --- peer matthew: cid anchored on `family-dowell`, members on the slug ---
+    let matthew_pool = test_pool();
+    {
+        let mut conn = matthew_pool.get().unwrap();
+        seed_collective_with_cid(
+            &mut conn,
+            "family-dowell",
+            Some("tech-valley"),
+            Some(DOWELL_CID),
+        );
+        seed_collective_with_cid(&mut conn, "household-dowell", Some("tech-valley"), None);
+        seed_human_with_key(
+            &mut conn,
+            "human-jessica-spouse",
+            K_JESSICA,
+            Some("household-dowell"),
+        );
+        seed_human_with_key(
+            &mut conn,
+            "human-james-son",
+            K_JAMES,
+            Some("household-dowell"),
+        );
+        seed_shared_dht_facts(&mut conn);
+    }
+
+    // --- peer jessica: cid-keyed placeholder + B1-stamped slug, mixed humans ---
+    let jessica_pool = test_pool();
+    {
+        let mut conn = jessica_pool.get().unwrap();
+        // `idx_collectives_cid_unique` makes ONE household ONE anchored row, so
+        // the B1 gap-fill RE-POINTED the cid off the placeholder onto the member
+        // slug; the stub survives un-anchored.
+        seed_collective_with_cid(&mut conn, DOWELL_CID, None, None);
+        seed_collective_with_cid(&mut conn, "household-dowell", None, Some(DOWELL_CID));
+        seed_human_with_key(
+            &mut conn,
+            "human-jessica-spouse",
+            K_JESSICA,
+            Some("household-dowell"),
+        );
+        seed_human_with_key(
+            &mut conn,
+            &format!("agent:{K_JAMES}"),
+            K_JAMES,
+            Some(DOWELL_CID),
+        );
+        seed_shared_dht_facts(&mut conn);
+    }
+
+    // --- peer james: jessica's mirror (agent keys swapped) ---
+    let james_pool = test_pool();
+    {
+        let mut conn = james_pool.get().unwrap();
+        seed_collective_with_cid(&mut conn, DOWELL_CID, None, None);
+        seed_collective_with_cid(&mut conn, "household-dowell", None, Some(DOWELL_CID));
+        seed_human_with_key(
+            &mut conn,
+            "human-james-son",
+            K_JAMES,
+            Some("household-dowell"),
+        );
+        seed_human_with_key(
+            &mut conn,
+            &format!("agent:{K_JESSICA}"),
+            K_JESSICA,
+            Some(DOWELL_CID),
+        );
+        seed_shared_dht_facts(&mut conn);
+    }
+
+    let matthew = household_resilience::snapshot(&matthew_pool, &ctx(), FOOTPRINT_CONTENT, None)
+        .expect("matthew snapshot");
+    let jessica = household_resilience::snapshot(&jessica_pool, &ctx(), FOOTPRINT_CONTENT, None)
+        .expect("jessica snapshot");
+    let james = household_resilience::snapshot(&james_pool, &ctx(), FOOTPRINT_CONTENT, None)
+        .expect("james snapshot");
+
+    let (m_backed, m_holders) = footprint(&matthew);
+    let (j_backed, j_holders) = footprint(&jessica);
+    let (k_backed, k_holders) = footprint(&james);
+
+    // The judge's exact comparison — pairwise, all three.
+    assert_eq!(
+        (m_backed, &m_holders),
+        (j_backed, &j_holders),
+        "matthew and jessica must testify the same footprint"
+    );
+    assert_eq!(
+        (j_backed, &j_holders),
+        (k_backed, &k_holders),
+        "jessica and james must testify the same footprint"
+    );
+
+    // And it converges on the HUMAN-FACING slug, not a raw cid — the felt
+    // surface still reads "names, not nines".
+    assert_eq!(
+        m_holders,
+        vec!["household:household-dowell".to_string()],
+        "one physical household, presented under the slug its members carry"
+    );
+    assert_eq!(
+        matthew.stewarding_collectives, 1,
+        "matthew folds the household once"
+    );
+    assert_eq!(
+        jessica.stewarding_collectives, 1,
+        "jessica's mixed slug/cid vocabularies fold to ONE household, not two"
+    );
+    assert_eq!(
+        james.stewarding_collectives, 1,
+        "james's mixed slug/cid vocabularies fold to ONE household, not two"
+    );
+
+    // Every peer's shortfall is stated against the same fold, so the
+    // floor-relative honesty guard converges with it.
+    assert_eq!(matthew.coverage_shortfall, jessica.coverage_shortfall);
+    assert_eq!(jessica.coverage_shortfall, james.coverage_shortfall);
+    assert_eq!(
+        matthew.coverage_shortfall,
+        Some(2),
+        "1 of the 3-household standard floor"
+    );
+}
+
+/// **The cascade guard.**
+///
+/// `stewarded_nodes.household_id` and the `peer_statuses ⋈ stewarded_nodes` join
+/// store whichever LOCAL household vocabulary their writer saw — here the SLUG —
+/// while the fold now groups on the DHT cid. If the fold fed those joins the bare
+/// group key they would match nothing, `onlinePeers.live`/`.known` would read 0,
+/// and the verdict would flip to `at-risk` on every peer that anchored its slug.
+///
+/// This pins the both-ways resolution: a cid-keyed group still finds its
+/// slug-keyed nodes.
+#[test]
+fn online_and_known_peers_survive_the_cid_grouping_key() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        // The slug is ANCHORED, so the fold's group key becomes the cid …
+        seed_collective_with_cid(
+            &mut conn,
+            "household-dowell",
+            Some("tech-valley"),
+            Some(DOWELL_CID),
+        );
+        seed_human_with_key(
+            &mut conn,
+            "human-jessica-spouse",
+            K_JESSICA,
+            Some("household-dowell"),
+        );
+        // … while the node rows stay keyed on the SLUG.
+        seed_stewarded_node(&mut conn, K_JESSICA, Some("household-dowell"));
+        seed_stewarded_node(&mut conn, K_JAMES, Some("household-dowell"));
+        seed_peer_status(&mut conn, K_JESSICA, "online");
+        seed_peer_status(&mut conn, K_JAMES, "offline");
+
+        seed_shard_manifest(&mut conn, FOOTPRINT_CONTENT, &format!("[\"{SHARD}\"]"));
+        seed_shard_location(&mut conn, SHARD, K_JESSICA);
+    }
+
+    let snapshot =
+        household_resilience::snapshot(&pool, &ctx(), FOOTPRINT_CONTENT, None).expect("snapshot");
+    let details = snapshot.details.as_ref().expect("details");
+
+    assert_eq!(
+        details.stewarding_collectives.len(),
+        1,
+        "the anchored slug folds onto the cid as one household"
+    );
+    assert_eq!(
+        details.online_peers.known, 2,
+        "known must NOT collapse to 0 — the cid group resolves back to its slug-keyed nodes"
+    );
+    assert_eq!(
+        details.online_peers.live, 1,
+        "live must NOT collapse to 0 — one of the two slug-keyed nodes is online"
+    );
+    assert_eq!(
+        snapshot.protection_status, "partial",
+        "a live peer keeps the verdict off at-risk"
+    );
+}
+
+/// A holder in a household with NO cid anywhere must stay its own bucket — two
+/// un-anchored households must never merge just because neither is anchored.
+#[test]
+fn unanchored_households_never_merge_into_one_bucket() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        seed_collective(&mut conn, "home-alpha", None);
+        seed_collective(&mut conn, "home-beta", None);
+        seed_human_with_key(&mut conn, "human-a", K_JESSICA, Some("home-alpha"));
+        seed_human_with_key(&mut conn, "human-b", K_JAMES, Some("home-beta"));
+        seed_shard_manifest(&mut conn, FOOTPRINT_CONTENT, &format!("[\"{SHARD}\"]"));
+        seed_shard_location(&mut conn, SHARD, K_JESSICA);
+        seed_shard_location(&mut conn, SHARD, K_JAMES);
+    }
+
+    let snapshot =
+        household_resilience::snapshot(&pool, &ctx(), FOOTPRINT_CONTENT, None).expect("snapshot");
+    let (_, holders) = footprint(&snapshot);
+    assert_eq!(
+        holders,
+        vec![
+            "household:home-alpha".to_string(),
+            "household:home-beta".to_string()
+        ],
+        "two un-anchored households stay two buckets"
+    );
+    assert_eq!(snapshot.stewarding_collectives, 2);
+}
+
+/// **Liveness must be REAL on the household mesh.**
+///
+/// Measured 2026-09-12: every content answered `onlinePeers {live: 0, known: 0}`
+/// while the very same households reported `intraHubPeers: 3`. The counts read
+/// only `stewarded_nodes.household_id`, which nothing had populated — three
+/// demonstrably online peers reported as zero. That is not a measurement; it is a
+/// missing join wearing a measurement's clothes, and it matters because the chaos
+/// drill showed custody rows OUTLIVE a killed peer: without honest liveness a
+/// household keeps being told "3 copies" after a copy dies.
+///
+/// Three humans with agent keys in the anchored household, three online
+/// peer_statuses rows, NO stewarded_nodes rows at all → live 3, known 3.
+#[test]
+fn online_peers_are_real_from_the_member_junction_alone() {
+    let pool = test_pool();
+    let third_key = "uhCAk2avo9u40OVb2v_LZGrCdDSa3_AHP5DgqPMVb6k3YTk7UMFBp";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_collective_with_cid(
+            &mut conn,
+            "household-dowell",
+            Some("tech-valley"),
+            Some(DOWELL_CID),
+        );
+        seed_human_with_key(
+            &mut conn,
+            "human-jessica-spouse",
+            K_JESSICA,
+            Some("household-dowell"),
+        );
+        seed_human_with_key(
+            &mut conn,
+            "human-james-son",
+            K_JAMES,
+            Some("household-dowell"),
+        );
+        // The third member arrives in the CID vocabulary — both fold to one household.
+        seed_human_with_key(&mut conn, "agent:matthew", third_key, Some(DOWELL_CID));
+
+        for peer in [K_JESSICA, K_JAMES, third_key] {
+            seed_peer_status(&mut conn, peer, "online");
+        }
+        // Deliberately NO stewarded_nodes rows — the household-mesh shape.
+
+        seed_shard_manifest(&mut conn, FOOTPRINT_CONTENT, &format!("[\"{SHARD}\"]"));
+        seed_shard_location(&mut conn, SHARD, K_JESSICA);
+    }
+
+    let snapshot =
+        household_resilience::snapshot(&pool, &ctx(), FOOTPRINT_CONTENT, None).expect("snapshot");
+    let details = snapshot.details.as_ref().expect("details");
+
+    assert_eq!(
+        details.online_peers.known, 3,
+        "all three members are KNOWN peers of the household, across both vocabularies"
+    );
+    assert_eq!(
+        details.online_peers.live, 3,
+        "all three are online — liveness must not read 0 just because no device registered"
+    );
+}
+
+/// Liveness must DEGRADE when a custody peer dies, even though its custody rows
+/// survive it — the signal the chaos cascade drill needs so the badge can drop
+/// from "3 copies" to an honest partial.
+#[test]
+fn online_peers_degrade_when_a_custody_peer_goes_offline() {
+    let pool = test_pool();
+    {
+        let mut conn = pool.get().unwrap();
+        seed_collective_with_cid(
+            &mut conn,
+            "household-dowell",
+            Some("tech-valley"),
+            Some(DOWELL_CID),
+        );
+        seed_human_with_key(
+            &mut conn,
+            "human-jessica-spouse",
+            K_JESSICA,
+            Some("household-dowell"),
+        );
+        seed_human_with_key(&mut conn, "human-james-son", K_JAMES, Some(DOWELL_CID));
+        seed_peer_status(&mut conn, K_JESSICA, "online");
+        // James was killed — his peer_status flipped, but his custody row remains.
+        seed_peer_status(&mut conn, K_JAMES, "offline");
+
+        seed_shard_manifest(&mut conn, FOOTPRINT_CONTENT, &format!("[\"{SHARD}\"]"));
+        seed_shard_location(&mut conn, SHARD, K_JESSICA);
+        seed_shard_location(&mut conn, SHARD, K_JAMES);
+    }
+
+    let snapshot =
+        household_resilience::snapshot(&pool, &ctx(), FOOTPRINT_CONTENT, None).expect("snapshot");
+    let details = snapshot.details.as_ref().expect("details");
+
+    assert_eq!(
+        details.stewarding_collectives[0].intra_hub_peers,
+        Some(2),
+        "custody survives the kill — the household still HOLDS two copies"
+    );
+    assert_eq!(
+        details.online_peers.known, 2,
+        "both peers stay KNOWN — the denominator does not shrink when one dies"
+    );
+    assert_eq!(
+        details.online_peers.live, 1,
+        "only the survivor is LIVE — this is the signal the badge degrades on"
     );
 }

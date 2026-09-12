@@ -14,6 +14,7 @@ use elohim_facings::relation::HolderRow;
 
 use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
+use crate::services::household_identity::HouseholdIdentity;
 use crate::views::{
     HouseholdResilienceDetails, HouseholdResilienceView, OnlinePeersView, PlacementGapView,
     ResilienceSnapshotDetailsView, ResilienceSnapshotView, StewardingCollectiveEntry,
@@ -100,9 +101,11 @@ fn compute_base(
     // Online peer count across the stewarding households (a separate projection).
     // The staleness window (0 = disabled) is injected by the caller; `now` is read
     // once here (per request, not per row).
+    let identity = HouseholdIdentity::load(conn)?;
     let online_peer_count = count_online_peers_in_households(
         conn,
         &steward_households,
+        &identity,
         staleness_secs,
         chrono::Utc::now().timestamp_micros(),
     )?;
@@ -139,15 +142,14 @@ fn compute_base(
     // to honest zeros rather than darking the whole card.
     // The commitment relation's `household_id` values come from the same
     // dual-vocabulary `humans` column the holder relation reads, so they get the
-    // SAME alias canonicalization — otherwise a fallback-only human's
-    // commitments (cid-form household) would silently miss the (slug-form)
-    // steward set they back.
-    let cid_to_canonical = load_collective_cid_alias_map(conn)?;
+    // SAME convergent grouping key — otherwise a fallback-only human's
+    // commitments (cid-form household) would silently miss the steward set they
+    // back, or vice versa.
     let commitment_relation: Vec<_> =
         crate::db::rea_commitments::load_replication_commitment_relation(conn, h_app_id)
             .into_iter()
             .map(|mut row| {
-                row.household_id = canonicalize_household_id(row.household_id, &cid_to_canonical);
+                row.household_id = identity.group_key_opt(row.household_id);
                 row
             })
             .collect();
@@ -274,11 +276,11 @@ pub fn snapshot_with_staleness_secs(
         .load::<(Option<String>, Option<String>)>(&mut conn)
         .map_err(|e| StorageError::Internal(format!("commitment-backed query: {e}")))?;
 
-    // Distinct-household count under the SAME household-vocabulary
-    // canonicalization as the holder relation (one physical household must not
-    // count twice because its members' `humans.household_id` values straddle
-    // the slug and cid namespaces).
-    let cid_to_canonical = load_collective_cid_alias_map(&mut conn)?;
+    // Distinct-household count under the SAME convergent grouping key as the
+    // holder relation (one physical household must not count twice because its
+    // members' `humans.household_id` values straddle the slug and cid
+    // namespaces).
+    let identity = HouseholdIdentity::load(&mut conn)?;
     let commitment_backed_collectives: i32 = candidate_rows
         .into_iter()
         .filter(|(_, classified)| {
@@ -286,7 +288,7 @@ pub fn snapshot_with_staleness_secs(
                 .iter()
                 .any(|c| c == &scope)
         })
-        .filter_map(|(household_id, _)| canonicalize_household_id(household_id, &cid_to_canonical))
+        .filter_map(|(household_id, _)| identity.group_key_opt(household_id))
         .collect::<HashSet<String>>()
         .len() as i32;
 
@@ -328,35 +330,25 @@ pub fn snapshot_with_staleness_secs(
     )?;
     let gaps: Vec<PlacementGapView> = gap_rows.into_iter().map(Into::into).collect();
 
-    // Map steward_households (Vec<String> of ids) → Vec<StewardingCollectiveEntry>,
-    // enriching with the collective's display name (collectives.name) so the felt
-    // surface can render names, not nines. `kind` stays "household": the stewards
-    // are sourced from humans.household_id (all households today); multi-kind
-    // derivation is a captured follow-on (resilience-tier-content-declared-floor).
-    let collective_labels: std::collections::HashMap<String, String> =
-        if base.details.steward_households.is_empty() {
-            std::collections::HashMap::new()
-        } else {
-            use crate::db::diesel_schema::collectives;
-            collectives::table
-                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-                .filter(collectives::id.eq_any(&base.details.steward_households))
-                .select((collectives::id, collectives::name))
-                .load::<(String, String)>(&mut conn)
-                .unwrap_or_default()
-                .into_iter()
-                .collect()
-        };
-
+    // PRESENTATION BOUNDARY (2026-09-12). The fold groups on the convergent DHT
+    // `collective_cid`; the wire restores the human-facing slug here so "names,
+    // not nines" survives and the a2o footprint judge (which compares
+    // `kind:id`) sees the same string from every peer.
+    //
+    // `id` — the slug any local row anchors to this cid, else the cid form.
+    // `label` — resolved by cid first, slug fallback.
+    //
+    // No wire-shape change: the same two fields, resolved from a convergent key
+    // instead of from a per-host routing alias.
     let steward_collective_entries: Vec<StewardingCollectiveEntry> = base
         .details
         .steward_households
         .iter()
-        .map(|id| StewardingCollectiveEntry {
-            id: id.clone(),
+        .map(|key| StewardingCollectiveEntry {
+            id: identity.display_id(key),
             kind: "household".to_string(),
-            label: collective_labels.get(id).cloned(),
-            intra_hub_peers: Some(intra_by_hub.get(id).copied().unwrap_or(0)),
+            label: identity.label(key),
+            intra_hub_peers: Some(intra_by_hub.get(key).copied().unwrap_or(0)),
         })
         .collect();
 
@@ -376,24 +368,21 @@ pub fn snapshot_with_staleness_secs(
 
     // Known denominator: stewarded nodes registered across the stewarding
     // collectives (the D2 join) — "2/3 peers live", never a bare zero.
-    let known_peer_count: i32 = {
-        use crate::db::diesel_schema::stewarded_nodes;
-        if base.details.steward_households.is_empty() {
-            0
-        } else {
-            stewarded_nodes::table
-                .filter(stewarded_nodes::h_app_id.eq(&ctx.h_app_id))
-                .filter(stewarded_nodes::household_id.is_not_null())
-                .filter(
-                    stewarded_nodes::household_id
-                        .assume_not_null()
-                        .eq_any(&base.details.steward_households),
-                )
-                .count()
-                .first::<i64>(&mut conn)
-                .unwrap_or(0) as i32
-        }
-    };
+    // Known peers come from the SAME two-junction, alias-resolved peer set that
+    // produced `live` in `compute_base` — one resolution, so the numerator can
+    // never exceed or drift from its denominator. `staleness_secs` is irrelevant
+    // to `known` (a dark peer is still known), so the window is passed as 0.
+    let steward_household_set: HashSet<String> =
+        base.details.steward_households.iter().cloned().collect();
+    let known_peer_count: i32 = count_household_peers(
+        &mut conn,
+        &steward_household_set,
+        &identity,
+        0,
+        chrono::Utc::now().timestamp_micros(),
+    )
+    .map(|c| c.known)
+    .unwrap_or(0);
 
     // Floor-relative coverage shortfall, stated from the SAME floor the felt
     // projection above compares against (tier "standard" until the
@@ -489,40 +478,39 @@ pub(crate) fn load_holder_relation(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("holder relation: {e}")))?;
 
-    // Household-vocabulary normalization (2026-08-22 card-tells-truth divergence).
+    // Household-vocabulary normalization onto the CONVERGENT grouping key
+    // (2026-09-12 doorway-footprint-convergence; supersedes the 2026-08-22
+    // cid→slug canonicalization, which was a no-op on every peer that lacked the
+    // slug row carrying the cid).
+    //
     // `humans.household_id` is written in TWO namespaces for the SAME physical
     // household: the slug id (`household-dowell`, seeder/membership-signal path)
-    // and the DHT-canonical cid (`collective:{action_hash}`, the
-    // `identity_fill` CREATE path — it writes the membership `household_cid`
-    // verbatim because no slug row exists to pair it with). The collectives
-    // projection on THIS node already declares the alias
-    // (`collectives.collective_cid`), but the fold never consulted it, so one
-    // peer counted `{household-dowell}` = 1 steward household while another
-    // counted `{household-dowell, collective:…}` = 2 for identical custody
-    // facts — the two doorways told different truths from the same
-    // shard_locations. Canonicalize cid-form household ids onto the collectives
-    // row's `id` (the key every downstream consumer joins on: labels,
-    // peer_statuses, stewarded_nodes) using ONLY local tables — the peer still
-    // serves its own verified truth, now internally coherent across namespaces.
-    let cid_to_canonical = load_collective_cid_alias_map(conn)?;
+    // and the DHT-canonical cid (`collective:{action_hash}`, the `identity_fill`
+    // CREATE path — it writes the membership `household_cid` verbatim because no
+    // slug row exists to pair it with).
+    //
+    // The prior fix canonicalized cid→slug through the LOCAL `collectives` row,
+    // which only works on a peer whose slug row happens to carry the cid. On the
+    // household mesh matthew anchored the cid onto `family-dowell` while jessica
+    // and james minted a cid-KEYED placeholder (`id == collective_cid`), so the
+    // alias map was the identity function there and the two doorways kept telling
+    // different truths from identical custody facts.
+    //
+    // The fold now groups on the DHT `collective_cid` — the column
+    // `p2p::projection_reconcile`'s collectives arm actually converges (it returns
+    // `InSync` for a cid held under ANY local routing alias). An un-anchored slug
+    // stays its own bucket, so two un-anchored households never merge. The
+    // human-facing slug is restored at the PRESENTATION boundary
+    // (`HouseholdIdentity::display_id`), never here.
+    let identity = HouseholdIdentity::load(conn)?;
     let rows: Vec<HolderJoinRow> = rows
         .into_iter()
         .map(|(shard_hash, peer_id, household_id, human_id, region)| {
-            match household_id
-                .as_deref()
-                .and_then(|h| cid_to_canonical.get(h))
-            {
-                Some((canonical_id, alias_region)) => (
-                    shard_hash,
-                    peer_id,
-                    Some(canonical_id.clone()),
-                    human_id,
-                    // The cid-form household missed the id-keyed left join, so its
-                    // region came back NULL; fill from the alias target row.
-                    region.or_else(|| alias_region.clone()),
-                ),
-                None => (shard_hash, peer_id, household_id, human_id, region),
-            }
+            let key = identity.group_key_opt(household_id);
+            // A cid-form household missed the id-keyed left join, so its region
+            // came back NULL; backfill from whichever row anchors the group.
+            let region = region.or_else(|| key.as_deref().and_then(|k| identity.region_for(k)));
+            (shard_hash, peer_id, key, human_id, region)
         })
         .collect();
 
@@ -574,62 +562,6 @@ pub(crate) fn load_holder_relation(
     Ok(out)
 }
 
-/// Load the collective-cid → canonical-collective-id alias map — the local
-/// vocabulary bridge between the two `household_id` namespaces found in
-/// `humans` (slug ids vs DHT-canonical `collective:{action_hash}` cids; see the
-/// normalization comment in [`load_holder_relation`]). The read is
-/// `h_app_id`-agnostic on `collectives`, mirroring the holder-relation
-/// left-join (a scope filter here would ship a silent no-op under the
-/// qahal/lamad ctx drift class). Collision (two collectives rows sharing a cid)
-/// resolves deterministically: prefer the non-`collective:`-prefixed id, then
-/// lexicographic min. Value carries the row's region so a cid-form holder that
-/// missed the id-keyed region join can be backfilled.
-fn load_collective_cid_alias_map(
-    conn: &mut diesel::SqliteConnection,
-) -> Result<std::collections::HashMap<String, (String, Option<String>)>, StorageError> {
-    use crate::db::diesel_schema::collectives;
-
-    let alias_rows: Vec<(String, Option<String>, Option<String>)> = collectives::table
-        .filter(collectives::collective_cid.is_not_null())
-        .select((
-            collectives::id,
-            collectives::collective_cid,
-            collectives::region,
-        ))
-        .load(conn)
-        .map_err(|e| StorageError::Internal(format!("collective cid aliases: {e}")))?;
-    let mut cid_to_canonical: std::collections::HashMap<String, (String, Option<String>)> =
-        std::collections::HashMap::new();
-    for (id, cid, region) in alias_rows {
-        let Some(cid) = cid else { continue };
-        match cid_to_canonical.get(&cid) {
-            Some((existing, _))
-                if (existing.starts_with("collective:"), existing.as_str())
-                    <= (id.starts_with("collective:"), id.as_str()) => {}
-            _ => {
-                cid_to_canonical.insert(cid, (id, region));
-            }
-        }
-    }
-    Ok(cid_to_canonical)
-}
-
-/// Canonicalize one optional household id through the alias map: a cid-form id
-/// with a declared alias becomes the collectives row's id; everything else
-/// passes through unchanged.
-fn canonicalize_household_id(
-    household_id: Option<String>,
-    cid_to_canonical: &std::collections::HashMap<String, (String, Option<String>)>,
-) -> Option<String> {
-    match household_id
-        .as_deref()
-        .and_then(|h| cid_to_canonical.get(h))
-    {
-        Some((canonical_id, _)) => Some(canonical_id.clone()),
-        None => household_id,
-    }
-}
-
 /// Count online/degraded peers across the stewarding households, applying an
 /// optional liveness staleness window.
 ///
@@ -639,34 +571,131 @@ fn canonicalize_household_id(
 /// does not count toward the protection verdict forever. `staleness_secs == 0`
 /// disables the window (legacy: age-agnostic). `now_micros` is threaded in (not
 /// read from the clock here) so the predicate is deterministically unit-testable.
-fn count_online_peers_in_households(
+/// `live` / `known` peer counts for a set of stewarding households — computed
+/// TOGETHER so the numerator can never drift from its denominator.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct HouseholdPeerCounts {
+    /// Peers in these households currently online/degraded within the window.
+    pub live: i32,
+    /// Peers KNOWN to belong to these households, live or not — the honest
+    /// denominator ("2 of 3 peers live", never a bare zero).
+    pub known: i32,
+}
+
+/// Resolve every peer (agent_cid) locally known to belong to one of
+/// `households`, then split it by liveness.
+///
+/// # Two junctions, not one (2026-09-12)
+///
+/// Peer↔household membership is recorded in TWO places, and reading only one of
+/// them is why the live mesh answered `onlinePeers {live: 0, known: 0}` for every
+/// content while reporting `intraHubPeers: 3` from the very same households:
+///
+/// - `stewarded_nodes.household_id` — the device-registration junction. Empty on
+///   the household mesh: nothing had registered devices there.
+/// - `humans.agent_pub_key` → `humans.household_id` — the junction the holder
+///   relation ALREADY folds over (which is why `intraHubPeers` was truthful).
+///
+/// Counting only `stewarded_nodes` reported zero live peers for three demonstrably
+/// online peers, which is not a measurement — it is a missing join wearing a
+/// measurement's clothes. Worse, the chaos drill showed the failure is asymmetric:
+/// custody rows outlive a killed peer, so a household kept being told "3 copies"
+/// while liveness — the signal that should have degraded the badge — was
+/// structurally pinned at 0. Both junctions now feed one deduplicated peer set.
+///
+/// # Vocabulary
+///
+/// `households` carries CONVERGENT group keys (a `collective:` cid wherever one is
+/// anchored) while both junctions store whichever LOCAL vocabulary their writer
+/// saw. `stewarded_nodes` is therefore queried through
+/// [`HouseholdIdentity::aliases_of`], and the `humans` side is folded through
+/// [`HouseholdIdentity::group_key`] — the same relabelling from both directions.
+///
+/// Neither junction is `h_app_id`-filtered, matching
+/// `peer_statuses::list_by_household` and `load_holder_relation` (a scope filter
+/// here would ship a silent no-op under the qahal/lamad ctx drift class — the
+/// same reasoning the identity resolver's `collectives` read records).
+fn count_household_peers(
     conn: &mut diesel::SqliteConnection,
     households: &HashSet<String>,
+    identity: &HouseholdIdentity,
     staleness_secs: i64,
     now_micros: i64,
-) -> Result<i32, StorageError> {
+) -> Result<HouseholdPeerCounts, StorageError> {
+    use crate::db::diesel_schema::{humans, stewarded_nodes};
+
     if households.is_empty() {
-        return Ok(0);
+        return Ok(HouseholdPeerCounts::default());
     }
+
+    // Junction 1 — registered devices, keyed on whichever local alias the writer used.
+    let alias_ids: Vec<String> = households
+        .iter()
+        .flat_map(|key| identity.aliases_of(key))
+        .collect::<std::collections::BTreeSet<String>>()
+        .into_iter()
+        .collect();
+    let mut peers: HashSet<String> = stewarded_nodes::table
+        .filter(stewarded_nodes::household_id.is_not_null())
+        .filter(
+            stewarded_nodes::household_id
+                .assume_not_null()
+                .eq_any(&alias_ids),
+        )
+        .select(stewarded_nodes::id)
+        .load::<String>(conn)
+        .map_err(|e| StorageError::Internal(format!("stewarded_nodes by household: {e}")))?
+        .into_iter()
+        .collect();
+
+    // Junction 2 — the member rows the holder relation already trusts.
+    let member_rows: Vec<(Option<String>, Option<String>)> = humans::table
+        .filter(humans::agent_pub_key.is_not_null())
+        .filter(humans::household_id.is_not_null())
+        .select((humans::agent_pub_key, humans::household_id))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("humans by household: {e}")))?;
+    for (agent_pub_key, household_id) in member_rows {
+        let (Some(key), Some(hh)) = (agent_pub_key, household_id) else {
+            continue;
+        };
+        if households.contains(&identity.group_key(&hh)) {
+            peers.insert(key);
+        }
+    }
+
+    if peers.is_empty() {
+        return Ok(HouseholdPeerCounts::default());
+    }
+    let known = peers.len() as i32;
+
     // `i64::MIN` cutoff makes the age test a no-op when the window is disabled.
     let cutoff_micros: i64 = if staleness_secs > 0 {
         now_micros.saturating_sub(staleness_secs.saturating_mul(1_000_000))
     } else {
         i64::MIN
     };
-    let mut count = 0;
-    for h in households.iter() {
-        let rows = peer_statuses::list_by_household(conn, h)
-            .map_err(|e| StorageError::Internal(format!("list_by_household: {e}")))?;
-        for row in rows {
-            if matches!(row.status.as_str(), "online" | "degraded")
-                && row.timestamp >= cutoff_micros
-            {
-                count += 1;
-            }
-        }
-    }
-    Ok(count)
+    let peer_ids: Vec<String> = peers.into_iter().collect();
+    let live = peer_statuses::list_by_peer_ids(conn, &peer_ids)
+        .map_err(|e| StorageError::Internal(format!("peer_statuses by peer ids: {e}")))?
+        .into_iter()
+        .filter(|row| {
+            matches!(row.status.as_str(), "online" | "degraded") && row.timestamp >= cutoff_micros
+        })
+        .count() as i32;
+
+    Ok(HouseholdPeerCounts { live, known })
+}
+
+/// Live-peer count alone — the reduction `compute_base` needs.
+fn count_online_peers_in_households(
+    conn: &mut diesel::SqliteConnection,
+    households: &HashSet<String>,
+    identity: &HouseholdIdentity,
+    staleness_secs: i64,
+    now_micros: i64,
+) -> Result<i32, StorageError> {
+    Ok(count_household_peers(conn, households, identity, staleness_secs, now_micros)?.live)
 }
 
 #[cfg(test)]
@@ -827,23 +856,33 @@ mod tests {
         let relation = load_holder_relation(&mut conn, "lamad", &["sha256-shard-1".to_string()])
             .expect("holder relation");
 
+        let relation_identity = HouseholdIdentity::load(&mut conn).expect("identity");
+
         assert_eq!(relation.len(), 2, "both holders survive");
         for row in &relation {
             assert_eq!(
                 row.hub_id.as_deref(),
-                Some("household-dowell"),
-                "cid-form household_id canonicalizes onto the collectives slug id"
+                Some("collective:uhCkkALIAS"),
+                "both vocabularies group on the CONVERGENT DHT collective_cid \
+                 (2026-09-12; the grouping key moved off the per-host routing alias)"
             );
             assert_eq!(
                 row.region.as_deref(),
                 Some("tech-valley"),
-                "alias target's region backfills the cid-form holder"
+                "the anchored row's region backfills the cid-form holder"
             );
         }
         assert_eq!(
             resiliency::stewarding_hubs(&relation).len(),
             1,
             "one physical household folds to ONE steward household across vocabularies"
+        );
+        // The presentation boundary restores the human-facing slug, so the felt
+        // surface still reads "names, not nines".
+        assert_eq!(
+            relation_identity.display_id("collective:uhCkkALIAS"),
+            "household-dowell",
+            "the wire still presents the slug, never the raw cid, when one is anchored"
         );
     }
 
@@ -859,17 +898,18 @@ mod tests {
         seed_online_peer(&mut conn, "uhCAkSTALE", "hh-a", now - 901 * 1_000_000);
 
         let households: HashSet<String> = HashSet::from(["hh-a".to_string()]);
+        let identity = HouseholdIdentity::load(&mut conn).expect("identity");
 
         // Window 900: only the fresh peer counts.
         assert_eq!(
-            count_online_peers_in_households(&mut conn, &households, 900, now).unwrap(),
+            count_online_peers_in_households(&mut conn, &households, &identity, 900, now).unwrap(),
             1,
             "the 901s-stale peer is excluded under a 900s window"
         );
 
         // Window 0: legacy age-agnostic — both count.
         assert_eq!(
-            count_online_peers_in_households(&mut conn, &households, 0, now).unwrap(),
+            count_online_peers_in_households(&mut conn, &households, &identity, 0, now).unwrap(),
             2,
             "both peers count when the window is disabled"
         );

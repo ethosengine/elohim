@@ -461,6 +461,27 @@ pub fn project_collective(
 /// between our read and our write — re-read and take the refresh branch
 /// instead of bubbling a hard error; that row existing under someone else's
 /// write is exactly the condition step 1 checks for.
+/// The local household slug the projected collective's FOUNDER already belongs
+/// to — the last-resort alias candidate in `project_collective` step (2).
+///
+/// Cid-form values are excluded: a row a prior fill pass already lit carries
+/// `household_id = collective_cid` verbatim, and stamping a cid onto its own
+/// namesake proves nothing. Only a genuine local routing slug qualifies.
+fn founder_household_slug(
+    conn: &mut SqliteConnection,
+    founder_agent_cid: Option<&str>,
+) -> Option<String> {
+    let raw = founder_agent_cid?.trim();
+    let bare = raw.strip_prefix("agent:").unwrap_or(raw).trim();
+    if bare.is_empty() {
+        return None;
+    }
+    let row = crate::db::humans::get_human_by_agent_key(conn, bare).ok()??;
+    row.household_id
+        .map(|h| h.trim().to_string())
+        .filter(|h| !h.is_empty() && !is_collective_cid_shaped(h))
+}
+
 fn project_collective_within_txn(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -477,7 +498,24 @@ fn project_collective_within_txn(
     }
 
     // (2) Alias merge onto an existing local row.
-    for alias in [hints.slug_alias(), p.merge_onto_id].into_iter().flatten() {
+    //
+    // 2026-09-12 (doorway-footprint-convergence): the candidate list ends with the
+    // household slug this node's OWN `humans` rows already speak, derived from the
+    // founder. Without it, a peer that lacks a row under the charter's declared
+    // `slugAlias` fell straight through to step (3) and minted a cid-keyed
+    // placeholder — leaving the slug its members actually carry
+    // (`humans.household_id`) un-anchored, so the resilience fold grouped that
+    // peer on a different key than its neighbours. Gated on `is_household()`: a
+    // founder's household slug must NEVER absorb a church/org collective's cid.
+    let founder_slug = if hints.is_household() {
+        founder_household_slug(conn, p.founder_agent_cid)
+    } else {
+        None
+    };
+    for alias in [hints.slug_alias(), p.merge_onto_id, founder_slug.as_deref()]
+        .into_iter()
+        .flatten()
+    {
         let Some(current_cid) = collective_cid_of_id(conn, ctx, alias)? else {
             continue; // no local row under this alias
         };
@@ -940,19 +978,33 @@ pub fn gap_fill_household_collective_cid_via_membership(
         return Ok(HouseholdCidGapFillOutcome::NoCandidateRow);
     }
 
-    // Already known locally under ANY row in this scope — nothing to do.
-    let already_known: Option<String> = collectives::table
+    // Already known locally under a REAL routing alias — nothing to do.
+    //
+    // 2026-09-12 (doorway-footprint-convergence): a cid-KEYED placeholder
+    // (`id == collective_cid`, minted by `project_collective` step 3 when no
+    // local alias matched the charter's `slugAlias`) must NOT satisfy this
+    // check. It used to, and the result was a self-blocking heal: the placeholder
+    // this node minted itself answered "already known" forever, so the membership
+    // join below never got to stamp the cid onto the slug row that
+    // `humans.household_id` actually names. Measured on the household mesh as
+    // `elohim_identity_fill_collective_cid_stamped_total 0` on every peer while
+    // `household-dowell` sat un-anchored everywhere — which is what left the
+    // resilience fold grouping two doorways onto different keys.
+    //
+    // A placeholder is a routing stub, not an alias: skipping it here lets the
+    // stamp proceed, after which BOTH rows carry the cid and the fold's
+    // `HouseholdIdentity` groups them together.
+    let anchored_ids: Vec<String> = collectives::table
         .filter(collectives::h_app_id.eq(&ctx.h_app_id))
         .filter(collectives::collective_cid.eq(discovered_cid))
         .select(collectives::id)
-        .first::<String>(conn)
-        .optional()
+        .load::<String>(conn)
         .map_err(|e| {
             StorageError::Internal(format!(
                 "household collective_cid gap-fill: already-known lookup failed: {e}"
             ))
         })?;
-    if already_known.is_some() {
+    if anchored_ids.iter().any(|id| id != discovered_cid) {
         return Ok(HouseholdCidGapFillOutcome::AlreadyKnown);
     }
 
@@ -1034,22 +1086,54 @@ pub fn gap_fill_household_collective_cid_via_membership(
             Ok(HouseholdCidGapFillOutcome::Mismatch)
         }
         Some(None) => {
-            let n = diesel::update(
-                collectives::table
-                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
-                    .filter(collectives::id.eq(&slug))
-                    .filter(collectives::collective_cid.is_null()),
-            )
-            .set((
-                collectives::collective_cid.eq(Some(discovered_cid)),
-                collectives::updated_at.eq(current_timestamp()),
-            ))
-            .execute(conn)
-            .map_err(|e| {
-                StorageError::Internal(format!(
-                    "household collective_cid gap-fill: stamp failed: {e}"
-                ))
-            })?;
+            // `idx_collectives_cid_unique` makes `(h_app_id, collective_cid)`
+            // unique, so ONE household is ONE anchored row. When a cid-keyed
+            // placeholder currently holds the cid (the only way we reach here —
+            // the `already_known` guard above returned early for any real alias),
+            // the stamp must RE-POINT it, not add a second anchor, or the UPDATE
+            // trips the unique index.
+            //
+            // This is not a "move" in the fills-never-moves sense: the
+            // cid→household binding is unchanged, and the placeholder is this
+            // node's OWN routing stub, minted by `project_collective` step (3)
+            // only because it had no better row at the time. What changes is
+            // purely which LOCAL row carries the anchor — a coherence repair
+            // inside one node's projection, moving it onto the slug that node's
+            // own member rows actually name. Both writes run in ONE transaction
+            // so no window exists where the cid is unanchored (a concurrent
+            // `project_collective` would mint a fresh placeholder into it).
+            let placeholder_held = anchored_ids.iter().any(|id| id == discovered_cid);
+            let n = conn
+                .immediate_transaction::<_, diesel::result::Error, _>(|conn| {
+                    if placeholder_held {
+                        diesel::update(
+                            collectives::table
+                                .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                                .filter(collectives::id.eq(discovered_cid)),
+                        )
+                        .set((
+                            collectives::collective_cid.eq(None::<String>),
+                            collectives::updated_at.eq(current_timestamp()),
+                        ))
+                        .execute(conn)?;
+                    }
+                    diesel::update(
+                        collectives::table
+                            .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                            .filter(collectives::id.eq(&slug))
+                            .filter(collectives::collective_cid.is_null()),
+                    )
+                    .set((
+                        collectives::collective_cid.eq(Some(discovered_cid)),
+                        collectives::updated_at.eq(current_timestamp()),
+                    ))
+                    .execute(conn)
+                })
+                .map_err(|e| {
+                    StorageError::Internal(format!(
+                        "household collective_cid gap-fill: stamp failed: {e}"
+                    ))
+                })?;
 
             Ok(if n > 0 {
                 tracing::info!(
@@ -2148,6 +2232,106 @@ mod tests {
                 "ambiguous pairing must never guess-write either candidate"
             );
         }
+    }
+
+    /// **The self-blocking heal (2026-09-12 doorway-footprint-convergence).**
+    ///
+    /// `project_collective` step (3) mints a cid-KEYED placeholder
+    /// (`id == collective_cid`) when no local alias matched the charter. That
+    /// placeholder used to satisfy the `already_known` short-circuit here, so this
+    /// gap-fill answered `AlreadyKnown` forever and NEVER stamped the slug row
+    /// that `humans.household_id` actually names. Measured on the household mesh
+    /// as `elohim_identity_fill_collective_cid_stamped_total 0` on every peer
+    /// while `household-dowell` sat un-anchored everywhere — which is what left
+    /// the resilience fold grouping two doorways onto different keys.
+    ///
+    /// A placeholder is a routing stub, not an alias. The stamp must proceed.
+    #[test]
+    fn gap_fill_is_not_blocked_by_its_own_cid_keyed_placeholder() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // The placeholder this node minted itself …
+        seed_family_row(&mut conn, &ctx, DISCOVERED_CID, Some(DISCOVERED_CID));
+        // … and the slug the household's members actually carry, un-anchored.
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+        seed_healed_member(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkMATTHEW",
+            Some("household-dowell"),
+        );
+
+        let member_cids = vec!["agent:uhCAkMATTHEW".to_string()];
+        let outcome = gap_fill_household_collective_cid_via_membership(
+            &mut conn,
+            &ctx,
+            DISCOVERED_CID,
+            &member_cids,
+        )
+        .expect("gap fill");
+        assert_eq!(
+            outcome,
+            HouseholdCidGapFillOutcome::Stamped,
+            "a cid-keyed placeholder must not count as an existing alias"
+        );
+
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("query")
+            .expect("row exists");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some(DISCOVERED_CID),
+            "the member slug is now anchored, so the fold groups it with the cid"
+        );
+
+        // `idx_collectives_cid_unique` is `(h_app_id, collective_cid)` — one
+        // household, one anchored row — so the stamp RE-POINTED the cid rather
+        // than adding a second anchor. The stub survives, un-anchored.
+        let placeholder = get_collective(&mut conn, &ctx, DISCOVERED_CID)
+            .expect("query")
+            .expect("placeholder row survives");
+        assert!(
+            placeholder.collective_cid.is_none(),
+            "the cid moved off the placeholder; two anchored rows would trip the unique index"
+        );
+    }
+
+    /// The short-circuit still holds for a REAL alias: once a genuine slug row
+    /// carries the cid, a second discovery is a clean no-op (fills-never-moves).
+    #[test]
+    fn gap_fill_still_short_circuits_on_a_real_anchored_alias() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        seed_family_row(&mut conn, &ctx, "family-dowell", Some(DISCOVERED_CID));
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+        seed_healed_member(
+            &mut conn,
+            "human-matthew-manager",
+            "uhCAkMATTHEW",
+            Some("household-dowell"),
+        );
+
+        let member_cids = vec!["agent:uhCAkMATTHEW".to_string()];
+        let outcome = gap_fill_household_collective_cid_via_membership(
+            &mut conn,
+            &ctx,
+            DISCOVERED_CID,
+            &member_cids,
+        )
+        .expect("gap fill");
+        assert_eq!(outcome, HouseholdCidGapFillOutcome::AlreadyKnown);
+
+        let row = get_collective(&mut conn, &ctx, "household-dowell")
+            .expect("query")
+            .expect("row exists");
+        assert!(
+            row.collective_cid.is_none(),
+            "an existing real alias keeps this a no-op — heal fills, never moves"
+        );
     }
 
     /// No member of this household resolves to ANY local `humans` row —
