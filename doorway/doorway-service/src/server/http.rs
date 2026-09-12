@@ -374,6 +374,19 @@ pub struct AppState {
     /// See `src/projection/epr_router.rs` (B11) and `src/main.rs` (B12).
     pub epr_router: Arc<crate::projection::EprRouter>,
 
+    /// Name-route table — which SIBLING doorway holds a live projection
+    /// contract for which root, plus how live it looked at the last federation
+    /// discovery tick.
+    ///
+    /// Read on the request path only when this doorway's own answer is a 404
+    /// (no contract for that root here) or a 503 (its own primary + pool are
+    /// shedding); the fold then names the candidate holders and ONE hop is
+    /// forwarded. Category C, Operational: rebuilt from the next discovery
+    /// tick, never persisted, never notarized.
+    ///
+    /// See `crate::services::name_routing`.
+    pub name_routes: Arc<crate::services::name_routing::NameRouteTable>,
+
     /// Materialized `/sitemap.xml` cache (spec §7.5): `(generation, xml)`.
     /// Served when the cached generation still matches `epr_router.generation()`;
     /// otherwise re-materialized from the routing table + commons ids and
@@ -763,6 +776,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -882,6 +896,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1016,6 +1031,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -1165,6 +1181,7 @@ impl AppState {
             render_semaphore: None,
             pkarr_resolver: None,
             epr_router: Arc::new(crate::projection::EprRouter::new()),
+            name_routes: Arc::new(crate::services::name_routing::NameRouteTable::new()),
             sitemap_cache: Arc::new(tokio::sync::RwLock::new(None)),
             transport_manifests: Arc::new(crate::routes::TransportManifestStore::new()),
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
@@ -5432,6 +5449,204 @@ mod path_segment_decoding_tests {
     }
 }
 
+// =============================================================================
+// Name-routed one-hop relay (WS3 Task 3.3)
+// =============================================================================
+
+/// Upper bound on a relayed body. A relay answers a NAME (a projected shell or
+/// a deep-linked SPA route), never a media stream — anything larger than this
+/// is refused rather than buffered, and the client keeps our honest local
+/// verdict. Blob bytes are NOT this path's business (`doorway/CLAUDE.md`
+/// §"No Blob Fan-Out").
+const RELAY_MAX_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Dedicated client for cross-doorway relays. Deliberately NOT
+/// `storage_proxy_client`: a slow sibling must never consume a connection the
+/// storage proxy will later check out. Short budget — a relay that has not
+/// answered in 8s is worse than our own honest 404.
+static RELAY_CLIENT: std::sync::LazyLock<reqwest::Client> = std::sync::LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(8))
+        .connect_timeout(std::time::Duration::from_secs(3))
+        .build()
+        .unwrap_or_default()
+});
+
+/// The inbound request facts a relay needs, snapshotted BEFORE the dispatch
+/// match consumes `req`.
+///
+/// Auth is forwarded AS-IS — the holder verifies a sibling-minted session
+/// against the issuer's JWKS (`PeerJwksCache`, already wired), so the relay
+/// mints nothing and weakens nothing. It carries no identity of its own.
+#[derive(Debug, Clone, Default)]
+struct RelayContext {
+    /// The inbound request already crossed a doorway — the one-hop budget is
+    /// spent and this doorway answers locally.
+    hop_seen: bool,
+    authorization: Option<String>,
+    cookie: Option<String>,
+    accept: Option<String>,
+}
+
+impl RelayContext {
+    fn from_request(req: &Request<Incoming>) -> Self {
+        let header = |name: &str| {
+            req.headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .map(|v| v.to_string())
+        };
+        Self {
+            hop_seen: crate::services::name_routing::inbound_hop_seen(
+                req.headers()
+                    .get(crate::services::name_routing::FEDERATION_HOP_HEADER)
+                    .and_then(|v| v.to_str().ok()),
+            ),
+            authorization: header("authorization"),
+            cookie: header("cookie"),
+            accept: header("accept"),
+        }
+    }
+}
+
+/// Forward one request to one holder. Stamps the loop-prevention header so the
+/// holder never forwards it again.
+async fn fetch_from_holder(
+    client: &reqwest::Client,
+    holder: &crate::services::name_routing::NameHolder,
+    path: &str,
+    query: Option<&str>,
+    ctx: &RelayContext,
+) -> Result<crate::services::name_routing::HolderReply, String> {
+    let mut url = format!("{}{}", holder.origin.trim_end_matches('/'), path);
+    if let Some(q) = query.filter(|q| !q.is_empty()) {
+        url.push('?');
+        url.push_str(q);
+    }
+
+    let mut request = client
+        .get(&url)
+        .header(crate::services::name_routing::FEDERATION_HOP_HEADER, "1");
+    if let Some(v) = &ctx.authorization {
+        request = request.header("authorization", v);
+    }
+    if let Some(v) = &ctx.cookie {
+        request = request.header("cookie", v);
+    }
+    if let Some(v) = &ctx.accept {
+        request = request.header("accept", v);
+    }
+
+    let response = request.send().await.map_err(|e| e.to_string())?;
+    let status = response.status().as_u16();
+    if let Some(len) = response.content_length() {
+        if len > RELAY_MAX_BYTES {
+            return Err(format!(
+                "relayed body {len} exceeds {RELAY_MAX_BYTES} bytes"
+            ));
+        }
+    }
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.to_string());
+    let body = response.bytes().await.map_err(|e| e.to_string())?;
+    if body.len() as u64 > RELAY_MAX_BYTES {
+        return Err(format!("relayed body exceeds {RELAY_MAX_BYTES} bytes"));
+    }
+    Ok(crate::services::name_routing::HolderReply {
+        status,
+        content_type,
+        body: body.to_vec(),
+    })
+}
+
+/// **The wired forward.** Returns `Some(response)` only when a sibling doorway
+/// holding a live contract for this name actually served it; `None` means the
+/// caller keeps its OWN response byte-for-byte — a failed relay never masks a
+/// local 404 or a local shed.
+///
+/// Gates (all in `name_routing::relay_precondition`, one testable predicate):
+/// GET only, non-service path only, no inbound hop header, and a local verdict
+/// of 404 (no contract for this root here) or 503 (our own primary + pool are
+/// shedding).
+async fn relay_by_name(
+    state: &Arc<AppState>,
+    is_get: bool,
+    path: &str,
+    query: Option<&str>,
+    ctx: &RelayContext,
+    local_status: StatusCode,
+) -> Option<Response<Full<Bytes>>> {
+    use crate::services::name_routing::{
+        build_relayed_response, relay_one_hop, relay_precondition, RelayVerdict,
+    };
+
+    if !relay_precondition(is_get, is_service_path(path), ctx.hop_seen, local_status) {
+        return None;
+    }
+
+    let self_doorway_id = state
+        .args
+        .doorway_id
+        .clone()
+        .unwrap_or_else(|| state.args.node_id.to_string());
+    let holders = state.name_routes.holders_for(path, &self_doorway_id);
+    if holders.is_empty() {
+        // Nobody in the federation holds a contract covering this name — our
+        // 404 is the whole truth, and saying so costs no network at all.
+        return None;
+    }
+
+    let outcome = relay_one_hop(&holders, |holder| {
+        let client = RELAY_CLIENT.clone();
+        let path = path.to_string();
+        let query = query.map(|q| q.to_string());
+        let ctx = ctx.clone();
+        async move { fetch_from_holder(&client, &holder, &path, query.as_deref(), &ctx).await }
+    })
+    .await;
+
+    // A shed observed by a relay is the only place a shed can be observed —
+    // the discovery probe cannot tell a shed from a death. Record it so the
+    // next fold orders that holder after the serving ones.
+    for doorway_id in &outcome.shed_doorways {
+        state.name_routes.note_shed(doorway_id);
+    }
+
+    match outcome.verdict {
+        RelayVerdict::Served {
+            doorway_id,
+            origin,
+            reply,
+        } => {
+            info!(
+                path = %path,
+                counter = "doorway_name_route_relay_total",
+                served_by = %origin,
+                holder = %doorway_id,
+                status = reply.status,
+                local_status = local_status.as_u16(),
+                candidates = holders.len(),
+                "name-route: relayed one hop to the holder of this name"
+            );
+            Some(build_relayed_response(&origin, &doorway_id, reply))
+        }
+        RelayVerdict::AllFailed { attempted } => {
+            warn!(
+                path = %path,
+                counter = "doorway_name_route_relay_failed_total",
+                attempted,
+                local_status = local_status.as_u16(),
+                "name-route: every holder failed — preserving the local verdict"
+            );
+            None
+        }
+        RelayVerdict::NoCandidates => None,
+    }
+}
+
 /// Route incoming HTTP requests
 async fn handle_request(
     state: Arc<AppState>,
@@ -5527,6 +5742,18 @@ async fn handle_request(
 
     // Snapshot storage URL before state is moved into match arms.
     let storage_url_for_obs: Option<String> = state.args.storage_url.clone();
+
+    // ── Name-route relay snapshot ─────────────────────────────────────────────
+    // Taken HERE because the dispatch match below consumes both `req` and
+    // `method`. `is_get` outlives the move; `RelayContext` carries the inbound
+    // hop header (the one-hop budget) and the session headers a relay forwards
+    // as-is. See `relay_by_name`.
+    let is_get = method == Method::GET;
+    let relay_query: Option<String> = req.uri().query().map(|q| q.to_string());
+    let relay_ctx = RelayContext::from_request(&req);
+    // The dispatch match below MOVES `state` into its arms; hold an Arc for the
+    // post-match relay (cheap refcount bump, not a state copy).
+    let relay_state = Arc::clone(&state);
 
     // Check if this is a signal subdomain request (signal.*.elohim.host)
     let host = req
@@ -5633,16 +5860,34 @@ async fn handle_request(
             // serve carries the trust surface.
             let chrome_context_json = build_chrome_context_json(&path, &req);
             let wants_html = routes::catching_up::accepts_html(req.headers());
-            return Ok(to_boxed(
-                dispatch_to_projected_epr(
+            let local = dispatch_to_projected_epr(
+                &state,
+                &path,
+                projection,
+                &chrome_context_json,
+                wants_html,
+            )
+            .await;
+            // We DO hold a contract for this root, so a 404 here is OUR
+            // contract's honest answer about a missing asset — relaying it
+            // would turn every stray asset request into a sibling round-trip.
+            // Only a SHED (our primary + pool all 503) is worth a hop: the name
+            // is served elsewhere by a holder of the same contract.
+            if local.status() == StatusCode::SERVICE_UNAVAILABLE {
+                if let Some(relayed) = relay_by_name(
                     &state,
+                    is_get,
                     &path,
-                    projection,
-                    &chrome_context_json,
-                    wants_html,
+                    relay_query.as_deref(),
+                    &relay_ctx,
+                    local.status(),
                 )
-                .await,
-            ));
+                .await
+                {
+                    return Ok(to_boxed(relayed));
+                }
+            }
+            return Ok(to_boxed(local));
         }
     }
 
@@ -6831,6 +7076,26 @@ async fn handle_request(
                 }
             }
         }
+    };
+
+    // ── Name-routed one-hop relay ─────────────────────────────────────────────
+    // A public name is a DHT fact, not a DNS fact: when this doorway holds no
+    // projection contract for the requested root (404) — or its own primary and
+    // pool are shedding (503) — the registry fold names the doorways that DO
+    // hold a live contract, and ONE hop is forwarded to the first live holder.
+    // `None` means nothing was relayed and the local response stands verbatim.
+    let response = match relay_by_name(
+        &relay_state,
+        is_get,
+        &path,
+        relay_query.as_deref(),
+        &relay_ctx,
+        response.status(),
+    )
+    .await
+    {
+        Some(relayed) => to_boxed(relayed),
+        None => response,
     };
 
     // Fire-and-forget: contribute doorway-originated errors to the observation session.

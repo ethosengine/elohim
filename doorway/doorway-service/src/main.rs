@@ -1578,6 +1578,10 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         // SelfHealingView is the Wave-F3 X-COH-DIAG follow-on, out of scope).
         let coherence_epr_router = Arc::clone(&state.epr_router);
         let coherence_cache = services::federation::new_peer_coherence_cache();
+        // The same probe round feeds the name-route table: a peer's coherence
+        // head set IS its live project-epr contract list, so the registry the
+        // one-hop name relay folds over costs no additional I/O (WS3 Task 3.3).
+        let name_routes = Arc::clone(&state.name_routes);
 
         services::federation::spawn_peer_discovery_task(
             peer_url_list,
@@ -1585,6 +1589,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             cache,
             coherence_epr_router,
             coherence_cache,
+            name_routes,
             std::time::Duration::from_secs(10), // initial delay (let peers boot)
             std::time::Duration::from_secs(60), // refresh interval
         );

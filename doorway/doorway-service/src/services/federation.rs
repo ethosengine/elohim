@@ -3,7 +3,7 @@
 //! Core federation engine for doorway-to-doorway cooperation:
 //! - DHT registration via infrastructure DNA
 //! - Periodic heartbeat reporting
-//! - Cross-doorway content fetching via DID resolution
+//! - Name-routed one-hop relay inputs (see `crate::services::name_routing`)
 //! - Runtime-mutable peer URL list for admin-managed federation topology
 //!
 //! This is the capstone of the 5-stage agency model, enabling community
@@ -37,7 +37,6 @@ use tracing::{debug, info, warn};
 
 use crate::config::Args;
 use crate::server::AppState;
-use crate::services::did_resolver::DIDResolver;
 use crate::services::zome_caller::ZomeCaller;
 
 // =============================================================================
@@ -123,33 +122,8 @@ impl FederationConfig {
 // =============================================================================
 
 pub use infrastructure_types::{
-    DoorwayOutput, DoorwayRegistration, FindPublishersInput, RecordHealthAttestationInput,
-    RegisterDoorwayInput,
+    DoorwayOutput, DoorwayRegistration, RecordHealthAttestationInput, RegisterDoorwayInput,
 };
-
-/// Federation error types
-#[derive(Debug)]
-pub enum FederationError {
-    /// Zome call failed
-    ZomeCallFailed(String),
-    /// DID resolution failed
-    DIDResolutionFailed(String),
-    /// No publishers found for content
-    NoPublishers(String),
-    /// Remote doorway fetch failed
-    RemoteFetchFailed(String),
-}
-
-impl std::fmt::Display for FederationError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FederationError::ZomeCallFailed(e) => write!(f, "Zome call failed: {e}"),
-            FederationError::DIDResolutionFailed(e) => write!(f, "DID resolution failed: {e}"),
-            FederationError::NoPublishers(h) => write!(f, "No publishers for content: {h}"),
-            FederationError::RemoteFetchFailed(e) => write!(f, "Remote fetch failed: {e}"),
-        }
-    }
-}
 
 // =============================================================================
 // Registration
@@ -357,215 +331,23 @@ pub fn spawn_heartbeat_task(
 }
 
 // =============================================================================
-// Cross-Doorway Content Fetch
+// Cross-Doorway Content Fetch — RETIRED
 // =============================================================================
-
-/// Fetch content from a remote doorway via DHT publisher discovery + DID resolution.
-///
-/// Called by DeliveryRelay as final fallback tier when local storage returns 404.
-///
-/// Flow:
-/// 1. Query infrastructure DHT for publishers of this content hash
-/// 2. For each publisher, extract doorway URL from ContentServer endpoints
-/// 3. Resolve doorway's DID document via DIDResolver
-/// 4. Extract ElohimBlobStore service endpoint
-/// 5. Fetch blob via HTTP GET
-/// 6. Add X-Federation-Hop header to prevent infinite loops
-pub async fn fetch_from_remote_doorway(
-    content_hash: &str,
-    zome_caller: &ZomeCaller,
-    did_resolver: &DIDResolver,
-    config: &FederationConfig,
-) -> Result<Vec<u8>, FederationError> {
-    debug!(
-        content_hash = %content_hash,
-        "Searching for remote publishers via infrastructure DHT"
-    );
-
-    // Step 1: Find publishers in DHT
-    let input = FindPublishersInput {
-        content_hash: content_hash.to_string(),
-        capability: Some("blob".to_string()),
-        prefer_region: config.region.clone(),
-        limit: Some(5),
-        online_only: Some(true),
-    };
-
-    // FAILOVER-ELIGIBLE: publisher discovery is an agent-agnostic DHT read (see
-    // `get_all_doorways`). A blob fetch must not be hostage to one conductor's health.
-    let publishers_result = zome_caller
-        .call_zome_failover(
-            &config.infrastructure_role,
-            &config.zome_name,
-            "find_publishers",
-            rmp_serde::to_vec(&input)
-                .map_err(|e| FederationError::ZomeCallFailed(e.to_string()))?,
-        )
-        .await
-        .map_err(FederationError::ZomeCallFailed)?;
-
-    // Parse publishers response
-    #[derive(Deserialize)]
-    struct FindPublishersOutput {
-        #[allow(dead_code)]
-        content_hash: String,
-        publishers: Vec<PublisherInfo>,
-    }
-    #[derive(Deserialize)]
-    struct PublisherInfo {
-        #[allow(dead_code)]
-        action_hash: Vec<u8>,
-        server: ServerInfo,
-    }
-    #[derive(Deserialize)]
-    struct ServerInfo {
-        endpoints: Vec<EndpointInfo>,
-        #[allow(dead_code)]
-        online: bool,
-        #[allow(dead_code)]
-        priority: u8,
-        #[allow(dead_code)]
-        region: Option<String>,
-    }
-    #[derive(Deserialize)]
-    struct EndpointInfo {
-        url: String,
-        #[allow(dead_code)]
-        protocol: String,
-    }
-
-    let output: FindPublishersOutput = rmp_serde::from_slice(&publishers_result)
-        .map_err(|e| FederationError::ZomeCallFailed(format!("Failed to parse publishers: {e}")))?;
-
-    if output.publishers.is_empty() {
-        return Err(FederationError::NoPublishers(content_hash.to_string()));
-    }
-
-    // Step 2-5: Try each publisher
-    let http_client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .unwrap_or_default();
-
-    for publisher in &output.publishers {
-        for endpoint in &publisher.server.endpoints {
-            // Try direct endpoint fetch first
-            let blob_url = format!("{}/{}", endpoint.url.trim_end_matches('/'), content_hash);
-
-            debug!(
-                blob_url = %blob_url,
-                "Attempting federation fetch from remote publisher"
-            );
-
-            match http_client
-                .get(&blob_url)
-                .header("X-Federation-Hop", "1")
-                .send()
-                .await
-            {
-                Ok(resp) if resp.status().is_success() => match resp.bytes().await {
-                    Ok(bytes) => {
-                        info!(
-                            content_hash = %content_hash,
-                            source = %endpoint.url,
-                            size = bytes.len(),
-                            "Federation fetch successful"
-                        );
-                        return Ok(bytes.to_vec());
-                    }
-                    Err(e) => {
-                        warn!("Failed to read response body from {}: {}", blob_url, e);
-                        continue;
-                    }
-                },
-                Ok(resp) => {
-                    debug!(
-                        status = %resp.status(),
-                        url = %blob_url,
-                        "Remote publisher returned non-success"
-                    );
-                    continue;
-                }
-                Err(e) => {
-                    debug!(
-                        error = %e,
-                        url = %blob_url,
-                        "Failed to reach remote publisher"
-                    );
-                    continue;
-                }
-            }
-        }
-
-        // If direct endpoint failed, try DID resolution for the doorway URL
-        // Extract domain from the first endpoint URL to construct a DID
-        if let Some(endpoint) = publisher.server.endpoints.first() {
-            if let Some(domain) = extract_domain_from_url(&endpoint.url) {
-                let did = format!("did:web:{domain}");
-                match did_resolver.resolve(&did).await {
-                    Ok(doc) => {
-                        // Find ElohimBlobStore service endpoint
-                        if let Some(blob_service) = doc
-                            .service
-                            .iter()
-                            .find(|s| s.service_type == "ElohimBlobStore")
-                        {
-                            let blob_url = format!(
-                                "{}/{}",
-                                blob_service.service_endpoint.trim_end_matches('/'),
-                                content_hash
-                            );
-
-                            match http_client
-                                .get(&blob_url)
-                                .header("X-Federation-Hop", "1")
-                                .send()
-                                .await
-                            {
-                                Ok(resp) if resp.status().is_success() => {
-                                    if let Ok(bytes) = resp.bytes().await {
-                                        info!(
-                                            content_hash = %content_hash,
-                                            source = %blob_url,
-                                            "Federation fetch via DID resolution successful"
-                                        );
-                                        return Ok(bytes.to_vec());
-                                    }
-                                }
-                                _ => continue,
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        debug!(did = %did, error = ?e, "DID resolution failed for remote publisher");
-                    }
-                }
-            }
-        }
-    }
-
-    Err(FederationError::RemoteFetchFailed(format!(
-        "All {} publishers failed for content {}",
-        output.publishers.len(),
-        content_hash
-    )))
-}
-
-/// Extract domain from a URL (e.g., "https://alpha.elohim.host/store" -> "alpha.elohim.host")
-fn extract_domain_from_url(url: &str) -> Option<String> {
-    let without_scheme = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .unwrap_or(url);
-
-    let domain = without_scheme.split('/').next()?.split(':').next()?;
-
-    if domain.is_empty() {
-        None
-    } else {
-        Some(domain.to_string())
-    }
-}
+//
+// `fetch_from_remote_doorway` lived here: a DHT `find_publishers` query that
+// iterated remote publishers for one blob hash, resolved each one's `did:web`
+// document, and pulled bytes from whichever answered. It was NEVER CALLED by
+// anything, while its own doc comment claimed DeliveryRelay invoked it as a
+// final fallback tier — dead code with a lying doc comment, the worst state.
+//
+// It is deleted rather than wired, per the 2026-09-12 operator ruling (WS3 /
+// Task 3.3): the federated fallback the doorway actually owes is a **name**
+// route, not a blob route. Publisher iteration for bytes is the shape
+// `doorway/CLAUDE.md` §"No Blob Fan-Out" forbids — byte mobility belongs to
+// the substrate's replication, not to the web2 projection. What replaced it:
+// `crate::services::name_routing` — a registry fold over sibling doorways'
+// live `project-epr` contracts plus ONE forwarded hop, carrying the same
+// `x-federation-hop` loop-prevention header this function introduced.
 
 // =============================================================================
 // Doorway List (for federation routes)
@@ -1020,20 +802,41 @@ pub async fn refresh_coherence(
     peers: &[(String, String)],
     client: &reqwest::Client,
     cache: &PeerCoherenceCache,
+    name_routes: Option<&crate::services::name_routing::NameRouteTable>,
 ) {
     use crate::routes::coherence::{compare_to_peer, divergences_to_warn};
 
     // Fix 1 + 6: probe every non-empty-url peer CONCURRENTLY; each future does
     // fetch + compare and yields its `PeerCoherence` verdict.
+    //
+    // The probe's manifest is RETAINED (not dropped after the compare) because
+    // a peer's head set IS its live `project-epr` contract list — exactly the
+    // registry the name-route fold needs. Populating `name_routes` here costs
+    // ZERO additional I/O: same tick, same response, second reader.
     let probes = peers
         .iter()
         .filter(|(_, peer_url)| !peer_url.trim().is_empty())
         .map(|(peer_id, peer_url)| async move {
             let (reachable, peer_manifest) = fetch_peer_coherence(client, peer_url).await;
-            compare_to_peer(self_manifest, peer_id, reachable, peer_manifest.as_ref())
+            (peer_id.clone(), peer_url.clone(), reachable, peer_manifest)
         });
-    let results: Vec<crate::routes::coherence::PeerCoherence> =
-        futures::future::join_all(probes).await;
+    let probed: Vec<(
+        String,
+        String,
+        bool,
+        Option<crate::routes::coherence::CoherenceManifest>,
+    )> = futures::future::join_all(probes).await;
+
+    if let Some(table) = name_routes {
+        install_name_routes(table, &probed);
+    }
+
+    let results: Vec<crate::routes::coherence::PeerCoherence> = probed
+        .iter()
+        .map(|(peer_id, _, reachable, manifest)| {
+            compare_to_peer(self_manifest, peer_id, *reachable, manifest.as_ref())
+        })
+        .collect();
 
     // Fix 5 — edge-triggered divergence ALARM. Read the PRIOR verdicts BEFORE
     // overwriting the cache, and warn only on the newly/changed-divergent subset.
@@ -1057,6 +860,80 @@ pub async fn refresh_coherence(
 
     let mut cache_write = cache.write().await;
     *cache_write = results;
+}
+
+/// Project a coherence-probe round into the name-route table.
+///
+/// Each probed peer contributes one [`HolderContract`] per mounted root it
+/// reports — that is the peer's own projection of its `project-epr`
+/// commitments, self-labelled with the `doorway_id` its manifest asserts (the
+/// discovery-advertised id can lag). Liveness is the probe's tri-state:
+/// manifest present → `Serving`; 200 with an unreadable body → `Uncertain`;
+/// anything else (transport error, 404, 5xx — a shed included) → `Unreachable`.
+///
+/// The probe genuinely cannot tell a shed from a death; only a relay attempt
+/// can, and `NameRouteTable::note_shed` is where that observation lands. An
+/// `Unreachable` holder is still folded (ordered last), because this verdict is
+/// up to one discovery interval stale.
+///
+/// Honest edge: an unreachable peer has no manifest, so its liveness is keyed
+/// by the DISCOVERY-advertised `peer_id`. If that id ever differs from the
+/// `doorway_id` a retained last-good contract carries, the stale holder folds
+/// as `Uncertain` rather than `Unreachable` — it is tried first and fails, and
+/// the next holder serves. One wasted attempt, never a wrong answer.
+///
+/// [`HolderContract`]: crate::services::name_routing::HolderContract
+fn install_name_routes(
+    table: &crate::services::name_routing::NameRouteTable,
+    probed: &[(
+        String,
+        String,
+        bool,
+        Option<crate::routes::coherence::CoherenceManifest>,
+    )],
+) {
+    use crate::services::name_routing::{HolderContract, HolderLiveness};
+    use std::collections::HashMap;
+
+    let mut contracts: Vec<HolderContract> = Vec::new();
+    let mut liveness: HashMap<String, HolderLiveness> = HashMap::new();
+
+    for (peer_id, peer_url, reachable, manifest) in probed {
+        match manifest {
+            Some(m) => {
+                let doorway_id = if m.doorway_id.trim().is_empty() {
+                    peer_id.clone()
+                } else {
+                    m.doorway_id.clone()
+                };
+                liveness.insert(doorway_id.clone(), HolderLiveness::Serving);
+                for head in &m.heads {
+                    contracts.push(HolderContract {
+                        doorway_id: doorway_id.clone(),
+                        origin: peer_url.clone(),
+                        url_path: head.url_path.clone(),
+                    });
+                }
+            }
+            None => {
+                liveness.insert(
+                    peer_id.clone(),
+                    if *reachable {
+                        HolderLiveness::Uncertain
+                    } else {
+                        HolderLiveness::Unreachable
+                    },
+                );
+            }
+        }
+    }
+
+    debug!(
+        contracts = contracts.len(),
+        peers = probed.len(),
+        "name-route table refreshed from the coherence probe"
+    );
+    table.replace_all(contracts, liveness);
 }
 
 /// Shared mutable list of federation peer URLs.
@@ -1212,6 +1089,7 @@ pub fn spawn_peer_discovery_task(
     cache: PeerCache,
     epr_router: Arc<crate::projection::EprRouter>,
     coherence_cache: PeerCoherenceCache,
+    name_routes: Arc<crate::services::name_routing::NameRouteTable>,
     initial_delay: std::time::Duration,
     interval: std::time::Duration,
 ) -> JoinHandle<()> {
@@ -1277,8 +1155,14 @@ pub fn spawn_peer_discovery_task(
                         .into_iter()
                         .map(|p| (p.id, p.url))
                         .collect();
-                    refresh_coherence(self_manifest, &peers, &coherence_client, &coherence_cache)
-                        .await;
+                    refresh_coherence(
+                        self_manifest,
+                        &peers,
+                        &coherence_client,
+                        &coherence_cache,
+                        Some(name_routes.as_ref()),
+                    )
+                    .await;
                 }
             }
 
@@ -1360,19 +1244,6 @@ mod tests {
                 },
             ]
         );
-    }
-
-    #[test]
-    fn test_extract_domain_from_url() {
-        assert_eq!(
-            extract_domain_from_url("https://alpha.elohim.host/store"),
-            Some("alpha.elohim.host".to_string())
-        );
-        assert_eq!(
-            extract_domain_from_url("http://localhost:8080/api"),
-            Some("localhost".to_string())
-        );
-        assert_eq!(extract_domain_from_url(""), None);
     }
 
     #[test]
@@ -1524,7 +1395,10 @@ mod tests {
             let client = reqwest::Client::new();
             let peers = vec![("apex".to_string(), server.uri())];
 
-            refresh_coherence(&me, &peers, &client, &cache).await;
+            // The SAME probe round also installs the name-route table — one
+            // fetch, two readers (WS3 Task 3.3).
+            let name_routes = crate::services::name_routing::NameRouteTable::new();
+            refresh_coherence(&me, &peers, &client, &cache, Some(&name_routes)).await;
 
             let stored = cache.read().await.clone();
             assert_eq!(stored.len(), 1);
@@ -1532,6 +1406,22 @@ mod tests {
             assert!(!stored[0].agrees, "divergent peer → !agrees");
             // Fix 7: labeled from the manifest's self-report.
             assert_eq!(stored[0].doorway_id, "apex");
+
+            // …and the peer's head set became a name-route contract, labelled
+            // by the manifest's self-reported doorway_id and pointing at the
+            // origin we probed.
+            let holders = name_routes.holders_for("/lamad/deep", "me");
+            assert_eq!(holders.len(), 1, "the peer holds /lamad");
+            assert_eq!(holders[0].doorway_id, "apex");
+            assert_eq!(holders[0].origin, server.uri().trim_end_matches('/'));
+            assert_eq!(
+                holders[0].liveness,
+                crate::services::name_routing::HolderLiveness::Serving
+            );
+            assert!(
+                name_routes.holders_for("/shefa", "me").is_empty(),
+                "a root the peer does not mount yields no holder"
+            );
         }
 
         #[tokio::test]
@@ -1542,7 +1432,7 @@ mod tests {
             let client = reqwest::Client::new();
             let peers = vec![("ghost".to_string(), "".to_string())];
 
-            refresh_coherence(&me, &peers, &client, &cache).await;
+            refresh_coherence(&me, &peers, &client, &cache, None).await;
 
             let stored = cache.read().await.clone();
             assert!(stored.is_empty(), "empty-url peer must not yield a verdict");

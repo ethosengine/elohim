@@ -1,13 +1,20 @@
 # Doorway Federation: Fediverse Patterns on P2P Infrastructure
 
-> **⚠ SPEC-DRIFT NOTICE (2026-07-31).** The custodian-selection / blob-routing narrative
-> below ("Blob Routing", "Custodian Health Federation", "Content Routing" — doorway
-> selecting and fetching from custodians) is NOT implemented and CONTRADICTS the enforced
+> **⚠ SPEC-DRIFT NOTICE (2026-07-31, updated 2026-09-12).** The custodian-selection /
+> blob-routing narrative below ("Blob Routing", "Custodian Health Federation", "Content
+> Routing", "Federated Content Fetch" — doorway selecting and fetching BYTES from
+> custodians or publishers) is NOT implemented and CONTRADICTS the enforced
 > No-Blob-Fan-Out rule. `doorway/CLAUDE.md` (§"No Blob Fan-Out") is the authority; the
 > storage proxy is single-target with a 503 shed contract (`routes/storage_proxy.rs`).
+> The function that once half-embodied that narrative,
+> `federation::fetch_from_remote_doorway`, was NEVER CALLED and was **deleted** on
+> 2026-09-12 along with the `find_publishers` fan-out it performed.
+>
 > What IS wired: DHT `DoorwayRegistration` + peer discovery + health attestations
-> (`services/federation.rs`), the JWKS/DID endpoints, and an EPR-projection fallback pool
-> (`projection/epr_router.rs`). Read the body below as design history, not behavior.
+> (`services/federation.rs`), the JWKS/DID endpoints, an EPR-projection fallback pool
+> (`projection/epr_router.rs`), and — new on 2026-09-12 — the **name-routed one-hop
+> relay** (`services/name_routing.rs`, §"Name Routing" below). Read the rest of the body
+> as design history, not behavior.
 
 > **See also**: [P2P-DATAPLANE.md](../P2P-DATAPLANE.md) for the overall P2P architecture
 
@@ -193,6 +200,70 @@ When a client requests content:
 6. Doorway A fetches from selected custodian
 7. Doorway A caches locally + returns to client
 ```
+
+---
+
+## Name Routing (WIRED — `services/name_routing.rs`)
+
+> Operator ruling, 2026-09-12. This is the behavior; everything above about
+> custodian/publisher byte selection is history.
+
+A public name is a **DHT fact, not a DNS fact**. Internet DNS only has to name
+doorways that can ROUTE — any live doorway. *Which* doorway SERVES a given root
+is the set of doorways holding a live `project-epr` contract for it, with
+liveness folded on top.
+
+### The fold
+
+When a doorway's own answer for a `GET` on a non-service path is a `404` (it
+holds no contract for that root) or a `503` (its own primary *and* pool are
+shedding), it folds a candidate set:
+
+1. every sibling doorway holding a live projection contract covering the
+   requested path (segment-boundary prefix match, identical to local
+   `EprRouter` dispatch, most-specific mount per doorway);
+2. ordered **health first** — `Serving` → `Uncertain` → `Shedding` →
+   `Unreachable` — then **owner order** (the order the registry handed them;
+   the sort is stable);
+3. itself excluded.
+
+Contract evidence is each peer's own `GET /api/v1/federation/coherence` head
+set — that peer's live `EprRouter` table, i.e. its `project-epr` commitments —
+read on the existing 60s federation discovery tick, so the registry costs no
+additional I/O. Nothing is persisted: the whole table is Category C and rebuilt
+from the next tick.
+
+*Not yet folded:* attested RTT. "Nearest" is health-then-owner-order today; the
+peer-health probe already records `response_time_ms` into the infrastructure
+DNA, and region is a selector term beside RTT (never a separate authority).
+`TODO(nearest)` in `fold_candidate_holders` marks the seam.
+
+### The forward
+
+```
+1. Client ──► Doorway A: GET /lamad/x
+2. A has no contract for /lamad (404)   — or A's own pool is shedding (503)
+3. A folds the holders of /lamad → [B (serving), C (serving)]
+4. A forwards ONE hop to B with `x-federation-hop: 1`, session headers as-is
+5. B verifies A's client session against the issuer's JWKS and answers
+6. A returns B's bytes with `x-elohim-served-by: https://b.example`
+   (+ `x-elohim-name-route: relay:<doorway_id>`, `cache-control: no-store`)
+7. The shipped sticky client goes direct to B next time
+```
+
+Invariants:
+
+| Rule | Why |
+|------|-----|
+| **Budget is ONE hop.** A request carrying `x-federation-hop` is answered with the local verdict and never forwarded. | A cycle of doorways cannot amplify one client request into a storm. |
+| **A holder's `503` is not the answer** — the next holder is tried first, and the shed is recorded so the next fold demotes that holder. | A sibling catching up is not an outage. |
+| **A failed relay preserves the ORIGINAL `404`/`503` verbatim.** | No error masking; the local verdict is the honest floor. |
+| **`GET` on non-service paths only.** | A name is a projected root, not `/db/*`, `/admin/*`, or a write. |
+| **Auth forwarded as-is; the relay mints nothing.** | The holder verifies sibling-minted sessions via the already-wired `PeerJwksCache`. |
+| **Never bytes-by-hash.** One request, one sibling doorway, one contract. | This is name routing, not blob fan-out. |
+
+Validation is the contracts themselves — hosting commitment (root + reach +
+doorway), hosted-cell promise (pool), sibling sessions via federation JWKS.
 
 ---
 

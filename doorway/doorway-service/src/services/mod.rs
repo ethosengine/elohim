@@ -15,6 +15,8 @@
 //! - **RouteRegistry**: Dynamic route management from DNAs and external agents
 //! - **SelfUptime**: doorway-local hourly availability heartbeat (Class C)
 //! - **DIDResolver**: W3C DID resolution for doorway federation
+//! - **NameRouting**: registry fold + one-hop federated relay for a name this
+//!   doorway does not serve (Category C, Operational)
 //! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
 pub mod custodian;
@@ -26,6 +28,7 @@ pub mod federation;
 pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
+pub mod name_routing;
 pub mod pkarr_resolver;
 pub mod recording;
 pub mod route_registry;
@@ -64,6 +67,7 @@ pub use import_orchestrator::{
     ImportProgress, ImportStatus, InMemoryBlobStore, StartImportInput, StartImportOutput,
     ZomeClient,
 };
+pub use name_routing::{NameRouteTable, FEDERATION_HOP_HEADER, SERVED_BY_HEADER};
 pub use recording::{
     spawn_recording_cleanup_task, AudioCodec, ContainerFormat, RecordingCmd, RecordingConfig,
     RecordingError, RecordingService, RecordingServiceConfig, RecordingSession, RecordingStatus,
