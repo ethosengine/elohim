@@ -39,6 +39,10 @@ Evidence today (runs 20260912T145758Z, 20260912T152941Z): custody rows converge 
 - [ ] **Step 3: liveness from the connected-peer view** — `onlinePeers.live` reflects the p2p connected set (ping timeout ≈35 s), `known` stays the heartbeat join; no wire change. Evidence: simultaneous-loss drill reads at-risk within the ping timeout.
 - [ ] **Step 4: deploy and measure** — feature-full bin from the sprint slot pinned under the scratchpad, `just mesh storage-restart`, `just test mesh features/resilience/chaos-peer-churn.feature` and `features/resilience/doorway-footprint-convergence.feature`; deltas in both storage atoms with run ids.
 
+- [ ] **Step 5: custody is authored by the provider's own peer** — the drill-custody seeder, the spool seeder and the chaos drill POST and activate each pair against the provider's own storage peer (never another peer's doorway); the drill's idempotence gate uses the assertion's own predicate. Evidence: a clean cold start's prologue leg seed-drill-custody EXIT=0 with 9/9 activated; the cascade Given seeds 3 and the fold counts 3.
+- [ ] **Step 6: one root per commitment id (coordinator zome)** — `create_rea_commitment` returns the existing root under a commitment_id anchor instead of minting a second; DNA hash unchanged; hot-swapped onto the household mesh by `hc-mesh.sh coordswap`. Evidence: two callers with one id yield one root; the forked ids never recur.
+- [ ] **Step 7: the doorway never masks a permanent error as backpressure** — a storage 503 without Retry-After/X-Available-Permits is relayed verbatim (1df5ae3a2). Evidence: the seeder fails fast with the storage sentence instead of 12 retries.
+
 ## Rung 2 — Doorway: name routing (served-under-standing · doorway-failover)
 
 Evidence today: `fetch_from_remote_doorway` is defined and never called; a doorway that does not host a name answers 404. Write set: `doorway/doorway-service` only, branch `sprint/2026-09-12-served-under-standing-doorway`.
