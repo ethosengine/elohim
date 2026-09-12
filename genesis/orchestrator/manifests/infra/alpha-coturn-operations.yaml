@@ -17,6 +17,25 @@
 # keeps its existing doorway-set lane only. Any apex lane remains an explicit
 # operator-owned flip.
 #
+# PARKED (branch sprint/apex-multi-a-ingress, 2026-09-12 operator ruling —
+# doorway/doorway-service/.epr-meta/doorway-failover.habit.md, RULING line;
+# WS3 + Task 3.1 of genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md):
+# that explicit flip is taken here — both beacon containers below now also
+# contribute elohim.host (the apex) as a SECOND shared lane via the
+# repeatable `--shared-record <name>=<owner>` flag (relay-addr-beacon
+# commit 906d7b159, already on dev at this branch's base 9792af2e1 — the
+# `:dev-latest` image already accepts it, no rebuild needed). Same
+# reconcile loop, same probe, exact-owner writes as the existing
+# doorways.elohim.host lane. This leg's exclusive name (alpha.elohim.host)
+# is unchanged. See genesis/orchestrator/manifests/infra/alpha-relay-addr-beacons.yaml's
+# header for the shem-leg exclusive-name rename and the full rollback note
+# (revert to the legacy `--shared-record-name`/`--record-owner` pair — still
+# accepted — and drop the apex `--shared-record` line; no image change
+# either direction). Do not apply until the operator's per-premise ingress
+# classes exist (manifests/doorway/alpha.yaml + alpha-b.yaml headers) — the
+# shared lane reconciles fine on its own, but doorway ingress would
+# refuse/404 elohim.host traffic on an unserved ingressClassName.
+#
 # THIS PHASE IS 3478-FIRST: no tls-listening-port, no turns:, no :443/:5349,
 # no cert-manager Certificate. IPv6 is scaffolded (commented) but dormant.
 #
@@ -235,11 +254,13 @@ spec:
             # Shared doorway-set mode (2026-07-22): this beacon instance also
             # contributes its own A record under the "operations" owner slug
             # toward doorways.elohim.host — the shared multi-A doorway-set
-            # name (see manifests/doorway/alpha.yaml Ingress comment).
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "operations"
+            # name (see manifests/doorway/alpha.yaml Ingress comment). PARKED
+            # second lane (2026-09-12): also contributes elohim.host, the
+            # apex, under the same owner slug (see this file's header).
+            - "--shared-record"
+            - "doorways.elohim.host=operations"
+            - "--shared-record"
+            - "elohim.host=operations"
           env:
             # The one-shot DNS sync at pod start needs the CF token too — without it
             # (and without the cloudflare sink above) beacon-init published only the
@@ -332,11 +353,13 @@ spec:
             # Shared doorway-set mode (2026-07-22): this beacon instance also
             # contributes its own A record under the "operations" owner slug
             # toward doorways.elohim.host — the shared multi-A doorway-set
-            # name (see manifests/doorway/alpha.yaml Ingress comment).
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "operations"
+            # name (see manifests/doorway/alpha.yaml Ingress comment). PARKED
+            # second lane (2026-09-12): also contributes elohim.host, the
+            # apex, under the same owner slug (see this file's header).
+            - "--shared-record"
+            - "doorways.elohim.host=operations"
+            - "--shared-record"
+            - "elohim.host=operations"
             # coturn has no config-reload signal for external-ip; the sidecar
             # shares the pod's process namespace (shareProcessNamespace: true
             # above), so SIGTERM-ing the turnserver process is enough — the

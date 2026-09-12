@@ -216,6 +216,80 @@ Scenario 2/3 run against the live pair (organic shed windows are real red eviden
 > beacon args (shem's exclusive apex ownership) and must receive the same
 > treatment when applied, or it silently reverts the apex ownership model.
 
+> **2026-09-12 operator ruling.** Decision: option 1 (doorway-failover.habit.md
+> RULING line). Doorways are the federated load balancer at the WAN addresses
+> of the apex; shared membership is the one authority and every sink projects
+> it — Cloudflare today, the household file sink at home, an authoritative DNS
+> server the federation runs next — routing a visitor to the cluster of
+> doorways that can provide ingress, whose own ingress picks the pod. No
+> borrowed LB. Cluster prerequisite the operator owns: per-premise ingress
+> classes pinned to their nodes (`public-ethosengine` for doorway-A's/
+> ethosengine's premise, `public-shem` for doorway-B's/shem's premise).
+> Repo side landed on the parked branch `sprint/apex-multi-a-ingress` (based
+> on dev @ `9792af2e1`), staying parked until those classes exist so no edge
+> deploy applies an ingress nothing serves: `check-ingress-conflicts.sh` now
+> keys conflicts on (host, ingressClassName) instead of host alone, so the
+> same `elohim.host` host legitimately serving from two ingress objects on
+> two different classes is no longer a false refusal; `alpha.yaml`'s doorway
+> (and relay) Ingress gets `public-ethosengine` and now also answers
+> `elohim.host` with the TLS SAN widened; `alpha-b.yaml`'s ingresses get
+> `public-shem`; both beacon legs (`alpha-coturn-shem.yaml`,
+> `alpha-coturn-operations.yaml`, `alpha-relay-addr-beacons.yaml`) contribute
+> the apex as a second shared lane via the now-landed repeatable
+> `--shared-record <name>=<owner>` flag (relay-addr-beacon commit
+> `906d7b159`), replacing the shem leg's former exclusive `elohim.host`
+> ownership with a renamed exclusive diagnostic record
+> (`turn-shem.elohim.host`). Flip condition: apex-transition green on the
+> fleet (Task 21 of the 2026-09-10 plan).
+>
+> **Refined serving model (same ruling, second pass).** Each doorway has one
+> WAN address; a public name is a DHT fact, not a DNS fact — the doorway
+> registration in the infrastructure DNA plus the hosting commitments /
+> projection contracts that say which doorways serve which root at which
+> reach. The routing table for a name is the set of doorways holding a live
+> contract for it, liveness folded on top. Internet DNS only needs to name
+> doorways that can ROUTE (any live doorway) — the beacon publishes the
+> live-doorway set, and per-name DNS lanes are not needed beyond that. A
+> doorway that does not host a requested name reads the registry, picks the
+> nearest live holder (health first, owner order until an RTT/capacity
+> advertisement lands — serve-routing and peer-advertisement stories are WIP
+> on both planes), forwards with the loop-prevention header and a one-hop
+> budget, and hands the client the holder's origin so the sticky fallback
+> goes direct next time; the holder admits or sheds per its own contract,
+> naming the sibling set it knows from the same contracts. This is the
+> doctrine answer to Task 3.3: WIRE `fetch_from_remote_doorway` as a
+> name-routed relay, not delete it. Validation is the contracts themselves —
+> hosting commitment (root + reach + doorway), hosted-cell promise (pool),
+> sibling sessions via federation JWKS. The parked branch (every doorway
+> accepts the apex at its ingress; beacon two lanes) remains the
+> precondition for any of this to measure on the fleet. Next slice is
+> doorway-side: registry fold + the wired forward, measured by a scenario
+> where a doorway that does not host a name still serves it through a
+> sibling.
+>
+> **Serving eligibility and reach (same ruling, third pass).** Serving
+> eligibility is a fold of four DHT-derived terms, never a doorway-local
+> allowlist: a live projection contract for the name, the EPR's declared
+> reach admitting the requester, the requester's standing as their own
+> conductor states it, and the doorway's liveness. The policy lever is a
+> governance act, not a config flag — a community holon supporting the
+> federation re-declares an EPR's reach through its ruling, and every
+> doorway's fold responds on its next reconcile (drops out of anonymous
+> serving everywhere, stays servable to an authenticated requester with the
+> standing the reach names). The CDN is placement plus preference UNDER that
+> governance: multiple projections of one EPR across doorways are the cache
+> tier, region (the snapshot's local/regional/global) is a selector term
+> beside RTT, never a separate authority. Named gap: the doorway's warm shell
+> and `app_file_cache` serve the last reconciled bundle by slug+hash, and
+> blob reads route by content address — neither re-asks reach at serve time,
+> so a cached projection keeps answering anonymously after a reach narrowing
+> until evicted. The cure is reach checked at serve time in the fold — cache
+> is bytes, never permission. Next measuring story (Opus authoring, filed as
+> the next check, not written here): a collective narrows an EPR's reach; a
+> visitor at a non-hosting doorway is refused with the reach reason; a member
+> with standing is served through the nearest holder; the holder's cached
+> shell stops answering anonymously inside the declared window.
+
 ### Task 3.1: Apex multi-A manifest diff (operator-gated apply) — **tier: Sonnet**
 **Files:** Modify `genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml`, `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`.
 **Spec:** Add `--shared-record-name elohim.host --record-owner <shem|operations>` contribution to BOTH beacon legs (exact flag shape copied from the working `doorways.elohim.host` stanzas at `alpha-coturn-shem.yaml:227-234` / `alpha-coturn-operations.yaml:232-239`), REPLACING the shem leg's exclusive `--record-name elohim.host` ownership. Header comment documents rollback (revert to single-owner) and the ingress precondition: doorway-A's ingress must accept the `elohim.host` host (add the host to `alpha.yaml`'s ingress + TLS SAN — include that diff) or A answers 404 for apex traffic. **This lands as a committed, ready-to-apply diff; the operator decides when the pipeline reconciles it** (outward-facing DNS semantics change — §Operator menu item 2).

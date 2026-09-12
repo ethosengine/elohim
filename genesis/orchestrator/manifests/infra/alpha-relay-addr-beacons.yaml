@@ -20,6 +20,41 @@
 # The two documents are intentionally separate one-replica Deployments rather
 # than one homogeneous two-replica Deployment: each premise owns a different
 # exclusive record and a different shared-record owner slug.
+#
+# PARKED (branch sprint/apex-multi-a-ingress, 2026-09-12 operator ruling —
+# doorway/doorway-service/.epr-meta/doorway-failover.habit.md, RULING line;
+# WS3 + Task 3.1 of genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md).
+# Both legs below now contribute elohim.host (the apex) as a SECOND shared
+# lane, alongside the existing doorways.elohim.host lane, using the
+# repeatable `--shared-record <name>=<owner>` flag (relay-addr-beacon
+# commit 906d7b159, "feat(beacon): repeatable shared-record lanes" — already
+# on dev at this branch's base 9792af2e1, so the `:dev-latest` image tag
+# already accepts this flag; no beacon rebuild is required, only the
+# operator's ingress-class prerequisite above). Each `--shared-record` is
+# reconciled independently by the SAME join/leave-hysteresis loop as the
+# doorways.elohim.host lane — same probe, exact-owner writes (see
+# relay-addr-beacon/src/config.rs `shared_record_lanes`).
+#
+# This REPLACES the shem leg's former exclusive `--record-name elohim.host`
+# ownership (the pre-2026-09-12 apex re-home) — elohim.host is no longer
+# single-owner, it is shared by both legs same as doorways.elohim.host
+# already was. The shem leg keeps an EXCLUSIVE diagnostic name so its own
+# WAN identity is still independently checkable outside the shared lane:
+# `turn-shem.elohim.host` (the name the dual-WAN TURN design already
+# expected — see doorway/alpha.yaml's historical apex-rehome comment and
+# genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md).
+# The operations leg's exclusive name (alpha.elohim.host) is unchanged.
+#
+# ROLLBACK (Task 3.1's spec ask): revert each leg's args to a single
+# `--shared-record-name doorways.elohim.host --record-owner <leg>` pair (the
+# legacy flags relay-addr-beacon still accepts) and restore the shem leg's
+# `--record-name elohim.host` exclusive ownership — that is exactly the
+# state this diff replaces. No image change is needed either direction.
+#
+# Do not apply until the operator's per-premise ingress classes exist (see
+# manifests/doorway/alpha.yaml + alpha-b.yaml headers) — the shared apex
+# lane is safe to reconcile on its own, but doorway ingress would 404/refuse
+# elohim.host traffic on an unserved ingressClassName until that lands.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -84,10 +119,14 @@ spec:
             - "elohim.host"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "operations"
+            # Two shared lanes, repeatable-flag form (see header): the
+            # existing doorway-set name, plus the apex as a SECOND shared
+            # lane (2026-09-12 operator ruling) — PARKED until the operator's
+            # ingress classes exist.
+            - "--shared-record"
+            - "doorways.elohim.host=operations"
+            - "--shared-record"
+            - "elohim.host=operations"
           env:
             - name: CF_API_TOKEN
               valueFrom:
@@ -172,16 +211,25 @@ spec:
             - "30"
             - "--sink"
             - "cloudflare"
+            # Exclusive diagnostic name (2026-09-12 operator ruling —
+            # PARKED, see header): was elohim.host; the apex is now a
+            # SHARED lane below, contributed by both legs, so this leg
+            # keeps its own independently-checkable identity under the
+            # TURN-plane name the dual-WAN design already expected.
             - "--record-name"
-            - "elohim.host"
+            - "turn-shem.elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "shem"
+            # Two shared lanes, repeatable-flag form (see header): the
+            # existing doorway-set name, plus the apex as a SECOND shared
+            # lane (2026-09-12 operator ruling) — PARKED until the operator's
+            # ingress classes exist.
+            - "--shared-record"
+            - "doorways.elohim.host=shem"
+            - "--shared-record"
+            - "elohim.host=shem"
           env:
             - name: CF_API_TOKEN
               valueFrom:

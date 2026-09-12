@@ -1,3 +1,19 @@
+# PARKED (branch sprint/apex-multi-a-ingress, 2026-09-12 operator ruling —
+# doorway/doorway-service/.epr-meta/doorway-failover.habit.md, RULING line;
+# WS3 of genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md).
+# This file's doorway Ingress below now carries `ingressClassName:
+# public-ethosengine` and answers elohim.host (the apex) alongside its
+# existing hosts, on the operator's premise-pinned ingress class naming
+# (public-ethosengine = doorway-A's/ethosengine's premise, public-shem =
+# doorway-B's/shem's premise — see alpha-b.yaml). The prerequisite the
+# operator owns: that ingress class must actually exist and be pinned to
+# this premise's nodes in the cluster BEFORE this manifest is applied — an
+# ingress-nginx controller with no matching IngressClass leaves the object
+# unserved (no error, no traffic; `kubectl get ingress` shows an ADDRESS of
+# nothing). Do not apply this file until the operator confirms both
+# public-ethosengine and public-shem exist. Flip condition: apex-transition
+# green on the fleet (Task 21 of the 2026-09-10 plan).
+#
 # Doorway Alpha Deployment — Agency On-Ramp
 #
 # Five roles in one process:
@@ -604,14 +620,22 @@ metadata:
 # is bench wiring for the address-set-contribution primitive, which later
 # graduates to a pkarr-resolved doorway set / DoorwayRegistration
 # multi-address (peer-native, deliberately not designed on this bench).
+#
+# PARKED — elohim.host (the apex) below (2026-09-12 operator ruling, see this
+# file's header): doorway-A now answers for the apex too, on
+# `ingressClassName: public-ethosengine` — the premise-pinned class the
+# operator has not yet created. Both doorways serve the apex; DNS/the
+# beacon's shared membership routes a visitor to the cluster of doorways,
+# each doorway's own ingress (this class) picks the pod. Do not apply.
 spec:
-  ingressClassName: public
+  ingressClassName: public-ethosengine
   tls:
     - hosts:
         - doorway-alpha.elohim.host
         - signal.alpha.elohim.host
         - signal.doorway-alpha.elohim.host
         - doorways.elohim.host
+        - elohim.host
       secretName: doorway-alpha-tls
   rules:
     - host: doorway-alpha.elohim.host
@@ -619,6 +643,20 @@ spec:
         paths:
           # All traffic through doorway gateway
           # Doorway handles routing: /threshold/* -> doorway-app, /hc/* -> conductor
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: elohim-doorway-alpha
+                port:
+                  number: 8080
+    - host: elohim.host
+      http:
+        paths:
+          # PARKED apex lane — doorway-A serves elohim.host on
+          # public-ethosengine; doorway-B serves the SAME host on
+          # public-shem (alpha-b.yaml). Different ingressClassName means
+          # check-ingress-conflicts.sh's (host, class) key allows both.
           - path: /
             pathType: Prefix
             backend:
@@ -991,6 +1029,13 @@ spec:
 # Follows the doorway ingress pattern (ingress-nginx + cert-manager
 # letsencrypt-production + the websocket annotation set), NOT the coturn
 # hostNetwork pattern: this is an HTTPS/WSS plane, not a raw UDP one.
+#
+# PARKED — ingressClassName public-ethosengine (2026-09-12 operator ruling,
+# see this file's header). Kept consistent with the doorway Ingress above:
+# the class is pinned to WHICH PREMISE'S NODES serve it, not to which app —
+# relay.alpha.elohim.host is on the same node/premise as doorway-A, so it
+# needs the same class once the operator's premise-pinned controllers exist.
+# Do not apply until public-ethosengine exists (unserved otherwise).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -1029,7 +1074,7 @@ metadata:
     # (see replicas:1 in the header) and a hash annotation would imply otherwise.
     cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
-  ingressClassName: public
+  ingressClassName: public-ethosengine
   tls:
     - hosts:
         - relay.alpha.elohim.host

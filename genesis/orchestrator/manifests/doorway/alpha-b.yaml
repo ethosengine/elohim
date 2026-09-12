@@ -1,3 +1,17 @@
+# PARKED (branch sprint/apex-multi-a-ingress, 2026-09-12 operator ruling —
+# doorway/doorway-service/.epr-meta/doorway-failover.habit.md, RULING line;
+# WS3 of genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md).
+# Both Ingress objects in this file (doorway-B apex ingress + the
+# doorway-B-leg iroh relay below) now carry `ingressClassName: public-shem`
+# — the shem-premise-pinned class the operator has not yet created.
+# Consistent choice for both: the class is pinned to WHICH PREMISE'S NODES
+# serve the object, not to which app runs there, and both objects here run
+# on the shem node. Do not apply this file until the operator confirms
+# public-shem (and doorway-A's sibling public-ethosengine) exist — an
+# unmatched ingressClassName leaves the object unserved with no error.
+# Flip condition: apex-transition green on the fleet (Task 21 of the
+# 2026-09-10 plan).
+#
 # Doorway Alpha-B Deployment — Federation Peer of doorway-alpha
 #
 # Second doorway in the elohim-alpha namespace, deployed alongside the primary
@@ -526,6 +540,12 @@ spec:
 # manifests/doorway/prod.yaml + manifests/elohim-app/prod/ingress.yaml
 # for the parking notes). Signal subdomain hosts the tx5/SBD WebRTC
 # relay.
+#
+# PARKED — ingressClassName public-shem (2026-09-12 operator ruling, see
+# this file's header). Doorway-A serves the SAME elohim.host host on
+# public-ethosengine (alpha.yaml). Different class means
+# check-ingress-conflicts.sh's (host, class) key allows both — same host,
+# two premises, one apex. Do not apply until public-shem exists.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -553,7 +573,7 @@ metadata:
       proxy_set_header Connection "upgrade";
     cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
-  ingressClassName: public
+  ingressClassName: public-shem
   tls:
     - hosts:
         - elohim.host
@@ -819,6 +839,12 @@ spec:
 # cert-manager letsencrypt-production + the websocket annotation set), NOT
 # the coturn hostNetwork pattern: this is an HTTPS/WSS plane, not a raw UDP
 # one.
+#
+# PARKED — ingressClassName public-shem (2026-09-12 operator ruling, see
+# this file's header). Kept consistent with the apex Ingress above: the
+# class is pinned to WHICH PREMISE'S NODES serve it, not to which app —
+# relay.elohim.host runs on the same shem node/premise as doorway-B. Do not
+# apply until public-shem exists (unserved otherwise).
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -858,7 +884,7 @@ metadata:
     # imply otherwise.
     cert-manager.io/cluster-issuer: letsencrypt-production
 spec:
-  ingressClassName: public
+  ingressClassName: public-shem
   tls:
     - hosts:
         - relay.elohim.host
