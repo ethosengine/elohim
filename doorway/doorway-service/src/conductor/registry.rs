@@ -346,8 +346,22 @@ impl ConductorRegistry {
 
     /// Find the conductor with the most available capacity
     pub fn find_least_loaded(&self) -> Option<ConductorInfo> {
+        self.find_least_loaded_excluding(&[])
+    }
+
+    /// Find the conductor with the most available capacity, skipping any whose
+    /// id appears in `exclude`.
+    ///
+    /// The exclusion set exists so a caller that has just watched a conductor
+    /// drop its admin socket mid-call can re-offer the SAME work to a different
+    /// member of the pool instead of surfacing a pool-wide refusal. Without it,
+    /// `find_least_loaded` hands the caller the same unhealthy conductor on
+    /// every retry, which is the "first-reachable-wins" degeneracy one seam out
+    /// (museum trap #12).
+    pub fn find_least_loaded_excluding(&self, exclude: &[String]) -> Option<ConductorInfo> {
         self.conductors
             .iter()
+            .filter(|entry| !exclude.iter().any(|id| id == entry.key()))
             .max_by_key(|entry| entry.capacity_max.saturating_sub(entry.capacity_used))
             .map(|entry| entry.value().clone())
     }

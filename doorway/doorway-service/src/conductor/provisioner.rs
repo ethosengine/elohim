@@ -37,6 +37,47 @@ const DEFAULT_APP_ID: &str = "elohim";
 /// Default bundle path for the Holochain app.
 const DEFAULT_BUNDLE_PATH: &str = "/app/elohim.happ";
 
+/// How many conductors a single provisioning call may be re-offered to when the
+/// admin socket drops mid-call.
+///
+/// Bounded deliberately: a registration is an interactive request behind a
+/// hosted human's sign-up, so the budget is "ask a couple of siblings", never
+/// "walk the pool". Each attempt targets a DIFFERENT conductor (the failing one
+/// is excluded), so three attempts is three distinct members, not three tries at
+/// the same sick one.
+const PROVISION_TRANSPORT_ATTEMPTS: u32 = 3;
+
+/// Is this provisioning error a TRANSPORT fault rather than a verdict?
+///
+/// A transport fault means the admin websocket died before the conductor
+/// answered — the work was never performed *or* its outcome was never reported,
+/// and in both cases nothing is established about whether it can succeed
+/// elsewhere. A verdict (at capacity, cell genesis timed out, the conductor
+/// refused) is a real answer and must not be retried into a second side effect.
+///
+/// Matched on the rendered error string because that is the only shape the
+/// `holochain_client` admin errors reach this layer in: they arrive as
+/// `External API wire error: InternalError("… Other({\"error\":\"BrokenPipe\"})")`,
+/// with the discriminant already flattened into text upstream. Widening this
+/// set is safe in one direction only — a false POSITIVE costs one extra
+/// provisioning attempt on a different conductor, a false NEGATIVE costs a human
+/// their registration.
+fn is_transport_fault(error: &str) -> bool {
+    const TRANSPORT_MARKERS: [&str; 8] = [
+        "BrokenPipe",
+        "ConnectionAborted",
+        "ConnectionReset",
+        "ConnectionRefused",
+        "connection closed",
+        "Connection closed",
+        "websocket closed",
+        "Failed to connect to admin",
+    ];
+    TRANSPORT_MARKERS
+        .iter()
+        .any(|marker| error.contains(marker))
+}
+
 /// Result of successful agent provisioning.
 #[derive(Debug, Clone)]
 pub struct ProvisionedAgent {
@@ -93,22 +134,82 @@ impl AgentProvisioner {
     /// re-login case where `find_least_loaded()` returns a different conductor
     /// than the one the app was originally installed on.
     ///
-    /// Flow:
+    /// Flow, per attempt:
     /// 1. Search all conductors for existing app (idempotency)
-    /// 2. If not found, pick least loaded conductor
+    /// 2. If not found, pick the least loaded conductor not already excluded
     /// 3. Generate agent key, install, enable, register
+    ///
+    /// ## A dropped admin socket is not a provisioning verdict
+    ///
+    /// `elohim-genesis/dev` #1576 refused two hosted registrations on a
+    /// seven-peer-healthy alpha with
+    /// `Failed to generate agent key on conductor-3: … Other: {"error":"BrokenPipe"}`
+    /// and
+    /// `Failed to install app on conductor-3: … Other({"error":"ConnectionAborted"})`,
+    /// each surfacing to the human as `503 PROVISIONING_FAILED`. Both are
+    /// TRANSPORT faults on the admin websocket: the conductor never answered,
+    /// so neither establishes anything about the work — exactly the class the
+    /// substrate trust contract says must be re-offered rather than verdicted
+    /// (the same lesson `conductor_admission`'s shed carries in elohim-storage,
+    /// and the same lesson the seed-blob forward learned on 2026-09-02).
+    ///
+    /// Only `conductor-3` appeared anywhere in that build's log: the pool held
+    /// other members and none was ever asked. The re-offer is bounded at
+    /// [`PROVISION_TRANSPORT_ATTEMPTS`] and EXCLUDES the conductor that dropped,
+    /// so a single sick pool member cannot absorb every attempt — and the
+    /// idempotency search re-runs at the top of each attempt, because an
+    /// `install_app` whose socket died may have landed before it died.
+    ///
+    /// A non-transport error (at capacity, cell genesis timed out, a real
+    /// conductor refusal) is returned immediately and unchanged: those ARE
+    /// verdicts.
     pub async fn provision_agent(&self, user_identifier: &str) -> Result<ProvisionedAgent, String> {
-        // 1. Search ALL conductors for an existing app for this user
-        if let Some(result) = self.find_existing_app(user_identifier).await {
-            return Ok(result);
+        let mut excluded: Vec<String> = Vec::new();
+        let mut last_transport_error: Option<String> = None;
+
+        for attempt in 1..=PROVISION_TRANSPORT_ATTEMPTS {
+            // 1. Search ALL conductors for an existing app for this user.
+            // Re-run per attempt, not once: a previous attempt's aborted
+            // install may have completed on the conductor that stopped talking.
+            if let Some(result) = self.find_existing_app(user_identifier).await {
+                return Ok(result);
+            }
+
+            // 2. No existing app found — provision on the least loaded
+            // conductor that has not already dropped on us in this call.
+            let Some(conductor) = self.registry.find_least_loaded_excluding(&excluded) else {
+                break;
+            };
+
+            match self.provision_on(&conductor, user_identifier).await {
+                Ok(agent) => return Ok(agent),
+                Err(e) if is_transport_fault(&e) => {
+                    warn!(
+                        conductor = %conductor.conductor_id,
+                        attempt,
+                        max_attempts = PROVISION_TRANSPORT_ATTEMPTS,
+                        error = %e,
+                        "conductor admin socket dropped mid-provision — re-offering to \
+                         another conductor; a dropped socket says nothing about the work"
+                    );
+                    excluded.push(conductor.conductor_id.clone());
+                    last_transport_error = Some(e);
+                }
+                Err(e) => return Err(e),
+            }
         }
 
-        // 2. No existing app found — provision on least loaded conductor
-        let conductor = self
-            .registry
-            .find_least_loaded()
-            .ok_or("No conductors available for provisioning")?;
+        Err(last_transport_error
+            .unwrap_or_else(|| "No conductors available for provisioning".to_string()))
+    }
 
+    /// One provisioning attempt against ONE named conductor.
+    async fn provision_on(
+        &self,
+        conductor: &super::registry::ConductorInfo,
+        user_identifier: &str,
+    ) -> Result<ProvisionedAgent, String> {
+        let conductor = conductor.clone();
         if conductor.capacity_used >= conductor.capacity_max {
             return Err(format!(
                 "Conductor {} at capacity ({}/{})",
@@ -407,6 +508,85 @@ fn generate_app_id(app_id: &str, conductor_id: &str, user_identifier: &str) -> S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The two error strings `elohim-genesis/dev` #1576 put in front of a human
+    /// as `503 PROVISIONING_FAILED`, verbatim from the build log. Both must
+    /// classify as transport faults — the conductor never answered.
+    #[test]
+    fn the_two_build_1576_refusals_are_transport_faults_not_verdicts() {
+        let generate_key = "Failed to generate agent key on conductor-3: Admin error \
+             (generate_agent_pub_key): External API wire error: \
+             InternalError(\"Other: {\\\"error\\\":\\\"BrokenPipe\\\"}\")";
+        let install = "Failed to install app on conductor-3: Admin error (install_app): \
+             External API wire error: InternalError(\"Conductor returned an error while \
+             using a ConductorApi: Other({\\\"error\\\":\\\"ConnectionAborted\\\"})\")";
+
+        assert!(
+            is_transport_fault(generate_key),
+            "a BrokenPipe on the admin socket says nothing about the work"
+        );
+        assert!(
+            is_transport_fault(install),
+            "a ConnectionAborted on the admin socket says nothing about the work"
+        );
+    }
+
+    /// The other half of the contract: a real answer must never be retried into
+    /// a second side effect.
+    #[test]
+    fn a_conductor_verdict_is_never_reoffered() {
+        for verdict in [
+            "Conductor conductor-1 at capacity (50/50)",
+            "Cell genesis timed out on conductor-2 for app 'elohim-conductor-2-ab12cd' after 15s",
+            "Failed to enable app on conductor-0: AppNotFound",
+            "Failed to register agent mapping: mongo write failed",
+        ] {
+            assert!(
+                !is_transport_fault(verdict),
+                "a verdict must be returned unchanged, got a retry for: {verdict}"
+            );
+        }
+    }
+
+    /// The exclusion is what makes the re-offer meaningful: without it, the
+    /// pool's least-loaded member is handed back on every attempt and the
+    /// budget is spent on the one conductor already known to be dropping.
+    #[tokio::test]
+    async fn a_dropped_conductor_is_excluded_from_the_next_offer() {
+        use crate::conductor::registry::ConductorInfo;
+
+        let registry = Arc::new(ConductorRegistry::new(None).await);
+        for id in ["conductor-3", "conductor-4"] {
+            registry.register_conductor(ConductorInfo {
+                conductor_id: id.to_string(),
+                conductor_url: format!("ws://{id}:8888"),
+                admin_url: format!("ws://{id}:4444"),
+                capacity_used: 0,
+                capacity_max: 10,
+            });
+        }
+
+        let first = registry
+            .find_least_loaded()
+            .expect("a two-member pool has a least-loaded member");
+        let second = registry
+            .find_least_loaded_excluding(std::slice::from_ref(&first.conductor_id))
+            .expect("excluding one member of a two-member pool still leaves one");
+
+        assert_ne!(
+            first.conductor_id, second.conductor_id,
+            "the re-offer must reach a DIFFERENT conductor"
+        );
+        assert!(
+            registry
+                .find_least_loaded_excluding(&[
+                    first.conductor_id.clone(),
+                    second.conductor_id.clone()
+                ])
+                .is_none(),
+            "excluding every member must yield None, not wrap around"
+        );
+    }
 
     #[test]
     fn test_generate_app_id() {

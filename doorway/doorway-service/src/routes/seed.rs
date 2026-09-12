@@ -443,6 +443,47 @@ fn backpressure_wait(response: &reqwest::Response) -> Option<std::time::Duration
     Some(std::time::Duration::from_secs(secs))
 }
 
+/// Render a transport failure with its CAUSE, not only its wrapper.
+///
+/// `reqwest::Error`'s `Display` stops at the wrapper — `error sending request
+/// for url (http://…)` — and deliberately says nothing about *why*. That is the
+/// exact string `elohim/dev` #1704/#1705 put in front of CI: the apex doorway
+/// could not reach `elohim-adam-alpha…:8090`, the staging leg reported it
+/// faithfully, and the one fact needed to route the finding — DNS failure vs
+/// connection-refused vs timeout vs TLS — was reachable only from the doorway
+/// pod's own logs.
+///
+/// This is the 2026-09-02 lesson applied one layer deeper. That fix made every
+/// refusal name the LEG that refused; a transport refusal must also name the
+/// CAUSE, because "could not reach storage" is a routing question (operator:
+/// network/DNS) and its answer decides who owns the finding.
+///
+/// The chain is walked with `std::error::Error::source()` and joined with
+/// `: `, bounded at [`TRANSPORT_CAUSE_CHAIN_MAX`] links so a pathological
+/// nesting cannot inflate a JSON response CI reads in full.
+fn transport_reason(prefix: &str, err: &(dyn std::error::Error + 'static)) -> String {
+    let mut parts = vec![err.to_string()];
+    let mut source = err.source();
+    while let Some(cause) = source {
+        if parts.len() >= TRANSPORT_CAUSE_CHAIN_MAX {
+            break;
+        }
+        let rendered = cause.to_string();
+        // hyper/reqwest repeat the wrapper text at the next link often enough
+        // that an unfiltered walk reads as stutter rather than as a cause.
+        if parts.last().is_some_and(|last| last == &rendered) {
+            source = cause.source();
+            continue;
+        }
+        parts.push(rendered);
+        source = cause.source();
+    }
+    format!("{prefix}: {}", parts.join(": "))
+}
+
+/// Maximum links rendered by [`transport_reason`].
+const TRANSPORT_CAUSE_CHAIN_MAX: usize = 4;
+
 /// Forward a blob to elohim-storage.
 ///
 /// If body is None, reads from local cache.
@@ -602,7 +643,10 @@ async fn forward_once(
                             error = %e,
                             "seed-blob forward read-back unreachable — reporting forwarded=false"
                         );
-                        Err((format!("read-back to storage was unreachable: {e}"), None))
+                        Err((
+                            transport_reason("read-back to storage was unreachable", &e),
+                            None,
+                        ))
                     }
                 }
             } else {
@@ -623,7 +667,7 @@ async fn forward_once(
         Err(e) => {
             error!(hash = %hash, error = %e, "Failed to connect to elohim-storage");
             Err((
-                format!("could not reach storage to forward the blob: {e}"),
+                transport_reason("could not reach storage to forward the blob", &e),
                 None,
             ))
         }
@@ -1096,6 +1140,110 @@ mod tests {
             reason.contains("storage_url"),
             "the reason must name the leg that refused, got: {reason}"
         );
+    }
+
+    /// A transport refusal must name its CAUSE, not only the wrapper.
+    ///
+    /// `elohim/dev` #1704/#1705 reported, verbatim and three times per host,
+    /// `could not reach storage to forward the blob: error sending request for
+    /// url (http://elohim-adam-alpha…:8090/blob/sha256-…)`. That sentence names
+    /// the leg (the 2026-09-02 cure) and withholds the one fact that routes the
+    /// finding: whether the apex doorway could not RESOLVE adam, could not
+    /// CONNECT to it, or waited and gave up. The cause chain is where that
+    /// lives, and `reqwest::Error`'s Display drops it.
+    #[test]
+    fn a_transport_refusal_names_its_cause_not_only_the_wrapper() {
+        #[derive(Debug)]
+        struct Wrapper(Inner);
+        #[derive(Debug)]
+        struct Inner(Leaf);
+        #[derive(Debug)]
+        struct Leaf;
+
+        impl std::fmt::Display for Wrapper {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "error sending request for url (http://adam:8090/blob/x)")
+            }
+        }
+        impl std::fmt::Display for Inner {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "client error (Connect)")
+            }
+        }
+        impl std::fmt::Display for Leaf {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "dns error: failed to lookup address information")
+            }
+        }
+        impl std::error::Error for Wrapper {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+        impl std::error::Error for Inner {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                Some(&self.0)
+            }
+        }
+        impl std::error::Error for Leaf {}
+
+        let reason = transport_reason(
+            "could not reach storage to forward the blob",
+            &Wrapper(Inner(Leaf)),
+        );
+        assert!(
+            reason.contains("error sending request for url"),
+            "the wrapper the deploy leg already recognises must survive: {reason}"
+        );
+        assert!(
+            reason.contains("dns error"),
+            "the ROOT cause is the fact that routes the finding: {reason}"
+        );
+    }
+
+    /// A stuttering chain must not be rendered twice, and a pathological one
+    /// must not inflate the JSON body CI reads in full.
+    #[test]
+    fn the_cause_chain_is_deduplicated_and_bounded() {
+        #[derive(Debug)]
+        struct Repeat;
+        impl std::fmt::Display for Repeat {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "same text")
+            }
+        }
+        impl std::error::Error for Repeat {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                None
+            }
+        }
+
+        #[derive(Debug)]
+        struct Deep(u32, Option<Box<Deep>>);
+        impl std::fmt::Display for Deep {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "link{}", self.0)
+            }
+        }
+        impl std::error::Error for Deep {
+            fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+                self.1.as_deref().map(|d| d as &dyn std::error::Error)
+            }
+        }
+
+        let mut deep = Deep(9, None);
+        for i in (0..9).rev() {
+            deep = Deep(i, Some(Box::new(deep)));
+        }
+        let rendered = transport_reason("p", &deep);
+        assert_eq!(
+            rendered.matches("link").count(),
+            TRANSPORT_CAUSE_CHAIN_MAX,
+            "the chain must stop at the declared bound: {rendered}"
+        );
+
+        let repeated = transport_reason("p", &Repeat);
+        assert_eq!(repeated, "p: same text", "got: {repeated}");
     }
 
     /// Build a `reqwest::Response` from a raw `http::Response` so the
