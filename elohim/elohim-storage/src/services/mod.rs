@@ -104,6 +104,7 @@ pub mod operation_authorization; // Che op-gate Slice 1 §14 — core op-gate ga
 pub mod operational_weave_facing;
 pub mod peer_capacity_service;
 pub mod peer_diversity; // Phase 4 T8 — archetype-mix diversity helper
+pub mod peer_liveness; // Live connected-peer view — the liveness the felt badge reads
 pub mod peer_selection;
 pub mod peer_status_fanout; // Cross-agent PeerStatus fan-in — breaks the self-only peer_statuses ceiling
 pub mod peer_topology_view;

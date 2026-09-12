@@ -102,12 +102,17 @@ fn compute_base(
     // The staleness window (0 = disabled) is injected by the caller; `now` is read
     // once here (per request, not per row).
     let identity = HouseholdIdentity::load(conn)?;
+    // The transport's current connected set, read ONCE per request. `None` when
+    // no p2p plane armed the registry — every reader then keeps the heartbeat
+    // behaviour rather than reading an unpublished set as "nobody is live".
+    let connected = crate::services::peer_liveness::connected_snapshot();
     let online_peer_count = count_online_peers_in_households(
         conn,
         &steward_households,
         &identity,
         staleness_secs,
         chrono::Utc::now().timestamp_micros(),
+        connected.as_ref(),
     )?;
 
     // Status classification (a2o spec): protected ← ≥3 households AND ≥2 online;
@@ -374,12 +379,15 @@ pub fn snapshot_with_staleness_secs(
     // to `known` (a dark peer is still known), so the window is passed as 0.
     let steward_household_set: HashSet<String> =
         base.details.steward_households.iter().cloned().collect();
+    // `known` is liveness-agnostic by definition, so the connected view is not
+    // consulted here — a dark peer is still a known peer.
     let known_peer_count: i32 = count_household_peers(
         &mut conn,
         &steward_household_set,
         &identity,
         0,
         chrono::Utc::now().timestamp_micros(),
+        None,
     )
     .map(|c| c.known)
     .unwrap_or(0);
@@ -615,12 +623,28 @@ pub(crate) struct HouseholdPeerCounts {
 /// `peer_statuses::list_by_household` and `load_holder_relation` (a scope filter
 /// here would ship a silent no-op under the qahal/lamad ctx drift class — the
 /// same reasoning the identity resolver's `collectives` read records).
+/// # Two liveness sources, in priority order (2026-09-12)
+///
+/// `connected` is the local transport's CURRENT connected-peer view
+/// ([`crate::services::peer_liveness`]), or `None` when no transport plane armed
+/// it. When present it DECIDES `live`: a household peer is live iff this node
+/// can see it right now, under either label namespace. When absent the count
+/// falls back to the `peer_statuses` heartbeat window, which is what this
+/// function has always done.
+///
+/// The fallback is not a nicety. The heartbeat cannot go down on its own: a
+/// SIGKILLed peer writes no offline row, so its last beat stays inside the 900 s
+/// window and the card reported three live copies of content whose holders were
+/// already dead (blob-durability DELTA 2026-09-12c, cause 2). `known` is
+/// unaffected either way — a dark peer is still a known peer, and "1 of 3" is
+/// the honest reading.
 fn count_household_peers(
     conn: &mut diesel::SqliteConnection,
     households: &HashSet<String>,
     identity: &HouseholdIdentity,
     staleness_secs: i64,
     now_micros: i64,
+    connected: Option<&HashSet<String>>,
 ) -> Result<HouseholdPeerCounts, StorageError> {
     use crate::db::diesel_schema::{humans, stewarded_nodes};
 
@@ -669,6 +693,14 @@ fn count_household_peers(
     }
     let known = peers.len() as i32;
 
+    // Transport-observed liveness wins when it exists. Set intersection, no
+    // window: the transport's set IS the measurement, and it is already bounded
+    // by the ping budget on the publishing side.
+    if let Some(connected) = connected {
+        let live = peers.iter().filter(|p| connected.contains(*p)).count() as i32;
+        return Ok(HouseholdPeerCounts { live, known });
+    }
+
     // `i64::MIN` cutoff makes the age test a no-op when the window is disabled.
     let cutoff_micros: i64 = if staleness_secs > 0 {
         now_micros.saturating_sub(staleness_secs.saturating_mul(1_000_000))
@@ -694,8 +726,17 @@ fn count_online_peers_in_households(
     identity: &HouseholdIdentity,
     staleness_secs: i64,
     now_micros: i64,
+    connected: Option<&HashSet<String>>,
 ) -> Result<i32, StorageError> {
-    Ok(count_household_peers(conn, households, identity, staleness_secs, now_micros)?.live)
+    Ok(count_household_peers(
+        conn,
+        households,
+        identity,
+        staleness_secs,
+        now_micros,
+        connected,
+    )?
+    .live)
 }
 
 #[cfg(test)]
@@ -902,16 +943,86 @@ mod tests {
 
         // Window 900: only the fresh peer counts.
         assert_eq!(
-            count_online_peers_in_households(&mut conn, &households, &identity, 900, now).unwrap(),
+            count_online_peers_in_households(&mut conn, &households, &identity, 900, now, None)
+                .unwrap(),
             1,
             "the 901s-stale peer is excluded under a 900s window"
         );
 
         // Window 0: legacy age-agnostic — both count.
         assert_eq!(
-            count_online_peers_in_households(&mut conn, &households, &identity, 0, now).unwrap(),
+            count_online_peers_in_households(&mut conn, &households, &identity, 0, now, None)
+                .unwrap(),
             2,
             "both peers count when the window is disabled"
         );
+    }
+
+    /// THE 2026-09-12c cause-2 regression: liveness comes from the local
+    /// transport's CONNECTED set, not from a heartbeat window a killed peer can
+    /// never move.
+    ///
+    /// Household `{a, b, c}`, all three heartbeating one minute ago — under the
+    /// old reading all three are "live" forever, which is exactly what told a
+    /// household it had three copies of "manifesto" after two of its peers had
+    /// been SIGKILLed. With the transport seeing only `{a, b}`, `live` is 2 and
+    /// `known` stays 3: "2 of 3", never a bare zero and never a comforting lie.
+    #[test]
+    fn live_follows_the_connected_set_while_known_follows_the_junction() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::Utc::now().timestamp_micros();
+        // All three beat 60s ago — well inside the 900s window.
+        for peer in ["uhCAkA", "uhCAkB", "uhCAkC"] {
+            seed_online_peer(&mut conn, peer, "hh-a", now - 60 * 1_000_000);
+        }
+
+        let households: HashSet<String> = HashSet::from(["hh-a".to_string()]);
+        let identity = HouseholdIdentity::load(&mut conn).expect("identity");
+
+        // Heartbeat-only: the old reading. Three live, because a dead peer
+        // cannot write its own obituary.
+        let heartbeat =
+            count_household_peers(&mut conn, &households, &identity, 900, now, None).unwrap();
+        assert_eq!(
+            (heartbeat.live, heartbeat.known),
+            (3, 3),
+            "the heartbeat window alone cannot see the kill — this is the red"
+        );
+
+        // Transport-observed: c is gone.
+        let connected: HashSet<String> =
+            HashSet::from(["uhCAkA".to_string(), "uhCAkB".to_string()]);
+        let observed = count_household_peers(
+            &mut conn,
+            &households,
+            &identity,
+            900,
+            now,
+            Some(&connected),
+        )
+        .unwrap();
+        assert_eq!(
+            observed.live, 2,
+            "live must follow the peers this node can actually reach right now"
+        );
+        assert_eq!(
+            observed.known, 3,
+            "known is liveness-agnostic — the third peer is still a household member, \
+             so the card reads `2 of 3` rather than a bare zero"
+        );
+
+        // And an EMPTY connected set is a real measurement, not a fallback: a
+        // node that can reach nobody must say so.
+        let alone = count_household_peers(
+            &mut conn,
+            &households,
+            &identity,
+            900,
+            now,
+            Some(&HashSet::new()),
+        )
+        .unwrap();
+        assert_eq!((alone.live, alone.known), (0, 3));
     }
 }

@@ -3328,6 +3328,32 @@ impl P2PNode {
             .unwrap_or(false)
     }
 
+    /// Publish a newly-connected peer into the process-global live
+    /// connected-peer view ([`crate::services::peer_liveness`]) under EVERY
+    /// label a household junction might name it by.
+    ///
+    /// Two labels, deliberately: the transport peer id (what `stewarded_nodes`
+    /// rows and half the custody rows carry) and the resolved `agent_cid` (what
+    /// `humans.agent_pub_key` carries). The either-namespace matching
+    /// `reconcile/custody.rs` documents is real — publishing one label would
+    /// silently match nothing for half the fleet, which is the shape of a
+    /// missing join wearing a measurement's clothes.
+    ///
+    /// The identity resolve is a pooled DB read, which is why this is called on
+    /// CONNECTION events only; the ping arm refreshes liveness with a lookup-free
+    /// `touch`. An unresolvable peer is published under its transport id alone —
+    /// honest partial evidence beats no evidence.
+    fn publish_peer_connected(&self, peer_id: &libp2p::PeerId) {
+        let pid = peer_id.to_string();
+        let mut labels = vec![pid.clone()];
+        if let identity_map::CallerIdentity::Agent(agent_cid) = self.identity_map.lookup(peer_id) {
+            if !agent_cid.is_empty() && agent_cid != pid {
+                labels.push(agent_cid);
+            }
+        }
+        crate::services::peer_liveness::record_connected(&pid, labels);
+    }
+
     /// Snapshot of currently connected peers.
     pub fn connected_peers(&self) -> Vec<libp2p::PeerId> {
         self.peer_metrics
@@ -3637,6 +3663,29 @@ impl P2PNode {
 
     /// Run the event loop (call in background task)
     pub async fn run(&self, mut shutdown: broadcast::Receiver<()>) {
+        // ARM the live connected-peer view for this process. From here on an
+        // EMPTY connected set means "nobody is connected" rather than "nobody
+        // asked", and the felt resilience badge reads liveness from the
+        // transport instead of from a 900 s heartbeat window that a SIGKILLed
+        // peer can never move (blob-durability DELTA 2026-09-12c, cause 2).
+        //
+        // The staleness backstop is this node's OWN ping budget — interval +
+        // timeout — because that is the window inside which the ping-failure arm
+        // below closes a silent peer's connection. The two mechanisms therefore
+        // agree on when a dead peer stops counting.
+        crate::services::peer_liveness::arm(
+            vec![
+                self.identity.peer_id().to_string(),
+                self.identity.agent_pubkey().to_string(),
+            ],
+            Duration::from_secs(
+                self.config
+                    .ping_interval_secs
+                    .saturating_add(self.config.ping_timeout_secs)
+                    .max(1),
+            ),
+        );
+
         // Initial status snapshot after start
         self.refresh_status().await;
         self.hydrate_replication_state().await;
@@ -5437,6 +5486,12 @@ impl P2PNode {
                         last_seen_ms: now_unix_ms(),
                         rtt_samples: std::collections::VecDeque::with_capacity(8),
                     });
+                // Publish the peer into the live connected-peer view the felt
+                // resilience badge reads. The identity lookup costs one query
+                // PER CONNECTION (not per ping) and is what lets a household
+                // junction keyed on `agent_cid` match a transport-keyed set —
+                // both labels go in, because both junctions exist.
+                self.publish_peer_connected(&peer_id);
                 // T24: learn bootstrap-addr → PeerId from outbound dials so the
                 // persistent-peering retry knows WHICH configured link dropped.
                 if endpoint.is_dialer() {
@@ -5551,6 +5606,11 @@ impl P2PNode {
                 self.peer_trust_cache.remove(&peer_id).await;
                 self.peer_metrics.remove(&peer_id.to_string());
                 self.identify_cache.remove(&peer_id.to_string());
+                // Leave the live set immediately. Paired with the ping-failure
+                // arm's explicit `close_connection`, this is what makes a
+                // SIGKILLed peer drop out of the felt badge inside the ping
+                // budget instead of lingering for the 900 s heartbeat window.
+                crate::services::peer_liveness::record_disconnected(&peer_id.to_string());
                 self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
@@ -7563,6 +7623,9 @@ impl P2PNode {
                 ..
             }) => {
                 let pid = peer.to_string();
+                // Cheapest possible liveness refresh: no lookup, no allocation
+                // beyond the key compare. Fires once per peer per ping interval.
+                crate::services::peer_liveness::touch(&pid);
                 self.peer_metrics
                     .entry(pid)
                     .and_modify(|m| {
