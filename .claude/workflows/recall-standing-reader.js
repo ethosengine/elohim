@@ -101,6 +101,13 @@ for (const question of QUESTIONS) {
   }
 }
 log(`${pairs.length} (question x reader-tier) pairs to sample and judge this run`)
+// Name the cap on tier-fidelity out loud: a tier string shortModel() cannot map runs at the
+// inherited session model, which is a silent substitution unless it is logged per pair.
+for (const pair of pairs) {
+  for (const tier of [pair.readerTier, pair.judgeTier]) {
+    if (!shortModel(tier)) log(`unrecognized tier ${tier}: pair ${pair.session} runs at the inherited model`)
+  }
+}
 
 const SAMPLE_SCHEMA = {
   type: 'object',
