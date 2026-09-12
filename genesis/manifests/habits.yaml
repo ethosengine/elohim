@@ -2898,7 +2898,7 @@ habits:
       sources ranked with the commands to compare, choose and file the residue — and the agent concludes without a mistaken assertion. Bytes saved
       never substitute for a correct decision; an unmetered direct read is a defect of the entry,
       not of the agent.
-    status: green
+    status: red
     active: false
     checks:
       - "a2o @concern:recall-reaches-authority (genesis/a2o/features/devflow/ceremony-reconciliation.feature — a fresh agent opens with its own question, the orientation carries it, a passage under .claude/skills/ is readable and receipted, and finish reports the question with bounded bytes)"
@@ -3011,6 +3011,17 @@ habits:
       real weekly run reads the discovery gap the standing reader found (4 of 6 questions) instead of diluting it. Fresh
       tree readings after the round: window 1 of 7 journeys within hard 0.2 (the new middot has no folds yet — the first
       run with it decides), python 64/64, rust 147/0, goldens byte-identical.
+      RED 2026-09-12 (GREEN → RED on evidence, the first rolling-window reading on the shared checkout): check 3's window bound
+      reads `failed — 4 of 6 journeys (14 folds) in the last 91 days — has reached the hard watermark 0.2` against main's own
+      fold history: reader 1 and reader 2 (pre-fix, unmetered ~100 KB / mistaken 1), the haiku bootstrap sample (mistaken 1: it
+      chose the headline's bare `hold --scope --apply`), one more positive; readers 3 and 5 reached clean. The latest-journey
+      checks were green because each read only the newest fold; the window reads the quarter, and the quarter says most
+      journeys missed. This is the instrument doing its job, not a regression in the code that landed today. The register flips
+      because the covenant flips on evidence, never intention. Two artifacts to name, neither a reason to widen the bound:
+      the two bootstrap samples share the hand-written journey label `bootstrap-sample` and group as one journey; the pre-3.2
+      hand folds carry no `recall-not-reached@1`. Green again when the standing reader's real weekly runs (with the discovery
+      gap in station 4 closed: short register vocabulary, area stemming, a reader-chosen candidate) bring the 91-day rate
+      under 0.2 — and not before.
     guard: >
       Regression risks: (1) greening by widening source_roots to everything — the private recall
       store and other worktrees stay refused, and a scope that admits scratch is not a governed

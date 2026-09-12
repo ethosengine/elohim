@@ -35,3 +35,10 @@ bootstrap is the first journey sample; two doors), [[project_governed_discovery_
 lens=AttentionTending, sample=FlowEvent+Verdict — never mint these), [[feedback_plan_checkbox_is_commitment_grain]]
 (one `- [ ]` per task in a plan; steps numbered). Spec: `genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md`;
 plan: `genesis/docs/superpowers/plans/2026-09-11-governed-discovery-stations-0-3-plan.md`.
+
+**2026-09-12 (governed-discovery stations 0–3 merged to dev):** the habit's check 3 became a rolling-window bound
+(`recall-journey-window-ceiling@1`, 91 days, hard 0.2) fed by `recall sample`/`judge` journeys and the weekly
+standing-reader workflow, and on its first reading against main's fold history the habit flipped GREEN → RED
+(4 of 6 journeys positive). The latest-journey readers were green; the quarter was not. Station 4's work is the
+discovery gap the standing reader surfaced (short register vocabulary like "top red", area stemming, a
+reader-chosen candidate) — that, not a wider bound, is what greens it.
