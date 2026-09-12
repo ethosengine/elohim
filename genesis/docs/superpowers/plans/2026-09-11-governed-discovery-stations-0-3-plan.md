@@ -63,7 +63,7 @@ cites:
 
 ### Task 0.1: Golden capture before any move
 
-- [ ] Task 0.1: Golden capture before any move
+- [x] Task 0.1: Golden capture before any move
 
 **Files:**
 - Create: `elohim/eprfs/epr-cli/tests/fixtures/recall-golden/README.md`
@@ -139,7 +139,7 @@ git commit -m "test(recall): pin three golden renderings before the station-zero
 
 ### Task 0.2: Turn `recall.rs` into `recall/mod.rs` and move the receipts seam
 
-- [ ] Task 0.2: Turn `recall.rs` into `recall/mod.rs` and move the receipts seam
+- [x] Task 0.2: Turn `recall.rs` into `recall/mod.rs` and move the receipts seam
 
 **Files:**
 - Move: `elohim/eprfs/epr-cli/src/flow/memory/recall.rs` → `elohim/eprfs/epr-cli/src/flow/memory/recall/mod.rs`
@@ -178,7 +178,7 @@ git commit -m "refactor(recall): recall.rs becomes recall/mod.rs; receipts seam 
 
 ### Task 0.3: Extract `refusal.rs`, `render.rs`, `measure.rs`
 
-- [ ] Task 0.3: Extract `refusal.rs`, `render.rs`, `measure.rs`
+- [x] Task 0.3: Extract `refusal.rs`, `render.rs`, `measure.rs`
 
 **Files:**
 - Create: `…/recall/refusal.rs` (`print_refusal`, `refusal_lines`, `remedy_for`, `one_line`, `accepted_flags`)
@@ -194,7 +194,7 @@ git commit -m "refactor(recall): recall.rs becomes recall/mod.rs; receipts seam 
 
 ### Task 0.4: Extract `discovery.rs` and `providers.rs` with the `Provider` trait
 
-- [ ] Task 0.4: Extract `discovery.rs` and `providers.rs` with the `Provider` trait
+- [x] Task 0.4: Extract `discovery.rs` and `providers.rs` with the `Provider` trait
 
 **Files:**
 - Create: `…/recall/discovery.rs` (`discover`, `discover_scored`, `question_terms`, `habit_row`, `matching_habits`, `focus_area`, `first_screen`, `trim_to_character_boundary`, `frontmatter_header`, `find_close`, `outline`, `outline_with_terms`, `best_section`)
@@ -253,7 +253,7 @@ mod tests {
 
 ### Task 0.5: Extract `journey.rs`; `mod.rs` is dispatch only
 
-- [ ] Task 0.5: Extract `journey.rs`; `mod.rs` is dispatch only
+- [x] Task 0.5: Extract `journey.rs`; `mod.rs` is dispatch only
 
 **Files:**
 - Create: `…/recall/journey.rs` (`execute`, `prior_state`, `revalidate`, `refresh_selected`, `native_context`, `native_concerns`, `evidence_continuation`, `retain_evidence`, `relevant_findings`, `selected_evidence`, `receipt_stamp`, `continuation_page`, `doc_repair`, `orientation`, `edge_identity`, `edges`, `selected_edge`, `evidence_key`, `last_one`, `without_content`, `cite_desc`, `charge_native`)
@@ -281,7 +281,7 @@ mod shape {
 
 ### Task 0.6: Re-declare the contract as a ProcessSpec with Bounds (no behaviour change)
 
-- [ ] Task 0.6: Re-declare the contract as a ProcessSpec with Bounds (no behaviour change)
+- [x] Task 0.6: Re-declare the contract as a ProcessSpec with Bounds (no behaviour change)
 
 **Files:**
 - Modify: `.epr-meta/elohim/algorithms/recall-contract.json` (add `process_spec`, `bounds`; keep `composition`/`limits` for one version as aliases)
@@ -328,7 +328,7 @@ and bump `"version": 10`. In `Contract`, `process_spec()` deserializes `value["p
 
 ### Task 1.1: `lens.rs` — ReaderRef, LensLevel, LensView, ResolveLens from the actor sidecar
 
-- [ ] Task 1.1: `lens.rs` — ReaderRef, LensLevel, LensView, ResolveLens from the actor sidecar
+- [x] Task 1.1: `lens.rs` — ReaderRef, LensLevel, LensView, ResolveLens from the actor sidecar
 
 **Files:**
 - Create: `…/recall/lens.rs`
@@ -405,7 +405,7 @@ fn a_requested_wider_lens_is_never_refused_and_is_recorded_as_requested() {
 
 ### Task 1.2: `Render` per lens with the honesty and content floors
 
-- [ ] Task 1.2: `Render` per lens with the honesty and content floors
+- [x] Task 1.2: `Render` per lens with the honesty and content floors
 
 **Files:**
 - Modify: `…/recall/render.rs`
@@ -443,7 +443,7 @@ fn a_correction_candidate_renders_at_every_lens() {
 
 ### Task 1.3: Fresh-reader sample on the lens + rule
 
-- [ ] Task 1.3: Fresh-reader sample on the lens + rule
+- [x] Task 1.3: Fresh-reader sample on the lens + rule
 
 1. **Step 1:** Run one context-reset Sonnet reader against the new binary with the standing question, `--lens` unset; fold the four recall-journey measures with `--env reader=fresh-reader-4-sonnet --env contract=v11`.
 2. **Step 2:** Append `DELTA` to `.epr-meta/recall-reaches-authority.habit.md` with the numbers; `python3 .claude/scripts/habits-project.py`.
@@ -455,7 +455,7 @@ fn a_correction_candidate_renders_at_every_lens() {
 
 ### Task 2.1: `open --purpose bootstrap` renders the session's top red as a ProjectionRequest
 
-- [ ] Task 2.1: `open --purpose bootstrap` renders the session's top red as a ProjectionRequest
+- [x] Task 2.1: `open --purpose bootstrap` renders the session's top red as a ProjectionRequest
 
 **Files:**
 - Modify: `…/recall/journey.rs`, `…/recall/discovery.rs`, `…/recall/mod.rs`
@@ -483,7 +483,7 @@ fn bootstrap_purpose_carries_the_top_red_as_intent_and_declares_its_inputs() {
 
 ### Task 2.2: The headline and run-plane hooks become projections of `open`
 
-- [ ] Task 2.2: The headline and run-plane hooks become projections of `open`
+- [x] Task 2.2: The headline and run-plane hooks become projections of `open`
 
 **Files:**
 - Modify: `.claude/hooks/load-project-context.py` (`get_habits_status`, `get_memory_budget` → one call), `.claude/hooks/run-projection.py`
@@ -517,7 +517,7 @@ class BootstrapProjectionCase(unittest.TestCase):
 
 ### Task 2.4: Tiered capability gate — destructive git needs a declared tier or a team check
 
-- [ ] Task 2.4: Tiered capability gate — destructive git needs a declared tier or a team check
+- [x] Task 2.4: Tiered capability gate — destructive git needs a declared tier or a team check
 
 **Why (operator, 2026-09-11):** a Haiku subagent of another session ran `git reset --hard` on the shared
 `dev` checkout, dropping three commits from the branch pointer and wiping other lanes' uncommitted work.
@@ -575,7 +575,7 @@ same seam as the lens table: a declared capability table, evaluated at the edge,
 
 ### Task 2.3: Orchestrator bootstrap sample
 
-- [ ] Task 2.3: Orchestrator bootstrap sample
+- [x] Task 2.3: Orchestrator bootstrap sample
 
 - Start a fresh session (or a context-reset general-purpose agent) with only the SessionStart block, ask it to name the concern's habit, last delta and first action, and fold `recall-screens-to-shape@1` with `--env reader=<model>-bootstrap`. Append the DELTA; reproject; commit.
 
@@ -585,7 +585,7 @@ same seam as the lens table: a declared capability table, evaluated at the edge,
 
 ### Task 3.1: The question bank as Intents
 
-- [ ] Task 3.1: The question bank as Intents
+- [x] Task 3.1: The question bank as Intents
 
 **Files:**
 - Create: `.epr-meta/elohim/algorithms/recall-questions.json`
@@ -611,7 +611,7 @@ fn the_question_bank_loads_as_intents_in_scope_of_the_recipe() {
 
 ### Task 3.2: `sample` and `judge` verbs
 
-- [ ] Task 3.2: `sample` and `judge` verbs
+- [x] Task 3.2: `sample` and `judge` verbs
 
 **Files:**
 - Modify: `…/recall/mod.rs` (operations), create `…/recall/sample.rs`
@@ -657,7 +657,7 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
 
 ### Task 3.3: Rolling window bound and the habit check
 
-- [ ] Task 3.3: Rolling window bound and the habit check
+- [x] Task 3.3: Rolling window bound and the habit check
 
 **Files:**
 - Modify: `.claude/epr-meta/measures.yaml` (lens `recall-journey-window-ceiling@1`: `derive: rate-over-window`, `consumes: [recall-mistaken-assertions@1, recall-unmetered-bytes@1]`, `window_days: 91`, `hard: 0.2` — fraction of journeys in the window with any mistaken assertion or unmetered bytes)
@@ -670,7 +670,7 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
 
 ### Task 3.4: The weekly routine and the reader tiers
 
-- [ ] Task 3.4: The weekly routine and the reader tiers
+- [x] Task 3.4: The weekly routine and the reader tiers
 
 **Files:**
 - Create: `.claude/workflows/recall-standing-reader.js` (Workflow script: for each reader tier the actor sidecar has seen in 30 days × each question: `agent(prompt=<context-reset reader brief>, model=tier)`, then one `judge` per sample by a seat of a different tier; folds land via the verbs)
@@ -683,7 +683,7 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
 
 ### Task 3.5: Close station 3
 
-- [ ] Task 3.5: Close station 3
+- [x] Task 3.5: Close station 3
 
 - Append DELTA to the habit with the first window's reading; reproject; `just gate memory-ceremony` EXIT=0; commit `habit(recall-reaches-authority): standing reader live; window reading recorded`.
 
