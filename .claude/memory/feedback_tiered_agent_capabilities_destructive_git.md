@@ -22,3 +22,12 @@ to run destructive git; when YOU are the controller, do destructive git yourself
 tree's other lanes. Worktrees per plan (`.claude/worktrees/<plan>`) are the structural half of this
 discipline — a hard reset in a worktree cannot wipe another lane. Related:
 [[feedback_push_branch_discipline]], [[feedback_agent_fleet_and_harness]], [[project_recall_reaches_authority_habit]].
+
+**Traps met on 2026-09-12 (first live day):** (1) the gate's deny-on-ambiguity path fires at EVERY
+tier, fable included, on an "indirect invocation" — `env -C`, `$(…)`, `<(…)` — whose text carries a
+destructive-looking token (`rm`, a filename containing `git`, a bare `-f`); the remedy it prints is
+right: split the compound into plain commands, never widen the gate. (2) A pointer-only fast-forward
+of the shared checkout (`git update-ref` with the old value as the compare-and-swap guard, then
+`git checkout HEAD -- <files>` to refresh) aborts wholesale when the branch DELETED a file — split the
+diff list into files present in the new HEAD (checkout) and files gone (`git rm --cached` + a plain
+`rm`), then re-diff the tracked WIP line-for-line before and after.
