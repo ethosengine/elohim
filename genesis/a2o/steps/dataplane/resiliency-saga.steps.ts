@@ -600,14 +600,20 @@ Then(
 // 3. Raw-body query pair (chapter 4)
 // ---------------------------------------------------------------------------
 
-interface RawCapture {
+/**
+ * Exported so a DIFFERENT chapter's own "When" step (apex-transition.steps.ts's
+ * sibling-visit resolution) can record what it actually observed into the SAME
+ * world slot this chapter's "the raw response status/body" Then steps read —
+ * one capture store per world, not a private copy per file.
+ */
+export interface RawCapture {
   status: number;
   text: string;
   url: string;
   /** Ride annotation (empty when no shed was ridden) — see describeCatchUpRide. */
   ride: string;
 }
-const rawCapture = new WeakMap<E2EWorld, RawCapture>();
+export const rawCapture = new WeakMap<E2EWorld, RawCapture>();
 
 /**
  * Hit a surface path on the named peer and store the raw HTTP status + body

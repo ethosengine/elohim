@@ -65,6 +65,12 @@ import {
 } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
+// The saga's own raw-response world slot — its "the raw response status/body"
+// Then steps read from here. This chapter's sibling-visit step below records
+// its real observation into the SAME slot so those steps see it, rather than
+// each chapter keeping a private, unsynchronized capture store.
+import { rawCapture } from './resiliency-saga.steps.js';
+
 /**
  * The household's membership authority, already proven complete (public name,
  * document path and the owner slug per doorway) by `requireMembershipAuthority`.
@@ -639,6 +645,16 @@ Then(
       `the sibling (${visit.origin}) served a page with no app-root mount`
     );
     state.observedOrigin = visit.origin;
+    // Record the REAL sibling response into the saga's shared world slot so
+    // the scenario's following "raw response status/body" steps
+    // (resiliency-saga.steps.ts) assert on what this visit actually observed,
+    // not on an empty, never-populated capture.
+    rawCapture.set(this, {
+      status: visit.status,
+      text: visit.text,
+      url: `${visit.origin}/`,
+      ride: '',
+    });
   }
 );
 
