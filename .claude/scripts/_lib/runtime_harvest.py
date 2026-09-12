@@ -15,6 +15,7 @@ LAG_POLLS = 3           # projector caughtUp=false / lag rising across >= N poll
 LAG_SECONDS = 30        # projector lagSeconds threshold (seconds)
 DEGEN_RATE = 0.25       # render degenerateRate sustained threshold
 DEGEN_POLLS = 3         # ... across >= N consecutive polls
+DEGEN_MIN_EVENTS = 3    # ... and >= N NEW degenerate renders (a rate needs a base)
 WINDOW = 8              # ring-buffer length per node (>= max predicate window)
 CLASS = "self-heal-exhaustion"
 
@@ -84,7 +85,9 @@ def _render_degenerate(node, samples):
     elevate-arm plan D2) and what the sibling `_admission_shed` already does to
     the equally-cumulative `shedTotal`. The delta baseline spans the whole stored
     ring buffer (WINDOW) so low-volume saturation is still visible, but at least
-    DEGEN_POLLS observations are required before the predicate may fire."""
+    DEGEN_POLLS observations AND DEGEN_MIN_EVENTS new degenerate renders are
+    required before the predicate may fire — a ratio over a 4-render base is noise,
+    not a condition (see the floor rationale inline below)."""
     win = samples[-WINDOW:]
     if len(win) < DEGEN_POLLS:
         return None
@@ -97,15 +100,36 @@ def _render_degenerate(node, samples):
     # Either delta < 0: the counters reset (pod restart); the window refills.
     if d_total <= 0 or d_degen < 0:
         return None
+    # A RATE NEEDS A BASE. DEGEN_RATE is 0.25, so on a 4-render delta a SINGLE slow
+    # fetch crossing the soft budget scores exactly at threshold — and on a 1-render
+    # delta it scores 1.00. One stall is not saturation: it is the fetch budget doing
+    # its job once. Measured 2026-09-12 on alpha (fp da8bb3bdd7e1): five byte-identical
+    # samples at total=9/stalled=0 then one at total=13/stalled=1 filed "1/4 of NEW
+    # renders = 0.25", while alpha-b — the node with 4x the stall history and 5x the
+    # avgWallMs — was correctly silent. The delta cured the lifetime-ratio defect but
+    # left the predicate with no floor under its denominator.
+    #
+    # So require DEGEN_MIN_EVENTS NEW degenerate renders as well as the rate. Three is
+    # the same "3 observations before we believe it" discipline OPEN_POLLS / SHED_POLLS
+    # / LAG_POLLS already carry, applied to events instead of polls. Deliberately NOT a
+    # floor on d_total: 3-of-3 degenerate on a quiet node IS saturation, and a volume
+    # floor would blind the predicate to exactly the low-traffic peer that needs it.
+    if d_degen < DEGEN_MIN_EVENTS:
+        return None
     rate = d_degen / d_total
     if rate < DEGEN_RATE:
         return None
+    # Count the polls that actually SAW new renders. `len(cums)` is the stored window,
+    # which on a mostly-idle node is 5 parts staleness to 1 part evidence — reporting it
+    # as "across last 6 polls" overstated the base in the very finding that exposed this.
+    moving = sum(1 for a, b in zip(cums, cums[1:]) if b[0] > a[0])
     return {
         "node": node,
         "class": CLASS,
         "provenance": "render-degenerate",
         "line": f"render degenerate {int(round(d_degen))}/{int(d_total)} of NEW renders "
-                f"= {rate:.2f} across last {len(cums)} polls (SSR stalled/timedOut saturation)",
+                f"= {rate:.2f} over {moving} of the last {len(cums)} polls "
+                f"(SSR stalled/timedOut saturation)",
     }
 
 

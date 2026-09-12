@@ -94,6 +94,47 @@ cool = _win("alpha", [_render(100, 1), _render(140, 1), _render(180, 1)])
 check("render-degenerate silent when healthy",
       not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(cool)))
 
+# ── DEGEN_MIN_EVENTS floor (fp da8bb3bdd7e1, alpha, 2026-09-12) ──
+# The delta cured the lifetime-ratio defect but left no floor under the DENOMINATOR.
+# The real stored window: five byte-identical samples at total=9/stalled=0, then one at
+# total=13/stalled=1 -> d_degen 1 / d_total 4 = 0.25, exactly at threshold. One slow fetch
+# crossing the soft budget is the budget working, not SSR saturation.
+alpha_1of4 = _win("alpha", [_render(9, 0)] * 5 + [_render(13, 1)])
+check("render-degenerate silent on ONE degenerate render in the window (da8bb3bdd7e1)",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(alpha_1of4)))
+
+# ... and the same shape is silent however extreme the rate, while under the event floor:
+# 1-of-1 scores 1.00 and must still say nothing.
+one_of_one = _win("alpha", [_render(9, 0)] * 5 + [_render(10, 1)])
+check("render-degenerate silent at rate 1.00 when only one render is new",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(one_of_one)))
+
+# 2 events is still under the floor even at a brutal rate
+two_events = _win("alpha", [_render(9, 0)] * 5 + [_render(12, 2)])
+check("render-degenerate silent at two degenerate renders (under DEGEN_MIN_EVENTS)",
+      not any(f["provenance"] == "render-degenerate" for f in rh.evaluate(two_events)))
+
+# the floor is on EVENTS, not volume: 3-of-3 on a quiet peer IS saturation and must fire
+quiet_saturated = _win("alpha-b", [_render(9, 0)] * 5 + [_render(12, 3)])
+check("render-degenerate fires at 3-of-3 on a low-traffic node (event floor, not volume floor)",
+      any(f["provenance"] == "render-degenerate" for f in rh.evaluate(quiet_saturated)))
+
+# the emitted line reports polls that SAW new renders, not the stored window length
+sat = _win("alpha", [_render(100, 10), _render(104, 12), _render(112, 18)])
+sat_f = [f for f in rh.evaluate(sat) if f["provenance"] == "render-degenerate"]
+check("render-degenerate line reports the moving polls, not the window length",
+      len(sat_f) == 1 and "over 2 of the last 3 polls" in sat_f[0]["line"])
+
+# a mostly-idle window must not claim a 6-poll base for evidence from one transition
+stale_base = _win("alpha", [_render(100, 10)] * 5 + [_render(112, 18)])
+stale_f = [f for f in rh.evaluate(stale_base) if f["provenance"] == "render-degenerate"]
+check("render-degenerate does not overstate the base on a mostly-idle window",
+      len(stale_f) == 1 and "over 1 of the last 6 polls" in stale_f[0]["line"])
+
+# the floor must not re-key the fingerprint: provenance is unchanged
+check("render-degenerate provenance stable across the event-floor change",
+      stale_f[0]["provenance"] == "render-degenerate")
+
 # counter RESET (pod restart mid-window) -> negative delta, no finding
 reset = _win("alpha", [_render(900, 300), _render(2, 1), _render(4, 2)])
 check("render-degenerate silent across a counter reset (pod restart)",

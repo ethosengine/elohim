@@ -265,3 +265,40 @@ wrong is that a SETTLED row keeps a stale death certificate, not that death is c
    ledger line by disappearance — the closure evidence, not an assertion in this file.
 
 Not verified as of 2026-09-11: the condition is live and unchanged (`stuckSweeps: 168`).
+
+### Recurrence after a restart, 2026-09-12 — the wedge is durable, and now failing
+
+`2b4761b2eaf6` re-filed as a NEW ledger line (`first_poll: 77`, `status` back to `open`)
+because the poller's closure-by-disappearance worked exactly as designed across a pod
+restart. Re-fetched live, `GET https://elohim.host/p2p/status .provideLoop`:
+
+```json
+{"active": true, "reanchorPending": 11, "reanchorCompleted": 27, "reanchorFailed": 6,
+ "reanchorCaughtUp": false, "reanchorDeadRemaining": 9, "stuckSweeps": 3,
+ "deadRemainingStuck": true, "reanchorSkippedReach": 0, "reanchorSkippedContentType": 0}
+```
+
+Three things changed, and each sharpens the record above:
+
+1. **`stuckSweeps` 168 → 3, `reanchorCompleted` 1512 → 27.** The counters reset: adam
+   restarted. Per the 2026-08-22 stuck-vs-draining design, the run counter resets and the
+   node must **re-earn** the verdict over 3 sweeps — and it did, immediately. A restart is
+   the broadest self-heal the node has, and it did not clear this. The wedge survives
+   process lifetime, which is what a stale `dht_anchor_state='dead'` row in diesel would
+   predict and a transient in-memory condition would not.
+
+2. **`reanchorDeadRemaining` is still exactly 9.** Same nine rows, across a restart.
+
+3. **`reanchorFailed` 0 → 6, `reanchorPending` 9 → 11.** New, and it does NOT fit the
+   settled-not-skipped account alone: the 2026-09-11 triage recorded `reanchorFailed: 0`
+   and `reanchorCompleted = 168 x 9` exactly, i.e. all nine rows counted settled every
+   sweep with nothing erroring. Post-restart there are 2 additional pending rows and 6
+   failures. Whether the failures are the 2 new rows retrying or the 9 old ones changing
+   arm is **not distinguishable on the published surface** — which is the same
+   observability gap F1 already proposes to close (per-arm `adopted`/`held` counts on
+   `.provideLoop`). Noting it as evidence F1 is now load-bearing for diagnosis, not just
+   for confirmation.
+
+Still **blocked** on the same grounds: the fix path touches `elohim/elohim-storage/src`,
+held as in-flight WIP by another lane, and runtime proof needs an operator-owned edge roll.
+Ledger line restored to `status: blocked` with the pointer to this file.

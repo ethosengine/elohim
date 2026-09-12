@@ -3,18 +3,19 @@ id: "backlog-self-heal-render-degenerate-cumulative-counter-false-positive"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "render-degenerate exhaustion fired on an IDLE node: /admin/render-stats counters are lifetime-cumulative, so the poller read a since-boot ratio as a live condition and filed 'sustained >= 3 polls' over a window in which zero renders happened (FIXED — delta predicate)"
+title: "_render_degenerate has twice reported a non-condition as SSR saturation: first reading a lifetime-cumulative ratio as a live one (FIXED — delta), then scoring a delta with no floor under its denominator, so one slow fetch out of four renders read as exhaustion (FIXED — event floor)"
 slug: "self-heal-render-degenerate-cumulative-counter-false-positive"
 written: "2026-09-11"
+updated: "2026-09-12"
 author: "runtime-triage"
 status: "wip"
 priority: "medium"
 self_heal_status: in-progress
 severity: medium
-fingerprints: [afc100835f7c]
-nodes: [alpha-b]
+fingerprints: [afc100835f7c, da8bb3bdd7e1]
+nodes: [alpha-b, alpha]
 relatedNodeIds: []
-tags: [self-heal, render-degenerate, sensing-gap, cumulative-counter, elevate-arm, runtime-harvest, false-positive, closure-by-disappearance, adam]
+tags: [self-heal, render-degenerate, sensing-gap, cumulative-counter, rate-without-a-base, elevate-arm, runtime-harvest, false-positive, closure-by-disappearance, adam]
 cites:
   - https://elohim.host/admin/render-stats
   - https://elohim.host/admin/self-healing
@@ -199,3 +200,165 @@ predicate).
 - Closure: no poller closure needed — the line is gone. Regression signature to watch: a
   `render-degenerate` fingerprint re-filing on a node whose `total` is *not* advancing
   across the window would mean the delta read has regressed.
+
+---
+
+# Second firing, 2026-09-12 — fp `da8bb3bdd7e1` (node **alpha**): a rate with no base
+
+## What is exhausted
+
+Still nothing. The delta fix above works exactly as designed and this finding is its
+*correct* arithmetic — applied to a denominator of four.
+
+Ledger line (fp `da8bb3bdd7e1`, filed poll 78, `2026-09-12T00:55:44+00:00`):
+
+```
+render degenerate 1/4 of NEW renders = 0.25 across last 6 polls (SSR stalled/timedOut saturation)
+```
+
+The stored window (`.claude/data/runtime-cursor.json`, read at triage) shows precisely
+where that came from — **five identical samples and one transition**:
+
+```
+alpha 0..4  {'total':  9, 'stalled': 0, 'avgWallMs': 102, 'degenerateRate': 0.0}
+alpha 5     {'total': 13, 'stalled': 1, 'avgWallMs': 184, 'degenerateRate': 0.0769}
+```
+
+`d_total = 4`, `d_degen = 1`, `rate = 0.25` — equal to `DEGEN_RATE`, so it fired. **One
+stalled render.** Not a burst, not a trend: a single upstream fetch that crossed the soft
+budget once, in one inter-poll interval.
+
+Re-fetch at triage confirms the node is healthy, `GET https://doorway-alpha.elohim.host/admin/render-stats` (HTTP 200):
+
+```json
+{"total": 14, "rendered": 13, "renderedEmpty": 0, "stalled": 1, "timedOut": 0,
+ "errored": 0, "avgWallMs": 176, "maxWallMs": 1263, "degenerateRate": 0.0714}
+```
+
+`maxWallMs` 1263 against `DEFAULT_SOFT_BUDGET_MS = 1_200` — the single stall is 5% over
+budget, which is the budget doing its job (convert an unsettled fetch into a fast
+fallback), not a mechanism exhausting itself. `errored: 0`, and the upstream circuit on
+this node reads `"circuit": "closed", "errorStreak": 0` with `admission.shedTotal: 0`.
+
+**The tell is the comparison.** In the very same window, alpha-b — the node with 4 lifetime
+stalls, `avgWallMs` 896 and a `degenerateRate` of 0.29 — was **silent** (its new renders
+were clean: `total` 11→14, `stalled` 4→4). The predicate flagged the healthy node at
+176 ms and stayed quiet about the slow one at 896 ms. A sensing rule that inverts the
+ranking of the two nodes it watches is mis-calibrated, whatever its arithmetic.
+
+## Root-cause inventory (scope pass)
+
+1. **`.claude/scripts/_lib/runtime_harvest.py`, `_render_degenerate` — no floor under the
+   denominator.** The predicate gated on `rate >= DEGEN_RATE` and on `DEGEN_POLLS`
+   *observations*, but never on how many degenerate renders the rate is actually made of.
+   With `DEGEN_RATE = 0.25`, a 4-render delta fires on one event and a 1-render delta fires
+   at `rate = 1.00`. Treating a 1-of-4 sample as evidence of a rate is a base-rate error:
+   if the node's true degenerate rate were a benign 5%, a single stall would still appear
+   in ~19% of 4-render windows. The predicate was sampling noise.
+
+2. **`DEGEN_POLLS` was not buying what it appeared to buy.** It counts *stored samples*,
+   not polls in which anything rendered. The 2026-09-11 fix deliberately let the delta
+   baseline span the whole `WINDOW` "so low-volume saturation stays visible" — correct in
+   intent, but it means five stale samples plus one moving one satisfy a "3 consecutive
+   observations" test on the strength of **one** transition. The staleness the delta was
+   introduced to cure re-entered through the *sustained* half of the predicate.
+
+3. **The emitted line inherited that overstatement.** `across last {len(cums)} polls` read
+   "across last 6 polls" for evidence drawn from one poll-to-poll transition, on a
+   human-facing ledger line whose whole job is to tell the next reader how much to believe.
+
+4. **Not a runtime defect, and not the sibling agent's.** `elohim/elohim-render`
+   (`stats.rs`, `traced_fetcher.rs`) and the doorway render registry behaved correctly
+   throughout: one fetch exceeded `DEFAULT_SOFT_BUDGET_MS` and was recorded as `Stalled`
+   with a fast fallback, which is the designed behaviour.
+
+## Not shared with the concurrent CI findings
+
+A `ci-failure-triage` agent is holding the alpha **503 hosted-registration** and
+**blob-forwarding** findings from this same window. **These do not share a root cause**,
+and this record deliberately does not claim theirs:
+
+- a 503 is a *fast* failure and would land in `errored`; alpha reports `errored: 0`, and
+  the one degenerate render is a `stalled` — a 1263 ms **slow** fetch, 5% over the soft
+  budget;
+- the upstream breaker that fronts the storage peer never left `closed` with
+  `errorStreak: 0` across the whole window, so the render path never saw the upstream fail;
+- and the finding under triage here is a *sensing* defect in the poller's own Python, which
+  no runtime condition could cause or cure.
+
+The honest statement is the negative one: nothing in the render evidence corroborates a
+shared upstream fault, so the two concerns stay separate.
+
+## Fix path
+
+Give the rate a base. Landed in `_render_degenerate`:
+
+- new constant **`DEGEN_MIN_EVENTS = 3`** — the predicate additionally requires at least 3
+  NEW degenerate renders across the window. Three is the same "3 observations before we
+  believe it" discipline `OPEN_POLLS` / `SHED_POLLS` / `LAG_POLLS` already carry, applied
+  to events rather than polls;
+- **deliberately NOT a floor on `d_total`.** A volume floor (e.g. `d_total >= 12`) would
+  blind the predicate to a genuinely saturated low-traffic peer — 3-of-3 degenerate *is*
+  exhaustion — and low-traffic peers are exactly the population this poller exists to
+  watch. The floor belongs on the numerator;
+- the emitted line now reports `over {moving} of the last {N} polls`, where `moving`
+  counts the poll transitions in which `total` actually advanced — so a mostly-idle window
+  can no longer overstate its own base.
+
+**No fingerprint churn**: `rh.fingerprint` keys on `node|class|provenance`
+(`runtime-harvest.py:305`); `line` is not an input, and `provenance` stays
+`render-degenerate`. Asserted in the suite.
+
+**The soft budget is still not widened**, for the reason the 2026-09-11 record gives: the
+budget is not the defect, and raising it trades a fast degenerate fallback for a slow one.
+
+## Current decision
+
+**FIXED at the sensing layer; ledger line deleted as a confirmed false positive.**
+
+Tests: `.claude/scripts/_lib/__tests__/runtime_harvest_test.py` — **51 assertions green**
+(was 44; +7, all seven derived from this window: the 1-of-4 regression at the exact
+threshold, a 1-of-1 at rate 1.00, a 2-event case under the floor, the 3-of-3 low-traffic
+case that must still FIRE, two `moving`-poll wording assertions, and a provenance-stability
+assertion). Sibling suites green and unaffected: `residual_channel_test.py` (59),
+`harvester_blind_test.py` (16), `findings_ledger_test.py` (17).
+
+Verified against the real stored window, not just fixtures:
+
+```
+alpha   -> []   # false positive, now silent
+alpha-b -> []   # correctly silent (its new renders are clean)
+```
+
+The line for `da8bb3bdd7e1` was **deleted** rather than left to age out — same rule and
+same justification as `afc100835f7c`: manual-delete-only-on-confirmed-removed, the
+condition never existed, and leaving it would suppress dispatch on a future *genuine*
+alpha render exhaustion for as long as it sat there. A real saturation re-files as NEW.
+
+## Verification
+
+- 2026-09-12 — `/admin/render-stats` re-fetched on both nodes (HTTP 200, both quoted
+  above); `/p2p/status` and the stored `upstreams`/`admission` samples read for the
+  breaker and shed cross-check.
+- Fixed predicate evaluated against that same on-disk window: both nodes `[]`.
+- Full harvester suite 51/51; three sibling suites green.
+- Regression signature to watch: a `render-degenerate` fingerprint whose line reports
+  fewer than 3 degenerate renders, or one whose `moving` count is 1, would mean the event
+  floor or the honest-base wording has regressed.
+
+## What this predicate has now cost, and the standing lesson
+
+Two false positives, zero true positives, on the only predicate in this file that derives a
+**ratio** rather than reading a state field. Both failures were the same shape at different
+depths: *the denominator was not what the reader assumed*. First it was lifetime when the
+reader assumed recent; then it was four when the reader assumed many.
+
+The standing rule for this file, now paid for twice: **a predicate that divides must state
+what its denominator is made of, and must refuse to fire until that denominator is made of
+enough.** `_circuit_open` and `_projector_lag` read state and have never misfired;
+`_admission_shed` takes a strict delta and has never misfired. The ratio predicate has
+misfired every time it has fired. If a third firing is also a false positive, the right
+move is not a third threshold — it is to replace the ratio with a state field the runtime
+publishes (a bounded rolling window in `elohim-render/src/stats.rs`, which that module
+already names as its intended refinement), and let the node decide when it is saturated
+instead of asking the poller to infer it from counters.
