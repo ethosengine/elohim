@@ -15,12 +15,14 @@ export const meta = {
 //   - one FlowEvent  (the sampled journey, folded by `sample`)
 //   - one Verdict    (the second seat's ruling, folded by `judge`, as a `verdict` note on the
 //                      recall contract)
-//   - FOUR folds — not five: `sample` folds recall-metered-bytes@1, recall-screens-to-shape@1
-//     and recall-unmetered-bytes@1 (three, read straight off sample.rs's own `note::observe`
-//     call sites); `judge` folds recall-mistaken-assertions@1 (one). 3 + 1 = 4 per pair,
-//     verified against sample.rs directly — the brief text's "five folds" does not match the
-//     landed code and is not reproduced here.
-// The dry run (one tier x one question, confirming 1 FlowEvent / 1 Verdict / 4 folds) is run by
+//   - FIVE folds: `sample` folds recall-metered-bytes@1, recall-screens-to-shape@1,
+//     recall-unmetered-bytes@1 and recall-not-reached@1 (four, read straight off sample.rs's own
+//     `note::observe` call sites); `judge` folds recall-mistaken-assertions@1 (one). 4 + 1 = 5
+//     per pair. It was FOUR until the 2026-09-12 station 3 fix round: a journey that never
+//     reached authority folded nothing the rolling-window bound consumes, so a measured MISS read
+//     as a clean journey. `recall-not-reached@1` is folded on EVERY journey — 1 on the miss path,
+//     0 on the located path — and `recall-journey-window-ceiling@1` now consumes it.
+// The dry run (one tier x one question, confirming 1 FlowEvent / 1 Verdict / 5 folds) is run by
 // the controller after this script is reported, not by this workflow.
 
 const EPR = process.env.EPR_BIN || 'epr'
@@ -181,8 +183,8 @@ return {
     outcome: results[i],
   })),
   note:
-    'One sample + one judge per (question, reader-tier) pair; 1 FlowEvent + 1 Verdict + 4 folds ' +
-    '(3 from sample, 1 from judge) per completed pair. Feeds the recall-journey-window-ceiling ' +
+    'One sample + one judge per (question, reader-tier) pair; 1 FlowEvent + 1 Verdict + 5 folds ' +
+    '(4 from sample, 1 from judge) per completed pair. Feeds the recall-journey-window-ceiling ' +
     'rolling-window bound this habit reads — it needs 3+ journeys in the window to report a rate ' +
     'rather than `skipped`.',
 }

@@ -185,9 +185,9 @@ fn question_bank_path_resolves_relative_to_the_repository_root() {
 // ── task 3.2: `sample` and `judge` — a journey as a FlowEvent, a second-seat Verdict ───────────────
 
 /// `sample` composes `open`/`read`/`finish` in-process, reaches authority on the fixture's located
-/// candidate, and folds `recall-metered-bytes@1`, `recall-screens-to-shape@1` and
-/// `recall-unmetered-bytes@1` — each exactly once — through the same registry-validated writer
-/// `flow note --measure` uses.
+/// candidate, and folds `recall-metered-bytes@1`, `recall-screens-to-shape@1`,
+/// `recall-unmetered-bytes@1` and `recall-not-reached@1` — each exactly once — through the same
+/// registry-validated writer `flow note --measure` uses.
 #[test]
 fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
     let dir = common::repo_with_bank();
@@ -205,7 +205,9 @@ fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
     assert_eq!(v["event"]["action"], "consume");
     assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 1);
     assert_eq!(v["reached"], true);
-    assert_eq!(v["folds"].as_array().unwrap().len(), 3);
+    // F3 (2026-09-12): FOUR sample folds, not three — `recall-not-reached@1` is folded on every
+    // journey so the rolling window reads a population, not only its failures.
+    assert_eq!(v["folds"].as_array().unwrap().len(), 4);
     // Fix round 1, C1: located == declared on this fixture, so the view names the match rather
     // than a divergence.
     assert_eq!(v["location"], "located tooling/skill.md (matches declared)");
@@ -235,12 +237,19 @@ fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
         .expect("recall-unmetered-bytes@1 folded");
     assert_eq!(unmetered["value"], 0.0);
     assert_eq!(unmetered["env"]["question"], "q-fixture");
+    // F3: the located path folds the miss middot at ZERO — a reached journey is a clean one.
+    let not_reached = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-not-reached@1")
+        .expect("recall-not-reached@1 folded");
+    assert_eq!(not_reached["value"], 0.0, "{not_reached:?}");
     // Fix round 1, F1 (controller ruling): every fold this journey writes names the journey's
     // own `FlowEvent` cid, so `rate-over-window` can group folds back into journeys instead of
     // counting each fold as its own population member.
     let event_cid = v["event"]["cid"].as_str().unwrap();
     assert_eq!(unmetered["env"]["journey"], event_cid);
     assert_eq!(screens["env"]["journey"], event_cid);
+    assert_eq!(not_reached["env"]["journey"], event_cid);
 }
 
 /// S1 (spec miss): `judge`'s argv carries no `--session` at all — the brief's own shape. It must
@@ -413,7 +422,7 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
     assert_eq!(mistaken["value"], 1.0);
     assert_eq!(mistaken["env"]["reader"], "agent:reader@claude-sonnet-5");
     // Fix round 1, F1: the mistaken-assertions fold names the SAME journey `sample` folded, so
-    // `rate-over-window` groups it with `sample`'s three folds as one journey rather than two.
+    // `rate-over-window` groups it with `sample`'s four folds as one journey rather than two.
     assert_eq!(mistaken["env"]["journey"], cid);
 }
 
@@ -445,6 +454,19 @@ fn a_sample_whose_terms_are_absent_writes_no_fulfillment() {
         .find(|r| r["measure"] == "recall-screens-to-shape@1")
         .expect("recall-screens-to-shape@1 folded");
     assert_eq!(screens["value"], 4.0, "{screens:?}");
+    // F3 (2026-09-12): the miss itself is folded — four sample folds, `recall-not-reached@1` = 1.
+    // Without it this journey folds nothing `recall-journey-window-ceiling@1` consumes and reads
+    // as a CLEAN journey in the rolling window.
+    assert_eq!(v["folds"].as_array().unwrap().len(), 4);
+    let not_reached = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-not-reached@1")
+        .expect("recall-not-reached@1 folded");
+    assert_eq!(not_reached["value"], 1.0, "{not_reached:?}");
+    assert_eq!(
+        not_reached["env"]["journey"],
+        v["event"]["cid"].as_str().unwrap()
+    );
 }
 
 /// Fix round 2, R1 (controller ruling): a question whose entry LOCATES NOTHING (no first-screen
@@ -452,7 +474,7 @@ fn a_sample_whose_terms_are_absent_writes_no_fulfillment() {
 /// `discovery::question_terms` drops every one and `open` renders the whole-scope ceremony door
 /// instead) is a MEASURED MISS, never a refusal. `sample` records it: no `read` (no receipt, and
 /// `finish` would refuse a focused journey with zero receipts — skipped, not forced), a `FlowEvent`
-/// with empty `fulfills`, and the standing reader's usual three folds.
+/// with empty `fulfills`, and the standing reader's usual four folds.
 #[test]
 fn sample_records_a_measured_miss_when_open_locates_no_candidate() {
     let dir = common::repo_with_bank();
@@ -475,7 +497,7 @@ fn sample_records_a_measured_miss_when_open_locates_no_candidate() {
     );
     assert_eq!(v["event"]["action"], "consume");
     assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 0);
-    assert_eq!(v["folds"].as_array().unwrap().len(), 3);
+    assert_eq!(v["folds"].as_array().unwrap().len(), 4);
 
     let folds = common::flows(dir.path());
     let screens = folds
@@ -504,6 +526,18 @@ fn sample_records_a_measured_miss_when_open_locates_no_candidate() {
         .find(|r| r["measure"] == "recall-unmetered-bytes@1")
         .expect("recall-unmetered-bytes@1 folded");
     assert_eq!(unmetered["value"], 0.0);
+    // F3 (2026-09-12): a journey that located nothing is the purest measured miss — it folds
+    // `recall-not-reached@1` = 1, which is the only fold in this journey's group that the
+    // rolling-window bound consumes as positive.
+    let not_reached = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-not-reached@1")
+        .expect("recall-not-reached@1 folded");
+    assert_eq!(not_reached["value"], 1.0, "{not_reached:?}");
+    assert_eq!(
+        not_reached["env"]["journey"],
+        v["event"]["cid"].as_str().unwrap()
+    );
 }
 
 /// `judge` accepts a measured-miss event exactly like any other sampled journey.

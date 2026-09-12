@@ -325,7 +325,7 @@ pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
 /// located source but names `reached_when.terms` that never appear in it, for the "terms absent
 /// from the excerpt" case.
 ///
-/// Also writes a minimal `.claude/epr-meta/measures.yaml` declaring the four `recall-journey`
+/// Also writes a minimal `.claude/epr-meta/measures.yaml` declaring the five `recall-journey`
 /// measures — a real repository fact in the live tree; a fixture standing in for it needs its
 /// own copy since `note::observe` reads it from disk, not from any live-repo assumption. `judge`'s
 /// verdict note lands on the fixture's own `recall::CONTRACT_REL` file (fix round 1, Q5 — the
@@ -349,6 +349,7 @@ pub fn repo_with_bank() -> TempDir {
          \x20 - id: recall-unmetered-bytes\n\x20   version: 1\n\x20   unit: bytes\n\
          \x20 - id: recall-mistaken-assertions\n\x20   version: 1\n\x20   unit: count\n\
          \x20 - id: recall-screens-to-shape\n\x20   version: 1\n\x20   unit: count\n\
+         \x20 - id: recall-not-reached\n\x20   version: 1\n\x20   unit: count\n\
          lenses: []\n",
     );
 

@@ -13,6 +13,15 @@
 //! here mints a record kind the fabric already has one for: a journey is a `FlowEvent`, a ruling is
 //! a `Verdict` carried by a `note --kind verdict`, and a measurement is an `Observation`.
 //!
+//! **The spec of record: FIVE folds per (question, reader-tier) pair.** `sample` folds FOUR —
+//! `recall-metered-bytes@1`, `recall-screens-to-shape@1`, `recall-unmetered-bytes@1` and (fix
+//! round 2026-09-12, F3) `recall-not-reached@1` — and `judge` folds one,
+//! `recall-mistaken-assertions@1`. 4 + 1 = 5. The `sample` four are written on EVERY journey,
+//! located or missed, so the rolling window reads a population rather than only its failures;
+//! before `recall-not-reached@1` existed a journey that never reached authority folded nothing
+//! the window bound consumes, and a quarter of pure misses rendered as a clean quarter.
+//! `.claude/workflows/recall-standing-reader.js` states the same count and must stay in step.
+//!
 //! **Why `judge` never takes the session lock [`Execution`] holds.** It rules on an
 //! ALREADY-RECORDED event; it neither opens nor advances a ceremony continuation, so `mod.rs`
 //! dispatches it BEFORE the `--session` requirement itself (the seat claims nothing — see the
@@ -330,6 +339,25 @@ pub(super) fn sample(
         &fold_actor,
         &measures_path,
     )?;
+    // Fix round (2026-09-12, F3 — controller ruling): a MEASURED MISS folded as a CLEAN journey.
+    // None of the three folds above makes a not-reached journey positive for
+    // `recall-journey-window-ceiling@1` — metered bytes are not consumed by it, unmetered bytes
+    // are 0 by construction here, and a miss is not a mistaken assertion — so a quarter of pure
+    // misses rendered as a clean quarter. This fold is the miss itself, written on EVERY journey
+    // (both paths) so the window reads a population, not just its failures: 1 when the event's
+    // `fulfills` is empty, 0 when it is not. Same `env` map, so it groups into the same journey.
+    let not_reached_fold = note::observe(
+        &args.root,
+        "observation",
+        "recall-not-reached@1",
+        note::REPO_SUBJECT,
+        if event.fulfills.is_empty() { 1.0 } else { 0.0 },
+        Some("count"),
+        &env,
+        None,
+        &fold_actor,
+        &measures_path,
+    )?;
 
     let mut view = json!({
         "operation": "sample",
@@ -375,6 +403,7 @@ pub(super) fn sample(
             metered_fold.record_cid,
             screens_fold.record_cid,
             unmetered_fold.record_cid,
+            not_reached_fold.record_cid,
         ],
         "usage": usage,
         "actions": [],

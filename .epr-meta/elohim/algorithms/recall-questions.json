@@ -111,7 +111,7 @@
       },
       "reached_when": {
         "path": ".claude/epr-meta/measures.yaml",
-        "assertion": "the four `recall-journey` family measures (recall-metered-bytes, recall-unmetered-bytes, recall-mistaken-assertions, recall-screens-to-shape) fold from `epr flow memory recall measure --phase close` (metered) and from the reader's own account via `epr flow note --kind observation --measure` (unmetered)",
+        "assertion": "the five `recall-journey` family measures (recall-metered-bytes, recall-unmetered-bytes, recall-mistaken-assertions, recall-screens-to-shape, recall-not-reached) fold from `epr flow memory recall measure --phase close` (metered) and from the reader's own account via `epr flow note --kind observation --measure` (unmetered)",
         "terms": ["recall-journey", "recall-metered-bytes", "recall-unmetered-bytes", "recall-mistaken-assertions", "recall-screens-to-shape"]
       },
       "scope": ".claude/epr-meta"

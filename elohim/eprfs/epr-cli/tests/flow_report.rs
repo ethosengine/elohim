@@ -2965,8 +2965,9 @@ fn the_derived_cleanup_slot_can_fail_when_it_drifts() {
 // `derive: rate-over-window` is a different shape than the reset-accumulations above: there is no
 // reset, and the population is every admissible fold whose `occurred_at` falls in the last
 // `window_days`, drawn from every measure the row `consumes:` (mirroring
-// `recall-journey-window-ceiling@1`'s two middot, `recall-mistaken-assertions@1` and
-// `recall-unmetered-bytes@1`). The observed value is the fraction of that windowed population
+// `recall-journey-window-ceiling@1`'s three middot, `recall-mistaken-assertions@1`,
+// `recall-unmetered-bytes@1` and `recall-not-reached@1`). The observed value is the fraction of
+// that windowed population
 // whose fold value is greater than zero — "how many of the last quarter's journeys were NOT
 // clean" — and `skipped` (never a zero) is the answer when fewer than three folds fall in the
 // window, since a rate over one or two journeys is noise wearing a percentage.
@@ -2987,6 +2988,11 @@ measures:
     unit: bytes
     default-authority: observation
     status: active
+  - id: recall-not-reached
+    version: 1
+    unit: count
+    default-authority: observation
+    status: active
 
 lenses:
   - id: recall-journey-window-ceiling
@@ -2997,6 +3003,7 @@ lenses:
     consumes:
       - recall-mistaken-assertions@1
       - recall-unmetered-bytes@1
+      - recall-not-reached@1
     window-days: 10
     context: recall-journey
     hard: 0.2
@@ -3200,6 +3207,85 @@ fn folds_sharing_a_journey_env_slot_count_as_one_journey() {
     );
     assert!(
         outcome.summary.contains("3 journeys (4 folds)"),
+        "{}",
+        outcome.summary
+    );
+}
+
+/// Station 3 fix round (2026-09-12, F3): a MEASURED MISS is not a clean journey.
+///
+/// A journey that never reached authority folds zero unmetered bytes and zero mistaken
+/// assertions — every middot the window read BEFORE `recall-not-reached@1` joined the consumed
+/// set — so a quarter of pure misses rendered as a clean quarter, which is the exact failure this
+/// bound exists to catch. Here journey-1 is positive ONLY through `recall-not-reached@1`, and
+/// that alone must make it count.
+#[test]
+fn a_journey_positive_only_through_not_reached_counts_as_not_clean() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    let mut journey_1 = BTreeMap::new();
+    journey_1.insert("journey".to_string(), "journey-1".to_string());
+    // The miss journey, exactly as `sample` folds it: bytes 0, mistaken 0, not-reached 1.
+    fold_env_at(
+        root,
+        &days_ago(1),
+        "recall-unmetered-bytes@1",
+        ".",
+        0.0,
+        &journey_1,
+    );
+    fold_env_at(
+        root,
+        &days_ago(1),
+        "recall-mistaken-assertions@1",
+        ".",
+        0.0,
+        &journey_1,
+    );
+    fold_env_at(
+        root,
+        &days_ago(1),
+        "recall-not-reached@1",
+        ".",
+        1.0,
+        &journey_1,
+    );
+    // Two clean journeys alongside it, so the window has a population to report a rate over.
+    for (n, days) in [("journey-2", 2_i64), ("journey-3", 3)] {
+        let mut env = BTreeMap::new();
+        env.insert("journey".to_string(), n.to_string());
+        fold_env_at(
+            root,
+            &days_ago(days),
+            "recall-unmetered-bytes@1",
+            ".",
+            0.0,
+            &env,
+        );
+        fold_env_at(
+            root,
+            &days_ago(days),
+            "recall-not-reached@1",
+            ".",
+            0.0,
+            &env,
+        );
+    }
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.observed,
+        Some(1.0 / 3.0),
+        "the miss is one NOT-clean journey of three — before F3 it read 0/3 = a clean quarter"
+    );
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Failed,
+        "0.33 is past the hard watermark 0.2 — a third of the window missed authority"
+    );
+    assert!(
+        outcome.summary.contains("1 of 3 journeys"),
         "{}",
         outcome.summary
     );
