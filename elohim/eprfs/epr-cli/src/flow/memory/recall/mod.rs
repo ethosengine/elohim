@@ -46,7 +46,10 @@ use eprfs_core::BlobCid;
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
-use super::super::{concerns, confine_under, context, context_sections, note, rel_to_root, walk};
+use super::super::{
+    concerns, confine_under, context, context_sections, head_commit_provenance, measures, note,
+    rel_to_root, walk,
+};
 use super::super::{FlowError, FlowResult};
 use super::footprint;
 
@@ -71,6 +74,8 @@ use providers::{process_result, providers_for};
 
 mod journey;
 use journey::execute;
+
+mod sample;
 
 mod lens;
 use lens::LensLevel;
@@ -127,7 +132,7 @@ const SECOND_LIMITS: [&str; 3] = ["scan_seconds", "provider_seconds", "native_ti
 /// this repository's source, however reachable its path happens to be.
 const FOREIGN_TREES: [&str; 1] = [".claude/worktrees"];
 
-const OPERATIONS: [&str; 16] = [
+const OPERATIONS: [&str; 18] = [
     "open",
     "select",
     "read",
@@ -144,6 +149,8 @@ const OPERATIONS: [&str; 16] = [
     "compare",
     "source",
     "measure",
+    "sample",
+    "judge",
 ];
 
 fn refused(message: impl Into<String>) -> FlowError {
@@ -830,6 +837,17 @@ pub struct Args {
     /// Whether `--root`/`--contract` were named, so linked next actions repeat only real overrides.
     pub root_explicit: bool,
     pub contract_explicit: bool,
+    /// `sample --reader agent:<role>@<model>` — the claimed identity whose journey is sampled.
+    pub reader: Option<String>,
+    /// `judge --event <cid>` — the sampled `FlowEvent`'s own record CID.
+    pub event: Option<String>,
+    /// `judge --as <seat>` — the second seat rendering the verdict; refused when it equals the
+    /// sampled event's own `provider` (a reader never judges its own journey).
+    pub seat: Option<String>,
+    /// `judge --mistaken <n>` — the count of assertions the seat found wrong.
+    pub mistaken: Option<i64>,
+    /// `judge --reason <text>` — the seat's one-line justification, carried as the witness summary.
+    pub reason: Option<String>,
 }
 
 impl Args {
@@ -874,6 +892,11 @@ impl Args {
             tags: Vec::new(),
             root_explicit: false,
             contract_explicit: false,
+            reader: None,
+            event: None,
+            seat: None,
+            mistaken: None,
+            reason: None,
         }
     }
 }
@@ -975,6 +998,10 @@ mints the session's intent from the register's own top red habit\n\
          \x20      --lens <level> widens/narrows the READER lens (minimal|simple|standard|detail|debug|trace); \
 resolved and printed on every view when omitted\n\
          \x20      --footprint-lens <path> names an EXTERNAL footprint-measurement lens script; native by default\n\
+         \x20      epr flow memory recall sample --question <id> --reader agent:<role>@<model> --session <id>; \
+runs the bank question's journey in-process (open, read, finish) and folds it as one FlowEvent\n\
+         \x20      epr flow memory recall judge --event <cid> --as <seat> --mistaken <n> --reason <text>; \
+a second seat's verdict over a sampled journey, refused when the seat is the journey's own reader\n\
          Receipts and continuations are PRIVATE session records under {RECALL_DIR_REL}/<session>/; \
          they are never imported, projected, witnessed or targeted by feedback.",
         OPERATIONS.join("|")
@@ -1091,6 +1118,17 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
             "--evidence" => args.evidence.push(value),
             "--measure-scope" => args.measure_scope.push(value),
             "--actor-session" => args.actor_session = Some(value),
+            "--reader" => args.reader = Some(value),
+            "--event" => args.event = Some(value),
+            "--as" => args.seat = Some(value),
+            "--mistaken" => {
+                args.mistaken = Some(
+                    value
+                        .parse()
+                        .map_err(|_| refused("--mistaken needs a nonnegative count"))?,
+                )
+            }
+            "--reason" => args.reason = Some(value),
             "--phase" => args.phase = value,
             "--classification" => args.classification = value,
             "--kind" => args.kind = value,
@@ -1134,6 +1172,9 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
         return Err(refused(
             "offsets must be nonnegative and limit between 1 and 100",
         ));
+    }
+    if args.mistaken.is_some_and(|n| n < 0) {
+        return Err(refused("--mistaken needs a nonnegative count"));
     }
     if !["baseline", "close"].contains(&args.phase.as_str()) {
         return Err(refused("--phase must be baseline|close"));
@@ -1249,6 +1290,12 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
         );
     }
 
+    // `judge` rules on an already-recorded `FlowEvent`; it neither opens nor advances a ceremony
+    // continuation, so it never takes the session lock the rest of this function exists to hold.
+    if args.operation == "judge" {
+        return sample::judge(&args, &contract);
+    }
+
     let session_limit = contract
         .value
         .pointer("/limits/session_bytes")
@@ -1284,7 +1331,14 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
     };
 
     let began = Instant::now();
-    let result = execute(&args, &contract, &mut execution, &method);
+    // `sample` composes `open`/`read`/`finish` in-process over the SAME locked session, so it
+    // slots in exactly where a single `execute()` call would — the accounting, honesty floor and
+    // encoding below apply to its aggregate view precisely as they do to any other operation's.
+    let result = if args.operation == "sample" {
+        sample::sample(&args, &contract, &mut execution, &method)
+    } else {
+        execute(&args, &contract, &mut execution, &method)
+    };
     let (mut view, resolved_lens) = match result {
         Ok(pair) => pair,
         Err(error) => {
@@ -1420,6 +1474,7 @@ mod shape {
             "measure.rs",
             "receipts.rs",
             "questions.rs",
+            "sample.rs",
         ] {
             let text = std::fs::read_to_string(
                 concat!(env!("CARGO_MANIFEST_DIR"), "/src/flow/memory/recall/").to_string() + f,

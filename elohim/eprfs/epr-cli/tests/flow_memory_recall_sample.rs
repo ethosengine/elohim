@@ -181,3 +181,154 @@ fn question_bank_path_resolves_relative_to_the_repository_root() {
         "declared question_bank path does not exist under the repository root: {declared}"
     );
 }
+
+// ── task 3.2: `sample` and `judge` — a journey as a FlowEvent, a second-seat Verdict ───────────────
+
+/// `sample` composes `open`/`read`/`finish` in-process, reaches authority on the fixture's located
+/// candidate, and folds `recall-metered-bytes@1`, `recall-screens-to-shape@1` and
+/// `recall-unmetered-bytes@1` — each exactly once — through the same registry-validated writer
+/// `flow note --measure` uses.
+#[test]
+fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp",
+        &[
+            "sample",
+            "--question",
+            "q-fixture",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    assert_eq!(v["event"]["action"], "consume");
+    assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 1);
+    assert_eq!(v["reached"], true);
+    assert_eq!(v["folds"].as_array().unwrap().len(), 3);
+
+    let folds = common::flows(dir.path());
+    let metered = folds
+        .iter()
+        .filter(|r| r["measure"] == "recall-metered-bytes@1")
+        .count();
+    assert_eq!(metered, 1, "folds: {folds:?}");
+    assert_eq!(
+        folds
+            .iter()
+            .filter(|r| r["measure"] == "recall-screens-to-shape@1")
+            .count(),
+        1
+    );
+    let unmetered = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-unmetered-bytes@1")
+        .expect("recall-unmetered-bytes@1 folded");
+    assert_eq!(unmetered["value"], 0.0);
+    assert_eq!(unmetered["env"]["question"], "q-fixture");
+}
+
+/// A reader named as the second seat is refused outright — a journey is never its own judge.
+#[test]
+fn a_reader_cannot_judge_its_own_journey() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp2",
+        &[
+            "sample",
+            "--question",
+            "q-fixture",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    let cid = v["event"]["cid"].as_str().unwrap();
+    let r = common::run_in_bank(
+        dir.path(),
+        "smp2",
+        &[
+            "judge",
+            "--event",
+            cid,
+            "--as",
+            "agent:reader@claude-sonnet-5",
+            "--mistaken",
+            "0",
+            "--reason",
+            "self",
+        ],
+    );
+    assert_eq!(r.code, 2, "{}{}", r.stdout, r.stderr);
+    assert!(
+        r.stdout
+            .contains("refused: a reader never judges its own journey"),
+        "{}",
+        r.stdout
+    );
+}
+
+/// A genuine second seat's verdict folds `recall-mistaken-assertions@1` at the observed count and
+/// renders a `refuse` decision when any assertion was mistaken.
+#[test]
+fn a_second_seat_verdict_folds_mistaken_assertions() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp3",
+        &[
+            "sample",
+            "--question",
+            "q-fixture",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    let cid = v["event"]["cid"].as_str().unwrap();
+    let j = common::ok_in_bank(
+        dir.path(),
+        "smp3-seat",
+        &[
+            "judge",
+            "--event",
+            cid,
+            "--as",
+            "agent:seat@claude-opus-5",
+            "--mistaken",
+            "1",
+            "--reason",
+            "misread the stamp rule",
+        ],
+    );
+    assert_eq!(j["verdict"]["witness"]["checks"][0]["observed"], 1);
+    assert_eq!(j["verdict"]["decision"], "refuse");
+
+    let folds = common::flows(dir.path());
+    let mistaken = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-mistaken-assertions@1")
+        .expect("recall-mistaken-assertions@1 folded");
+    assert_eq!(mistaken["value"], 1.0);
+    assert_eq!(mistaken["env"]["reader"], "agent:reader@claude-sonnet-5");
+}
+
+/// A question whose `reached_when.terms` never appear in the located excerpt writes `fulfills: []`
+/// and `reached: false` — reaching authority is checked against the excerpt actually read, not
+/// assumed from a located candidate alone.
+#[test]
+fn a_sample_whose_terms_are_absent_writes_no_fulfillment() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp4",
+        &[
+            "sample",
+            "--question",
+            "q-fixture-miss",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    assert_eq!(v["reached"], false);
+    assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 0);
+}

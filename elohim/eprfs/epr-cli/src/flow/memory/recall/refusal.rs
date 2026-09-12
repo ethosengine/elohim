@@ -21,6 +21,8 @@ pub(super) fn accepted_flags(operation: &str) -> &'static str {
         "resume" | "context" => "--need --section --context-pin --evidence --evidence-offset",
         "adopt" => "--from-session --need",
         "history" | "compare" => "--limit --offset",
+        "sample" => "--question --reader --lens",
+        "judge" => "--event --as --mistaken --reason",
         _ => "--session --need --json --root --contract (see `recall --help`)",
     }
 }

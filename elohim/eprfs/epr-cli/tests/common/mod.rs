@@ -283,3 +283,181 @@ pub fn begin_focused(root: &Path, about: &str) {
         ],
     );
 }
+
+// ── station 3, task 3.2: `sample`/`judge` — a one-question bank fixture, CLI-driven ───────────────
+
+/// `run_in`, but for a fixture that pins its contract at the DEFAULT `recall::CONTRACT_REL`
+/// location (see [`repo_with_bank`]) rather than the flat `contract.json` every other fixture in
+/// this file uses — `--contract` is omitted so `Args::new()`'s own default resolves it, which is
+/// the only way `Contract::question_bank()` can climb back to a real repository root (its doc
+/// comment on this).
+#[allow(dead_code)]
+pub fn run_in_bank(root: &Path, session: &str, args: &[&str]) -> Run {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .args(["flow", "memory", "recall"])
+        .args(args)
+        .args(["--root", &root.to_string_lossy()])
+        .args(["--session", session, "--json"]);
+    let out = command.output().expect("epr runs");
+    Run {
+        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
+        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
+        code: out.status.code().unwrap_or(-1),
+    }
+}
+
+/// [`run_in_bank`], asserting success and returning the parsed `--json` payload.
+#[allow(dead_code)]
+pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
+    let run = run_in_bank(root, session, args);
+    assert_eq!(
+        run.code, 0,
+        "{args:?} refused: {}{}",
+        run.stdout, run.stderr
+    );
+    run.json()
+}
+
+/// A fixture repository whose recall contract declares a ONE-question `question_bank` — the
+/// question's `reached_when` names `tooling/skill.md`, a file this fixture also writes, inside
+/// the contract's own `source_roots`. A second question (`q-fixture-miss`) shares the same
+/// located source but names `reached_when.terms` that never appear in it, for the "terms absent
+/// from the excerpt" case.
+///
+/// Also writes a stub of the real plan doc `judge` notes onto (`PLAN_REL` in `sample.rs`) and a
+/// minimal `.claude/epr-meta/measures.yaml` declaring the four `recall-journey` measures — both
+/// are real repository facts in the live tree; a fixture standing in for it needs its own copies
+/// since `note`/`observe` read them from disk, not from any live-repo assumption.
+#[allow(dead_code)]
+pub fn repo_with_bank() -> TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+
+    write(
+        root,
+        "tooling/skill.md",
+        "---\ntitle: Stamping\n---\n# Stamping\nThe stamp rule and the remine cadence are recorded here for the ceremony.\n",
+    );
+    write(
+        root,
+        "genesis/docs/superpowers/plans/2026-09-11-governed-discovery-stations-0-3-plan.md",
+        "# Governed discovery stations 0-3\nFixture stub for task 3.2 tests.\n",
+    );
+    write(
+        root,
+        ".claude/epr-meta/measures.yaml",
+        "measures:\n\
+         \x20 - id: recall-metered-bytes\n\x20   version: 1\n\x20   unit: bytes\n\
+         \x20 - id: recall-unmetered-bytes\n\x20   version: 1\n\x20   unit: bytes\n\
+         \x20 - id: recall-mistaken-assertions\n\x20   version: 1\n\x20   unit: count\n\
+         \x20 - id: recall-screens-to-shape\n\x20   version: 1\n\x20   unit: count\n\
+         lenses: []\n",
+    );
+
+    let mut value = contract_value(false);
+    value["source_roots"] = json!(["tooling"]);
+    value["ceremony"]["defaults"]["scope"] = json!("tooling");
+    value["question_bank"] = json!(".epr-meta/elohim/algorithms/recall-questions.json");
+    write(
+        root,
+        recall::CONTRACT_REL,
+        &serde_json::to_string(&value).expect("encode"),
+    );
+    let contract =
+        recall::Contract::load(&root.join(recall::CONTRACT_REL)).expect("fixture contract loads");
+    let recipe_cid = contract.method_cid();
+
+    let bank = json!({
+        "version": 1,
+        "recipe": recipe_cid,
+        "questions": [
+            {
+                "id": "q-fixture",
+                "intent": {
+                    "action": "consume",
+                    "resource_spec": {"classifiedAs": ["stamp rule remine cadence"]},
+                    "in_scope_of": recipe_cid,
+                    "raised_by": "agent:steward@repo"
+                },
+                "reached_when": {
+                    "path": "tooling/skill.md",
+                    "assertion": "the stamp rule and the remine cadence are recorded here",
+                    "terms": ["stamp", "remine", "cadence"]
+                },
+                "scope": "tooling"
+            },
+            {
+                "id": "q-fixture-miss",
+                "intent": {
+                    "action": "consume",
+                    "resource_spec": {"classifiedAs": ["stamp rule remine cadence"]},
+                    "in_scope_of": recipe_cid,
+                    "raised_by": "agent:steward@repo"
+                },
+                "reached_when": {
+                    "path": "tooling/skill.md",
+                    "assertion": "a sentence this fixture never writes",
+                    "terms": ["unicorn", "dragon", "phoenix"]
+                },
+                "scope": "tooling"
+            }
+        ]
+    });
+    write(
+        root,
+        ".epr-meta/elohim/algorithms/recall-questions.json",
+        &serde_json::to_string(&bank).expect("encode"),
+    );
+
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "fixture"]);
+    dir
+}
+
+/// Every structured `run:observation` fold recorded in the flows sidecar, projected to the small
+/// JSON shape `flow_memory_recall_sample.rs`'s assertions read (`measure`, `value`, `unit`, `env`)
+/// — a minimal, test-local re-derivation of `flow::report::read_folds`'s slot-prefix convention,
+/// since that reader is `pub(super)` to the library crate and this is a separate test binary.
+#[allow(dead_code)]
+pub fn flows(root: &Path) -> Vec<Value> {
+    let records = SidecarFlowStore::open(root)
+        .expect("flows sidecar opens")
+        .records()
+        .expect("flows sidecar reads");
+    let mut out = Vec::new();
+    for (cid, record) in records {
+        let FlowRecord::Event(event) = record else {
+            continue;
+        };
+        if event.classified_as.first().map(String::as_str) != Some("run:observation") {
+            continue;
+        }
+        let mut env = serde_json::Map::new();
+        let mut row = serde_json::Map::new();
+        row.insert("cid".to_string(), json!(cid.to_string()));
+        for slot in event.classified_as.iter().skip(2) {
+            if let Some(raw) = slot.strip_prefix("measure:") {
+                row.insert("measure".to_string(), json!(raw));
+            } else if let Some(raw) = slot.strip_prefix("value:") {
+                row.insert(
+                    "value".to_string(),
+                    json!(raw.parse::<f64>().unwrap_or(0.0)),
+                );
+            } else if let Some(raw) = slot.strip_prefix("unit:") {
+                row.insert("unit".to_string(), json!(raw));
+            } else if let Some(raw) = slot.strip_prefix("env:") {
+                if let Some((key, value)) = raw.split_once('=') {
+                    env.insert(key.to_string(), json!(value));
+                }
+            }
+        }
+        if !row.contains_key("measure") {
+            continue;
+        }
+        row.insert("env".to_string(), Value::Object(env));
+        out.push(Value::Object(row));
+    }
+    out
+}
