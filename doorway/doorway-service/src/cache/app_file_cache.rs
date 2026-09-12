@@ -404,6 +404,26 @@ impl AppFileCacheService {
         None
     }
 
+    /// Reverse the slug index: which app slug currently declares `blob_hash` as
+    /// its head?
+    ///
+    /// The serving-eligibility fold needs this because a content-addressed read
+    /// (`/blob/{hash}`, `/apps/{sha256-…}/…`) names no slug and no mount, so
+    /// without it there is no way to ask which EPR's reach governs the bytes.
+    /// Index-only by construction — never a Mongo scan — so an unknown hash is
+    /// an immediate `None` and the caller passes it through unchanged rather
+    /// than paying a read to learn nothing.
+    pub async fn slug_for_head(&self, blob_hash: &str) -> Option<String> {
+        if blob_hash.is_empty() {
+            return None;
+        }
+        let index = self.slug_index.read().await;
+        index
+            .iter()
+            .find(|(_, hash)| hash.as_str() == blob_hash)
+            .map(|(slug, _)| slug.clone())
+    }
+
     /// Declare `blob_hash` as this doorway's head for `slug` in the in-memory
     /// index — the fast path `resolve_blob_hash` reads first.
     ///

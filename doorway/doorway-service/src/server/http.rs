@@ -31,8 +31,8 @@ use crate::render::warm_shell::ShellProvenance;
 use crate::routes;
 use crate::server::websocket;
 use crate::services::{
-    spawn_health_probe_task, CustodianService, CustodianServiceConfig, RouteRegistry,
-    VerificationService, VerifyBlobRequest,
+    spawn_health_probe_task, standing_from_request, CustodianService, CustodianServiceConfig,
+    RequesterStanding, RouteRegistry, VerificationService, VerifyBlobRequest,
 };
 use crate::signal::{self, SignalStore, DEFAULT_MAX_CLIENTS};
 use crate::signing::{SigningConfig, SigningService};
@@ -1433,7 +1433,13 @@ fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
     .to_json()
 }
 
-fn resolve_verified_claims_from_request<B>(
+/// The verified claims of THIS request, or `None` when no credential verified.
+///
+/// `pub(crate)` so the serving-eligibility fold
+/// (`crate::services::serve_eligibility`) reads standing through the SAME
+/// verification path the op-gate and the storage proxy use — one place decides
+/// what a credential proves, so a serve gate cannot drift from an auth gate.
+pub(crate) fn resolve_verified_claims_from_request<B>(
     state: &AppState,
     req: &Request<B>,
 ) -> Option<crate::auth::Claims> {
@@ -3257,6 +3263,78 @@ fn projected_shell_response(
     )
 }
 
+/// The first path segment after `prefix`, or `None` when there is none.
+///
+/// Used to pull the ADDRESS out of a content-addressed serve path
+/// (`/apps/{address}/…`, `/blob/{address}`) so the fold can ask which EPR's
+/// reach governs those bytes.
+fn addressed_segment<'a>(path: &'a str, prefix: &str) -> Option<&'a str> {
+    let rest = path.strip_prefix(prefix)?;
+    let seg = rest.split('/').next()?;
+    let seg = seg.split(['?', '#']).next().unwrap_or(seg);
+    (!seg.is_empty()).then_some(seg)
+}
+
+/// Re-ask the serving fold for a byte path addressed by an EPR ATOM (or by one
+/// of its heads) rather than by a mount path.
+///
+/// `/apps/{slug}/…` and `/blob/{hash}` are the two paths that reach warm bytes
+/// without ever consulting the EPR router: the app-file cache answers by
+/// `{slug}:{file}:{hash}` out of Mongo (which outlives the pod), and a blob read
+/// is pure content addressing. That is exactly the state the
+/// `served-under-standing` habit names — "a cached projection keeps answering
+/// anonymously after a narrowing until eviction". This closes it by resolving
+/// the address back to the CURRENT projection row and folding reach + standing
+/// before the bytes move.
+///
+/// Returns `Some(refusal)` when the fold refuses, and `None` when it serves —
+/// OR when the address maps to no projection this doorway holds a contract for.
+/// That second case is deliberate and is NOT a hole in the fold: an address
+/// with no contract row is not an EPR serve under a contract at all (a loose
+/// blob, an asset of something this doorway never mounted), so there is no
+/// reach declaration to enforce and no ledger record a refusal could point at.
+/// Refusing it would be the doorway inventing a policy of its own — the very
+/// thing this module exists to refuse — and would 403 every content-addressed
+/// read on the box. The honest gap is named in the habit's evidence ledger:
+/// a hash whose EPR this doorway does not mount is governed where it IS
+/// mounted, not here.
+async fn fold_for_addressed_serve<B>(
+    state: &AppState,
+    req: &Request<B>,
+    path: &str,
+    address: &str,
+) -> Option<Response<Full<Bytes>>> {
+    // 1. The address IS the atom id (the ordinary bundle case — the shell URL
+    //    `projected_shell_url` mints uses `projection.epr_id` verbatim).
+    let projection = match state.epr_router.projection_for_epr_id(address) {
+        Some(p) => Some(p),
+        // 2. The address is a declared HEAD of a mounted atom. The slug index
+        //    is in-memory, so an unknown hash costs a map walk, never a read.
+        None => match state.app_file_cache.as_ref() {
+            Some(cache) => match cache.slug_for_head(address).await {
+                Some(slug) => state.epr_router.projection_for_epr_id(&slug),
+                None => None,
+            },
+            None => None,
+        },
+    }?;
+
+    let standing = standing_from_request(state, req);
+    match crate::services::serve_eligibility::fold_for_projection(
+        state,
+        path,
+        &projection,
+        standing,
+    )
+    .await
+    {
+        crate::services::ServeEligibility::Serve => None,
+        crate::services::ServeEligibility::Refuse(refusal) => Some(
+            crate::services::serve_eligibility::refusal_response(&refusal),
+        ),
+    }
+}
+
 /// Dispatch a request to a projected EPR (B13).
 ///
 /// MVP scope (§8.1 + §8.2):
@@ -3282,28 +3360,33 @@ async fn dispatch_to_projected_epr(
     projection: elohim_views::projection::EprProjectionView,
     chrome_context_json: &str,
     wants_html: bool,
+    standing: RequesterStanding,
 ) -> Response<Full<Bytes>> {
     use elohim_views::projection::ProjectionMode;
 
-    // Reach gate — MVP: only anon-readable reaches (commons|public, the
-    // substrate's anon rule) are served. Gated projections deferred (§8.2).
-    if !anon_reach_readable(&projection.reach) {
-        let body = serde_json::json!({
-            "error": "reach-gated",
-            "message": "This content requires authorization. Gated EPR serving is not yet implemented."
-            // TODO(#6-2 gate-face / spec §5.1 "never a wall"): this MOUNT-arm 401 contradicts
-            // the resolver-owns-the-gate invariant — gated mounts should fall to the shell
-            // boundary (head-edge + inclusive path), not a hard 401. Tracked: gap #6-2 of
-            // epr-route-claims-link-conformance-design + epr-routing-complementary-captures.md.
-            // (Was: TODO(B-later) consult gate_hints + req auth for gated projections.)
-        });
-        return Response::builder()
-            .status(StatusCode::UNAUTHORIZED)
-            .header("content-type", "application/json")
-            .body(Full::new(Bytes::from(
-                serde_json::to_vec(&body).unwrap_or_else(|_| b"{}".to_vec()),
-            )))
-            .expect("infallible 401 response");
+    // ── THE FOLD, re-asked NOW ───────────────────────────────────────────────
+    // Reach + standing, resolved against the projection row the router holds at
+    // THIS moment — never a value cached beside the bytes. Everything below
+    // this point is a byte path (the warm shell, the bundle proxy), and every
+    // one of them used to answer from bytes alone: a collective's ruling that
+    // narrowed an EPR's reach could not reach a visitor standing in front of a
+    // doorway with a warm copy. It reaches them here, on the next reconcile,
+    // with no restart and no eviction — cache is bytes, never permission.
+    //
+    // This supersedes the old anon-only gate, which 401'd every non-commons
+    // reach regardless of who was asking (so a member the narrowed reach still
+    // named was refused alongside the stranger) and named no term, no record
+    // and no redress.
+    if let crate::services::ServeEligibility::Refuse(refusal) =
+        crate::services::serve_eligibility::fold_for_projection(
+            state,
+            request_path,
+            &projection,
+            standing,
+        )
+        .await
+    {
+        return crate::services::serve_eligibility::refusal_response(&refusal);
     }
 
     // Mode gate — MVP: only Cached is implemented. StewardDirect deferred (§8.2).
@@ -3821,6 +3904,264 @@ mod epr_dispatch_breaker_tests {
             .await;
     }
 
+    // ── the serving fold, on the byte paths ─────────────────────────────────
+
+    /// THE NAMED GAP, closed and pinned. The holder has the shell warm and can
+    /// answer without asking anyone anything — the exact state in which a
+    /// narrowing used to go unnoticed, because nothing in the byte path ever
+    /// asked again.
+    ///
+    /// Two serves, ONE process, ONE warm archive. Between them nothing happens
+    /// except the router's reconcile replacing the projection row with a
+    /// narrowed reach — no restart, no eviction, no cache invalidation. The
+    /// second serve must refuse the same anonymous visitor the first one
+    /// served, and the bytes must STILL be held afterwards: curing this by
+    /// forgetting would refuse identically and would prove the opposite of what
+    /// this asserts. Cache is bytes, never permission.
+    #[tokio::test]
+    async fn a_narrowed_reach_stops_the_warm_copy_answering_with_no_restart_and_no_eviction() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let storage = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-warm/index.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html")
+                    .set_body_string("<app-root></app-root>"),
+            )
+            .mount(&storage)
+            .await;
+
+        let archive = Arc::new(AssetBindingArchive {
+            declared: Some("head-warm".into()),
+            latest: Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: "head-warm".into(),
+                content_type: "text/html".into(),
+                bytes: b"<app-root></app-root>".to_vec(),
+                head_bound: true,
+            }),
+        });
+        let state = asset_binding_state(&storage.uri(), archive);
+        hydrate_asset_binding_shell(&state).await;
+
+        // The collective's EPR is at commons reach, and this doorway holds the
+        // contract. The visitor has shown nothing.
+        state.epr_router.replace_all(vec![shell_projection(true)]);
+        let before = dispatch_to_projected_epr(
+            &state,
+            "/",
+            state.epr_router.dispatch("/").expect("mounted at /"),
+            "{}",
+            true,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(
+            before.status(),
+            StatusCode::OK,
+            "an anonymous visitor can read it today"
+        );
+
+        // The collective rules. The ONLY thing that changes is the row the next
+        // reconcile installs — the warm archive is untouched, the process is
+        // the same process.
+        let mut narrowed = shell_projection(true);
+        narrowed.reach = "local".into();
+        state.epr_router.replace_all(vec![narrowed]);
+
+        let after = dispatch_to_projected_epr(
+            &state,
+            "/",
+            state.epr_router.dispatch("/").expect("still mounted at /"),
+            "{}",
+            true,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+
+        assert_eq!(
+            after.status(),
+            StatusCode::FORBIDDEN,
+            "the warm copy must stop answering anonymously"
+        );
+        assert_eq!(
+            after
+                .headers()
+                .get(crate::services::STANDING_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("refused;reach=local"),
+            "the chrome reads the standing off the response"
+        );
+        let body = after.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["refused"], "reach", "the term that failed is named");
+        assert_eq!(json["reach"], "local");
+        assert_eq!(json["hear"], crate::services::WHERE_TO_BE_HEARD);
+        assert_eq!(
+            json["epr"], "elohim-host-landing",
+            "the reason reads back to a record"
+        );
+
+        // NO EVICTION. Observed from the doorway's own account of what it holds,
+        // not inferred from the refusal.
+        let held = crate::render::warm_shell::plan_shell_serve(
+            &state.warm_shell,
+            "elohim-host-landing",
+            "index.html",
+            true,
+        )
+        .await;
+        assert!(
+            held.warm.is_some(),
+            "the bytes must still be held warm — the refusal came from the fold, \
+             not from forgetting"
+        );
+    }
+
+    /// The other side of the same ruling: narrowing is not hiding. A requester
+    /// who can show standing is served through the SAME narrowed row, in the
+    /// same process, with no second reconcile.
+    #[tokio::test]
+    async fn a_requester_with_standing_is_served_under_the_same_narrowed_reach() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let storage = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-warm/index.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html")
+                    .set_body_string("<app-root></app-root>"),
+            )
+            .mount(&storage)
+            .await;
+        let archive = Arc::new(AssetBindingArchive {
+            declared: Some("head-warm".into()),
+            latest: Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: "head-warm".into(),
+                content_type: "text/html".into(),
+                bytes: b"<app-root></app-root>".to_vec(),
+                head_bound: true,
+            }),
+        });
+        let state = asset_binding_state(&storage.uri(), archive);
+        hydrate_asset_binding_shell(&state).await;
+
+        let mut narrowed = shell_projection(true);
+        narrowed.reach = "local".into();
+
+        let member = RequesterStanding {
+            authenticated: true,
+            human_id: Some("human-matthew".into()),
+            agent_pub_key: Some("uhCAkMatthew".into()),
+            memberships: vec![],
+        };
+        let served =
+            dispatch_to_projected_epr(&state, "/", narrowed.clone(), "{}", true, member).await;
+        assert_eq!(
+            served.status(),
+            StatusCode::OK,
+            "the people the narrowed reach still names must still be served"
+        );
+
+        let stranger = dispatch_to_projected_epr(
+            &state,
+            "/",
+            narrowed,
+            "{}",
+            true,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(
+            stranger.status(),
+            StatusCode::FORBIDDEN,
+            "in the same minute, under the same row — the fold discriminates \
+             rather than having reopened"
+        );
+    }
+
+    /// The address a content-addressed serve path carries, so `/apps/{a}/…` and
+    /// `/blob/{a}` can both be resolved back to the EPR whose reach governs
+    /// them.
+    #[test]
+    fn addressed_segment_pulls_the_address_out_of_a_content_addressed_path() {
+        assert_eq!(
+            addressed_segment("/apps/elohim-host-landing/index.html", "/apps/"),
+            Some("elohim-host-landing")
+        );
+        assert_eq!(
+            addressed_segment("/apps/sha256-abc/nested/deep.js", "/apps/"),
+            Some("sha256-abc")
+        );
+        assert_eq!(
+            addressed_segment("/blob/sha256-abc", "/blob/"),
+            Some("sha256-abc")
+        );
+        assert_eq!(
+            addressed_segment("/blob/sha256-abc?x=1", "/blob/"),
+            Some("sha256-abc")
+        );
+        assert_eq!(addressed_segment("/apps/", "/apps/"), None);
+        assert_eq!(addressed_segment("/other/x", "/apps/"), None);
+    }
+
+    /// An address with no contract row is passed through untouched — refusing
+    /// it would be the doorway inventing a policy of its own, and would 403
+    /// every loose content-addressed read on the box.
+    #[tokio::test]
+    async fn an_unmounted_address_is_not_refused_by_the_fold() {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let state = AppState::new(args);
+        state.epr_router.replace_all(vec![shell_projection(true)]);
+
+        let req = Request::builder()
+            .uri("/blob/sha256-unknown")
+            .body(http_body_util::Empty::<Bytes>::new())
+            .unwrap();
+        assert!(
+            fold_for_addressed_serve(&state, &req, "/blob/sha256-unknown", "sha256-unknown")
+                .await
+                .is_none(),
+            "no contract row ⇒ no reach declaration to enforce ⇒ pass through"
+        );
+    }
+
+    /// …but an address that IS a mounted EPR gets folded like any other serve of
+    /// it. This is the `/apps/{slug}` and `/blob/{head}` half of the named gap.
+    #[tokio::test]
+    async fn a_mounted_address_is_folded_against_the_current_row() {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let state = AppState::new(args);
+
+        let mut narrowed = shell_projection(true);
+        narrowed.reach = "local".into();
+        state.epr_router.replace_all(vec![narrowed]);
+
+        let req = Request::builder()
+            .uri("/apps/elohim-host-landing/main.js")
+            .body(http_body_util::Empty::<Bytes>::new())
+            .unwrap();
+        let refusal = fold_for_addressed_serve(
+            &state,
+            &req,
+            "/apps/elohim-host-landing/main.js",
+            "elohim-host-landing",
+        )
+        .await
+        .expect("a narrowed EPR's cached assets stop answering anonymously too");
+        assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+    }
+
     /// Regression for the live alpha split: `/` came from the new declared head,
     /// but its relative `main-*.js` and `version.json` requests were sent through
     /// the stale moving slug. Exercise the actual proxy against a mock storage
@@ -3869,23 +4210,43 @@ mod epr_dispatch_breaker_tests {
         let state = asset_binding_state(&storage.uri(), archive);
         let projection = shell_projection(true);
 
-        let root = dispatch_to_projected_epr(&state, "/", projection.clone(), "{}", true).await;
+        let root = dispatch_to_projected_epr(
+            &state,
+            "/",
+            projection.clone(),
+            "{}",
+            true,
+            RequesterStanding::anonymous(),
+        )
+        .await;
         assert_eq!(root.status(), StatusCode::OK);
         let root_body = root.into_body().collect().await.unwrap().to_bytes();
         assert!(String::from_utf8_lossy(&root_body).contains("main-NEW.js"));
 
-        let main =
-            dispatch_to_projected_epr(&state, "/main-NEW.js", projection.clone(), "{}", false)
-                .await;
+        let main = dispatch_to_projected_epr(
+            &state,
+            "/main-NEW.js",
+            projection.clone(),
+            "{}",
+            false,
+            RequesterStanding::anonymous(),
+        )
+        .await;
         assert_eq!(main.status(), StatusCode::OK);
         assert_eq!(
             main.into_body().collect().await.unwrap().to_bytes(),
             Bytes::from_static(b"new-main")
         );
 
-        let version =
-            dispatch_to_projected_epr(&state, "/version.json", projection.clone(), "{}", false)
-                .await;
+        let version = dispatch_to_projected_epr(
+            &state,
+            "/version.json",
+            projection.clone(),
+            "{}",
+            false,
+            RequesterStanding::anonymous(),
+        )
+        .await;
         assert_eq!(version.status(), StatusCode::OK);
         assert_eq!(
             version.into_body().collect().await.unwrap().to_bytes(),
@@ -3923,6 +4284,7 @@ mod epr_dispatch_breaker_tests {
                 shell_projection(true),
                 "{}",
                 false,
+                RequesterStanding::anonymous(),
             )
             .await;
             assert_eq!(response.status(), StatusCode::OK);
@@ -4060,17 +4422,6 @@ mod epr_dispatch_breaker_tests {
     }
 }
 
-/// The anon-readable reach set — the doorway's HALF of the substrate's anon
-/// rule. MUST mirror storage's unauthenticated list filter
-/// (`elohim-storage/src/http.rs` handle_db_content_list:
-/// `reach == "commons" || reach == "public"`); reach hierarchy: public=6,
-/// commons=7 most permissive. One definition per side; the wider 3-vocabulary
-/// reach reconciliation is tracked in memory
-/// `project_reach_enum_drift_reconciliation`.
-pub(crate) fn anon_reach_readable(reach: &str) -> bool {
-    matches!(reach, "commons" | "public")
-}
-
 /// The universal `/epr/{id}` address ALWAYS serves the shell (EPR Slice 1,
 /// operator decision 2026-06-08: the universal-address claims-302 is DEMOTED).
 /// Before this, a claimed, commons-reach target (e.g. a path) 302'd to its
@@ -4103,12 +4454,14 @@ async fn dispatch_epr_universal(
     original_path: &str,
     chrome_context_json: &str,
     wants_html: bool,
+    standing: RequesterStanding,
 ) -> Response<Full<Bytes>> {
     match epr_universal_root(&state.epr_router) {
         Some(root) => {
             tracing::debug!(path = %original_path,
                 "universal /epr address — serving shell (root projection bundle)");
-            dispatch_to_projected_epr(state, "/", root, chrome_context_json, wants_html).await
+            dispatch_to_projected_epr(state, "/", root, chrome_context_json, wants_html, standing)
+                .await
         }
         None => {
             tracing::debug!(path = %original_path,
@@ -4215,7 +4568,7 @@ fn sitemap_response(xml: String, generation: u64) -> Response<Full<Bytes>> {
 
 /// Tolerant anon-readable-id fetch for one claimed contentType — one query per
 /// reach in the anon-readable set ({commons, public}, see
-/// [`anon_reach_readable`]), merged. Any failure → empty for that reach (the
+/// [`crate::services::serve_eligibility::classify_reach`]), merged. Any failure → empty for that reach (the
 /// sitemap omits those entries rather than 500ing — fail open).
 async fn fetch_commons_ids(
     state: &AppState,
@@ -4514,6 +4867,9 @@ async fn ssr_fallback_response(
 ) -> Response<Full<Bytes>> {
     // Negotiated before `req` is consumed by the proxy/dispatch arms below.
     let wants_html = routes::catching_up::accepts_html(req.headers());
+    // Likewise the standing: the `ProjectedEpr` arm re-asks the serving fold,
+    // and `req` is moved by the sibling arms.
+    let standing = standing_from_request(state, &req);
     match fallback {
         SsrFallback::Registry => match reason {
             SsrFallbackReason::AuthModeUnsupported
@@ -4562,6 +4918,7 @@ async fn ssr_fallback_response(
                 *projection,
                 chrome_context_json,
                 wants_html,
+                standing,
             )
             .await;
             with_ssr_skipped_header(resp, &reason)
@@ -5870,6 +6227,31 @@ async fn handle_request(
             {
                 return Ok(to_boxed(relayed));
             }
+            // ── THE FOLD, before any byte path ───────────────────────────────
+            // Checked AFTER the relay (a name a sibling holds the contract for
+            // is the HOLDER's reach to fold, never ours) and BEFORE the SSR
+            // diversion, because a successful SSR render serves the warm shell
+            // through `resolve_projected_shell` and returns without ever
+            // reaching `dispatch_to_projected_epr`. Without this the SSR path
+            // would be the one serve path a reach narrowing never reached.
+            //
+            // `projection` here is the row `EprRouter::dispatch` just returned
+            // from the table the reconcile rebuilds — the CURRENT reach, not a
+            // value that travelled with any cached bytes.
+            let standing = standing_from_request(&state, &req);
+            if let crate::services::ServeEligibility::Refuse(refusal) =
+                crate::services::serve_eligibility::fold_for_projection(
+                    &state,
+                    &path,
+                    &projection,
+                    standing.clone(),
+                )
+                .await
+            {
+                return Ok(to_boxed(
+                    crate::services::serve_eligibility::refusal_response(&refusal),
+                ));
+            }
             // The manifest `render` field is the agnostic SSR contract: a
             // projection whose path is ALSO declared render:"angular-ssr" must
             // serve through the V8 SSR engine (peer-capability-gated), not the
@@ -5911,6 +6293,7 @@ async fn handle_request(
                 projection,
                 &chrome_context_json,
                 wants_html,
+                standing,
             )
             .await;
             // We DO hold a contract for this root, so a 404 here is OUR
@@ -6661,6 +7044,16 @@ async fn handle_request(
         // HTML5 App serving routes (projection cache → elohim-storage fallback)
         // GET /apps/{app_id}/{path} - Serve files from HTML5 app ZIPs
         (Method::GET, p) if p.starts_with("/apps/") => {
+            // THE NAMED GAP. `handle_app_request` answers by
+            // `{slug}:{file}:{blob_hash}` straight out of the Mongo-backed
+            // app-file cache — bytes that outlive the pod and that no reach
+            // check ever stood in front of. Re-ask the fold first, against the
+            // CURRENT projection row for this address.
+            if let Some(address) = addressed_segment(p, "/apps/") {
+                if let Some(refusal) = fold_for_addressed_serve(&state, &req, p, address).await {
+                    return Ok(to_boxed(refusal));
+                }
+            }
             debug!(path = %p, "Handling app request (projection cache)");
             return Ok(to_boxed(
                 routes::handle_app_request(Arc::clone(&state), p).await,
@@ -6693,7 +7086,14 @@ async fn handle_request(
             let chrome_context_json = build_chrome_context_json(p, &req);
             let wants_html = routes::catching_up::accepts_html(req.headers());
             return Ok(to_boxed(
-                dispatch_epr_universal(&state, p, &chrome_context_json, wants_html).await,
+                dispatch_epr_universal(
+                    &state,
+                    p,
+                    &chrome_context_json,
+                    wants_html,
+                    standing_from_request(&state, &req),
+                )
+                .await,
             ));
         }
 
@@ -6931,6 +7331,18 @@ async fn handle_request(
                     // Blob paths get cache-aware forwarding; all other registry
                     // routes use the generic forwarder unchanged.
                     if p.starts_with("/blob/") {
+                        // A blob read is pure content addressing: it names no
+                        // mount and consults no router, so a narrowing never
+                        // reached it. When the hash IS a head of something this
+                        // doorway mounts, the fold governs it like any other
+                        // serve of that EPR.
+                        if let Some(address) = addressed_segment(p, "/blob/") {
+                            if let Some(refusal) =
+                                fold_for_addressed_serve(&state, &req, p, address).await
+                            {
+                                return Ok(to_boxed(refusal));
+                            }
+                        }
                         return Ok(to_boxed(
                             routes::forward_blob_to_storage(
                                 req,

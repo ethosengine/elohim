@@ -17,6 +17,9 @@
 //! - **DIDResolver**: W3C DID resolution for doorway federation
 //! - **NameRouting**: registry fold + one-hop federated relay for a name this
 //!   doorway does not serve (Category C, Operational)
+//! - **ServeEligibility**: the reach + standing terms of the serving fold,
+//!   re-asked at serve time on every cached path (Category C, Operational —
+//!   nothing is stored, the fold is resolved from the live projection)
 //! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
 pub mod custodian;
@@ -33,6 +36,7 @@ pub mod pkarr_resolver;
 pub mod recording;
 pub mod route_registry;
 pub mod self_uptime;
+pub mod serve_eligibility;
 pub mod shard_resolver;
 pub mod storage_registration;
 pub mod verification;
@@ -76,6 +80,11 @@ pub use recording::{
 pub use route_registry::{
     spawn_cleanup_task as spawn_route_cleanup_task, AgentRouteEntry, CompiledRoute, RouteRegistry,
     RouteRegistryConfig, RouteRegistryStats, RouteSource, RouteTarget,
+};
+pub use serve_eligibility::{
+    audience_from_projection, contract_from_projection, fold_for_projection, serve_eligibility,
+    standing_from_request, AudienceTerm, ContractTerms, ReachClass, Refusal, RequesterStanding,
+    ServeEligibility, ServeRequest, STANDING_HEADER, WHERE_TO_BE_HEARD,
 };
 pub use shard_resolver::{
     BlobResolution, ResolvedBlob, ResolverStats, ShardLocation, ShardManifest, ShardResolver,

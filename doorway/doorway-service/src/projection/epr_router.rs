@@ -473,6 +473,27 @@ impl EprRouter {
             .collect()
     }
 
+    /// The CURRENT projection row for an EPR atom id — the reach-and-contract
+    /// truth for a serve path that is addressed by the atom (or its head)
+    /// rather than by a mount path.
+    ///
+    /// `/apps/{slug}/…` and `/blob/{hash}` reach bundle bytes without ever
+    /// consulting a mount, which is precisely why they used to answer after a
+    /// reach narrowing. This lookup gives them the same live row `dispatch`
+    /// gives a path-addressed request — read from the table the reconcile
+    /// rebuilds wholesale, never from a value cached beside the bytes.
+    ///
+    /// Linear over the mount table on purpose: the table holds one row per
+    /// mount (a handful), and an id-keyed index would be a second structure to
+    /// keep coherent with `replace_all` for no measurable gain.
+    pub fn projection_for_epr_id(&self, epr_id: &str) -> Option<EprProjectionView> {
+        if epr_id.is_empty() {
+            return None;
+        }
+        let table = self.table.read().expect("router lock poisoned");
+        table.values().find(|p| p.epr_id == epr_id).cloned()
+    }
+
     /// Mint the pretty-mount Location for a claimed contentType (spec §5.1).
     /// The id is substituted as-received from the request path — already
     /// percent-encoded, never re-encoded.

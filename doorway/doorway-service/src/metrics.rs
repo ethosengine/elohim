@@ -314,6 +314,28 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Serves refused by the serving-eligibility fold, by the reach that
+    /// refused them. label: reach (the declared rung, or `undeclared`).
+    ///
+    /// Doorway-resident and deliberately NOT a storage metric: this counts
+    /// refusals the doorway resolved for itself from the CURRENT projection, so
+    /// a rising count immediately after a collective's ruling is the evidence
+    /// that the ruling reached this doorway's fold. A flat count with a
+    /// narrowed reach means the fold is not being asked — the exact defect the
+    /// `served-under-standing` habit exists to refuse.
+    ///
+    /// The reach label is an OPEN vocabulary (a collective may declare a rung
+    /// this binary predates), so only `undeclared` is pre-touched below; every
+    /// other series appears when that rung first refuses someone.
+    pub static ref SERVE_REFUSED_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_serve_refused_total",
+            "Serves refused by the eligibility fold, by declared reach.",
+        ),
+        &["reach"],
+    )
+    .unwrap();
+
     /// Active membrane bans (sources with a ban_until in the future).
     /// Updated on each `maybe_sweep` pass from EdgeGuardStore.
     pub static ref MEMBRANE_BANS_ACTIVE: IntGauge = IntGauge::new(
@@ -677,6 +699,11 @@ pub fn register_all() {
                 .with_label_values(&[verdict])
                 .inc_by(0);
         }
+        let _ = REGISTRY.register(Box::new(SERVE_REFUSED_TOTAL.clone()));
+        // A doorway that has refused nothing must read as a MEASURED zero.
+        SERVE_REFUSED_TOTAL
+            .with_label_values(&["undeclared"])
+            .inc_by(0);
         let _ = REGISTRY.register(Box::new(MEMBRANE_BANS_ACTIVE.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_VERDICT_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(FRESHNESS_PANTRY_BYTES.clone()));
@@ -912,6 +939,15 @@ pub fn inc_membrane_verdict(verdict: &str) {
     MEMBRANE_VERDICT_TOTAL.with_label_values(&[verdict]).inc();
 }
 
+/// Serving eligibility: count one refusal, labelled by the reach that refused.
+/// `reach` MUST already be sanitised (see
+/// `crate::services::serve_eligibility::sanitize_reach_label`) — a projection
+/// row is not a place to trust label bytes from, and an unbounded label set is
+/// a cardinality leak.
+pub fn inc_serve_refused(reach: &str) {
+    SERVE_REFUSED_TOTAL.with_label_values(&[reach]).inc();
+}
+
 /// Membrane: update the active-ban gauge (called from `EdgeGuardStore::maybe_sweep`).
 pub fn set_membrane_bans_active(count: i64) {
     MEMBRANE_BANS_ACTIVE.set(count);
@@ -1119,6 +1155,7 @@ mod tests {
         inc_resolve("projection");
         inc_blob_pantry("hit");
         inc_membrane_verdict("allow");
+        inc_serve_refused("local");
         inc_auth_token_issued();
         inc_elohim_session_established();
 
@@ -1137,6 +1174,7 @@ mod tests {
             "doorway_admission_shed_total",
             "doorway_membrane_verdict_total",
             "doorway_membrane_bans_active",
+            "doorway_serve_refused_total",
             "doorway_auth_token_issued_total",
             "doorway_elohim_session_established_total",
         ] {
