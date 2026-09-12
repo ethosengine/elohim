@@ -1462,29 +1462,41 @@ fn truncate(text: &str, limit: usize) -> String {
 
 #[cfg(test)]
 mod shape {
+    /// Every `.rs` file in this seam stays under the soft line ceiling.
+    ///
+    /// Fix round (2026-09-12, F6): the list used to be ELEVEN hardcoded filenames, so a twelfth
+    /// module could be added to this directory and never be measured — the one failure mode a
+    /// shape test exists to prevent. `read_dir` makes the seam itself the population.
     #[test]
     fn no_recall_module_exceeds_the_soft_line_ceiling() {
-        for f in [
-            "mod.rs",
-            "journey.rs",
-            "discovery.rs",
-            "providers.rs",
-            "lens.rs",
-            "render.rs",
-            "refusal.rs",
-            "measure.rs",
-            "receipts.rs",
-            "questions.rs",
-            "sample.rs",
-        ] {
-            let text = std::fs::read_to_string(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/src/flow/memory/recall/").to_string() + f,
-            )
-            .unwrap();
+        let seam = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src/flow/memory/recall"
+        ));
+        let mut measured = 0usize;
+        for entry in std::fs::read_dir(seam).expect("recall seam directory reads") {
+            let path = entry.expect("directory entry").path();
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .expect("utf-8 filename")
+                .to_string();
+            let text = std::fs::read_to_string(&path).expect("module reads");
             assert!(
                 text.lines().count() <= 1800,
-                "{f} is over the module ceiling"
+                "{name} is over the module ceiling"
             );
+            measured += 1;
         }
+        // An empty walk would pass vacuously — the same silence the hardcoded list produced.
+        assert!(
+            measured >= 11,
+            "only {measured} recall modules measured — the seam walk found less than the eleven \
+             that existed when this test was written; a walk that stops finding modules is a \
+             broken measure, not a clean one"
+        );
     }
 }
