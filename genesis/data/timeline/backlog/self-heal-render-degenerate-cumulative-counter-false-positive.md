@@ -27,6 +27,8 @@ cites:
   - doorway/doorway-service/src/render/registry.rs
   - genesis/docs/superpowers/plans/2026-06-13-elevate-arm-runtime-harvest-plan.md
   - genesis/data/timeline/backlog/runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
+  - genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md
+  - genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md
 ---
 
 # The node was not saturated. It was idle.
@@ -362,3 +364,60 @@ move is not a third threshold — it is to replace the ratio with a state field 
 publishes (a bounded rolling window in `elohim-render/src/stats.rs`, which that module
 already names as its intended refinement), and let the node decide when it is saturated
 instead of asking the poller to infer it from counters.
+
+---
+
+# 2026-09-12, same day, second firing of `da8bb3bdd7e1` — the third firing was TRUE, and this concern hands off
+
+**The branch above resolved the other way. Do not act on the escalation it proposed.**
+
+`da8bb3bdd7e1` re-filed at poll 82 (`12:12:45+00:00`) with an honest base — 11 new
+degenerate renders over a 31-render delta across 2 moving polls, clearing the
+`DEGEN_MIN_EVENTS = 3` floor this record added six hours earlier:
+
+```
+render degenerate 11/31 of NEW renders = 0.35 over 2 of the last 7 polls (SSR stalled/timedOut saturation)
+```
+
+Triage reproduced it by hand on single, cache-busted, non-concurrent requests: four
+consecutive cold renders of `/` on doorway-alpha came back `x-ssr-terminal: stalled` at
+1232–1256 ms — clamped at `DEFAULT_SOFT_BUDGET_MS` — while elohim.host rendered the same
+route clean at 124–556 ms. **Real condition, real people served degenerate HTTP 200s.**
+
+So the tally this record has been keeping is now superseded:
+
+| | before | after |
+|---|---|---|
+| `_render_degenerate` false positives | 2 | 2 |
+| `_render_degenerate` true positives | **0** | **1** |
+
+The two fixes this record landed are what made the third firing legible: the delta cured
+the lifetime ratio, and the event floor kept the predicate silent through the 1-of-4
+noise. On the firing that mattered, both floors passed and the predicate was right.
+**The predicate is now calibrated; leave it alone.** In particular, do NOT replace it
+with a runtime-published rolling window on this evidence — that change would have made
+no difference to any of the three firings, and it costs a `stats.rs` change plus a fleet
+roll.
+
+## Handoff
+
+`da8bb3bdd7e1` stays listed in this record's `fingerprints:` because this record owns the
+history of its first two (spurious) firings. Its **live** concern — and what the ledger
+line cites — is now:
+
+**`genesis/data/timeline/backlog/self-heal-alpha-ssr-post-bundle-swap-cold-fetch-stall.md`**
+
+which carries the measured root cause (a deploy-coupled cold window after an
+`elohim-host-landing` head swap, in which exactly one of 29 SSR data fetches never
+settles inside the soft budget) and the blocker. `afc100835f7c` remains wholly this
+record's.
+
+## The follow-on this record named a day earlier also came due
+
+The "Follow-on named, not taken" section above reserved a `_projector_lag` question for
+the deterministic-layer owner. The same 2026-09-12 poll filed `79f357281ca5` (alpha-b,
+`projector:reconcile`), and re-fetch showed `healedTotal: 0` across **209 sweeps** with
+`caughtUp` flapping false↔true on windowed-scan noise — i.e. exactly the frozen-vs-live
+ambiguity this record predicted, in the wild. Canonicalized in
+`genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md`
+(2026-09-12 section), still reserved to the owner, now with live evidence attached.

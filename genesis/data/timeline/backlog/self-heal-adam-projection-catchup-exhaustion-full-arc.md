@@ -6,19 +6,27 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-07-30"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed)"
+updated: "2026-09-12"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage)"
 status: "wip"
 priority: "high"
+self_heal_status: blocked
+severity: high
 ci_status: blocked
 jobs: [elohim-edge]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare]
+fingerprints: [79f357281ca5]
+nodes: [alpha-b, elohim-adam-alpha]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm]
 cites:
   - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - genesis/orchestrator/manifests/humans/adam-firstman.yaml
   - genesis/docs/content/elohim-protocol/architecture/2026-07-12-substrate-trust-contract-runbook.md
+  - https://elohim.host/admin/self-healing
+  - https://elohim.host/p2p/status
+  - .claude/scripts/_lib/runtime_harvest.py
+  - genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md
 ---
 
 # adam's post-restart catch-up cannot complete — corrected mechanism
@@ -225,3 +233,111 @@ adam serving 200 (`caught_up=true`) → re-run the App pipeline's `authorHeadOnc
 (a `[build:app]` push) so the declare-carries-Record cross-declare lands A's head
 on B against a responsive conductor. The mechanism is proven; it needs a declare
 cycle against a non-503 B.
+
+---
+
+# 2026-09-12 — the elevate arm now files this concern as a fingerprint (`79f357281ca5`)
+
+## What is exhausted
+
+Nothing new. This is the SAME ceiling, six weeks later, arriving through the runtime
+poller instead of a CI chapter — and at a magnitude two orders smaller than the
+2026-07-27 incident. Ledger line (fp `79f357281ca5`, node **alpha-b**, filed poll 82,
+`2026-09-12T12:12:45+00:00`):
+
+```
+projector caughtUp=false sustained >= 3 polls
+```
+
+`_projector_lag` (`.claude/scripts/_lib/runtime_harvest.py`) fires on
+`projector.caughtUp is False` across `LAG_POLLS = 3` consecutive samples. The stored
+cursor window shows it false on the last four samples of the ring buffer. The report is
+HONEST — the node really did say "I am not caught up" four polls running.
+
+## Re-fetch at triage — SELF-RESOLVED, and the interesting part is what did NOT change
+
+`GET https://elohim.host/admin/self-healing` (12:22:38Z, HTTP 200):
+
+```json
+"projector": {"lagSeconds": null, "caughtUp": true, "divergentAnchor": 1}
+```
+
+`caughtUp` back to **true** and `divergentAnchor` **9 → 1**. But `GET /p2p/status` the
+same minute says what actually happened:
+
+```json
+"projectionReconcile": {"pending": 0, "completed": 0, "failed": 0, "caughtUp": true,
+                        "peersAsked": 0, "divergentAnchor": 1, "healedTotal": 0,
+                        "sweeps": 209, "exhausted": 0, "converged": false}
+```
+
+**209 sweeps, `healedTotal: 0`, `completed: 0`, `converged: false`.** The projector did
+not catch up by healing anything — it healed nothing, in two hundred and nine sweeps.
+`caughtUp` went true because the windowed divergence scan happened to come back small,
+which is precisely the "`content_divergent_anchor` oscillates … windowed-scan noise, no
+trend" behaviour the 2026-07-30 post-cure measurement above already recorded. Same
+signature, four-digit divergence then, single-digit now.
+
+So this fingerprint is the ceiling's **flap**, not a new stall: `caughtUp` oscillates
+false↔true with the scan window while `healedTotal` stays pinned at zero. The chapter-
+blocking 2026-07-27 shape (`content_divergent_anchor: 3599`, 80+ minutes continuously
+false) and today's shape (`divergentAnchor: 9`, four polls) are the same mechanism at
+different amplitudes.
+
+## Current decision
+
+**BLOCKED — unchanged blocker, now ledger-bound.**
+
+The blocker is exactly the one "The real ceiling (operator decision)" names above:
+kitsune2 budgets gossip **per space**, not per agent (`initiate.rs:104-107`), while
+`DEFAULT_MAX_AGENTS_PER_CONDUCTOR = 50`
+(`doorway/doorway-service/src/conductor/pool_map.rs:44`) keeps adding hosted agents to
+adam's one conductor. Arc-convergence cost scales with hosted agents; the convergence
+budget does not. **No storage-side or DNA-side code change moves this** — the 2026-07-29
+cures are deployed and measured working. The next state change is an operator
+provisioning decision (cap or shard doorway-B's agents onto adam), which is a cluster
+action and therefore out of a background triage agent's hands by rule.
+
+Ledger entry `79f357281ca5` is marked `blocked` so the poller stops dispatching on the
+present fingerprint. The condition having already self-resolved, the poller will delete
+the line by disappearance within `CLOSE_STREAK` polls; the next flap re-files as NEW.
+
+## The re-dispatch hazard this creates, and the sensing follow-on NOT taken
+
+Because `caughtUp` flaps, this fingerprint will close by disappearance and re-file as
+NEW on every future oscillation, dispatching a fresh triage agent each time for a
+condition whose verdict is already written here. That cost is real and should be named
+rather than absorbed.
+
+The cheap mitigation exists and is deliberately **left to the deterministic-layer
+owner**: `_projector_lag` reads `caughtUp` alone, while the discriminators between a
+flap and a stall are **already sampled on every poll** and simply not consulted —
+`projectionReconcile.sweeps`, `healedTotal`, and `divergentAnchor` on `/p2p/status`. A
+predicate that required, say, a divergence magnitude floor or sweep-count-without-
+progress would have been silent today and loud on 2026-07-27.
+
+Two reasons this triage did not just implement it:
+
+1. **A magnitude floor can blind the poller to a genuine small-corpus stall.** A
+   household peer with nine divergent anchors and no ability to heal them is exhausted;
+   today's alpha-b with nine and a working scan is not. `divergentAnchor` alone does not
+   separate those, and guessing a threshold is how the sibling `_render_degenerate`
+   predicate acquired two false positives (see the cited record).
+2. **The standing lesson in this file's sibling applies**: a predicate that has misfired
+   gets a *state field the runtime publishes*, not a third hand-tuned threshold. The
+   runtime-side version of that is a projector self-report that distinguishes
+   "sweeping, making progress", "sweeping, healing nothing", and "cannot sweep" —
+   which is a `projection_reconcile.rs` change with a fleet roll behind it, not a poller
+   tweak.
+
+Written as a specified follow-on, owner-assigned, not silently taken.
+
+## Verification
+
+- 2026-09-12 12:22:38Z — `/admin/self-healing` and `/p2p/status` re-fetched on
+  elohim.host (HTTP 200, both quoted above).
+- Condition confirmed self-resolved at triage: `caughtUp: true`, `divergentAnchor` 9→1.
+- Confirmed NOT healed: `healedTotal: 0` over 209 sweeps, `converged: false`.
+- Regression signature to watch: `healedTotal` STILL 0 with `divergentAnchor` climbing
+  into the hundreds or thousands, or `caughtUp` false for a wall-clock hour — that is
+  the 2026-07-27 amplitude returning, and it blocks ch04/ch06 again.
