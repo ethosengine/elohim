@@ -163,6 +163,50 @@ pub fn is_diagnostic_probe(path: &str) -> bool {
     matches!(path, "/p2p/status" | "/db/p2p/conductor-diagnostics")
 }
 
+/// True when an upstream `429`/`503` actually DECLARES backpressure — i.e. the
+/// upstream is asking us to come back, not reporting that something broke.
+///
+/// `headers` are the UPSTREAM response's headers (reqwest's `HeaderMap`), so
+/// this is generic over the header map type rather than pinned to hyper's.
+///
+/// The rule, and why it is exactly this:
+///
+/// * `429` is backpressure BY DEFINITION — its whole meaning is "too many
+///   requests". Always true, headers or not.
+/// * `503` is ambiguous, and that ambiguity is the bug. elohim-storage emits a
+///   503 from two categorically different places:
+///   - its shed responders (`services::response::too_many_requests_with_retry`
+///     and `admission_shed_backpressure`), which ALWAYS set `Retry-After` and
+///     `X-Available-Permits` alongside the `{"status":"catching-up"}` body; and
+///   - its error mapper (`services::response::from_result` for
+///     `StorageError::Conductor` / `StorageError::Connection`, and
+///     `service_unavailable`), which sets NEITHER header and carries the real
+///     reason in `{"error": "…"}`.
+///
+/// So a 503 with neither header is a REPORT, not a request to back off.
+///
+/// Measured, 2026-09-12 household mesh: the prologue's `seed-drill-custody`
+/// leg PATCHed `custody-blob-abca87ccc3b77518` to `state=active`. Storage
+/// answered `503 {"error":"Conductor error: … commitment observation
+/// unavailable: multiple root Creates for ID"}` in 44 ms — a permanent DHT
+/// identity fork, not backpressure, and no `Retry-After` in sight. The
+/// honor-backpressure branch relabelled it
+/// `{"status":"catching-up","retryAfter":30,"cause":"upstream",
+/// "circuit":"closed","errorStreak":0}`, so the seeder spent 12 retries × 15 s
+/// on a call that could never succeed and the operator never saw the sentence
+/// that names the defect. Same masking class the `is_diagnostic_probe`
+/// carve-out already fixed for two paths; this is the general rule behind it.
+///
+/// Deliberately NOT applied to the `/blob/` forwarder's sibling branch: a blob
+/// fetch's client is usually an `<img>`/SDK that can do nothing with a storage
+/// error body, and widening the change there buys nothing for this class.
+pub fn declares_backpressure<T>(status: u16, headers: &hyper::http::HeaderMap<T>) -> bool {
+    if status == 429 {
+        return true;
+    }
+    headers.contains_key(hyper::header::RETRY_AFTER) || headers.contains_key("x-available-permits")
+}
+
 /// True for the notary HEAD-declare write route (`POST /db/content/{id}/head`)
 /// — mirrors elohim-storage's `is_head_declare_write` (`elohim/elohim-storage/
 /// src/http.rs`) byte-for-byte in shape. Doorway carries NO authority logic of
@@ -360,6 +404,45 @@ mod tests {
         let mut h = HeaderMap::new();
         h.insert(ACCEPT, HeaderValue::from_str(v).unwrap());
         h
+    }
+
+    fn headers_with(name: &'static str, v: &str) -> HeaderMap {
+        let mut h = HeaderMap::new();
+        h.insert(name, HeaderValue::from_str(v).unwrap());
+        h
+    }
+
+    #[test]
+    fn a_429_always_declares_backpressure() {
+        assert!(declares_backpressure(429, &HeaderMap::new()));
+    }
+
+    #[test]
+    fn a_503_with_retry_after_declares_backpressure() {
+        assert!(declares_backpressure(
+            503,
+            &headers_with("retry-after", "2")
+        ));
+    }
+
+    #[test]
+    fn a_503_with_available_permits_declares_backpressure() {
+        assert!(declares_backpressure(
+            503,
+            &headers_with("x-available-permits", "0")
+        ));
+    }
+
+    /// The measured case: `StorageError::Conductor` maps to a bare 503 with
+    /// `{"error": …}` and NEITHER header. That is a report, not a request to
+    /// back off, and must never wear the catching-up envelope.
+    #[test]
+    fn a_bare_503_declares_no_backpressure() {
+        assert!(!declares_backpressure(503, &HeaderMap::new()));
+        assert!(!declares_backpressure(
+            503,
+            &headers_with("content-type", "application/json")
+        ));
     }
 
     #[test]

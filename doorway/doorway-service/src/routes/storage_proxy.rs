@@ -762,6 +762,17 @@ where
                 // client still gets the catching-up response below; the
                 // breaker stays closed so unrelated routes keep flowing.
                 record_trial(&trial, true);
+                // Does this 429/503 actually DECLARE backpressure, or is it
+                // storage REPORTING a failure? A 503 carrying neither
+                // `Retry-After` nor `X-Available-Permits` is the error mapper
+                // (`StorageError::Conductor` / `Connection`), not a shed — and
+                // relabelling it `catching-up` tells the caller to wait for a
+                // condition that will never clear. See
+                // `catching_up::declares_backpressure` for the measured case.
+                let declares = crate::routes::catching_up::declares_backpressure(
+                    status_u16,
+                    response.headers(),
+                );
                 let upstream_ra = response
                     .headers()
                     .get(reqwest::header::RETRY_AFTER)
@@ -769,24 +780,70 @@ where
                     .and_then(|s| s.parse::<u64>().ok());
                 let retry_after = upstream_ra
                     .unwrap_or(crate::routes::upstream_health::UPSTREAM_CIRCUIT_COOLDOWN_SECS);
-                warn!(
-                    target: "upstream_shed",
-                    counter = "doorway_upstream_backpressure_honored_total",
-                    storage_url = %storage_url,
-                    status = status_u16,
-                    retry_after,
-                    "honoring upstream backpressure — surfacing catching-up to client"
-                );
-                crate::metrics::inc_backpressure_honored();
+                if declares {
+                    warn!(
+                        target: "upstream_shed",
+                        counter = "doorway_upstream_backpressure_honored_total",
+                        storage_url = %storage_url,
+                        status = status_u16,
+                        retry_after,
+                        "honoring upstream backpressure — surfacing catching-up to client"
+                    );
+                    crate::metrics::inc_backpressure_honored();
+                } else {
+                    warn!(
+                        target: "upstream_shed",
+                        counter = "doorway_upstream_error_relayed_total",
+                        storage_url = %storage_url,
+                        status = status_u16,
+                        path = %path,
+                        "upstream 503 declares no backpressure (no Retry-After, no \
+                         X-Available-Permits) — relaying storage's own status and body \
+                         instead of masking it as catching-up"
+                    );
+                }
                 // HOOK 3 (honored upstream backpressure). Amber is allowed
                 // here precisely BECAUSE it honours the backpressure: drawing
                 // from the local pantry issues no further work to the upstream
                 // that just asked us to back off (C11). The trial is already
                 // recorded `true` above — a busy upstream is a live one.
+                //
+                // Reached for BOTH arms on purpose: when the upstream reports a
+                // failure rather than asking us to wait, true bytes from the
+                // pantry are still the better answer for a read that is allowed
+                // one (a floor-class read — every write included — gets `None`
+                // here and falls through to the honest answer below).
                 if let Some(class) = read_class {
                     if let Some(amber) = freshness_answer(&ctx, class, &pantry_key) {
                         return amber;
                     }
+                }
+                if !declares {
+                    // Relay verbatim. The round trip is already spent, so
+                    // passing storage's own status and body through issues no
+                    // further work upstream — and it is the only way the caller
+                    // (and the operator reading its log) ever sees the sentence
+                    // that names the defect.
+                    let content_type = response
+                        .headers()
+                        .get("content-type")
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or("application/json")
+                        .to_string();
+                    let body = response.bytes().await.unwrap_or_default();
+                    let relayed = Response::builder()
+                        .status(
+                            StatusCode::from_u16(status_u16)
+                                .unwrap_or(StatusCode::SERVICE_UNAVAILABLE),
+                        )
+                        .header("Content-Type", content_type)
+                        .header("Cross-Origin-Resource-Policy", "cross-origin")
+                        .body(Full::new(Bytes::from(body.to_vec())))
+                        .expect("infallible relayed upstream response");
+                    return match read_class {
+                        Some(class) => tag_shed(relayed, class),
+                        None => relayed,
+                    };
                 }
                 let shed =
                     catching_up_proxy_response(wants_html, retry_after, storage_url, breakers);
@@ -1615,6 +1672,51 @@ mod tests {
         (addr, handle)
     }
 
+    /// Same as [`spawn_mock_storage`], plus a fixed extra header — the one
+    /// axis that tells a storage SHED (`Retry-After` / `X-Available-Permits`
+    /// present) apart from a storage ERROR (neither present).
+    async fn spawn_mock_storage_with_header(
+        status: u16,
+        body: Vec<u8>,
+        content_type: &'static str,
+        header: (&'static str, &'static str),
+    ) -> (SocketAddr, tokio::task::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let handle = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let io = TokioIo::new(stream);
+                let body_clone = body.clone();
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            service_fn(move |_req: Request<hyper::body::Incoming>| {
+                                let b = body_clone.clone();
+                                async move {
+                                    let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                        Ok(Response::builder()
+                                            .status(status)
+                                            .header("Content-Type", content_type)
+                                            .header(header.0, header.1)
+                                            .body(Full::new(Bytes::from(b)))
+                                            .unwrap());
+                                    resp
+                                }
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+
+        (addr, handle)
+    }
+
     /// Spawn an in-process HTTP server that accepts the connection and then
     /// never answers — the shape of a storage peer mid-churn (accepting, but
     /// not responding within the client's patience).
@@ -1870,16 +1972,22 @@ mod tests {
     }
 
     /// Sibling scoping test for the carve-out above: an ordinary read against
-    /// the same 503-answering upstream still gets the catching-up shed. The
-    /// bypass is scoped to the two named probes, not a blanket "relay every
+    /// a genuinely SHEDDING upstream still gets the catching-up shed. The
+    /// relay is scoped — to the two named probes, and (since 2026-09-12) to a
+    /// 503 that declares no backpressure at all — not a blanket "relay every
     /// upstream 503" — honoring backpressure for normal traffic is what keeps
     /// a busy storage from being hammered.
+    ///
+    /// The mock carries `Retry-After` because storage's real shed responder
+    /// (`services::response::too_many_requests_with_retry`) always does; that
+    /// header IS the declaration `declares_backpressure` reads.
     #[tokio::test]
     async fn non_diagnostic_read_still_honors_upstream_503() {
-        let (addr, _handle) = spawn_mock_storage(
+        let (addr, _handle) = spawn_mock_storage_with_header(
             503,
             br#"{"error":"write pool exhausted"}"#.to_vec(),
             "application/json",
+            ("Retry-After", "2"),
         )
         .await;
         let storage_url = format!("http://{addr}");
@@ -2870,6 +2978,110 @@ mod tests {
         // The breaker stays CLOSED: a busy upstream is a live one, and amber
         // did not change that classification.
         assert_eq!(breakers.snapshot()[0].circuit, "closed");
+    }
+
+    fn make_patch_request(uri: &str) -> Request<Full<Bytes>> {
+        Request::builder()
+            .method(Method::PATCH)
+            .uri(uri)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from_static(br#"{"state":"active"}"#)))
+            .unwrap()
+    }
+
+    /// A storage 503 that declares NO backpressure is storage REPORTING a
+    /// failure, and the caller must see storage's own words.
+    ///
+    /// Regression for the 2026-09-12 household-mesh red: the prologue's
+    /// `seed-drill-custody` leg PATCHed a custody-blob commitment to `active`;
+    /// storage answered in 44 ms with `503 {"error":"… multiple root Creates
+    /// for ID"}` — a permanent DHT identity fork — and the doorway relabelled
+    /// it `{"status":"catching-up"}`, so the seeder burned 12 retries × 15 s on
+    /// a call that could never succeed and nobody saw the defect named.
+    #[tokio::test]
+    async fn a_storage_error_503_is_relayed_verbatim_not_masked_as_catching_up() {
+        const ERR: &[u8] = br#"{"error":"Conductor error: commitment observation unavailable: multiple root Creates for ID"}"#;
+        let (addr, _h) = spawn_mock_storage(503, ERR.to_vec(), "application/json").await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let path = "/api/v1/commitments/custody-blob-abca87ccc3b77518";
+
+        let resp = forward_to_storage(
+            make_patch_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let body = String::from_utf8(
+            resp.into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(
+            body.contains("multiple root Creates for ID"),
+            "storage's own reason must reach the caller, got: {body}"
+        );
+        assert!(
+            !body.contains("catching-up"),
+            "a permanent error must not wear the catching-up envelope, got: {body}"
+        );
+        // Unchanged: busy-or-broken, the upstream ANSWERED, so the breaker
+        // stays closed and unrelated routes keep flowing.
+        assert_eq!(breakers.snapshot()[0].circuit, "closed");
+    }
+
+    /// The other side of the same rule: a 503 that DOES declare backpressure
+    /// (storage's shed responder always sets `Retry-After`) keeps the exact
+    /// legacy catching-up envelope, including the upstream's own Retry-After.
+    #[tokio::test]
+    async fn a_declared_backpressure_503_still_sheds_as_catching_up() {
+        let (addr, _h) = spawn_mock_storage_with_header(
+            503,
+            br#"{"status":"catching-up","retryAfter":2}"#.to_vec(),
+            "application/json",
+            ("Retry-After", "2"),
+        )
+        .await;
+        let storage_url = format!("http://{addr}");
+        let client = reqwest::Client::new();
+        let breakers = UpstreamBreakers::default();
+        let path = "/api/v1/commitments/custody-blob-abca87ccc3b77518";
+
+        let resp = forward_to_storage(
+            make_patch_request(path),
+            &storage_url,
+            path,
+            &client,
+            &breakers,
+            ForwardCtx::default(),
+        )
+        .await;
+
+        assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(header(&resp, "retry-after"), Some("2"));
+        let body = String::from_utf8(
+            resp.into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .to_vec(),
+        )
+        .unwrap();
+        assert!(
+            body.contains("catching-up"),
+            "declared backpressure keeps its envelope, got: {body}"
+        );
     }
 
     /// An unwired call site (`ForwardCtx::default()`) is byte-for-byte the
