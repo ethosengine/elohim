@@ -491,10 +491,31 @@ fn project_collective_within_txn(
     let layer = hints.governance_layer();
     let reach = hints.reach();
 
-    // (1) Already anchored to this cid, under whatever id — refresh only.
-    if let Some(existing_id) = id_for_collective_cid(conn, ctx, p.collective_cid)? {
-        refresh_collective_row(conn, ctx, &existing_id, p.display_name, &layer)?;
-        return Ok(CollectiveProjectionOutcome::Refreshed);
+    // (1) Already anchored to this cid, under a REAL routing alias — refresh only.
+    //
+    // 2026-09-12 (doorway-footprint-convergence): a cid-KEYED placeholder
+    // (`id == collective_cid`, minted by step (3) when no alias matched) must NOT
+    // satisfy this check. It used to, and the short-circuit then froze the peer on
+    // its own stub permanently: once a placeholder existed, NO later projection —
+    // not even one carrying a corrected charter `slugAlias` — could re-evaluate
+    // the alias, so the slug the household's members actually name
+    // (`humans.household_id`) stayed un-anchored and the resilience fold grouped
+    // that peer on a different key than its neighbours. Measured on the household
+    // mesh: jessica and james each held the cid under `collective:uhCkkD5Z9…` with
+    // `household-dowell` un-anchored, and no amount of re-projection moved it.
+    //
+    // Same principle as `gap_fill_household_collective_cid_via_membership`'s
+    // `already_known` guard: a placeholder is a routing stub, not an alias.
+    // Falling through lets step (2) re-point onto a real alias when one becomes
+    // resolvable; when none is, step (2)'s loop finds nothing and we refresh the
+    // placeholder exactly as before.
+    let anchored_under = id_for_collective_cid(conn, ctx, p.collective_cid)?;
+    let placeholder_anchored = anchored_under.as_deref() == Some(p.collective_cid);
+    if let Some(existing_id) = anchored_under.as_deref() {
+        if !placeholder_anchored {
+            refresh_collective_row(conn, ctx, existing_id, p.display_name, &layer)?;
+            return Ok(CollectiveProjectionOutcome::Refreshed);
+        }
     }
 
     // (2) Alias merge onto an existing local row.
@@ -524,6 +545,27 @@ fn project_collective_within_txn(
             // Heal fills, never moves — the canonical channels own this.
             return Ok(CollectiveProjectionOutcome::SkippedDeclared);
         }
+        if placeholder_anchored {
+            // `idx_collectives_cid_unique` is `(h_app_id, collective_cid)` — one
+            // household, ONE anchored row — so the cid must be freed from the stub
+            // before the real alias can take it, or the stamp below trips the
+            // unique index. We are already inside `project_collective`'s
+            // `immediate_transaction`, so the release and the stamp are atomic:
+            // no window exists in which the cid is unanchored.
+            diesel::update(
+                collectives::table
+                    .filter(collectives::h_app_id.eq(&ctx.h_app_id))
+                    .filter(collectives::id.eq(p.collective_cid)),
+            )
+            .set((
+                collectives::collective_cid.eq(None::<String>),
+                collectives::updated_at.eq(current_timestamp()),
+            ))
+            .execute(conn)
+            .map_err(|e| {
+                StorageError::Internal(format!("Collective placeholder release failed: {}", e))
+            })?;
+        }
         let stamped = diesel::update(
             collectives::table
                 .filter(collectives::h_app_id.eq(&ctx.h_app_id))
@@ -544,6 +586,15 @@ fn project_collective_within_txn(
                 e
             ))),
         };
+    }
+
+    // (2b) No alias was resolvable and a placeholder already holds the cid —
+    // nothing better exists yet. Refresh it and keep the pre-2026-09-12 outcome
+    // exactly: falling into step (3) would re-upsert the same row and report
+    // `Created` for what is plainly a refresh.
+    if placeholder_anchored {
+        refresh_collective_row(conn, ctx, p.collective_cid, p.display_name, &layer)?;
+        return Ok(CollectiveProjectionOutcome::Refreshed);
     }
 
     // (3) Insert a cid-keyed row (idempotent upsert on id), then stamp the cid.
@@ -2232,6 +2283,139 @@ mod tests {
                 "ambiguous pairing must never guess-write either candidate"
             );
         }
+    }
+
+    /// **The frozen placeholder (2026-09-12 doorway-footprint-convergence).**
+    ///
+    /// Step (1) used to treat a cid-KEYED placeholder as "already anchored" and
+    /// return `Refreshed`, which froze the peer on its own stub: no later
+    /// projection could ever re-evaluate the alias, so the member slug stayed
+    /// un-anchored forever. Measured on the mesh as jessica/james holding the cid
+    /// under `collective:uhCkkD5Z9…` with `household-dowell` un-anchored.
+    ///
+    /// A placeholder is a routing stub, not an alias. A later projection that CAN
+    /// name a real alias must re-point onto it — and, because
+    /// `idx_collectives_cid_unique` allows only one anchored row per cid, must
+    /// free the stub in the same transaction.
+    #[test]
+    fn placeholder_does_not_freeze_the_alias_and_is_repointed() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        // First projection: no local alias exists, so a placeholder is minted.
+        let first = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Dowell Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household","slugAlias":"household-dowell"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(first, CollectiveProjectionOutcome::Created);
+        assert_eq!(
+            get_collective(&mut conn, &ctx, CID_A)
+                .expect("get")
+                .expect("Some")
+                .collective_cid
+                .as_deref(),
+            Some(CID_A),
+            "the placeholder holds the cid while no alias exists"
+        );
+
+        // The slug row arrives later (seed, membership projection, backfill).
+        seed_family_row(&mut conn, &ctx, "household-dowell", None);
+
+        // Re-projection must now RE-POINT onto the real alias, not report Refreshed.
+        let second = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Dowell Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household","slugAlias":"household-dowell"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(
+            second,
+            CollectiveProjectionOutcome::AliasMerged,
+            "a resolvable alias must win over the stub"
+        );
+
+        assert_eq!(
+            get_collective(&mut conn, &ctx, "household-dowell")
+                .expect("get")
+                .expect("Some")
+                .collective_cid
+                .as_deref(),
+            Some(CID_A),
+            "the member slug is now anchored — the fold groups every peer on it"
+        );
+        assert!(
+            get_collective(&mut conn, &ctx, CID_A)
+                .expect("get")
+                .expect("placeholder row survives")
+                .collective_cid
+                .is_none(),
+            "the stub released the cid; two anchored rows would trip the unique index"
+        );
+    }
+
+    /// With no alias resolvable the placeholder is still the best the peer has —
+    /// it must be refreshed in place, exactly as before the step-(1) relaxation.
+    #[test]
+    fn placeholder_without_a_resolvable_alias_still_refreshes_in_place() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+        let ctx = make_ctx();
+
+        project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Dowell Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+
+        let again = project_collective(
+            &mut conn,
+            &ctx,
+            &CollectiveProjection {
+                collective_cid: CID_A,
+                display_name: "Renamed Household",
+                founder_agent_cid: None,
+                charter: Some(r#"{"kind":"household"}"#),
+                merge_onto_id: None,
+                mode: CollectiveStampMode::GapFill,
+            },
+        )
+        .expect("project");
+        assert_eq!(again, CollectiveProjectionOutcome::Refreshed);
+
+        let row = get_collective(&mut conn, &ctx, CID_A)
+            .expect("get")
+            .expect("Some");
+        assert_eq!(
+            row.collective_cid.as_deref(),
+            Some(CID_A),
+            "the placeholder keeps the cid when nothing better exists"
+        );
+        assert_eq!(row.name, "Renamed Household", "and is refreshed in place");
     }
 
     /// **The self-blocking heal (2026-09-12 doorway-footprint-convergence).**
