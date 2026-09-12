@@ -53,7 +53,7 @@ The recall contract is `bounded-evidence-recall` v12 at `.epr-meta/elohim/algori
 
 The lens (`recall/lens.rs`) composes three inputs: the recipe's defaults, the reader's *stated* tier from the actor sidecar (`role@model`, e.g. `claude-sonnet-5 → simple`, `claude-fable-5-1 → detail`), and the reader's *revealed* history. A `ReaderRef` is resolved from the sidecar, never inferred (`lens.rs:157-172`). The human half is one unbuilt line: "human lens not yet negotiated; recipe default" (`lens.rs:522`).
 
-The classifier vocabulary (`AttentionTending` with `ValuesForward | Fatigue | ScopeMismatch | Safety`) is real Rust as a kind at L2 (`elohim-storage/src/p2p/attention_tending.rs`; integrity zome `content_store_integrity/src/attention_tending.rs`) and **declared only** as classification variants (the spec, line 110; no Rust enum). The sense-respond classifier (`2026-07-15`) is the frame-and-intent design it inherits from.
+The classifier vocabulary (`AttentionTending` with `ValuesForward | Fatigue | ScopeMismatch | Safety`) is real Rust at L2, both the kind and its `Classification` enum (`elohim-storage/src/p2p/attention_tending.rs:61-70, 89`; integrity zome `content_store_integrity/src/attention_tending.rs`). An earlier draft of this document called the variants declared only; that was an inventory error, corrected 2026-09-12. The sense-respond classifier (`2026-07-15`) is the frame-and-intent design it inherits from.
 
 No Rust crate anywhere in the tree declares full-text or vector search (grep across every `Cargo.toml`: zero hits for tantivy, sqlite-vec, fts5, hnsw, usearch, embedding) ✅.
 
@@ -251,10 +251,10 @@ Small, dependency-ordered, each with the seam it lives in and a probe that would
 | # | Seam | Build | Depends on | Probe |
 |---|---|---|---|---|
 | B1 | 1 | **Lexical provider on SQLite FTS5** behind the `Provider` trait; BM25 with `ranking_known: true` and a method CID | station 1 (trait lands) | a recall packet prints a lexical candidate with its method CID; no new crate in `Cargo.toml` |
-| B2 | 1 | **Index as a measure**: one middot declaration carrying reach ceiling, surfaces, chunk rule, model CID, retention | B1 | the measure's CID appears in the receipt beside the recipe CID |
+| B2 | 1 | **Index as a measure**: one middot declaration carrying a reach bound, surfaces, chunk rule, model CID, retention — **vocabulary landed 2026-09-12** in `elohim/epr-rea/src/index.rs` (gate green); the receipt wiring is still open | B1 | the measure's CID appears in the receipt beside the recipe CID |
 | B3 | 1 | **Semantic provider on sqlite-vec** with a pinned local model (llama.cpp/ggml or ONNX; model bytes CID'd in B2) | B2 | `recall-contract.json` `semantic_provider` no longer reads `mempalace`; a candidate carries the model CID |
 | B4 | 1 | **Bi-temporal `as_of`** on `EpistemicStanding` and graph edges; demotion, never deletion | B2 | a query `as_of` yesterday returns a since-demoted fact with its demotion timestamp |
-| B5 | 1 | **`AttentionTending` classification enum** in Rust (`ValuesForward, Fatigue, ScopeMismatch, Safety`), private chain only | none | the kind serializes; no path exports it above the private chain |
+| B5 | 1 | ~~`AttentionTending` classification enum~~ **Withdrawn 2026-09-12:** the enum exists as real Rust (`elohim-storage/src/p2p/attention_tending.rs:61-70`, `Classification { ValuesForward, Fatigue, ScopeMismatch, Safety }`); the inventory's "declared only" was wrong. Remaining gap: the kind is not exported through `elohim-epr` for other crates | none | a consumer outside elohim-storage names the variants without a storage dependency |
 | B6 | 1 | **Human lens negotiation** (`lens.rs:522`) | station 1 | a human `ReaderRef` resolves a stated level and the receipt records it |
 | B7 | 1 | **Index freshness as reconciliation**: the controller re-folds on head change; retire the manual mine gate | B2, B3 | the session-start gate reads fold-lag, not files-newer-than-mine |
 | B8 | 2 | **Household = smallest Collective EPR**, named by ring, no new kind | pools Q3 | a household index measure is declared as a collective's |
@@ -301,7 +301,9 @@ Each with a recommendation; the operator decides.
 
 ---
 
-## 7. Mint outputs (for the operator's mint pass)
+## 7. Mint outputs (folded 2026-09-12)
+
+**Folded:** measure-family borrows rows 26–27 · commons-holonic stewardship rows 27–29 · dataplane borrows rows 12–15 · confidentiality plane rows 10–11 · scale risk rows 9–10 · agentic-context-tooling queue item 24. Consolidating spec: [memory, search and scale — the three seams](epr:memory-search-scale-three-seams-design) (its §6 is the seam register, the dedupe guard for this whole space). The pools and search documents' own §9/§10 proposals remain the operator's mint. The table below is the map that was folded.
 
 | Cluster | Row |
 |---|---|

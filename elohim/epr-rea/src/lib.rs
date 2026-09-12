@@ -59,6 +59,7 @@ pub mod actor;
 pub mod epistemic;
 pub mod error;
 pub mod fold;
+pub mod index;
 pub mod model;
 pub mod scope;
 #[cfg(feature = "sidecar")]
@@ -76,6 +77,10 @@ pub use epistemic::{
 };
 pub use error::{FabricError, Result};
 pub use fold::{fulfillment, resource_state, FulfillmentStatus, ResourceState};
+pub use index::{
+    ArcRange, FoldAttestation, FoldState, IndexError, IndexMeasure, ModelPin, RankingMethod,
+    ReachBound, Retention, ShardManifest, SurfaceRule, VectorMetric, PRIVATE_CHAIN_KINDS,
+};
 pub use model::{
     atom_cid, edge_fp, AgentRef, Bound, Commitment, CommitmentState, Composition, DepEdge,
     EdgeSpec, EdgeStatus, FlowEvent, Governor, Intent, LimitSource, PinnedRef, Process,

@@ -67,6 +67,14 @@ becoming a node in the project's first-class graph alongside humans, devices, an
 - First memory entry graduated to story → memorialized to deep tier (test the lifecycle)
 - Reach-policy for memory entries (who can attest a graduation?)
 
+- **2026-09-12 — the memory/search/scale seams are now a sealed spec.** Where the addressable
+  memory goes once it graduates past `.claude/`: [the three-seams spec](epr:memory-search-scale-three-seams-design) registers the
+  local membrane (an index is a middot measure; native FTS5/sqlite-vec providers with the lens
+  bound at retrieval; MemPalace as a watched visitor), reach at replication between holons, and
+  the council-stewarded pool fold on DHT arcs — with a seam register (§6) naming where each
+  concern lives today. Research: [local-first → council](epr:local-first-to-council-memory-search-seams-2026-09-12). Not scheduled; picked as cluster
+  rows (see the spec's §10) after the governed-discovery plan's station 3.
+
 ## Out of scope for this horizon
 
 - Reach-policy substrate beyond Stage-1 social trust

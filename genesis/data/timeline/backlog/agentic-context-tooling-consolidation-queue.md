@@ -331,6 +331,19 @@ before investing.
     was missing. Not a deep pass yet — the entry exists so the research pass can be bootstrapped
     from breadcrumbs rather than re-derived.
 
+24. **The palace's semantic route goes native, and the lens binds at retrieval.** The research
+    pass item 23 asked for ran 2026-09-12: [local-first → council](epr:local-first-to-council-memory-search-seams-2026-09-12) and
+    [the three-seams spec](epr:memory-search-scale-three-seams-design). Answer: build the EPR-native layer, keep MemPalace as a
+    watched visitor and second opinion. After the governed-discovery plan's station 1 lands the
+    `Provider` trait: an FTS5 lexical provider (BM25, zero new crates), an `IndexMeasure`
+    declaration (measure-family row 26), a sqlite-vec semantic provider with a pinned local model
+    (dataplane-borrows row 14), fold-lag freshness that retires the manual mine gate (the
+    `mempalace-surfaces-changed-ceiling@1` bound reads red today), and the human half of lens
+    negotiation at `recall/lens.rs:522`. Retirement criteria for the palace's *semantic role*: the
+    recall contract's `semantic_provider` no longer reads `mempalace`, and removing the palace
+    loses only the second opinion. The palace itself stays, as one declared provider with
+    `ranking_known: false` under the six-part admission contract (confidentiality row 10).
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
