@@ -195,12 +195,14 @@ class CapabilityTierGateCase(unittest.TestCase):
         "time git reset --hard": "git reset",
         'eval "git reset --hard"': "git reset",
         "eval git reset --hard": "git reset",
+        # Round 3: xargs resolves its REAL trailing command and classifies it exactly like a
+        # plain invocation (tier-respecting, direct reason) -- not a blanket indirect bucket.
+        "xargs git reset --hard": "git reset",
     }
 
     ROUND2_INDIRECT = [
         "$(echo git) reset --hard",
         "`echo git` reset --hard",
-        "xargs git reset --hard",
         'echo "git reset --hard" | xargs -I{} bash -c \'{}\'',
         'python3 -c "import subprocess; subprocess.run(\'git reset --hard\')"',
     ]
@@ -229,10 +231,17 @@ class CapabilityTierGateCase(unittest.TestCase):
 
     def test_indirect_denies_regardless_of_tier(self):
         # DENY ON AMBIGUITY bypasses tier resolution entirely — even opus cannot clear it.
-        r = run_hook("xargs git reset --hard", self.proj, {"CLAUDE_MODEL": "claude-opus-5"})
+        r = run_hook("$(echo git) reset --hard", self.proj, {"CLAUDE_MODEL": "claude-opus-5"})
         self.assertEqual(r.returncode, 0, r.stderr)
         out = json.loads(r.stdout)
         self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_xargs_real_command_respects_tier_unlike_true_indirection(self):
+        # Round 3: `xargs git reset --hard` classifies the REAL trailing command directly (tier-
+        # respecting), unlike a genuinely indirect construct which never respects tier.
+        r = run_hook("xargs git reset --hard", self.proj, {"CLAUDE_MODEL": "claude-opus-5"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "", "opus is at the floor: this must be ALLOWED")
 
     # ── declared-class gaps closed this round ────────────────────────────────────────────────
     DECLARED_GAPS = [
@@ -463,6 +472,126 @@ class CapabilityTierGateCase(unittest.TestCase):
     def test_real_repo_registry_relaxed_matrix(self):
         for cmd in ("git restore --staged file.txt", "git checkout -- file.txt",
                     "git branch --delete oldbranch", "git rebase --abort"):
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), "", cmd)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════
+    # Round 3 (third adversarial pass): the tokeniser traded a HEAD-TOKEN bypass for a
+    # TOKENISATION bypass (quote-splitting, shell variable-expansion/ANSI-C-quote gluing, a
+    # variable used as the head, function bodies, bare-shell sinks, find -exec) — and, in the
+    # OTHER direction, round 2's blanket "indirection marker anywhere + a git/rm word anywhere
+    # in the chain" over-blocked routine commands whose ONLY git/rm mention was a harmless
+    # read-only inner command or a commit-message word.
+    # ══════════════════════════════════════════════════════════════════════════════════════
+
+    ROUND3_BYPASSES = [
+        'g""it reset --hard',
+        "git${IFS}reset${IFS}--hard",
+        "git reset $'--hard'",
+        "GIT=git; $GIT reset --hard",
+        "f(){ git reset --hard; }; f",
+        'bash <<< "git reset --hard"',
+        "printf 'git reset --hard' | sh",
+        'echo "git reset --hard" | sh',
+        "find . -exec git checkout -- . ;",
+    ]
+
+    def test_round3_bypasses_denied(self):
+        for cmd in self.ROUND3_BYPASSES:
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
+
+    ROUND3_OVER_BLOCKS = [
+        "cd $(git rev-parse --show-toplevel) && ls",
+        "git log --oneline $(git merge-base HEAD main)",
+        "export SHA=$(git rev-parse HEAD)",
+        "rm -rf $(mktemp -d)",
+        "git commit -m 'fix rm handling'",
+        "find . -name '*.rs' | xargs grep -l git",
+        "python3 script.py --git-dir x",
+    ]
+
+    def test_round3_over_blocks_allowed(self):
+        for cmd in self.ROUND3_OVER_BLOCKS:
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), "", f"unexpected deny for: {cmd}")
+                self.assertEqual(r.stderr.strip(), "", f"unexpected stderr for: {cmd}")
+
+    def test_scoped_substitution_still_catches_a_destructive_inner_command(self):
+        # The scoping refinement must not become a blanket allow: a DESTRUCTIVE git invocation
+        # inside an argument-position substitution is still ambiguous (deny).
+        r = run_hook(
+            "cd $(git branch -D main) && ls", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = json.loads(r.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_scoped_substitution_denies_an_unrecognised_git_subcommand(self):
+        # An inner git subcommand that is neither destructive NOR on the read-only allowlist is
+        # treated as unclassifiable -> ambiguous, per the ruling's "unclassifiable while
+        # carrying a git/rm head token" clause. (Substitution NOT under a prose head -- `echo
+        # $(...)` is prose printing a computed value and is legitimately exempt; that is a
+        # different case from the substitution's output being USED, as here via `cd`.)
+        r = run_hook(
+            "cd $(git blame somefile) && ls", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = json.loads(r.stdout)
+        self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny")
+
+    def test_scoped_substitution_allows_a_non_git_inner_command(self):
+        r = run_hook(
+            "cd $(date +%s) && ls", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "")
+
+    def test_prose_printing_a_substitution_stays_exempt(self):
+        # `echo $(...)` is prose printing a computed value, not using it as a command -- the
+        # single-stage prose exemption legitimately applies even when the substitution's inner
+        # text would itself be ambiguous.
+        r = run_hook(
+            "echo $(git blame somefile)", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "")
+
+    def test_find_exec_non_destructive_command_allowed(self):
+        r = run_hook(
+            "find . -exec git status ;", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "")
+
+    def test_pre_filter_runs_on_tokens_not_raw_string(self):
+        # A command whose RAW TEXT never contains the literal substring "git"/"rm" contiguously
+        # (quote-split) must still reach classification once shlex merges the tokens.
+        r = run_hook('g""it reset --hard', self.proj, {"CLAUDE_MODEL": "claude-opus-5"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.strip(), "", "opus is at the floor: this must be ALLOWED")
+
+    def test_real_repo_registry_round3_bypasses(self):
+        for cmd in ("git${IFS}reset${IFS}--hard", "GIT=git; $GIT reset --hard",
+                    "f(){ git reset --hard; }; f", 'bash <<< "git reset --hard"'):
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
+
+    def test_real_repo_registry_round3_over_blocks(self):
+        for cmd in ("cd $(git rev-parse --show-toplevel) && ls",
+                    "git commit -m 'fix rm handling'",
+                    "find . -name '*.rs' | xargs grep -l git",
+                    "python3 script.py --git-dir x"):
             with self.subTest(cmd=cmd):
                 r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
                 self.assertEqual(r.returncode, 0, r.stderr)

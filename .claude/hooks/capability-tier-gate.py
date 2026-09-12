@@ -15,38 +15,51 @@ The table lives in ONE place: `.claude/epr-meta/policies.yaml` row
 tier-floor, unknown-tier, remedy). This hook is a thin reader of that declared table — see the
 `capability-tier-gate-owns-destructive-git` rule in `.claude/hooks/.epr-meta`.
 
-FIX ROUND 1: substring matching -> TOKENISED subcommand classification (unwrap bash -c/sh -c/
-command/env/an absolute path to git; strip git global options before reading the subcommand);
-contentHash pin verification BEFORE trusting the row (fail-closed on tamper); every internal
-error spoken, never a bare silent exit; tier resolution drops `ANTHROPIC_MODEL`; remedy carries
-no self-claim hint.
+FIX ROUND 1: substring matching -> TOKENISED subcommand classification; contentHash pin
+verification BEFORE trusting the row (fail-closed on tamper); every internal error spoken;
+tier resolution drops `ANTHROPIC_MODEL`; remedy carries no self-claim hint.
 
-FIX ROUND 2 (adversarial re-review, 30+ new payloads: round 1's tokeniser traded a substring
-bypass for a HEAD-TOKEN bypass). Round 1 only classified an invocation when the unwrapped HEAD
-token literally equaled `git`/`rm`/a shell — so `eval "git reset --hard"`, `$(echo git) reset
---hard`, `xargs git reset --hard`, `echo … | xargs -I{} bash -c '{}'`, `(git reset --hard)`,
-`{ git reset --hard; }`, `if …; then git reset --hard; fi`, `bash -lc "…"` / `bash -x -c "…"`,
-`nohup|setsid|stdbuf|time git reset --hard`, and `python3 -c "…git reset --hard…"` all resolved
-to a non-git/rm/shell head and were silently allowed. This is DENY ON AMBIGUITY: a candidate is
-now any CHAIN (a `;`/`&&`/`||`/newline-separated unit, itself possibly multiple `|`-piped
-stages) containing a `git` or `rm` word anywhere. A wider wrapper set is stripped before
-classification (`eval`, `command`, `env`+assignments, `nohup`, `setsid`, `stdbuf`, `time`,
-`timeout <n>`, `nice`, `sudo`, and the bare shell-keyword/paren/brace no-ops `( ) { } if then
-else elif fi do done while until`); a shell (`bash`/`sh`/`zsh`) is unwrapped whenever ANY of its
-leading option tokens carries the letter `c` (`-c`, `-lc`, `-x -c`, `-euo pipefail -c`),
-recursing into its script string. If, after all that, the chain is STILL indirect — command
-substitution (`$(`/backtick) inside a token, `xargs` as any stage's head, or an interpreter
-(`python*`/`perl`/`ruby`/`node`) whose argument string carries a `git`/`rm` word — the WHOLE
-chain denies with the reason `indirect invocation carrying a destructive token; run it plainly
-or ask the controller`, unconditionally (no tier can clear it: an ambiguous invocation is not
-something a floor can bless). `echo`/`printf`/`grep`/`cat`/`rg` prose stays exempt ONLY as a
-single-stage chain (no `|`, no `xargs` downstream) — piping prose into `xargs`/`bash -c` voids
-the exemption. Session key: this harness's real session-id env var is `CLAUDE_CODE_SESSION_ID`
-(round 1 read only `CLAUDE_SESSION_ID`, which this harness never sets, so the sidecar lookup
-never matched and every actor silently resolved `unknown`) — read `CLAUDE_CODE_SESSION_ID`
-first, `CLAUDE_SESSION_ID` as a fallback. `CLAUDE_MODEL` is not exported by this harness either;
-in practice the ladder is honour-system via `epr actor claim`, and absent a claim it is a
-uniform deny.
+FIX ROUND 2: DENY ON AMBIGUITY — a wider wrapper/keyword strip set, flexible shell `-c`
+detection, and an unconditional deny (bypassing tier) for a chain that is still indirect after
+unwrapping (command substitution, `xargs`, an interpreter carrying a git/rm word). Session key
+fixed to `CLAUDE_CODE_SESSION_ID` (this harness's real var), `CLAUDE_SESSION_ID` as fallback.
+
+FIX ROUND 3 (third adversarial pass, 25/25 tests still green — two problems, one in each
+direction). STILL ALLOWED: a quote-split word (`g""it reset --hard` — the RAW-STRING pre-filter
+missed it although shlex merges it to `git`); `git${IFS}reset${IFS}--hard` / `git reset
+$'--hard'` (shell variable-expansion / ANSI-C-quote gluing); `GIT=git; $GIT reset --hard`
+(variable head); `f(){ git reset --hard; }; f` (function body); `bash <<< "…"` / `printf … | sh`
+/ `echo … | sh` (a bare shell as a heredoc/here-string target or pipeline SINK wasn't treated as
+indirect); `find . -exec git checkout -- . ;` (find -exec is xargs-equivalent, terminator
+escaped in real usage). NOW
+OVER-BLOCKED (denied for every tier — load-bearing, would block routine work): `cd
+$(git rev-parse --show-toplevel) && ls`, `git log --oneline $(git merge-base HEAD main)`,
+`export SHA=$(git rev-parse HEAD)`, `rm -rf $(mktemp -d)`, `git commit -m 'fix rm handling'`,
+`find . -name '*.rs' | xargs grep -l git`, `python3 script.py --git-dir x` (`\bgit\b` hit
+`--git-dir`) — round 2's blanket "an indirection marker anywhere + a git/rm word anywhere in the
+chain" denied everyone the moment a command substitution held ANY git mention, destructive or
+not.
+
+The fix: (1) the pre-filter runs on TOKENS (shlex-merged), never the raw string, so a
+quote-split word is never missed. (2) A stage's stripped HEAD starting with `$` or a backtick is
+unconditionally indirect (a variable/substitution used AS THE COMMAND — we cannot know what it
+resolves to); a `NAME(){ BODY; }` function-definition preamble is stripped so the BODY still
+classifies directly. A raw-text scan catches `${...}`/`$'...'` gluing adjacent to a git/rm word
+(`git${IFS}reset`, `git reset $'--hard'`) as indirect too. (3) A `$( )`/backtick substitution used
+as an ARGUMENT (not the head) is SCOPED: its inner text is extracted and itself classified —
+ambiguous (deny) only when that inner text is destructive, or is git/rm-headed but not one of a
+small read-only allowlist (`rev-parse`, `merge-base`, `log`, `status`, `describe`, `ls-files`,
+`diff`, `show`, `remote`, `rev-list`, `config --get`, `branch --show-current`, a read-form
+`symbolic-ref`); a non-git/rm inner head (`mktemp`, `date`, `pwd`, …) is never ambiguous. `xargs`
+and `find -exec/-execdir` resolve their REAL trailing command and classify it the SAME way a
+plain invocation would (`xargs grep -l git` is allowed — grep is not git/rm; `xargs git reset
+--hard` denies via the ordinary destructive-git reason, not the generic indirect one); only when
+the resolved command is itself a shell/`eval` (the "run whatever came down the pipe" shape) do we
+fall back to inspecting the upstream payload (an `echo`/`printf` stage's own arguments, or a
+`<<<` here-string's text) and deny with the indirect reason if THAT payload is destructive — an
+unrecoverable upstream (anything else) defaults to deny, since we cannot verify it's safe. The
+interpreter word-scan now skips dash-prefixed tokens entirely (a flag like `--git-dir` is never
+"free text"), so `\bgit\b` no longer fires on an option name.
 
 Deny shape copies `cargo-disk-guard.py`'s exact convention: one `hookSpecificOutput` JSON object
 on stdout (`permissionDecision: deny`), process exit 0.
@@ -76,14 +89,10 @@ POLICY_ID = "destructive-git-requires-tier"
 POLICY_VERSION = 1
 POLICY_REF = f"{POLICY_ID}@{POLICY_VERSION}"
 
+INDIRECT = "__INDIRECT__"
 INDIRECT_REASON = (
     "indirect invocation carrying a destructive token; run it plainly or ask the controller"
 )
-
-# Cheap pre-filter: only a Bash command that mentions `git` or `rm` can possibly contain a
-# destructive invocation, so everything else returns before touching policies.yaml (or the
-# actor sidecar, or the pin-hashing lib) at all.
-_PRE_FILTER = re.compile(r"git|rm")
 
 _MAX_UNWRAP_DEPTH = 4
 
@@ -93,23 +102,22 @@ _TOP_OPERATORS = {"&&", "||", ";", "&"}
 _PIPE_OP = "|"
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
-# Wrappers whose head is stripped and whose own (dash-prefixed) options are skipped; `timeout`
-# additionally consumes its one numeric duration argument. `eval` is handled separately (its
-# remaining tokens are REJOINED into a string and re-scanned, like a shell's `-c` argument).
 _WRAPPERS = {"timeout", "nice", "env", "command", "sudo", "nohup", "setsid", "stdbuf", "time"}
-# Bare shell-keyword / paren / brace no-ops: skip ONE token, no argument consumed.
 _NOOP_LEADING = {"(", ")", "{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until"}
 _SHELLS = {"bash", "sh", "dash", "zsh"}
 _NEVER_CLASSIFY_HEADS = {"echo", "printf", "grep", "cat", "rg"}
 _INTERPRETER_RE = re.compile(r"^(python\d*(\.\d+)?|perl\d?|ruby|node|nodejs)$")
 _GIT_RM_WORD_RE = re.compile(r"\bgit\b|\brm\b")
 
-# `(` and `)`/`{`/`}` are spaced out so shlex yields them as their own tokens (it has no shell
-# syntax awareness and otherwise glues them to an adjacent word, e.g. "(git" / "hard)"). A `(`
-# immediately preceded by `$` is left GLUED on purpose — that is what keeps a `$(` command-
-# substitution marker intact as a single detectable token instead of being torn apart into `$`
-# and `(`.
+# `(`/`)`/`{`/`}` are spaced out so shlex yields them as their own tokens (bare shell no-ops); a
+# `(` immediately preceded by `$` is left GLUED so a `$(` command-substitution marker survives
+# as one detectable token instead of being torn into `$` and `(`.
 _PAREN_BRACE_RE = re.compile(r"(?<!\$)([(){}])")
+
+# Round 3: a `${VAR}` or `$'...'` construct glued directly against a `git`/`rm` word (shell
+# variable-expansion or ANSI-C-quote obfuscation of whitespace) is scanned on the RAW command
+# text — token-level analysis alone cannot see it once shlex has already merged/quoted things.
+_VAR_GLUE_RE = re.compile(r"\$\{[^}]{1,40}\}|\$'[^']{1,80}'")
 
 
 def _tokenize(text: str) -> list:
@@ -124,7 +132,7 @@ def _tokenize(text: str) -> list:
 def _chains(command: str) -> list:
     """List of chains; each chain is a list of stages; each stage is a list of tokens. Chains
     are independent units separated by `;`/`&&`/`||`/`&`/newline; stages within one chain are
-    `|`-piped (so a pipeline's stages travel together for indirection analysis)."""
+    `|`-piped (so a pipeline's stages travel together)."""
     toks = _tokenize(command)
     chains, cur_chain, cur_stage = [], [], []
     for t in toks:
@@ -155,15 +163,16 @@ def _chains(command: str) -> list:
 
 
 def _strip_wrappers(toks: list) -> list:
-    """Strip leading `VAR=val` env assignments, bare shell-keyword/paren/brace no-ops, and
-    wrapper heads (`env`, `command`, `timeout <n>`, `nice`, `sudo`, `nohup`, `setsid`, `stdbuf`,
-    `time` + their own dash-prefixed options) so the REAL head is toks[0] afterward. `eval` and
-    shells are handled separately by the caller (they recurse into a re-joined/`-c` string,
-    rather than simply continuing with the same token list)."""
+    """Strip leading `VAR=val` assignments, a `NAME(){` function-definition preamble, bare
+    shell-keyword/paren/brace no-ops, and wrapper heads (their own dash-prefixed options
+    included) so the REAL head is toks[0] afterward. `eval` and shells recurse elsewhere."""
     i = 0
     while i < len(toks):
         if _ENV_ASSIGN.match(toks[i]):
             i += 1
+            continue
+        if i + 3 < len(toks) and toks[i + 1] == "(" and toks[i + 2] == ")" and toks[i + 3] == "{":
+            i += 4  # `NAME(){` -- classify the function BODY, not the definition
             continue
         base = os.path.basename(toks[i])
         if base in _NOOP_LEADING:
@@ -183,8 +192,7 @@ def _strip_wrappers(toks: list) -> list:
 
 
 def _find_dash_c(tokens: list):
-    """Index of the shell `-c`-equivalent option among a shell's argv (combined short clusters
-    like `-lc` count — any leading dash-option token carrying the letter `c`), or None."""
+    """Index of the shell `-c`-equivalent option (combined clusters like `-lc` count), or None."""
     for i, t in enumerate(tokens):
         if t == "-c":
             return i
@@ -197,29 +205,30 @@ def _is_interpreter(head: str) -> bool:
     return bool(_INTERPRETER_RE.match(head))
 
 
-# ── indirection (DENY ON AMBIGUITY) ──────────────────────────────────────────────────────────
+def _text_carries_git_or_rm_word(text: str) -> bool:
+    return bool(_GIT_RM_WORD_RE.search(text))
 
-def _chain_is_indirect(chain: list) -> bool:
-    for stage in chain:
-        for t in stage:
-            if "$(" in t or "`" in t:
-                return True
-        toks = _strip_wrappers(stage)
-        if not toks:
+
+def _interpreter_args_carry_destructive_word(argv: list) -> bool:
+    """FREE-TEXT scan of an interpreter's positional args (its `-c` script string, typically).
+    Dash-prefixed tokens are never "free text" — `--git-dir` is an option name, not prose, and a
+    naive word-boundary scan would otherwise fire on it (a hyphen satisfies `\\b` on both sides)."""
+    for t in argv:
+        if t.startswith("-"):
             continue
-        head = os.path.basename(toks[0])
-        if head == "xargs":
+        if _text_carries_git_or_rm_word(t):
             return True
-        if _is_interpreter(head):
-            rest_text = " ".join(toks[1:])
-            if _GIT_RM_WORD_RE.search(rest_text):
-                return True
     return False
 
 
-def _chain_has_git_or_rm_word(chain: list) -> bool:
-    text = " ".join(t for stage in chain for t in stage)
-    return bool(_GIT_RM_WORD_RE.search(text))
+def _has_glued_var_obfuscation(command: str) -> bool:
+    for m in _VAR_GLUE_RE.finditer(command):
+        start, end = m.span()
+        window = command[max(0, start - 20):end + 20]
+        de_globbed = _VAR_GLUE_RE.sub(" ", window)
+        if _GIT_RM_WORD_RE.search(de_globbed):
+            return True
+    return False
 
 
 # ── git subcommand rule evaluation ───────────────────────────────────────────────────────────
@@ -249,8 +258,7 @@ def _git_rule_matches(sub: str, args: list, rules: list):
     """The first declared rule (registry order) whose `sub` matches and whose predicate keys
     all hold (AND across keys present on ONE rule; a rule with no predicate keys matches the
     bare subcommand unconditionally). `exempt_if_any_args` is a final override: if any of its
-    tokens is present, this rule does NOT match, regardless of everything else. Multiple rows
-    sharing one `sub` OR together (each is checked independently)."""
+    tokens is present, this rule does NOT match. Multiple rows sharing one `sub` OR together."""
     for rule in rules:
         if not isinstance(rule, dict) or rule.get("sub") != sub:
             continue
@@ -279,10 +287,7 @@ _GIT_GLOBAL_ARG_OPTS_EQ = ("--git-dir=", "--work-tree=", "--namespace=", "--exec
 
 def _split_git_global_opts(args: list):
     """(subcommand, subcommand_args) after skipping git GLOBAL options — `-C <path>` and
-    friends consume the option AND their following value; git subcommands never start with `-`,
-    so the first non-dash token is always the subcommand. This is what makes `git -C
-    /other/checkout reset --hard` classify as `reset` regardless of the `-C` target — the gate
-    denies a destructive command aimed at ANY checkout, not only the cwd's."""
+    friends consume the option AND their following value; git subcommands never start with `-`."""
     i = 0
     while i < len(args):
         t = args[i]
@@ -294,8 +299,31 @@ def _split_git_global_opts(args: list):
         if t.startswith(_GIT_GLOBAL_ARG_OPTS_EQ):
             i += 1
             continue
-        i += 1  # an unrecognised global flag: skip one token, keep looking for the subcommand
+        i += 1
     return None, []
+
+
+def _classify_argv(argv: list, row: dict) -> "str | None":
+    """Classify an already-split argv (head = argv[0]) exactly like a plain top-level
+    invocation — shared by the direct stage path, `xargs`'s real trailing command, and
+    `find -exec`'s exec'd command."""
+    if not argv:
+        return None
+    head = os.path.basename(argv[0])
+    if head == "git":
+        sub, sub_args = _split_git_global_opts(argv[1:])
+        if not sub:
+            return None
+        rule = _git_rule_matches(sub, sub_args, row["rules"])
+        if rule:
+            return f"git {sub}" + (f" {' '.join(sub_args)}" if sub_args else "")
+        return None
+    if head == "rm":
+        target = _rm_matches(argv[1:], row["rm_targets"])
+        if target:
+            return f"rm {' '.join(argv[1:])}"
+        return None
+    return None
 
 
 # ── rm -rf / -fr / -r -f (the SHELL command) ─────────────────────────────────────────────────
@@ -340,14 +368,131 @@ def _rm_matches(args: list, literal_targets: set) -> "str | None":
     return None
 
 
+# ── xargs / find -exec real-command resolution ───────────────────────────────────────────────
+
+def _xargs_real_command(args: list) -> list:
+    """Skip xargs's own dash-prefixed options AND stray `{`/`}` tokens — the paren/brace spacer
+    (`_PAREN_BRACE_RE`) splits a glued placeholder like `-I{}` into `-I`, `{`, `}` as separate
+    tokens, and those braces are xargs's own replacement-string syntax, never the start of the
+    real command."""
+    i = 0
+    while i < len(args) and (args[i].startswith("-") or args[i] in ("{", "}")):
+        i += 1
+    return args[i:]
+
+
+def _find_exec_commands(args: list) -> list:
+    """Token lists for each `-exec`/`-execdir ... {} ;|+` clause in a `find` stage's argv
+    (argv AFTER the `find` head). The `;` terminator is almost always already consumed as a
+    chain-separator by `_chains` (an escaped `\\;` unescapes to a bare `;` token), so this simply
+    collects to the end of the available tokens and trims a literal trailing `;`/`+`."""
+    out = []
+    i = 0
+    n = len(args)
+    while i < n:
+        if args[i] in ("-exec", "-execdir"):
+            cmd = args[i + 1:]
+            if cmd and cmd[-1] in (";", "+"):
+                cmd = cmd[:-1]
+            if cmd:
+                out.append(cmd)
+            break
+        i += 1
+    return out
+
+
+def _stage_payload_text(stage_toks: list) -> "str | None":
+    """Best-effort literal text a stage would emit downstream: `echo`/`printf`'s own arguments,
+    joined. None for any other head — we cannot see what it would actually output."""
+    toks = _strip_wrappers(stage_toks)
+    if not toks:
+        return None
+    head = os.path.basename(toks[0])
+    if head in ("echo", "printf"):
+        return " ".join(toks[1:])
+    return None
+
+
+# ── $()/backtick argument-position substitutions, SCOPED to their inner text ─────────────────
+
+_INNER_SAFE_GIT_SUBS = {
+    "rev-parse", "merge-base", "log", "status", "describe", "ls-files",
+    "diff", "show", "remote", "rev-list",
+}
+
+
+def _extract_paren_substitutions(chain: list) -> list:
+    """Inner-text strings for each `$(...)` span found across a chain's tokens (token-based,
+    depth-tracked via '(' / ')' occurrence counts across the collected tokens)."""
+    flat = [t for stage in chain for t in stage]
+    spans = []
+    i = 0
+    n = len(flat)
+    while i < n:
+        idx = flat[i].find("$(")
+        if idx == -1:
+            i += 1
+            continue
+        remainder = flat[i][idx + 2:]
+        depth = 1 + remainder.count("(") - remainder.count(")")
+        collected = [remainder]
+        j = i
+        while depth > 0 and j + 1 < n:
+            j += 1
+            seg = flat[j]
+            depth += seg.count("(") - seg.count(")")
+            collected.append(seg)
+        if collected:
+            collected[-1] = collected[-1].rstrip(")")
+        spans.append(" ".join(p for p in collected if p))
+        i = j + 1
+    return spans
+
+
+def _inner_text_is_safe(inner_text: str) -> bool:
+    """True iff an argument-position substitution's inner text is definitely non-ambiguous:
+    every stage it contains is either NOT git/rm-headed, or a git invocation matching the small
+    read-only allowlist. Any git subcommand outside that allowlist (destructive-declared or
+    simply unknown), or a bare `rm`, is NOT safe — this is what keeps `cd
+    $(git rev-parse --show-toplevel)` allowed while still treating an unrecognised or
+    destructive inner git/rm invocation as ambiguous."""
+    chains = _chains(inner_text)
+    if not chains:
+        return True
+    for chain in chains:
+        for stage in chain:
+            toks = _strip_wrappers(stage)
+            if not toks:
+                continue
+            head = os.path.basename(toks[0])
+            if head == "git":
+                sub, sub_args = _split_git_global_opts(toks[1:])
+                if not sub:
+                    return False
+                if sub in _INNER_SAFE_GIT_SUBS:
+                    continue
+                if sub == "config" and "--get" in sub_args:
+                    continue
+                if sub == "branch" and "--show-current" in sub_args:
+                    continue
+                if sub == "symbolic-ref":
+                    if (
+                        _positional_count(sub_args) < 2
+                        and not _flag_present(sub_args, "-d")
+                        and not _flag_present(sub_args, "--delete")
+                    ):
+                        continue
+                return False
+            if head == "rm":
+                return False
+    return True
+
+
 # ── policy row loading + pin verification ────────────────────────────────────────────────────
 
 def _load_policy_row():
     """(`{raw, rules, rm_targets, tier_order, tier_floor, unknown_tier, remedy}`, None) on
-    success, or (None, reason) — never raises. Reads the row directly (not the full `.epr-meta`
-    compose-gate machinery in `_lib.epr_meta.load_policies`, which validates fields this
-    Bash-command predicate does not carry, e.g. a file-write `scope`) — this hook IS the
-    consumer, so it owns its own minimal, honest validation."""
+    success, or (None, reason) — never raises."""
     try:
         import yaml
     except Exception as e:  # pragma: no cover - PyYAML is vendored in this workspace
@@ -403,17 +548,10 @@ def _load_policy_row():
 
 
 def _verify_pin(row: dict):
-    """(True, None) if the row's `contentHash` matches the SAME canonicalization
-    `epr-meta-pin.py` writes (`_lib.epr_meta.policy_content_hash`); else (False, reason). Never
-    raises."""
     declared = row.get("contentHash")
     if not declared:
         return False, "row carries no contentHash pin"
     try:
-        # The hashing CODE resolves relative to THIS hook's own installed location (sibling
-        # `.claude/scripts/_lib/`), never relative to CLAUDE_PROJECT_DIR — the row's DATA comes
-        # from the (test-variable) project dir, but the canonicalization logic is fixed code
-        # that must be found regardless of which registry is under test.
         lib_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts")
         if lib_dir not in sys.path:
             sys.path.insert(0, lib_dir)
@@ -427,10 +565,6 @@ def _verify_pin(row: dict):
 
 
 def _latest_claim(session_id: str) -> "str | None":
-    """The `claimed` string (`agent:<role>@<model>`) of the LAST claim record in the actor
-    sidecar for `session_id`, append-order (claims stack; latest wins) — mirrors
-    `ActorStore::current_for` (elohim/epr-rea/src/actor.rs). Missing/unreadable file or no claim
-    for this session -> None (honest absence, never an error)."""
     try:
         with open(ACTORS_FILE) as f:
             lines = f.readlines()
@@ -457,9 +591,6 @@ def _latest_claim(session_id: str) -> "str | None":
 
 
 def _resolve_tier(session_id: str) -> str:
-    """`CLAUDE_MODEL` env (not exported by this harness in practice; the ladder is honour-
-    system via `epr actor claim`) -> the actor sidecar's latest claim for `session_id` ->
-    `unknown`."""
     env_tier = os.environ.get("CLAUDE_MODEL")
     if env_tier and env_tier.strip():
         return env_tier.strip()
@@ -473,45 +604,99 @@ def _resolve_tier(session_id: str) -> str:
 
 
 def _session_id_from_env() -> str:
-    """`CLAUDE_CODE_SESSION_ID` first (this harness's real session-id env var — round 1 read
-    only `CLAUDE_SESSION_ID`, which this harness never sets, so the sidecar lookup never
-    matched), `CLAUDE_SESSION_ID` as a fallback for any harness that does use it."""
     return os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or ""
 
 
-# ── classification entry point (DENY ON AMBIGUITY) ───────────────────────────────────────────
-
-INDIRECT = "__INDIRECT__"
-
+# ── classification entry point (DENY ON AMBIGUITY, scoped) ──────────────────────────────────
 
 def _scan(command: str, row: dict, depth: int = 0) -> "str | None":
-    """None (allowed) | INDIRECT sentinel | a short match description, for the first destructive
-    or indirect invocation found in `command`."""
     if depth > _MAX_UNWRAP_DEPTH:
         return None
     for chain in _chains(command):
         if len(chain) == 1:
-            toks = _strip_wrappers(chain[0])
-            if toks and os.path.basename(toks[0]) in _NEVER_CLASSIFY_HEADS:
+            toks0 = _strip_wrappers(chain[0])
+            if toks0 and os.path.basename(toks0[0]) in _NEVER_CLASSIFY_HEADS:
                 continue  # prose, single stage, no pipe/xargs downstream: exempt
 
-        if _chain_is_indirect(chain) and _chain_has_git_or_rm_word(chain):
+        # A stage's stripped head starting with `$` or a backtick is a variable/substitution
+        # USED AS THE COMMAND — unconditionally indirect, regardless of what it resolves to.
+        head_is_indirect = False
+        for stage in chain:
+            toks = _strip_wrappers(stage)
+            if toks and toks[0][:1] in ("$", "`"):
+                head_is_indirect = True
+                break
+        if head_is_indirect:
             return INDIRECT
 
-        for stage in chain:
+        # Argument-position $(...) substitutions: SCOPED — ambiguous only when the inner text
+        # itself is unsafe (destructive, or git/rm-headed outside the read-only allowlist).
+        for inner in _extract_paren_substitutions(chain):
+            if not _inner_text_is_safe(inner):
+                return INDIRECT
+
+        for k, stage in enumerate(chain):
             toks = _strip_wrappers(stage)
             if not toks:
                 continue
             head = os.path.basename(toks[0])
+
             if head in _NEVER_CLASSIFY_HEADS:
                 continue
+
+            if head == "find":
+                for cmd in _find_exec_commands(toks[1:]):
+                    result = _classify_argv(cmd, row)
+                    if result:
+                        return result
+                continue
+
+            if head == "xargs":
+                real = _xargs_real_command(toks[1:])
+                real_head = os.path.basename(real[0]) if real else ""
+                if real_head in ("git", "rm"):
+                    result = _classify_argv(real, row)
+                    if result:
+                        return result
+                    continue
+                if real_head in ("grep", "rg"):
+                    continue
+                if real_head in _SHELLS or real_head == "eval":
+                    payload = _stage_payload_text(chain[k - 1]) if k > 0 else None
+                    if payload is None:
+                        return INDIRECT  # unverifiable upstream feeding an executor: deny
+                    if _scan(payload, row, depth + 1):
+                        return INDIRECT
+                    continue
+                continue
+
             if head in _SHELLS:
                 idx = _find_dash_c(toks[1:])
                 if idx is not None and idx + 1 < len(toks[1:]):
                     result = _scan(toks[1:][idx + 1], row, depth + 1)
                     if result:
                         return result
+                    continue
+                # bare shell (no -c): here-string, or a piped sink
+                here_idx = None
+                for hi, t in enumerate(toks[1:]):
+                    if t == "<<<":
+                        here_idx = hi
+                        break
+                if here_idx is not None:
+                    payload = " ".join(toks[1:][here_idx + 1:])
+                    if _scan(payload, row, depth + 1):
+                        return INDIRECT
+                    continue
+                if k > 0:
+                    payload = _stage_payload_text(chain[k - 1])
+                    if payload is None:
+                        return INDIRECT
+                    if _scan(payload, row, depth + 1):
+                        return INDIRECT
+                    continue
                 continue
+
             if head == "eval":
                 rest = toks[1:]
                 if rest:
@@ -519,17 +704,15 @@ def _scan(command: str, row: dict, depth: int = 0) -> "str | None":
                     if result:
                         return result
                 continue
-            if head == "git":
-                sub, sub_args = _split_git_global_opts(toks[1:])
-                if sub:
-                    rule = _git_rule_matches(sub, sub_args, row["rules"])
-                    if rule:
-                        return f"git {sub}" + (f" {' '.join(sub_args)}" if sub_args else "")
+
+            if _is_interpreter(head):
+                if _interpreter_args_carry_destructive_word(toks[1:]):
+                    return INDIRECT
                 continue
-            if head == "rm":
-                target = _rm_matches(toks[1:], row["rm_targets"])
-                if target:
-                    return f"rm {' '.join(toks[1:])}"
+
+            result = _classify_argv(toks, row)
+            if result:
+                return result
     return None
 
 
@@ -551,12 +734,24 @@ def skip(reason: str):
     sys.exit(0)
 
 
+def _worth_investigating(command: str) -> bool:
+    """The pre-filter, fixed round 3: runs on TOKENS (shlex-merged, so a quote-split word like
+    `g""it` reads as `git`), never the raw string. Also checks the raw text for the
+    `${...}`/`$'...'` obfuscation shape, which by design does not survive as a clean token."""
+    for chain in _chains(command):
+        for stage in chain:
+            for t in stage:
+                if "git" in t or "rm" in t:
+                    return True
+    return _has_glued_var_obfuscation(command)
+
+
 def main():
     data = json.load(sys.stdin)
     if data.get("tool_name") != "Bash":
         return
     command = (data.get("tool_input") or {}).get("command", "")
-    if not command or not _PRE_FILTER.search(command):
+    if not command or not _worth_investigating(command):
         return
 
     row, err = _load_policy_row()
@@ -573,13 +768,19 @@ def main():
         )
         return
 
+    # Shell variable-expansion / ANSI-C-quote gluing (`git${IFS}reset${IFS}--hard`, `git reset
+    # $'--hard'`) survives no clean token for the per-stage scan below to recognise as `git`/
+    # `rm` — a token starting with `$`/backtick catches a GLUED HEAD, but this obfuscation can
+    # sit mid-command too. Checked globally, ahead of the per-chain scan.
+    if _has_glued_var_obfuscation(command):
+        deny(INDIRECT_REASON)
+        return
+
     matched = _scan(command, row, depth=0)
     if not matched:
         return
 
     if matched == INDIRECT:
-        # DENY ON AMBIGUITY: an indirect invocation bypasses tier resolution entirely — we
-        # cannot confirm what it actually runs, so no declared floor can clear it.
         deny(INDIRECT_REASON)
         return
 
@@ -594,9 +795,6 @@ def main():
     if tier_idx is not None and tier_idx >= floor_idx:
         return  # at/above the declared floor: allowed, silently
 
-    # Below the floor, OR an unresolved/unrecognised tier — `unknown-tier: deny` is fail-closed
-    # by design: an unclaimed or unrecognised actor is treated as below the floor, never assumed
-    # safe.
     deny(
         f"DESTRUCTIVE GIT ({POLICY_REF}): command matches `{matched}`. "
         f"Resolved tier: {tier} (floor: {floor}; tier-order: {tier_order}). {row['remedy']}"
@@ -608,8 +806,6 @@ if __name__ == "__main__":
         main()
         sys.exit(0)
     except Exception as e:
-        # Fail-open, but never silent: a bare `except: exit(0)` swallows a hook bug where a
-        # deny should have fired. This must never itself crash, so it names only the TYPE.
         try:
             print(f"capability-tier-gate: skipped — internal error: {type(e).__name__}",
                   file=sys.stderr)
