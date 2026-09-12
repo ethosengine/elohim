@@ -3323,3 +3323,189 @@ mod chain_root_repoint_tests {
         assert_eq!(pred_after.state, SUPERSEDED_STATE);
     }
 }
+
+/// A steward's re-declaration of an EPR's reach must reach the doorways.
+///
+/// `find_active_projections` is literally what every doorway fetches on each
+/// EprRouter refresh (`GET /db/rea_commitments?action=project-epr&doorwayId=..`),
+/// and `commitment_to_projection_view` reads `reach` out of `metadata_json`. So
+/// "the fold flips within one refresh" is exactly: the reach this selector
+/// reports changes after the write sequence a reach-narrowing PATCH performs.
+#[cfg(test)]
+mod reach_redeclaration_tests {
+    use super::*;
+    use crate::db::models::NewReaCommitment;
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
+
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    const DOORWAY: &str = "alpha-elohim-host";
+    const COMMITMENT_ID: &str = "project-epr-sus-garden";
+
+    fn setup() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
+        conn
+    }
+
+    fn metadata(reach: &str) -> String {
+        format!(
+            r#"{{"urlPath":"/sus-garden","mode":"cached","reach":"{reach}","baseHref":"/","entryFile":"index.html"}}"#
+        )
+    }
+
+    /// Seed the row a `POST /api/v1/commitments` for a project-epr leaves
+    /// behind: state `created` (the conductor-projected birth state -- NOT
+    /// `proposed`, which is why every reach re-declaration is also a state
+    /// transition), a doorway scope, and commons reach.
+    fn seed_projection(conn: &mut SqliteConnection, ctx: &AppContext) {
+        let scope = format!("doorway:{DOORWAY}|epr:sus-garden");
+        let meta = metadata("commons");
+        let row = NewReaCommitment {
+            id: COMMITMENT_ID,
+            h_app_id: &ctx.h_app_id,
+            action: PROJECT_EPR_ACTION,
+            provider: "peer-A",
+            receiver: "peer-A",
+            resource_conforms_to: None,
+            resource_classified_as: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: Some(&scope),
+            medium_of_exchange_id: None,
+            state: "created",
+            finished: 0,
+            note: None,
+            metadata_json: Some(&meta),
+            dht_anchor_hash: Some("uhCkk-create"),
+        };
+        diesel::insert_into(rea_commitments::table)
+            .values(&row)
+            .execute(conn)
+            .expect("seed projection");
+    }
+
+    fn served_reach(conn: &mut SqliteConnection, ctx: &AppContext) -> String {
+        find_active_projections(conn, ctx, DOORWAY)
+            .expect("projections")
+            .into_iter()
+            .find(|p| p.commitment_id == COMMITMENT_ID)
+            .expect("the projection is still mounted")
+            .reach
+    }
+
+    /// The anchor advance a conductor-backed state update performs, with the
+    /// metadata the call site chooses. `state`/`in_scope_of` mirror
+    /// `update_state_via_conductor`'s anchor input exactly -- including the
+    /// scope, which is why `upsert_with_anchor` takes its metadata-writing
+    /// branch here rather than the anchor-only one.
+    fn anchor_advance(conn: &mut SqliteConnection, ctx: &AppContext, metadata_json: &str) {
+        let scope = format!("doorway:{DOORWAY}|epr:sus-garden");
+        upsert_with_anchor(
+            conn,
+            ctx,
+            CreateReaCommitmentInput {
+                id: Some(COMMITMENT_ID.to_string()),
+                action: PROJECT_EPR_ACTION.to_string(),
+                provider: "peer-A".to_string(),
+                receiver: "peer-A".to_string(),
+                in_scope_of: Some(scope),
+                metadata_json: Some(metadata_json.to_string()),
+                state: Some("proposed".to_string()),
+                ..Default::default()
+            },
+            Some("uhCkk-update"),
+        )
+        .expect("anchor advance");
+    }
+
+    fn narrowing() -> UpdateReaCommitmentState {
+        UpdateReaCommitmentState {
+            state: "proposed".to_string(),
+            finished: None,
+            metadata_json: Some(metadata("household")),
+        }
+    }
+
+    /// THE FIX, end to end at the selector every doorway reads. One PATCH that
+    /// re-declares reach and moves lifecycle: the reach the doorways fetch on
+    /// their next refresh is the narrowed one.
+    #[test]
+    fn a_narrowed_reach_is_what_the_next_refresh_fetches() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_projection(&mut conn, &ctx);
+        assert_eq!(
+            served_reach(&mut conn, &ctx),
+            "commons",
+            "before the ruling"
+        );
+
+        // The two writes `update_state_via_conductor` performs, in order.
+        let update = narrowing();
+        update_commitment_state(&mut conn, &ctx, COMMITMENT_ID, &update).expect("state write");
+        // The FIXED call site states the caller's declaration here.
+        anchor_advance(&mut conn, &ctx, update.metadata_json.as_deref().unwrap());
+
+        assert_eq!(
+            served_reach(&mut conn, &ctx),
+            "household",
+            "the narrowing must be what the doorway's next EprRouter refresh reads"
+        );
+    }
+
+    /// THE DEFECT, pinned so it cannot come back by accident. Stating the DHT
+    /// entry's metadata on the anchor advance rewrites the declaration that was
+    /// just written -- the entry cannot carry it, because the zome's update
+    /// input is `{id, state, finished}`. MEASURED live: the PATCH answered 200
+    /// and both doorways served at commons forever.
+    #[test]
+    fn stating_the_entrys_stale_metadata_on_the_anchor_advance_undoes_the_narrowing() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_projection(&mut conn, &ctx);
+
+        let update = narrowing();
+        update_commitment_state(&mut conn, &ctx, COMMITMENT_ID, &update).expect("state write");
+        assert_eq!(
+            served_reach(&mut conn, &ctx),
+            "household",
+            "the state write itself does land the narrowing"
+        );
+
+        // What the call site used to pass: the entry's create-time metadata.
+        anchor_advance(&mut conn, &ctx, &metadata("commons"));
+
+        assert_eq!(
+            served_reach(&mut conn, &ctx),
+            "commons",
+            "and this is how it was lost -- the anchor advance rewrote it from a \
+             copy that cannot carry a metadata change"
+        );
+    }
+
+    /// A lifecycle-only transition is untouched by the fix: with no declared
+    /// metadata the entry's copy still governs.
+    #[test]
+    fn a_lifecycle_only_transition_leaves_the_declared_reach_alone() {
+        let mut conn = setup();
+        let ctx = AppContext::default_lamad();
+        seed_projection(&mut conn, &ctx);
+
+        let update = UpdateReaCommitmentState {
+            state: "proposed".to_string(),
+            finished: None,
+            metadata_json: None,
+        };
+        update_commitment_state(&mut conn, &ctx, COMMITMENT_ID, &update).expect("state write");
+        anchor_advance(&mut conn, &ctx, &metadata("commons"));
+
+        assert_eq!(served_reach(&mut conn, &ctx), "commons");
+    }
+}

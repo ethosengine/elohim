@@ -740,7 +740,36 @@ impl ReaCommitmentService {
             in_scope_of,
             medium_of_exchange_id: None,
             note: c.note.clone(),
-            metadata_json: Some(c.metadata_json.clone()),
+            // THE NEWER DECLARATION WINS (2026-09-12).
+            //
+            // The zome's `UpdateReaCommitmentStateInput` carries `{id, state,
+            // finished}` and nothing else -- metadata is not a DHT term of a
+            // state update at all, it is this projection's own field. So after a
+            // state update the DHT entry still holds the CREATE-TIME metadata,
+            // and `c.metadata_json` is stale by construction.
+            //
+            // Passing that stale copy here silently undid the caller's
+            // re-declaration: `update_commitment_state` above writes
+            // `update.metadata_json`, and then this anchor advance takes
+            // `upsert_with_anchor`'s scope-carrying branch (a project-epr row
+            // always has an `in_scope_of`, so the `in_scope_of.is_some()` guard
+            // that was meant to keep this path metadata-free never holds) and
+            // rewrites `metadata_json` from the entry's old value. The PATCH
+            // answered 200 and the change went nowhere.
+            //
+            // MEASURED on the household mesh (run 20260912T225331Z): a steward
+            // re-declaring an EPR's reach from `commons` to a narrower rung got
+            // 200, and both doorways kept serving it at commons indefinitely --
+            // every doorway's serving fold reads `metadata.reach`
+            // (`commitment_to_projection_view`), so the narrowing could reach
+            // nobody. A project-epr row is created in state `created`, so EVERY
+            // reach re-declaration is also a state transition and this was the
+            // only path such a PATCH could take.
+            //
+            // When the caller declared metadata, that IS the newer truth and it
+            // is what BOTH writes must state, so the two cannot disagree. With
+            // no caller metadata this is byte-identical to today.
+            metadata_json: Some(anchor_metadata_json(update, &c.metadata_json)),
             // Anchor-advance only; no supersession on a state-update projection.
             supersedes: None,
             // Carry the GRADUATED state onto the anchor advance as well. The
@@ -760,6 +789,22 @@ impl ReaCommitmentService {
         }
         Ok(commitment_view(commitment))
     }
+}
+
+/// Which `metadata_json` the anchor-advance projection must state.
+///
+/// The caller's declaration when there is one, else the entry's. See the call
+/// site in `update_state_via_conductor` for why the entry's copy is stale by
+/// construction after a state update.
+///
+/// Pure so the rule is checkable without a conductor: the arm that lost a
+/// steward's re-declaration is a one-line choice, and a one-line choice that
+/// costs a governance act deserves a test that names it.
+fn anchor_metadata_json(update: &UpdateReaCommitmentState, entry_metadata_json: &str) -> String {
+    update
+        .metadata_json
+        .clone()
+        .unwrap_or_else(|| entry_metadata_json.to_string())
 }
 
 /// Bridge the storage-layer input shape (Option<String> id, single-string
@@ -1506,5 +1551,43 @@ mod tests {
         let browser = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-browser");
         let server = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-server");
         assert_ne!(browser, server);
+    }
+
+    // -- the anchor advance must not undo a steward's re-declaration ---------
+
+    fn state_update(metadata_json: Option<&str>) -> UpdateReaCommitmentState {
+        UpdateReaCommitmentState {
+            state: "proposed".into(),
+            finished: None,
+            metadata_json: metadata_json.map(str::to_string),
+        }
+    }
+
+    /// THE REGRESSION. A PATCH that re-declares metadata AND moves lifecycle
+    /// used to have its declaration rewritten from the DHT entry, which cannot
+    /// carry it: the zome's update input is `{id, state, finished}`, so the
+    /// entry still holds the create-time metadata. The anchor advance must
+    /// state what the caller declared.
+    #[test]
+    fn a_declared_metadata_wins_over_the_entry_s_stale_copy() {
+        let declared = r#"{"urlPath":"/garden","reach":"household"}"#;
+        let entry_says = r#"{"urlPath":"/garden","reach":"commons"}"#;
+        assert_eq!(
+            anchor_metadata_json(&state_update(Some(declared)), entry_says),
+            declared,
+            "the caller's re-declaration is the newer truth and must survive the \
+             anchor advance that follows it"
+        );
+    }
+
+    /// And with nothing declared, the entry's copy still governs -- so a plain
+    /// lifecycle transition is byte-identical to its previous behaviour.
+    #[test]
+    fn an_undeclared_metadata_leaves_the_entry_s_copy_governing() {
+        let entry_says = r#"{"urlPath":"/garden","reach":"commons"}"#;
+        assert_eq!(
+            anchor_metadata_json(&state_update(None), entry_says),
+            entry_says
+        );
     }
 }
