@@ -56,13 +56,20 @@
  * — but they will fail for THIS reason, not the registry-gap reason below,
  * and that distinction matters when reading a red.
  *
- * IDS ARE RUN-SCOPED, NEVER SHARED ACROSS RUNS. See `runStamp`'s own doc for
- * why (a row cycled through create/cancel/reactivate across many runs while
- * diagnosing this feature wedged storage's write path for minutes). Every
- * test id — `project-epr-nrt-*` AND `nrt-app-*` — includes it, so a fresh
- * lane invocation never touches a previous run's row, wedged or not, and by
- * construction can never collide with a REAL seeded project-epr id either
- * (those are addressed over (doorwayId, eprId), never urlPath).
+ * IDS ARE RUN-SCOPED, NEVER SHARED ACROSS RUNS — AND, AS OF 2026-09-12, NEVER
+ * SHARED ACROSS SCENARIOS EITHER. See `runStamp`'s own doc for why a row
+ * cycled through create/cancel/reactivate across many RUNS wedged storage's
+ * write path for minutes, and `scenarioNonce`'s own doc for why reactivating
+ * a row across SCENARIOS within one run raced the doorway's own mount/cache
+ * reconciliation and read as "marker present=false" for up to the full
+ * `waitForLocalMount` budget (measured live, run 20260912T214110Z — scenarios
+ * 2–4 all failed in their own staging `Given`, reusing scenario 1's row).
+ * Every test id — `project-epr-nrt-*` AND `nrt-app-*` — includes BOTH
+ * `runStamp` and `scenarioNonce`, so a fresh lane invocation never touches a
+ * previous run's row, a later scenario never reactivates an earlier one's,
+ * and by construction neither can ever collide with a REAL seeded
+ * project-epr id either (those are addressed over (doorwayId, eprId), never
+ * urlPath).
  *
  * FEDERATION-PEER DISCOVERY MUST BE ARRANGED, NOT ASSUMED. `main.rs` only
  * spawns `spawn_peer_discovery_task` — the ONLY writer of `state.name_routes`
@@ -185,9 +192,16 @@ function nrtRequestPath(root: string): string {
  * doc describes: a trailing-slash extension-less path can be swallowed as a 200 by a
  * doorway that does NOT hold the mount at all). Every assertion in this file that needs
  * to know whether a specific doorway actually served THIS root checks for this marker,
- * never bare `<html`/status-200, which the real landing page would also satisfy. */
+ * never bare `<html`/status-200, which the real landing page would also satisfy.
+ *
+ * Carries `requireScenarioNonce()` as a second attribute — see that function's doc and
+ * `scenarioNonce`'s doc on the `Before` hook: a stale cache entry surviving from an
+ * EARLIER scenario in this same run (the exact glue defect measured 2026-09-12 — a
+ * doorway's warm-shell/bundle-heads reconciliation racing a reactivated, previously
+ * cancelled-and-deleted row) carries the SAME root text but a DIFFERENT scenario nonce,
+ * so it can never read as this scenario's green. */
 function nrtMarker(root: string): string {
-  return `data-nrt-root="${root}"`;
+  return `data-nrt-root="${root}" data-nrt-nonce="${requireScenarioNonce()}"`;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,8 +377,8 @@ interface StagedArchive {
 /** PUT a real ZIP (containing `index.html`) via `/admin/seed/blob` and create the
  * `content_node` row an `html5-app` project-epr mount resolves through — the minimal
  * staging a synthetic root needs to actually SERVE, not merely route. Idempotent: a
- * 409 on the content-row POST (a prior scenario in this SAME run already staged the
- * same run-scoped id) is treated as already-done. */
+ * 409 on the content-row POST (a prior ATTEMPT of this SAME scenario already staged the
+ * same scenario-scoped id — see `scenarioNonce`'s doc) is treated as already-done. */
 async function stockAppArchive(
   doorwayUrl: string,
   contentId: string,
@@ -372,7 +386,7 @@ async function stockAppArchive(
 ): Promise<StagedArchive> {
   const html = Buffer.from(
     `<!doctype html><html><head><meta charset="utf-8"><title>${root}</title></head>` +
-      `<body data-nrt-root="${root}">nrt-${root}</body></html>`,
+      `<body ${nrtMarker(root)}>nrt-${root}</body></html>`,
     'utf8'
   );
   const zip = buildZip('index.html', html);
@@ -437,12 +451,14 @@ async function deleteContentRowQuiet(archive: StagedArchive): Promise<void> {
   }
 }
 
-/** Content-addressed over (path, runStamp) — same reasoning as `testCommitmentId`
- * below (run-scoped, so a wedged row from a previous run can never block this one). */
+/** Content-addressed over (path, runStamp, scenarioNonce) — same reasoning as
+ * `testCommitmentId` below (fresh per scenario attempt, so a stale row cancelled and
+ * deleted by an EARLIER scenario's `After` hook is never reactivated by a LATER one — see
+ * `scenarioNonce`'s doc for the race that reactivation raced). */
 function testContentId(path: string): string {
   assert.ok(runStamp, 'runStamp not minted yet — the Before hook must run before any staging step');
   const digest = createHash('sha256')
-    .update(`content|${path}|${runStamp}`, 'utf8')
+    .update(`content|${path}|${runStamp}|${requireScenarioNonce()}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
   return `nrt-app-${digest}`;
@@ -593,37 +609,90 @@ interface StagedContract {
  * diagnosing this feature and wedged — `PATCH` on it started returning a persistent
  * `503 {"status":"catching-up","cause":"upstream"}` for minutes on end, while a BRAND NEW
  * id `POST`ed and `PATCH`ed instantly. Scoping the id to this run bounds reactivation
- * churn to WITHIN one lane invocation (still needed — the After hook below cancels a
- * scenario's staged rows, and a later scenario in the SAME run reusing the same root
- * reactivates them) and guarantees a fresh run never touches a previous run's row at all,
- * cancelled-and-wedged or not.
+ * churn to WITHIN one lane invocation (still needed for a genuine cucumber RETRY of the
+ * same attempt — see `scenarioNonce`'s doc, right below, for why a fresh SCENARIO no
+ * longer reactivates at all) and guarantees a fresh run never touches a previous run's
+ * row at all, cancelled-and-wedged or not.
  */
 let runStamp: string | undefined;
 
-Before(function (this: E2EWorld): void {
+/**
+ * One nonce per SCENARIO ATTEMPT (cucumber's `pickle.id` — stable across a retry of the
+ * same attempt, distinct for every other scenario), minted fresh in every `Before` hook.
+ *
+ * WHY (measured 2026-09-12, run 20260912T214110Z): with `testContentId`/`testCommitmentId`
+ * scoped only to (doorwayId, mount, runStamp) — i.e. shared across every scenario in the
+ * feature that stages the same root — the SECOND scenario to stage "garden" reactivates
+ * the FIRST scenario's row (cancelled + `DELETE /db/content/{id}`'d by that scenario's
+ * `After` hook, then `POST`ed/`PATCH`ed back by this scenario's `Given`). That reactivation
+ * races the doorway's own mount-teardown-and-rebuild: `waitForLocalMount`'s `x-federation-hop:1`
+ * probe served the doorway's REAL "/" landing page (`X-Elohim-Bundle: last-reconciled`, no
+ * test marker — exactly the SPA-fallback risk this file's header names) for as long as the
+ * EprRouter mount table had not yet re-recognised the reactivated commitment. A manual
+ * curl-level repro of exactly this cancel→delete→restage cycle (against the live alpha
+ * doorway, root "manrepro1") measured this window at ~7s in isolation; under the noisier
+ * multi-scenario CI lane it exceeded the 65s `waitForLocalMount` budget outright — the
+ * "marker present=false" red this file's own scenarios 2–4 hit. Nothing server-side is
+ * defective: `commitment_to_projection_view` (elohim-storage `db/rea_commitments.rs`)
+ * derives `epr_id` by PARSING `in_scope_of` (`doorway:{id}|epr:{epr_id}`) fresh on every
+ * read, and `in_scope_of` is immutable after creation (the `PATCH` handler,
+ * `handle_update_state`, only ever reconciles `state`/`finished`/`metadata_json` — never
+ * `in_scope_of`). So reusing a commitment id across scenarios while trying to point it at a
+ * FRESH content id per scenario is not an option: only reusing the SAME content id (as
+ * before) keeps `in_scope_of` valid, and reusing the same content id is exactly the reuse
+ * that races the cache/reconciliation machinery above. The fix is to stop reactivating
+ * across scenario boundaries at all — mint BOTH ids fresh per scenario attempt, so every
+ * scenario's `Given` is a clean `POST` (scenario 1's own, already-reliable shape), never a
+ * cancel-and-delete's `PATCH` reactivation of someone else's row. `nrtMarker` also carries
+ * this nonce, so a warm/archived cache entry surviving from an EARLIER scenario (same root
+ * text, same bytes, same blob hash) can never satisfy THIS scenario's marker check.
+ */
+let scenarioNonce: string | undefined;
+
+Before(function (this: E2EWorld, scenario): void {
   runStamp ??= process.env['A2O_RUN_ID'] ?? `${process.pid}-${Date.now().toString(36)}`;
+  scenarioNonce = scenario.pickle.id
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase()
+    .slice(0, 12);
 });
 
-/** Content-addressed over (doorwayId, mount, runStamp) — deterministic WITHIN one lane
- * invocation (so scenarios sharing a root reuse the same row, per the idempotent-reuse
- * design) but never collides with a previous run's row (see `runStamp`'s doc). By
- * construction can never collide with a REAL seeded project-epr id either (those are
- * addressed over (doorwayId, eprId), never urlPath — see file header). */
+/** See `scenarioNonce`'s doc — every reader of the nonce goes through this so a missing
+ * `Before` hook fails loudly rather than minting an `undefined`-shaped id. */
+function requireScenarioNonce(): string {
+  assert.ok(
+    scenarioNonce,
+    'scenarioNonce not minted yet — the Before hook must run before any staging step'
+  );
+  return scenarioNonce;
+}
+
+/** Content-addressed over (doorwayId, mount, runStamp, scenarioNonce) — deterministic
+ * WITHIN one scenario ATTEMPT (so a cucumber retry of the SAME attempt reactivates its own
+ * row rather than minting a duplicate) but distinct for every OTHER scenario, even one
+ * staging the identical root on the identical doorway (see `scenarioNonce`'s doc for why:
+ * `in_scope_of` is immutable, so a commitment id shared across scenarios can only ever be
+ * safely re-pointed at the SAME content id, and reusing that content id is exactly what
+ * raced the doorway's mount/cache reconciliation). By construction can never collide with a
+ * REAL seeded project-epr id either (those are addressed over (doorwayId, eprId), never
+ * urlPath — see file header). */
 function testCommitmentId(doorwayId: string, mount: string): string {
   assert.ok(runStamp, 'runStamp not minted yet — the Before hook must run before any staging step');
   const digest = createHash('sha256')
-    .update(`${doorwayId}|${mount}|${runStamp}`, 'utf8')
+    .update(`${doorwayId}|${mount}|${runStamp}|${requireScenarioNonce()}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
   return `project-epr-nrt-${digest}`;
 }
 
-/** Stage (or re-activate) a test project-epr contract on `doorwayId`, projecting a
- * dedicated, freshly-stocked app archive (see `stockAppArchive`) at `mount`, via
- * `doorwayUrl`'s own doorway (so the write lands on the storage that doorway's
- * EprRouter refresh reads). Idempotent: a 409 on a prior run's id is reactivated
- * (state -> "proposed") rather than treated as failure, so scenarios sharing a root
- * (all four stage "garden") reuse the same row within one run. */
+/** Stage a test project-epr contract on `doorwayId`, projecting a dedicated,
+ * freshly-stocked app archive (see `stockAppArchive`) at `mount`, via `doorwayUrl`'s own
+ * doorway (so the write lands on the storage that doorway's EprRouter refresh reads). Every
+ * scenario attempt mints its own (content id, commitment id) pair (see `scenarioNonce`'s
+ * doc), so this is normally a clean `POST` even when an earlier scenario staged the SAME
+ * root — the 409 branch below exists only for a genuine cucumber RETRY of this same
+ * attempt (identical nonce), where the prior partial attempt's rows are reactivated rather
+ * than duplicated. */
 async function stageRoot(
   doorwayUrl: string,
   doorwayId: string,
@@ -661,7 +730,8 @@ async function stageRoot(
   };
   const created = await adminCall('POST', `${doorwayUrl}/api/v1/commitments`, body);
   if (created.status === 409) {
-    // A prior scenario/run already minted this exact (doorwayId, mount) row — reactivate it
+    // A prior ATTEMPT of this exact scenario (a cucumber retry — same pickle.id, so the
+    // same scenarioNonce) already minted this exact (doorwayId, mount) row — reactivate it
     // rather than failing; the body is byte-identical by construction (deterministic id).
     const reactivated = await adminCall('PATCH', `${doorwayUrl}/api/v1/commitments/${id}`, {
       state: 'proposed',

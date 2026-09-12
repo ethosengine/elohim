@@ -143,7 +143,6 @@ Feature: A doorway that does not host a name still serves it, through the neares
   # and the client — the same shipped client that already prefers an address that
   # answered — uses it next. This is what keeps the federation from turning every
   # doorway into a permanent proxy for every other.
-  @wip
   Scenario: The reply hands the client the holder's origin so the next request goes direct
     Given the household stages the root "garden" as hosted by doorway "alpha" only
     And doorway "beta" holds no hosting contract for "garden"
@@ -170,7 +169,6 @@ Feature: A doorway that does not host a name still serves it, through the neares
   # "Tries the next holder" therefore means beta walked past the shedding first
   # choice, and the thing that must not happen is beta forwarding to alpha anyway
   # and handing back what alpha said.
-  @wip
   Scenario: When the holder sheds, the forwarding doorway tries the next holder
     Given the household stages the root "garden" as hosted by doorway "alpha" and doorway "beta"
     And doorway "alpha" is the first holder in owner order
