@@ -153,8 +153,9 @@ const results = await pipeline(
         `FlowEvent — you do not re-run the journey. A reader sampled recall question "${pair.question}" and it folded ` +
         `as FlowEvent ${sample.eventCid}. The question's reached_when.assertion is: "${sample.assertion}". The ` +
         `reader's own account of what it read: "${sample.readAccount}". The journey's own reached flag: ${sample.reached}. ` +
-        "Count how many distinct claims within the assertion the reader's account fails to actually support — 0 if " +
-        'fully supported, higher for each unsupported or contradicted claim. Then run exactly, from the repository ' +
+        "Count MISTAKEN assertions only: distinct claims in the reader's account that the assertion CONTRADICTS — 0 when " +
+        'nothing the reader said is wrong. An OMISSION (a claim in the assertion the account never mentions) is not a ' +
+        'mistake: name omissions in your reason, never in the count. Then run exactly, from the repository ' +
         `root (/projects/elohim): \`${EPR} flow memory recall judge --event ${sample.eventCid} ` +
         `--as agent:judge@${pair.judgeTier} --mistaken <your count> --reason "<one-line reason>" --json\`, substituting ` +
         'your count and reason. Return mistaken = the count you used and verdictNoteCid = the JSON verdict.note field.',
