@@ -13,6 +13,8 @@ cites:
   - "social-reach-nervous-system | the receive-side contract this design inherits: reach floor, provenance, sense/respond, the five constraints of a legitimate user-side filter, the anti-bubble policy | sha256:d85af6961ce566c6 | path: genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md"
   - genesis/docs/content/elohim-protocol/social_medium/epic.md
   - genesis/docs/content/elohim-protocol/living_memory/epic.md
+  - "search-epic | the native-search epic this ladder graduates toward: found-not-crawled, provider as a declared method, ranking as a governable artifact | sha256:7ca54d18d954aae4 | path: genesis/docs/content/elohim-protocol/search/epic.md"
+  - genesis/research/search-discovery-incumbent-power-and-p2p-inversion-2026-09-11.md
   - "bounded-recall-mastery-sprint | the sprint whose five rounds and three fresh readers proved the journey this design generalizes | sha256:d4c6f66d1685d124 | path: genesis/docs/superpowers/plans/2026-09-11-bounded-recall-mastery-sprint.md"
   - "unified-memory-loop-design | the collective-memory owner split and the graduation-as-reach-rehearsal rule this ladder extends | sha256:07e941a325cc49c2 | path: genesis/docs/superpowers/specs/2026-06-01-unified-memory-loop-design.md"
   - "private-thought-governed-fruit | the SDO/RWA boundaries every entity row answers — journeys are held by the holon, only outcomes cross | sha256:5b6f5cdb858277e4 | path: genesis/docs/architecture/private-thought-governed-fruit.md"

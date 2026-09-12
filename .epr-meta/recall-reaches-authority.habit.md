@@ -137,3 +137,11 @@ Intermediate reading FAILED at 1 of 5 journeys (exactly the hard 0.2 at-or-above
 unmetered 0. Thin window, honestly: three of the seven are pre-3.2 hand folds and three are deterministic misses of
 one question — the first real weekly run decides. Frontiers: `finish` refuses a zero-receipt focused journey
 (journey.rs); fold `occurred_at` is HEAD-dated while `now` is wall-clock; `Contract::question_bank()` ignores `--root`.
+DELTA 2026-09-12 (final review round; GREEN preserved): the whole-branch review found the habit's own gate not running
+this sprint's four test binaries (golden, lens, sample, report) — `just gate memory-ceremony` now runs them and the
+manifest watches their sources; the tier gate closed `--force`/`--recursive` long flags, `submodule foreach`, and an
+ABSENT policy row (deny, not skip); and a measured miss no longer folds as a clean journey: `recall-not-reached@1`
+(1 when the FlowEvent fulfills nothing) is folded on every journey and consumed by the window bound, so the next
+real weekly run reads the discovery gap the standing reader found (4 of 6 questions) instead of diluting it. Fresh
+tree readings after the round: window 1 of 7 journeys within hard 0.2 (the new middot has no folds yet — the first
+run with it decides), python 64/64, rust 147/0, goldens byte-identical.
