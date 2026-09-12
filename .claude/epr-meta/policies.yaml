@@ -795,7 +795,7 @@ policies:
 
   - id: destructive-git-requires-tier
     version: 1
-    contentHash: sha256:f924a6d0ceb53991f6ea5897802aefe76f2d027005479d6b6c46169d74e0e2e7
+    contentHash: sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f
     title: Destructive git requires a declared tier or a team check
     binding: constitutional
     class: deny
@@ -840,11 +840,22 @@ policies:
       # filter-branch/update-ref) matches unconditionally unless exempt fires.
       # Shell `rm -rf`/-fr/-r -f is classified separately: recursive+force present AND a target
       # in rm-force-recursive-targets, or an absolute path whose <path>/.git exists.
+      # R6 (whole-branch review, 2026-09-12): three commands classified as ALLOW at every tier
+      # because `flag_letters` reads only COMBINED SHORT options and skips `--`-prefixed tokens.
+      # `git clean --force -d` and `git clean -x --force` (long-form force — the short-form `-f`
+      # row never saw it) get a second `clean` row on `any_flags: ["--force"]`; `git rm
+      # --recursive --force .` gets a second `rm` row on `any_flags: ["--recursive"]` AND the
+      # same `.`/`*` target list. `git submodule foreach '<anything>'` had no row at all —
+      # `foreach` runs arbitrary shell text in EVERY submodule, so the destructive payload never
+      # reaches this table as a git subcommand; `{ sub: submodule, any_args: ["foreach"] }`
+      # classifies the wrapper itself. `git clean --dry-run`, `git rm --cached <path>` and
+      # `git submodule update --init` remain allowed at every tier.
       rules:
         - { sub: reset, any_flags: ["--hard", "--merge", "--keep"] }
         - { sub: checkout, any_args: [".", "*", ":/", "-B", "-f", "--force", "--orphan"] }
         - { sub: restore, any_args: [".", "*", ":/"] }
         - { sub: clean, flag_letters: ["f"] }
+        - { sub: clean, any_flags: ["--force"] }
         - { sub: push, any_flags: ["-f", "--force", "--force-with-lease", "--delete", "-d"] }
         - { sub: push, any_arg_prefix: ["+"] }
         - { sub: branch, any_flags: ["-D", "-f", "--force"] }
@@ -857,6 +868,8 @@ policies:
         - { sub: stash, any_args: ["drop", "clear"] }
         - { sub: worktree, any_args: ["remove"], any_flags: ["--force", "-f"] }
         - { sub: rm, flag_letters: ["r"], any_args: [".", "*"] }
+        - { sub: rm, any_flags: ["--recursive"], any_args: [".", "*"] }
+        - { sub: submodule, any_args: ["foreach"] }
         - { sub: symbolic-ref, min_positional_args: 2 }
         - { sub: symbolic-ref, any_flags: ["-d", "--delete"] }
       rm-force-recursive-targets: [".", "./", "..", "*", "~", "/"]

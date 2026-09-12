@@ -62,6 +62,7 @@ policies:
         - { sub: checkout, any_args: [".", "*", ":/", "-B", "-f", "--force", "--orphan"] }
         - { sub: restore, any_args: [".", "*", ":/"] }
         - { sub: clean, flag_letters: ["f"] }
+        - { sub: clean, any_flags: ["--force"] }
         - { sub: push, any_flags: ["-f", "--force", "--force-with-lease", "--delete", "-d"] }
         - { sub: push, any_arg_prefix: ["+"] }
         - { sub: branch, any_flags: ["-D", "-f", "--force"] }
@@ -74,6 +75,8 @@ policies:
         - { sub: stash, any_args: ["drop", "clear"] }
         - { sub: worktree, any_args: ["remove"], any_flags: ["--force", "-f"] }
         - { sub: rm, flag_letters: ["r"], any_args: [".", "*"] }
+        - { sub: rm, any_flags: ["--recursive"], any_args: [".", "*"] }
+        - { sub: submodule, any_args: ["foreach"] }
         - { sub: symbolic-ref, min_positional_args: 2 }
         - { sub: symbolic-ref, any_flags: ["-d", "--delete"] }
       rm-force-recursive-targets: [".", "./", "..", "*", "~", "/"]
@@ -92,6 +95,27 @@ policies:
     parameters: {}
 """
 
+# Round 6 (F4): a syntactically valid registry that simply does not carry the row.
+STUB_POLICY_WITHOUT_ROW = """\
+epr-meta-policies-version: 1
+policies:
+  - id: some-other-policy
+    version: 1
+    class: deny
+    title: Not the destructive-git row
+    parameters: {}
+"""
+
+NON_DENY_CLASS_POLICY = """\
+epr-meta-policies-version: 1
+policies:
+  - id: destructive-git-requires-tier
+    version: 1
+    class: advisory
+    title: Downgraded out of deny
+    parameters: {}
+"""
+
 
 def _content_hash(body_text: str) -> str:
     import yaml
@@ -104,18 +128,20 @@ def _content_hash(body_text: str) -> str:
     return em.policy_content_hash(row)
 
 
-def _pinned_fixture_policy() -> str:
-    h = _content_hash(FIXTURE_POLICY_BODY)
-    lines = FIXTURE_POLICY_BODY.splitlines()
+def _pin(body_text: str) -> str:
+    """Insert the computed contentHash pin into a policy body — the pin procedure the hook
+    verifies. Any fixture variant must be re-pinned or it denies as tampered, not on its own
+    merits."""
+    h = _content_hash(body_text)
     out = []
-    for line in lines:
+    for line in body_text.splitlines():
         out.append(line)
         if line.strip() == "version: 1":
             out.append(f"    contentHash: {h}")
     return "\n".join(out) + "\n"
 
 
-FIXTURE_POLICY = _pinned_fixture_policy()
+FIXTURE_POLICY = _pin(FIXTURE_POLICY_BODY)
 
 
 def _actor_claim_line(claimed: str, session: str) -> str:
@@ -438,13 +464,78 @@ class CapabilityTierGateCase(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertIn("fails its pin", _deny_reason(r))
 
-    # ── malformed row: honest skip ────────────────────────────────────────────────────────────
-    def test_malformed_row_skips_loudly(self):
+    # ── round 6 (F4): an unreadable declared table is FAIL-CLOSED, never a silent allow ──────
+    def test_malformed_row_denies_fail_closed(self):
+        # Round 1-5 SKIPPED here (allowed the command, spoke on stderr). A gate whose declared
+        # table has gone missing cannot say what ISN'T destructive either, and "the row is gone"
+        # is indistinguishable from "the row was removed to get past the gate".
         _write_project(self.proj, MALFORMED_POLICY, actor_lines=[])
         r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"})
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(r.stdout.strip(), "")
-        self.assertTrue(r.stderr.strip().startswith("capability-tier-gate: skipped —"), r.stderr)
+        self.assertIn("absent or not a deny row", _deny_reason(r))
+
+    def test_absent_row_denies_fail_closed(self):
+        # A syntactically valid registry that simply does not carry the row at all.
+        _write_project(self.proj, STUB_POLICY_WITHOUT_ROW, actor_lines=[])
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_MODEL": "claude-fable-5-1"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        reason = _deny_reason(r)
+        self.assertIn("absent or not a deny row", reason)
+        self.assertIn("no active row `destructive-git-requires-tier@1`", reason)
+
+    def test_non_deny_class_row_denies_fail_closed(self):
+        _write_project(self.proj, NON_DENY_CLASS_POLICY, actor_lines=[])
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_MODEL": "claude-fable-5-1"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("absent or not a deny row", _deny_reason(r))
+
+    # ── round 6 (F5): `unknown-tier` is CONSUMED, not merely loaded ──────────────────────────
+    def test_unknown_tier_value_other_than_deny_refuses_the_table(self):
+        bad = _pin(FIXTURE_POLICY_BODY.replace("unknown-tier: deny", "unknown-tier: allow"))
+        _write_project(self.proj, bad, actor_lines=[])
+        r = run_hook("git reset --hard abc", self.proj, {"CLAUDE_MODEL": "claude-fable-5-1"})
+        self.assertEqual(r.returncode, 0, r.stderr)
+        reason = _deny_reason(r)
+        self.assertIn("unknown-tier", reason)
+        self.assertIn("'allow'", reason)
+
+    def test_unknown_tier_deny_reason_names_the_declared_disposition(self):
+        # The branch that READS the value: a tier absent from tier-order.
+        r = run_hook(
+            "git reset --hard abc", self.proj, {"CLAUDE_SESSION_ID": "session-with-no-claim"}
+        )
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("unknown-tier: deny", _deny_reason(r))
+
+    # ── round 6 (F2/F9): long-form flags and `submodule foreach` ─────────────────────────────
+    ROUND6_LONG_FLAG_AND_FOREACH = [
+        "git clean --force -d",
+        "git clean -x --force",
+        "git rm --recursive --force .",
+        "git submodule foreach 'git reset --hard'",
+    ]
+
+    def test_round6_long_flag_and_foreach_denied_at_haiku(self):
+        self._assert_denied(self.ROUND6_LONG_FLAG_AND_FOREACH)
+
+    def test_round6_long_flag_and_foreach_allowed_at_fable(self):
+        self._assert_allowed(self.ROUND6_LONG_FLAG_AND_FOREACH, tier="claude-fable-5-1")
+
+    def test_round6_non_destructive_neighbours_stay_allowed_at_haiku(self):
+        self._assert_allowed([
+            "git clean --dry-run",
+            "git rm --cached x",
+            "git submodule update --init",
+        ])
+
+    def test_round6_real_registry_carries_the_rows(self):
+        for cmd in self.ROUND6_LONG_FLAG_AND_FOREACH:
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertNotEqual(r.stdout.strip(), "", f"ALLOWED (bypass) for: {cmd!r}")
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
 
     # ── internal error: spoken, never silent ─────────────────────────────────────────────────
     def test_internal_error_is_spoken_not_silently_swallowed(self):

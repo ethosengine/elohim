@@ -104,6 +104,24 @@ are also resolved into a substituted variant scanned alongside the original, so 
 reset ${MODE}` classifies with the value — an ADDITIONAL scan through the ordinary tier path, never
 a short-circuit.
 
+FIX ROUND 6 (whole-branch review, 2026-09-12 — findings F2/F4/F5/F9). (a) THREE COMMANDS ALLOWED
+AT EVERY TIER because `_flag_letters_present` reads only COMBINED SHORT options and skips every
+`--`-prefixed token: `git clean --force -d`, `git clean -x --force`, `git rm --recursive --force
+.`. Closed in the DECLARED TABLE, not in code — a second `clean` row on `any_flags: ["--force"]`
+and a second `rm` row on `any_flags: ["--recursive"]` + the same `.`/`*` target list (multiple
+rows sharing one `sub` OR together, so the short and long forms both classify). (b) `git
+submodule foreach '<anything>'` had NO row: `foreach` runs arbitrary shell text in every
+submodule, so the payload never reaches this table as a git subcommand — `{ sub: submodule,
+any_args: ["foreach"] }` classifies the wrapper. `git submodule update --init`, `git clean
+--dry-run` and `git rm --cached <path>` stay allowed at every tier. (c) F4 FAIL-CLOSED LOAD: an
+absent row, a non-`deny` row, or any missing/invalid parameter block now DENIES instead of
+skipping — "the declared table is gone" is indistinguishable from "the table was removed to get
+past the gate". `skip()` survives for exactly one reason, PyYAML being unavailable (an
+interpreter fact no repo edit can produce). (d) F5: `unknown-tier` was loaded and never read.
+It is now consumed — an explicit `deny` is the only accepted value (anything else, absence
+included, refuses the whole table by name), and the unresolved-tier deny in `main()` is the
+branch that reads it.
+
 Deny shape copies `cargo-disk-guard.py`'s exact convention: one `hookSpecificOutput` JSON object
 on stdout (`permissionDecision: deny`), process exit 0.
 """
@@ -765,19 +783,28 @@ def _inner_text_is_safe(inner_text: str) -> bool:
 # ── policy row loading + pin verification ────────────────────────────────────────────────────
 
 def _load_policy_row():
-    """(`{raw, rules, rm_targets, tier_order, tier_floor, unknown_tier, remedy}`, None) on
-    success, or (None, reason) — never raises."""
+    """(`{raw, rules, rm_targets, tier_order, tier_floor, unknown_tier, remedy}`, None, False) on
+    success, or (None, reason, skippable) — never raises.
+
+    FIX ROUND 6 (F4, fail-closed): every load failure — an ABSENT row, a row that is not
+    `class: deny`, a missing/invalid parameter block — now DENIES rather than skipping. A gate
+    that silently allows the whole destructive-git class the moment its declared table goes
+    missing is the same unguarded state this hook exists to remove, and "the table is gone" is
+    indistinguishable from "the table was removed to get past the gate". `skippable` is True for
+    exactly ONE reason: PyYAML itself is unavailable, an interpreter-environment fact that no
+    edit to the repo can produce and that would otherwise deny every git command in a checkout
+    whose Python has no YAML."""
     try:
         import yaml
     except Exception as e:  # pragma: no cover - PyYAML is vendored in this workspace
-        return None, f"PyYAML unavailable ({e!r})"
+        return None, f"PyYAML unavailable ({e!r})", True
     try:
         with open(POLICY_FILE) as f:
             data = yaml.safe_load(f) or {}
     except Exception as e:
-        return None, f"cannot read/parse {POLICY_FILE}: {e!r}"
+        return None, f"cannot read/parse {POLICY_FILE}: {e!r}", False
     if not isinstance(data, dict) or data.get("epr-meta-policies-version") != 1:
-        return None, f"{POLICY_FILE} missing/invalid `epr-meta-policies-version`"
+        return None, f"{POLICY_FILE} missing/invalid `epr-meta-policies-version`", False
     row = None
     for candidate in data.get("policies") or []:
         if (
@@ -789,36 +816,47 @@ def _load_policy_row():
             row = candidate
             break
     if row is None:
-        return None, f"no active row `{POLICY_REF}` in {POLICY_FILE}"
+        return None, f"no active row `{POLICY_REF}` in {POLICY_FILE}", False
     if row.get("class") != "deny":
-        return None, f"policy `{POLICY_REF}` is not `class: deny` (got {row.get('class')!r})"
+        return None, f"policy `{POLICY_REF}` is not `class: deny` (got {row.get('class')!r})", False
     params = row.get("parameters")
     if not isinstance(params, dict):
-        return None, f"policy `{POLICY_REF}` missing `parameters` block"
+        return None, f"policy `{POLICY_REF}` missing `parameters` block", False
     rules = params.get("rules")
     rm_targets = params.get("rm-force-recursive-targets")
     tier_order = params.get("tier-order")
     tier_floor = params.get("tier-floor")
     if not isinstance(rules, list) or not rules:
-        return None, f"policy `{POLICY_REF}` `parameters.rules` missing or empty"
+        return None, f"policy `{POLICY_REF}` `parameters.rules` missing or empty", False
     if not isinstance(rm_targets, list) or not rm_targets:
-        return None, f"policy `{POLICY_REF}` `parameters.rm-force-recursive-targets` missing or empty"
+        return None, f"policy `{POLICY_REF}` `parameters.rm-force-recursive-targets` missing or empty", False
     if not isinstance(tier_order, list) or not tier_order:
-        return None, f"policy `{POLICY_REF}` `parameters.tier-order` missing or empty"
+        return None, f"policy `{POLICY_REF}` `parameters.tier-order` missing or empty", False
     if not isinstance(tier_floor, str) or tier_floor not in tier_order:
         return None, (
             f"policy `{POLICY_REF}` `parameters.tier-floor` missing or not present in "
             f"`parameters.tier-order`"
-        )
+        ), False
+    # FIX ROUND 6 (F5): `unknown-tier` was loaded and never read. It is now CONSUMED — an
+    # explicit `deny` is the only accepted value, and the branch that reads it is the
+    # unresolved-tier deny in main(). Anything else (including the key's absence) refuses the
+    # whole table by name, because a row declaring `unknown-tier: allow` would otherwise read as
+    # a permission this hook has no code to honour.
+    unknown_tier = params.get("unknown-tier")
+    if unknown_tier != "deny":
+        return None, (
+            f"policy `{POLICY_REF}` `parameters.unknown-tier` is {unknown_tier!r} — `deny` is "
+            f"the only accepted value (an unresolved tier is never allowed)"
+        ), False
     return {
         "raw": row,
         "rules": rules,
         "rm_targets": set(rm_targets),
         "tier_order": tier_order,
         "tier_floor": tier_floor,
-        "unknown_tier": params.get("unknown-tier", "deny"),
+        "unknown_tier": unknown_tier,
         "remedy": params.get("remedy", ""),
-    }, None
+    }, None, False
 
 
 def _verify_pin(row: dict):
@@ -1028,10 +1066,17 @@ def main():
     if not command or not _worth_investigating(command):
         return
 
-    row, err = _load_policy_row()
+    row, err, skippable = _load_policy_row()
     if err:
-        skip(err)
-        return  # unreachable (skip() exits); kept for readability under test/import
+        if skippable:
+            skip(err)
+        else:
+            deny(
+                f"policy row {POLICY_REF} absent or not a deny row ({err}) — refusing every "
+                f"git/rm candidate until the declared table is readable. Fail-closed: a table "
+                f"that cannot be read cannot say what ISN'T destructive either."
+            )
+        return  # unreachable (skip()/deny() exit); kept for readability under test/import
 
     pin_ok, pin_reason = _verify_pin(row["raw"])
     if not pin_ok:
@@ -1076,6 +1121,17 @@ def main():
 
     if tier_idx is not None and tier_idx >= floor_idx:
         return  # at/above the declared floor: allowed, silently
+
+    if tier_idx is None:
+        # The declared `unknown-tier` disposition (validated at load: `deny` is the only value
+        # this hook accepts). An actor whose tier we cannot resolve is not given the floor's
+        # benefit of the doubt.
+        deny(
+            f"DESTRUCTIVE GIT ({POLICY_REF}): command matches `{matched}`. Resolved tier: "
+            f"{tier} — not in the declared tier-order {tier_order}; `unknown-tier: "
+            f"{row['unknown_tier']}`. {row['remedy']}"
+        )
+        return
 
     deny(
         f"DESTRUCTIVE GIT ({POLICY_REF}): command matches `{matched}`. "
