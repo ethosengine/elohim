@@ -25,6 +25,11 @@ import {
   type HouseholdMeshFixture,
 } from '../src/framework/fixtures/household-mesh.js';
 import {
+  assertPeerInventoryParityHealthy,
+  normalizeInventoryParity,
+  type InventoryParityWire,
+} from '../src/framework/fixtures/inventory-parity.js';
+import {
   resolveOwnedMeshProcess,
   signalOwnedMeshProcess,
   type OwnedProcessHandle,
@@ -1235,24 +1240,6 @@ interface DeliveryPeer {
   peerId: string;
 }
 
-interface InventoryParityWire {
-  gossiped_but_missing?: string[];
-  local_but_not_gossiped?: string[];
-  filesystem_count?: number;
-  gossiped_count?: number;
-  gossipedButMissing?: string[];
-  localButNotGossiped?: string[];
-  filesystemCount?: number;
-  gossipedCount?: number;
-}
-
-interface InventoryParity {
-  gossipedButMissing: string[];
-  localButNotGossiped: string[];
-  filesystemCount: number;
-  gossipedCount: number;
-}
-
 interface PeerLossState {
   peers: HouseholdPeer[];
   paused: Set<HouseholdPeerName>;
@@ -1345,18 +1332,6 @@ async function responseBytes(baseUrl: string, path: string): Promise<Uint8Array>
   const bytes = new Uint8Array(await response.arrayBuffer());
   assert.ok(response.ok, `GET ${baseUrl}${path} failed: ${response.status}`);
   return bytes;
-}
-
-function normalizeInventoryParity(wire: InventoryParityWire): InventoryParity {
-  const normalized = {
-    gossipedButMissing: wire.gossiped_but_missing ?? wire.gossipedButMissing ?? [],
-    localButNotGossiped: wire.local_but_not_gossiped ?? wire.localButNotGossiped ?? [],
-    filesystemCount: wire.filesystem_count ?? wire.filesystemCount ?? -1,
-    gossipedCount: wire.gossiped_count ?? wire.gossipedCount ?? -1,
-  };
-  assert.ok(normalized.filesystemCount >= 0, 'inventory parity omitted filesystem count');
-  assert.ok(normalized.gossipedCount >= 0, 'inventory parity omitted gossiped count');
-  return normalized;
 }
 
 /**
@@ -1526,32 +1501,14 @@ Then(
         // an equal-counts assertion was red before the outage ever started.
         // Jessica's claim is: her view is clean again, she lost nothing she
         // held before going dark, and the survivors' views are clean too.
+        // (Shared contract: src/framework/fixtures/inventory-parity.ts.)
         const baseline = state.inventoryBaseline;
         assert.ok(baseline, 'inventory baseline was not measured before the outage');
         for (const [index, peer] of state.peers.entries()) {
           const report = reports[index];
           assert.ok(report);
-          assert.deepEqual(
-            report.gossipedButMissing,
-            [],
-            `${peer.name} gossips blobs it does not hold: ${report.gossipedButMissing.join(', ')}`
-          );
-          assert.deepEqual(
-            report.localButNotGossiped,
-            [],
-            `${peer.name} holds blobs it has not gossiped: ${report.localButNotGossiped.join(', ')}`
-          );
-          assert.equal(
-            report.filesystemCount,
-            report.gossipedCount,
-            `${peer.name} filesystem/gossip counts differ`
-          );
           const before = baseline.get(peer.name) ?? 0;
-          assert.ok(
-            report.filesystemCount >= before,
-            `${peer.name} holds ${report.filesystemCount} blobs, fewer than the ${before} it ` +
-              'held before the outage'
-          );
+          assertPeerInventoryParityHealthy(peer.name, report, before, 'before the outage');
         }
       },
       {

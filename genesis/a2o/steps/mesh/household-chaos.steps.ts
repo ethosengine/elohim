@@ -69,6 +69,11 @@ import {
   requireFixtureStoragePeer,
 } from '../../src/framework/fixtures/household-mesh.js';
 import {
+  assertPeerInventoryParityHealthy,
+  normalizeInventoryParity,
+  type InventoryParityReport,
+} from '../../src/framework/fixtures/inventory-parity.js';
+import {
   discoverStoragePeerPid,
   writeRestartCapture,
 } from '../../src/framework/fixtures/process-control.js';
@@ -650,33 +655,11 @@ async function measurePeerIds(state: DrillState): Promise<void> {
   }
 }
 
-interface ParityReport {
-  gossipedButMissing: string[];
-  localButNotGossiped: string[];
-  filesystemCount: number;
-  gossipedCount: number;
-}
+type ParityReport = InventoryParityReport;
 
 async function inventoryParity(peer: PeerHandle): Promise<ParityReport> {
   const { body } = await probeInventoryParity(peer.url);
-  const wire = body;
-  const list = (snake: string, camel: string): string[] => {
-    const value = wire[snake] ?? wire[camel];
-    return Array.isArray(value) ? (value as string[]) : [];
-  };
-  const count = (snake: string, camel: string): number => {
-    const value = wire[snake] ?? wire[camel];
-    return typeof value === 'number' ? value : -1;
-  };
-  const report: ParityReport = {
-    gossipedButMissing: list('gossiped_but_missing', 'gossipedButMissing'),
-    localButNotGossiped: list('local_but_not_gossiped', 'localButNotGossiped'),
-    filesystemCount: count('filesystem_count', 'filesystemCount'),
-    gossipedCount: count('gossiped_count', 'gossipedCount'),
-  };
-  assert.ok(report.filesystemCount >= 0, `${peer.name} inventory parity omitted filesystemCount`);
-  assert.ok(report.gossipedCount >= 0, `${peer.name} inventory parity omitted gossipedCount`);
-  return report;
+  return normalizeInventoryParity(body, peer.name);
 }
 
 /** Every custody-blob commitment this peer's projection holds. */
@@ -1475,6 +1458,14 @@ When(
     if (held) return held;
     const state = drill(this);
     state.drillStartedAt = new Date().toISOString();
+    // Pre-churn inventory baseline, per household peer — the honest parity
+    // claim ("Jessica's peer holds the same inventory as the rest of the
+    // mesh") is that nobody loses blobs across the flap, never that all
+    // three peers hold equal counts (see peer-loss-failover.feature).
+    for (const peer of state.peers) {
+      const report = await inventoryParity(peer);
+      state.baselines.set(`inventory:${peer.name}`, report.filesystemCount);
+    }
     for (let round = 0; round < times; round += 1) {
       await killPeer(state, 'jessica');
       await new Promise(resolve => setTimeout(resolve, gapSeconds * 1_000));
@@ -1503,28 +1494,27 @@ Then(
   { timeout: RESYNC_WINDOW_MS + 15_000 },
   async function (this: E2EWorld) {
     const state = drill(this);
+    // "Same inventory" is honest parity, not equal counts:
+    // genesis/a2o/features/federation/peer-loss-failover.feature states the
+    // claim ("each peer's gossip view agreeing with its own filesystem, and
+    // Jessica holding no fewer blobs than before she went dark") and
+    // federation-failover.steps.ts's "Jessica's peer inventory parity
+    // matches the mesh again" implements it. Household peers legitimately
+    // hold DIFFERENT blob sets (the seeding peer carries the corpus), so an
+    // equal-counts assertion is red before the drill even starts — see the
+    // shared contract in src/framework/fixtures/inventory-parity.ts.
+    let lastReports: Map<HouseholdPeerName, ParityReport> | undefined;
     await retry(
       async () => {
         const reports = new Map<HouseholdPeerName, ParityReport>();
         for (const peer of state.peers) reports.set(peer.name, await inventoryParity(peer));
-        const jessica = reports.get('jessica');
-        assert.ok(jessica);
-        assert.deepEqual(
-          jessica.gossipedButMissing,
-          [],
-          'Jessica is missing blobs her peers gossip as hers'
-        );
-        assert.deepEqual(
-          jessica.localButNotGossiped,
-          [],
-          'Jessica holds blobs the mesh does not know about'
-        );
-        assert.equal(
-          new Set([...reports.values()].map(report => report.filesystemCount)).size,
-          1,
-          'household inventories still differ: ' +
-            [...reports].map(([name, r]) => `${name}=${r.filesystemCount}`).join(', ')
-        );
+        lastReports = reports;
+        for (const peer of state.peers) {
+          const report = reports.get(peer.name);
+          assert.ok(report);
+          const baseline = state.baselines.get(`inventory:${peer.name}`) ?? 0;
+          assertPeerInventoryParityHealthy(peer.name, report, baseline, 'before the churn');
+        }
       },
       {
         maxAttempts: 60,
@@ -1533,6 +1523,22 @@ Then(
         maxDelayMs: 5_000,
         timeoutMs: RESYNC_WINDOW_MS,
       }
+    );
+    assert.ok(lastReports, 'inventory parity was never measured');
+    const reports = lastReports;
+    this.attach(
+      JSON.stringify({
+        filesystemCounts: Object.fromEntries(
+          state.peers.map(peer => [peer.name, reports.get(peer.name)?.filesystemCount ?? null])
+        ),
+        preChurnFilesystemCounts: Object.fromEntries(
+          state.peers.map(peer => [
+            peer.name,
+            state.baselines.get(`inventory:${peer.name}`) ?? null,
+          ])
+        ),
+      }),
+      'application/json'
     );
   }
 );
