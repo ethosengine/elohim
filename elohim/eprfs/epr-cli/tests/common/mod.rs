@@ -398,6 +398,21 @@ pub fn repo_with_bank() -> TempDir {
                     "terms": ["unicorn", "dragon", "phoenix"]
                 },
                 "scope": "tooling"
+            },
+            {
+                "id": "q-fixture-nolocate",
+                "intent": {
+                    "action": "consume",
+                    "resource_spec": {"classifiedAs": ["top red now"]},
+                    "in_scope_of": recipe_cid,
+                    "raised_by": "agent:steward@repo"
+                },
+                "reached_when": {
+                    "path": "tooling/skill.md",
+                    "assertion": "never inspected — this question's entry locates nothing",
+                    "terms": ["stamp"]
+                },
+                "scope": "."
             }
         ]
     });

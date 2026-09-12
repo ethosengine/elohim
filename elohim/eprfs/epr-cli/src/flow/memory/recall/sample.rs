@@ -115,7 +115,7 @@ pub(super) fn sample(
     open_args.purpose = None;
     open_args.need = need.clone();
     open_args.need_explicit = true;
-    let (open_view, _) = execute(&open_args, contract, execution, method)?;
+    let (open_view, open_lens) = execute(&open_args, contract, execution, method)?;
 
     let candidates: Vec<Value> = open_view["first_screen"]["candidates"]
         .as_array()
@@ -124,53 +124,96 @@ pub(super) fn sample(
     let located = candidates
         .first()
         .filter(|candidate| candidate["best_section"]["lines"].is_string())
-        .ok_or_else(|| {
-            refused(
-                "sample found no located candidate for this question; open the session manually \
-                 and choose a source",
-            )
-        })?;
-    let read_path = located["path"].as_str().unwrap_or_default().to_string();
-    let read_lines = located["best_section"]["lines"]
-        .as_str()
-        .unwrap_or_default()
-        .to_string();
+        .cloned();
 
-    // 2. read — the first located candidate's own range.
-    let mut read_args = args.clone();
-    read_args.operation = "read".into();
-    read_args.path = Some(read_path.clone());
-    read_args.lines = Some(read_lines.clone());
-    read_args.need = need.clone();
-    let (read_view, _) = execute(&read_args, contract, execution, method)?;
+    // Fix round 2, R1 (controller ruling): a journey whose entry locates nothing is a MEASURED
+    // MISS, never an invalid argument — exactly what the standing reader exists to count. On the
+    // real tree this is 4 of the 6 bank questions (`discovery::question_terms` drops sub-4-char
+    // tokens and no area/habit matches what remains — a recorded frontier, not fixed here; R3).
+    // `located: None` skips `read` (there is nothing to read) and `finish` (a focused journey with
+    // zero receipts REFUSES there — `journey.rs`'s own guard, untouched this round), closing
+    // instead on `open`'s own resolved lens.
+    let (reached, metered_bytes, read_field, location, outcome, resolved_lens, usage) =
+        match located {
+            Some(located) => {
+                let read_path = located["path"].as_str().unwrap_or_default().to_string();
+                let read_lines = located["best_section"]["lines"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string();
 
-    let excerpt = read_view["evidence"]["sources"][0]["content"]
-        .as_str()
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    let reached = !question.reached_when.terms.is_empty()
-        && question
-            .reached_when
-            .terms
-            .iter()
-            .all(|term| excerpt.contains(&term.to_ascii_lowercase()));
-    let metered_bytes = read_view["usage"]["source_bytes"].as_u64().unwrap_or(0);
+                // 2. read — the first located candidate's own range.
+                let mut read_args = args.clone();
+                read_args.operation = "read".into();
+                read_args.path = Some(read_path.clone());
+                read_args.lines = Some(read_lines.clone());
+                read_args.need = need.clone();
+                let (read_view, _) = execute(&read_args, contract, execution, method)?;
 
-    // 3. finish — a focused journey closes on its inspected passage, not a selected concern.
-    let mut finish_args = args.clone();
-    finish_args.operation = "finish".into();
-    finish_args.outcome = Some(format!(
-        "sample journey for question `{question_id}`; reached={reached}"
-    ));
-    finish_args.question = Some(format!(
-        "sample --question {question_id} — journey closed, nothing left open"
-    ));
-    let (finish_view, resolved_lens) = execute(&finish_args, contract, execution, method)?;
+                let excerpt = read_view["evidence"]["sources"][0]["content"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                let reached = !question.reached_when.terms.is_empty()
+                    && question
+                        .reached_when
+                        .terms
+                        .iter()
+                        .all(|term| excerpt.contains(&term.to_ascii_lowercase()));
+                let metered_bytes = read_view["usage"]["source_bytes"].as_u64().unwrap_or(0);
 
-    let mut usage = json!({});
-    add_usage(&mut usage, &open_view["usage"]);
-    add_usage(&mut usage, &read_view["usage"]);
-    add_usage(&mut usage, &finish_view["usage"]);
+                // 3. finish — a focused journey closes on its inspected passage.
+                let mut finish_args = args.clone();
+                finish_args.operation = "finish".into();
+                finish_args.outcome = Some(format!(
+                    "sample journey for question `{question_id}`; reached={reached}"
+                ));
+                finish_args.question = Some(format!(
+                    "sample --question {question_id} — journey closed, nothing left open"
+                ));
+                let (finish_view, resolved_lens) =
+                    execute(&finish_args, contract, execution, method)?;
+
+                let mut usage = json!({});
+                add_usage(&mut usage, &open_view["usage"]);
+                add_usage(&mut usage, &read_view["usage"]);
+                add_usage(&mut usage, &finish_view["usage"]);
+
+                // Fix round 1, C1: name the located-vs-declared divergence when the ranking's
+                // first located candidate is not the question's own `reached_when.path`.
+                let declared_path = question.reached_when.path.display().to_string();
+                let location = if read_path == declared_path {
+                    format!("located {read_path} (matches declared)")
+                } else {
+                    format!("located {read_path} · declared {declared_path}")
+                };
+
+                (
+                    reached,
+                    metered_bytes,
+                    json!({"path": read_path, "lines": read_lines}),
+                    location,
+                    finish_view["outcome"].clone(),
+                    resolved_lens,
+                    usage,
+                )
+            }
+            None => {
+                // No `read`, so `recall-metered-bytes@1` is exactly what `open` itself charged —
+                // never a receipt that does not exist.
+                let usage = open_view["usage"].clone();
+                let metered_bytes = usage["source_bytes"].as_u64().unwrap_or(0);
+                (
+                    false,
+                    metered_bytes,
+                    Value::Null,
+                    "no candidate located — the entry rendered the ceremony door".to_string(),
+                    Value::Null,
+                    open_lens,
+                    usage,
+                )
+            }
+        };
 
     // Identity: the bank question's own Intent, addressed the same way every fabric atom is.
     let intent_cid = atom_cid(&question.intent)?;
@@ -288,17 +331,6 @@ pub(super) fn sample(
         &measures_path,
     )?;
 
-    // Fix round 1, C1: name the located-vs-declared divergence when the ranking's first located
-    // candidate is not the question's own `reached_when.path` — `reached:false` on such a journey
-    // is the ranking telling the truth, not a defect, and the view should say so in one line
-    // rather than leave a reader to diff two buried fields themselves.
-    let declared_path = question.reached_when.path.display().to_string();
-    let location = if read_path == declared_path {
-        format!("located {read_path} (matches declared)")
-    } else {
-        format!("located {read_path} · declared {declared_path}")
-    };
-
     let mut view = json!({
         "operation": "sample",
         "orientation": {
@@ -317,7 +349,7 @@ pub(super) fn sample(
         // `first_screen.ranking`/`.omissions` (selection rule, omissions) directly off the view —
         // without these, the floor line under-reports a journey that ranked, omitted and stands
         // on a real receipt as "no candidates ranked … omissions: 0 · receipts: 0".
-        "outcome": finish_view["outcome"].clone(),
+        "outcome": outcome,
         "first_screen": open_view["first_screen"].clone(),
         "event": {
             "cid": event_cid.to_string(),
@@ -334,10 +366,10 @@ pub(super) fn sample(
         "reached": reached,
         "question": {
             "id": question_id,
-            "path": declared_path,
+            "path": question.reached_when.path.display().to_string(),
             "assertion": question.reached_when.assertion,
         },
-        "read": {"path": read_path, "lines": read_lines},
+        "read": read_field,
         "location": location,
         "folds": [
             metered_fold.record_cid,

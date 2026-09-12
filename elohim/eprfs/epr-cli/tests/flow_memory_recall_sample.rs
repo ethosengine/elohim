@@ -446,3 +446,97 @@ fn a_sample_whose_terms_are_absent_writes_no_fulfillment() {
         .expect("recall-screens-to-shape@1 folded");
     assert_eq!(screens["value"], 4.0, "{screens:?}");
 }
+
+/// Fix round 2, R1 (controller ruling): a question whose entry LOCATES NOTHING (no first-screen
+/// candidate at all — `q-fixture-nolocate`'s need is all sub-4-char tokens, so
+/// `discovery::question_terms` drops every one and `open` renders the whole-scope ceremony door
+/// instead) is a MEASURED MISS, never a refusal. `sample` records it: no `read` (no receipt, and
+/// `finish` would refuse a focused journey with zero receipts — skipped, not forced), a `FlowEvent`
+/// with empty `fulfills`, and the standing reader's usual three folds.
+#[test]
+fn sample_records_a_measured_miss_when_open_locates_no_candidate() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp5",
+        &[
+            "sample",
+            "--question",
+            "q-fixture-nolocate",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    assert_eq!(v["reached"], false);
+    assert!(v["read"].is_null(), "{v:#}");
+    assert_eq!(
+        v["location"],
+        "no candidate located — the entry rendered the ceremony door"
+    );
+    assert_eq!(v["event"]["action"], "consume");
+    assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 0);
+    assert_eq!(v["folds"].as_array().unwrap().len(), 3);
+
+    let folds = common::flows(dir.path());
+    let screens = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-screens-to-shape@1")
+        .expect("recall-screens-to-shape@1 folded");
+    assert_eq!(screens["value"], 4.0, "{screens:?}");
+    assert_eq!(screens["env"]["question"], "q-fixture-nolocate");
+    // Task 3.3's `env:journey=<FlowEvent cid>` slot must still be present on a miss journey's
+    // folds — the window bound groups folds back into the journey they came from either way.
+    assert_eq!(
+        screens["env"]["journey"],
+        v["event"]["cid"].as_str().unwrap()
+    );
+
+    let metered = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-metered-bytes@1")
+        .expect("recall-metered-bytes@1 folded");
+    assert_eq!(
+        metered["env"]["journey"],
+        v["event"]["cid"].as_str().unwrap()
+    );
+    let unmetered = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-unmetered-bytes@1")
+        .expect("recall-unmetered-bytes@1 folded");
+    assert_eq!(unmetered["value"], 0.0);
+}
+
+/// `judge` accepts a measured-miss event exactly like any other sampled journey.
+#[test]
+fn judge_accepts_a_measured_miss_event() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp5-seat",
+        &[
+            "sample",
+            "--question",
+            "q-fixture-nolocate",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    let cid = v["event"]["cid"].as_str().unwrap();
+    let j = common::ok_in_bank(
+        dir.path(),
+        "smp5-seat-judge",
+        &[
+            "judge",
+            "--event",
+            cid,
+            "--as",
+            "agent:seat@claude-opus-5",
+            "--mistaken",
+            "0",
+            "--reason",
+            "the miss itself is honestly recorded",
+        ],
+    );
+    assert_eq!(j["verdict"]["decision"], "permit");
+    assert_eq!(j["verdict"]["subject"], cid);
+}
