@@ -289,6 +289,15 @@ Scenario 2/3 run against the live pair (organic shed windows are real red eviden
 > visitor at a non-hosting doorway is refused with the reach reason; a member
 > with standing is served through the nearest holder; the holder's cached
 > shell stops answering anonymously inside the declared window.
+>
+> **Standing, not property (same ruling, fourth pass).** A doorway projecting EPRs in
+> classic client→server shape for public consumption is a commons privilege and right
+> afforded by the network under the EPR's reach — never the doorway's own property — and
+> the public has feedback available to challenge and refine that standing (the witnessed
+> interaction / earned-reach machinery). Every serving feature on this plan is therefore a
+> standing the doorway holds on behalf of the commons: eligibility derived from the DHT and
+> re-asked at serve time, a ruling on reach propagating to every doorway's fold, and the
+> public challenge path shipped as part of the feature, not after it.
 
 ### Task 3.1: Apex multi-A manifest diff (operator-gated apply) — **tier: Sonnet**
 **Files:** Modify `genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml`, `genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml`.
