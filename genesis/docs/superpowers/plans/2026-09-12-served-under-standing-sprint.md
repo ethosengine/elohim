@@ -47,6 +47,20 @@ Evidence today: `fetch_from_remote_doorway` is defined and never called; a doorw
 - [ ] **Step 2: one-hop forward** — relay to the first live holder with the loop-prevention header and a budget of one; try the next holder on a shed before answering the shed; preserve the original 404 when every holder fails; add the served-by origin header so the sticky client goes direct next time; wired as DeliveryRelay's final tier; dead code and the FEDERATION.md claim reconciled. Tests first.
 - [ ] **Step 3: measure** — doorway bin from the sprint slot, restart the household doorways, glue for `features/federation/name-routing.feature` (drop `@wip` per scenario as glue lands), run under the lane lock; delta in served-under-standing with the run id.
 
+**Routing dimensions (operator steering 2026-09-12 — the feature must cover the standard range; the fold/selector/relay shape makes each a field or a term, never a rewrite):**
+
+| Dimension | Rung 2 (today) | Generalizes at |
+|---|---|---|
+| Path / mount prefix | yes — segment-boundary match, same rule as the local router | — |
+| Host (virtual hosts; hostnames as head channels) | fold key is `RouteKey { host: Option, path }`, host unconstrained | rung 4 — contract gains host + channel |
+| Health-based failover | yes — serving / shedding / uncertain / unreachable; next holder on a shed | — |
+| Reach and requester standing | enforced at the holder, not in selection | rung 3 — eligibility fold |
+| Nearest (attested RTT, region) | named hook; owner order today | selector term when the advertisement lands |
+| Weighted / canary | no | the candidate channel is the canary; weight is a selector term if wanted |
+| Relay mode | `Proxy`, one hop, served-by hint; `Redirect` declared, unimplemented | small addition |
+| Sticky | client-side via the hint and the shipped fallback client | stays client-side |
+| Rewrites | no — contracts declare mounts | not planned |
+
 ## Rung 3 — The standing story (served-under-standing · epr-atom-home)
 
 Evidence today: the habit is born red with two READY stories and no glue; the chrome's five affordances are named as epr-atom-home's commons checks.
