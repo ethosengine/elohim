@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { randomUUID } from 'node:crypto';
 
-import { Given, Then, When } from '@cucumber/cucumber';
+import { After, Given, Then, When } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
@@ -201,12 +201,17 @@ function remember(
     doorwayUrl,
     ...(device instanceof PlaywrightDevice ? { device } : {}),
   });
-  world.onCleanup(async () => {
-    try {
-      await closeAccount(person, person.token);
-    } catch {
-      // Best-effort cleanup through the same self-service contract under test.
-    }
+  world.scenarioCreatedHumans.push({
+    label: `"${displayName}" (${auth.identifier}) at ${doorwayUrl}`,
+    close: async () => {
+      const result = await closeAccount(person, person.token);
+      const closed = result.body['closed'] === true || result.body['alreadyClosed'] === true;
+      if (result.status !== 200 || !closed) {
+        throw new Error(
+          `POST /auth/close-account returned ${result.status}: ${JSON.stringify(result.body)}`
+        );
+      }
+    },
   });
 }
 
@@ -1025,3 +1030,35 @@ Then(
     );
   }
 );
+
+// ---------------------------------------------------------------------------
+// Cleanup — "the story creates and removes its own human" (07's own module
+// doc), made true for a scenario that fails partway too.
+//
+// Every human this file registers is tracked on `world.scenarioCreatedHumans`
+// at the point of registration (`remember()`, above) — never a fixture or
+// Prologue cast member, which this hook must never touch (those are closed
+// and re-cast by their own scenarios in
+// `steps/dataplane/humans-served.steps.ts`, never by this list). Scoped by
+// tag to the two features whose scenarios mint their own throwaway humans, so
+// it never fires for scenarios that only exercise the standing cast.
+// `humans-served.steps.ts` creates none of its own today, so this hook is
+// presently a no-op there — the tag scoping is future-proofing for the day a
+// scenario in that file does register one, at which point pushing onto the
+// same `world.scenarioCreatedHumans` list is all that step needs.
+//
+// Runs regardless of pass/fail (cucumber always runs `After` hooks, even when
+// a step throws) and is fail-soft: a close failure is logged, one line per
+// human, and never thrown — a cleanup defect must never turn a passed
+// scenario red, and must never mask the scenario's own failure either.
+// ---------------------------------------------------------------------------
+After({ tags: '@hosted-human or @concern:humans-served' }, async function (this: E2EWorld) {
+  const created = this.scenarioCreatedHumans.splice(0, this.scenarioCreatedHumans.length);
+  for (const entry of created) {
+    try {
+      await entry.close();
+    } catch (error) {
+      console.error(`[hosted-human cleanup] could not close ${entry.label}: ${String(error)}`);
+    }
+  }
+});

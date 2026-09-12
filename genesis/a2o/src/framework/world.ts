@@ -32,6 +32,23 @@ interface PlaywrightBrowser {
 /** Singleton Playwright browser shared across scenarios in a run. */
 let sharedBrowser: PlaywrightBrowser | undefined;
 
+/**
+ * A human a SCENARIO itself registered at a doorway (never a fixture/Prologue
+ * cast member — those are never closed by this mechanism). Tracked on
+ * `E2EWorld.scenarioCreatedHumans` at the point of registration so a
+ * tag-scoped `After` hook (see `steps/ui/hosted-human.steps.ts`) can close
+ * each one through the doorway's own self-service close path regardless of
+ * whether the scenario passed or failed partway through — a bare
+ * `world.onCleanup` registration still runs on failure too, but carried no
+ * visibility when the close attempt itself failed silently.
+ */
+export interface ScenarioCreatedHuman {
+  /** Human-readable label for cleanup-failure log lines only. */
+  label: string;
+  /** Closes this human's account. Must reject on failure — never swallow it — so the After hook can log it. */
+  close: () => Promise<void>;
+}
+
 export class E2EWorld extends World {
   /** Named doorway instances (e.g. "alpha", "staging") */
   doorways = new Map<string, DoorwayEntry>();
@@ -63,6 +80,15 @@ export class E2EWorld extends World {
 
   /** Content IDs created during the scenario, keyed by alias */
   contentIds = new Map<string, string>();
+
+  /**
+   * Humans this scenario itself registered at a doorway during its own run —
+   * never fixture/Prologue cast members. The hosted-human/humans-served
+   * `After` hook closes each of these, fail-soft, once the scenario ends
+   * (pass or fail). Populated at the point of registration (see `remember()`
+   * in `steps/ui/hosted-human.steps.ts`).
+   */
+  scenarioCreatedHumans: ScenarioCreatedHuman[] = [];
 
   /** Cleanup callbacks to run after each scenario */
   private cleanupCallbacks: (() => Promise<void>)[] = [];
