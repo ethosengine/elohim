@@ -92,7 +92,7 @@ import { once } from 'node:events';
 import { readFile, readlink } from 'node:fs/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 
-import { After, Given, Then, When } from '@cucumber/cucumber';
+import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
 import { getRawWithHeaders } from '../../src/framework/dataplane/surfaces.js';
 import {
@@ -189,7 +189,7 @@ async function localOnlyGet(url: string): Promise<RawResponse> {
   return rawGet(url, { 'x-federation-hop': '1' });
 }
 
-async function adminCall(
+async function adminCallOnce(
   method: 'POST' | 'PATCH',
   url: string,
   body: unknown
@@ -202,6 +202,41 @@ async function adminCall(
   });
   const text = await response.text();
   return { status: response.status, text };
+}
+
+/** The upstream circuit's transient "catching-up" shape (storage_proxy.rs / dispatch_to_projected_epr's
+ * warm-shell path) — never a hard failure, just "not yet". Retrying here (rather than pushing the
+ * retry into every call site) is what keeps a brief catching-up window from reading as a staging
+ * failure this file's own logic caused. */
+function retryAfterMs(text: string): number | undefined {
+  try {
+    const parsed = JSON.parse(text) as { retryAfter?: unknown; status?: unknown };
+    if (parsed.status === 'catching-up' && typeof parsed.retryAfter === 'number') {
+      return parsed.retryAfter * 1000;
+    }
+  } catch {
+    // not the catching-up shape
+  }
+  return undefined;
+}
+
+/** Retries a write on 503 "catching-up" — observed live on this mesh's write path (storage
+ * upstream circuit) — honoring its own `retryAfter` when present, capped, up to `maxAttempts`. */
+async function adminCall(
+  method: 'POST' | 'PATCH',
+  url: string,
+  body: unknown,
+  maxAttempts = 5
+): Promise<{ status: number; text: string }> {
+  let last: { status: number; text: string } = { status: -1, text: '' };
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    last = await adminCallOnce(method, url, body);
+    if (last.status !== 503) return last;
+    if (attempt === maxAttempts) return last;
+    const wait = Math.min(retryAfterMs(last.text) ?? 5_000, 15_000);
+    await delay(wait);
+  }
+  return last;
 }
 
 async function coherenceManifest(
@@ -240,12 +275,40 @@ interface StagedContract {
   path: string;
 }
 
-/** Content-addressed over (doorwayId, path) ONLY — deterministic across re-runs of this
- * lane, and by construction can never collide with a REAL seeded project-epr id (those are
+/**
+ * One stamp per lane invocation (this process), minted lazily on the FIRST scenario's
+ * `Before` hook and reused by every scenario after it — never per-scenario. Prefers the
+ * lane's own run id when the caller supplies one (`A2O_RUN_ID`, the same env var
+ * `just test mesh`'s recipe honors — see its `run_id="${A2O_RUN_ID:-...}"` — though that
+ * recipe computes its OWN default locally and does not export it back to this process, so
+ * it is visible here only when the invoker set it); otherwise a `pid+timestamp` stamp.
+ *
+ * WHY: `testCommitmentId` used to be content-addressed over (doorwayId, path) alone, so
+ * every lane invocation reused the SAME row. That row got cycled through
+ * create→cancel→reactivate dozens of times across repeated manual/automated runs while
+ * diagnosing this feature and wedged — `PATCH` on it started returning a persistent
+ * `503 {"status":"catching-up","cause":"upstream"}` for minutes on end, while a BRAND NEW
+ * id `POST`ed and `PATCH`ed instantly. Scoping the id to this run bounds reactivation
+ * churn to WITHIN one lane invocation (still needed — the After hook below cancels a
+ * scenario's staged rows, and a later scenario in the SAME run reusing the same root
+ * reactivates them) and guarantees a fresh run never touches a previous run's row at all,
+ * cancelled-and-wedged or not.
+ */
+let runStamp: string | undefined;
+
+Before(function (this: E2EWorld): void {
+  runStamp ??= process.env['A2O_RUN_ID'] ?? `${process.pid}-${Date.now().toString(36)}`;
+});
+
+/** Content-addressed over (doorwayId, path, runStamp) — deterministic WITHIN one lane
+ * invocation (so scenarios sharing a root reuse the same row, per the idempotent-reuse
+ * design) but never collides with a previous run's row (see `runStamp`'s doc). By
+ * construction can never collide with a REAL seeded project-epr id either (those are
  * addressed over (doorwayId, eprId), never urlPath — see file header). */
 function testCommitmentId(doorwayId: string, path: string): string {
+  assert.ok(runStamp, 'runStamp not minted yet — the Before hook must run before any staging step');
   const digest = createHash('sha256')
-    .update(`${doorwayId}|${path}`, 'utf8')
+    .update(`${doorwayId}|${path}|${runStamp}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
   return `project-epr-nrt-${digest}`;
