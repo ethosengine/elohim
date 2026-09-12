@@ -24,6 +24,12 @@ load-bearing OVER-BLOCK class (`git log --oneline ${SHA}`, `git commit -m "${MSG
 rule is now in-token only and classifies through the NORMAL tier path, so a glued destructive
 command denies at haiku and clears at fable exactly as its plainly-typed twin does.
 
+Fix round 5 (fifth and final pass) adds the two remaining misses: backslash-newline LINE
+CONTINUATION (a wrapped multi-line command is ordinary typing, and the newline substitution ran
+before anything handled the escape), and `rm -rf` against `$PWD`/`${PWD}`/`$HOME`/`${HOME}`/
+`$OLDPWD` — a bare `$VAR` is not in-token gluing and none of them were declared literal targets.
+Leading `VAR=value` assignments are resolved into a variant scanned alongside the original.
+
 Run: python3 -m unittest discover -s .claude/hooks/__tests__ -p 'capability_tier_gate_test.py'
 """
 from __future__ import annotations
@@ -750,6 +756,108 @@ class CapabilityTierGateCase(unittest.TestCase):
                     r = run_hook(cmd, REPO, {"CLAUDE_MODEL": tier})
                     self.assertEqual(r.returncode, 0, r.stderr)
                     self.assertEqual(r.stdout.strip(), "", f"unexpected deny at {tier}: {cmd}")
+
+    # ══════════════════════════════════════════════════════════════════════════════════════
+    # Round 5 (fifth and final adversarial pass): two pre-existing misses.
+    # ══════════════════════════════════════════════════════════════════════════════════════
+
+    # (a) LOAD-BEARING — backslash-newline line continuation. `_tokenize` substituted newline ->
+    # ` ; ` BEFORE anything handled backslash escapes, so a trailing backslash left `--hard ` (with
+    # a trailing space, matching no declared flag) and a command wrapped mid-invocation split into
+    # separate chains. A wrapped multi-line command is ordinary typing, not obfuscation.
+    ROUND5_LINE_CONTINUATION = [
+        "git reset --hard\\\n",
+        "git reset \\\n  --hard",
+        "git \\\nreset \\\n--hard",
+        "git \\\n  clean \\\n  -xfd",
+        "rm -rf \\\n  /projects/elohim",
+    ]
+
+    # (b) `rm -rf` against a shell variable naming the working tree or the home directory: a bare
+    # `$VAR` is neither in-token gluing nor a declared literal target, so every one was ALLOWED.
+    ROUND5_RM_VAR_TARGETS = [
+        'rm -rf -- "$PWD"',
+        "rm -rf $PWD",
+        "rm -rf ${PWD}",
+        "rm -rf $HOME",
+        "rm -rf ${HOME}",
+        'rm -rf "$OLDPWD"',
+        "rm -rf $PWD/",
+        "rm -rf ${PWD}/",
+        "rm -rf ../",
+    ]
+
+    # (b2) A leading `VAR=value` assignment is part of the SAME command.
+    ROUND5_LEADING_ASSIGNMENTS = [
+        "MODE=--hard git reset ${MODE}",
+        "MODE=--hard git reset $MODE",
+        "T=. ; rm -rf $T",
+        "D=$PWD; rm -rf -f -r $D",
+    ]
+
+    def test_round5_line_continuation_denied(self):
+        self._assert_denied(self.ROUND5_LINE_CONTINUATION)
+
+    def test_round5_line_continuation_allowed_at_fable(self):
+        self._assert_allowed(self.ROUND5_LINE_CONTINUATION, tier="claude-fable-5-1")
+
+    def test_round5_line_continuation_is_tier_respecting_not_ambiguous(self):
+        r = run_hook("git reset \\\n  --hard", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+        reason = _deny_reason(r)
+        self.assertIn("destructive-git-requires-tier", reason)
+        self.assertIn("git reset", reason)
+        self.assertNotIn("indirect invocation", reason)
+
+    def test_round5_rm_variable_targets_denied(self):
+        self._assert_denied(self.ROUND5_RM_VAR_TARGETS)
+
+    def test_round5_rm_variable_targets_allowed_at_fable(self):
+        self._assert_allowed(self.ROUND5_RM_VAR_TARGETS, tier="claude-fable-5-1")
+
+    def test_round5_leading_assignments_resolved(self):
+        self._assert_denied(self.ROUND5_LEADING_ASSIGNMENTS)
+        self._assert_allowed(self.ROUND5_LEADING_ASSIGNMENTS, tier="claude-fable-5-1")
+
+    def test_round5_a_path_below_a_variable_target_stays_allowed(self):
+        # The narrowing that keeps this honest: `$PWD` is the working tree, `$PWD/target` is a
+        # build directory. Only the directory ITSELF (with or without a trailing slash) matches.
+        self._assert_allowed([
+            'rm -rf "$PWD/target"',
+            "rm -rf $PWD/target/debug",
+            'rm -rf "${PWD}/target"',
+            'rm -rf "$HOME/.cache/x"',
+            "rm -rf ./target",
+            'rm -rf "${TMPDIR}/scratch"',
+        ])
+        self._assert_allowed([
+            'rm -rf "$PWD/target"',
+            'rm -rf "${PWD}/target"',
+        ], tier="claude-fable-5-1")
+
+    def test_round5_assignment_resolution_does_not_over_block(self):
+        # An assignment whose value is harmless must not manufacture a deny, and the round-3/4
+        # substitution and `${VAR}` allow-matrices must survive the extra scan unchanged.
+        self._assert_allowed([
+            'MSG=hello git commit -m "${MSG}"',
+            "export SHA=$(git rev-parse HEAD)",
+            "git log --oneline ${SHA}",
+            "TMPDIR=/tmp/scratch rm -rf ${TMPDIR}/inner",
+        ])
+
+    def test_real_repo_registry_round5(self):
+        for cmd in ("git reset \\\n  --hard", 'rm -rf -- "$PWD"', "rm -rf ${HOME}",
+                    "MODE=--hard git reset ${MODE}"):
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertNotEqual(r.stdout.strip(), "", f"ALLOWED (bypass) for: {cmd!r}")
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
+        for cmd in ('rm -rf "$PWD/target"', "git log --oneline ${SHA}"):
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), "", cmd)
 
 
 if __name__ == "__main__":

@@ -88,6 +88,22 @@ so `git${IFS}reset${IFS}--hard` denies at haiku exactly like `git reset --hard` 
 fable-tier controller is not blocked either way. `${VAR}` standing alone as an argument, quoted,
 or used as a path component is never a hit.
 
+FIX ROUND 5 (fifth and final adversarial pass — two pre-existing misses). (a) BACKSLASH-NEWLINE
+LINE CONTINUATION, load-bearing because a wrapped multi-line command is ordinary typing: `_tokenize`
+substituted newline -> ` ; ` BEFORE anything handled backslash escapes, so a trailing backslash
+left `--hard ` (trailing space, matching no declared flag) and a command wrapped between `reset`
+and `--hard` split into two separate chains. Continuation lines are now JOINED (`_JOIN_CONTINUATION_RE`,
+backslash + newline -> one space) before the newline substitution. (b) `rm -rf "$PWD"` / `$PWD` /
+`${PWD}` / `$HOME` / `${HOME}` / `rm -rf -- "$PWD"`: a bare `$VAR` is not in-token gluing and none
+of these appeared in the declared `rm-force-recursive-targets`, so every one was ALLOWED. A
+code-level target set (`_RM_DESTRUCTIVE_VAR_TARGETS`) now names the shell variables whose loss IS
+the incident this gate exists for, unioned with the declared literal list (the policy row is
+unchanged this round); a trailing slash is normalised away (`$PWD/`, `../`) while a path BELOW one
+of them (`rm -rf "$PWD/target"`) stays allowed. Leading `VAR=value` assignments in the same command
+are also resolved into a substituted variant scanned alongside the original, so `MODE=--hard git
+reset ${MODE}` classifies with the value — an ADDITIONAL scan through the ordinary tier path, never
+a short-circuit.
+
 Deny shape copies `cargo-disk-guard.py`'s exact convention: one `hookSpecificOutput` JSON object
 on stdout (`permissionDecision: deny`), process exit 0.
 """
@@ -170,6 +186,28 @@ _VAR_BRACE_RE = re.compile(r"\$\{[^}]{1,200}\}")
 _ANSI_C_RE = re.compile(r"\$'(?:[^'\\]|\\.){0,200}'")
 _GLUE_WORD_CHAR_RE = re.compile(r"[A-Za-z0-9_]")
 
+# Round 5: a backslash-newline is a LINE CONTINUATION — the shell joins the lines into one command
+# before it ever splits words. Joining must happen before the newline -> `;` substitution below, or
+# `git reset --hard\` + newline tokenises as `--hard ` (trailing space, matching no declared flag)
+# and a wrapped `git reset \<NL> --hard` reads as two unrelated chains.
+_JOIN_CONTINUATION_RE = re.compile(r"\\[ \t]*\r?\n")
+
+# A `${…}` expansion span — its closing `}` belongs to the expansion, never to a shell block.
+_DOLLAR_BRACE_SPAN_RE = re.compile(r"\$\{[^}]*\}")
+
+# Round 5: shell variables naming a directory whose recursive removal IS the incident this gate
+# exists for. A bare `$VAR` is neither in-token gluing nor a declared literal target, so `rm -rf
+# "$PWD"` was allowed at every tier. Code-level (the declared row is unchanged this round) and
+# unioned with `parameters.rm-force-recursive-targets`.
+_RM_DESTRUCTIVE_VAR_TARGETS = {
+    "$PWD", "${PWD}", "$OLDPWD", "${OLDPWD}", "$HOME", "${HOME}",
+    "$CLAUDE_PROJECT_DIR", "${CLAUDE_PROJECT_DIR}", "$REPO_ROOT", "${REPO_ROOT}",
+}
+
+# Round 5: a leading `VAR=value` assignment is part of the SAME command — `MODE=--hard git reset
+# ${MODE}` runs a hard reset. Resolved into a substituted variant scanned ALONGSIDE the original.
+_ASSIGNMENT_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
+
 
 def _space_operators(text: str) -> str:
     """Insert spaces around shell operators found OUTSIDE quotes and outside backslash escapes,
@@ -232,10 +270,25 @@ def _drop_redirects(stage: list) -> list:
     return out
 
 
+def _space_parens_braces(text: str) -> str:
+    """Space out bare parens/braces, but never INSIDE a `${…}` span: the closing `}` of `${PWD}` is
+    the expansion's own syntax, not a shell block terminator, and splitting it left `rm -rf ${PWD}`
+    tokenised as `${PWD` + `}` — matching no declared target (round 5)."""
+    out = []
+    pos = 0
+    for m in _DOLLAR_BRACE_SPAN_RE.finditer(text):
+        out.append(_PAREN_BRACE_RE.sub(r" \1 ", text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_PAREN_BRACE_RE.sub(r" \1 ", text[pos:]))
+    return "".join(out)
+
+
 def _tokenize(text: str) -> list:
+    text = _JOIN_CONTINUATION_RE.sub(" ", text)
     text = text.replace("\n", " ; ")
     text = _space_operators(text)
-    text = _PAREN_BRACE_RE.sub(r" \1 ", text)
+    text = _space_parens_braces(text)
     try:
         return shlex.split(text)
     except ValueError:
@@ -400,6 +453,28 @@ def _glue_affected(command: str) -> bool:
     return False
 
 
+def _resolve_leading_assignments(command: str) -> "str | None":
+    """The command with any `VAR=value` assignment it carries substituted into later `$VAR` /
+    `${VAR}` references, or None when it carries no assignment that is actually referenced. The
+    result is scanned IN ADDITION to the original, through the ordinary tier path."""
+    assignments = {}
+    for chain in _chains(command):
+        for stage in chain:
+            for tok in stage:
+                m = _ASSIGNMENT_RE.match(tok)
+                if m and m.group(2):
+                    assignments.setdefault(m.group(1), m.group(2))
+    if not assignments:
+        return None
+    out = command
+    changed = False
+    for name, value in assignments.items():
+        pattern = re.compile(r"\$\{" + re.escape(name) + r"\}|\$" + re.escape(name) + r"\b")
+        out, n = pattern.subn(value.replace("\\", "\\\\"), out)
+        changed = changed or bool(n)
+    return out if changed else None
+
+
 def _deglue(command: str) -> str:
     """The command as it reads once the `$`-constructs resolve away: `${…}` becomes the word break
     it was hiding, `$'X'` becomes the ordinary `'X'` the shell would hand the command. Scanned IN
@@ -524,7 +599,12 @@ def _rm_force_and_recursive(args: list) -> bool:
 
 
 def _rm_target_is_destructive(target: str, literal_targets: set) -> bool:
-    if target in literal_targets:
+    # `$PWD/` and `../` name the same directory as `$PWD` and `..`; a path BELOW one of them
+    # (`$PWD/target`) is a different, ordinary thing and stays allowed.
+    normalised = target[:-1] if len(target) > 1 and target.endswith("/") else target
+    if target in literal_targets or normalised in literal_targets:
+        return True
+    if target in _RM_DESTRUCTIVE_VAR_TARGETS or normalised in _RM_DESTRUCTIVE_VAR_TARGETS:
         return True
     if target.startswith("/"):
         try:
@@ -971,6 +1051,13 @@ def main():
     # denied `git commit -m "${MSG}"` at every tier including the controller's.
     if not matched and _glue_affected(command):
         matched = _scan(_deglue(command), row, depth=0)
+
+    # Round 5: a leading `VAR=value` assignment belongs to the same command — `MODE=--hard git
+    # reset ${MODE}` runs a hard reset. Again an ADDITION, classified through the normal path.
+    if not matched:
+        resolved = _resolve_leading_assignments(command)
+        if resolved:
+            matched = _scan(resolved, row, depth=0)
 
     if not matched:
         return
