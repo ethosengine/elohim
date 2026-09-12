@@ -61,6 +61,33 @@ unrecoverable upstream (anything else) defaults to deny, since we cannot verify 
 interpreter word-scan now skips dash-prefixed tokens entirely (a flag like `--git-dir` is never
 "free text"), so `\bgit\b` no longer fires on an option name.
 
+FIX ROUND 4 (fourth adversarial pass — three misses, one over-block class). MISSES, all plainly
+typed and all ALLOWED before this round: (a) UNSPACED SHELL OPERATORS — `git reset --hard;echo x`,
+`...&&echo x`, `...||true`, `...&`, `...>log`, `cd /dir&&git reset --hard`: shlex only splits on
+whitespace, so `--hard;echo` never equalled `--hard`. Fixed by a quote-aware pre-tokenisation pass
+(`_space_operators`) that inserts spaces around `;`/`&&`/`||`/`|`/`&`/`>`/`>>`/`<`/`2>`/… OUTSIDE
+quotes and outside backslash escapes, plus redirect-token dropping (`_drop_redirects`) so a
+redirect and its target never count as a subcommand's positional arguments. (b) `exec git reset
+--hard`, `exec -a foo git …`, `builtin eval git …`: `exec`/`builtin` joined the wrapper set, with a
+value-consuming option table (`exec -a NAME`, `env -u`, `nice -n`, `sudo -u`, …) so an option's
+separate VALUE is never mistaken for the real head. (c) `xargs -n 1 git reset --hard`, `xargs -a
+list.txt git …`: `_xargs_real_command` skipped only dash tokens, so an option's value became the
+head — now a declared xargs option table consumes values (`-n -a -I -i -L -P -s -d -E --max-args
+--arg-file --replace --max-procs --delimiter …`).
+
+OVER-BLOCK, denied at EVERY tier before this round with the INDIRECT reason (which bypasses tier
+resolution entirely): `git log --oneline ${SHA}`, `git commit -m "${MSG}"`, `git checkout
+${BRANCH}`, `git add -- ${FILES}`, `cd "${PROJECT_DIR}" && git status`, `rm -rf
+"${TMPDIR}/scratch"`, `git log --format=$'%h %s'` — round 3's `_has_glued_var_obfuscation` denied
+any `${…}`/`$'…'` within a 20-character WINDOW of a git/rm word. Replaced by `_glue_affected` /
+`_deglue`: a hit requires the `$`-construct to be fused INSIDE ONE TOKEN (its immediate neighbour
+in that token is a letter/digit/underscore — never a quote, never `/`, never the token boundary),
+or to be an ANSI-C `$'…'` quote (which shlex silently corrupts into a literal `$` prefix). A hit
+no longer short-circuits to INDIRECT: the de-glued form is scanned through the NORMAL tier path,
+so `git${IFS}reset${IFS}--hard` denies at haiku exactly like `git reset --hard` does, and a
+fable-tier controller is not blocked either way. `${VAR}` standing alone as an argument, quoted,
+or used as a path component is never a hit.
+
 Deny shape copies `cargo-disk-guard.py`'s exact convention: one `hookSpecificOutput` JSON object
 on stdout (`permissionDecision: deny`), process exit 0.
 """
@@ -102,7 +129,17 @@ _TOP_OPERATORS = {"&&", "||", ";", "&"}
 _PIPE_OP = "|"
 _ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
-_WRAPPERS = {"timeout", "nice", "env", "command", "sudo", "nohup", "setsid", "stdbuf", "time"}
+_WRAPPERS = {"timeout", "nice", "env", "command", "sudo", "nohup", "setsid", "stdbuf", "time",
+             "exec", "builtin"}
+# Round 4: a wrapper option that consumes a SEPARATE value — skipping only the dash token leaves
+# the value standing where the real head should be (`exec -a foo git reset --hard` -> head `foo`).
+_WRAPPER_VALUE_OPTS = {
+    "exec": {"-a"},
+    "env": {"-u", "--unset", "-C", "--chdir", "-S", "--split-string"},
+    "nice": {"-n", "--adjustment"},
+    "sudo": {"-u", "--user", "-g", "--group", "-p", "--prompt", "-C", "--close-from"},
+    "stdbuf": {"-i", "-o", "-e", "--input", "--output", "--error"},
+}
 _NOOP_LEADING = {"(", ")", "{", "}", "if", "then", "else", "elif", "fi", "do", "done", "while", "until"}
 _SHELLS = {"bash", "sh", "dash", "zsh"}
 _NEVER_CLASSIFY_HEADS = {"echo", "printf", "grep", "cat", "rg"}
@@ -114,14 +151,90 @@ _GIT_RM_WORD_RE = re.compile(r"\bgit\b|\brm\b")
 # as one detectable token instead of being torn into `$` and `(`.
 _PAREN_BRACE_RE = re.compile(r"(?<!\$)([(){}])")
 
-# Round 3: a `${VAR}` or `$'...'` construct glued directly against a `git`/`rm` word (shell
-# variable-expansion or ANSI-C-quote obfuscation of whitespace) is scanned on the RAW command
-# text — token-level analysis alone cannot see it once shlex has already merged/quoted things.
-_VAR_GLUE_RE = re.compile(r"\$\{[^}]{1,40}\}|\$'[^']{1,80}'")
+# Round 4: shell OPERATORS need no surrounding whitespace — `git reset --hard;echo x` is two
+# commands to the shell but one `--hard;echo` token to shlex. Longest-first so `&&` never reads as
+# two `&`, `>>` never as two `>`, `<<<` never as `<<` + `<`.
+_OPERATOR_UNITS = ("2>&1", "&>>", "<<<", ">>", "<<", "&&", "||", "&>", ">&", "2>",
+                   ";", "|", "&", ">", "<")
+_TOKEN_BOUNDARY_BEFORE = set(" \t\n|&;<>()")
+
+# A redirection and its target are never part of the command's own arguments (`git symbolic-ref
+# HEAD > out` has ONE positional arg, not three). `<<<` is deliberately NOT matched here — the
+# bare-shell here-string branch needs it.
+_REDIR_RE = re.compile(r"^(?:\d?(?:>>|>|<)&?\d*|&>>?)$")
+_REDIR_CARRIES_ITS_TARGET_RE = re.compile(r"&\d+$")
+
+# Round 4 (replacing round 3's 20-character WINDOW scan, which denied every `${…}` near a git/rm
+# word): the `$`-construct shapes that do not survive tokenisation as the shell would read them.
+_VAR_BRACE_RE = re.compile(r"\$\{[^}]{1,200}\}")
+_ANSI_C_RE = re.compile(r"\$'(?:[^'\\]|\\.){0,200}'")
+_GLUE_WORD_CHAR_RE = re.compile(r"[A-Za-z0-9_]")
+
+
+def _space_operators(text: str) -> str:
+    """Insert spaces around shell operators found OUTSIDE quotes and outside backslash escapes,
+    so shlex's whitespace-only splitting sees them as their own tokens. A backslash-escaped
+    character is copied through untouched, so a find-exec terminator keeps behaving as before."""
+    out = []
+    i = 0
+    n = len(text)
+    quote = None
+    while i < n:
+        ch = text[i]
+        if quote:
+            out.append(ch)
+            if ch == "\\" and quote == '"' and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch == "\\":
+            out.append(ch)
+            if i + 1 < n:
+                out.append(text[i + 1])
+            i += 2
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        matched = None
+        for op in _OPERATOR_UNITS:
+            if not text.startswith(op, i):
+                continue
+            if op[0].isdigit() and not (i == 0 or text[i - 1] in _TOKEN_BOUNDARY_BEFORE):
+                continue  # `foo2>x`: the digit belongs to the word, not to a `2>` redirect
+            matched = op
+            break
+        if matched:
+            out.append(" " + matched + " ")
+            i += len(matched)
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _drop_redirects(stage: list) -> list:
+    out = []
+    i = 0
+    while i < len(stage):
+        t = stage[i]
+        if _REDIR_RE.match(t):
+            i += 1 if _REDIR_CARRIES_ITS_TARGET_RE.search(t) else 2
+            continue
+        out.append(t)
+        i += 1
+    return out
 
 
 def _tokenize(text: str) -> list:
     text = text.replace("\n", " ; ")
+    text = _space_operators(text)
     text = _PAREN_BRACE_RE.sub(r" \1 ", text)
     try:
         return shlex.split(text)
@@ -135,28 +248,34 @@ def _chains(command: str) -> list:
     `|`-piped (so a pipeline's stages travel together)."""
     toks = _tokenize(command)
     chains, cur_chain, cur_stage = [], [], []
+
+    def _close_stage(stage):
+        stage = _drop_redirects(stage)
+        if stage:
+            cur_chain.append(stage)
+
     for t in toks:
         if t in _TOP_OPERATORS:
             if cur_stage:
-                cur_chain.append(cur_stage)
+                _close_stage(cur_stage)
             if cur_chain:
                 chains.append(cur_chain)
             cur_chain, cur_stage = [], []
             continue
         if t == _PIPE_OP:
             if cur_stage:
-                cur_chain.append(cur_stage)
+                _close_stage(cur_stage)
             cur_stage = []
             continue
         if t.endswith(";") and t not in _TOP_OPERATORS:
             cur_stage.append(t.rstrip(";"))
-            cur_chain.append(cur_stage)
+            _close_stage(cur_stage)
             chains.append(cur_chain)
             cur_chain, cur_stage = [], []
             continue
         cur_stage.append(t)
     if cur_stage:
-        cur_chain.append(cur_stage)
+        _close_stage(cur_stage)
     if cur_chain:
         chains.append(cur_chain)
     return chains
@@ -184,8 +303,9 @@ def _strip_wrappers(toks: list) -> list:
                 if i < len(toks) and re.match(r"^[\d.]+[smhd]?$", toks[i]):
                     i += 1
             else:
+                value_opts = _WRAPPER_VALUE_OPTS.get(base, ())
                 while i < len(toks) and toks[i].startswith("-"):
-                    i += 1
+                    i += 2 if toks[i] in value_opts else 1
             continue
         break
     return toks[i:]
@@ -221,14 +341,71 @@ def _interpreter_args_carry_destructive_word(argv: list) -> bool:
     return False
 
 
-def _has_glued_var_obfuscation(command: str) -> bool:
-    for m in _VAR_GLUE_RE.finditer(command):
-        start, end = m.span()
-        window = command[max(0, start - 20):end + 20]
-        de_globbed = _VAR_GLUE_RE.sub(" ", window)
-        if _GIT_RM_WORD_RE.search(de_globbed):
+def _raw_words(command: str) -> list:
+    """The RAW text split on unquoted whitespace, quotes and escapes preserved — one entry per
+    shell WORD, which is the unit in-token gluing is defined against."""
+    words, cur, quote = [], [], None
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if quote:
+            cur.append(ch)
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            cur.append(ch)
+            cur.append(command[i + 1])
+            i += 2
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            cur.append(ch)
+            i += 1
+            continue
+        if ch.isspace():
+            if cur:
+                words.append("".join(cur))
+                cur = []
+            i += 1
+            continue
+        cur.append(ch)
+        i += 1
+    if cur:
+        words.append("".join(cur))
+    return words
+
+
+def _glue_affected(command: str) -> bool:
+    """True iff some `$`-construct is fused INSIDE one shell word in a way shlex cannot reproduce:
+    a `${…}` whose immediate neighbour within that word is a letter/digit/underscore
+    (`git${IFS}reset`, `g${X}t`), or ANY ANSI-C `$'…'` quote (shlex leaves its `$` as a literal
+    character, so `$'--hard'` tokenises as `$--hard` and matches no declared flag).
+
+    A `${VAR}` standing alone as an argument (`git log --oneline ${SHA}`), quoted (`git commit -m
+    "${MSG}"`), or used as a path component (`rm -rf "${TMPDIR}/scratch"`) is NEVER a hit — that
+    over-block was round 3's 20-character window scan, and it denied routine work at every tier."""
+    for word in _raw_words(command):
+        if _ANSI_C_RE.search(word):
             return True
+        for m in _VAR_BRACE_RE.finditer(word):
+            before = word[m.start() - 1] if m.start() > 0 else ""
+            after = word[m.end()] if m.end() < len(word) else ""
+            if (before and _GLUE_WORD_CHAR_RE.match(before)) or (
+                after and _GLUE_WORD_CHAR_RE.match(after)
+            ):
+                return True
     return False
+
+
+def _deglue(command: str) -> str:
+    """The command as it reads once the `$`-constructs resolve away: `${…}` becomes the word break
+    it was hiding, `$'X'` becomes the ordinary `'X'` the shell would hand the command. Scanned IN
+    ADDITION to the original text, through the normal tier path — never as a short-circuit deny."""
+    out = _ANSI_C_RE.sub(lambda m: m.group(0)[1:], command)
+    return _VAR_BRACE_RE.sub(" ", out)
 
 
 # ── git subcommand rule evaluation ───────────────────────────────────────────────────────────
@@ -370,14 +547,31 @@ def _rm_matches(args: list, literal_targets: set) -> "str | None":
 
 # ── xargs / find -exec real-command resolution ───────────────────────────────────────────────
 
+# Round 4: xargs options that consume a SEPARATE value. Skipping only the dash token leaves the
+# value standing where the real command should be — `xargs -n 1 git reset --hard` read its head as
+# `1` and allowed the reset.
+_XARGS_VALUE_OPTS = {
+    "-n", "-a", "-I", "-i", "-L", "-P", "-s", "-d", "-E",
+    "--max-args", "--arg-file", "--replace", "--max-lines", "--max-procs", "--max-chars",
+    "--delimiter", "--eof", "--process-slot-var",
+}
+
+
 def _xargs_real_command(args: list) -> list:
-    """Skip xargs's own dash-prefixed options AND stray `{`/`}` tokens — the paren/brace spacer
-    (`_PAREN_BRACE_RE`) splits a glued placeholder like `-I{}` into `-I`, `{`, `}` as separate
-    tokens, and those braces are xargs's own replacement-string syntax, never the start of the
-    real command."""
+    """Skip xargs's own options — value-consuming ones (`-n 1`, `-a list.txt`, `-I {}`) take their
+    value with them — AND stray `{`/`}` tokens, since the paren/brace spacer (`_PAREN_BRACE_RE`)
+    splits a glued placeholder like `-I{}` into `-I`, `{`, `}` and those braces are xargs's own
+    replacement-string syntax, never the start of the real command."""
     i = 0
-    while i < len(args) and (args[i].startswith("-") or args[i] in ("{", "}")):
-        i += 1
+    while i < len(args):
+        t = args[i]
+        if t in ("{", "}"):
+            i += 1
+            continue
+        if t.startswith("-"):
+            i += 2 if t in _XARGS_VALUE_OPTS else 1
+            continue
+        break
     return args[i:]
 
 
@@ -736,14 +930,14 @@ def skip(reason: str):
 
 def _worth_investigating(command: str) -> bool:
     """The pre-filter, fixed round 3: runs on TOKENS (shlex-merged, so a quote-split word like
-    `g""it` reads as `git`), never the raw string. Also checks the raw text for the
-    `${...}`/`$'...'` obfuscation shape, which by design does not survive as a clean token."""
+    `g""it` reads as `git`), never the raw string. Also checks the raw text for the in-token
+    `${…}`/`$'…'` gluing shape, which by design does not survive as a clean token."""
     for chain in _chains(command):
         for stage in chain:
             for t in stage:
                 if "git" in t or "rm" in t:
                     return True
-    return _has_glued_var_obfuscation(command)
+    return _glue_affected(command)
 
 
 def main():
@@ -768,15 +962,16 @@ def main():
         )
         return
 
-    # Shell variable-expansion / ANSI-C-quote gluing (`git${IFS}reset${IFS}--hard`, `git reset
-    # $'--hard'`) survives no clean token for the per-stage scan below to recognise as `git`/
-    # `rm` — a token starting with `$`/backtick catches a GLUED HEAD, but this obfuscation can
-    # sit mid-command too. Checked globally, ahead of the per-chain scan.
-    if _has_glued_var_obfuscation(command):
-        deny(INDIRECT_REASON)
-        return
-
     matched = _scan(command, row, depth=0)
+
+    # Round 4: in-token `${…}`/`$'…'` gluing (`git${IFS}reset${IFS}--hard`, `git reset $'--hard'`,
+    # `g$'i't reset --hard`) survives no clean token for the scan above to recognise. Scan the
+    # DE-GLUED form too — as an ADDITION, and through the ordinary classification path, so the
+    # declared tier floor still decides. Round 3 short-circuited this class to INDIRECT, which
+    # denied `git commit -m "${MSG}"` at every tier including the controller's.
+    if not matched and _glue_affected(command):
+        matched = _scan(_deglue(command), row, depth=0)
+
     if not matched:
         return
 

@@ -15,6 +15,15 @@ subcommand `rm -r .`/`*`, `checkout --orphan`, `symbolic-ref` writes); over-bloc
 (`CLAUDE_CODE_SESSION_ID`, read before the round-1 `CLAUDE_SESSION_ID` fallback) so the actor
 sidecar lookup actually resolves a claimed tier.
 
+Fix round 4 (fourth adversarial pass) adds four tables at the bottom of this file: unspaced shell
+operators (`git reset --hard;echo x`, `&&`, `||`, `&`, `>`, `cd /dir&&git reset --hard`), the
+`exec`/`builtin` wrapper class (including `exec -a NAME`), xargs options that consume a separate
+VALUE (`-n 1`, `-a list.txt`, `-I {}`) — all three classes were ALLOWED before this round — and the
+load-bearing OVER-BLOCK class (`git log --oneline ${SHA}`, `git commit -m "${MSG}"`, `rm -rf
+"${TMPDIR}/scratch"`, `git log --format=$'%h %s'`, …) which round 3 denied at EVERY tier. The glue
+rule is now in-token only and classifies through the NORMAL tier path, so a glued destructive
+command denies at haiku and clears at fable exactly as its plainly-typed twin does.
+
 Run: python3 -m unittest discover -s .claude/hooks/__tests__ -p 'capability_tier_gate_test.py'
 """
 from __future__ import annotations
@@ -596,6 +605,151 @@ class CapabilityTierGateCase(unittest.TestCase):
                 r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
                 self.assertEqual(r.returncode, 0, r.stderr)
                 self.assertEqual(r.stdout.strip(), "", cmd)
+
+    # ══════════════════════════════════════════════════════════════════════════════════════
+    # Round 4 (fourth adversarial pass). Three MISSES — all plainly typed, all previously
+    # ALLOWED — and one load-bearing OVER-BLOCK class that was denied at every tier.
+    # ══════════════════════════════════════════════════════════════════════════════════════
+
+    # (a) Unspaced shell operators: shlex splits on whitespace only, so `--hard;echo` never
+    # equalled `--hard` and the whole command sailed through.
+    ROUND4_OPERATOR_GLUING = [
+        "git reset --hard;echo x",
+        "git reset --hard&&echo x",
+        "git reset --hard||true",
+        "git reset --hard&",
+        "git reset --hard>log",
+        "git reset --hard>>log",
+        "git reset --hard 2>/dev/null",
+        "cd /projects/elohim&&git reset --hard",
+        "echo start;git clean -xfd",
+        "true&&rm -rf /projects/elohim",
+    ]
+
+    # (b) `exec`/`builtin` were absent from the wrapper set; `exec -a NAME` additionally needs
+    # its option VALUE consumed or the value reads as the head.
+    ROUND4_EXEC_BUILTIN = [
+        "exec git reset --hard",
+        "exec -a foo git reset --hard",
+        "exec -c git reset --hard",
+        "exec -l git reset --hard",
+        "builtin eval git reset --hard",
+        "builtin git reset --hard",
+    ]
+
+    # (c) xargs options that consume a separate value — the value became the head.
+    ROUND4_XARGS_VALUE_OPTS = [
+        "xargs -n 1 git reset --hard",
+        "xargs -a list.txt git reset --hard",
+        "xargs -I {} git reset --hard",
+        "xargs -P 4 -n 1 git reset --hard",
+        "xargs -d , -n 1 git clean -xfd",
+    ]
+
+    def _assert_denied(self, cmds, tier="claude-haiku-4-5"):
+        for cmd in cmds:
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, self.proj, {"CLAUDE_MODEL": tier})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertNotEqual(r.stdout.strip(), "", f"ALLOWED (bypass) for: {cmd}")
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
+
+    def _assert_allowed(self, cmds, tier="claude-haiku-4-5"):
+        for cmd in cmds:
+            with self.subTest(cmd=cmd, tier=tier):
+                r = run_hook(cmd, self.proj, {"CLAUDE_MODEL": tier})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertEqual(r.stdout.strip(), "", f"unexpected deny at {tier} for: {cmd}")
+                self.assertEqual(r.stderr.strip(), "", f"unexpected stderr for: {cmd}")
+
+    def test_round4_unspaced_operators_denied(self):
+        self._assert_denied(self.ROUND4_OPERATOR_GLUING)
+
+    def test_round4_exec_and_builtin_wrappers_denied(self):
+        self._assert_denied(self.ROUND4_EXEC_BUILTIN)
+
+    def test_round4_xargs_value_consuming_options_denied(self):
+        self._assert_denied(self.ROUND4_XARGS_VALUE_OPTS)
+
+    def test_round4_operator_gluing_is_tier_respecting_not_ambiguous(self):
+        # An operator-glued command is a PLAINLY TYPED destructive command, not an ambiguous one:
+        # it must deny with the declared-pattern reason (naming the subcommand and the floor), and
+        # a controller at/above the floor must clear it.
+        r = run_hook("git reset --hard;echo x", self.proj, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+        reason = _deny_reason(r)
+        self.assertIn("destructive-git-requires-tier", reason)
+        self.assertIn("git reset", reason)
+        self.assertNotIn("indirect invocation", reason)
+        self._assert_allowed(["git reset --hard;echo x"], tier="claude-fable-5-1")
+
+    # (d) THE OVER-BLOCK: round 3's `_has_glued_var_obfuscation` denied any `${…}`/`$'…'` within
+    # a 20-character window of a git/rm word, with the INDIRECT reason that bypasses tier
+    # resolution — so routine, load-bearing work was refused at EVERY tier, the controller's
+    # included. `${VAR}` standing alone, quoted, or as a path component is never a hit now.
+    ROUND4_OVER_BLOCKS = [
+        "git log --oneline ${SHA}",
+        'git commit -m "${MSG}"',
+        "git checkout ${BRANCH}",
+        "git add -- ${FILES}",
+        'cd "${PROJECT_DIR}" && git status',
+        'rm -rf "${TMPDIR}/scratch"',
+        "git log --format=$'%h %s'",
+    ]
+
+    def test_round4_over_blocks_allowed_at_haiku(self):
+        self._assert_allowed(self.ROUND4_OVER_BLOCKS, tier="claude-haiku-4-5")
+
+    def test_round4_over_blocks_allowed_at_fable(self):
+        self._assert_allowed(self.ROUND4_OVER_BLOCKS, tier="claude-fable-5-1")
+
+    # The narrowing must not surrender the class it was built for: in-token gluing still denies,
+    # now through the ordinary tier path (so it reads exactly like its plainly-typed twin).
+    ROUND4_GLUE_STILL_DENIED = [
+        "git${IFS}reset${IFS}--hard",
+        "git reset $'--hard'",
+        "g$'i't reset --hard",
+        "git${IFS}clean${IFS}-xfd",
+    ]
+
+    def test_round4_in_token_gluing_still_denied_at_haiku(self):
+        self._assert_denied(self.ROUND4_GLUE_STILL_DENIED)
+
+    def test_round4_in_token_gluing_is_tier_respecting_not_ambiguous(self):
+        r = run_hook("git${IFS}reset${IFS}--hard", self.proj,
+                     {"CLAUDE_MODEL": "claude-haiku-4-5"})
+        reason = _deny_reason(r)
+        self.assertIn("destructive-git-requires-tier", reason)
+        self.assertNotIn("indirect invocation", reason)
+        self._assert_allowed(self.ROUND4_GLUE_STILL_DENIED, tier="claude-fable-5-1")
+
+    def test_round4_redirect_and_its_target_are_not_positional_args(self):
+        # `git symbolic-ref HEAD > out` is a READ (one positional arg). Counting the redirect and
+        # its target as arguments would trip the `min_positional_args: 2` write rule.
+        self._assert_allowed([
+            "git symbolic-ref HEAD > out",
+            "git status 2>/dev/null",
+            "git log --oneline > /tmp/log.txt",
+        ])
+
+    def test_real_repo_registry_round4_misses(self):
+        for cmd in ("git reset --hard;echo x", "cd /projects/elohim&&git reset --hard",
+                    "exec -a foo git reset --hard", "builtin eval git reset --hard",
+                    "xargs -n 1 git reset --hard", "xargs -a list.txt git reset --hard"):
+            with self.subTest(cmd=cmd):
+                r = run_hook(cmd, REPO, {"CLAUDE_MODEL": "claude-haiku-4-5"})
+                self.assertEqual(r.returncode, 0, r.stderr)
+                self.assertNotEqual(r.stdout.strip(), "", f"ALLOWED (bypass) for: {cmd}")
+                out = json.loads(r.stdout)
+                self.assertEqual(out["hookSpecificOutput"]["permissionDecision"], "deny", cmd)
+
+    def test_real_repo_registry_round4_over_blocks(self):
+        for tier in ("claude-haiku-4-5", "claude-fable-5-1"):
+            for cmd in self.ROUND4_OVER_BLOCKS:
+                with self.subTest(cmd=cmd, tier=tier):
+                    r = run_hook(cmd, REPO, {"CLAUDE_MODEL": tier})
+                    self.assertEqual(r.returncode, 0, r.stderr)
+                    self.assertEqual(r.stdout.strip(), "", f"unexpected deny at {tier}: {cmd}")
 
 
 if __name__ == "__main__":
