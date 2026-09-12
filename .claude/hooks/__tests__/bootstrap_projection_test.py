@@ -38,9 +38,12 @@ What is asserted:
      is a true no-op for `run-projection.py`.
   2. GOLDEN, against the REAL gate binary (skipped when unavailable): the two properties the
      brief's own failing test names verbatim — the headline block (now read out of the JSON
-     wrapper's `additionalContext`) is the `minimal` lens under 1,600 bytes carrying
-     `recipe bafk…`, `lens bafk…`, `top red:` and exactly one `  epr flow memory recall `
-     select line; the run-plane block is the `simple` lens and never re-derives
+     wrapper's `additionalContext`) is the `minimal` lens under 2,000 bytes (mirrors the lens
+     table's `minimal` density; Task 2.1 round 2 added `last delta:`/`atom:` lines, moving the
+     right-sized block to ~1,730 bytes, and Task 3.1 moves the contract's declared density to
+     2,000 in its next bump) carrying `recipe bafk…`, `lens bafk…`, `top red:`, `last delta:`,
+     `atom:` and exactly one `  epr flow memory recall ` select line; the run-plane block is
+     the `simple` lens and never re-derives
      (`re-derived this turn from habits.yaml` — the retired hook's own banner — must not
      appear). Golden tests use a session id unique per test run (never the bare `input="{}"`
      fallback) so a same-day re-run of this file never resumes a prior test's session and
@@ -349,10 +352,16 @@ class BootstrapProjectionGoldenCase(unittest.TestCase):
             input=json.dumps({"session_id": session_id}), capture_output=True, text=True,
             env=self.env(session_id), timeout=60).stdout
         block = _bootstrap_block(out)
-        self.assertLess(len(block.encode()), 1600)
+        # Cap 2,000 bytes: mirrors the lens table's `minimal` density (Task 2.1 round 2 added
+        # `last delta:` and `atom:` lines to the minimal rendering, moving the right-sized block
+        # from ~1,500 to ~1,730 bytes; Task 3.1 moves the contract's declared `minimal` density
+        # to 2,000 in its next bump, so this cap tracks that rather than the pre-round-2 figure).
+        self.assertLess(len(block.encode()), 2000)
         self.assertIn("recipe bafk", block)
         self.assertIn("lens bafk", block)
         self.assertIn("top red:", block)
+        self.assertIn("last delta:", block)
+        self.assertIn("atom:", block)
         self.assertEqual(block.count("\n  epr flow memory recall "), 1)
 
     def test_run_plane_is_the_simple_lens_and_names_no_second_renderer(self):
