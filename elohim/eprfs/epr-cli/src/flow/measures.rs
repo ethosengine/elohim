@@ -262,7 +262,7 @@ pub enum Derive {
     /// measured. The config fallback is kept (it is the kit's, and it is a real timestamp); only
     /// the epoch-0 arm becomes a refusal.
     FilesNewerThan,
-    /// The fraction of a ROLLING TIME WINDOW's folds whose value is positive — a rate, not a count
+    /// The fraction of a ROLLING TIME WINDOW's JOURNEYS that are positive — a rate, not a count
     /// since a reset.
     ///
     /// `recall-journey-window-ceiling@1` is the first consumer: the per-journey ceilings
@@ -270,12 +270,15 @@ pub enum Derive {
     /// LATEST journey alone, so one clean journey right after a bad one reads green with no memory
     /// of the bad one. This derive is the mishpat's actual claim — "the last quarter's journeys are
     /// mostly clean" — read over every consumed measure's folds whose `occurred_at` falls in the
-    /// declared `window_days` (default 91, a quarter). No reset exists for a window: the population
-    /// ages out on its own as folds fall past the cutoff, so there is nothing to drain.
+    /// declared `window_days` (default 91, a quarter), GROUPED by the `env:journey=<FlowEvent cid>`
+    /// slot `sample`/`judge` write on every fold (a fold with no such slot is its own singleton
+    /// journey) — a bad journey folded by both `sample` and `judge` counts once, not twice. No
+    /// reset exists for a window: the population ages out on its own as folds fall past the
+    /// cutoff, so there is nothing to drain.
     ///
-    /// **Fewer than 3 folds in the window is `skipped`, never a rate.** A percentage over one or
-    /// two journeys is noise wearing a number — the same three-valued discipline the other derives
-    /// hold, moved from "no reset yet" to "not enough population yet".
+    /// **Fewer than 3 journeys in the window is `skipped`, never a rate.** A percentage over one
+    /// or two journeys is noise wearing a number — the same three-valued discipline the other
+    /// derives hold, moved from "no reset yet" to "not enough population yet".
     RateOverWindow,
 }
 
@@ -287,9 +290,16 @@ impl Derive {
             "files-newer-than" => Some(Derive::FilesNewerThan),
             "rate-over-window" => Some(Derive::RateOverWindow),
             other => {
+                // Fix round 1, F5: an unknown `derive:` string must NOT fall through to being
+                // read as a plain measurement — a row that declares `derive:` has committed to
+                // an accumulation, and reading its `consumes:` primary as a bare latest-fold
+                // reading can render a confident `passed … 0` for a bound nobody evaluated. The
+                // caller (`bound_from`) captures this same raw string as `Bound::unknown_derive`
+                // and reports `skipped` instead — this eprintln stays for the operator tailing
+                // stderr, not as the record of what happens next.
                 eprintln!(
                     "report: bound `{row}` declares unknown derive `{other}` — \
-                     reading the bound as a plain measurement instead"
+                     reporting `skipped` (binary older than the declared measure?)"
                 );
                 None
             }
@@ -397,6 +407,14 @@ pub struct Bound {
     /// of this crate's parsing so the declared-vs-defaulted distinction stays visible to a reader
     /// of the row rather than being baked into a silently-filled field.
     pub window_days: Option<f64>,
+    /// The raw `derive:` string when the row DECLARED one but `Derive::parse` did not recognize
+    /// it (a binary older than the measure registry it is reading, most commonly). `None` covers
+    /// both "no `derive:` at all" (an ordinary plain bound) and "a recognized `derive:`" — only
+    /// this one variant means "committed to an accumulation this binary cannot compute". Kept
+    /// distinct from `derive: None` so `evaluate` can refuse to fall through to a plain-fold
+    /// reading, which would otherwise render a confident `passed … 0` for a bound nobody actually
+    /// evaluated (fix round 1, F5).
+    pub unknown_derive: Option<String>,
     /// The row's `status:`. `superseded` takes the bound OUT of evaluation — see [`Bound::retired`].
     pub status: Option<String>,
     /// `superseded_by:` — what replaced it. The registry's never-delete rule: a version with live
@@ -584,9 +602,17 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         .map(|raw| Compare::parse(&raw, &bare_id))
         .unwrap_or_default();
 
-    let derive = string_at(row, "derive")
-        .or_else(|| block.and_then(|m| string_at(m, "derive")))
-        .and_then(|raw| Derive::parse(&raw, &bare_id));
+    let derive_raw =
+        string_at(row, "derive").or_else(|| block.and_then(|m| string_at(m, "derive")));
+    let derive = derive_raw
+        .as_deref()
+        .and_then(|raw| Derive::parse(raw, &bare_id));
+    // Distinct from "no `derive:` declared" — this row COMMITTED to an accumulation and this
+    // binary does not recognize the word, so `evaluate` must refuse to read it as a plain bound.
+    let unknown_derive = match (&derive_raw, derive) {
+        (Some(raw), None) => Some(raw.clone()),
+        _ => None,
+    };
 
     // Every consumed pin, primary first. A malformed one is DROPPED with a notice rather than
     // taking the row down: a derived bound with four good sources and one typo should still count
@@ -689,6 +715,7 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         binding: string_at(row, "binding"),
         walk,
         window_days,
+        unknown_derive,
         status: string_at(row, "status"),
         superseded_by: string_at(row, "superseded_by").or_else(|| string_at(row, "superseded-by")),
         superseded_reason: string_at(row, "superseded_reason")

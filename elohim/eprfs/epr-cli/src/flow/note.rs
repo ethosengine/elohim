@@ -131,6 +131,14 @@ pub(crate) const UNIT_SLOT_PREFIX: &str = "unit:";
 /// addresses for one measurement.
 pub(crate) const ENV_SLOT_PREFIX: &str = "env:";
 
+/// The `env:` key naming the sampled journey's own `FlowEvent` cid (fix round 1, F1 of
+/// governed-discovery station 3, task 3.3). Written by `recall::sample`'s three folds and
+/// `recall::judge`'s mistaken-assertions fold onto the same journey; read by
+/// `report::evaluate_rate_over_window` to group folds back into journeys instead of counting each
+/// fold as its own population member. One constant so a writer and the reader can never spell the
+/// key two ways.
+pub(crate) const JOURNEY_ENV_KEY: &str = "journey";
+
 /// The actor sidecar, relative to the root. Its EXISTENCE is checked before it is opened, because
 /// [`SidecarActorStore::open`] creates the tree — and a read path that leaves `.eprfs/` behind on
 /// a repository that never had one has written a record of having looked.

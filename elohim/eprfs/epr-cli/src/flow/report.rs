@@ -49,8 +49,8 @@ use super::measures::{
     default_measures, default_policies, Bound, Derive, MeasureRef, Registry, SurfaceWalk,
 };
 use super::note::{
-    normalize_subject, ENV_SLOT_PREFIX, MEASURE_SLOT_PREFIX, REPO_SUBJECT, UNIT_SLOT_PREFIX,
-    VALUE_SLOT_PREFIX,
+    normalize_subject, ENV_SLOT_PREFIX, JOURNEY_ENV_KEY, MEASURE_SLOT_PREFIX, REPO_SUBJECT,
+    UNIT_SLOT_PREFIX, VALUE_SLOT_PREFIX,
 };
 use super::{short_cid, FlowError, FlowResult};
 use crate::report::{Finding, FindingStatus};
@@ -611,6 +611,11 @@ pub struct ReportOptions {
     /// The recipes to evaluate, in order. The FIRST is the primary — the one whose lines the
     /// headline prints.
     pub recipes: Vec<Recipe>,
+    /// Pins the clock a `rate-over-window` bound reads `now` from. `None` (the CLI's own
+    /// default) means `report()` reads real wall-clock `Utc::now()`; a test pins this instead of
+    /// dating its fixture's folds relative to whatever moment the test happens to run at (fix
+    /// round 1, F3).
+    pub now: Option<DateTime<Utc>>,
 }
 
 impl ReportOptions {
@@ -624,6 +629,7 @@ impl ReportOptions {
             headline: false,
             bound: None,
             recipes: declared_recipes(root),
+            now: None,
         }
     }
 
@@ -640,6 +646,13 @@ impl ReportOptions {
         if let Some(first) = self.recipes.first_mut() {
             first.policies = path;
         }
+        self
+    }
+
+    /// Pin the clock a `rate-over-window` bound evaluates against, instead of real wall-clock
+    /// `Utc::now()`.
+    pub fn with_now(mut self, now: DateTime<Utc>) -> Self {
+        self.now = Some(now);
         self
     }
 }
@@ -672,6 +685,7 @@ pub fn report(root: &Path, options: &ReportOptions) -> FlowResult<ReportPayload>
         ));
     }
 
+    let now = options.now.unwrap_or_else(Utc::now);
     let folds = read_folds(root)?;
     let mut recipes = Vec::with_capacity(options.recipes.len());
     for (index, recipe) in options.recipes.iter().enumerate() {
@@ -681,6 +695,7 @@ pub fn report(root: &Path, options: &ReportOptions) -> FlowResult<ReportPayload>
             &folds,
             options.bound.as_deref(),
             index == 0,
+            now,
         )?);
     }
 
@@ -717,6 +732,7 @@ fn evaluate_recipe(
     folds: &[Fold],
     filter: Option<&str>,
     primary: bool,
+    now: DateTime<Utc>,
 ) -> FlowResult<RecipeReport> {
     let measures = Registry::open_optional(&recipe.measures)?;
     let policies = Registry::open_optional(&recipe.policies)?;
@@ -760,7 +776,7 @@ fn evaluate_recipe(
         bounds.iter().partition(|bound| bound.retired());
     let outcomes: Vec<BoundOutcome> = live
         .iter()
-        .map(|bound| evaluate(root, bound, folds, &recipe_ref))
+        .map(|bound| evaluate(root, bound, folds, &recipe_ref, now))
         .collect();
     let retired: Vec<RetiredBound> = retired_bounds
         .iter()
@@ -791,17 +807,37 @@ fn count(outcomes: &[BoundOutcome], want: OutcomeStatus) -> usize {
 }
 
 /// Evaluate one bound against the latest admissible fold.
-fn evaluate(root: &Path, bound: &Bound, folds: &[Fold], recipe: &RecipeRef) -> BoundOutcome {
+///
+/// `now` is the evaluator's own clock — threaded in from [`report`] (default `Utc::now()`, but a
+/// caller of `ReportOptions::with_now` can pin it) rather than read here, so a test can hold it
+/// fixed. Fix round 1, F3's named frontier: a fold's `occurred_at` is HEAD's commit date (see
+/// `note.rs`'s dating discipline), which can lag real wall-clock time by however long the tree
+/// went uncommitted — a `rate-over-window` cutoff compares a git-clock timestamp against a
+/// wall-clock `now`, and closing that skew is not this round's fix.
+fn evaluate(
+    root: &Path,
+    bound: &Bound,
+    folds: &[Fold],
+    recipe: &RecipeRef,
+    now: DateTime<Utc>,
+) -> BoundOutcome {
     let watermarks = Watermarks {
         soft: bound.soft,
         hard: bound.hard,
     };
+    // Fix round 1, F5: a row that DECLARED `derive:` but whose value this binary does not
+    // recognize must never fall through to being read as a plain latest-fold bound — that silent
+    // fallback is what let `derive: rate-over-window` typo'd (or read by a binary built before
+    // this derive existed) render a confident `passed … 0` for a bound nobody evaluated.
+    if let Some(name) = &bound.unknown_derive {
+        return unknown_derive_outcome(bound, name, recipe, watermarks);
+    }
     if let Some(derive) = bound.derive {
         if derive.reads_tree() {
             return evaluate_surface_walk(root, bound, derive, recipe, watermarks);
         }
         if derive.reads_window() {
-            return evaluate_rate_over_window(bound, derive, folds, recipe, watermarks, Utc::now());
+            return evaluate_rate_over_window(bound, derive, folds, recipe, watermarks, now);
         }
         return evaluate_derived(bound, derive, folds, recipe, watermarks);
     }
@@ -899,6 +935,45 @@ fn evaluate(root: &Path, bound: &Bound, folds: &[Fold], recipe: &RecipeRef) -> B
         binding: bound.binding.clone(),
         compare: bound.compare.as_str().to_string(),
         derive: None,
+        reset_measure: None,
+        reset_fold_cid: None,
+        contributing_folds: None,
+        recipe: recipe.clone(),
+    }
+}
+
+/// The outcome for a row that declared a `derive:` this binary does not recognize.
+///
+/// Never `passed … 0` — that reading comes from treating the row as an ordinary plain bound
+/// (the pre-fix-round-1 behaviour), which finds no fold matching the primary `consumes:` measure
+/// under the plain-bound's single-measure `admits_measure` and, worse, silently accepts one if a
+/// stray fold happens to match. `skipped` names the actual gap: the measure registry moved ahead
+/// of this binary, and the row needs a rebuild to be evaluated at all.
+fn unknown_derive_outcome(
+    bound: &Bound,
+    name: &str,
+    recipe: &RecipeRef,
+    watermarks: Watermarks,
+) -> BoundOutcome {
+    let subject = bound
+        .subject
+        .as_deref()
+        .map(|s| normalize_subject(s).to_string())
+        .unwrap_or_else(|| REPO_SUBJECT.to_string());
+    BoundOutcome {
+        bound: bound.id.clone(),
+        measure: bound.measure.to_string(),
+        subject,
+        outcome: OutcomeStatus::Skipped,
+        summary: format!("unknown derive {name} (binary older than the declared measure)"),
+        observed: None,
+        unit: None,
+        watermarks,
+        fold_cid: None,
+        source: bound.source.as_str().to_string(),
+        binding: bound.binding.clone(),
+        compare: bound.compare.as_str().to_string(),
+        derive: Some(name.to_string()),
         reset_measure: None,
         reset_fold_cid: None,
         contributing_folds: None,
@@ -1303,23 +1378,31 @@ fn evaluate_derived(
 }
 
 /// How far back a `rate-over-window` bound looks when the row declares no `window_days:` — a
-/// quarter, matching the recall habit's own "the last quarter's journeys" framing.
+/// quarter, matching the recall habit's own "the last quarter's journeys" framing. Also the
+/// fallback used when a declared `window_days` cannot be turned into a duration at all (fix
+/// round 1, F2) — always representable, by construction (91 days is nowhere near
+/// `chrono::Duration`'s range).
 const DEFAULT_WINDOW_DAYS: f64 = 91.0;
 
 /// Evaluate a bound whose value is a RATE OVER A ROLLING TIME WINDOW — never an accumulation
 /// since a reset, because a window has no reset: folds age out on their own as they fall past the
 /// cutoff, so the population re-derives itself on every read.
 ///
-/// The population is every admissible fold (drawn from every measure the row `consumes:`, exactly
-/// like the reset-accumulation derives) whose `occurred_at` is within `window_days` of `now`. The
-/// observed value is the fraction of that population whose value is positive — the same
-/// "something happened" reading `count-since-reset` gives a single measure, generalized to a rate
-/// over several.
+/// The bound reads JOURNEYS, not folds, because that is the claim the row actually makes ("the
+/// last quarter's journeys are mostly clean") — a single bad journey that both `sample` (the
+/// unmetered-bytes fold) and `judge` (the mistaken-assertions fold) each write a fold for must
+/// count once, not twice. Folds in the window (drawn from every measure the row `consumes:`,
+/// exactly like the reset-accumulation derives) are grouped by their `env:journey=<FlowEvent
+/// cid>` slot; a fold carrying none (a hand-written observation, or one written before this key
+/// existed) is its own singleton journey — its cid is already a unique address, so it doubles as
+/// a collision-free group key. A journey is POSITIVE when any of its folds has a positive value.
+/// The observed value is positive journeys over all journeys in the window.
 ///
-/// **Fewer than 3 folds in the window is `skipped`, never a rate.** A fraction over one or two
+/// **Fewer than 3 journeys in the window is `skipped`, never a rate.** A fraction over one or two
 /// journeys is not evidence of a trend; it is that trend's number wearing more confidence than the
 /// population earns. This is the same three-valued discipline the module doc opens with, applied
-/// to a population size rather than to a reset's presence.
+/// to a population size rather than to a reset's presence. This is a JOURNEY count, not a fold
+/// count: four folds forming only two journeys still skips.
 fn evaluate_rate_over_window(
     bound: &Bound,
     derive: Derive,
@@ -1328,8 +1411,17 @@ fn evaluate_rate_over_window(
     watermarks: Watermarks,
     now: DateTime<Utc>,
 ) -> BoundOutcome {
-    let window_days = bound.window_days.unwrap_or(DEFAULT_WINDOW_DAYS);
-    let cutoff = now - chrono::Duration::seconds((window_days * 86_400.0) as i64);
+    let declared_window_days = bound.window_days.unwrap_or(DEFAULT_WINDOW_DAYS);
+    let (cutoff, window_days, fell_back) = window_cutoff(now, declared_window_days);
+    let fallback_note = if fell_back {
+        format!(
+            " (window_days {} is not usable; the default {} applied)",
+            trim_number(declared_window_days),
+            trim_number(DEFAULT_WINDOW_DAYS)
+        )
+    } else {
+        String::new()
+    };
 
     let subject = bound
         .subject
@@ -1349,14 +1441,27 @@ fn evaluate_rate_over_window(
             .then_with(|| a.seq.cmp(&b.seq))
     });
 
-    if windowed.len() < 3 {
+    // Folds sharing one journey's cid are one journey; a fold with no `journey` slot is its own
+    // journey (its own cid is already unique, so it cannot collide with a real journey's group).
+    let mut journeys: BTreeMap<&str, Vec<&Fold>> = BTreeMap::new();
+    for fold in windowed.iter().copied() {
+        let key = fold
+            .env
+            .get(JOURNEY_ENV_KEY)
+            .map(String::as_str)
+            .unwrap_or(fold.cid.as_str());
+        journeys.entry(key).or_default().push(fold);
+    }
+
+    if journeys.len() < 3 {
         return BoundOutcome {
             bound: bound.id.clone(),
             measure: bound.measure.to_string(),
             subject,
             outcome: OutcomeStatus::Skipped,
             summary: format!(
-                "fewer than 3 journeys in window — {} fold(s) in the last {} days",
+                "fewer than 3 journeys in window — {} journeys ({} folds) in the last {} days{fallback_note}",
+                journeys.len(),
                 windowed.len(),
                 trim_number(window_days)
             ),
@@ -1375,11 +1480,15 @@ fn evaluate_rate_over_window(
         };
     }
 
-    let positive = windowed.iter().filter(|fold| fold.value > 0.0).count();
-    let observed = positive as f64 / windowed.len() as f64;
+    let positive = journeys
+        .values()
+        .filter(|group| group.iter().any(|fold| fold.value > 0.0))
+        .count();
+    let observed = positive as f64 / journeys.len() as f64;
 
     let basis = format!(
-        "{positive} of {} journeys in the last {} days",
+        "{positive} of {} journeys ({} folds) in the last {} days{fallback_note}",
+        journeys.len(),
         windowed.len(),
         trim_number(window_days)
     );
@@ -1415,6 +1524,35 @@ fn fold_within_window(fold: &Fold, cutoff: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(&fold.occurred_at)
         .map(|dt| dt.with_timezone(&Utc) >= cutoff)
         .unwrap_or(false)
+}
+
+/// `now - window_days` as a cutoff, never a panic — fix round 1, F2.
+///
+/// A declared `window_days` is an ordinary YAML number: nothing stops an absurd value (`NaN`,
+/// infinite, or one whose seconds overflow what `chrono::Duration`/`DateTime` can represent) from
+/// landing in the registry, and the un-guarded arithmetic this replaces
+/// (`Duration::seconds((window_days * 86_400.0) as i64)` then `now - dur`) can panic on exactly
+/// that input — taking the whole headline down over one bad row. Returns
+/// `(cutoff, effective_window_days, fell_back_to_default)`; the caller folds the third value into
+/// the rendered summary rather than resolving silently, so the fallback is never invisible.
+fn window_cutoff(now: DateTime<Utc>, window_days: f64) -> (DateTime<Utc>, f64, bool) {
+    fn try_cutoff(now: DateTime<Utc>, days: f64) -> Option<DateTime<Utc>> {
+        let seconds = days * 86_400.0;
+        if !seconds.is_finite() || seconds.abs() > i64::MAX as f64 {
+            return None;
+        }
+        let duration = chrono::Duration::try_seconds(seconds as i64)?;
+        now.checked_sub_signed(duration)
+    }
+
+    match try_cutoff(now, window_days) {
+        Some(cutoff) => (cutoff, window_days, false),
+        None => {
+            let cutoff = try_cutoff(now, DEFAULT_WINDOW_DAYS)
+                .expect("the default window is always representable");
+            (cutoff, DEFAULT_WINDOW_DAYS, true)
+        }
+    }
 }
 
 fn describe_watermarks(bound: &Bound) -> String {

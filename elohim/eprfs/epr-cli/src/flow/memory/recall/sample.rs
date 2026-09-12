@@ -230,6 +230,11 @@ pub(super) fn sample(
     env.insert("question".into(), question_id.clone());
     env.insert("recipe".into(), method.to_string());
     env.insert("lens".into(), resolved_lens.cid.clone());
+    // Fix round 1, F1 (controller ruling): the bound reads JOURNEYS, and this is what makes that
+    // true rather than an approximation — every fold this journey writes names the journey's own
+    // `FlowEvent` cid, so `rate-over-window` can group folds back into the one journey they came
+    // from instead of counting each fold as its own population member.
+    env.insert(note::JOURNEY_ENV_KEY.into(), event_cid.to_string());
 
     let measures_path = measures::default_measures(&args.root);
     let fold_actor = note::NoteActor {
@@ -455,6 +460,11 @@ fn judge_inner(args: &Args, contract: &Contract) -> FlowResult<JudgeOutcome> {
             }
         }
     }
+    // Fix round 1, F1: the mistaken-assertions fold names the SAME journey `sample` folded — the
+    // event this `judge` invocation was handed IS that journey's own cid, so this is direct
+    // knowledge, not a slot read back off `classified_as` (the event never carries its own cid as
+    // one of its slots).
+    env.insert(note::JOURNEY_ENV_KEY.to_string(), event_cid.to_string());
 
     let decision_word = if mistaken == 0 { "permit" } else { "refuse" };
     let verdict_word = if mistaken == 0 {

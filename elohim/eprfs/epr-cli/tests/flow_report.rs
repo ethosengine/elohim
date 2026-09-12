@@ -3124,3 +3124,248 @@ fn a_fold_older_than_the_window_does_not_count_toward_the_rate() {
     assert_eq!(outcome.observed, Some(0.0));
     assert_eq!(outcome.outcome, OutcomeStatus::Passed);
 }
+
+// ── fix round 1 ──────────────────────────────────────────────────────────────────────────────
+//
+// F1: the denominator is JOURNEYS, made true rather than disclosed as an approximation — folds
+// sharing one `env:journey=<FlowEvent cid>` slot (the shape `sample`/`judge` write, fix round 1)
+// are one journey; a fold with no such slot is its own singleton journey. F2: a declared
+// `window_days` that cannot become a `chrono::Duration` falls back to the default rather than
+// panicking. F3: `now` is pinned through `ReportOptions::with_now` rather than read inline.
+// F5: an unrecognized `derive:` skips rather than silently falling back to a plain-bound reading.
+
+fn fold_env_at(
+    root: &Path,
+    when: &str,
+    measure: &str,
+    subject: &str,
+    value: f64,
+    env: &BTreeMap<String, String>,
+) -> String {
+    let n = MARKER_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    write(root, &format!(".markers/m{n}"), when);
+    git_at(root, when, &["add", "-A"]);
+    git_at(root, when, &["commit", "-qm", &format!("marker {n}")]);
+    fold_env(root, measure, subject, value, env)
+}
+
+#[test]
+fn folds_sharing_a_journey_env_slot_count_as_one_journey() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    let mut journey_1 = BTreeMap::new();
+    journey_1.insert("journey".to_string(), "journey-1".to_string());
+    // Journey 1: two folds (as `sample` + `judge` write for one real journey), one positive.
+    fold_env_at(
+        root,
+        &days_ago(1),
+        "recall-mistaken-assertions@1",
+        ".",
+        1.0,
+        &journey_1,
+    );
+    fold_env_at(
+        root,
+        &days_ago(2),
+        "recall-unmetered-bytes@1",
+        ".",
+        0.0,
+        &journey_1,
+    );
+    let mut journey_2 = BTreeMap::new();
+    journey_2.insert("journey".to_string(), "journey-2".to_string());
+    fold_env_at(
+        root,
+        &days_ago(3),
+        "recall-mistaken-assertions@1",
+        ".",
+        0.0,
+        &journey_2,
+    );
+    // No `journey` slot at all — a hand-written fold, its own singleton journey.
+    fold_at(root, &days_ago(4), "recall-unmetered-bytes@1", ".", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.contributing_folds,
+        Some(4),
+        "four raw folds contributed"
+    );
+    assert_eq!(
+        outcome.observed,
+        Some(1.0 / 3.0),
+        "THREE journeys, one positive — the two journey-1 folds are one journey, not two \
+         (a naive per-fold rate would read 1/4 = 0.25)"
+    );
+    assert!(
+        outcome.summary.contains("3 journeys (4 folds)"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn four_folds_forming_only_two_journeys_still_skips() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    let mut journey_1 = BTreeMap::new();
+    journey_1.insert("journey".to_string(), "journey-1".to_string());
+    fold_env_at(
+        root,
+        &days_ago(1),
+        "recall-mistaken-assertions@1",
+        ".",
+        1.0,
+        &journey_1,
+    );
+    fold_env_at(
+        root,
+        &days_ago(2),
+        "recall-unmetered-bytes@1",
+        ".",
+        0.0,
+        &journey_1,
+    );
+    let mut journey_2 = BTreeMap::new();
+    journey_2.insert("journey".to_string(), "journey-2".to_string());
+    fold_env_at(
+        root,
+        &days_ago(3),
+        "recall-mistaken-assertions@1",
+        ".",
+        0.0,
+        &journey_2,
+    );
+    fold_env_at(
+        root,
+        &days_ago(4),
+        "recall-unmetered-bytes@1",
+        ".",
+        0.0,
+        &journey_2,
+    );
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Skipped,
+        "4 folds, but only 2 JOURNEYS — the denominator that matters is folds grouped by \
+         env:journey, and 4 raw folds must never read as \"enough\""
+    );
+    assert!(
+        outcome.summary.contains("fewer than 3 journeys in window"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn an_absurd_window_days_falls_back_to_the_default_instead_of_panicking() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    // 1e17 days -> ~8.64e21 seconds, past `i64::MAX` (~9.22e18) — exactly the magnitude the
+    // un-guarded `Duration::seconds((window_days * 86_400.0) as i64)` would panic on.
+    write(
+        root,
+        ".claude/epr-meta/measures.yaml",
+        &RATE_MEASURES.replace("window-days: 10", "window-days: \"1e17\""),
+    );
+    fold_at(root, &days_ago(1), "recall-mistaken-assertions@1", ".", 0.0);
+    fold_at(root, &days_ago(2), "recall-unmetered-bytes@1", ".", 0.0);
+    fold_at(root, &days_ago(3), "recall-mistaken-assertions@1", ".", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Passed,
+        "no panic, and the default 91-day window still finds these recent folds: {}",
+        outcome.summary
+    );
+    assert!(
+        outcome.summary.contains("is not usable") && outcome.summary.contains("default 91"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn a_pinned_now_makes_the_window_deterministic_without_the_real_wall_clock() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    let pinned_now: chrono::DateTime<chrono::Utc> =
+        "2026-06-15T00:00:00Z".parse().expect("valid rfc3339");
+    // Absolute calendar dates, not `days_ago()` (which reads the REAL wall clock) — this test's
+    // outcome does not depend on what day it happens to run.
+    fold_at(
+        root,
+        "2026-06-14T00:00:00Z",
+        "recall-mistaken-assertions@1",
+        ".",
+        1.0,
+    );
+    fold_at(
+        root,
+        "2026-06-10T00:00:00Z",
+        "recall-unmetered-bytes@1",
+        ".",
+        0.0,
+    );
+    fold_at(
+        root,
+        "2026-06-06T00:00:00Z",
+        "recall-mistaken-assertions@1",
+        ".",
+        0.0,
+    );
+    // Outside the 10-day window measured from the PINNED `now`, even though it may well be
+    // inside a window measured from whatever real day this test happens to execute.
+    fold_at(
+        root,
+        "2025-01-01T00:00:00Z",
+        "recall-unmetered-bytes@1",
+        ".",
+        1.0,
+    );
+
+    let payload = report(root, &options(root).with_now(pinned_now)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.contributing_folds,
+        Some(3),
+        "the 2025 fold is outside the window measured from the PINNED now"
+    );
+    assert_eq!(outcome.observed, Some(1.0 / 3.0));
+}
+
+#[test]
+fn an_unrecognized_derive_skips_rather_than_reading_a_stray_fold_as_a_plain_bound() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    write(
+        root,
+        ".claude/epr-meta/measures.yaml",
+        &RATE_MEASURES.replace("derive: rate-over-window", "derive: not-a-real-derive"),
+    );
+    // A fold matching the PRIMARY consumed measure alone — exactly the shape the pre-fix
+    // fallback (treat an unrecognized `derive:` as no `derive:` at all) would pick up as "the
+    // latest fold" and render `passed … 0` for a bound nobody actually evaluated.
+    fold(root, "recall-mistaken-assertions@1", ".", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Skipped,
+        "an unrecognized derive must never fall back to a plain-bound reading: {}",
+        outcome.summary
+    );
+    assert!(outcome.observed.is_none());
+    assert!(
+        outcome.summary.contains("unknown derive not-a-real-derive"),
+        "{}",
+        outcome.summary
+    );
+}

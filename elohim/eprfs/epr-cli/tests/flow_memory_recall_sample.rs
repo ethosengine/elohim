@@ -235,6 +235,12 @@ fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
         .expect("recall-unmetered-bytes@1 folded");
     assert_eq!(unmetered["value"], 0.0);
     assert_eq!(unmetered["env"]["question"], "q-fixture");
+    // Fix round 1, F1 (controller ruling): every fold this journey writes names the journey's
+    // own `FlowEvent` cid, so `rate-over-window` can group folds back into journeys instead of
+    // counting each fold as its own population member.
+    let event_cid = v["event"]["cid"].as_str().unwrap();
+    assert_eq!(unmetered["env"]["journey"], event_cid);
+    assert_eq!(screens["env"]["journey"], event_cid);
 }
 
 /// S1 (spec miss): `judge`'s argv carries no `--session` at all — the brief's own shape. It must
@@ -406,6 +412,9 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
         .expect("recall-mistaken-assertions@1 folded");
     assert_eq!(mistaken["value"], 1.0);
     assert_eq!(mistaken["env"]["reader"], "agent:reader@claude-sonnet-5");
+    // Fix round 1, F1: the mistaken-assertions fold names the SAME journey `sample` folded, so
+    // `rate-over-window` groups it with `sample`'s three folds as one journey rather than two.
+    assert_eq!(mistaken["env"]["journey"], cid);
 }
 
 /// A question whose `reached_when.terms` never appear in the located excerpt writes `fulfills: []`
