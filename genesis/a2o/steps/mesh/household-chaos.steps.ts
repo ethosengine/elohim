@@ -1290,7 +1290,7 @@ async function seedShardManifestFootprint(
  * POST) instead of minting a duplicate or erroring.
  */
 async function seedSelfCustodyCommitment(
-  primaryUrl: string,
+  targetUrl: string,
   peer: PeerHandle,
   hash: string,
   sizeBytes: number,
@@ -1304,7 +1304,7 @@ async function seedSelfCustodyCommitment(
   const digest = createHash('sha256').update(`${agent}|${agent}|${hash}`, 'utf8').digest('hex');
   const id = `custody-blob-${digest.slice(0, 16)}`;
 
-  const existing = await getRaw(`${primaryUrl}/api/v1/commitments/${id}`);
+  const existing = await getRaw(`${targetUrl}/api/v1/commitments/${id}`);
   let state: string | undefined;
   if (existing.status === 200) {
     state = (JSON.parse(existing.text) as Record<string, unknown>)['state'] as string | undefined;
@@ -1325,17 +1325,17 @@ async function seedSelfCustodyCommitment(
         fixture: 'a2o-drill',
       },
     };
-    const created = await postRaw(`${primaryUrl}/api/v1/commitments`, body);
+    const created = await postRaw(`${targetUrl}/api/v1/commitments`, body);
     assert.ok(
       created.status === 200 || created.status === 201 || created.status === 409,
-      `POST ${primaryUrl}/api/v1/commitments (self-custody pledge for ${peer.name}) → ` +
+      `POST ${targetUrl}/api/v1/commitments (self-custody pledge for ${peer.name}) → ` +
         `${created.status}: ${created.text.slice(0, 300)}`
     );
     state = 'proposed';
   }
 
   if (state === 'active') return;
-  const patch = await fetch(`${primaryUrl}/api/v1/commitments/${id}`, {
+  const patch = await fetch(`${targetUrl}/api/v1/commitments/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ state: 'active' }),
@@ -1343,7 +1343,7 @@ async function seedSelfCustodyCommitment(
   });
   assert.ok(
     patch.ok,
-    `PATCH ${primaryUrl}/api/v1/commitments/${id} state=active (${peer.name}) → ${patch.status}`
+    `PATCH ${targetUrl}/api/v1/commitments/${id} state=active (${peer.name}) → ${patch.status}`
   );
 }
 
@@ -1379,11 +1379,28 @@ async function seedCustodyFootprint(
   // hex-equivalence (not by re-deriving our own id and hoping it collides)
   // is what keeps this seed idempotent and prevents minting a second,
   // redundant pledge per peer.
-  const existingCredits = activeCredits(creditsFor(await custodyCredits(primary.url), hash));
+  //
+  // nonWithdrawnCredits, not activeCredits: the `state` column does not
+  // travel to a non-authoring peer (2026-09-12 diagnosis, same one
+  // `nonWithdrawnCredits`'s own doc comment names) — reading via `primary`
+  // would see a peer's own self-pledge (authored on THAT peer's cell) as
+  // "proposed" forever, so an `active`-only filter here would never
+  // recognize it as already-pledged and would re-mint a second, redundant
+  // proposed row beside it every drill run. This gate must use the SAME
+  // predicate `"the mesh's custody record … is settled"` uses above.
+  const existingCredits = nonWithdrawnCredits(creditsFor(await custodyCredits(primary.url), hash));
   for (const peer of state.peers) {
     const alreadyPledged = existingCredits.some(credit => providerNamesPeer(credit.provider, peer));
     if (alreadyPledged) continue;
-    await seedSelfCustodyCommitment(primary.url, peer, hash, sizeBytes, contentId);
+    // Provider-authored routing: a self-custody pledge's provider IS this
+    // peer, so it must be authored (and activated) through peer.url — its
+    // OWN storage node's own conductor cell — never through primary.url.
+    // Routing another peer's self-pledge through primary's cell mints the
+    // root Create there instead of on the provider's own cell; the PATCH
+    // from any other peer then 503s forever (update_rea_commitment_state
+    // requires the root author). Mirrors seed-commitments.ts's
+    // provider-authored routing rule for the exact same reason.
+    await seedSelfCustodyCommitment(peer.url, peer, hash, sizeBytes, contentId);
   }
 }
 

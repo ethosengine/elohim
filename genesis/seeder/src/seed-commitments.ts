@@ -564,6 +564,82 @@ export class CommitmentClient extends DoorwayClient {
 }
 
 // =============================================================================
+// Provider-authored routing
+// =============================================================================
+
+/**
+ * Resolves the `CommitmentClient` that should author/activate ONE pair's
+ * custody-blob commitment.
+ *
+ * Decision: a custody-blob commitment is authored AND activated by the
+ * PROVIDER's own peer, never through another peer's doorway.
+ * `create_rea_commitment` writes a root under the commitment's deterministic
+ * id on whichever conductor cell the request lands on; a second caller
+ * (another peer's doorway, proxying to a different peer's cell) mints a
+ * SECOND root Create for the SAME id — "multiple root Creates for ID",
+ * permanently unhealable — and `update_rea_commitment_state` then requires
+ * the root author, so the other peer's activation PATCH answers 503 forever.
+ */
+export type CommitmentClientResolver = (pair: CustodyPair) => CommitmentClient;
+
+/**
+ * Shared options for the create + activate phases: peer-id/blob resolution
+ * options, plus an optional per-pair client resolver. Omitting
+ * `clientForPair` preserves the original single-`client` behavior (every
+ * existing caller/test that passes one mocked `client` for all pairs).
+ */
+export type CustodySeedOptions = ResolvePeerIdOptions & {
+  clientForPair?: CommitmentClientResolver;
+};
+
+/** One `CommitmentClient` per resolved storage URL, cached for the run — the
+ * create and activate phases must target the SAME peer for a given pair. */
+const providerClientCache = new Map<string, CommitmentClient>();
+
+/** Reset the per-run provider-client cache (exported for tests). */
+export function clearProviderClientCache(): void {
+  providerClientCache.clear();
+}
+
+/**
+ * Build a `CommitmentClientResolver` that routes every pair directly to its
+ * PROVIDER's own storage peer — `storageUrlForHuman(pair.providerHumanId)`,
+ * the same PEER_STORAGE_URLS-aware resolver already used for blob/peer-id
+ * resolution — bypassing the doorway entirely.
+ *
+ * Why direct-to-storage rather than "the doorway whose primary is that
+ * peer": elohim-storage's own `/api/v1/commitments` POST/PATCH handlers
+ * dispatch through THIS node's own conductor client (see
+ * `services::rea_commitment_service::create`), so hitting the provider's
+ * storage peer directly guarantees the root Create/activation lands on the
+ * provider's own cell no matter which doorway (or none, as with a
+ * doorway-less peer) fronts it. It also needs no bearer/apiKey: storage's
+ * `auth_required()` on this route is manifest metadata the DOORWAY enforces
+ * (`elohim/elohim-storage/src/api/qahal.rs`: "The handler does NOT enforce
+ * this directly — the doorway manifest declares auth_required() and doorway
+ * rejects unauthenticated requests before they reach storage") — storage
+ * itself never checks it, the same unauthenticated posture `peer-id.ts`
+ * already relies on for `/auth/me` and `/p2p/status` against these same
+ * peers.
+ */
+export function providerCommitmentClientResolver(
+  opts: ResolvePeerIdOptions = {},
+): CommitmentClientResolver {
+  return (pair: CustodyPair) => {
+    const storageUrl = storageUrlForHuman(pair.providerHumanId);
+    let client = providerClientCache.get(storageUrl);
+    if (!client) {
+      client = new CommitmentClient({
+        baseUrl: storageUrl,
+        ...(opts.timeoutMs ? { timeout: opts.timeoutMs } : {}),
+      });
+      providerClientCache.set(storageUrl, client);
+    }
+    return client;
+  };
+}
+
+// =============================================================================
 // Seeding (fail-fast on non-409 errors)
 // =============================================================================
 
@@ -580,7 +656,7 @@ export interface SeedCustodyCommitmentsResult {
 export async function seedCustodyCommitments(
   client: CommitmentClient,
   pairs: CustodyPair[],
-  opts: ResolvePeerIdOptions = {},
+  opts: CustodySeedOptions = {},
 ): Promise<SeedCustodyCommitmentsResult> {
   console.log(`[seed-commitments] Seeding ${pairs.length} custody-blob commitments...`);
 
@@ -618,6 +694,13 @@ export async function seedCustodyCommitments(
     const resolvedPair: ResolvedCustodyPair = { ...pair, ...blob };
     const body = buildCustodyCommitmentBody(resolvedPair, peerIds);
 
+    // Provider-authored routing: every create/read for this pair goes
+    // through the PROVIDER's own peer (opts.clientForPair), never the
+    // single caller-supplied `client` — see CommitmentClientResolver's doc.
+    // Falls back to `client` when no resolver is given (existing single-
+    // doorway callers and tests are unaffected).
+    const pairClient = opts.clientForPair ? opts.clientForPair(pair) : client;
+
     // GET-before-POST idempotency check (mirrors activateCustodyCommitments'
     // existing read-first rule below): the storage/doorway create handler
     // upserts on a duplicate id and returns 200/201 with the EXISTING row —
@@ -629,14 +712,14 @@ export async function seedCustodyCommitments(
     // idempotency posture as the activation phase, applied to the create
     // phase too. A non-404 read failure falls through to the write (fail
     // toward the write, never silently skip a resolvable pair).
-    const existing = await client.getCommitment(body.id);
+    const existing = await pairClient.getCommitment(body.id);
     if (existing.ok) {
       console.log(`  [=] ${label} (idempotent re-run)`);
       alreadyExists += 1;
       continue;
     }
 
-    const response = await client.createCommitment(body);
+    const response = await pairClient.createCommitment(body);
 
     if (response.ok) {
       console.log(`  [+] ${label} ${blob.blobHash.slice(0, 16)}...`);
@@ -712,7 +795,7 @@ export function activationDecision(currentState: string | null | undefined): 'sk
 export async function activateCustodyCommitments(
   client: CommitmentClient,
   pairs: CustodyPair[],
-  opts: ResolvePeerIdOptions = {},
+  opts: CustodySeedOptions = {},
 ): Promise<void> {
   console.log(`[seed-commitments] Activating ${pairs.length} custody-blob commitments...`);
 
@@ -729,9 +812,14 @@ export async function activateCustodyCommitments(
     const body = buildCustodyCommitmentBody(resolvedPair, await resolveCustodyPeerIds(pair, opts));
     const label = `${pair.providerHumanId.replace(/^human-/, '')}→${pair.receiverHumanId.replace(/^human-/, '')}`;
 
+    // Provider-authored routing (same rule as the create phase above): the
+    // activation PATCH must land on the SAME cell that authored the root
+    // Create, or `update_rea_commitment_state` 503s forever.
+    const pairClient = opts.clientForPair ? opts.clientForPair(pair) : client;
+
     // Read-first idempotency check: recognize the same commitment already active
     // and treat that as a valid success — no redundant, sheddable write.
-    const getResp = await client.getCommitment(body.id);
+    const getResp = await pairClient.getCommitment(body.id);
     const decision =
       getResp.status === 404
         ? 'missing'
@@ -753,7 +841,7 @@ export async function activateCustodyCommitments(
       continue;
     }
 
-    const response = await client.patchCommitmentState(body.id, 'active', body.metadata);
+    const response = await pairClient.patchCommitmentState(body.id, 'active', body.metadata);
 
     if (response.ok) {
       console.log(`  [+] ${label}: activated`);
@@ -957,7 +1045,14 @@ if (isMain) {
   console.log(`  Pairs:  ${pairs.length}`);
   console.log();
 
-  const result = await seedCustodyCommitments(client, pairs);
+  // Provider-authored routing: create + activate go straight to each pair's
+  // PROVIDER's own storage peer (storageUrlForHuman, PEER_STORAGE_URLS-aware
+  // — exported process-wide by the prologue), never through `client`'s
+  // single doorway. `client` remains the readiness-gate/capacity-pledge
+  // target only.
+  const result = await seedCustodyCommitments(client, pairs, {
+    clientForPair: providerCommitmentClientResolver(),
+  });
   await seedCapacityPledge(client);
 
   // Partial-vs-total contract (Jenkinsfile's runProbedSeeder): 0=clean,
