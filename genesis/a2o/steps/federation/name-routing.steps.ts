@@ -9,41 +9,60 @@
  * `services/federation.rs::install_name_routes`) and relays ONE hop when the
  * LOCAL verdict is 404/503 (`relay_precondition` in `name_routing.rs`).
  *
- * WHY THE TEST ROOT IS `/nrt-<slug>.html`, NOT A BARE PATH. Every doorway in
- * this household already projects `elohim-host-landing` at the universal root
- * mount `"/"` with `spaFallback: true` — confirmed live (`GET
- * /totally-random-nonexistent-xyz` on either doorway answers 200 with the
- * Angular shell). `EprRouter::path_matches_prefix` treats `"/"` as covering
- * EVERY request path, and `derive_app_subpath` (`server/http.rs`) only bypasses
- * `spaFallback`'s "serve entry_file" behaviour for a sub-path whose LAST
- * segment carries a `.` (`is_spa_route_subpath`) — genuine assets 404 through
- * verbatim, extensionless "deep routes" always get the SPA shell. So a bare
- * name like `/garden` can NEVER 404 locally while the real `"/"` mount is live,
- * and the relay would never fire. Naming the test root `/nrt-<slug>.html` (an
- * extension-bearing top-level path) escapes the SPA fallback: a doorway that
- * mounts it EXACTLY (a bare-prefix hit, remainder empty) serves the shell via
- * `entry_file`; a doorway that does NOT mount it falls through to its own `"/"`
- * catch-all, strips a NON-empty, extension-bearing remainder, and proxies
- * verbatim to storage — which genuinely has no such file, and genuinely 404s.
- * Verified live (2026-09-12): holder 200 (bare-hit → entry_file), non-holder
- * 404 (`{"error": "File not found in app: <slug>.html"}`), holder-with-forced
- * local-only header (`x-federation-hop: 1`) still 200 — proving the holder's
- * 200 is a REAL local mount, not an accidental relay.
+ * A HOSTING COMMITMENT ROUTES A NAME; IT DOES NOT SERVE IT. A `project-epr`
+ * commitment alone (pointing at a made-up `epr_id`) makes `EprRouter` dispatch
+ * the mount, but `dispatch_to_projected_epr` then proxies to storage's
+ * `GET /apps/{identifier}/{file}`, which opens an ARCHIVE for that identifier
+ * via `slug_index` — populated only from `content_node` rows (format
+ * `html5-app`/`spa-bundle`) that clear the Amber trust floor. No such row
+ * exists for a made-up id, so the archive genuinely has no member matching the
+ * request: a real, storage-side 404 (`{"error": "File not found in app: …"}`),
+ * indistinguishable from a genuine non-holder's answer unless you stock real
+ * bytes. So every staged root gets a REAL, tiny archive: `stockAppArchive`
+ * builds a one-file ZIP (`index.html`, hand-rolled STORED-method writer — no
+ * new dependency for one tiny archive), PUTs it content-addressed via
+ * `/admin/seed/blob` (mirrors `scripts/ci/stage-spa-blob.sh` +
+ * `genesis/seeder/src/doorway-client.ts`'s `pushBlob`), and creates a
+ * `content_node` row naming that blob with `dhtAnchorHash` set AT INGEST
+ * (`CreateContentInput.dhtAnchorHash` — "so the row satisfies the
+ * require_provenance read gate … where the libp2p publish drain never runs")
+ * so the row is Amber-floor-visible immediately, with no conductor round-trip
+ * to wait out on this dev-mode, diesel-direct mesh.
  *
- * WHY EVERY TEST CONTRACT PROJECTS THE ALREADY-CACHED `elohim-host-landing`
- * EPR rather than a fresh one: the seeder's own id formula
- * (`project-epr-${sha256(peer|action|doorway:D|epr:E)}`, `seed-projections.ts`
- * `baseProjectionId`) keys ONLY on (doorwayId, eprId) — NOT urlPath — so a
- * NEW commitment naming an eprId ALREADY mounted on that doorway (e.g.
- * `elohim-host-landing` at `"/"`) would collide with the REAL seeded id and a
- * drift-detected re-grant would SUPERSEDE the real `"/"` mount. This file
- * therefore mints its OWN ids (content-addressed over doorwayId + the test
- * urlPath, `project-epr-nrt-*`, never the seeder's formula) and always reuses
- * the `elohim-host-landing` eprId at a NEW, never-seeded urlPath — real bytes,
- * zero risk to the household's real mounts. `storage/db/rea_commitments`
- * carries no per-(doorway,eprId) uniqueness constraint beyond the id itself
- * (verified against `elohim-storage/src/db/rea_commitments.rs`), so two rows
- * for the same eprId at different urlPaths on the same doorway coexist fine.
+ * REQUEST SHAPE: `/nrt-<slug>/` — a trailing-slash, extension-less path
+ * against a mount `/nrt-<slug>` (no trailing slash; elohim-storage's
+ * `validate_project_epr_commitment` rule 4 forbids one except for `"/"`).
+ * `derive_app_subpath` strips the mount prefix and `trim_start_matches('/')`,
+ * leaving an EMPTY sub-path either way the trailing slash falls — a bare-mount
+ * hit, so the HOLDER always serves `entry_file` ("index.html") regardless.
+ *
+ * THE ONE OPEN RISK THIS SHAPE CARRIES, FLAGGED HONESTLY: every doorway in
+ * this household ALSO projects `elohim-host-landing` at the universal root
+ * mount `"/"` with `spaFallback: true` (confirmed live — `GET
+ * /totally-random-nonexistent-xyz` answers 200 with the real Angular shell).
+ * `is_spa_route_subpath` (`server/http.rs`) reads a trailing-slash remainder's
+ * LAST segment as the empty string after the final `/` — which never contains
+ * a `.` — so it is ALWAYS classified as an extension-less "deep route" and
+ * `"/"`'s own `spaFallback` can answer 200 with the REAL landing page for
+ * `/nrt-<slug>/` on a doorway that holds no `/nrt-<slug>` mount at all,
+ * whether or not the relay ever ran. Traced from source, not yet re-observed
+ * live post-deploy (mesh down while this was written). Every assertion in
+ * this file that needs to know a specific doorway actually served a root
+ * therefore checks for `nrtMarker(root)` — a literal string the staged
+ * archive's `index.html` carries — NEVER bare `<html`/status-200, which the
+ * real landing page would also satisfy; see `nrtMarker`'s own doc. If this
+ * risk is real, the affected scenarios still fail HONESTLY (a content-marker
+ * mismatch, or "no relay log line was ever written") rather than false-green
+ * — but they will fail for THIS reason, not the registry-gap reason below,
+ * and that distinction matters when reading a red.
+ *
+ * IDS ARE RUN-SCOPED, NEVER SHARED ACROSS RUNS. See `runStamp`'s own doc for
+ * why (a row cycled through create/cancel/reactivate across many runs while
+ * diagnosing this feature wedged storage's write path for minutes). Every
+ * test id — `project-epr-nrt-*` AND `nrt-app-*` — includes it, so a fresh
+ * lane invocation never touches a previous run's row, wedged or not, and by
+ * construction can never collide with a REAL seeded project-epr id either
+ * (those are addressed over (doorwayId, eprId), never urlPath).
  *
  * FEDERATION-PEER DISCOVERY MUST BE ARRANGED, NOT ASSUMED. `main.rs` only
  * spawns `spawn_peer_discovery_task` — the ONLY writer of `state.name_routes`
@@ -134,15 +153,299 @@ function testStewardPeerId(): string {
   return `12D3KooW${digest.toString('hex').slice(0, 38)}`;
 }
 
-/** "garden" -> "/nrt-garden.html". See the file header for why the extension matters. */
-function nrtPath(root: string): string {
+/** "garden" -> "garden". Shared slug derivation for every `nrt*` path helper below. */
+function nrtSlug(root: string): string {
   const collapsed = root.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   let start = 0;
   let end = collapsed.length;
   while (start < end && collapsed[start] === '-') start += 1;
   while (end > start && collapsed[end - 1] === '-') end -= 1;
   const slug = collapsed.slice(start, end);
-  return `/nrt-${slug || 'root'}.html`;
+  return slug || 'root';
+}
+
+/** The project-epr commitment's `urlPath` — no trailing slash (validator rule 4 in
+ * elohim-storage's `validate_project_epr_commitment` forbids one, except for `"/"`). */
+function nrtMount(root: string): string {
+  return `/nrt-${nrtSlug(root)}`;
+}
+
+/** What Jessica actually asks for: a trailing-slash, extension-less request against the
+ * mount above (coordinator's design — see the "bytes-staging" note below `nrtMount`'s
+ * doc for how a bare-mount-hit resolves this to `entry_file` regardless of the trailing
+ * slash: `derive_app_subpath` strips the mount prefix then `trim_start_matches('/')`,
+ * leaving an EMPTY sub-path either way). */
+function nrtRequestPath(root: string): string {
+  return `${nrtMount(root)}/`;
+}
+
+/** The literal marker `stockAppArchive`'s `index.html` carries for `root` — the one
+ * reliable way to tell "this doorway served MY test archive" apart from "this doorway's
+ * own real `"/"` landing page answered instead" (the SPA-fallback risk `nrtRequestPath`'s
+ * doc describes: a trailing-slash extension-less path can be swallowed as a 200 by a
+ * doorway that does NOT hold the mount at all). Every assertion in this file that needs
+ * to know whether a specific doorway actually served THIS root checks for this marker,
+ * never bare `<html`/status-200, which the real landing page would also satisfy. */
+function nrtMarker(root: string): string {
+  return `data-nrt-root="${root}"`;
+}
+
+// ---------------------------------------------------------------------------
+// A tiny, real app archive — CIDv1 + a hand-rolled STORED-method ZIP.
+//
+// A hosting commitment makes a doorway ROUTE a name; it does not make the
+// doorway SERVE bytes. `dispatch_to_projected_epr` (server/http.rs) resolves
+// `dispatch_address` to `projection.epr_id` for a never-warmed mount, and
+// storage's `GET /apps/{identifier}/{file}` (`handle_app_request`,
+// elohim-storage/src/http.rs) opens the ARCHIVE for that identifier via its
+// `slug_index` — populated ONLY from `content_node` rows of format
+// `html5-app`/`spa-bundle` that clear the Amber trust floor (a provenance
+// marker: `dht_anchor_hash` or a completed libp2p publish drain — see
+// `lookup_slug_blob_hash`'s doc). No such row existed for a made-up test
+// `epr_id`, so the archive genuinely had no member matching the request —
+// the storage-side 404 this file's earlier runs actually hit.
+//
+// The fix mirrors `scripts/ci/stage-spa-blob.sh` + `genesis/seeder/src/
+// doorway-client.ts`'s `pushBlob`: PUT a real, content-addressed ZIP via
+// `/admin/seed/blob` (`X-Blob-Hash`/`X-Blob-Cid`/`X-Blob-Size`), then create a
+// `content_node` row naming that blob. The one addition CI's own path does
+// NOT need: `CreateContentInput.dhtAnchorHash` (`genesis/seeder/src/
+// generated/create-content-input.ts`) — "set at ingest so the row satisfies
+// the require_provenance read gate ... where the libp2p publish drain never
+// runs" — is exactly the provenance marker `lookup_slug_blob_hash` looks for,
+// so the row is Amber-floor-visible immediately, with no conductor
+// round-trip to wait out (this household mesh's doorways are dev-mode,
+// diesel-direct writes; there is no drain loop staging content for them
+// otherwise).
+//
+// No `multiformats` import: that package resolves for genesis/seeder (a
+// declared dependency there) but not genesis/a2o (a separate pnpm workspace
+// member with no such dependency of its own) — hand-rolled CIDv1 here rather
+// than adding a new cross-package dependency for one content address.
+// ---------------------------------------------------------------------------
+
+const BASE32_ALPHABET = 'abcdefghijklmnopqrstuvwxyz234567';
+
+function base32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) {
+    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  }
+  return output;
+}
+
+/** Unsigned LEB128 varint — CID's own encoding for its version/codec/multihash-code
+ * fields. Both values used here (1, 0x55, 0x12) fit in one byte; encoded properly
+ * regardless, since a varint of a small value is just that one byte. */
+function varint(n: number): number[] {
+  const out: number[] = [];
+  let v = n;
+  while (v >= 0x80) {
+    out.push((v & 0x7f) | 0x80);
+    v >>>= 7;
+  }
+  out.push(v);
+  return out;
+}
+
+const RAW_CODEC = 0x55;
+const SHA2_256_CODE = 0x12;
+
+/** CIDv1, raw codec, sha2-256 multihash — `bafkrei…`, this codebase's canonical blob
+ * address (`doorway/CLAUDE.md` "Addressing canon"). */
+function cidV1Raw(bytes: Uint8Array): string {
+  const digest = createHash('sha256').update(bytes).digest();
+  const multihash = [...varint(SHA2_256_CODE), ...varint(digest.length), ...digest];
+  const cidBytes = [...varint(1), ...varint(RAW_CODEC), ...multihash];
+  return `b${base32Encode(Uint8Array.from(cidBytes))}`;
+}
+
+let crc32TableCache: Uint32Array | undefined;
+
+function crc32Table(): Uint32Array {
+  if (crc32TableCache) return crc32TableCache;
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n += 1) {
+    let c = n;
+    for (let k = 0; k < 8; k += 1) {
+      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    }
+    table[n] = c >>> 0;
+  }
+  crc32TableCache = table;
+  return table;
+}
+
+function crc32(data: Uint8Array): number {
+  const table = crc32Table();
+  let crc = 0xffffffff;
+  for (const byte of data) {
+    crc = table[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** A fixed DOS date/time stamp. The archive is content-addressed by hash, never by
+ * mtime, so a fixed stamp keeps the SAME html producing the SAME zip bytes (and thus
+ * the same hash) on every re-run — no wall-clock entropy in a content address. */
+const ZIP_DOS_DATE = ((2026 - 1980) << 9) | (1 << 5) | 1;
+const ZIP_DOS_TIME = 0;
+
+/** A minimal, valid, STORED-method (uncompressed) ZIP containing exactly one file at
+ * `name` — everything `handle_app_request`'s `zip::ZipArchive` reader needs, nothing
+ * a general-purpose zip library would add (compression, extra fields, comments). */
+function buildZip(name: string, content: Uint8Array): Buffer {
+  const nameBytes = Buffer.from(name, 'utf8');
+  const crc = crc32(content);
+
+  const localHeader = Buffer.alloc(30);
+  localHeader.writeUInt32LE(0x04034b50, 0);
+  localHeader.writeUInt16LE(20, 4);
+  localHeader.writeUInt16LE(0, 6);
+  localHeader.writeUInt16LE(0, 8);
+  localHeader.writeUInt16LE(ZIP_DOS_TIME, 10);
+  localHeader.writeUInt16LE(ZIP_DOS_DATE, 12);
+  localHeader.writeUInt32LE(crc, 14);
+  localHeader.writeUInt32LE(content.length, 18);
+  localHeader.writeUInt32LE(content.length, 22);
+  localHeader.writeUInt16LE(nameBytes.length, 26);
+  localHeader.writeUInt16LE(0, 28);
+  const localEntry = Buffer.concat([localHeader, nameBytes, Buffer.from(content)]);
+
+  const centralHeader = Buffer.alloc(46);
+  centralHeader.writeUInt32LE(0x02014b50, 0);
+  centralHeader.writeUInt16LE(20, 4);
+  centralHeader.writeUInt16LE(20, 6);
+  centralHeader.writeUInt16LE(0, 8);
+  centralHeader.writeUInt16LE(0, 10);
+  centralHeader.writeUInt16LE(ZIP_DOS_TIME, 12);
+  centralHeader.writeUInt16LE(ZIP_DOS_DATE, 14);
+  centralHeader.writeUInt32LE(crc, 16);
+  centralHeader.writeUInt32LE(content.length, 20);
+  centralHeader.writeUInt32LE(content.length, 24);
+  centralHeader.writeUInt16LE(nameBytes.length, 28);
+  centralHeader.writeUInt16LE(0, 30);
+  centralHeader.writeUInt16LE(0, 32);
+  centralHeader.writeUInt16LE(0, 34);
+  centralHeader.writeUInt16LE(0, 36);
+  centralHeader.writeUInt32LE(0, 38);
+  centralHeader.writeUInt32LE(0, 42);
+  const centralEntry = Buffer.concat([centralHeader, nameBytes]);
+
+  const endRecord = Buffer.alloc(22);
+  endRecord.writeUInt32LE(0x06054b50, 0);
+  endRecord.writeUInt16LE(0, 4);
+  endRecord.writeUInt16LE(0, 6);
+  endRecord.writeUInt16LE(1, 8);
+  endRecord.writeUInt16LE(1, 10);
+  endRecord.writeUInt32LE(centralEntry.length, 12);
+  endRecord.writeUInt32LE(localEntry.length, 16);
+  endRecord.writeUInt16LE(0, 20);
+
+  return Buffer.concat([localEntry, centralEntry, endRecord]);
+}
+
+interface StagedArchive {
+  contentId: string;
+  doorwayUrl: string;
+}
+
+/** PUT a real ZIP (containing `index.html`) via `/admin/seed/blob` and create the
+ * `content_node` row an `html5-app` project-epr mount resolves through — the minimal
+ * staging a synthetic root needs to actually SERVE, not merely route. Idempotent: a
+ * 409 on the content-row POST (a prior scenario in this SAME run already staged the
+ * same run-scoped id) is treated as already-done. */
+async function stockAppArchive(
+  doorwayUrl: string,
+  contentId: string,
+  root: string
+): Promise<StagedArchive> {
+  const html = Buffer.from(
+    `<!doctype html><html><head><meta charset="utf-8"><title>${root}</title></head>` +
+      `<body data-nrt-root="${root}">nrt-${root}</body></html>`,
+    'utf8'
+  );
+  const zip = buildZip('index.html', html);
+  const legacyHash = `sha256-${createHash('sha256').update(zip).digest('hex')}`;
+  const cid = cidV1Raw(zip);
+
+  let putStatus = -1;
+  let putText = '';
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    const response = await fetch(`${doorwayUrl}/admin/seed/blob`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${ADMIN_KEY}`,
+        'Content-Type': 'application/zip',
+        'X-Blob-Hash': legacyHash,
+        'X-Blob-Cid': cid,
+        'X-Blob-Size': String(zip.length),
+      },
+      body: zip,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    putStatus = response.status;
+    putText = await response.text();
+    if (putStatus !== 503) break;
+    if (attempt < 5) await delay(Math.min(retryAfterMs(putText) ?? 5_000, 15_000));
+  }
+  assert.ok(
+    putStatus === 200 || putStatus === 201,
+    `PUT ${doorwayUrl}/admin/seed/blob failed for test archive ${contentId}: HTTP ${putStatus} ${putText.slice(0, 300)}`
+  );
+
+  const createBody = {
+    id: contentId,
+    title: `[a2o name-routing-test] ${root}`,
+    contentType: 'application',
+    contentFormat: 'html5-app',
+    blobHash: legacyHash,
+    blobCid: cid,
+    contentSizeBytes: zip.length,
+    reach: 'commons',
+    createdBy: testStewardPeerId(),
+    dhtAnchorHash: cid,
+  };
+  const created = await adminCall('POST', `${doorwayUrl}/db/content`, createBody);
+  assert.ok(
+    created.status === 201 || created.status === 409,
+    `staging the test app archive ${contentId} failed: HTTP ${created.status} ${created.text.slice(0, 300)}`
+  );
+
+  return { contentId, doorwayUrl };
+}
+
+async function deleteContentRowQuiet(archive: StagedArchive): Promise<void> {
+  try {
+    await fetch(`${archive.doorwayUrl}/db/content/${archive.contentId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    // best-effort — the blob bytes are content-addressed and harmless to leave regardless
+  }
+}
+
+/** Content-addressed over (path, runStamp) — same reasoning as `testCommitmentId`
+ * below (run-scoped, so a wedged row from a previous run can never block this one). */
+function testContentId(path: string): string {
+  assert.ok(runStamp, 'runStamp not minted yet — the Before hook must run before any staging step');
+  const digest = createHash('sha256')
+    .update(`content|${path}|${runStamp}`, 'utf8')
+    .digest('hex')
+    .slice(0, 16);
+  return `nrt-app-${digest}`;
 }
 
 /** Trim trailing slashes without a backtracking-prone regex (matches
@@ -272,7 +575,8 @@ interface StagedContract {
   commitmentId: string;
   doorwayUrl: string;
   doorwayId: string;
-  path: string;
+  mount: string;
+  archive: StagedArchive;
 }
 
 /**
@@ -300,34 +604,39 @@ Before(function (this: E2EWorld): void {
   runStamp ??= process.env['A2O_RUN_ID'] ?? `${process.pid}-${Date.now().toString(36)}`;
 });
 
-/** Content-addressed over (doorwayId, path, runStamp) — deterministic WITHIN one lane
+/** Content-addressed over (doorwayId, mount, runStamp) — deterministic WITHIN one lane
  * invocation (so scenarios sharing a root reuse the same row, per the idempotent-reuse
  * design) but never collides with a previous run's row (see `runStamp`'s doc). By
  * construction can never collide with a REAL seeded project-epr id either (those are
  * addressed over (doorwayId, eprId), never urlPath — see file header). */
-function testCommitmentId(doorwayId: string, path: string): string {
+function testCommitmentId(doorwayId: string, mount: string): string {
   assert.ok(runStamp, 'runStamp not minted yet — the Before hook must run before any staging step');
   const digest = createHash('sha256')
-    .update(`${doorwayId}|${path}|${runStamp}`, 'utf8')
+    .update(`${doorwayId}|${mount}|${runStamp}`, 'utf8')
     .digest('hex')
     .slice(0, 16);
   return `project-epr-nrt-${digest}`;
 }
 
-/** Stage (or re-activate) a test project-epr contract projecting the household's own,
- * already-cached `elohim-host-landing` bundle at `path` on `doorwayId`, via `doorwayUrl`'s
- * own doorway (so the write lands on the storage that doorway's EprRouter refresh reads).
- * Idempotent: a 409 on a prior run's id is reactivated (state -> "proposed") rather than
- * treated as failure, so scenarios sharing a root (all four stage "garden") never collide. */
+/** Stage (or re-activate) a test project-epr contract on `doorwayId`, projecting a
+ * dedicated, freshly-stocked app archive (see `stockAppArchive`) at `mount`, via
+ * `doorwayUrl`'s own doorway (so the write lands on the storage that doorway's
+ * EprRouter refresh reads). Idempotent: a 409 on a prior run's id is reactivated
+ * (state -> "proposed") rather than treated as failure, so scenarios sharing a root
+ * (all four stage "garden") reuse the same row within one run. */
 async function stageRoot(
   doorwayUrl: string,
   doorwayId: string,
-  path: string
+  mount: string,
+  root: string
 ): Promise<StagedContract> {
-  const id = testCommitmentId(doorwayId, path);
+  const contentId = testContentId(`${doorwayId}|${mount}`);
+  const archive = await stockAppArchive(doorwayUrl, contentId, root);
+
+  const id = testCommitmentId(doorwayId, mount);
   const provider = testStewardPeerId();
   const metadata = {
-    urlPath: path,
+    urlPath: mount,
     mode: 'cached',
     reach: 'commons',
     baseHref: '/',
@@ -345,14 +654,14 @@ async function stageRoot(
     action: 'project-epr',
     provider,
     receiver: provider,
-    inScopeOf: `doorway:${doorwayId}|epr:elohim-host-landing`,
-    note: `[a2o name-routing-test] project elohim-host-landing at ${path} on ${doorwayId}`,
+    inScopeOf: `doorway:${doorwayId}|epr:${contentId}`,
+    note: `[a2o name-routing-test] project ${contentId} at ${mount} on ${doorwayId}`,
     metadataJson: JSON.stringify(metadata),
     metadata,
   };
   const created = await adminCall('POST', `${doorwayUrl}/api/v1/commitments`, body);
   if (created.status === 409) {
-    // A prior scenario/run already minted this exact (doorwayId, path) row — reactivate it
+    // A prior scenario/run already minted this exact (doorwayId, mount) row — reactivate it
     // rather than failing; the body is byte-identical by construction (deterministic id).
     const reactivated = await adminCall('PATCH', `${doorwayUrl}/api/v1/commitments/${id}`, {
       state: 'proposed',
@@ -367,10 +676,10 @@ async function stageRoot(
     assert.equal(
       created.status,
       201,
-      `staging ${path} on ${doorwayId} failed: HTTP ${created.status} ${created.text.slice(0, 300)}`
+      `staging ${mount} on ${doorwayId} failed: HTTP ${created.status} ${created.text.slice(0, 300)}`
     );
   }
-  return { commitmentId: id, doorwayUrl, doorwayId, path };
+  return { commitmentId: id, doorwayUrl, doorwayId, mount, archive };
 }
 
 async function lapseContract(staged: StagedContract): Promise<void> {
@@ -386,7 +695,10 @@ async function lapseContract(staged: StagedContract): Promise<void> {
   );
 }
 
-/** Best-effort — used only from the After hook. */
+/** Best-effort — used only from the After hook. Cancels the commitment AND deletes the
+ * content-row binding (`DELETE /db/content/{id}` exists — elohim-storage/src/http.rs
+ * "GET/DELETE /db/content/{id}"); the blob BYTES stay (content-addressed by hash, so a
+ * leftover zip is harmless and may be reused by a later run's identical archive). */
 async function cancelContractQuiet(staged: StagedContract): Promise<void> {
   try {
     await adminCall('PATCH', `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`, {
@@ -395,47 +707,56 @@ async function cancelContractQuiet(staged: StagedContract): Promise<void> {
   } catch {
     // best-effort cleanup, matches E2EWorld.runCleanup's own swallow convention
   }
+  await deleteContentRowQuiet(staged.archive);
 }
 
 /** Poll until `doorwayUrl` locally serves `path` (forced local-only, so this proves a REAL
- * mount, never an accidental relay). A brand-new commitment reaches the doorway's EprRouter
- * via its SSE-driven refresh subscriber — asynchronous relative to the POST response — so a
- * single immediate check races that refresh and flakes; this bounds the wait instead. */
+ * mount, never an accidental relay) — verified by the archive's OWN marker, not bare
+ * status 200, since a doorway with NO mount at `path` can still answer 200 from its own
+ * `"/"` root (see `nrtRequestPath`'s doc). A brand-new commitment reaches the doorway's
+ * EprRouter via its SSE-driven refresh subscriber — asynchronous relative to the POST
+ * response — so a single immediate check races that refresh and flakes; this bounds the
+ * wait instead. */
 async function waitForLocalMount(
   doorwayUrl: string,
   doorwayLabel: string,
   path: string,
   root: string,
-  budgetMs = 20_000
+  budgetMs = 65_000
 ): Promise<void> {
+  const marker = nrtMarker(root);
   const deadline = Date.now() + budgetMs;
-  let lastStatus = -1;
+  let last: RawResponse | undefined;
   for (;;) {
-    const res = await localOnlyGet(`${doorwayUrl}${path}`);
-    lastStatus = res.status;
-    if (res.status === 200) return;
+    last = await localOnlyGet(`${doorwayUrl}${path}`);
+    if (last.status === 200 && last.text.includes(marker)) return;
     if (Date.now() >= deadline) {
       throw new Error(
         `doorway "${doorwayLabel}" does not locally serve the just-staged root "${root}" (${path}) ` +
-          `within ${budgetMs}ms: HTTP ${lastStatus}`
+          `within ${budgetMs}ms: HTTP ${last.status}, marker present=${last.text.includes(marker)}`
       );
     }
     await delay(1_000);
   }
 }
 
+/** "doorway X holds no hosting contract for root" — proven by the ABSENCE of the archive's
+ * own marker in a local-only response, never by status alone: a doorway with no `nrtMount`
+ * for this root still answers 200 from its own real `"/"` landing page for the trailing-
+ * slash, extension-less `nrtRequestPath` (see that function's doc) — the marker is the one
+ * reliable way to tell "not my content" apart from "no content at all". */
 async function assertNoLocalContract(
   doorwayUrl: string,
   doorwayLabel: string,
-  path: string,
   root: string
 ): Promise<void> {
+  const path = nrtRequestPath(root);
+  const marker = nrtMarker(root);
   const res = await localOnlyGet(`${doorwayUrl}${path}`);
-  assert.equal(
-    res.status,
-    404,
+  assert.ok(
+    !(res.status === 200 && res.text.includes(marker)),
     `doorway "${doorwayLabel}" answered the local-only probe (x-federation-hop:1) for "${root}" ` +
-      `(${path}) with HTTP ${res.status}, not 404 — it holds a local mount there`
+      `(${path}) with the test archive's own marker (HTTP ${res.status}) — it holds a local mount there`
   );
 }
 
@@ -488,18 +809,21 @@ async function waitForRegistryToKnowHolder(
 async function waitForOwnDispatchToDrop(
   doorwayUrl: string,
   doorwayLabel: string,
-  path: string,
+  root: string,
   budgetMs: number
 ): Promise<void> {
+  const path = nrtRequestPath(root);
+  const marker = nrtMarker(root);
   const deadline = Date.now() + budgetMs;
+  let last: RawResponse | undefined;
   for (;;) {
-    const res = await localOnlyGet(`${doorwayUrl}${path}`);
-    if (res.status === 404) return;
+    last = await localOnlyGet(`${doorwayUrl}${path}`);
+    if (!(last.status === 200 && last.text.includes(marker))) return;
     if (Date.now() >= deadline) {
       throw new Error(
-        `doorway "${doorwayLabel}" still answers 200 for the lapsed contract at ${path} after ` +
-          `${budgetMs}ms — its own EprRouter refresh (DOORWAY_EPR_REFRESH_SECS, default 30s) has not ` +
-          `caught up with the cancellation yet`
+        `doorway "${doorwayLabel}" still serves the lapsed contract's marker at ${path} after ` +
+          `${budgetMs}ms (HTTP ${last.status}) — its own EprRouter refresh (DOORWAY_EPR_REFRESH_SECS, ` +
+          `default 30s) has not caught up with the cancellation yet`
       );
     }
     await delay(3_000);
@@ -618,6 +942,9 @@ interface AskCapture {
 
 interface NameRoutingState {
   root: string;
+  /** The project-epr commitment's `urlPath` (no trailing slash — `/nrt-garden`). */
+  mount: string;
+  /** What Jessica actually asks for (trailing slash, extension-less — `/nrt-garden/`). */
   path: string;
   staged: StagedContract[];
   paused: Map<string, OwnedProcessHandle>; // fixture id -> handle, while SIGSTOP'd
@@ -637,7 +964,8 @@ function getState(world: E2EWorld): NameRoutingState {
 function beginScenario(world: E2EWorld, root: string): NameRoutingState {
   const state: NameRoutingState = {
     root,
-    path: nrtPath(root),
+    mount: nrtMount(root),
+    path: nrtRequestPath(root),
     staged: [],
     paused: new Map(),
   };
@@ -744,7 +1072,7 @@ Given(
     const state = beginScenario(this, root);
     const holder = this.getDoorway(holderId);
     const holderDoorwayId = await resolvedDoorwayId(this, holderId, holder.url);
-    const staged = await stageRoot(holder.url, holderDoorwayId, state.path);
+    const staged = await stageRoot(holder.url, holderDoorwayId, state.mount, root);
     state.staged.push(staged);
 
     // Sanity: the holder genuinely, locally serves it (forced local-only probe — proves this
@@ -774,7 +1102,7 @@ Given(
     for (const id of [firstId, secondId]) {
       const doorway = this.getDoorway(id);
       const doorwayId = await resolvedDoorwayId(this, id, doorway.url);
-      const staged = await stageRoot(doorway.url, doorwayId, state.path);
+      const staged = await stageRoot(doorway.url, doorwayId, state.mount, root);
       state.staged.push(staged);
       await waitForLocalMount(doorway.url, id, state.path, root);
     }
@@ -789,8 +1117,9 @@ Given(
     const holder = this.getDoorway(holderId);
     const other = this.getDoorway(otherFixtureId(holderId));
     const holderDoorwayId = await resolvedDoorwayId(this, holderId, holder.url);
-    const staged = await stageRoot(holder.url, holderDoorwayId, state.path);
+    const staged = await stageRoot(holder.url, holderDoorwayId, state.mount, root);
     state.staged.push(staged);
+    await waitForLocalMount(holder.url, holderId, state.path, root);
 
     // The stale-registry premise (feature comment on this scenario): the OTHER
     // doorway must have learned the holder BEFORE it lapses, so its next ask still
@@ -808,7 +1137,7 @@ Given(
     // Now lapse it — and wait for the HOLDER's own dispatch to catch up, so the
     // upcoming forwarded hop meets a genuine local 404, not a stale 200.
     await lapseContract(staged);
-    await waitForOwnDispatchToDrop(holder.url, holderId, state.path, OWN_REFRESH_BUDGET_MS);
+    await waitForOwnDispatchToDrop(holder.url, holderId, root, OWN_REFRESH_BUDGET_MS);
   }
 );
 
@@ -817,8 +1146,7 @@ Given(
   { timeout: 15_000 },
   async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
     const doorway = this.getDoorway(doorwayId);
-    const path = nrtPath(root);
-    await assertNoLocalContract(doorway.url, doorwayId, path, root);
+    await assertNoLocalContract(doorway.url, doorwayId, root);
   }
 );
 
@@ -827,8 +1155,7 @@ Given(
   { timeout: 15_000 },
   async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
     const doorway = this.getDoorway(doorwayId);
-    const path = nrtPath(root);
-    await assertNoLocalContract(doorway.url, doorwayId, path, root);
+    await assertNoLocalContract(doorway.url, doorwayId, root);
   }
 );
 
@@ -967,9 +1294,15 @@ Then('Jessica is served {string}', function (this: E2EWorld, root: string): void
     200,
     `Jessica's request for "${root}" answered HTTP ${ask.response.status}: ${ask.response.text.slice(0, 300)}`
   );
+  // The marker, never a bare `<html`/`<app-root` check: a doorway that does NOT hold this
+  // root can still answer 200 from its own unrelated "/" landing page for this request
+  // shape (see nrtRequestPath's doc) — that must fail this step, not pass it.
+  const marker = nrtMarker(root);
   assert.ok(
-    ask.response.text.includes('<app-root') || ask.response.text.includes('<html'),
-    `Jessica's request for "${root}" did not return the app shell: ${ask.response.text.slice(0, 200)}`
+    ask.response.text.includes(marker),
+    `Jessica's request for "${root}" answered 200 but without the test archive's own marker ` +
+      `(${marker}) — this looks like an UNRELATED doorway answering (e.g. its own "/" landing ` +
+      `page), not the staged root: ${ask.response.text.slice(0, 300)}`
   );
 });
 
@@ -1181,6 +1514,12 @@ Then(
       ask.response.status,
       200,
       `doorway "${servingId}" answered HTTP ${ask.response.status}`
+    );
+    const marker = nrtMarker(root);
+    assert.ok(
+      ask.response.text.includes(marker),
+      `doorway "${servingId}" answered 200 but without the test archive's own marker (${marker}) — this ` +
+        `looks like its own unrelated "/" landing page, not its staged mount for "${root}"`
     );
     assert.ok(
       !ask.response.headers['x-elohim-name-route'],
