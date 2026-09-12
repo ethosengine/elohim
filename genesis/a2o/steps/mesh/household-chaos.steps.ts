@@ -1706,15 +1706,38 @@ Then(
     // copy, so the string in the Gherkin and the string asserted here cannot
     // drift.
     const expected = ladderLabel(state, 1);
-    const { custodyCopies, livePeers, rung } = await intraHubRung(this, contentId);
-    const actual = ladderLabel(state, rung);
-    assert.equal(
-      actual,
-      expected,
-      `one custody peer left, but "${contentId}" has ${custodyCopies} custody ` +
-        `cop${custodyCopies === 1 ? 'y' : 'ies'}, ${livePeers} live peer${livePeers === 1 ? '' : 's'}, ` +
-        `rung ${rung} (ladder rung "${actual}"), not the "${expected}" rung a single surviving peer ` +
-        'should read as'
+    const protectedLabel = ladderLabel(state, 3);
+    // The badge is a LIVENESS fold: over a datagram transport a killed peer's
+    // loss is only observed at the ping budget (~35 s), so the rung is given
+    // the same window the first rung already has. "Not silence" stays strict —
+    // intraHubRung() throws on a non-200 — and "not protected" is asserted on
+    // EVERY poll, so a badge that ever climbs back to the top rung fails.
+    await retry(
+      async () => {
+        const { custodyCopies, livePeers, rung } = await intraHubRung(this, contentId);
+        const actual = ladderLabel(state, rung);
+        assert.notEqual(
+          actual,
+          protectedLabel,
+          `one custody peer left, but "${contentId}" reads "${protectedLabel}" ` +
+            `(${custodyCopies} custody copies, ${livePeers} live peers)`
+        );
+        assert.equal(
+          actual,
+          expected,
+          `one custody peer left, but "${contentId}" has ${custodyCopies} custody ` +
+            `cop${custodyCopies === 1 ? 'y' : 'ies'}, ${livePeers} live peer${livePeers === 1 ? '' : 's'}, ` +
+            `rung ${rung} (ladder rung "${actual}"), not the "${expected}" rung a single surviving peer ` +
+            'should read as'
+        );
+      },
+      {
+        maxAttempts: 200,
+        initialDelayMs: 1_000,
+        backoffFactor: 1.1,
+        maxDelayMs: 5_000,
+        timeoutMs: 55_000,
+      }
     );
   }
 );
