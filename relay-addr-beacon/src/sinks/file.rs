@@ -142,6 +142,12 @@ impl FileMembershipSink {
         }
     }
 
+    /// Does this leg write the document for `record_name`? Compared on the
+    /// normalized lane key, so either DNS spelling of the name selects it.
+    pub fn owns_lane(&self, record_name: &str) -> bool {
+        crate::config::lane_key(&self.public_name) == crate::config::lane_key(record_name)
+    }
+
     fn lock_path(&self) -> PathBuf {
         let mut name = self.path.as_os_str().to_os_string();
         name.push(".lock");

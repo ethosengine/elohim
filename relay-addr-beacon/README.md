@@ -119,6 +119,16 @@ UDP, so a proxied record would break STUN/TURN).
 Flow: `GET /zones?name=<zone>` → zone id; `GET /zones/{zid}/dns_records?type=A&name=<rec>`
 → PATCH if it exists else POST create.
 
+That default behaviour is the **exclusive lane**: one beacon instance owns
+`--record-name` outright and keeps it correct. `--record-name` is always
+required by the cloudflare sink, including when the lane you actually care
+about is a shared one — so point it at a per-instance diagnostic name you want
+anyway. It must NOT also be one of the shared names: a shared lane and an
+exclusive owner cannot both own one name (the exclusive upsert patches the
+first record it finds at that name, which may be a sibling's). With
+`--serving-probe-url` configured that collision is refused at startup; without
+a probe nothing catches it, so keep the names distinct.
+
 ##### Shared doorway-set mode (sibling-safe multi-A "logical anycast")
 
 The exclusive lane above assumes ONE beacon owns `--record-name` outright.
@@ -126,10 +136,19 @@ Shared lanes let **multiple beacon instances — one per WAN — each maintain
 their OWN A/AAAA record under a shared hostname**, so a doorway set (e.g.
 `doorways.elohim.host`) resolves to several relays without any instance ever
 clobbering a sibling's record. One beacon can contribute to several shared
-hostnames by repeating `--shared-record <name>=<owner>`; order is preserved.
-This is the protocol primitive "address-set contribution with ownership +
-freshness"; Cloudflare DNS is its current projection. Shared lanes run
-**alongside** the exclusive lane, not instead of it.
+hostnames by repeating `--shared-record <name>=<owner>`; order is preserved,
+and duplicate hostnames (case- and terminal-dot-insensitive) are rejected at
+startup. This is the protocol primitive "address-set contribution with
+ownership + freshness"; Cloudflare DNS is its current projection. Shared lanes
+run **alongside** the exclusive lane, not instead of it.
+
+**Lanes are independent.** Each lane carries its OWN membership state — its own
+join/leave counters, its own applied-projection marker, its own publish gate.
+One serving probe decides one thing ("is *my* doorway serving?") and every lane
+is reconciled against that same verdict, but a lane whose projection fails (a
+Cloudflare 503, a wedged document lock) retries on its own and is never
+recorded as applied because a sibling lane succeeded on the same tick. That is
+the difference between two lanes and one lane written twice.
 
 | Flag | Env | Default | Meaning |
 |------|-----|---------|---------|
@@ -138,6 +157,16 @@ freshness"; Cloudflare DNS is its current projection. Shared lanes run
 | `--record-owner` | `BEACON_RECORD_OWNER` | — | Legacy owner paired with `--shared-record-name`. |
 | `--shared-refresh-secs` | `BEACON_SHARED_REFRESH_SECS` | `300` | Max age of our own freshness stamp before we re-PATCH even with an unchanged IP. |
 | `--shared-stale-secs` | `BEACON_SHARED_STALE_SECS` | `900` | Age beyond which a SIBLING's record is considered abandoned and reaped (DELETEd). Must be greater than `--shared-refresh-secs` (validated at startup). |
+
+**Membership is earned from the serving probe** when `--serving-probe-url` is
+configured (the flags are tabled under the [`file` sink](#file-household-ownable-membership-projection),
+and they govern BOTH projections identically). A lane joins after
+`--serving-join-after` consecutive HTTP 200s — `POST`/`PATCH`ing its record —
+and withdraws after `--serving-leave-after` consecutive non-200s, `DELETE`ing
+only the records it owns. While a lane is withdrawn, an address-change publish
+cannot re-advertise it. The probe is OPTIONAL for the cloudflare sink: with no
+probe, every configured lane publishes unconditionally, which is what the
+deployed doorway-set legs do today. It is REQUIRED for the `file` sink.
 
 **Ownership rides the Cloudflare record `comment` field** —
 `beacon-owner=<slug>; ts=<unix-seconds>`, tolerant-parsed (unknown keys
@@ -193,11 +222,9 @@ it does not control, and a test-only proxy that never executes the real routing
 decision certifies nothing. Two legs — one per doorway — writing their own entry
 into one document *is* the routing apparatus.
 
-| Flag | Env | Meaning |
-|------|-----|---------|
 | Flag | Env | Default | Meaning |
 |------|-----|---------|---------|
-| `--membership-file` | `BEACON_MEMBERSHIP_FILE` | — | Document this leg contributes its own entry to. Sibling legs share the path. |
+| `--membership-file` | `BEACON_MEMBERSHIP_FILE` | — | Where this leg's membership document(s) live. Sibling legs share it. One document per public name — see the derivation rules below. |
 | `--member-origin` | `BEACON_MEMBER_ORIGIN` | — | The origin (`scheme://host:port`) this leg advertises. Required because household doorways can differ by PORT on one host, which no address snapshot can distinguish. |
 
 The serving-probe flags below are shared with the Cloudflare shared lane (both
@@ -212,10 +239,28 @@ decide membership from the same probe); the `file` sink **requires** the URL:
 
 The public name and this leg's owner slug come from the **same**
 `--shared-record <name>=<owner>` (or legacy `--shared-record-name` /
-`--record-owner`) pair the Cloudflare lane uses. Exactly one lane may be
-configured with `--sink file`: one document names one public name.
+`--record-owner`) lanes the Cloudflare sink uses; at least one is required.
 `--serving-probe-url` is **required** — membership is earned from the probe,
 never assumed.
+
+**One document per public name.** A document's `name` field names ONE public
+name, so a leg contributing to two lanes writes two documents, each with its
+own entry for this owner. Which file each lane lands in is derived from
+`--membership-file`, in this order:
+
+| Configured `--membership-file` | Lane `elohim.host` lands at | When to use it |
+|--------------------------------|------------------------------|----------------|
+| contains `{name}` — e.g. `/var/lib/beacon/{name}/members.json` | `/var/lib/beacon/elohim.host/members.json` | any lane count; the explicit spelling, and the one that does not depend on the directory already existing |
+| directory-shaped — a trailing `/` (e.g. `/var/lib/beacon/membership/`), or a path that already exists as a directory | `/var/lib/beacon/membership/elohim.host.json` | the usual two-lane shape |
+| a plain file path — e.g. `…/membership/elohim.local.json` | that path, **verbatim** | a single lane (every existing single-lane invocation is unchanged) |
+
+A plain file path with **two or more** lanes is refused at startup, naming both
+fixes: deriving sibling documents beside a file the operator already named
+would leave that name meaning nothing, and writing one lane there while
+inventing paths for the rest is exactly the last-value-wins class repeatable
+lanes exist to remove. A terminal dot is DNS-equivalent and never reaches a
+file name (`elohim.host.` becomes `elohim.host.json`); a lane name containing a
+path separator is refused (no DNS name has one).
 
 Document shape:
 
@@ -275,6 +320,34 @@ relay-addr-beacon --sink file \
 `just mesh start` (opt out with `MESH_MEMBERSHIP=0`), and the household fixture
 declares the document so acceptance scenarios resolve the public name through
 it.
+
+The same two legs staging **two** public names — the household rehearsal of the
+apex shape, where both doorways serve the apex *and* the doorway set. Each leg
+now writes two documents under the directory-shaped path:
+
+```
+# leg A — the alpha doorway, contributing to BOTH names
+relay-addr-beacon --sink file \
+  --shared-record elohim.local=alpha \
+  --shared-record doorways.elohim.local=alpha \
+  --membership-file /tmp/elohim-local-mesh/membership/ \
+  --member-origin http://localhost:8888 \
+  --serving-probe-url http://127.0.0.1:8888/health
+
+# leg B — the apex doorway, the same two names under its own owner slug
+relay-addr-beacon --sink file \
+  --shared-record elohim.local=apex \
+  --shared-record doorways.elohim.local=apex \
+  --membership-file /tmp/elohim-local-mesh/membership/ \
+  --member-origin http://localhost:8889 \
+  --serving-probe-url http://127.0.0.1:8889/health
+```
+
+That writes `membership/elohim.local.json` and
+`membership/doorways.elohim.local.json`, each holding one entry per serving
+owner. Freezing leg B's doorway withdraws `apex` from **both** documents after
+`--serving-leave-after` probes and leaves leg A's entries byte-identical in
+both.
 
 #### `pkarr` (Tier-2 — published, not yet consumed) — OFF by default
 
@@ -385,6 +458,46 @@ relay-addr-beacon --sink cloudflare \
   --shared-record doorway-canary.elohim.host=operations
 ```
 
+**The apex two-lane shape** (2026-09-12 ruling: the apex `elohim.host` is
+served by BOTH doorways, so each beacon leg contributes an owner record to two
+shared names). Copy this into a manifest's `args` — two `--shared-record`
+values, one per name, the same owner slug on both, and the apex name must NOT
+also be that leg's exclusive `--record-name` (validation refuses it: a shared
+lane and an exclusive owner cannot both own one name):
+
+```
+# leg "operations"
+relay-addr-beacon --sink cloudflare \
+  --record-name alpha.elohim.host --cf-zone elohim.host \
+  --shared-record doorways.elohim.host=operations \
+  --shared-record elohim.host=operations
+
+# leg "shem" (different WAN, different owner slug, same two shared names)
+relay-addr-beacon --sink cloudflare \
+  --record-name turn-shem.elohim.host --cf-zone elohim.host \
+  --shared-record doorways.elohim.host=shem \
+  --shared-record elohim.host=shem
+```
+
+Note the shem leg's `--record-name`: today that leg owns `elohim.host`
+exclusively, so moving the apex into a shared lane means giving that leg a
+DIFFERENT exclusive name in the same edit (above, `turn-shem.elohim.host`) —
+otherwise one name is both exclusively owned and shared-contributed by the same
+process. The apex flip itself, and the doorway ingress/TLS SAN that must accept
+the apex host before it answers, remain operator-owned decisions; this crate
+only supplies the mechanism.
+
+As YAML `args` (the deployed spelling; the legacy
+`--shared-record-name`/`--record-owner` pair the coturn manifests still use
+stays accepted, and is equivalent to a single `--shared-record` value):
+
+```yaml
+- "--shared-record"
+- "doorways.elohim.host=operations"
+- "--shared-record"
+- "elohim.host=operations"
+```
+
 ## Development gate
 
 Native crate (no Holochain WASM flag). In constrained environments point the
@@ -417,7 +530,11 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
   fail-safe not-reapable, a same-owner duplicate record never reaped, an
   AAAA-lane create proving the shared list call is type-scoped with a correct
   AAAA body, ordered multi-lane PATCH fan-out, and exclusive-lane ownership
-  stamping.
+  stamping. Two further production-cycle tests drive `serving_cycle` with TWO
+  Cloudflare lanes: both lanes join on the second serving probe and withdraw on
+  the third non-serving one with a sibling's apex record untouched, and — with
+  record removal broken for one lane only — the failing lane neither marks
+  itself applied nor suppresses the lane that succeeded.
 - The `file` membership sink has unit tests (document materialisation,
   exact-owner writes with a byte-identical sibling entry across a withdrawal, no
   duplicate owner on rejoin, hand-edited duplicate collapse, corrupt-document
@@ -425,8 +542,14 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
   two-leg writes leaving a complete document and no lock/temp residue, and an
   abandoned lock being broken) plus production-cycle tests that drive
   `serving_cycle` itself: join2/leave3 across two legs sharing one document, a
-  restarted leg withdrawing then re-adopting exactly one entry, and a dead probe
-  endpoint withdrawing the same way a shedding one does.
+  restarted leg withdrawing then re-adopting exactly one entry, a dead probe
+  endpoint withdrawing the same way a shedding one does, two lanes on one leg
+  writing two derived documents and withdrawing from both together (with the
+  sibling leg's entries byte-identical in both), the `{name}` placeholder
+  deriving the same pair, and a single-lane leg still writing the verbatim
+  configured document with nothing derived beside it. Config tests cover the
+  per-lane path derivation, the refusal of two lanes into one named document,
+  and the refusal of a lane name carrying a path separator.
 - The `Dockerfile` and live DNS/coturn integration are **not** exercised by the
   test gate; they are provided for the operator to build and deploy.
 

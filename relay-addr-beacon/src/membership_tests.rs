@@ -8,6 +8,9 @@ struct World {
     requests: Vec<String>,
     probe: u16,
     fail_delete: bool,
+    /// DELETE fails only for records at this name — one lane's projection
+    /// failing while its sibling lane's succeeds.
+    fail_delete_name: Option<String>,
     fail_wan: bool,
 }
 
@@ -20,7 +23,14 @@ struct Harness {
 }
 
 impl Harness {
+    /// The single-lane harness every pre-existing scenario uses.
     async fn new() -> Self {
+        Self::with_lanes(&["shared.test=mine"]).await
+    }
+
+    /// `lanes` are `<name>=<owner>` exactly as the flag spells them, so a
+    /// scenario configures two lanes the way a manifest would.
+    async fn with_lanes(lanes: &[&str]) -> Self {
         let server = MockServer::start().await;
         let stamp = cloudflare::format_owner_comment("mine", 1);
         let world = Arc::new(Mutex::new(World {
@@ -36,6 +46,7 @@ impl Harness {
             requests: vec![],
             probe: 200,
             fail_delete: false,
+            fail_delete_name: None,
             fail_wan: false,
         }));
         let state = world.clone();
@@ -70,10 +81,13 @@ impl Harness {
                         .cloned()
                         .collect::<Vec<_>>())
                 } else if method == "DELETE" {
-                    if w.fail_delete {
+                    let id = path.rsplit('/').next().unwrap();
+                    let lane_blocked = w.fail_delete_name.as_deref().is_some_and(|name| {
+                        w.records.iter().any(|r| r["id"] == id && r["name"] == name)
+                    });
+                    if w.fail_delete || lane_blocked {
                         return ResponseTemplate::new(503);
                     }
-                    let id = path.rsplit('/').next().unwrap();
                     w.records.retain(|r| r["id"] != id);
                     json!({"id":id})
                 } else {
@@ -92,23 +106,26 @@ impl Harness {
             })
             .mount(&server)
             .await;
-        let cfg = Config::parse_from([
-            "beacon",
-            "--sink",
-            "cloudflare",
-            "--record-name",
-            "diagnostic.test",
-            "--shared-record",
-            "shared.test=mine",
-            "--serving-probe-url",
-            &format!("{}/serving", server.uri()),
-            "--egress-endpoint",
-            &format!("{}/wan", server.uri()),
-            "--lan-ip",
-            "192.0.2.1",
-            "--state-file",
-            &format!("/tmp/beacon-membership-{}.json", server.address().port()),
-        ]);
+        let mut args: Vec<String> = vec![
+            "beacon".into(),
+            "--sink".into(),
+            "cloudflare".into(),
+            "--record-name".into(),
+            "diagnostic.test".into(),
+            "--serving-probe-url".into(),
+            format!("{}/serving", server.uri()),
+            "--egress-endpoint".into(),
+            format!("{}/wan", server.uri()),
+            "--lan-ip".into(),
+            "192.0.2.1".into(),
+            "--state-file".into(),
+            format!("/tmp/beacon-membership-{}.json", server.address().port()),
+        ];
+        for lane in lanes {
+            args.push("--shared-record".into());
+            args.push((*lane).into());
+        }
+        let cfg = Config::parse_from(args);
         cfg.validate().unwrap();
         let client = build_probe_client(1).unwrap();
         let sink = CloudflareSink::new(
@@ -117,12 +134,16 @@ impl Harness {
             "test".into(),
             "diagnostic.test".into(),
             false,
-            vec![cloudflare::SharedRecordConfig {
-                record_name: "shared.test".into(),
-                owner: "mine".into(),
-                refresh_secs: 300,
-                stale_secs: 900,
-            }],
+            cfg.shared_record_lanes()
+                .unwrap()
+                .into_iter()
+                .map(|lane| cloudflare::SharedRecordConfig {
+                    record_name: lane.record_name,
+                    owner: lane.owner,
+                    refresh_secs: 300,
+                    stale_secs: 900,
+                })
+                .collect(),
         )
         .with_api_base(server.uri())
         .with_serving_probe(true);
@@ -135,23 +156,44 @@ impl Harness {
         }
     }
 
-    async fn probe(&self, membership: &mut state::Membership) -> Result<()> {
+    async fn probe(&self, membership: &mut state::MembershipSet) -> Result<()> {
         serving_cycle(&self.cfg, &self.client, &self.sinks, membership).await
     }
+
+    /// Per-lane serving evidence for exactly the lanes this harness configured.
+    fn membership(&self) -> state::MembershipSet {
+        state::MembershipSet::new(&self.cfg.shared_record_lanes().unwrap())
+    }
+
     fn mine(&self) -> usize {
+        self.mine_at("shared.test")
+    }
+
+    /// Records at `name` whose ownership comment resolves to owner `mine`.
+    fn mine_at(&self, name: &str) -> usize {
         self.world
             .lock()
             .unwrap()
             .records
             .iter()
             .filter(|r| {
-                r["name"] == "shared.test"
+                r["name"] == name
                     && r["comment"]
                         .as_str()
                         .and_then(cloudflare::parse_owner_comment)
                         .is_some_and(|s| s.owner == "mine")
             })
             .count()
+    }
+
+    fn record(&self, id: &str) -> Option<Value> {
+        self.world
+            .lock()
+            .unwrap()
+            .records
+            .iter()
+            .find(|r| r["id"] == id)
+            .cloned()
     }
 }
 impl Drop for Harness {
@@ -160,10 +202,28 @@ impl Drop for Harness {
     }
 }
 
+/// Read one lane's decided verdict out of the per-lane evidence.
+fn lane_serving(membership: &state::MembershipSet, name: &str) -> bool {
+    membership
+        .lane(name)
+        .expect("lane is configured")
+        .membership
+        .serving
+}
+
+/// Read one lane's applied-projection marker.
+fn lane_applied(membership: &state::MembershipSet, name: &str) -> Option<bool> {
+    membership
+        .lane(name)
+        .expect("lane is configured")
+        .membership
+        .applied
+}
+
 #[tokio::test]
 async fn actual_cycles_join_withdraw_and_rejoin_on_unchanged_wan_preserving_other_owners() {
     let h = Harness::new().await;
-    let mut membership = state::Membership::default();
+    let mut membership = h.membership();
     assert!(cycle(&h.cfg, &h.client, &h.sinks, false).await.unwrap());
     // Address publication before first health tick cannot re-advertise us.
     h.probe(&mut membership).await.unwrap();
@@ -203,13 +263,13 @@ async fn actual_cycles_join_withdraw_and_rejoin_on_unchanged_wan_preserving_othe
     assert_eq!(h.mine(), 0);
     h.probe(&mut membership).await.unwrap();
     assert_eq!(h.mine(), 1);
-    assert_eq!(membership.applied, Some(true));
+    assert_eq!(lane_applied(&membership, "shared.test"), Some(true));
 }
 
 #[tokio::test]
 async fn startup_withdrawal_retries_failed_dns_despite_wan_failure() {
     let h = Harness::new().await;
-    let mut membership = state::Membership::default();
+    let mut membership = h.membership();
     {
         let mut w = h.world.lock().unwrap();
         w.fail_delete = true;
@@ -218,12 +278,12 @@ async fn startup_withdrawal_retries_failed_dns_despite_wan_failure() {
     }
     assert!(cycle(&h.cfg, &h.client, &h.sinks, false).await.is_err());
     assert!(h.probe(&mut membership).await.is_err());
-    assert_eq!(membership.applied, None);
+    assert_eq!(lane_applied(&membership, "shared.test"), None);
     assert_eq!(h.mine(), 3);
     h.world.lock().unwrap().fail_delete = false;
     h.probe(&mut membership).await.unwrap();
     assert_eq!(h.mine(), 0);
-    assert_eq!(membership.applied, Some(false));
+    assert_eq!(lane_applied(&membership, "shared.test"), Some(false));
     let w = h.world.lock().unwrap();
     assert!(!w
         .requests
@@ -237,12 +297,12 @@ async fn startup_withdrawal_retries_failed_dns_despite_wan_failure() {
 async fn redirects_timeout_and_refusal_do_not_supply_join_evidence() {
     let mut h = Harness::new().await;
     cycle(&h.cfg, &h.client, &h.sinks, false).await.unwrap();
-    let mut membership = state::Membership::default();
+    let mut membership = h.membership();
     h.world.lock().unwrap().probe = 302;
     for _ in 0..2 {
         h.probe(&mut membership).await.unwrap();
     }
-    assert!(!membership.serving);
+    assert!(!lane_serving(&membership, "shared.test"));
     assert!(!h
         .world
         .lock()
@@ -257,13 +317,13 @@ async fn redirects_timeout_and_refusal_do_not_supply_join_evidence() {
         .await;
     h.cfg.serving_probe_url = Some(format!("{}/slow", h.server.uri()));
     h.probe(&mut membership).await.unwrap();
-    assert!(!membership.serving);
+    assert!(!lane_serving(&membership, "shared.test"));
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let address = listener.local_addr().unwrap();
     drop(listener);
     h.cfg.serving_probe_url = Some(format!("http://{address}/serving"));
     h.probe(&mut membership).await.unwrap();
-    assert!(!membership.serving);
+    assert!(!lane_serving(&membership, "shared.test"));
 }
 
 #[test]
@@ -303,4 +363,113 @@ fn positive_counts_and_hysteresis_reset_are_required() {
     assert!(membership.serving);
     membership.observe(false, 3, 2);
     assert!(!membership.serving);
+}
+
+/// TWO Cloudflare lanes on one beacon leg, driven through the production
+/// serving cycle: the apex name and the doorway-set name are separate lanes
+/// with separate evidence, and one probe result reconciles both.
+#[tokio::test]
+async fn two_cloudflare_lanes_join_and_withdraw_independently_through_the_production_cycle() {
+    let h = Harness::with_lanes(&["shared.test=mine", "apex.test=mine"]).await;
+    // A sibling already contributes to the apex lane; it must survive
+    // everything this leg does (its modified_on is absent, so it is
+    // fail-safe not reapable).
+    h.world.lock().unwrap().records.push(json!({
+        "id": "apex-sibling",
+        "name": "apex.test",
+        "type": "A",
+        "content": "198.51.100.9",
+        "comment": cloudflare::format_owner_comment("sibling", 1),
+    }));
+    let sibling_before = h.record("apex-sibling").unwrap();
+
+    let mut membership = h.membership();
+    assert_eq!(membership.lanes().len(), 2);
+    assert!(cycle(&h.cfg, &h.client, &h.sinks, false).await.unwrap());
+
+    // Both lanes start withdrawn: one serving probe is evidence, not membership.
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 0));
+
+    // The second consecutive serving probe earns BOTH lanes (join_after = 2).
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (1, 1));
+    assert_eq!(lane_applied(&membership, "shared.test"), Some(true));
+    assert_eq!(lane_applied(&membership, "apex.test"), Some(true));
+
+    // The doorway sheds. leave_after = 3, so two non-serving probes hold both
+    // lanes, and the third withdraws both — this leg's contribution to each
+    // name, and nothing else.
+    h.world.lock().unwrap().probe = 503;
+    for _ in 0..2 {
+        h.probe(&mut membership).await.unwrap();
+        assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (1, 1));
+    }
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 0));
+    assert_eq!(lane_applied(&membership, "apex.test"), Some(false));
+
+    // An address cycle after withdrawal must not re-advertise either lane.
+    assert!(cycle(&h.cfg, &h.client, &h.sinks, false).await.unwrap());
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 0));
+
+    // Rejoin: again both lanes, again only on the second serving probe.
+    h.world.lock().unwrap().probe = 200;
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 0));
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (1, 1));
+
+    // The sibling's apex record was never patched, reordered or reaped.
+    assert_eq!(h.record("apex-sibling"), Some(sibling_before));
+}
+
+/// A lane whose projection FAILS retries on its own and is not recorded as
+/// applied, while its sibling lane's successful projection stands. This is the
+/// whole reason the counters and the applied marker are held per lane rather
+/// than one verdict written twice.
+#[tokio::test]
+async fn one_lane_failing_neither_marks_itself_applied_nor_suppresses_the_other() {
+    let h = Harness::with_lanes(&["shared.test=mine", "apex.test=mine"]).await;
+    h.world.lock().unwrap().records.push(json!({
+        "id": "apex-mine",
+        "name": "apex.test",
+        "type": "A",
+        "content": "203.0.113.7",
+        "comment": cloudflare::format_owner_comment("mine", 1),
+    }));
+    let mut membership = h.membership();
+    assert!(cycle(&h.cfg, &h.client, &h.sinks, false).await.unwrap());
+    for _ in 0..2 {
+        h.probe(&mut membership).await.unwrap();
+    }
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (1, 1));
+
+    // Withdrawal DELETEs. Break it for the apex lane ONLY, then shed.
+    {
+        let mut w = h.world.lock().unwrap();
+        w.fail_delete_name = Some("apex.test".into());
+        w.probe = 503;
+    }
+    // leave_after = 3: the first two probes still carry a JOIN verdict, which
+    // writes no DELETE and so cannot fail.
+    for _ in 0..2 {
+        h.probe(&mut membership).await.unwrap();
+    }
+    // The third flips both lanes to withdrawn. One lane projects it; the other
+    // cannot — and the cycle reports the incomplete pass.
+    assert!(h.probe(&mut membership).await.is_err());
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 1));
+    // The lane that succeeded recorded its withdrawal...
+    assert_eq!(lane_applied(&membership, "shared.test"), Some(false));
+    // ...the lane that failed did NOT, so its next tick retries...
+    assert_eq!(lane_applied(&membership, "apex.test"), Some(true));
+    // ...and both still hold the decided verdict, so that retry is a withdrawal.
+    assert!(!lane_serving(&membership, "shared.test"));
+    assert!(!lane_serving(&membership, "apex.test"));
+
+    h.world.lock().unwrap().fail_delete_name = None;
+    h.probe(&mut membership).await.unwrap();
+    assert_eq!((h.mine_at("shared.test"), h.mine_at("apex.test")), (0, 0));
+    assert_eq!(lane_applied(&membership, "apex.test"), Some(false));
 }

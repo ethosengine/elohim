@@ -123,20 +123,28 @@ fn build_sinks(cfg: &Config, client: &reqwest::Client) -> Result<Vec<ActiveSink>
             SinkName::File => {
                 // `Config::validate` already proved each of these; resolve
                 // defensively so this constructor stays sound if called alone.
-                let path = cfg.membership_file.clone().ok_or_else(|| {
-                    anyhow!("file sink requires --membership-file / BEACON_MEMBERSHIP_FILE")
-                })?;
                 let origin = cfg.member_origin.clone().ok_or_else(|| {
                     anyhow!("file sink requires --member-origin / BEACON_MEMBER_ORIGIN")
                 })?;
-                let lane = cfg.membership_lane()?;
-                sinks.push(ActiveSink::File(FileMembershipSink::new(
-                    path,
-                    lane.record_name,
-                    lane.owner,
-                    origin,
-                    cfg.shared_refresh_secs,
-                )));
+                // ONE SINK PER LANE, each with its own derived document: one
+                // membership document names one public name, so two lanes are
+                // two documents — never one document whose `name` field means
+                // whichever lane was parsed last.
+                for (lane, path) in cfg.membership_lanes()? {
+                    info!(
+                        lane = %lane.record_name,
+                        owner = %lane.owner,
+                        document = %path.display(),
+                        "file membership lane"
+                    );
+                    sinks.push(ActiveSink::File(FileMembershipSink::new(
+                        path,
+                        lane.record_name,
+                        lane.owner,
+                        origin.clone(),
+                        cfg.shared_refresh_secs,
+                    )));
+                }
             }
         }
     }
@@ -315,7 +323,7 @@ async fn serving_cycle(
     cfg: &Config,
     client: &reqwest::Client,
     sinks: &[ActiveSink],
-    membership: &mut state::Membership,
+    membership: &mut state::MembershipSet,
 ) -> Result<()> {
     let url = cfg
         .serving_probe_url
@@ -330,43 +338,66 @@ async fn serving_cycle(
     apply_membership(cfg, sinks, membership).await
 }
 
+/// Project each lane's already-decided verdict through every sink.
+///
+/// Lanes are reconciled INDEPENDENTLY: one lane's failing projection never
+/// suppresses another's, and a lane is marked applied only on its own success.
+/// The address snapshot is loaded at most once per pass and shared by every
+/// joining lane — the verdicts differ per lane, the detected address does not.
 async fn apply_membership(
     cfg: &Config,
     sinks: &[ActiveSink],
-    membership: &mut state::Membership,
+    membership: &mut state::MembershipSet,
 ) -> Result<()> {
-    let previous = if membership.serving {
+    let any_serving = membership
+        .lanes()
+        .iter()
+        .any(|held| held.membership.serving);
+    let previous = if any_serving {
         state::load(&cfg.state_file)?
     } else {
         None
     };
-    let mut all_ok = true;
-    for sink in sinks {
-        // Every membership projection is handed the SAME already-decided
-        // verdict. Cloudflare projects it as A records for the fleet; the file
-        // sink projects it into a document the household owns.
-        let outcome = match sink {
-            ActiveSink::Cloudflare(cf) => {
-                cf.reconcile_membership(membership.serving, previous.as_ref())
-                    .await
+    let mut failures = 0_usize;
+    for held in membership.lanes_mut() {
+        let serving = held.membership.serving;
+        let mut lane_ok = true;
+        for sink in sinks {
+            // Every sink holding this lane is handed the SAME already-decided
+            // verdict. Cloudflare projects it as A records for the fleet; a
+            // file sink projects it into the one document it owns.
+            if let Err(error) = sink
+                .reconcile_lane(&held.lane.record_name, serving, previous.as_ref())
+                .await
+            {
+                lane_ok = false;
+                warn!(
+                    sink = sink.name(),
+                    lane = %held.lane.record_name,
+                    owner = %held.lane.owner,
+                    error = %error,
+                    "shared membership projection failed; retrying next probe"
+                );
             }
-            ActiveSink::File(f) => f.reconcile_membership(membership.serving).await,
-            _ => Ok(()),
-        };
-        if let Err(error) = outcome {
-            all_ok = false;
-            warn!(sink = sink.name(), error = %error, "shared membership projection failed; retrying next probe");
+        }
+        if !lane_ok {
+            failures += 1;
+            continue;
+        }
+        if held.membership.applied != Some(serving) {
+            info!(
+                lane = %held.lane.record_name,
+                owner = %held.lane.owner,
+                serving,
+                "shared membership projection applied"
+            );
+            held.membership.applied = Some(serving);
         }
     }
-    if !all_ok {
-        return Err(anyhow!("shared membership projection incomplete"));
-    }
-    if membership.applied != Some(membership.serving) {
-        info!(
-            serving = membership.serving,
-            "shared membership projection applied"
-        );
-        membership.applied = Some(membership.serving);
+    if failures > 0 {
+        return Err(anyhow!(
+            "shared membership projection incomplete for {failures} lane(s)"
+        ));
     }
     Ok(())
 }
@@ -388,8 +419,12 @@ async fn address_loop(cfg: &Config, client: &reqwest::Client, sinks: &[ActiveSin
     }
 }
 
-async fn serving_loop(cfg: &Config, client: &reqwest::Client, sinks: &[ActiveSink]) {
-    let mut membership = state::Membership::default();
+async fn serving_loop(
+    cfg: &Config,
+    client: &reqwest::Client,
+    sinks: &[ActiveSink],
+    mut membership: state::MembershipSet,
+) {
     loop {
         if let Err(e) = serving_cycle(cfg, client, sinks, &mut membership).await {
             warn!(error = %e, "serving cycle failed — retrying next interval");
@@ -417,8 +452,12 @@ async fn run(cfg: Config) -> Result<()> {
         "relay-addr-beacon starting"
     );
 
+    // Per-lane serving evidence, built from the SAME validated lane list the
+    // sinks were constructed from.
+    let lanes = cfg.shared_record_lanes()?;
+
     if cfg.once {
-        let mut membership = state::Membership::default();
+        let mut membership = state::MembershipSet::new(&lanes);
         if cfg.serving_probe_url.is_some() {
             // Withdraw stale contributions before detection, even if WAN is down.
             apply_membership(&cfg, &sinks, &mut membership).await?;
@@ -449,13 +488,24 @@ async fn run(cfg: Config) -> Result<()> {
                 let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
                 tokio::join!(
                     address_loop(&cfg, &client, &sinks),
-                    serving_loop(&cfg, &probe_client, &sinks)
+                    serving_loop(
+                        &cfg,
+                        &probe_client,
+                        &sinks,
+                        state::MembershipSet::new(&lanes)
+                    )
                 );
             }
             (true, false) => address_loop(&cfg, &client, &sinks).await,
             (false, true) => {
                 let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
-                serving_loop(&cfg, &probe_client, &sinks).await;
+                serving_loop(
+                    &cfg,
+                    &probe_client,
+                    &sinks,
+                    state::MembershipSet::new(&lanes),
+                )
+                .await;
             }
             (false, false) => {
                 return Err(anyhow!(

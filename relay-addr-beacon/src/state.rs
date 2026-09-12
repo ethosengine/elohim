@@ -5,6 +5,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
+use crate::config::SharedRecordLane;
 use crate::sinks::AddrUpdate;
 
 /// Load the last-published snapshot, or `None` if the state file does not yet
@@ -123,8 +124,9 @@ mod tests {
     }
 }
 
-/// Ephemeral serving evidence, rebuilt after every restart. DNS is its projection,
-/// never evidence that a doorway is currently serving.
+/// Ephemeral serving evidence for ONE shared lane, rebuilt after every
+/// restart. DNS is its projection, never evidence that a doorway is currently
+/// serving.
 #[derive(Default)]
 pub struct Membership {
     pub serving: bool,
@@ -144,5 +146,65 @@ impl Membership {
         if self.consecutive >= if serving { join_after } else { leave_after } {
             self.serving = serving;
         }
+    }
+}
+
+/// One lane's identity plus the serving evidence held for it.
+pub struct LaneMembership {
+    pub lane: SharedRecordLane,
+    pub membership: Membership,
+}
+
+/// Per-lane serving evidence for every shared lane this beacon contributes to.
+///
+/// One serving probe decides one thing — "is MY doorway serving?" — and every
+/// lane is reconciled against that same verdict. The hysteresis counters and
+/// the applied-projection marker are nonetheless held PER LANE: a lane whose
+/// projection failed (a Cloudflare 503, a wedged sibling lock) must retry on
+/// its own, and must not be recorded as applied because a different lane
+/// succeeded on the same tick. That is the whole difference between two lanes
+/// and one lane written twice.
+#[derive(Default)]
+pub struct MembershipSet {
+    lanes: Vec<LaneMembership>,
+}
+
+impl MembershipSet {
+    pub fn new(lanes: &[SharedRecordLane]) -> Self {
+        Self {
+            lanes: lanes
+                .iter()
+                .map(|lane| LaneMembership {
+                    lane: lane.clone(),
+                    membership: Membership::default(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Feed ONE probe result into every lane's own counters.
+    pub fn observe(&mut self, serving: bool, leave_after: u64, join_after: u64) {
+        for lane in &mut self.lanes {
+            lane.membership.observe(serving, leave_after, join_after);
+        }
+    }
+
+    pub fn lanes(&self) -> &[LaneMembership] {
+        &self.lanes
+    }
+
+    pub fn lanes_mut(&mut self) -> &mut [LaneMembership] {
+        &mut self.lanes
+    }
+
+    /// The evidence held for one lane, by either DNS spelling of its name.
+    ///
+    /// A reader's accessor: the reconcile path walks every lane in order
+    /// (`lanes_mut`), so this exists for tests and for any future diagnostic
+    /// that asks about one lane by name.
+    #[cfg(test)]
+    pub fn lane(&self, record_name: &str) -> Option<&LaneMembership> {
+        let key = crate::config::lane_key(record_name);
+        self.lanes.iter().find(|held| held.lane.key() == key)
     }
 }

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_epr_chrome_is_the_trust_signal",
+  "claim": "Operator 2026-09-12: the EPR chrome around a site signals governance, fair trade, redress, feedback with owed response, and interpretable decisions — a concierge to the commons; frames every chrome/atom-home feature.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_epr_chrome_is_the_trust_signal.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_epr_chrome_is_the_trust_signal.md",
+        "cid": "bafkreih35kzxm2fvlcs62gcsytuhqff3m74s6jkvxrdjwrml5xhsupfpka"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "feedback_epr_chrome_is_the_trust_signal",
+    "file": "feedback_epr_chrome_is_the_trust_signal.md",
+    "scopePath": ".claude/memory/feedback_epr_chrome_is_the_trust_signal.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

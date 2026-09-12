@@ -18,6 +18,69 @@ pub struct SharedRecordLane {
     pub owner: String,
 }
 
+impl SharedRecordLane {
+    /// The lane's identity for lookup and duplicate detection. DNS names are
+    /// case-insensitive and a terminal dot is equivalent, so both aliases
+    /// normalize to one key — a lane cannot be configured twice under two
+    /// spellings, and a per-lane reconcile can find its lane by either.
+    pub fn key(&self) -> String {
+        lane_key(&self.record_name)
+    }
+}
+
+/// Normalize a shared record name to its lane key (see
+/// [`SharedRecordLane::key`]).
+pub fn lane_key(record_name: &str) -> String {
+    record_name.trim_end_matches('.').to_ascii_lowercase()
+}
+
+/// The `{name}` placeholder an operator may put anywhere inside
+/// `--membership-file` to say where each lane's public name lands.
+pub const MEMBERSHIP_NAME_PLACEHOLDER: &str = "{name}";
+
+/// Derive ONE lane's membership document path from the configured
+/// `--membership-file`. One document names one public name, so a beacon leg
+/// contributing to several lanes writes several documents. Three shapes, in
+/// order:
+///
+/// 1. the configured path contains `{name}` — substituted with the lane's
+///    public name. Explicit and operator-controlled; works at any lane count.
+/// 2. the configured path is directory-shaped (a trailing `/`, or it already
+///    exists as a directory) — the lane lands at `<dir>/<public-name>.json`.
+/// 3. otherwise it is a plain file path: used VERBATIM for a single lane (so
+///    every deployed single-lane invocation stays byte-identical), and
+///    REFUSED for two or more — deriving sibling documents beside a file the
+///    operator already named would leave that name meaning nothing, and
+///    silently writing one lane there and inventing paths for the rest is
+///    exactly the last-value-wins class this lane work exists to remove.
+pub fn membership_path_for(
+    base: &std::path::Path,
+    record_name: &str,
+    lane_count: usize,
+) -> Result<PathBuf> {
+    // A terminal dot is DNS-equivalent but not wanted in a file name.
+    let public_name = record_name.trim_end_matches('.');
+    let raw = base.to_string_lossy();
+    if raw.contains(MEMBERSHIP_NAME_PLACEHOLDER) {
+        return Ok(PathBuf::from(
+            raw.replace(MEMBERSHIP_NAME_PLACEHOLDER, public_name),
+        ));
+    }
+    if raw.ends_with('/') || base.is_dir() {
+        return Ok(base.join(format!("{public_name}.json")));
+    }
+    if lane_count <= 1 {
+        return Ok(base.to_path_buf());
+    }
+    Err(anyhow!(
+        "--membership-file {} names ONE document but {lane_count} shared lanes are configured — \
+         one membership document names one public name. Pass a directory (give the path a \
+         trailing `/`) or put the `{MEMBERSHIP_NAME_PLACEHOLDER}` placeholder in the path, so \
+         every lane gets its own document.",
+        base.display(),
+    ))
+}
+
 /// The sinks a single beacon process can drive. `--sink` is repeatable and the
 /// enabled sinks compose (all run on every publish).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -229,6 +292,15 @@ impl Config {
                     "--shared-record {raw:?} requires an owner; expected <name>=<owner>"
                 ));
             }
+            // A lane's public name becomes a file name under the `file` sink's
+            // per-lane document derivation, so a path separator in it is
+            // refused here rather than allowed to escape the configured
+            // directory. No DNS name contains one.
+            if record_name.contains('/') || record_name.contains('\\') {
+                return Err(anyhow!(
+                    "--shared-record name {record_name:?} must be a DNS name (no path separators)"
+                ));
+            }
             lanes.push(SharedRecordLane {
                 record_name: record_name.to_string(),
                 owner: owner.to_string(),
@@ -254,8 +326,7 @@ impl Config {
         for lane in &lanes {
             // DNS names are case-insensitive and a terminal dot is equivalent,
             // so reject those aliases as duplicates too.
-            let key = lane.record_name.trim_end_matches('.').to_ascii_lowercase();
-            if !names.insert(key) {
+            if !names.insert(lane.key()) {
                 return Err(anyhow!(
                     "duplicate shared record lane name: {}",
                     lane.record_name
@@ -266,24 +337,31 @@ impl Config {
         Ok(lanes)
     }
 
-    /// The single shared lane the file membership sink projects. One document
-    /// names ONE public name, so a file leg contributing to several lanes has
-    /// no coherent document to write — refused rather than silently taking the
-    /// first.
-    pub fn membership_lane(&self) -> Result<SharedRecordLane> {
-        let mut lanes = self.shared_record_lanes()?;
-        match lanes.len() {
-            1 => Ok(lanes.remove(0)),
-            0 => Err(anyhow!(
-                "file membership sink requires exactly one shared lane \
-                 (--shared-record <public-name>=<owner>, or the legacy \
+    /// Every shared lane the file membership sink projects, each paired with
+    /// its OWN document path (see [`membership_path_for`]). One document names
+    /// ONE public name, so a leg contributing to two lanes writes two
+    /// documents — never one document that silently means whichever lane was
+    /// parsed last.
+    pub fn membership_lanes(&self) -> Result<Vec<(SharedRecordLane, PathBuf)>> {
+        let base = self.membership_file.as_deref().ok_or_else(|| {
+            anyhow!("file sink requires --membership-file / BEACON_MEMBERSHIP_FILE")
+        })?;
+        let lanes = self.shared_record_lanes()?;
+        if lanes.is_empty() {
+            return Err(anyhow!(
+                "file membership sink requires at least one shared lane \
+                 (--shared-record <public-name>=<owner>, repeatable, or the legacy \
                  --shared-record-name/--record-owner pair); none configured"
-            )),
-            n => Err(anyhow!(
-                "file membership sink requires exactly one shared lane, {n} configured — \
-                 one membership document names one public name"
-            )),
+            ));
         }
+        let count = lanes.len();
+        lanes
+            .into_iter()
+            .map(|lane| {
+                let path = membership_path_for(base, &lane.record_name, count)?;
+                Ok((lane, path))
+            })
+            .collect()
     }
 
     /// Cross-field validation clap's declarative attributes can't express.
@@ -300,12 +378,10 @@ impl Config {
             ));
         }
         if self.sinks.contains(&SinkName::File) {
-            self.membership_lane()?;
-            if self.membership_file.is_none() {
-                return Err(anyhow!(
-                    "file sink requires --membership-file / BEACON_MEMBERSHIP_FILE"
-                ));
-            }
+            // Resolves every lane's document path too, so an ambiguous
+            // multi-lane `--membership-file` is refused before launch rather
+            // than at the first health tick.
+            self.membership_lanes()?;
             let origin = self.member_origin.as_deref().ok_or_else(|| {
                 anyhow!("file sink requires --member-origin / BEACON_MEMBER_ORIGIN")
             })?;
@@ -407,6 +483,7 @@ impl std::fmt::Debug for Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn parse(args: &[&str]) -> Config {
         Config::try_parse_from(std::iter::once("relay-addr-beacon").chain(args.iter().copied()))
@@ -468,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn file_sink_requires_a_document_an_origin_a_probe_and_one_lane() {
+    fn file_sink_requires_a_document_an_origin_a_probe_and_a_lane() {
         let complete = [
             "--sink",
             "file",
@@ -505,14 +582,10 @@ mod tests {
             assert!(error.contains(expected), "unexpected error: {error}");
         }
 
-        // One document names ONE public name.
-        let two_lanes = parse(&[
+        // A lane is required: membership needs a public name to be a member of.
+        let no_lane = parse(&[
             "--sink",
             "file",
-            "--shared-record",
-            "elohim.local=alpha",
-            "--shared-record",
-            "other.local=alpha",
             "--membership-file",
             "/tmp/beacon-config-test/elohim.local.json",
             "--member-origin",
@@ -520,9 +593,9 @@ mod tests {
             "--serving-probe-url",
             "http://localhost:8888/health",
         ]);
-        let error = two_lanes.validate().unwrap_err().to_string();
+        let error = no_lane.validate().unwrap_err().to_string();
         assert!(
-            error.contains("exactly one shared lane, 2 configured"),
+            error.contains("at least one shared lane"),
             "unexpected error: {error}"
         );
 
@@ -542,6 +615,125 @@ mod tests {
         let error = bad_origin.validate().unwrap_err().to_string();
         assert!(
             error.contains("member origin must use http or https"),
+            "unexpected error: {error}"
+        );
+    }
+
+    /// One document names ONE public name, so two lanes pointed at one named
+    /// file is refused before launch — with both unambiguous spellings named.
+    #[test]
+    fn two_lanes_into_one_named_document_are_refused_with_the_fix_named() {
+        let cfg = parse(&[
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.local=alpha",
+            "--shared-record",
+            "doorways.elohim.local=alpha",
+            "--membership-file",
+            "/tmp/beacon-config-test/elohim.local.json",
+            "--member-origin",
+            "http://localhost:8888",
+            "--serving-probe-url",
+            "http://localhost:8888/health",
+        ]);
+        let error = cfg.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("names ONE document but 2 shared lanes are configured"),
+            "unexpected error: {error}"
+        );
+        assert!(error.contains("trailing `/`"), "unexpected error: {error}");
+        assert!(error.contains("{name}"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn membership_documents_are_derived_per_lane() {
+        let two = [
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.host=shem",
+            "--shared-record",
+            "doorways.elohim.host=shem",
+            "--member-origin",
+            "https://doorway.elohim.host",
+            "--serving-probe-url",
+            "https://doorway.elohim.host/health",
+        ];
+
+        // Directory-shaped (trailing `/`): one document per public name.
+        let mut args = two.to_vec();
+        args.extend(["--membership-file", "/var/lib/beacon/membership/"]);
+        let cfg = parse(&args);
+        cfg.validate()
+            .expect("directory-shaped path is unambiguous");
+        let paths: Vec<PathBuf> = cfg
+            .membership_lanes()
+            .unwrap()
+            .into_iter()
+            .map(|(_, path)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                PathBuf::from("/var/lib/beacon/membership/elohim.host.json"),
+                PathBuf::from("/var/lib/beacon/membership/doorways.elohim.host.json"),
+            ]
+        );
+
+        // `{name}` placeholder: substituted wherever it appears.
+        let mut args = two.to_vec();
+        args.extend(["--membership-file", "/var/lib/beacon/{name}/members.json"]);
+        let cfg = parse(&args);
+        cfg.validate().expect("placeholder path is unambiguous");
+        let paths: Vec<PathBuf> = cfg
+            .membership_lanes()
+            .unwrap()
+            .into_iter()
+            .map(|(_, path)| path)
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                PathBuf::from("/var/lib/beacon/elohim.host/members.json"),
+                PathBuf::from("/var/lib/beacon/doorways.elohim.host/members.json"),
+            ]
+        );
+
+        // BACKWARD COMPATIBILITY: one lane, a plain file path — used verbatim,
+        // exactly as every deployed single-lane invocation already does.
+        let cfg = parse(&[
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.local=alpha",
+            "--membership-file",
+            "/tmp/elohim-local-mesh/membership/elohim.local.json",
+            "--member-origin",
+            "http://localhost:8888",
+            "--serving-probe-url",
+            "http://localhost:8888/health",
+        ]);
+        cfg.validate().expect("single-lane file leg");
+        let lanes = cfg.membership_lanes().unwrap();
+        assert_eq!(lanes.len(), 1);
+        assert_eq!(
+            lanes[0].1,
+            PathBuf::from("/tmp/elohim-local-mesh/membership/elohim.local.json")
+        );
+        // A terminal dot is DNS-equivalent but never reaches a file name.
+        assert_eq!(
+            membership_path_for(Path::new("/var/lib/beacon/"), "elohim.host.", 2).unwrap(),
+            PathBuf::from("/var/lib/beacon/elohim.host.json")
+        );
+    }
+
+    #[test]
+    fn a_lane_name_with_a_path_separator_is_refused() {
+        let cfg = parse(&["--shared-record", "../../etc/passwd=alpha"]);
+        let error = cfg.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("must be a DNS name"),
             "unexpected error: {error}"
         );
     }

@@ -61,6 +61,35 @@ impl ActiveSink {
         }
     }
 
+    /// Reconcile ONE shared lane's membership through this sink.
+    ///
+    /// Every membership projection is handed the SAME already-decided verdict
+    /// for that lane. A sink that holds no lane by this name is a no-op, which
+    /// is what lets one beacon process run two lanes with different sink
+    /// targets: the Cloudflare sink reconciles the lanes whose records it
+    /// owns, and each file sink reconciles the one document it writes.
+    pub async fn reconcile_lane(
+        &self,
+        record_name: &str,
+        serving: bool,
+        update: Option<&AddrUpdate>,
+    ) -> Result<()> {
+        match self {
+            ActiveSink::Cloudflare(s) => {
+                s.reconcile_membership_lane(record_name, serving, update)
+                    .await
+            }
+            ActiveSink::File(s) => {
+                if s.owns_lane(record_name) {
+                    s.reconcile_membership(serving).await
+                } else {
+                    Ok(())
+                }
+            }
+            ActiveSink::Pkarr(_) | ActiveSink::Coturn(_) => Ok(()),
+        }
+    }
+
     /// Does this sink's projection depend on the detected WAN/LAN address?
     ///
     /// Every DNS/coturn projection does — they publish the address itself. The

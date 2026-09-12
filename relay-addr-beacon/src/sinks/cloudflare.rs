@@ -24,6 +24,7 @@
 //!   fleet clocks skew by hours, and only Cloudflare's clock is one every
 //!   instance agrees on.
 
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, Context, Result};
@@ -33,6 +34,7 @@ use time::OffsetDateTime;
 use tracing::{debug, error, info, warn};
 
 use super::{AddrUpdate, Sink};
+use crate::config::lane_key;
 
 const CF_API_BASE: &str = "https://api.cloudflare.com/client/v4";
 const RECORD_TTL: u32 = 60;
@@ -244,7 +246,11 @@ pub struct CloudflareSink {
     enable_v6: bool,
     shared: Vec<SharedRecordConfig>,
     api_base: String,
-    shared_serving: tokio::sync::Mutex<bool>,
+    /// Per-lane "may this lane be published?" gate, keyed by lane key. Held
+    /// per lane, not once for the sink: a lane that has withdrawn must not be
+    /// re-advertised by an address publisher just because a sibling lane on
+    /// the same beacon is serving.
+    shared_serving: tokio::sync::Mutex<HashMap<String, bool>>,
 }
 
 impl CloudflareSink {
@@ -262,9 +268,9 @@ impl CloudflareSink {
             zone,
             record_name,
             enable_v6,
+            shared_serving: tokio::sync::Mutex::new(lane_gates(&shared, true)),
             shared,
             api_base: CF_API_BASE.to_string(),
-            shared_serving: tokio::sync::Mutex::new(true),
         }
     }
 
@@ -276,62 +282,72 @@ impl CloudflareSink {
         self
     }
 
-    /// Start opt-in membership withdrawn before any address publisher runs.
+    /// Start opt-in membership withdrawn before any address publisher runs —
+    /// every lane independently.
     pub fn with_serving_probe(mut self, enabled: bool) -> Self {
-        self.shared_serving = tokio::sync::Mutex::new(!enabled);
+        self.shared_serving = tokio::sync::Mutex::new(lane_gates(&self.shared, !enabled));
         self
     }
 
-    /// Reconcile only our shared contribution. Serialize against address refresh
-    /// so an in-flight publisher cannot re-add a record after withdrawal.
-    pub async fn reconcile_membership(
+    /// Reconcile only ONE lane's shared contribution. Serialize against
+    /// address refresh so an in-flight publisher cannot re-add a record after
+    /// withdrawal.
+    ///
+    /// `record_name` selects the lane; a name this sink holds no lane for is a
+    /// no-op (the beacon's lane set and a sink's lane set need not be the same
+    /// — a `file`-only lane is reconciled by the file sink alone). The verdict
+    /// handed in is the one that lane's own `state::Membership` already
+    /// decided.
+    pub async fn reconcile_membership_lane(
         &self,
+        record_name: &str,
         serving: bool,
         update: Option<&AddrUpdate>,
     ) -> Result<()> {
-        let mut allowed = self.shared_serving.lock().await;
-        if self.shared.is_empty() {
+        let key = lane_key(record_name);
+        let Some(shared) = self
+            .shared
+            .iter()
+            .find(|lane| lane_key(&lane.record_name) == key)
+        else {
             return Ok(());
-        }
+        };
+        let mut gates = self.shared_serving.lock().await;
         if !serving {
-            *allowed = false;
+            gates.insert(key.clone(), false);
         }
         let zone = self.zone_id().await?;
         if serving {
             let update = update.context("membership join awaits a detected address")?;
-            for shared in &self.shared {
-                self.publish_shared_lane(&zone, shared, "A", &update.wan_v4.to_string())
+            self.publish_shared_lane(&zone, shared, "A", &update.wan_v4.to_string())
+                .await?;
+            if let Some(v6) = update.wan_v6.filter(|_| self.enable_v6) {
+                self.publish_shared_lane(&zone, shared, "AAAA", &v6.to_string())
                     .await?;
-                if let Some(v6) = update.wan_v6.filter(|_| self.enable_v6) {
-                    self.publish_shared_lane(&zone, shared, "AAAA", &v6.to_string())
-                        .await?;
-                }
             }
-            *allowed = true;
+            gates.insert(key, true);
         } else {
-            for shared in &self.shared {
-                // Include old AAAA contributions after an IPv6 configuration change.
-                for kind in ["A", "AAAA"] {
-                    for record in self.list_records(&zone, kind, &shared.record_name).await? {
-                        if record
-                            .comment
-                            .as_deref()
-                            .and_then(parse_owner_comment)
-                            .is_some_and(|stamp| stamp.owner == shared.owner)
-                        {
-                            let response = self
-                                .client
-                                .delete(format!(
-                                    "{}/zones/{zone}/dns_records/{}",
-                                    self.api_base, record.id
-                                ))
-                                .bearer_auth(&self.token)
-                                .send()
-                                .await
-                                .context("withdraw own shared record")?;
-                            parse_cf::<serde_json::Value>(response, "withdraw own shared record")
-                                .await?;
-                        }
+            // Include old AAAA contributions after an IPv6 configuration change.
+            for kind in ["A", "AAAA"] {
+                for record in self.list_records(&zone, kind, &shared.record_name).await? {
+                    if record
+                        .comment
+                        .as_deref()
+                        .and_then(parse_owner_comment)
+                        .is_some_and(|stamp| stamp.owner == shared.owner)
+                    {
+                        let response = self
+                            .client
+                            .delete(format!(
+                                "{}/zones/{zone}/dns_records/{}",
+                                self.api_base, record.id
+                            ))
+                            .bearer_auth(&self.token)
+                            .send()
+                            .await
+                            .context("withdraw own shared record")?;
+                        parse_cf::<serde_json::Value>(response, "withdraw own shared record")
+                            .await?;
                     }
                 }
             }
@@ -656,15 +672,15 @@ impl CloudflareSink {
     /// A true no-op (`Ok(())`, zero network calls) with no shared config.
     #[allow(dead_code)]
     pub async fn publish_shared_only(&self, update: &AddrUpdate) -> Result<()> {
-        let serving = self.shared_serving.lock().await;
-        if !*serving {
-            return Ok(());
-        }
+        let gates = self.shared_serving.lock().await;
         if self.shared.is_empty() {
             return Ok(());
         }
         let zone_id = self.zone_id().await?;
         for shared in &self.shared {
+            if !lane_allowed(&gates, shared) {
+                continue;
+            }
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
             if self.enable_v6 {
@@ -756,11 +772,11 @@ impl CloudflareSink {
                     .await?;
             }
         }
-        let serving = self.shared_serving.lock().await;
-        if !*serving {
-            return Ok(());
-        }
+        let gates = self.shared_serving.lock().await;
         for shared in &self.shared {
+            if !lane_allowed(&gates, shared) {
+                continue;
+            }
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
             if self.enable_v6 {
@@ -772,6 +788,25 @@ impl CloudflareSink {
         }
         Ok(())
     }
+}
+
+/// Initialize every configured lane's gate to `allowed`.
+fn lane_gates(shared: &[SharedRecordConfig], allowed: bool) -> HashMap<String, bool> {
+    shared
+        .iter()
+        .map(|lane| (lane_key(&lane.record_name), allowed))
+        .collect()
+}
+
+/// Is this lane currently allowed to publish? A lane with no gate entry (a
+/// lane added after construction cannot happen today) defaults to allowed,
+/// which matches the no-serving-probe case: without a probe there is nothing
+/// to earn membership from and the lane publishes unconditionally.
+fn lane_allowed(gates: &HashMap<String, bool>, shared: &SharedRecordConfig) -> bool {
+    gates
+        .get(&lane_key(&shared.record_name))
+        .copied()
+        .unwrap_or(true)
 }
 
 impl Sink for CloudflareSink {
@@ -789,11 +824,11 @@ impl Sink for CloudflareSink {
                 self.upsert(&zone_id, "AAAA", &v6.to_string()).await?;
             }
         }
-        let serving = self.shared_serving.lock().await;
-        if !*serving {
-            return Ok(());
-        }
+        let gates = self.shared_serving.lock().await;
         for shared in &self.shared {
+            if !lane_allowed(&gates, shared) {
+                continue;
+            }
             self.publish_shared_lane(&zone_id, shared, "A", &update.wan_v4.to_string())
                 .await?;
             if self.enable_v6 {
