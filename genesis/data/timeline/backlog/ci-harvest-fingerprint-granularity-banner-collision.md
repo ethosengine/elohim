@@ -77,3 +77,35 @@ was written to REPORT. When in doubt, read the producing code — if the
 observed value selects a code path, it is signal, and the right remedy for
 the extra dispatch is a backlog entry that names both fingerprints as one
 concern (which is what the sentinel is for), not a coarser measure.
+
+## 2026-09-12 — third over-COARSE instance: `stage:Execute Builds` on the orchestrator
+
+Not a banner line this time, but the **unclassified stage fallback**, which is the same
+defect with a different producer. `ci-harvest.py` step 4 keys a red build it could not
+otherwise classify as `red build, stage:<first FAILED/UNSTABLE stage>`. For
+`elohim-orchestrator` that stage is almost always **`Execute Builds`** — the one stage
+every downstream verdict lands in — so it is the maximally-colliding identifier the
+harvester can mint for that job.
+
+Observed: `9b7f3c58a51a` was minted at #1845 for an **operator manual abort** of
+elohim-genesis (`backlog/ci-orchestrator-abort-misread-as-genesis-failure.md`, since
+fixed) and re-minted at #1854 for an **unrelated downstream elohim-edge FAILURE**
+(`backlog/ci-orchestrator-downstream-drift-echo.md`). Two concerns, two remedies, one
+fingerprint — and the second read as "the fix didn't take" on a fix that has not yet been
+exercised. Cost: one false reopen and one triage dispatch, the same price the 2026-07-12
+pair charged.
+
+**Why the obvious fix is not obviously right here.** Adding a taxonomy pattern for the
+orchestrator's own `❌ <pipeline>: <RESULT>` line would key per-downstream-pipeline — but
+every orchestrator red is an *echo* of a downstream red the harvester already fingerprints
+independently in that downstream job. Finer keys would therefore buy discrimination at the
+cost of systematically duplicating every finding. The orchestrator arm wants
+**suppression**, not granularity: its red carries no information the downstream job's red
+does not already carry, except in the two cases that ARE orchestrator-owned (a dispatch
+defect, and an abort misclassification). Both of those emit distinguishable console text.
+
+Until that is designed, the operational rule for a triage agent holding an
+`elohim-orchestrator` / `stage:Execute Builds` fingerprint: **read the build's result and
+description before trusting the reopen.** `UNSTABLE` + `auto: <job>` with an `Aborted by`
+line is the abort class; `FAILURE` + `❌ <job>: FAILURE` with no abort line is the echo
+class. They are not the same finding and the ledger cannot tell them apart.

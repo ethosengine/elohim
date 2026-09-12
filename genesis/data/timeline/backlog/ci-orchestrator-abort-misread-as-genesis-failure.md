@@ -88,10 +88,47 @@ the work… Persistent waste signals supersede-thrash or **operator-aborts**." T
 cannot import an `.mjs`, so the contract drifted silently in the one consumer that most needed
 it.
 
+## 2026-09-12 — the "recurrence" at #1854 is a FINGERPRINT COLLISION, not this concern
+
+The sweep reopened `9b7f3c58a51a` on `elohim-orchestrator/dev` **#1854**
+(`last_build 1854 > triaged_at_build 1845`). It is not this failure.
+
+- #1845 was `UNSTABLE`, description `auto: elohim-genesis`, and its Execute Builds console
+  read `Aborted by Matthew Dowell` → `❌ elohim-genesis: ERROR`.
+- #1854 is **`FAILURE`**, description `auto: elohim-edge`, and a regex sweep of its console
+  for `ABORTED|Aborted|⏹️` returns **no abort of any kind**. The stage log reads
+  `Build elohim-edge » dev #1454 completed: FAILURE` → `❌ elohim-edge: FAILURE` →
+  `[Pipeline] error`.
+
+So #1854 is an ordinary **downstream echo** — the class already canonicalized at
+`ci-orchestrator-downstream-drift-echo.md` (`ci_status: blocked`) — of a genuine
+`elohim-edge/dev` #1454 red (the `blob-durability` habit's `coverageShortfall`-ABSENT
+scenario, owned by that habit's own ledger, not by CI triage).
+
+Both builds mint the SAME fingerprint because the harvester's unclassified fallback keys
+only on the failing stage name, and **`stage:Execute Builds` is where every downstream
+verdict lands** — so it is the maximally-colliding identifier in this job. Recorded as a
+third instance of the over-coarse polarity at
+`ci-harvest-fingerprint-granularity-banner-collision.md`.
+
+**Action taken:** ledger `triaged_at_build` re-stamped `1845 → 1854`, resetting the sweep's
+recurrence reference to the current point. `status` stays `triaged`. **The ABORTED fix is
+untested, not disproven** — no operator abort has occurred since it landed, so the
+green-streak clock simply restarts.
+
+Second observation, recorded and deliberately NOT fixed here: #1854's summary printed
+`BUILDS: ✅ 0 succeeded │ ⚠️ 0 unstable │ ❌ 0 failed │ ⏹️ 0 aborted` for a build whose
+Execute Builds stage had just reported a downstream FAILURE. The `error` step aborts the
+stage before `results` is populated, so the post-block summarises an empty map. That is
+pre-existing behaviour (not introduced by this entry's fix — `failCount` excludes only
+`wasted`, and `wasted` is false here), and it is museum trap #1's lossy-measure family one
+layer in. It belongs with the echo concern, not here.
+
 ## Current decision
 
 **Fixed and landed, locally verified; awaiting disappearance confirmation.** Ledger entry
-stamped `status: triaged`, `triaged_at_build: 1845`. The harvester's green-streak sweep
+stamped `status: triaged`, `triaged_at_build: 1854` (re-stamped 2026-09-12 — see the
+collision note above; it was 1845 at landing). The harvester's green-streak sweep
 (≥3, no recurrence) confirms and closes. `decompose_on_confirm` is deliberately **not** set —
 the lesson graduates into the anti-patterns museum as trap #1's third discriminator, so the
 entry should be graduated-then-decomposed rather than silently deleted.

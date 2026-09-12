@@ -238,6 +238,31 @@ currently carries unrelated in-flight edits under
 `verify_envelope`) — that breakage is NOT from this change and is owned
 elsewhere.
 
+## 2026-09-12 — `5ee767181c07` recurred, and it is NOT this concern
+
+`elohim/dev` #1704/#1705 re-minted `5ee767181c07` (plus its `elohim-host-landing` sibling
+`82831e35dcd7`). The fingerprint is the generic staging line, which three separate root
+causes emit. This occurrence is the **apex doorway having no network path at all** to
+`elohim-adam-alpha…:8090` — a connection-level failure with no HTTP status, so the shed
+classifier this entry added can never see it. Canonicalized separately at
+`ci-apex-doorway-cannot-reach-adam-storage-blob-forward.md`; that entry's ledger lines are
+`blocked` on an operator move.
+
+**The discriminator is mechanical, and it exists because of this entry's fix**: read the
+`error:` field on the JSON line immediately above the `✗ … forwarding FAILED` banner.
+
+| `error:` reads | concern |
+|---|---|
+| `storage shed the blob PUT (…)` / `storage shed the read-back (…)` | this entry |
+| `could not reach storage to forward the blob: …` | `ci-apex-doorway-cannot-reach-adam-storage-blob-forward.md` |
+| `storage accepted the PUT … (read-back <status>)` | the 2026-08-16 vanishing-blob class |
+| the line is absent entirely | a pre-2026-09-02 binary — the deploy is measuring a stale image |
+
+That fix went one layer short: a *transport* refusal named the leg but not the CAUSE
+(`reqwest::Error`'s `Display` stops at the wrapper and drops its `source()` chain), which
+is what cost the #1704 triage dispatch. Cured 2026-09-12 in the same file — see the sibling
+entry's fix trail. Both halves of the lesson now live in museum trap #19.
+
 ## Adjacent, deliberately not folded in
 
 - `alpha-spa-blob-patch-503` (2026-06-27) — the PATCH leg 503ing on this same
