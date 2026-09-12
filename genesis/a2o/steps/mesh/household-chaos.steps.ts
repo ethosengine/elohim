@@ -720,6 +720,57 @@ function activeCredits(credits: CustodyCredit[]): CustodyCredit[] {
   return credits.filter(credit => credit.state === 'active');
 }
 
+/**
+ * Rows still "on the books" for a settled-record COMPARISON across peers —
+ * state-agnostic by design, excluding only a row the mesh has actively
+ * retired (cancelled/withdrawn). Diagnosis 2026-09-12: the `state` column
+ * does not travel on the wire to non-authoring peers — the rows converge
+ * (same commitment ids and providers everywhere), but a peer that did not
+ * author the row reads it as "proposed" forever, so filtering to
+ * `state === "active"` here makes non-authoring peers read as having no
+ * custody record at all and the settled precondition refuses honest,
+ * converged custody. That state-propagation gap is a named dataplane red
+ * recorded elsewhere (see `stateHistogram`/the per-peer attachment below) —
+ * this comparison's job is only to see whether the mesh agrees on WHICH rows
+ * exist, not to also require the wire to agree on each row's `state`.
+ */
+function nonWithdrawnCredits(credits: CustodyCredit[]): CustodyCredit[] {
+  return credits.filter(credit => credit.state !== 'cancelled' && credit.state !== 'withdrawn');
+}
+
+/** `{state: count}` for a set of custody credits — for visibility, never a verdict. */
+function stateHistogram(credits: CustodyCredit[]): Record<string, number> {
+  const histogram: Record<string, number> = {};
+  for (const credit of credits) {
+    const key = credit.state || 'empty';
+    histogram[key] = (histogram[key] ?? 0) + 1;
+  }
+  return histogram;
+}
+
+/**
+ * Attach a per-peer custody-blob STATE histogram to the run report. Never
+ * consulted for pass/fail — the comparisons above are deliberately
+ * state-agnostic — but the divergence (non-authoring peers stuck on
+ * "proposed") must stay visible rather than disappear just because the
+ * comparison itself stopped filtering on it.
+ */
+async function attachCustodyStateHistogram(
+  world: E2EWorld,
+  state: DrillState,
+  contentId: string,
+  hash: string
+): Promise<void> {
+  const histogram: Record<string, Record<string, number>> = {};
+  for (const peer of state.peers) {
+    histogram[peer.name] = stateHistogram(creditsFor(await custodyCredits(peer.url), hash));
+  }
+  world.attach(
+    JSON.stringify({ contentId, perPeerCustodyStateHistogram: histogram }),
+    'application/json'
+  );
+}
+
 function creditsFor(credits: CustodyCredit[], address: string): CustodyCredit[] {
   const hex = sha256HexOf(address);
   return credits.filter(credit => {
@@ -766,23 +817,43 @@ async function serveBlobEvents(baseUrl: string, address: string): Promise<ServeB
 }
 
 /**
- * The household's own intra-hub custody COPY count for `contentId` —
- * `details.stewardingCollectives[household].intraHubPeers` — which is the
- * axis the chaos-peer-churn ladder actually describes (see the Background
- * comment in the feature file). Deliberately NOT the snapshot's top-level
- * `protectionStatus`: that field folds COLLECTIVE DIVERSITY (how many
- * separate households hold a copy, `households_stewarding` in
- * `household_resilience.rs`), which a one-household three-peer mesh can
- * never read as "protected" no matter how many intra-household copies
- * survive a cascade — 2026-09-12, `chaos-ladder` measured `protectionStatus:
- * "at-risk"` at a full 3-of-3 intra-household copy count. This fixture is
- * single-household by construction (`the household mesh is three storage
- * peers`), so exactly one `kind: "household"` entry is expected; more than
- * one is a fixture assumption violated, not a copies-to-classify question.
- * No household entry at all (the content is not stewarded here) reads as 0
- * copies — the floor rung, not a missing-data error.
+ * The household's ladder RUNG for `contentId` — min(custody copies, live
+ * peers), never custody copies alone.
+ *
+ * `details.stewardingCollectives[household].intraHubPeers` is the intra-hub
+ * custody COPY count — the axis the chaos-peer-churn ladder actually
+ * describes (see the Background comment in the feature file). Deliberately
+ * NOT the snapshot's top-level `protectionStatus`: that field folds
+ * COLLECTIVE DIVERSITY (how many separate households hold a copy,
+ * `households_stewarding` in `household_resilience.rs`), which a
+ * one-household three-peer mesh can never read as "protected" no matter how
+ * many intra-household copies survive a cascade — 2026-09-12, `chaos-ladder`
+ * measured `protectionStatus: "at-risk"` at a full 3-of-3 intra-household
+ * copy count.
+ *
+ * But `intraHubPeers` alone is not the rung either: it is a CUSTODY promise
+ * (a peer's commitment row naming it as holder), and that promise outlives
+ * the peer that made it — a killed peer's row still counts toward
+ * `intraHubPeers` until something notices and revokes it. Read alone,
+ * custody would still say "3 copies" (and "protected") moments after two of
+ * three peers are killed, and the cascade in this feature would never reach
+ * "partial". `details.onlinePeers.live` is the separate, honest denominator
+ * of who is actually reachable right now. The rung is the smaller of the
+ * two — custody promises a copy exists, liveness says whether anyone is
+ * actually there to serve it, and the ladder must read the cheaper of those
+ * two truths.
+ *
+ * This fixture is single-household by construction (`the household mesh is
+ * three storage peers`), so exactly one `kind: "household"` entry is
+ * expected; more than one is a fixture assumption violated, not a
+ * copies-to-classify question. No household entry at all (the content is
+ * not stewarded here) reads as 0 custody copies — the floor rung, not a
+ * missing-data error.
  */
-async function intraHubCopies(world: E2EWorld, contentId: string): Promise<number> {
+async function intraHubRung(
+  world: E2EWorld,
+  contentId: string
+): Promise<{ custodyCopies: number; livePeers: number; rung: number }> {
   const { status, text } = await getRaw(
     `${doorwayUrl(world)}/api/v1/resilience/${encodeURIComponent(contentId)}/household`
   );
@@ -804,14 +875,24 @@ async function intraHubCopies(world: E2EWorld, contentId: string): Promise<numbe
       `honestly among them: ${JSON.stringify(households)}`
   );
   const household = households[0];
-  if (!household) return 0;
-  const copies = household['intraHubPeers'];
+  let custodyCopies = 0;
+  if (household) {
+    const copies = household['intraHubPeers'];
+    assert.ok(
+      typeof copies === 'number' && Number.isInteger(copies),
+      `household resilience snapshot for "${contentId}" carries a non-integer intraHubPeers: ` +
+        `${JSON.stringify(household)}`
+    );
+    custodyCopies = copies;
+  }
+  const onlinePeers = details?.['onlinePeers'] as Record<string, unknown> | undefined;
+  const livePeers = onlinePeers?.['live'];
   assert.ok(
-    typeof copies === 'number' && Number.isInteger(copies),
-    `household resilience snapshot for "${contentId}" carries a non-integer intraHubPeers: ` +
-      `${JSON.stringify(household)}`
+    typeof livePeers === 'number' && Number.isInteger(livePeers),
+    `household resilience snapshot for "${contentId}" carries a non-integer onlinePeers.live: ` +
+      `${JSON.stringify(onlinePeers)}`
   );
-  return copies;
+  return { custodyCopies, livePeers, rung: Math.min(custodyCopies, livePeers) };
 }
 
 async function blobHashFor(world: E2EWorld, state: DrillState, contentId: string): Promise<string> {
@@ -980,6 +1061,28 @@ Given(
   async function (this: E2EWorld, contentId: string, expected: number) {
     const state = drill(this);
     await ensureUnderCustody(this, state, contentId, expected, { seedIfMissing: false });
+
+    // The custody-blob commitment check above proves each peer holds a
+    // provider row and the bytes — it does NOT prove the household
+    // resilience fold counts those copies. `intraHubPeers` is folded on the
+    // fold peer (today: matthew) from BOUND member agent keys, and a peer's
+    // copy joins the household entry only once its agent key is bound as a
+    // household member there. Bytes-plus-commitment on jessica/james does
+    // not bind them as household members, so the fold can undercount even
+    // when custody itself is real and converged. A cascade asserted against
+    // that undercounted baseline would blame CHURN for a gap that predates
+    // it — refuse here, loudly, instead of letting the ladder rungs below
+    // read a broken baseline as if it were the drill's doing.
+    const { custodyCopies } = await intraHubRung(this, contentId);
+    const seededNames = state.peers.map(peer => peer.name).join(', ');
+    assert.equal(
+      custodyCopies,
+      expected,
+      `seeded custody on all ${expected} household peers (${seededNames}) but the household ` +
+        `resilience fold counts only ${custodyCopies} intra-household ` +
+        `cop${custodyCopies === 1 ? 'y' : 'ies'} for "${contentId}" — household formation ` +
+        'incomplete: member agent keys not bound on the fold peer'
+    );
   }
 );
 
@@ -1316,7 +1419,14 @@ Given(
     const readAll = async (): Promise<Map<HouseholdPeerName, string>> => {
       const signatures = new Map<HouseholdPeerName, string>();
       for (const peer of state.peers) {
-        const credits = activeCredits(creditsFor(await custodyCredits(peer.url), hash));
+        // State-agnostic on purpose (nonWithdrawnCredits, not activeCredits):
+        // the rows converge across peers, but the `state` column does not
+        // travel to non-authoring peers, so a peer that did not author the
+        // row would read as having no custody record at all under an
+        // active-only filter — refusing an honestly settled mesh. The state
+        // gap itself is a named dataplane red, surfaced below via the
+        // per-peer histogram attachment, not folded into this precondition.
+        const credits = nonWithdrawnCredits(creditsFor(await custodyCredits(peer.url), hash));
         signatures.set(
           peer.name,
           credits
@@ -1345,11 +1455,12 @@ Given(
         '— the mesh has not made up its mind yet, so churn is not yet attributable'
     );
 
-    const settled = activeCredits(
+    const settled = nonWithdrawnCredits(
       creditsFor(await custodyCredits(peerByName(state, state.peers[0]?.name).url), hash)
     );
     assert.ok(settled.length > 0, `no custody record exists for "${contentId}" to settle on`);
     state.settledCredits = settled;
+    await attachCustodyStateHistogram(this, state, contentId, hash);
   }
 );
 
@@ -1434,7 +1545,11 @@ Then(
     const hash = await blobHashFor(this, state, contentId);
     await measurePeerIds(state);
     for (const peer of state.peers) {
-      const credits = activeCredits(creditsFor(await custodyCredits(peer.url), hash));
+      // State-agnostic (nonWithdrawnCredits): the state column doesn't
+      // travel to non-authoring peers, so filtering to "active" would read a
+      // non-authoring peer's converged-but-"proposed" row as zero copies —
+      // the same dataplane gap the settled-record Given works around.
+      const credits = nonWithdrawnCredits(creditsFor(await custodyCredits(peer.url), hash));
       for (const household of state.peers) {
         const copies = credits.filter(credit =>
           providerNamesPeer(credit.provider, household)
@@ -1447,6 +1562,7 @@ Then(
         );
       }
     }
+    await attachCustodyStateHistogram(this, state, contentId, hash);
   }
 );
 
@@ -1511,12 +1627,13 @@ Then(
       `"${expected}" is not a rung on the ladder this feature declared ` +
         `(${[...(state.ladder?.values() ?? [])].join(', ') || 'none registered'})`
     );
-    const copies = await intraHubCopies(this, contentId);
-    const actual = ladderLabel(state, copies);
+    const { custodyCopies, livePeers, rung } = await intraHubRung(this, contentId);
+    const actual = ladderLabel(state, rung);
     assert.equal(
       actual,
       expected,
-      `"${contentId}" has ${copies} intra-household custody cop${copies === 1 ? 'y' : 'ies'} ` +
+      `"${contentId}" has ${custodyCopies} custody cop${custodyCopies === 1 ? 'y' : 'ies'}, ` +
+        `${livePeers} live peer${livePeers === 1 ? '' : 's'}, rung ${rung} ` +
         `(ladder rung "${actual}"), expected the "${expected}" rung`
     );
   }
@@ -1534,12 +1651,13 @@ Then(
     );
     await retry(
       async () => {
-        const copies = await intraHubCopies(this, contentId);
-        const actual = ladderLabel(state, copies);
+        const { custodyCopies, livePeers, rung } = await intraHubRung(this, contentId);
+        const actual = ladderLabel(state, rung);
         assert.equal(
           actual,
           expected,
-          `"${contentId}" has ${copies} intra-household custody cop${copies === 1 ? 'y' : 'ies'} ` +
+          `"${contentId}" has ${custodyCopies} custody cop${custodyCopies === 1 ? 'y' : 'ies'}, ` +
+            `${livePeers} live peer${livePeers === 1 ? '' : 's'}, rung ${rung} ` +
             `(ladder rung "${actual}"), expected the "${expected}" rung`
         );
       },
@@ -1559,20 +1677,21 @@ Then(
   { timeout: 60_000 },
   async function (this: E2EWorld, contentId: string) {
     const state = drill(this);
-    // intraHubCopies() fails on a non-200 or a missing/malformed field:
-    // silence is a failure here, not a pass — that is the whole point of the
-    // rung. The expected label comes from the Background ladder at ONE
-    // custody copy, so the string in the Gherkin and the string asserted here
-    // cannot drift.
+    // intraHubRung() fails on a non-200 or a missing/malformed field: silence
+    // is a failure here, not a pass — that is the whole point of the rung.
+    // The expected label comes from the Background ladder at ONE custody
+    // copy, so the string in the Gherkin and the string asserted here cannot
+    // drift.
     const expected = ladderLabel(state, 1);
-    const copies = await intraHubCopies(this, contentId);
-    const actual = ladderLabel(state, copies);
+    const { custodyCopies, livePeers, rung } = await intraHubRung(this, contentId);
+    const actual = ladderLabel(state, rung);
     assert.equal(
       actual,
       expected,
-      `one custody peer left, but "${contentId}" still shows ${copies} intra-household custody ` +
-        `cop${copies === 1 ? 'y' : 'ies'} (ladder rung "${actual}"), not the "${expected}" rung a ` +
-        'single surviving peer should read as'
+      `one custody peer left, but "${contentId}" has ${custodyCopies} custody ` +
+        `cop${custodyCopies === 1 ? 'y' : 'ies'}, ${livePeers} live peer${livePeers === 1 ? '' : 's'}, ` +
+        `rung ${rung} (ladder rung "${actual}"), not the "${expected}" rung a single surviving peer ` +
+        'should read as'
     );
   }
 );

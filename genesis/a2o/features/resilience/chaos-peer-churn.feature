@@ -79,6 +79,10 @@ Feature: Chaos peer churn — the dataplane proves itself by surviving us
   # (measured 2026-09-12: 3-of-3 intra-household copies still read
   # `protectionStatus: "at-risk"`), so the step glue for this feature derives
   # every rung below from `intraHubPeers`, never from `protectionStatus`.
+  # `intraHubPeers` alone is a custody PROMISE, though, and a promise outlives
+  # the peer that made it, so the rung the step glue reads is actually
+  # min(intraHubPeers, the snapshot's live peer count) — custody says a copy
+  # exists, liveness says whether anyone is still there to serve it.
 
   # @requires:owned-substrate (every scenario below) names the substrate
   # dependency the scope reconciler gates on: a mesh this suite may actually
