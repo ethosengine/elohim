@@ -908,11 +908,15 @@ fn install_name_routes(
                 };
                 liveness.insert(doorway_id.clone(), HolderLiveness::Serving);
                 for head in &m.heads {
-                    contracts.push(HolderContract {
-                        doorway_id: doorway_id.clone(),
-                        origin: peer_url.clone(),
-                        url_path: head.url_path.clone(),
-                    });
+                    // ANY-HOST: a coherence head set carries no host, so every
+                    // contract minted here answers for every host. The next
+                    // rung (hostnames as head channels) is what populates
+                    // `HolderContract::host`; the fold already matches on it.
+                    contracts.push(HolderContract::any_host(
+                        &doorway_id,
+                        peer_url,
+                        &head.url_path,
+                    ));
                 }
             }
             None => {
@@ -1073,6 +1077,115 @@ pub async fn refresh_peer_cache(peer_urls: &[String], self_id: Option<&str>, cac
     }
 }
 
+/// Normalize a candidate seed URL to a comparable origin form, or `None` if it
+/// is not an http(s) URL we could ever fetch from.
+fn normalize_seed(raw: &str) -> Option<String> {
+    let trimmed = raw.trim().trim_end_matches('/');
+    if trimmed.is_empty() {
+        return None;
+    }
+    let parsed = reqwest::Url::parse(trimmed).ok()?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+/// **Where peer discovery gets its seeds.** Static `FEDERATION_PEERS` UNION the
+/// DHT-registered doorway set, deduped by origin, self excluded.
+///
+/// This is the doorway-side half of "the registry IS the DHT" (2026-09-12
+/// operator ruling). Peer discovery — and therefore the coherence probe, and
+/// therefore the name-route table the one-hop relay folds over — used to be
+/// GATED on a non-empty static peer list, so a doorway pair that knew each
+/// other perfectly well through `register_doorway_in_dht` + heartbeat (both
+/// visible on `GET /api/v1/federation/doorways`) never probed each other and
+/// the name-route registry stayed empty forever. The static list is now an
+/// ADDITIONAL SEED, never a gate.
+///
+/// Ordering: static seeds first (an operator's explicit list keeps its
+/// priority and its meaning for existing telemetry), then DHT registrations by
+/// id for determinism, and within one registration its `gateway` endpoints by
+/// signed priority before the registration's own `url`.
+///
+/// Self-exclusion is belt AND braces: by registration id, and by origin
+/// (`self_urls` = this doorway's own advertised URLs). A doorway that probed
+/// itself would coherence-compare against its own manifest and, worse, could
+/// fold itself in as a relay candidate.
+pub fn merge_discovery_seeds(
+    static_peers: &[String],
+    registrations: &[DoorwayRegistration],
+    self_doorway_id: Option<&str>,
+    self_urls: &[String],
+) -> Vec<String> {
+    let mut seeds: Vec<String> = Vec::new();
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Never dial ourselves, whichever of our own addresses is offered.
+    for own in self_urls {
+        if let Some(normalized) = normalize_seed(own) {
+            seen.insert(normalized);
+        }
+    }
+
+    let push =
+        |raw: &str, seeds: &mut Vec<String>, seen: &mut std::collections::HashSet<String>| {
+            if let Some(normalized) = normalize_seed(raw) {
+                if seen.insert(normalized.clone()) {
+                    seeds.push(normalized);
+                }
+            }
+        };
+
+    for peer in static_peers {
+        push(peer, &mut seeds, &mut seen);
+    }
+
+    let mut registered: Vec<&DoorwayRegistration> = registrations
+        .iter()
+        .filter(|reg| match self_doorway_id {
+            Some(id) => reg.id != id,
+            None => true,
+        })
+        .collect();
+    registered.sort_by(|left, right| left.id.cmp(&right.id));
+
+    for reg in registered {
+        let mut gateways: Vec<(usize, &infrastructure_types::DoorwayEndpoint)> = reg
+            .endpoints
+            .iter()
+            .enumerate()
+            .filter(|(_, endpoint)| endpoint.service == "gateway")
+            .collect();
+        gateways.sort_by_key(|(signed_order, endpoint)| (endpoint.priority, *signed_order));
+        for (_, endpoint) in gateways {
+            push(&endpoint.url, &mut seeds, &mut seen);
+        }
+        push(&reg.url, &mut seeds, &mut seen);
+    }
+
+    seeds
+}
+
+/// One discovery tick's peer-cache half: merge the seeds, then refresh the
+/// cache from them. Returns the seeds actually used so the caller (and tests)
+/// can see what the tick dialed.
+///
+/// Extracted from the loop body so the DHT-seeded path is testable without a
+/// conductor: a test supplies `registrations` directly, exactly as
+/// `get_all_doorways` would have.
+pub async fn refresh_peer_cache_from_seeds(
+    static_peers: &[String],
+    registrations: &[DoorwayRegistration],
+    self_id: Option<&str>,
+    self_urls: &[String],
+    cache: &PeerCache,
+) -> Vec<String> {
+    let seeds = merge_discovery_seeds(static_peers, registrations, self_id, self_urls);
+    refresh_peer_cache(&seeds, self_id, cache).await;
+    seeds
+}
+
 /// Spawn a background task that periodically refreshes the peer cache.
 /// Initial fetch happens after `initial_delay`, then every `interval`.
 /// Reads peer URLs from the shared mutable list on each iteration.
@@ -1090,6 +1203,14 @@ pub fn spawn_peer_discovery_task(
     epr_router: Arc<crate::projection::EprRouter>,
     coherence_cache: PeerCoherenceCache,
     name_routes: Arc<crate::services::name_routing::NameRouteTable>,
+    // DHT registry reader. `Some` means each tick also seeds from
+    // `get_all_doorways` — the same source `GET /api/v1/federation/doorways`
+    // serves — so a doorway pair that knows each other only through the DHT
+    // still discovers, probes, and name-routes. `None` falls back to the
+    // static list alone.
+    dht_registry: Option<(Arc<ZomeCaller>, FederationConfig)>,
+    // This doorway's own advertised URLs — never dialled as a peer.
+    self_urls: Vec<String>,
     initial_delay: std::time::Duration,
     interval: std::time::Duration,
 ) -> JoinHandle<()> {
@@ -1123,8 +1244,38 @@ pub fn spawn_peer_discovery_task(
             // ALWAYS refresh the peer cache — it feeds /p2p-peers and the 60s
             // discovery cadence, independent of coherence. (`self_id`, including
             // the "unknown" fallback, is still used for self-exclusion here.)
-            let urls = peer_urls.read().await.clone();
-            refresh_peer_cache(&urls, self_id.as_deref(), &cache).await;
+            let static_urls = peer_urls.read().await.clone();
+            // The registry IS the DHT: read the registered doorway set every
+            // tick so a registration that appears (or an endpoint that moves)
+            // changes the probe set without a doorway restart. A conductor
+            // that is not ready yet yields an empty set and the static list
+            // still seeds — the next tick retries, no operator step.
+            let registrations = match dht_registry.as_ref() {
+                Some((zome_caller, config)) => get_all_doorways(zome_caller, config)
+                    .await
+                    .unwrap_or_else(|e| {
+                        debug!(
+                            error = %e,
+                            "Peer discovery: doorway registry unavailable this tick"
+                        );
+                        Vec::new()
+                    }),
+                None => Vec::new(),
+            };
+            let urls = refresh_peer_cache_from_seeds(
+                &static_urls,
+                &registrations,
+                self_id.as_deref(),
+                &self_urls,
+                &cache,
+            )
+            .await;
+            debug!(
+                seeds = urls.len(),
+                static_seeds = static_urls.len(),
+                dht_registrations = registrations.len(),
+                "Federation peer discovery tick"
+            );
 
             // F-COHERENCE cross-edge probe — runs only when we have a real
             // self-identity (fix 3).
@@ -1273,8 +1424,9 @@ mod tests {
     // ── F-COHERENCE: tri-state fetch + edge-trigger + empty-clear ─────────────
     mod coherence_probe {
         use super::super::{
-            fetch_peer_coherence, new_peer_cache, new_peer_coherence_cache, refresh_coherence,
-            refresh_peer_cache, PeerDoorway,
+            fetch_peer_coherence, merge_discovery_seeds, new_peer_cache, new_peer_coherence_cache,
+            refresh_coherence, refresh_peer_cache, refresh_peer_cache_from_seeds,
+            DoorwayRegistration, PeerDoorway,
         };
         use crate::projection::EprRouter;
         use crate::routes::coherence::{router_fingerprint, CoherenceManifest, EprHeadFingerprint};
@@ -1410,7 +1562,10 @@ mod tests {
             // …and the peer's head set became a name-route contract, labelled
             // by the manifest's self-reported doorway_id and pointing at the
             // origin we probed.
-            let holders = name_routes.holders_for("/lamad/deep", "me");
+            let holders = name_routes.holders_for(
+                &crate::services::name_routing::RouteKey::path_only("/lamad/deep"),
+                "me",
+            );
             assert_eq!(holders.len(), 1, "the peer holds /lamad");
             assert_eq!(holders[0].doorway_id, "apex");
             assert_eq!(holders[0].origin, server.uri().trim_end_matches('/'));
@@ -1419,7 +1574,12 @@ mod tests {
                 crate::services::name_routing::HolderLiveness::Serving
             );
             assert!(
-                name_routes.holders_for("/shefa", "me").is_empty(),
+                name_routes
+                    .holders_for(
+                        &crate::services::name_routing::RouteKey::path_only("/shefa"),
+                        "me",
+                    )
+                    .is_empty(),
                 "a root the peer does not mount yields no holder"
             );
         }
@@ -1456,6 +1616,206 @@ mod tests {
             assert!(
                 cache.read().await.is_empty(),
                 "empty peer-url list must clear the stale cache"
+            );
+        }
+
+        // ── DHT-seeded discovery: the static list is a seed, never a gate ─────
+
+        /// A `DoorwayRegistration` shaped like what `get_all_doorways` returns.
+        fn registration(id: &str, url: &str, gateways: &[(&str, u16)]) -> DoorwayRegistration {
+            DoorwayRegistration {
+                id: id.to_string(),
+                url: url.to_string(),
+                identity_root: format!("{id}-identity-root"),
+                signing_key: format!("{id}-key"),
+                endpoints: gateways
+                    .iter()
+                    .map(|(u, priority)| infrastructure_types::DoorwayEndpoint {
+                        service: "gateway".to_string(),
+                        url: (*u).to_string(),
+                        priority: *priority,
+                        ttl_secs: 300,
+                    })
+                    .collect(),
+                record_serial: 1,
+                record_signature: vec![1; 64],
+                operator_agent: format!("{id}-operator"),
+                operator_human: None,
+                capabilities_json: r#"["gateway"]"#.to_string(),
+                reach: "public".to_string(),
+                region: None,
+                bandwidth_mbps: None,
+                version: "test".to_string(),
+                tier: "Emerging".to_string(),
+                registered_at: "test".to_string(),
+                updated_at: "test".to_string(),
+            }
+        }
+
+        #[test]
+        fn seeds_come_from_the_dht_when_no_static_peers_are_configured() {
+            // The household shape: no FEDERATION_PEERS at all, one sibling
+            // registered in the DHT. Before this fix the discovery task never
+            // even spawned, so this seed set was empty forever.
+            let registrations = vec![registration(
+                "apex-elohim-host",
+                "http://localhost:8889",
+                &[("http://localhost:8889", 0)],
+            )];
+            let seeds = merge_discovery_seeds(
+                &[],
+                &registrations,
+                Some("alpha-elohim-host"),
+                &["http://localhost:8888".to_string()],
+            );
+            assert_eq!(seeds, vec!["http://localhost:8889".to_string()]);
+        }
+
+        #[test]
+        fn static_and_dht_seeds_merge_and_dedupe_by_origin() {
+            let registrations = vec![
+                registration(
+                    "apex",
+                    "http://localhost:8889/",
+                    &[("http://localhost:8889", 0)],
+                ),
+                registration("zeta", "https://zeta.example", &[]),
+            ];
+            let seeds = merge_discovery_seeds(
+                &[
+                    "https://static-one.example/".to_string(),
+                    "http://localhost:8889".to_string(), // also in the DHT
+                ],
+                &registrations,
+                Some("alpha"),
+                &[],
+            );
+            assert_eq!(
+                seeds,
+                vec![
+                    // static first, order preserved, trailing slash normalised
+                    "https://static-one.example".to_string(),
+                    "http://localhost:8889".to_string(),
+                    // DHT registrations by id; the duplicate origin is dropped
+                    "https://zeta.example".to_string(),
+                ]
+            );
+        }
+
+        #[test]
+        fn self_is_never_seeded_by_id_or_by_origin() {
+            let registrations = vec![
+                registration(
+                    "alpha",
+                    "http://localhost:8888",
+                    &[("http://localhost:8888", 0)],
+                ),
+                // A stale registration under another id still advertising OUR origin.
+                registration("ghost", "http://localhost:8888", &[]),
+                registration("apex", "http://localhost:8889", &[]),
+            ];
+            let seeds = merge_discovery_seeds(
+                &[],
+                &registrations,
+                Some("alpha"),
+                &["http://localhost:8888/".to_string()],
+            );
+            assert_eq!(
+                seeds,
+                vec!["http://localhost:8889".to_string()],
+                "self excluded by id AND by origin"
+            );
+        }
+
+        #[test]
+        fn non_http_and_empty_seeds_are_dropped() {
+            let registrations = vec![registration("bad", "wss://not-a-gateway.example", &[])];
+            let seeds = merge_discovery_seeds(
+                &["".to_string(), "   ".to_string(), "not a url".to_string()],
+                &registrations,
+                None,
+                &[],
+            );
+            assert!(seeds.is_empty(), "only http(s) origins are dialable seeds");
+        }
+
+        #[tokio::test]
+        async fn dht_registered_sibling_populates_the_name_route_table() {
+            // END-TO-END for the live finding: NO static peers, ONE
+            // DHT-registered sibling. The tick seeds from the registration,
+            // discovers the peer over HTTP, coherence-probes it, and the
+            // name-route table fills from that peer's head set — which is what
+            // the one-hop relay folds over.
+            let sibling = MockServer::start().await;
+
+            // The sibling's federation surface (what refresh_peer_cache reads).
+            Mock::given(matchers::method("GET"))
+                .and(matchers::path("/api/v1/federation/doorways"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "doorways": [{
+                        "id": "apex-elohim-host",
+                        "url": sibling.uri(),
+                        "region": null,
+                        "capabilities": ["gateway"],
+                        "status": "online",
+                    }]
+                })))
+                .mount(&sibling)
+                .await;
+            // …and its coherence manifest (what the name-route table folds).
+            mount_coherence(
+                &sibling,
+                &manifest_body("apex-elohim-host", &[("/nrt-garden", "EPR-GARDEN")]),
+            )
+            .await;
+
+            let registrations = vec![registration(
+                "apex-elohim-host",
+                &sibling.uri(),
+                &[(&sibling.uri(), 0)],
+            )];
+
+            let cache = new_peer_cache();
+            let seeds = refresh_peer_cache_from_seeds(
+                &[], // NO static FEDERATION_PEERS — the old gate
+                &registrations,
+                Some("alpha-elohim-host"),
+                &["http://localhost:8888".to_string()],
+                &cache,
+            )
+            .await;
+            assert_eq!(seeds.len(), 1, "the DHT registration alone seeded the tick");
+
+            let peers: Vec<(String, String)> = cache
+                .read()
+                .await
+                .iter()
+                .map(|p| (p.id.clone(), p.url.clone()))
+                .collect();
+            assert_eq!(peers.len(), 1, "the sibling was discovered");
+
+            let name_routes = crate::services::name_routing::NameRouteTable::new();
+            let me = self_manifest(&[("/lamad", "MINE")]);
+            let client = reqwest::Client::new();
+            refresh_coherence(
+                &me,
+                &peers,
+                &client,
+                &new_peer_coherence_cache(),
+                Some(&name_routes),
+            )
+            .await;
+
+            let holders = name_routes.holders_for(
+                &crate::services::name_routing::RouteKey::path_only("/nrt-garden/"),
+                "alpha-elohim-host",
+            );
+            assert_eq!(holders.len(), 1, "the sibling holds /nrt-garden");
+            assert_eq!(holders[0].doorway_id, "apex-elohim-host");
+            assert_eq!(holders[0].origin, sibling.uri().trim_end_matches('/'));
+            assert_eq!(
+                holders[0].liveness,
+                crate::services::name_routing::HolderLiveness::Serving
             );
         }
     }

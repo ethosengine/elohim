@@ -1562,14 +1562,38 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         }
     }
 
-    // Federation peer discovery (HTTP-based)
-    // Queries FEDERATION_PEERS URLs to discover other doorways in the network
-    // Uses shared PeerUrlList so admin API can add/remove peers at runtime
-    if !args.federation_peers.is_empty() {
+    // Federation peer discovery
+    //
+    // Seeds from BOTH the static FEDERATION_PEERS list and the DHT-registered
+    // doorway set (`get_all_doorways` — the same source
+    // `GET /api/v1/federation/doorways` serves). The static list is an
+    // ADDITIONAL SEED, never a gate: this block used to run only when
+    // FEDERATION_PEERS was non-empty, so a household pair that knew each other
+    // perfectly well through `register_doorway_in_dht` + heartbeat never probed
+    // each other — no coherence probe, and therefore an empty name-route table
+    // and a relay that could never fire (measured on the household mesh,
+    // run 20260912T201307Z). "The registry IS the DHT" (2026-09-12 ruling).
+    //
+    // Uses shared PeerUrlList so admin API can add/remove peers at runtime.
+    let dht_registry = match (
+        state.zome_caller.clone(),
+        services::FederationConfig::from_args(&args),
+    ) {
+        (Some(zome_caller), Some(fed_config)) => Some((zome_caller, fed_config)),
+        _ => None,
+    };
+    if !args.federation_peers.is_empty() || dht_registry.is_some() {
         let peer_url_list = state.peer_url_list.clone();
         let self_id = args.doorway_id.clone();
         let cache = state.peer_cache.clone();
         let peer_count = args.federation_peers.len();
+        // Every address this doorway advertises as itself — excluded from the
+        // seed set so a self-registration in the DHT can never make us probe,
+        // compare against, or relay to ourselves.
+        let mut self_urls: Vec<String> = args.doorway_urls.clone();
+        if let Some(url) = args.doorway_url.clone() {
+            self_urls.push(url);
+        }
 
         // F-COHERENCE: the cross-edge probe rides the existing discovery loop.
         // It needs the EprRouter (to recompute this edge's self-manifest each
@@ -1590,12 +1614,15 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             coherence_epr_router,
             coherence_cache,
             name_routes,
+            dht_registry.clone(),
+            self_urls,
             std::time::Duration::from_secs(10), // initial delay (let peers boot)
             std::time::Duration::from_secs(60), // refresh interval
         );
         info!(
-            "Federation peer discovery started: {} peer(s) configured",
-            peer_count
+            static_peers = peer_count,
+            dht_seeded = dht_registry.is_some(),
+            "Federation peer discovery started"
         );
     }
 

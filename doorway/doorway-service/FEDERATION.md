@@ -233,10 +233,37 @@ read on the existing 60s federation discovery tick, so the registry costs no
 additional I/O. Nothing is persisted: the whole table is Category C and rebuilt
 from the next tick.
 
-*Not yet folded:* attested RTT. "Nearest" is health-then-owner-order today; the
-peer-health probe already records `response_time_ms` into the infrastructure
-DNA, and region is a selector term beside RTT (never a separate authority).
-`TODO(nearest)` in `fold_candidate_holders` marks the seam.
+**Where the probed peer set comes from: the DHT.** Peer discovery seeds from
+BOTH the static `FEDERATION_PEERS` list and the DHT-registered doorway set
+(`get_all_doorways` — the same source `GET /api/v1/federation/doorways`
+serves), merged and deduped by origin, self excluded by id AND by origin. The
+static list is an **additional seed, never a gate**: until 2026-09-12 the whole
+discovery task was gated on a non-empty `FEDERATION_PEERS`, so a household pair
+that knew each other perfectly well through `register_doorway_in_dht` +
+heartbeat never probed each other and the name-route registry stayed empty
+forever (measured, run `20260912T201307Z`). The registry IS the DHT.
+
+### Routing dimensions
+
+Name routing must eventually cover the standard range. The seams for the next
+rung are **in place and typed today** — the fold is keyed on a `RouteKey`
+matched host-first, the selector is one explicit ordered term list, and the
+relay mode is an enum — so each row below is filled in, never re-keyed.
+
+| Dimension | Today | Next |
+|---|---|---|
+| **host** | `RouteKey.host` is carried and matched host-first (lowercased, port-stripped). Every contract is an **any-host** contract (`HolderContract.host = None`), because a coherence head set carries no host — so the term never narrows yet. A host-bound contract already beats an any-host one for the same doorway. | Hostnames become **head channels**: `elohim.host` = converged head at commons reach, `alpha.elohim.host` = candidate head at stewards reach, both served by every doorway. Populating `HolderContract.host` is the whole change. |
+| **path** | Segment-boundary mount match, identical to local `EprRouter` dispatch; most specific mount per doorway. | unchanged |
+| **health** | WIRED — `SelectorTerm::Liveness`, the first term. `Serving` → `Uncertain` → `Shedding` → `Unreachable`. | unchanged |
+| **reach / standing** | Declared `SelectorTerm::ReachStanding`, constant (`TERM_NOT_YET_WIRED`) — a no-op that cannot reorder anything. | The requester's standing as their own conductor states it, against the EPR's declared reach, per holder. |
+| **nearest** | Declared `SelectorTerm::Nearest`, constant. | Attested RTT (the peer-health probe already records `response_time_ms` into the infrastructure DNA), with **region as a selector term beside RTT, never a separate authority**. |
+| **weight** | Declared `SelectorTerm::Weight`, constant. | Holder-advertised capacity weight. |
+| **owner order** | WIRED — `SelectorTerm::OwnerOrder`, the final stable tiebreak (registry order). | unchanged |
+| **relay mode** | `RelayMode::Proxy` — this doorway fetches and returns the bytes. `RelayMode::Redirect` is **declared and not implemented**: a named match arm skips such a holder with a warning rather than silently proxying it. | Redirect (307/308) to the holder's origin so the client goes direct — a session and CORS decision, not only a routing one. |
+
+The selector lives in ONE function (`selector_rank`) returning one tuple element
+per entry in `SELECTOR_TERMS`, in that order. Adding a term = add the variant,
+add its element at the matching position, fill it in.
 
 ### The forward
 

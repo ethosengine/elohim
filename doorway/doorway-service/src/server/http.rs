@@ -5483,6 +5483,10 @@ struct RelayContext {
     /// The inbound request already crossed a doorway — the one-hop budget is
     /// spent and this doorway answers locally.
     hop_seen: bool,
+    /// The host the client asked for. Carried into the fold's `RouteKey` NOW
+    /// even though every contract is any-host today, so the next rung
+    /// (hostnames as head channels) needs no change here.
+    host: Option<String>,
     authorization: Option<String>,
     cookie: Option<String>,
     accept: Option<String>,
@@ -5502,6 +5506,7 @@ impl RelayContext {
                     .get(crate::services::name_routing::FEDERATION_HOP_HEADER)
                     .and_then(|v| v.to_str().ok()),
             ),
+            host: header("host"),
             authorization: header("authorization"),
             cookie: header("cookie"),
             accept: header("accept"),
@@ -5592,7 +5597,10 @@ async fn relay_by_name(
         .doorway_id
         .clone()
         .unwrap_or_else(|| state.args.node_id.to_string());
-    let holders = state.name_routes.holders_for(path, &self_doorway_id);
+    // Host-first, then path — the fold's key. Host never narrows today (every
+    // contract is any-host); it is threaded so the next rung does not re-key.
+    let key = crate::services::name_routing::RouteKey::new(ctx.host.as_deref(), path);
+    let holders = state.name_routes.holders_for(&key, &self_doorway_id);
     if holders.is_empty() {
         // Nobody in the federation holds a contract covering this name — our
         // 404 is the whole truth, and saying so costs no network at all.
