@@ -44,6 +44,11 @@ Feature: Chaos peer churn — the dataplane proves itself by surviving us
   #     never the goal. When a scenario says a peer "sees its 2 neighbours" it
   #     is claiming health; when it says a peer "reports no connected peers" it
   #     is claiming honest degradation.
+  #   SETTLED       — the mesh has finished reconciling for now: every peer
+  #     agrees on the custody record, and that agreement holds across a settle
+  #     window (no sweep still mid-flight). A drill can only blame CHURN for a
+  #     duplicate or a phantom custody row if the record was settled — not
+  #     already moving — the moment before the churn started.
   #
   # What this mesh's "independent" is, honestly: the three peers are separate
   # storage processes with separate stores, not separate hosts or disks. So a
@@ -61,8 +66,29 @@ Feature: Chaos peer churn — the dataplane proves itself by surviving us
     And a household peer counts as joined only while it sees 2 neighbours
     And the household protection status reads "protected" at 3 custody copies, "partial" at 2, and "at-risk" at 1
 
+  # What the ladder above actually measures: this mesh is ONE household
+  # (Dowell) with three peers, so its rungs walk the INTRA-HOUSEHOLD custody
+  # COPY count — how many of Dowell's own peers hold a copy — never the
+  # household's collective-diversity floor. Those are two different axes on
+  # the same resilience snapshot: `details.stewardingCollectives[household]
+  # .intraHubPeers` is the copies axis this ladder reads; the snapshot's
+  # top-level `protectionStatus` (and `coverageShortfall`) instead answer how
+  # many SEPARATE HOUSEHOLDS hold a copy — @concern:household-diversity
+  # territory. A one-household mesh can never read `protectionStatus:
+  # "protected"` no matter how many intra-household copies survive a cascade
+  # (measured 2026-09-12: 3-of-3 intra-household copies still read
+  # `protectionStatus: "at-risk"`), so the step glue for this feature derives
+  # every rung below from `intraHubPeers`, never from `protectionStatus`.
+
+  # @requires:owned-substrate (every scenario below) names the substrate
+  # dependency the scope reconciler gates on: a mesh this suite may actually
+  # kill peers on, never a shared fleet it only observes. See
+  # genesis/a2o/CLAUDE.md §Substrate scope for the full capability contract.
   @requires:owned-substrate
   Scenario: A flapping peer never corrupts what the mesh believes
+    # Jessica is one of the household's three drill-fixture peers (the other
+    # two are unnamed in this scenario's steps) — see the blast-radius note
+    # above: a fixture human, not a person whose disk is being gambled with.
     Given content "manifesto" is under custody on every household peer
     And every household peer sees its 2 neighbours
     And the mesh's custody record for "manifesto" is settled
