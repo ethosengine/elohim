@@ -115,3 +115,25 @@ unknown_derive`, distinct from "no `derive:` declared") now resolves to `skipped
 older than the declared measure)` rather than silently falling through to a plain bound's `passed … 0`. Check 3 split
 into two bullets: the window bound (may legitimately read `skipped` under 3 journeys) and the four per-journey
 ceilings (still `no fold is skipped, never green`).
+DELTA 2026-09-12 (station 3 — the standing reader; GREEN preserved on the first rolling-window reading): the six
+fresh-start questions are Intents in scope of the recipe (`recall-questions.json`, contract v12); `recall sample`
+records a reader's journey as a FlowEvent (Consume; fulfills iff the receipt bytes carry every `reached_when.terms`;
+a journey whose entry locates nothing is a MEASURED MISS — screens-to-shape 4, no receipt — never a refusal) and folds
+metered/unmetered/screens with `env:journey=<event cid>`; `recall judge` lets a seat of a DIFFERENT tier record a
+Verdict as a `verdict` note on the contract and fold `recall-mistaken-assertions@1` (a reader never judges its own
+journey; every refusal keeps the `--json` envelope). Check 3 now reads `recall-journey-window-ceiling@1`
+(`derive: rate-over-window`, journeys grouped by the journey slot, 91 days, hard 0.2, `skipped` under 3 journeys,
+an unknown derive skips rather than passing 0). The weekly routine `.claude/workflows/recall-standing-reader.js`
+samples every tier the actor sidecar saw in 30 days × the six questions and judges each by a rotated tier
+(routine: operator /schedule pending). Dry-run pair: haiku-labelled sample of q-corrections reached
+(memory-ceremony/SKILL.md:133-159, lens minimal, 2,152 metered B, 0 unmetered) → sonnet judge Verdict refuse,
+mistaken 1 — an omission counted as a mistake against an account the controller wrote; the judge brief was corrected
+the same day to count contradicted claims only, and the provenance is an observation on the contract. What the
+instrument found first: under the deterministic first-candidate journey 4 of 6 bank questions locate no candidate
+(`question_terms` drops "top"/"red"; no area stemming) and q-remine lands on converge/SKILL.md — recorded on the
+question bank as the station-4 frontier (short register vocabulary, area stemming, reader-chosen candidate).
+Intermediate reading FAILED at 1 of 5 journeys (exactly the hard 0.2 at-or-above); final reading this station:
+1 of 7 journeys (9 folds) within hard 0.2; latest journey mistaken 0, screens-to-shape 4 (soft warn 3, hard 6);
+unmetered 0. Thin window, honestly: three of the seven are pre-3.2 hand folds and three are deterministic misses of
+one question — the first real weekly run decides. Frontiers: `finish` refuses a zero-receipt focused journey
+(journey.rs); fold `occurred_at` is HEAD-dated while `now` is wall-clock; `Contract::question_bank()` ignores `--root`.
