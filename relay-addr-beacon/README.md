@@ -84,7 +84,7 @@ Precedence is **flag > env > default**.
 | `--record-name` | `BEACON_RECORD_NAME` | — | DNS record name for the Cloudflare sink (e.g. `turn.elohim.host`). |
 | `--lan-ip` | `BEACON_LAN_IP` | auto | Override the detected LAN IPv4 for coturn's `<wan>/<lan>` mapping. |
 | `--state-file` | `BEACON_STATE_FILE` | `/var/lib/relay-addr-beacon/state.json` | Persisted last-published snapshot for change detection. |
-| `--sink` | — | — | Enable a sink (`cloudflare`, `pkarr`, `coturn`). Repeatable; sinks compose. At least one required. |
+| `--sink` | — | — | Enable a sink (`cloudflare`, `pkarr`, `coturn`, `file`). Repeatable; sinks compose. At least one required. |
 | `--egress-endpoint` | `BEACON_EGRESS_ENDPOINTS` | ipify / ifconfig.me / icanhazip | Ordered public-IP echo endpoints; first success wins. |
 
 ### Detection
@@ -179,6 +179,102 @@ unchanged cycle runs the Cloudflare freshness pass, which verifies the
 exclusive lane and iterates every shared lane; other sinks remain untouched.
 That is enough to keep freshness stamps and stale-sibling reap active without
 reintroducing churn elsewhere (see the `cycle` doc comment in `src/main.rs`).
+
+#### `file` (household-ownable membership projection)
+
+Shared membership is a **set of origins eligible to serve one public name**.
+The Cloudflare shared lane above projects that set as `A`/`AAAA` records for a
+zone you rent; the `file` sink projects the **same set**, decided by the **same
+`reconcile_membership` call, the same serving probe and the same join/leave
+hysteresis**, into a JSON document on a filesystem you own.
+
+It exists because a household cannot certify public-name transition against DNS
+it does not control, and a test-only proxy that never executes the real routing
+decision certifies nothing. Two legs — one per doorway — writing their own entry
+into one document *is* the routing apparatus.
+
+| Flag | Env | Meaning |
+|------|-----|---------|
+| Flag | Env | Default | Meaning |
+|------|-----|---------|---------|
+| `--membership-file` | `BEACON_MEMBERSHIP_FILE` | — | Document this leg contributes its own entry to. Sibling legs share the path. |
+| `--member-origin` | `BEACON_MEMBER_ORIGIN` | — | The origin (`scheme://host:port`) this leg advertises. Required because household doorways can differ by PORT on one host, which no address snapshot can distinguish. |
+
+The serving-probe flags below are shared with the Cloudflare shared lane (both
+decide membership from the same probe); the `file` sink **requires** the URL:
+
+| Flag | Env | Default | Meaning |
+|------|-----|---------|---------|
+| `--serving-probe-url` | `BEACON_SERVING_PROBE_URL` | — | Health URL polled to decide whether this leg's doorway is serving. Only HTTP 200 serves — a redirect, an error and silence do not. |
+| `--serving-probe-interval-secs` | `BEACON_SERVING_PROBE_INTERVAL_SECS` | `15` | Probe cadence, independent of address discovery. Also bounds each probe's timeout (`min(interval, 15s)`). |
+| `--serving-join-after` | `BEACON_SERVING_JOIN_AFTER` | `2` | Consecutive serving probes required to join, including after a restart. |
+| `--serving-leave-after` | `BEACON_SERVING_LEAVE_AFTER` | `3` | Consecutive non-serving probes required to withdraw. |
+
+The public name and this leg's owner slug come from the **same**
+`--shared-record <name>=<owner>` (or legacy `--shared-record-name` /
+`--record-owner`) pair the Cloudflare lane uses. Exactly one lane may be
+configured with `--sink file`: one document names one public name.
+`--serving-probe-url` is **required** — membership is earned from the probe,
+never assumed.
+
+Document shape:
+
+```json
+{
+  "name": "elohim.local",
+  "members": [
+    { "owner": "alpha", "origin": "http://localhost:8888", "updated_at": "2026-09-12T12:52:27Z" },
+    { "owner": "apex",  "origin": "http://localhost:8889", "updated_at": "2026-09-12T12:52:27Z" }
+  ],
+  "updated_at": "2026-09-12T12:52:27Z"
+}
+```
+
+Rules, identical in spirit to the Cloudflare shared lane:
+
+- **Exact-owner writes.** A leg only ever adds, refreshes or removes the entry
+  whose `owner` is its own; a sibling's entry is never rewritten, reordered into
+  a different value, or reaped. There is deliberately **no stale-sibling reap**:
+  on one host the legs share a clock and a filesystem, so an absent sibling is
+  an absent *process* — a household fact to read, not a record to collect.
+- **Exactly one entry per owner**, and `members` is sorted by owner so the
+  document is deterministic.
+- **Freshness.** A serving leg re-stamps its own `updated_at` once it is older
+  than `--shared-refresh-secs`.
+- **Restart starts withdrawn**, then earns membership back with
+  `--serving-join-after` consecutive serving probes.
+- **Concurrency.** Every read-modify-write is taken under an `O_EXCL` lock file
+  (`<path>.lock`, broken after 30 s if abandoned) and committed by `rename`, so
+  a reader never sees a partial document and two legs never clobber each other.
+
+A `file`-only leg needs **no address detection at all** (membership is
+origin-keyed, not address-keyed), so it runs on a loopback mesh with no public
+IP and no internet — the address loop is skipped entirely.
+
+Two legs, one host, two doorway ports:
+
+```
+# leg A — the alpha doorway
+relay-addr-beacon --sink file \
+  --shared-record elohim.local=alpha \
+  --membership-file /tmp/elohim-local-mesh/membership/elohim.local.json \
+  --member-origin http://localhost:8888 \
+  --serving-probe-url http://127.0.0.1:8888/health \
+  --serving-probe-interval-secs 3
+
+# leg B — the apex doorway
+relay-addr-beacon --sink file \
+  --shared-record elohim.local=apex \
+  --membership-file /tmp/elohim-local-mesh/membership/elohim.local.json \
+  --member-origin http://localhost:8889 \
+  --serving-probe-url http://127.0.0.1:8889/health \
+  --serving-probe-interval-secs 3
+```
+
+`app/elohim-app/scripts/hc-mesh.sh` stages exactly these two legs at
+`just mesh start` (opt out with `MESH_MEMBERSHIP=0`), and the household fixture
+declares the document so acceptance scenarios resolve the public name through
+it.
 
 #### `pkarr` (Tier-2 — published, not yet consumed) — OFF by default
 
@@ -322,6 +418,15 @@ just gate    # cargo fmt --check && cargo clippy -D warnings && cargo test
   AAAA-lane create proving the shared list call is type-scoped with a correct
   AAAA body, ordered multi-lane PATCH fan-out, and exclusive-lane ownership
   stamping.
+- The `file` membership sink has unit tests (document materialisation,
+  exact-owner writes with a byte-identical sibling entry across a withdrawal, no
+  duplicate owner on rejoin, hand-edited duplicate collapse, corrupt-document
+  rebuild, an origin change touching only our own entry, 25 rounds of concurrent
+  two-leg writes leaving a complete document and no lock/temp residue, and an
+  abandoned lock being broken) plus production-cycle tests that drive
+  `serving_cycle` itself: join2/leave3 across two legs sharing one document, a
+  restarted leg withdrawing then re-adopting exactly one entry, and a dead probe
+  endpoint withdrawing the same way a shedding one does.
 - The `Dockerfile` and live DNS/coturn integration are **not** exercised by the
   test gate; they are provided for the operator to build and deploy.
 

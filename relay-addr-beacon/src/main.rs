@@ -16,8 +16,8 @@ use tracing::{error, info, warn};
 
 use config::{Config, SinkName};
 use sinks::{
-    cloudflare, cloudflare::CloudflareSink, coturn::CoturnSink, pkarr::PkarrSink, ActiveSink,
-    AddrUpdate, Sink,
+    cloudflare, cloudflare::CloudflareSink, coturn::CoturnSink, file::FileMembershipSink,
+    pkarr::PkarrSink, ActiveSink, AddrUpdate, Sink,
 };
 
 #[tokio::main]
@@ -119,6 +119,24 @@ fn build_sinks(cfg: &Config, client: &reqwest::Client) -> Result<Vec<ActiveSink>
                     out_conf,
                     cfg.on_change_exec.clone(),
                 )?));
+            }
+            SinkName::File => {
+                // `Config::validate` already proved each of these; resolve
+                // defensively so this constructor stays sound if called alone.
+                let path = cfg.membership_file.clone().ok_or_else(|| {
+                    anyhow!("file sink requires --membership-file / BEACON_MEMBERSHIP_FILE")
+                })?;
+                let origin = cfg.member_origin.clone().ok_or_else(|| {
+                    anyhow!("file sink requires --member-origin / BEACON_MEMBER_ORIGIN")
+                })?;
+                let lane = cfg.membership_lane()?;
+                sinks.push(ActiveSink::File(FileMembershipSink::new(
+                    path,
+                    lane.record_name,
+                    lane.owner,
+                    origin,
+                    cfg.shared_refresh_secs,
+                )));
             }
         }
     }
@@ -324,14 +342,20 @@ async fn apply_membership(
     };
     let mut all_ok = true;
     for sink in sinks {
-        if let ActiveSink::Cloudflare(cf) = sink {
-            if let Err(error) = cf
-                .reconcile_membership(membership.serving, previous.as_ref())
-                .await
-            {
-                all_ok = false;
-                warn!(error = %error, "shared membership projection failed; retrying next probe");
+        // Every membership projection is handed the SAME already-decided
+        // verdict. Cloudflare projects it as A records for the fleet; the file
+        // sink projects it into a document the household owns.
+        let outcome = match sink {
+            ActiveSink::Cloudflare(cf) => {
+                cf.reconcile_membership(membership.serving, previous.as_ref())
+                    .await
             }
+            ActiveSink::File(f) => f.reconcile_membership(membership.serving).await,
+            _ => Ok(()),
+        };
+        if let Err(error) = outcome {
+            all_ok = false;
+            warn!(sink = sink.name(), error = %error, "shared membership projection failed; retrying next probe");
         }
     }
     if !all_ok {
@@ -379,10 +403,17 @@ async fn run(cfg: Config) -> Result<()> {
     let client = build_http_client()?;
     let sinks = build_sinks(&cfg, &client)?;
     let enabled: Vec<&str> = sinks.iter().map(ActiveSink::name).collect();
+    // A membership-only leg (the household `file` sink alone) projects ORIGINS,
+    // not the detected address, so it must not require an egress echo endpoint:
+    // a loopback household mesh has no public IP to discover and may have no
+    // internet at all. Skipping the address loop entirely is the difference
+    // between "runs at home" and "logs a detection error every interval".
+    let needs_address = sinks.iter().any(ActiveSink::needs_address);
     info!(
         ?enabled,
         once = cfg.once,
         enable_v6 = cfg.enable_v6,
+        needs_address,
         "relay-addr-beacon starting"
     );
 
@@ -392,7 +423,12 @@ async fn run(cfg: Config) -> Result<()> {
             // Withdraw stale contributions before detection, even if WAN is down.
             apply_membership(&cfg, &sinks, &mut membership).await?;
         }
-        let ok = cycle(&cfg, &client, &sinks, true).await?;
+        let ok = if needs_address {
+            cycle(&cfg, &client, &sinks, true).await?
+        } else {
+            info!("no address-dependent sink enabled — skipping address detection");
+            true
+        };
         if cfg.serving_probe_url.is_some() {
             serving_cycle(
                 &cfg,
@@ -408,18 +444,30 @@ async fn run(cfg: Config) -> Result<()> {
             Err(anyhow!("--once: at least one sink failed"))
         }
     } else {
-        if cfg.serving_probe_url.is_some() {
-            let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
-            tokio::join!(
-                address_loop(&cfg, &client, &sinks),
-                serving_loop(&cfg, &probe_client, &sinks)
-            );
-        } else {
-            address_loop(&cfg, &client, &sinks).await;
+        match (needs_address, cfg.serving_probe_url.is_some()) {
+            (true, true) => {
+                let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
+                tokio::join!(
+                    address_loop(&cfg, &client, &sinks),
+                    serving_loop(&cfg, &probe_client, &sinks)
+                );
+            }
+            (true, false) => address_loop(&cfg, &client, &sinks).await,
+            (false, true) => {
+                let probe_client = build_probe_client(cfg.serving_probe_interval_secs)?;
+                serving_loop(&cfg, &probe_client, &sinks).await;
+            }
+            (false, false) => {
+                return Err(anyhow!(
+                    "nothing to run: no address-dependent sink and no --serving-probe-url"
+                ))
+            }
         }
         Ok(())
     }
 }
 
+#[cfg(test)]
+mod file_membership_tests;
 #[cfg(test)]
 mod membership_tests;

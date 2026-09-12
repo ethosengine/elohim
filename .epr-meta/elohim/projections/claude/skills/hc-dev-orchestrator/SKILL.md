@@ -227,6 +227,31 @@ the window) and records `conductor_receipt_scope` per peer (`per-peer` vs
 refuses (exit 5) without one, and the resulting record carries `zome_path`
 (`alive`/`dead`/`inconclusive`/`unknown`) from the restart's zome probe.
 
+**The public-name membership authority (`MESH_MEMBERSHIP`, `MESH_MEMBERSHIP_NAME`,
+`MESH_MEMBERSHIP_PROBE_SECS`, `BEACON_BIN`).** Shared membership is the set of ORIGINS
+currently eligible to serve one public name. On the fleet `relay-addr-beacon` projects that
+set into Cloudflare as multi-A records; nothing about the set is decided by DNS — DNS is its
+projection. `mesh start` now stages the SAME apparatus with a projection target the household
+owns: one beacon leg per doorway (`--sink file`), owner `alpha` → `http://localhost:8888` and
+owner `apex` → `http://localhost:8889`, both writing exactly their OWN entry into
+`$MESH_DIR/membership/elohim.local.json`. Same `reconcile_membership` call, same serving probe
+(HTTP 200 on the doorway's own `/health`), same join2/leave3 hysteresis — only the sink
+differs. The probe cadence is short here (`MESH_MEMBERSHIP_PROBE_SECS`, default 3s) so a
+withdraw resolves in ~10s and a rejoin in ~6s; the fleet's 15s cadence would not fit an
+acceptance window. A leg needs NO address detection (membership is origin-keyed), so no egress
+echo endpoint is contacted and it works offline. `start_membership_beacons` also writes
+`$MESH_DIR/membership/authority.json`, which the Prologue copies into the household fixture as
+`membershipAuthority` — that is how `features/dataplane/doorway-apex-transition.feature`
+resolves the public name THROUGH the document (try the advertised origins in order, stick to
+the first that serves) instead of through a hardcoded doorway port, which the feature's own
+preamble refuses as certification. `mesh stop` reaps the legs by recorded pid, `mesh status`
+prints the currently-eligible set plus each leg's liveness, and `mesh preflight` REFUSES
+without the binary (`cd relay-addr-beacon && just gate`, or `BEACON_BIN=<path>`).
+`MESH_MEMBERSHIP=0` stages nothing — and the absence is honest: the apex-transition scenarios
+then fail naming a household that owns no membership authority, rather than reading a set
+nothing maintains. WAN ingress continuity remains a separate prerequisite: the document proves
+the routing decision, never that the resolved address is reachable.
+
 ### Act I Prologue cast (`hc-mesh-prologue.sh`)
 
 `hc-mesh.sh` brings the mesh's PROCESSES up; it does not cast the household.

@@ -3,6 +3,7 @@
 
 pub mod cloudflare;
 pub mod coturn;
+pub mod file;
 pub mod pkarr;
 
 use std::net::{Ipv4Addr, Ipv6Addr};
@@ -38,6 +39,7 @@ pub enum ActiveSink {
     Cloudflare(cloudflare::CloudflareSink),
     Pkarr(pkarr::PkarrSink),
     Coturn(coturn::CoturnSink),
+    File(file::FileMembershipSink),
 }
 
 impl ActiveSink {
@@ -46,6 +48,7 @@ impl ActiveSink {
             ActiveSink::Cloudflare(s) => s.name(),
             ActiveSink::Pkarr(s) => s.name(),
             ActiveSink::Coturn(s) => s.name(),
+            ActiveSink::File(s) => s.name(),
         }
     }
 
@@ -54,6 +57,21 @@ impl ActiveSink {
             ActiveSink::Cloudflare(s) => s.publish(update).await,
             ActiveSink::Pkarr(s) => s.publish(update).await,
             ActiveSink::Coturn(s) => s.publish(update).await,
+            ActiveSink::File(s) => s.publish(update).await,
+        }
+    }
+
+    /// Does this sink's projection depend on the detected WAN/LAN address?
+    ///
+    /// Every DNS/coturn projection does — they publish the address itself. The
+    /// file membership sink does NOT: it projects ORIGINS, which are declared
+    /// configuration. A beacon leg running only the file sink therefore needs
+    /// no egress echo endpoint at all, which is what lets a household run one
+    /// per doorway on a loopback mesh with no public IP and no internet.
+    pub fn needs_address(&self) -> bool {
+        match self {
+            ActiveSink::Cloudflare(_) | ActiveSink::Pkarr(_) | ActiveSink::Coturn(_) => true,
+            ActiveSink::File(_) => false,
         }
     }
 }

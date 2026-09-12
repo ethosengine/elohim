@@ -519,6 +519,13 @@ export PROLOGUE_MESH_DIR="$MESH_DIR"
 export PROLOGUE_DOORWAY_A_PORT="$DOORWAY_PORT"
 export PROLOGUE_DOORWAY_B_PORT="$DOORWAY_B_PORT"
 export PROLOGUE_LOGDIR="$LOGDIR"
+# The household's public-name membership authority, declared by hc-mesh.sh at
+# the moment it staged the beacon legs (start_membership_beacons). Copied in
+# rather than re-derived: the staging site owns the ports, the owner slugs and
+# the probe cadence, and a fixture that re-guessed them could describe an
+# apparatus that isn't the one running. Absent when MESH_MEMBERSHIP=0 (or no
+# beacon binary) — and its absence is the honest signal a scenario needs.
+export PROLOGUE_MEMBERSHIP_AUTHORITY="$MESH_DIR/membership/authority.json"
 
 python3 - > "$FIXTURE_PATH" <<'PYEOF'
 import json, os, sys
@@ -574,6 +581,17 @@ fixture = {
     },
     "storagePeers": storage_peers,
 }
+
+# The household-owned public-name membership authority, when this mesh staged
+# one. a2o resolves the public name THROUGH the document this names — the same
+# selection the shipped client makes over multi-A records — instead of through
+# a hardcoded doorway port, which would be the test-only proxy the
+# apex-transition feature's preamble refuses to accept as certification.
+authority_path = os.environ.get("PROLOGUE_MEMBERSHIP_AUTHORITY", "")
+if authority_path and os.path.exists(authority_path):
+    with open(authority_path) as handle:
+        fixture["membershipAuthority"] = json.load(handle)
+
 json.dump(fixture, sys.stdout, indent=2)
 print()
 PYEOF

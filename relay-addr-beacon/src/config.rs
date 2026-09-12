@@ -30,6 +30,11 @@ pub enum SinkName {
     Pkarr,
     /// Local: render coturn's `external-ip=<wan>/<lan>` and optionally reload.
     Coturn,
+    /// Household-ownable: project shared membership (the set of origins
+    /// eligible to serve the public name) into a JSON document this household
+    /// owns, instead of into a DNS zone it does not. Same reconcile loop, same
+    /// join/leave hysteresis, same serving probe as the Cloudflare shared lane.
+    File,
 }
 
 /// relay-addr-beacon — publish a relay's dynamic WAN IP to DNS / pkarr / coturn.
@@ -154,6 +159,20 @@ pub struct Config {
     #[arg(long, env = "BEACON_SERVING_JOIN_AFTER", default_value_t = 2)]
     pub serving_join_after: u64,
 
+    // ---- file membership sink -------------------------------------------
+    /// Membership document this beacon leg contributes its own entry to
+    /// (`--sink file`). Sibling legs share the path and each owns exactly one
+    /// entry, keyed by `--record-owner` / the owner half of `--shared-record`.
+    #[arg(long, env = "BEACON_MEMBERSHIP_FILE")]
+    pub membership_file: Option<PathBuf>,
+
+    /// The origin (`scheme://host:port`) this leg advertises as eligible to
+    /// serve the public name. Required by `--sink file`, because a household's
+    /// doorways can differ by PORT on one host rather than by IP — an address
+    /// snapshot cannot tell them apart, and a membership entry must.
+    #[arg(long, env = "BEACON_MEMBER_ORIGIN")]
+    pub member_origin: Option<String>,
+
     // ---- pkarr sink -----------------------------------------------------
     /// Dedicated pkarr secret-key file (hex, 0600). Generated if absent. Do NOT
     /// reuse an iroh/libp2p key here.
@@ -247,6 +266,26 @@ impl Config {
         Ok(lanes)
     }
 
+    /// The single shared lane the file membership sink projects. One document
+    /// names ONE public name, so a file leg contributing to several lanes has
+    /// no coherent document to write — refused rather than silently taking the
+    /// first.
+    pub fn membership_lane(&self) -> Result<SharedRecordLane> {
+        let mut lanes = self.shared_record_lanes()?;
+        match lanes.len() {
+            1 => Ok(lanes.remove(0)),
+            0 => Err(anyhow!(
+                "file membership sink requires exactly one shared lane \
+                 (--shared-record <public-name>=<owner>, or the legacy \
+                 --shared-record-name/--record-owner pair); none configured"
+            )),
+            n => Err(anyhow!(
+                "file membership sink requires exactly one shared lane, {n} configured — \
+                 one membership document names one public name"
+            )),
+        }
+    }
+
     /// Cross-field validation clap's declarative attributes can't express.
     /// Called once at startup, independent of which sinks are enabled — these
     /// are shared-mode invariants, not per-sink construction concerns.
@@ -260,11 +299,38 @@ impl Config {
                 "serving probe interval and join/leave counts must be positive"
             ));
         }
+        if self.sinks.contains(&SinkName::File) {
+            self.membership_lane()?;
+            if self.membership_file.is_none() {
+                return Err(anyhow!(
+                    "file sink requires --membership-file / BEACON_MEMBERSHIP_FILE"
+                ));
+            }
+            let origin = self.member_origin.as_deref().ok_or_else(|| {
+                anyhow!("file sink requires --member-origin / BEACON_MEMBER_ORIGIN")
+            })?;
+            let parsed = reqwest::Url::parse(origin).context("invalid member origin")?;
+            if !matches!(parsed.scheme(), "http" | "https") {
+                return Err(anyhow!("member origin must use http or https"));
+            }
+            if self.serving_probe_url.is_none() {
+                // Membership is EARNED from the serving probe. A file leg with
+                // no probe would publish an entry it never re-verified — the
+                // exact "DNS as evidence of serving" inversion the shared lane
+                // exists to refuse.
+                return Err(anyhow!(
+                    "file sink requires --serving-probe-url / BEACON_SERVING_PROBE_URL — \
+                     membership is earned from the serving probe, never assumed"
+                ));
+            }
+        }
         if let Some(url) = &self.serving_probe_url {
             let lanes = self.shared_record_lanes()?;
-            if !self.sinks.contains(&SinkName::Cloudflare) || lanes.is_empty() {
+            let projects_membership =
+                self.sinks.contains(&SinkName::Cloudflare) || self.sinks.contains(&SinkName::File);
+            if !projects_membership || lanes.is_empty() {
                 return Err(anyhow!(
-                    "serving probe requires a Cloudflare shared record lane"
+                    "serving probe requires a shared record lane projected by the cloudflare or file sink"
                 ));
             }
             if lanes.iter().any(|lane| {
@@ -327,6 +393,8 @@ impl std::fmt::Debug for Config {
             )
             .field("serving_leave_after", &self.serving_leave_after)
             .field("serving_join_after", &self.serving_join_after)
+            .field("membership_file", &self.membership_file)
+            .field("member_origin", &self.member_origin)
             .field("pkarr_key_file", &self.pkarr_key_file)
             .field("pkarr_relay", &self.pkarr_relay)
             .field("coturn_base_conf", &self.coturn_base_conf)
@@ -395,6 +463,85 @@ mod tests {
         let error = cfg.validate().unwrap_err().to_string();
         assert!(
             error.contains("requires an owner"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn file_sink_requires_a_document_an_origin_a_probe_and_one_lane() {
+        let complete = [
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.local=alpha",
+            "--membership-file",
+            "/tmp/beacon-config-test/elohim.local.json",
+            "--member-origin",
+            "http://localhost:8888",
+            "--serving-probe-url",
+            "http://localhost:8888/health",
+        ];
+        parse(&complete).validate().expect("complete file leg");
+
+        for (drop_flag, expected) in [
+            ("--membership-file", "requires --membership-file"),
+            ("--member-origin", "requires --member-origin"),
+            ("--serving-probe-url", "requires --serving-probe-url"),
+        ] {
+            let mut args: Vec<&str> = Vec::new();
+            let mut skip = false;
+            for arg in complete {
+                if skip {
+                    skip = false;
+                    continue;
+                }
+                if arg == drop_flag {
+                    skip = true;
+                    continue;
+                }
+                args.push(arg);
+            }
+            let error = parse(&args).validate().unwrap_err().to_string();
+            assert!(error.contains(expected), "unexpected error: {error}");
+        }
+
+        // One document names ONE public name.
+        let two_lanes = parse(&[
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.local=alpha",
+            "--shared-record",
+            "other.local=alpha",
+            "--membership-file",
+            "/tmp/beacon-config-test/elohim.local.json",
+            "--member-origin",
+            "http://localhost:8888",
+            "--serving-probe-url",
+            "http://localhost:8888/health",
+        ]);
+        let error = two_lanes.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("exactly one shared lane, 2 configured"),
+            "unexpected error: {error}"
+        );
+
+        // A non-HTTP origin is not an origin a client can be told to try.
+        let bad_origin = parse(&[
+            "--sink",
+            "file",
+            "--shared-record",
+            "elohim.local=alpha",
+            "--membership-file",
+            "/tmp/beacon-config-test/elohim.local.json",
+            "--member-origin",
+            "ftp://localhost:8888",
+            "--serving-probe-url",
+            "http://localhost:8888/health",
+        ]);
+        let error = bad_origin.validate().unwrap_err().to_string();
+        assert!(
+            error.contains("member origin must use http or https"),
             "unexpected error: {error}"
         );
     }

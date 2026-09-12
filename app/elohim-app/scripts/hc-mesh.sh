@@ -158,6 +158,21 @@
 #                   Unset = the first `iroh-relay` on PATH. MESH_RELAY=0 skips
 #                   the launch — you then own MESH_FORK_RELAY_URL.
 #
+#   MESH_MEMBERSHIP The household's PUBLIC-NAME MEMBERSHIP AUTHORITY: two
+#                   relay-addr-beacon legs (`--sink file`), one per doorway,
+#                   each owning exactly its own entry in
+#                   $MESH_DIR/membership/<name>.json. That document IS the set
+#                   of origins eligible to serve MESH_MEMBERSHIP_NAME, decided
+#                   by the SAME reconcile_membership call, serving probe and
+#                   join2/leave3 hysteresis the fleet's Cloudflare shared lane
+#                   runs — the household owns the routing apparatus and its
+#                   fault controls instead of renting them. Set 0 to skip.
+#                   MESH_MEMBERSHIP_NAME (default elohim.local) names it;
+#                   MESH_MEMBERSHIP_PROBE_SECS (default 3) sets the probe
+#                   cadence, so a withdraw resolves in ~10s and a rejoin in ~6s.
+#                   BEACON_BIN overrides the binary (default: the pool debug
+#                   slot; build with `cd relay-addr-beacon && just gate`).
+#
 #   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
 #                   warn + INFO on exactly the three modules that diagnose a
 #                   sys-validation spin (read-pool saturation, cascade
@@ -251,6 +266,13 @@ MESH_RELAY_PORT="${MESH_RELAY_PORT:-3340}"
 MESH_RELAY_BIN="${MESH_RELAY_BIN:-$(command -v iroh-relay 2>/dev/null || true)}"
 DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
 DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
+# The household's public-name membership authority (see MESH_MEMBERSHIP above).
+# Off is a deliberate shape, not a fallback: with no legs staged, the document
+# never exists and the apex-transition scenarios fail naming the absence rather
+# than reading a stale set.
+MESH_MEMBERSHIP="${MESH_MEMBERSHIP:-1}"
+MESH_MEMBERSHIP_NAME="${MESH_MEMBERSHIP_NAME:-elohim.local}"
+MESH_MEMBERSHIP_PROBE_SECS="${MESH_MEMBERSHIP_PROBE_SECS:-3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -283,6 +305,17 @@ if [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
+# relay-addr-beacon (relay-addr-beacon/): its own workspace root, so its own
+# pool slot rather than elohim's. Only the membership legs need it.
+# A bare `cargo build` in that crate (its justfile sets no CARGO_TARGET_DIR)
+# lands in the crate's own ./target instead, so accept that too rather than
+# refusing a binary that is sitting right there.
+_beacon_pool="$POOL/relay-addr-beacon/dev/debug/relay-addr-beacon"
+_beacon_local="$REPO_ROOT/relay-addr-beacon/target/debug/relay-addr-beacon"
+if [ -z "${BEACON_BIN:-}" ] && [ ! -x "$_beacon_pool" ] && [ -x "$_beacon_local" ]; then
+  BEACON_BIN="$_beacon_local"
+fi
+BEACON_BIN="${BEACON_BIN:-$_beacon_pool}"
 # The ark launcher (elohim/ark/cli). Resolved here so `status` and the launch
 # sites name the same binary, but NEVER required at source time: only
 # MESH_CONDUCTOR_LAUNCH=ark needs it, and assert_ark_binary is what refuses.
@@ -1423,6 +1456,139 @@ EOF
   echo "iroh-relay up on :$MESH_RELAY_PORT ($("$MESH_RELAY_BIN" --version 2>/dev/null || echo iroh-relay))"
 }
 
+# ---------------------------------------------------------------------------
+# The household's PUBLIC-NAME MEMBERSHIP AUTHORITY.
+#
+# Shared membership is the set of ORIGINS currently eligible to serve one
+# public name. On the fleet, relay-addr-beacon projects that set into
+# Cloudflare as multi-A records; nothing about that set is decided by DNS —
+# DNS is its projection. Until now the household owned NO such authority at
+# all: the beacon had only remote sinks, so an apex-transition scenario could
+# only fake the routing decision with a test proxy, which the feature's own
+# preamble refuses as certification.
+#
+# So the household runs the SAME apparatus with a projection target it owns:
+# one beacon leg per doorway, `--sink file`, both writing exactly their OWN
+# entry into $MESH_DIR/membership/<name>.json. Same reconcile_membership call,
+# same serving probe (HTTP 200 on the doorway's own /health serves; a redirect,
+# an error and silence do not), same join2/leave3 hysteresis. The probe cadence
+# is short here (MESH_MEMBERSHIP_PROBE_SECS, default 3s) so a withdraw resolves
+# in ~10s and a rejoin in ~6s — well inside the fixture's convergence window,
+# where the fleet's 15s cadence would not be.
+#
+# A leg needs NO address detection (membership is origin-keyed), so no egress
+# echo endpoint is contacted and this works with the host offline.
+#
+# Also writes $MESH_DIR/membership/authority.json — the declaration the
+# prologue copies into the household fixture so a2o resolves the public name
+# through the document rather than through a hardcoded port.
+# ---------------------------------------------------------------------------
+membership_file_path() { echo "$MESH_DIR/membership/$MESH_MEMBERSHIP_NAME.json"; }
+
+# What the household's public-name authority currently SAYS, read from the
+# document itself — not from whether the legs are running. A live leg whose
+# doorway sheds is correctly absent from the set, and that distinction is the
+# whole point of the apparatus.
+membership_status_rows() {
+  local doc; doc="$(membership_file_path)"
+  printf "membership %s " "$MESH_MEMBERSHIP_NAME"
+  if [ "$MESH_MEMBERSHIP" != "1" ]; then
+    echo "disabled (MESH_MEMBERSHIP=0 — no household public-name authority)"
+    return 0
+  fi
+  if [ ! -s "$doc" ]; then
+    echo "NO DOCUMENT at $doc (legs never started? $LOGDIR/beacon-*.log)"
+    return 0
+  fi
+  python3 -c '
+import json, sys
+members = json.load(open(sys.argv[1])).get("members", [])
+parts = [m["owner"] + "=" + m["origin"] for m in members]
+print("eligible: " + ", ".join(parts) if parts else "EMPTY (no origin is eligible to serve)")
+' "$doc" 2>/dev/null || echo "unreadable document at $doc"
+  local owner pid
+  for owner in alpha apex; do
+    printf "  leg %-6s " "$owner"
+    if pid="$(live_recorded_pid beacon "$owner")"; then
+      echo "up (pid $pid)"
+    else
+      echo "down — nothing maintains this owner's entry (./hc-mesh.sh start, or cd relay-addr-beacon && just gate)"
+    fi
+  done
+}
+
+start_membership_beacons() {
+  if [ "$MESH_MEMBERSHIP" != "1" ]; then
+    echo "membership: not staged (MESH_MEMBERSHIP=0); the household owns no public-name authority this run"
+    return 0
+  fi
+  if [ ! -x "$BEACON_BIN" ]; then
+    echo "WARN: no relay-addr-beacon binary ($BEACON_BIN) — the household stages NO public-name membership" >&2
+    echo "      build it: cd relay-addr-beacon && just gate   (or MESH_MEMBERSHIP=0 to declare the absence)" >&2
+    return 0
+  fi
+  local dir; dir="$MESH_DIR/membership"
+  mkdir -p "$dir"
+  local doc; doc="$(membership_file_path)"
+
+  # owner|origin|probe-url, one per doorway. The owner slug matches the
+  # household fixture's doorway id so a scenario joins them structurally.
+  local legs=(
+    "alpha|http://localhost:$DOORWAY_PORT|http://127.0.0.1:$DOORWAY_PORT/health"
+    "apex|http://localhost:$DOORWAY_B_PORT|http://127.0.0.1:$DOORWAY_B_PORT/health"
+  )
+  local spec owner origin probe
+  for spec in "${legs[@]}"; do
+    IFS='|' read -r owner origin probe <<< "$spec"
+    if live_recorded_pid beacon "$owner" >/dev/null 2>&1; then
+      echo "membership leg $owner already running (pid $(live_recorded_pid beacon "$owner"))"
+      continue
+    fi
+    RUST_LOG="${MESH_MEMBERSHIP_RUST_LOG:-info}" nohup "$BEACON_BIN" \
+      --sink file \
+      --shared-record "$MESH_MEMBERSHIP_NAME=$owner" \
+      --membership-file "$doc" \
+      --member-origin "$origin" \
+      --serving-probe-url "$probe" \
+      --serving-probe-interval-secs "$MESH_MEMBERSHIP_PROBE_SECS" \
+      --state-file "$dir/$owner.state.json" \
+      > "$LOGDIR/beacon-$owner.log" 2>&1 &
+    record_mesh_pid beacon "$owner" "$!" || true
+    echo "membership leg $owner -> $origin (probe $probe, ${MESH_MEMBERSHIP_PROBE_SECS}s)"
+  done
+
+  # The declaration a2o reads. Written here, at the staging site that owns the
+  # ports and owner slugs, rather than re-derived by the prologue.
+  MESH_MEMBERSHIP_DOC="$doc" \
+  MESH_MEMBERSHIP_NAME="$MESH_MEMBERSHIP_NAME" \
+  MESH_MEMBERSHIP_PROBE_SECS="$MESH_MEMBERSHIP_PROBE_SECS" \
+  MESH_MEMBERSHIP_LOGDIR="$LOGDIR" \
+  python3 - <<'PYEOF' > "$dir/authority.json"
+import json, os
+probe = int(os.environ["MESH_MEMBERSHIP_PROBE_SECS"])
+join, leave = 2, 3  # relay-addr-beacon --serving-join-after / --serving-leave-after defaults
+# A probe against a STOPPED doorway costs a full client timeout (which the
+# beacon sizes at min(interval, 15s)) before the next tick, so budget two
+# intervals per probe, plus one for the tick already in flight when the fault
+# lands. These are upper bounds the household may assert against, not targets.
+print(json.dumps({
+    "$comment": "Written by hc-mesh.sh start_membership_beacons. The household's public-name membership authority.",
+    "kind": "relay-addr-beacon-file-sink",
+    "publicName": os.environ["MESH_MEMBERSHIP_NAME"],
+    "membershipFile": os.environ["MESH_MEMBERSHIP_DOC"],
+    "logDir": os.environ["MESH_MEMBERSHIP_LOGDIR"],
+    # fixture doorway id -> the owner slug that leg writes its entry under
+    "owners": {"alpha": "alpha", "apex": "apex"},
+    "probeIntervalSecs": probe,
+    "joinAfterProbes": join,
+    "leaveAfterProbes": leave,
+    "withdrawBoundMs": (leave + 1) * 2 * probe * 1000,
+    "rejoinBoundMs": (join + 1) * 2 * probe * 1000,
+}, indent=2))
+PYEOF
+  echo "membership document: $doc (public name $MESH_MEMBERSHIP_NAME)"
+}
+
 patch_mesh_gossip_config() { # <conductor-config.yaml>
   python3 - "$1" <<'PYEOF'
 import sys
@@ -1564,6 +1730,7 @@ fallback_pattern_pids() {
            "$args" == *"--listen 0.0.0.0:$DOORWAY_B_PORT"* ]] && owned=1 ;;
       mongod) [[ "$args" == *"--dbpath $MONGO_DIR"* ]] && owned=1 ;;
       iroh-relay) [[ "$args" == *"$MESH_DIR/iroh-relay.toml"* ]] && owned=1 ;;
+      relay-addr-beacon) [[ "$args" == *"--membership-file $MESH_DIR/membership/"* ]] && owned=1 ;;
     esac
     [ "$owned" -eq 1 ] && echo "$pid"
   done < <({
@@ -1693,6 +1860,7 @@ status_all() {
   fi
   printf "relay    :%s " "$MESH_RELAY_PORT"
   if curl -s -m 2 -o /dev/null "http://localhost:$MESH_RELAY_PORT/"; then echo "UP (conductors home to $(mesh_relay_url))"; else echo "down (0.7 conductors report 0 connections without a reachable relay)"; fi
+  membership_status_rows
   printf "mongod   :%s " "$MONGO_PORT"
   if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then echo "UP (archive-backed doorways)"; else echo "down (doorways run archive-less: inert warm shell)"; fi
   mesh_footprint
@@ -2971,6 +3139,22 @@ preflight() {
     rm -f "$tmp"
   fi
 
+  # 5c. relay-addr-beacon binary, only when this shape stages the household's
+  #     public-name membership authority. A missing binary is REFUSED, not
+  #     warned: without it the apex-transition feature has no routing apparatus
+  #     to exercise and the lane reads as a doorway defect instead of an
+  #     un-staged household.
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] && [ "$MESH_MEMBERSHIP" = "1" ]; then
+    if [ -x "$BEACON_BIN" ]; then
+      echo "ok relay-addr-beacon binary: $BEACON_BIN"
+    else
+      echo "REFUSED relay-addr-beacon binary: not executable ($BEACON_BIN) — the household stages its public-name membership authority with it; build it: cd relay-addr-beacon && just gate (or RUSTFLAGS=\"\" CARGO_TARGET_DIR=$POOL/relay-addr-beacon/dev cargo build --bin relay-addr-beacon), or MESH_MEMBERSHIP=0 to declare the absence"
+      fail=1
+    fi
+  else
+    echo "ok relay-addr-beacon binary: skipped (MESH_MEMBERSHIP=$MESH_MEMBERSHIP MESH_DOORWAYS=$MESH_DOORWAYS_EFFECTIVE)"
+  fi
+
   # 6. storage transport/iroh capability marker per peer — the exact check
   #    start_all runs before generating a single sandbox.
   for name in "${PEERS[@]}"; do
@@ -3417,6 +3601,11 @@ EOF
   if [ "$MESH_PORTAL" = "1" ]; then
     start_portal
   fi
+
+  # 1d. The public-name membership authority. AFTER both doorways are up so the
+  # first probes measure a real serving state rather than a boot race; the legs
+  # start withdrawn either way and earn membership from the probe.
+  start_membership_beacons
   fi
 
   # 2. Conductors: hc sandbox generate (installs the happ + writes each

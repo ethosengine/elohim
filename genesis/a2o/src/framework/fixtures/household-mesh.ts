@@ -52,6 +52,44 @@ export interface StoragePeerFixture {
   conductorAppUrl?: string;
 }
 
+/**
+ * The household's PUBLIC-NAME MEMBERSHIP AUTHORITY, declared by
+ * `hc-mesh.sh` (`start_membership_beacons`) at the moment it staged it and
+ * copied verbatim into this manifest by `hc-mesh-prologue.sh`.
+ *
+ * Shared membership is the set of ORIGINS currently eligible to serve one
+ * public name. On the fleet, `relay-addr-beacon` projects that set into DNS as
+ * multi-A records; on the household it runs the SAME `reconcile_membership`
+ * call, the SAME serving probe and the SAME join/leave hysteresis through its
+ * `file` sink, writing `membershipFile`. That document is the routing
+ * apparatus the household OWNS — which is what lets the apex-transition
+ * feature be exercised at all, since its preamble refuses a test-only proxy
+ * that does not execute the real routing decision.
+ *
+ * Absent when the mesh staged no authority (`MESH_MEMBERSHIP=0`, or no beacon
+ * binary). The absence is the honest signal: a scenario then reports that the
+ * household owns no membership authority, rather than reading a stale set.
+ */
+export interface MembershipAuthorityFixture {
+  /** What projects the set — `relay-addr-beacon-file-sink` on the household. */
+  kind?: string;
+  /** The public name this set serves (e.g. `elohim.local`). */
+  publicName?: string;
+  /** Absolute path to the membership document the beacon legs maintain. */
+  membershipFile?: string;
+  /** Where each leg logs (`<logDir>/beacon-<owner>.log`). */
+  logDir?: string;
+  /** Fixture doorway id -> the owner slug that doorway's leg writes under. */
+  owners?: Record<string, string>;
+  probeIntervalSecs?: number;
+  joinAfterProbes?: number;
+  leaveAfterProbes?: number;
+  /** Upper bound for an owner's entry to leave the set after its doorway stops serving. */
+  withdrawBoundMs?: number;
+  /** Upper bound for an owner's entry to return after its doorway serves again. */
+  rejoinBoundMs?: number;
+}
+
 export interface HouseholdMeshFixture {
   commonsEprId?: string;
   convergenceWindowMs?: number;
@@ -67,6 +105,7 @@ export interface HouseholdMeshFixture {
   processControlReason?: string;
   doorways?: Record<string, DoorwayFixture>;
   storagePeers?: Record<string, StoragePeerFixture>;
+  membershipAuthority?: MembershipAuthorityFixture;
 }
 
 export interface HouseholdFootprint {
@@ -292,6 +331,37 @@ export function requireFixtureDoorwayUrl(fixture: HouseholdMeshFixture, id: stri
     );
   }
   return value;
+}
+
+/**
+ * The household's membership authority, or a named refusal.
+ *
+ * Throws — deliberately — naming the apparatus rather than an environment
+ * variable, because "this household owns no public-name routing apparatus" is
+ * the substrate fact a reader needs, and the cure is one command.
+ */
+export function requireMembershipAuthority(
+  fixture: HouseholdMeshFixture
+): Required<Pick<MembershipAuthorityFixture, 'publicName' | 'membershipFile' | 'owners'>> &
+  MembershipAuthorityFixture {
+  const authority = fixture.membershipAuthority;
+  if (!authority?.membershipFile || !authority.publicName || !authority.owners) {
+    throw new Error(
+      'this household owns no public-name membership authority: the manifest declares no ' +
+        'complete membershipAuthority (publicName + membershipFile + owners). `just mesh start` ' +
+        'stages two relay-addr-beacon legs (`--sink file`, one per doorway) that maintain it, and ' +
+        '`just mesh prologue` copies their declaration into this manifest. Absent here means ' +
+        'MESH_MEMBERSHIP=0, no relay-addr-beacon binary (cd relay-addr-beacon && just gate), or a ' +
+        'prologue that ran before the legs were staged. This is a missing-apparatus refusal, not ' +
+        'a defect in the doorways.'
+    );
+  }
+  return {
+    ...authority,
+    publicName: authority.publicName,
+    membershipFile: authority.membershipFile,
+    owners: authority.owners,
+  };
 }
 
 export function requireFixturePrimaryStorageUrl(
