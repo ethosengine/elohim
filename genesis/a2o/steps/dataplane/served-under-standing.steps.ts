@@ -28,12 +28,20 @@
  * `metadata` (a JSON object, not a string) REPLACES the row's metadata wholesale
  * (`UpdateReaCommitmentStateView` / `handle_update_state`,
  * elohim/elohim-storage/src/api/rea_commitments.rs:352-378). `state` is required on
- * every PATCH; this file always resends `'proposed'`, the state the commitment was
- * created with, so a reach-only narrowing never touches lifecycle. This IS the
- * steward's own re-declaration of the contract's reach standing in for a Mishpat
- * ruling verb until one exists (habit note, WS3 pass three: "the governance lever
- * is a holon's ruling rather than a config flag" — today the closest live lever is
- * this admin PATCH on the commitment the collective's own steward provider holds).
+ * every PATCH, and a fresh `project-epr` POST lands in state `"created"`, NOT
+ * `"proposed"` — sending a DIFFERENT state than the row currently holds is a real
+ * lifecycle transition, which routes storage through a conductor state-advance that
+ * re-anchors the entry's OLD metadata over the new (measured 2026-09-12: this file
+ * used to hardcode `state: 'proposed'` on every narrowing PATCH, which silently
+ * clobbered the reach it had just set; fixed storage-side in 48f706e98, unshipped).
+ * So `narrowReach` below GETs the commitment first and echoes its CURRENT `state`
+ * verbatim in the PATCH body — the only change in the payload is `metadata.reach`
+ * (and, for scenario 2, `metadata.gateHints`) — which also routes storage through
+ * its direct (non-conductor) path. This IS the steward's own re-declaration of the
+ * contract's reach standing in for a Mishpat ruling verb until one exists (habit
+ * note, WS3 pass three: "the governance lever is a holon's ruling rather than a
+ * config flag" — today the closest live lever is this admin PATCH on the
+ * commitment the collective's own steward provider holds).
  *
  * THE HOUSEHOLD COLLECTIVE. The real Dowell household on this mesh is the
  * `household-dowell` collective (`genesis/seeder/src/seed-household-formation.ts`
@@ -628,20 +636,45 @@ async function stageRoot(world: E2EWorld, doorwayId: string, label: string): Pro
   return staged;
 }
 
+/** The commitment's CURRENT `state`, read live — never assumed. A fresh
+ * `project-epr` create lands in `"created"`, not `"proposed"`; sending any
+ * OTHER value on a PATCH is a genuine lifecycle transition, which is exactly
+ * what a reach-only narrowing must not be (file header, NARROWING). */
+async function currentCommitmentState(doorwayUrl: string, commitmentId: string): Promise<string> {
+  const res = await fetch(`${doorwayUrl}/api/v1/commitments/${commitmentId}`, {
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const text = await res.text();
+  assert.equal(
+    res.status,
+    200,
+    `GET ${doorwayUrl}/api/v1/commitments/${commitmentId} failed: HTTP ${res.status} ${text.slice(0, 300)}`
+  );
+  const body = JSON.parse(text) as { state?: string };
+  assert.ok(
+    body.state,
+    `commitment ${commitmentId} carries no "state" field: ${text.slice(0, 300)}`
+  );
+  return body.state;
+}
+
 /** Re-declare `staged`'s reach (and, optionally, its gate hints) — the
  * steward's own re-declaration of the contract, standing in for a Mishpat
- * ruling verb until one exists (file header). */
+ * ruling verb until one exists (file header). GENUINELY reach-only: the
+ * PATCH echoes the row's CURRENT `state` back verbatim (never a hardcoded
+ * lifecycle value), so the only real change in the payload is `metadata`. */
 async function narrowReach(
   staged: StagedRoot,
   reach: string,
   gateHints: GateHint[] = []
 ): Promise<void> {
   const metadata = buildMetadata(staged.mount, reach, gateHints);
+  const currentState = await currentCommitmentState(staged.doorwayUrl, staged.commitmentId);
   const res = await adminCall(
     'PATCH',
     `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`,
     {
-      state: 'proposed',
+      state: currentState,
       metadata,
     }
   );
@@ -825,6 +858,37 @@ async function pollUntilStatus(
       throw new Error(
         `GET ${url} never reached HTTP ${wantStatus} within ${budgetMs}ms (last observed: ` +
           `HTTP ${last.status} ${last.text.slice(0, 200)})`
+      );
+    }
+    await delay(intervalMs);
+  }
+}
+
+/** Poll until the narrowing has genuinely landed AND standing is still
+ * admitted — the two-sided check a single "poll for 200 with the bearer"
+ * cannot certify (a 200 there is trivially true while the reach is still
+ * `commons`, before the narrowing has even reached this doorway's fold). Both
+ * conditions must hold: an ANONYMOUS request answers 403 (the narrowing
+ * itself landed on this doorway's fold) and the SAME path answers 200 to the
+ * bearer (the standing the reach names is still admitted under it). */
+async function pollUntilNarrowedWithStanding(
+  url: string,
+  bearerHeaders: Record<string, string>,
+  budgetMs: number,
+  intervalMs = RECONCILE_POLL_INTERVAL_MS
+): Promise<void> {
+  const deadline = Date.now() + budgetMs;
+  let lastAnon: RawResponse | undefined;
+  let lastAuthed: RawResponse | undefined;
+  for (;;) {
+    lastAnon = await rawGet(url);
+    lastAuthed = await rawGet(url, bearerHeaders);
+    if (lastAnon.status === 403 && lastAuthed.status === 200) return;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `GET ${url} did not converge to "narrowed but standing admitted" within ${budgetMs}ms — ` +
+          `anonymous answered HTTP ${lastAnon.status} (want 403, i.e. the narrowing landed), ` +
+          `authenticated answered HTTP ${lastAuthed.status} (want 200, i.e. standing still admits)`
       );
     }
     await delay(intervalMs);
@@ -1148,7 +1212,7 @@ const NO_DEVICE_STANDING_PATH_REASON = (name: string): string =>
 
 Given(
   '{string} has been narrowed to a reach that admits members of {string}',
-  { timeout: OWN_REFRESH_BUDGET_MS + 60_000 },
+  { timeout: 150_000 },
   async function (
     this: E2EWorld,
     eprLabel: string,
@@ -1166,17 +1230,21 @@ Given(
       },
     ]);
     // Wait for the HOLDER's own EprRouter refresh to pick up the new gate
-    // hints — probed with a bearer any household member holds (matthew,
-    // minted via alpha — see the ATTACHMENT above), so the wait genuinely
-    // observes the fold admitting standing under the new reach, not merely
-    // "the row changed".
+    // hints, checking BOTH sides at once — a bearer-only poll for 200 is
+    // trivially true while the reach is still `commons` (before the
+    // narrowing has even reached this fold) and certifies nothing. The
+    // convergence this scenario needs is that an ANONYMOUS request has
+    // started being refused (the narrowing landed) at the SAME time a
+    // bearer any household member holds (matthew, minted via alpha — see
+    // the ATTACHMENT above) is still admitted (the standing the reach
+    // names survives it) — both within the household's declared reconcile
+    // window.
     const bearer = await loginDevicePersonaBearer(this, 'Matthew');
     if (!bearer) return 'pending';
-    await pollUntilStatus(
+    await pollUntilNarrowedWithStanding(
       `${holder.doorwayUrl}${holder.path}`,
       { Authorization: `Bearer ${bearer.token}` },
-      200,
-      OWN_REFRESH_BUDGET_MS + 30_000
+      state.reconcileWindowMs + 15_000
     );
   }
 );
