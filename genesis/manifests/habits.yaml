@@ -93,6 +93,7 @@ vision: >
 
 habits:
   - id: dataplane-convergence
+    declared: elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
     invariant: >
       Serving-critical content state converges peer-to-peer; no per-host
       imperative write is load-bearing. A peer that missed a deploy heals.
@@ -845,6 +846,7 @@ habits:
       watched permanently rather than until a milestone.
 
   - id: blob-durability
+    declared: elohim/elohim-storage/.epr-meta/blob-durability.habit.md
     invariant: >
       Blob bytes survive peer loss and churn: custody commitments honored,
       RS-quilt placement household-diverse, salvage re-places without data loss.
@@ -1073,6 +1075,7 @@ habits:
       exactly the class that must not depend on someone remembering to look.
 
   - id: notary-authority
+    declared: elohim/holochain/.epr-meta/notary-authority.habit.md
     invariant: >
       Converged state can be notarized: green tier is reachable for any content
       (HEAD-DAG declare_content_head, reach re-certified at republish, author
@@ -1499,6 +1502,7 @@ habits:
       stops being a separate question anyone can answer wrongly.
 
   - id: doorway-failover
+    declared: doorway/doorway-service/.epr-meta/doorway-failover.habit.md
     invariant: >
       The apex name serves a person the landing shell through the loss OR
       catch-up shed of either doorway: siblings are honestly classifiable
@@ -1857,6 +1861,7 @@ habits:
       statement about a component that no longer sits in the path.
 
   - id: reach-enforced-everywhere
+    declared: .epr-meta/reach-enforced-everywhere.habit.md
     invariant: >
       Receiver-side pre-authorization at EVERY egress plane (DHT, CRDT sync,
       shard, HTTP, doorway): a credential the substrate cannot verify grants
@@ -1896,6 +1901,7 @@ habits:
       someone remembers to gate it. The per-plane gate is what this habit is really watching.
 
   - id: identity-cross-signed
+    declared: elohim/elohim-storage/.epr-meta/identity-cross-signed.habit.md
     invariant: >
       Agent-to-transport identity bindings are cross-signed and verifiable; no
       economic attribution rides a self-asserted binding.
@@ -1997,6 +2003,7 @@ habits:
       from a self-asserted one even by a caller trying to.
 
   - id: operator-runtime-surface
+    declared: elohim/elohim-storage/.epr-meta/operator-runtime-surface.habit.md
     invariant: >
       Any peer operator can inspect a runtime, restart, reseed, and trigger
       reconciliation as commitment-gated protocol verbs — with peer-local
@@ -2247,6 +2254,7 @@ habits:
       The habit then describes a product, not a practice.
 
   - id: dev-system-equilibrium
+    declared: .epr-meta/dev-system-equilibrium.habit.md
     invariant: >
       Every stock in the development system drains at least as fast as it
       fills — measured as rates over a declared window, never as a level.
@@ -2384,6 +2392,7 @@ habits:
       need a weekly reader.
 
   - id: sync-scale-honesty
+    declared: elohim/elohim-storage/.epr-meta/sync-scale-honesty.habit.md
     invariant: >
       The sync plane's cost is sub-quadratic and measured: announce-on-change
       (not poll-only), head-diff transfer, healthy request-response to every
@@ -2426,6 +2435,7 @@ habits:
       plane whose cost class it cannot afford — rather than by our measuring it after the fact.
 
   - id: measure-honesty-local
+    declared: elohim/epr/.epr-meta/measure-honesty-local.habit.md
     invariant: >
       Every quantity this repo tracks declares its kind (level/rate/ratio), a
       rate cannot forget its period, confidence rides inside the canonical
@@ -2546,6 +2556,7 @@ habits:
       forgot its period cannot be constructed), leaving the governance gate nothing to refuse.
 
   - id: conductor-capacity-represented
+    declared: elohim/elohim-storage/.epr-meta/conductor-capacity-represented.habit.md
     invariant: >
       The conductor's DB read pool is a REPRESENTED resource, not one discovered
       by timing out against it: every zome call is admitted through one
@@ -2700,6 +2711,7 @@ habits:
       local gate is then a compatibility shim, and shims retire.
 
   - id: governance-plane-single-evaluator
+    declared: .epr-meta/governance-plane-single-evaluator.habit.md
     invariant: >
       The repo's governance plane has exactly ONE evaluator. A given manifest
       yields one decision class, not one per implementation that happens to be
@@ -2870,6 +2882,7 @@ habits:
       then a fact about the build, not a property under watch.
 
   - id: recall-reaches-authority
+    declared: .epr-meta/recall-reaches-authority.habit.md
     invariant: >
       One governed journey serves every agent question — a ceremony's "understand this assertion
       and its changed evidence" and a session's "what is the shape of this concern and what do I
@@ -3016,6 +3029,7 @@ habits:
       reliably serves the next agent no longer needs a reader watching it.
 
   - id: epr-atom-home
+    declared: app/elohim-app/.epr-meta/epr-atom-home.habit.md
     invariant: >
       Every reachable EPR renders at /epr/{id} in one shell-owned frame — arrival where you
       actually came from, identity, a focal render shaped by format, the four legs in household
@@ -3083,6 +3097,7 @@ habits:
       habit then describes the runtime, not an Angular component.
 
   - id: hosted-cell-promised
+    declared: doorway/doorway-service/.epr-meta/hosted-cell-promised.habit.md
     invariant: >
       A hosted cell is a promise the notary recorded, not a favour the doorway keeps privately:
       registering as a hosted human yields a delegates-compute commitment (scope hosted-cell)
@@ -3133,6 +3148,7 @@ habits:
       promise cannot exist by construction, and the count is a fold over the DHT, not a doorway row.
 
   - id: hosted-human-lifecycle
+    declared: doorway/doorway-service/.epr-meta/hosted-human-lifecycle.habit.md
     invariant: >
       A hosted human's account at a doorway is their own from the portal forward and gone when
       they close it: registering through the portal yields the display name they typed and a
@@ -3221,6 +3237,7 @@ habits:
       and the practice under watch has become a property of the substrate.
 
   - id: nachalah-allotment
+    declared: elohim/elohim-storage/.epr-meta/nachalah-allotment.habit.md
     invariant: >
       Verified membership, consent, and witnessed assignments determine scoped holding;
       every assigned authority fully validates. Changes preserve sector-by-sector recovery
@@ -3251,6 +3268,7 @@ habits:
       cover every failure boundary without a separate cross-seam rehearsal.
 
   - id: runtime-death-witnessed
+    declared: elohim/elohim-storage/.epr-meta/runtime-death-witnessed.habit.md
     invariant: >
       A supervised child's death is witnessed by the runtime that was its parent: its exit class,
       last words, resource snapshot, the supervisor's own preceding decisions, and the passport are
@@ -3341,6 +3359,7 @@ habits:
       storage feature.
 
   - id: runtime-upgrade-propagation
+    declared: elohim/elohim-storage/.epr-meta/runtime-upgrade-propagation.habit.md
     invariant: >
       A runtime release (coordinator bundle first; config, binary, hApp bundle behind it) reaches
       every peer by ELECTION on its release channel — staged, soaked by a canary, promoted on
@@ -3586,6 +3605,7 @@ habits:
       register describes a product, not a practice.
 
   - id: happ-lineage-migration
+    declared: elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
     invariant: >
       A hApp version crossing (an integrity change, a new DNA hash) is carried by the network
       itself: refused at verify unless the release names what it migrates from and the elohim's
@@ -3993,6 +4013,7 @@ habits:
       describes a product, not a practice.
 
   - id: custodial-authority-answerable
+    declared: elohim/holochain/dna/imagodei/.epr-meta/custodial-authority-answerable.habit.md
     invariant: >
       A party acting on another party's account is answerable for it: the authority reaches the
       ACTING HUMAN over a traversable path even when the steward is an institution, the act names
@@ -4033,6 +4054,7 @@ habits:
       - "elohim/holochain/dna/imagodei/STEWARDSHIP_PHILOSOPHY.md"
 
   - id: antigravity-skill-projection
+    declared: elohim/sdk/domains/elohim-agent/.epr-meta/antigravity-skill-projection.habit.md
     invariant: >
       Every Elohim SkillPackage materializes as a discoverable Antigravity workspace skill from the
       same package-authoritative body used by Claude and Codex; every relative asset follows it

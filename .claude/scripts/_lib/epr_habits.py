@@ -207,6 +207,10 @@ def census(root: Path) -> tuple[list[dict], list[str]]:
             errs.append(f"{rel}: unreadable habit declaration")
             continue
         errs.extend(validate(habit, rel))
+        # The atom's own path, carried on the row: a reader that needs the declaration (the
+        # bootstrapping head's last-delta line) opens it directly instead of re-walking the tree
+        # under a byte budget that a stray untracked directory can exhaust.
+        habit["declared"] = rel
         habits.append(habit)
 
     seen: dict[str, str] = {}
@@ -324,6 +328,8 @@ def project_habit(habit: dict) -> list[str]:
         if key not in fields:
             continue
         out.extend(f"    {ln}" if ln.strip() else "" for ln in fields[key])
+        if key == "id" and isinstance(habit.get("declared"), str):
+            out.append(f"    declared: {habit['declared']}")
     if out:
         out[0] = "  - " + out[0][4:]
     return out
