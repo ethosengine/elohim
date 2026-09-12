@@ -215,9 +215,24 @@ liveness folded on top.
 
 ### The fold
 
-When a doorway's own answer for a `GET` on a non-service path is a `404` (it
-holds no contract for that root) or a `503` (its own primary *and* pool are
-shedding), it folds a candidate set:
+A relay is considered on **two** triggers:
+
+- **`LocalVerdict`** — this doorway's answer for a `GET` on a non-service path
+  is a `404` (it holds no contract for that root) or a `503` (its own primary
+  *and* pool are shedding).
+- **`LessSpecificThanHolder`** — this doorway *can* answer, but only from a
+  less specific mount than a sibling's. Longest-prefix is decided across local
+  contracts **UNION** the name-route table, host-first — not local contracts
+  alone. A doorway holding the landing app at `/` would otherwise answer
+  `GET /nrt-garden/` with its own catch-all shell (200, no marker, relay tier
+  never consulted) for a name a sibling holds the real contract for. Measured
+  on the household mesh, run `20260912T211541Z`. **Ties go to local**: equal
+  specificity means we hold the same contract, so serving it ourselves is
+  cheaper, keeps the client's origin, and cannot loop. A more specific *local*
+  mount also wins. The check runs BEFORE the SSR diversion, so no V8 render is
+  spent on content this doorway does not hold the contract for.
+
+On either trigger it folds a candidate set:
 
 1. every sibling doorway holding a live projection contract covering the
    requested path (segment-boundary prefix match, identical to local
@@ -254,6 +269,7 @@ relay mode is an enum — so each row below is filled in, never re-keyed.
 |---|---|---|
 | **host** | `RouteKey.host` is carried and matched host-first (lowercased, port-stripped). Every contract is an **any-host** contract (`HolderContract.host = None`), because a coherence head set carries no host — so the term never narrows yet. A host-bound contract already beats an any-host one for the same doorway. | Hostnames become **head channels**: `elohim.host` = converged head at commons reach, `alpha.elohim.host` = candidate head at stewards reach, both served by every doorway. Populating `HolderContract.host` is the whole change. |
 | **path** | Segment-boundary mount match, identical to local `EprRouter` dispatch; most specific mount per doorway. | unchanged |
+| **specificity (local vs federation)** | WIRED — longest-prefix across local contracts ∪ the name-route table (`mount_specificity` = host-bound, then path length). A strictly more specific holder wins; ties and a more specific local mount keep the request here. | unchanged in shape; the host term starts participating once contracts carry hosts |
 | **health** | WIRED — `SelectorTerm::Liveness`, the first term. `Serving` → `Uncertain` → `Shedding` → `Unreachable`. | unchanged |
 | **reach / standing** | Declared `SelectorTerm::ReachStanding`, constant (`TERM_NOT_YET_WIRED`) — a no-op that cannot reorder anything. | The requester's standing as their own conductor states it, against the EPR's declared reach, per holder. |
 | **nearest** | Declared `SelectorTerm::Nearest`, constant. | Attested RTT (the peer-health probe already records `response_time_ms` into the infrastructure DNA), with **region as a selector term beside RTT, never a separate authority**. |

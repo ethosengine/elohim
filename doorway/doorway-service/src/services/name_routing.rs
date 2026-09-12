@@ -276,10 +276,70 @@ pub fn host_matches(contract_host: Option<&str>, requested_host: Option<&str>) -
     }
 }
 
-/// How specific a contract is for a key: host-bound beats any-host, then the
-/// longer mount wins. Used to pick ONE contract per doorway.
+/// How specific a mount is: host-bound beats any-host, then the longer path
+/// wins. ONE definition, used both to pick a doorway's best contract and to
+/// compare the federation's best against this doorway's own.
+pub fn mount_specificity(host: Option<&str>, url_path: &str) -> (u8, usize) {
+    (u8::from(host.is_some()), url_path.len())
+}
+
 fn specificity(contract: &HolderContract) -> (u8, usize) {
-    (u8::from(contract.host.is_some()), contract.url_path.len())
+    mount_specificity(contract.host.as_deref(), &contract.url_path)
+}
+
+/// The mount THIS doorway would serve a request from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalMount {
+    pub host: Option<String>,
+    pub url_path: String,
+}
+
+impl LocalMount {
+    /// Today's shape: a local projection carries no host.
+    pub fn path_only(url_path: &str) -> Self {
+        Self {
+            host: None,
+            url_path: url_path.to_string(),
+        }
+    }
+
+    fn specificity(&self) -> (u8, usize) {
+        mount_specificity(self.host.as_deref(), &self.url_path)
+    }
+}
+
+/// Keep only holders whose mount is **strictly more specific** than this
+/// doorway's own best match.
+///
+/// The catch-all problem, measured on the household mesh (run
+/// `20260912T211541Z`): doorway B holds the landing app at mount `/`, so
+/// `GET /nrt-garden/` answered 200 with the landing shell and the relay tier —
+/// which only fired on a local 404/shed — was never consulted. B's name-route
+/// table DID hold A's `/nrt-garden` contract at the time: B's own cross-edge
+/// divergence WARN at 21:16:34Z names `divergent_paths: ["/nrt-garden"]`, i.e.
+/// A's head set carried it and B's did not. Serving our own catch-all for a
+/// name a sibling holds the specific contract for is answering for somebody
+/// else's name.
+///
+/// `local = None` means this doorway has no mount for the request, or cannot
+/// serve from the one it has (a 404 or a shed) — every holder qualifies, which
+/// is exactly today's behaviour.
+///
+/// **Ties go to LOCAL.** Equal specificity means we hold the same contract the
+/// sibling does; serving it ourselves is cheaper, keeps the client's origin,
+/// and cannot loop.
+pub fn holders_more_specific_than(
+    local: Option<&LocalMount>,
+    holders: Vec<NameHolder>,
+) -> Vec<NameHolder> {
+    let Some(local) = local else {
+        return holders;
+    };
+    let local_rank = local.specificity();
+    holders
+        .into_iter()
+        .filter(|holder| mount_specificity(holder.host.as_deref(), &holder.url_path) > local_rank)
+        .collect()
 }
 
 /// **The registry fold.** Candidate holders for a [`RouteKey`], matched
@@ -569,28 +629,47 @@ where
     }
 }
 
+/// Why a relay is being considered. The two triggers answer different
+/// questions: one is "we cannot serve this", the other is "we can, but
+/// somebody else holds the more specific contract".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RelayTrigger {
+    /// This doorway's own answer. Only a 404 (no contract for this root here)
+    /// or a 503 (its own primary + pool are shedding) is relay-eligible.
+    LocalVerdict(StatusCode),
+    /// This doorway CAN answer, but only from a LESS SPECIFIC mount than a
+    /// sibling's — typically its `/` catch-all against a sibling's real
+    /// contract for the requested root. Eligible whatever the local status
+    /// would have been: the local answer is not broken, it is simply not ours
+    /// to give.
+    LessSpecificThanHolder,
+}
+
 /// Whether a request is eligible for a name-routed relay at all. PURE, so the
-/// gate is one testable predicate instead of a condition smeared across two
+/// gate is one testable predicate instead of a condition smeared across the
 /// dispatch sites.
 ///
-/// All four must hold:
+/// All must hold:
 /// 1. `is_get` — only reads relay; a write is never replayed at a sibling.
 /// 2. `!is_service_path` — a name is a projected root, not `/db/*`, `/admin/*`
 ///    or any other doorway/storage service surface.
 /// 3. `!hop_seen` — the ONE-hop budget (see [`MAX_FEDERATION_HOPS`]).
-/// 4. the local answer is a 404 (no contract for this root here) or a 503
-///    (this doorway's own primary + pool are shedding).
+/// 4. the trigger admits it (see [`RelayTrigger`]).
 pub fn relay_precondition(
     is_get: bool,
     is_service_path: bool,
     hop_seen: bool,
-    local_status: StatusCode,
+    trigger: RelayTrigger,
 ) -> bool {
-    is_get
-        && !is_service_path
-        && !hop_seen
-        && (local_status == StatusCode::NOT_FOUND
-            || local_status == StatusCode::SERVICE_UNAVAILABLE)
+    if !is_get || is_service_path || hop_seen {
+        return false;
+    }
+    match trigger {
+        RelayTrigger::LocalVerdict(status) => {
+            status == StatusCode::NOT_FOUND || status == StatusCode::SERVICE_UNAVAILABLE
+        }
+        RelayTrigger::LessSpecificThanHolder => true,
+    }
 }
 
 /// True iff an inbound request already crossed a doorway. Any non-empty value
@@ -936,63 +1015,154 @@ mod tests {
 
     // ── the one-hop budget ──────────────────────────────────────────────────
 
+    const NOT_FOUND: RelayTrigger = RelayTrigger::LocalVerdict(StatusCode::NOT_FOUND);
+
     #[test]
     fn inbound_hop_header_refuses_the_forward() {
-        // (c) inbound loop header → no forward, whatever the local verdict is.
+        // (c) inbound loop header → no forward, whatever the trigger is.
         assert!(!relay_precondition(
             true,
             false,
             inbound_hop_seen(Some("1")),
-            StatusCode::NOT_FOUND
+            NOT_FOUND
         ));
         assert!(!relay_precondition(
             true,
             false,
             inbound_hop_seen(Some("anything")),
-            StatusCode::SERVICE_UNAVAILABLE
+            RelayTrigger::LocalVerdict(StatusCode::SERVICE_UNAVAILABLE)
+        ));
+        // The one-hop budget binds the specificity trigger exactly as hard.
+        assert!(!relay_precondition(
+            true,
+            false,
+            inbound_hop_seen(Some("1")),
+            RelayTrigger::LessSpecificThanHolder
         ));
         // No header (or a blank one) → eligible.
         assert!(relay_precondition(
             true,
             false,
             inbound_hop_seen(None),
-            StatusCode::NOT_FOUND
+            NOT_FOUND
         ));
         assert!(relay_precondition(
             true,
             false,
             inbound_hop_seen(Some("  ")),
-            StatusCode::NOT_FOUND
+            NOT_FOUND
         ));
     }
 
     #[test]
     fn relay_precondition_gates_method_surface_and_status() {
+        assert!(!relay_precondition(false, false, false, NOT_FOUND));
+        assert!(!relay_precondition(true, true, false, NOT_FOUND));
         assert!(!relay_precondition(
+            true,
             false,
             false,
-            false,
-            StatusCode::NOT_FOUND
+            RelayTrigger::LocalVerdict(StatusCode::OK)
         ));
         assert!(!relay_precondition(
             true,
-            true,
-            false,
-            StatusCode::NOT_FOUND
-        ));
-        assert!(!relay_precondition(true, false, false, StatusCode::OK));
-        assert!(!relay_precondition(
-            true,
             false,
             false,
-            StatusCode::INTERNAL_SERVER_ERROR
+            RelayTrigger::LocalVerdict(StatusCode::INTERNAL_SERVER_ERROR)
         ));
         assert!(relay_precondition(
             true,
             false,
             false,
-            StatusCode::SERVICE_UNAVAILABLE
+            RelayTrigger::LocalVerdict(StatusCode::SERVICE_UNAVAILABLE)
         ));
+        // The specificity trigger is status-independent: a local 200 from a
+        // catch-all is exactly the case it exists for.
+        assert!(relay_precondition(
+            true,
+            false,
+            false,
+            RelayTrigger::LessSpecificThanHolder
+        ));
+        assert!(!relay_precondition(
+            false,
+            false,
+            false,
+            RelayTrigger::LessSpecificThanHolder
+        ));
+        assert!(!relay_precondition(
+            true,
+            true,
+            false,
+            RelayTrigger::LessSpecificThanHolder
+        ));
+    }
+
+    // ── specificity: a catch-all must not answer for somebody else's name ────
+
+    fn holder_at(id: &str, origin: &str, mount: &str) -> NameHolder {
+        NameHolder {
+            url_path: mount.to_string(),
+            ..holder(id, origin, HolderLiveness::Serving)
+        }
+    }
+
+    #[test]
+    fn sibling_specific_mount_beats_a_local_catch_all() {
+        // THE measured case: B holds "/" (landing SPA), A holds "/nrt-garden".
+        let holders = vec![holder_at("alpha", "https://a.example", "/nrt-garden")];
+        let kept = holders_more_specific_than(Some(&LocalMount::path_only("/")), holders);
+        assert_eq!(kept.len(), 1, "the sibling's specific mount wins over '/'");
+        assert_eq!(kept[0].url_path, "/nrt-garden");
+    }
+
+    #[test]
+    fn an_equal_mount_ties_and_local_wins() {
+        let holders = vec![holder_at("alpha", "https://a.example", "/nrt-garden")];
+        let kept = holders_more_specific_than(Some(&LocalMount::path_only("/nrt-garden")), holders);
+        assert!(
+            kept.is_empty(),
+            "we hold the same contract — serve it ourselves, never relay"
+        );
+    }
+
+    #[test]
+    fn a_more_specific_local_mount_wins() {
+        let holders = vec![holder_at("alpha", "https://a.example", "/nrt-garden")];
+        let kept =
+            holders_more_specific_than(Some(&LocalMount::path_only("/nrt-garden/deep")), holders);
+        assert!(kept.is_empty(), "local is the more specific holder");
+    }
+
+    #[test]
+    fn no_local_mount_keeps_every_holder_todays_404_path() {
+        // `None` = we hold no mount (404) or cannot serve the one we hold
+        // (shed). Behaviour must be exactly as before the specificity term.
+        let holders = vec![
+            holder_at("alpha", "https://a.example", "/nrt-garden"),
+            holder_at("gamma", "https://g.example", "/"),
+        ];
+        let kept = holders_more_specific_than(None, holders.clone());
+        assert_eq!(kept, holders, "unchanged when there is no local match");
+    }
+
+    #[test]
+    fn an_empty_table_relays_nothing_and_local_serves() {
+        // No name-route table (fresh boot, or a doorway with no siblings):
+        // nothing qualifies, so dispatch is byte-for-byte today's.
+        let kept = holders_more_specific_than(Some(&LocalMount::path_only("/")), Vec::new());
+        assert!(kept.is_empty());
+    }
+
+    #[test]
+    fn a_host_bound_sibling_mount_outranks_an_equal_length_local_any_host_mount() {
+        // Forward-looking: when hosts become head channels, host-bound is more
+        // specific than any-host at equal path length.
+        let mut bound = holder_at("alpha", "https://a.example", "/nrt-garden");
+        bound.host = Some("elohim.host".to_string());
+        let kept =
+            holders_more_specific_than(Some(&LocalMount::path_only("/nrt-garden")), vec![bound]);
+        assert_eq!(kept.len(), 1, "host-bound beats any-host at equal length");
     }
 
     // ── the relay ───────────────────────────────────────────────────────────

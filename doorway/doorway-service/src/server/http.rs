@@ -5576,19 +5576,27 @@ async fn fetch_from_holder(
 /// GET only, non-service path only, no inbound hop header, and a local verdict
 /// of 404 (no contract for this root here) or 503 (our own primary + pool are
 /// shedding).
+#[allow(clippy::too_many_arguments)]
 async fn relay_by_name(
     state: &Arc<AppState>,
     is_get: bool,
     path: &str,
     query: Option<&str>,
     ctx: &RelayContext,
-    local_status: StatusCode,
+    trigger: crate::services::name_routing::RelayTrigger,
+    // The mount this doorway WOULD serve the request from, when it holds one
+    // AND can serve it. `None` for a local 404 or shed — then every holder
+    // qualifies, which is the original behaviour. `Some(mount)` filters the
+    // candidates down to those STRICTLY more specific than ours, so a `/`
+    // catch-all never answers for a name a sibling holds the contract for.
+    local_mount: Option<&crate::services::name_routing::LocalMount>,
 ) -> Option<Response<Full<Bytes>>> {
     use crate::services::name_routing::{
-        build_relayed_response, relay_one_hop, relay_precondition, RelayVerdict,
+        build_relayed_response, holders_more_specific_than, relay_one_hop, relay_precondition,
+        RelayVerdict,
     };
 
-    if !relay_precondition(is_get, is_service_path(path), ctx.hop_seen, local_status) {
+    if !relay_precondition(is_get, is_service_path(path), ctx.hop_seen, trigger) {
         return None;
     }
 
@@ -5600,10 +5608,14 @@ async fn relay_by_name(
     // Host-first, then path — the fold's key. Host never narrows today (every
     // contract is any-host); it is threaded so the next rung does not re-key.
     let key = crate::services::name_routing::RouteKey::new(ctx.host.as_deref(), path);
-    let holders = state.name_routes.holders_for(&key, &self_doorway_id);
+    let holders = holders_more_specific_than(
+        local_mount,
+        state.name_routes.holders_for(&key, &self_doorway_id),
+    );
     if holders.is_empty() {
-        // Nobody in the federation holds a contract covering this name — our
-        // 404 is the whole truth, and saying so costs no network at all.
+        // Either nobody in the federation holds a contract covering this name
+        // (our 404 is the whole truth) or nobody holds a MORE SPECIFIC one
+        // than we do (we serve it ourselves). Both cost no network at all.
         return None;
     }
 
@@ -5635,7 +5647,7 @@ async fn relay_by_name(
                 served_by = %origin,
                 holder = %doorway_id,
                 status = reply.status,
-                local_status = local_status.as_u16(),
+                trigger = ?trigger,
                 candidates = holders.len(),
                 "name-route: relayed one hop to the holder of this name"
             );
@@ -5646,7 +5658,7 @@ async fn relay_by_name(
                 path = %path,
                 counter = "doorway_name_route_relay_failed_total",
                 attempted,
-                local_status = local_status.as_u16(),
+                trigger = ?trigger,
                 "name-route: every holder failed — preserving the local verdict"
             );
             None
@@ -5833,6 +5845,31 @@ async fn handle_request(
                 url_path = %projection.url_path,
                 "EPR router matched — dispatching to projected bundle"
             );
+            // ── Federation specificity ────────────────────────────────────────
+            // Longest-prefix is decided across local contracts UNION the
+            // name-route table, not local contracts alone. A doorway holding
+            // the landing app at "/" would otherwise answer `GET /nrt-garden/`
+            // with its own catch-all shell — 200, no marker, relay tier never
+            // consulted — for a name a sibling holds the real contract for
+            // (measured on the household mesh, run 20260912T211541Z). Ties go
+            // to local; a local 404/shed still relays below, as before.
+            // Checked BEFORE the SSR diversion so no V8 render is spent on
+            // content this doorway does not hold the contract for.
+            let local_mount =
+                crate::services::name_routing::LocalMount::path_only(&projection.url_path);
+            if let Some(relayed) = relay_by_name(
+                &state,
+                is_get,
+                &path,
+                relay_query.as_deref(),
+                &relay_ctx,
+                crate::services::name_routing::RelayTrigger::LessSpecificThanHolder,
+                Some(&local_mount),
+            )
+            .await
+            {
+                return Ok(to_boxed(relayed));
+            }
             // The manifest `render` field is the agnostic SSR contract: a
             // projection whose path is ALSO declared render:"angular-ssr" must
             // serve through the V8 SSR engine (peer-capability-gated), not the
@@ -5888,7 +5925,11 @@ async fn handle_request(
                     &path,
                     relay_query.as_deref(),
                     &relay_ctx,
-                    local.status(),
+                    crate::services::name_routing::RelayTrigger::LocalVerdict(local.status()),
+                    // No local mount filter: we hold a contract but cannot
+                    // serve it, so ANY holder of this name is better than a
+                    // shed — specificity is irrelevant when we answer nothing.
+                    None,
                 )
                 .await
                 {
@@ -7098,7 +7139,10 @@ async fn handle_request(
         &path,
         relay_query.as_deref(),
         &relay_ctx,
-        response.status(),
+        crate::services::name_routing::RelayTrigger::LocalVerdict(response.status()),
+        // We hold no mount for this request (404) or could not serve it (503),
+        // so there is nothing to be more specific than.
+        None,
     )
     .await
     {
