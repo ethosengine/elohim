@@ -174,4 +174,9 @@ wiped another lane's uncommitted work on the shared `dev` checkout):
 `capability-tier-gate-owns-destructive-git` fires when destructive-git command text appears in
 a `.py` file, pointing at the one declared pattern table
 (`.claude/epr-meta/policies.yaml`'s `destructive-git-requires-tier@1`) rather than a second,
-driftable copy. None of the five blocks; each retires on a counted condition.
+driftable copy. The enforcer itself classifies by TOKEN, not substring — the command is joined
+across `\`-newline continuations, split on operators, unwrapped through `sudo`/`env`/`nice`/
+`exec`/`xargs`/`sh -c`, and each `git <sub>` matched against the row's subcommand rules — and it
+denies on ambiguity only when the unresolvable text sits inside a destructive form (a glued
+`git${IFS}reset`, a `$VAR` flag on `reset`), never on a `${VAR}` in an ordinary commit message.
+None of the five blocks; each retires on a counted condition.

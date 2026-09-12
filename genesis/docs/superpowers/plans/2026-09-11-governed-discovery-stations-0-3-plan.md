@@ -24,7 +24,7 @@ cites:
 
 ## Global Constraints
 
-- Native gate, run after every task that touches Rust, EXIT echoed on its own line: `cd /projects/elohim && env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-gate-target CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test help_is_a_question --test flow_report; echo EXIT=$?` plus `cargo fmt --all --manifest-path elohim/eprfs/Cargo.toml -- --check` and `cargo clippy --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --all-targets -- -D warnings`. Claim the cargo berth first: `BERTH_SESSION=<session> berth claim cargo --ttl 7200`.
+- Native gate, run after every task that touches Rust, EXIT echoed on its own line: `env RUSTFLAGS= CARGO_TARGET_DIR=/tmp/eprfs-gate-target CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test help_is_a_question --test flow_report; echo EXIT=$?` plus `cargo fmt --all --manifest-path elohim/eprfs/Cargo.toml -- --check` and `cargo clippy --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --all-targets -- -D warnings`. Claim the cargo berth first: `BERTH_SESSION=<session> berth claim cargo --ttl 7200`.
 - Integrated gate before any commit that touches hooks, a2o or the contract: `just gate memory-ceremony; echo EXIT=$?`.
 - Honesty floor: every rendered view at every lens prints recipe CID, lens CID, selection rule, omissions and receipts (collapsed to one line at `minimal`, never dropped). Unfilterable content classes (corrections, counter-evidence, accountability, own-community facts) render regardless of lens.
 - Nothing mints a kind the spec maps to an existing one. Use `elohim_epr_rea::{ProcessSpec, StageSpec, Bound, Intent, FlowEvent, AgentRef}`, `elohim_epr::verdict::{Verdict, Witness, CheckWitness, Decision}`, `eprfs_agent::memory::{ProjectionRequest, Feedback, FeedbackKind}`.
@@ -514,6 +514,64 @@ class BootstrapProjectionCase(unittest.TestCase):
 3. **Step 3: Implement**: both hooks call the binary via `_observation.resolve_bin()` with a 6-second budget and print its stdout under `BOOTSTRAP:` (headline) or as the run-plane block; on timeout or non-zero exit they print one line `bootstrap: skipped — <reason>` (honest absence, never a fallback renderer). Delete `run-projection.py`'s own habits.yaml/flows.jsonl derivation and cache (`cache_key`, `read_cache`, `write_cache` go; the binary is the cache). Keep `epr flow report --headline` as the first block (it is the bounds fold, a different derivation).
 4. **Step 4: Declare the rule** in `.claude/hooks/.epr-meta`: `class: inject`, `when: {write: "run-projection.py|load-project-context.py"}`, text: "the bootstrapping head is `epr flow memory recall open --purpose bootstrap`; a hook renders it at a lens and never derives a second orientation".
 5. **Step 5: Integrated gate** `just gate memory-ceremony; echo EXIT=$?` — Expected 0 (the drift test's headline assertions updated to the new block). **Step 6: Commit** — `git commit -m "feat(hooks): SessionStart headline and run-plane are projections of recall open at minimal/simple; bespoke renderers retired"`
+
+### Task 2.4: Tiered capability gate — destructive git needs a declared tier or a team check
+
+- [ ] Task 2.4: Tiered capability gate — destructive git needs a declared tier or a team check
+
+**Why (operator, 2026-09-11):** a Haiku subagent of another session ran `git reset --hard` on the shared
+`dev` checkout, dropping three commits from the branch pointer and wiping other lanes' uncommitted work.
+Haiku- and Sonnet-tier agents must not hold `git reset`-level capability without checking with the team
+first. The tier vocabulary is the one the reader lens already uses (`agent:<role>@<model>`), so this is the
+same seam as the lens table: a declared capability table, evaluated at the edge, printed with its reason.
+
+**Files:**
+- Create: `.claude/hooks/capability-tier-gate.py` (PreToolUse, matcher `Bash`)
+- Modify: `.claude/settings.json` (register the hook in the existing `Bash` PreToolUse entry, timeout 5 s)
+- Modify: `.claude/epr-meta/policies.yaml` (row `destructive-git-requires-tier`, `class: deny`, with the table)
+- Create: `.claude/hooks/__tests__/capability_tier_gate_test.py`
+- Modify: `.claude/hooks/.epr-meta` (rule `capability-tier-gate-owns-destructive-git`, `class: inject`)
+- Package: follow the hook packaging convention (`.epr-meta/elohim/packages/hooks/*.json`, `plant-eprfs-hook` skill) so the verifier stays green.
+
+**Interfaces:**
+- Consumes: the acting tier — `CLAUDE_MODEL`/`ANTHROPIC_MODEL` env if present, else the actor sidecar's current claim for `CLAUDE_SESSION_ID` (`epr actor current --session <id>` or a direct read of `.eprfs/status/actors.jsonl`), else `unknown`.
+- Produces: exit 2 with a `deny` decision and the reason on stdout/stderr per the hooks contract, for a Bash command matching the destructive set when the tier is below the declared floor; exit 0 otherwise. The declared table in `policies.yaml`:
+
+```yaml
+  - id: destructive-git-requires-tier
+    version: 1
+    class: deny
+    subject: bash-command
+    predicate: destructive-git
+    patterns:                       # matched against the whole command line, any position
+      - "git reset --hard"
+      - "git reset --merge"
+      - "git checkout -- ."
+      - "git checkout ."
+      - "git restore ."
+      - "git clean -f"
+      - "git push --force"
+      - "git push -f"
+      - "git branch -D"
+      - "git branch -f"
+      - "git update-ref"
+      - "git stash drop"
+      - "git stash clear"
+      - "git worktree remove --force"
+      - "rm -rf ."
+    tier-floor: claude-opus-5       # models at or above this tier may run these; below must check with the team
+    tier-order: [claude-haiku-4-5, claude-sonnet-5, claude-opus-5, claude-fable-5-1, gpt-5.6-sol]
+    unknown-tier: deny              # an unclaimed actor is treated as below the floor (fail-closed)
+    remedy: "check with the team first: ask the controller/operator to run this, or claim your tier (epr actor claim --as agent:<role>@<model> --session $CLAUDE_SESSION_ID) if you are at or above the floor"
+    established_by: governed-discovery-task-2.4-2026-09-11
+```
+
+1. **Step 1: Failing tests** — `capability_tier_gate_test.py`: (a) `git reset --hard abc` with `CLAUDE_MODEL=claude-haiku-4-5` → exit 2, output contains `destructive-git-requires-tier` and the remedy; (b) same command with `CLAUDE_MODEL=claude-opus-5` → exit 0; (c) no env and no actor claim → exit 2 (unknown = deny); (d) no env but `actors.jsonl` claims `agent:implementer@claude-fable-5-1` for `CLAUDE_SESSION_ID` → exit 0; (e) `git reset --soft abc`, `git status`, `git log` → exit 0 (not in the set); (f) a malformed `policies.yaml` row → the hook prints `capability-tier-gate: skipped — <reason>` and exits 0 (fail-open like every hook, but SAYS so — never silently allow).
+2. **Step 2: Run** `python3 -m unittest discover -s .claude/hooks/__tests__ -p 'capability_tier_gate_test.py'` — FAIL.
+3. **Step 3: Implement** the hook thin, reading the table from `policies.yaml` (the `_lib` YAML reader the other hooks use), the tier from env → sidecar → unknown, matching patterns as substrings of the normalised command (collapse whitespace), and emitting the hooks contract's deny shape (look at `cargo-disk-guard.py` for the exact stdout JSON / exit code the harness expects for a deny).
+4. **Step 4: Register** the hook in `settings.json`'s `Bash` PreToolUse entry after `cargo-disk-guard.py`; declare the `.epr-meta` rule; package the hook.
+5. **Step 5: Gate**: hook tests green; `node elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs verify; echo EXIT=$?`; `just gate memory-ceremony; echo EXIT=$?`.
+6. **Step 6: Commit** — `git add -- .claude/hooks .claude/settings.json .claude/epr-meta/policies.yaml .epr-meta/elohim/packages/hooks` and `git commit -m "feat(hooks): capability tier gate — destructive git needs a declared tier or a team check"`.
 
 ### Task 2.3: Orchestrator bootstrap sample
 
