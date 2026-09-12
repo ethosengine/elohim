@@ -28,7 +28,7 @@
     "display": "Governed discovery reuses existing kinds — recipe=ProcessSpec, lens=AttentionTending, sample=FlowEvent+Verdict",
     "file": "project_governed_discovery_ontology_reuse.md",
     "scopePath": ".claude/memory/project_governed_discovery_ontology_reuse.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
     "indexed": false
   }

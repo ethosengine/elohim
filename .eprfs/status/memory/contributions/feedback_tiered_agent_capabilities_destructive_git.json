@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:orchestrator@claude-fable-5-1",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback_tiered_agent_capabilities_destructive_git",
+  "claim": "Operator 2026-09-11 after a Haiku hard-reset of shared dev: destructive git needs a declared tier (opus+) or a team check; unknown = deny; gate = PreToolUse hook on the policies.yaml row.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_tiered_agent_capabilities_destructive_git.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_tiered_agent_capabilities_destructive_git.md",
+        "cid": "bafkreigkeelrxs5xekhyu5qddxzoi2fntg3opo67azqkzbcvkv27prkusq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Tiered agent capabilities — haiku/sonnet never git-reset without a team check",
+    "file": "feedback_tiered_agent_capabilities_destructive_git.md",
+    "scopePath": ".claude/memory/feedback_tiered_agent_capabilities_destructive_git.md",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

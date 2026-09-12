@@ -28,7 +28,7 @@
     "display": "In a plan, `- [ ]` is the commitment grain — one per task, never per step",
     "file": "feedback_plan_checkbox_is_commitment_grain.md",
     "scopePath": ".claude/memory/feedback_plan_checkbox_is_commitment_grain.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": false
   }
