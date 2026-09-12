@@ -1281,6 +1281,13 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
         );
         return print_refusal(&message, &args.session, None, args.json);
     }
+    // `judge` rules on an already-recorded `FlowEvent`; it neither opens nor advances a ceremony
+    // continuation, so it never takes the session lock the rest of this function exists to hold
+    // — and, unlike every operation below, it names no session of its own (the seat claims
+    // nothing), so this intercept sits BEFORE the `--session` requirement, not after it.
+    if args.operation == "judge" {
+        return sample::judge(&args, &contract);
+    }
     if args.session.is_empty() {
         return print_refusal(
             "recall needs --session <id>",
@@ -1288,12 +1295,6 @@ pub fn run(argv: &[String]) -> FlowResult<ExitCode> {
             None,
             args.json,
         );
-    }
-
-    // `judge` rules on an already-recorded `FlowEvent`; it neither opens nor advances a ceremony
-    // continuation, so it never takes the session lock the rest of this function exists to hold.
-    if args.operation == "judge" {
-        return sample::judge(&args, &contract);
     }
 
     let session_limit = contract

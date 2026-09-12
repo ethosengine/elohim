@@ -5,7 +5,8 @@
 //! single `elohim_epr_rea::FlowEvent { action: Consume, … }` on the flows sidecar — the same store
 //! every other REA record in this repository lands in. `judge` is the SECOND seat: a reviewer who
 //! did not run the journey rules on how many of the reader's assertions were mistaken, recorded as
-//! an `elohim_epr::verdict::Verdict` riding inside a `run:verdict` note on the plan.
+//! an `elohim_epr::verdict::Verdict` riding inside a `run:verdict` note on the recall contract —
+//! the governed method whose CID every receipt in this file already pins, never a dated plan path.
 //!
 //! Both verbs write their folds through [`note::observe`] — the SAME registry-validated writer
 //! `epr flow note --kind observation --measure …` uses — never a hand-rolled sidecar line. Nothing
@@ -14,10 +15,11 @@
 //!
 //! **Why `judge` never takes the session lock [`Execution`] holds.** It rules on an
 //! ALREADY-RECORDED event; it neither opens nor advances a ceremony continuation, so `mod.rs`
-//! dispatches it before a session is ever opened (see the module doc there). `sample`, in
-//! contrast, genuinely drives the ceremony state machine — three internal [`execute`] calls over
-//! one session — so it is dispatched exactly where a single `execute()` call would be, and the
-//! caller's usual accounting/encoding/exit-code plumbing applies to its aggregate view unchanged.
+//! dispatches it BEFORE the `--session` requirement itself (the seat claims nothing — see the
+//! dispatch site's own comment). `sample`, in contrast, genuinely drives the ceremony state
+//! machine — three internal [`execute`] calls over one session — so it is dispatched exactly
+//! where a single `execute()` call would be, and the caller's usual accounting/encoding/exit-code
+//! plumbing applies to its aggregate view unchanged.
 use std::collections::BTreeMap;
 
 use cid::Cid;
@@ -33,11 +35,6 @@ use super::*;
 /// steward seat, not the reader who ran the journey.
 const SAMPLE_RECEIVER: &str = "agent:steward@repo";
 
-/// The plan a `judge` verdict lands on — the same document station 3 of this plan is itself a
-/// task of, so the ruling and the work it rules on share one home.
-const PLAN_REL: &str =
-    "genesis/docs/superpowers/plans/2026-09-11-governed-discovery-stations-0-3-plan.md";
-
 /// The axis every `judge` verdict answers on.
 const JUDGE_AXIS: &str = "recall-journey";
 
@@ -45,10 +42,16 @@ const JUDGE_AXIS: &str = "recall-journey";
 /// governing habit (`.epr-meta/recall-reaches-authority.habit.md`) without parsing prose.
 const JUDGE_POLICY_REF: &str = "recall-reaches-authority";
 
-/// `classified_as` slot keys `judge` reconstructs its fold's `--env` from. Closed on purpose: a
-/// fifth slot on a future `FlowEvent` this code does not know about must never be silently folded
-/// in as if it were one of these four.
+/// `env:k=v` slot keys `judge` reconstructs its fold's `--env` from — exact parity with
+/// `note::observe`'s own `ENV_SLOT_PREFIX`/`k=v` writer (fix round 1, D1), so a fold minted by
+/// `sample` and one reconstructed by `judge` from the event alone are indistinguishable.  Closed
+/// on purpose: a fifth slot on a future `FlowEvent` this code does not know about must never be
+/// silently folded in as if it were one of these four.
 const ENV_SLOT_KEYS: [&str; 4] = ["reader", "question", "recipe", "lens"];
+
+/// The journey operations `sample` always runs internally (`open`, `read`, `finish`) — the base
+/// the "not reached" screens-to-shape fold adds one to (fix round 1, Q3's ruling).
+const JOURNEY_OPERATIONS: f64 = 3.0;
 
 /// `epr flow memory recall sample --question <id> --reader agent:<role>@<model> [--lens L]`.
 ///
@@ -198,13 +201,14 @@ pub(super) fn sample(
             Vec::new()
         },
         satisfies: Vec::new(),
-        // Additive, positional, `key:value` — the shape `judge` reconstructs its own fold's `--env`
-        // from when handed nothing but this event's CID (see `ENV_SLOT_KEYS`).
+        // Fix round 1, D1: `env:k=v`, exact parity with `note::observe`'s own env-slot writer —
+        // the shape `judge` reconstructs its fold's `--env` from when handed nothing but this
+        // event's cid.
         classified_as: vec![
-            format!("reader:{reader_ref}"),
-            format!("question:{question_id}"),
-            format!("recipe:{method}"),
-            format!("lens:{}", resolved_lens.cid),
+            format!("env:reader={reader_ref}"),
+            format!("env:question={question_id}"),
+            format!("env:recipe={method}"),
+            format!("env:lens={}", resolved_lens.cid),
         ],
         occurred_at,
     };
@@ -244,14 +248,22 @@ pub(super) fn sample(
         &fold_actor,
         &measures_path,
     )?;
-    // A focused `open` that locates its candidate on the first screen is one screen to shape —
-    // the same reading `lens.rs`'s revealed-tier rule and the measure's own procedure line give.
+    // Fix round 1, Q3 (controller ruling): reached → the shape was on the first screen the first
+    // located candidate carried, so it folds 1. Not reached → the shape was never on a screen this
+    // journey showed, so it folds the journey's rendered-screen count (open, read, finish = 3)
+    // plus one (4) — an honest "more than every screen it rendered" rather than the flat 1 every
+    // journey folded before this fix, reached or not.
+    let screens_value = if reached {
+        1.0
+    } else {
+        JOURNEY_OPERATIONS + 1.0
+    };
     let screens_fold = note::observe(
         &args.root,
         "observation",
         "recall-screens-to-shape@1",
         note::REPO_SUBJECT,
-        1.0,
+        screens_value,
         Some("count"),
         &env,
         None,
@@ -271,6 +283,17 @@ pub(super) fn sample(
         &measures_path,
     )?;
 
+    // Fix round 1, C1: name the located-vs-declared divergence when the ranking's first located
+    // candidate is not the question's own `reached_when.path` — `reached:false` on such a journey
+    // is the ranking telling the truth, not a defect, and the view should say so in one line
+    // rather than leave a reader to diff two buried fields themselves.
+    let declared_path = question.reached_when.path.display().to_string();
+    let location = if read_path == declared_path {
+        format!("located {read_path} (matches declared)")
+    } else {
+        format!("located {read_path} · declared {declared_path}")
+    };
+
     let mut view = json!({
         "operation": "sample",
         "orientation": {
@@ -285,6 +308,12 @@ pub(super) fn sample(
             "recipe_version": contract.value["version"],
             "provider": Value::Null,
         },
+        // Fix round 1, Q2: the honesty floor reads `outcome.receipts` (receipt count) and
+        // `first_screen.ranking`/`.omissions` (selection rule, omissions) directly off the view —
+        // without these, the floor line under-reports a journey that ranked, omitted and stands
+        // on a real receipt as "no candidates ranked … omissions: 0 · receipts: 0".
+        "outcome": finish_view["outcome"].clone(),
+        "first_screen": open_view["first_screen"].clone(),
         "event": {
             "cid": event_cid.to_string(),
             "action": "consume",
@@ -300,10 +329,11 @@ pub(super) fn sample(
         "reached": reached,
         "question": {
             "id": question_id,
-            "path": question.reached_when.path,
+            "path": declared_path,
             "assertion": question.reached_when.assertion,
         },
         "read": {"path": read_path, "lines": read_lines},
+        "location": location,
         "folds": [
             metered_fold.record_cid,
             screens_fold.record_cid,
@@ -318,18 +348,66 @@ pub(super) fn sample(
     Ok((view, resolved_lens))
 }
 
+/// Everything one `judge` invocation resolves to, before rendering.
+enum JudgeOutcome {
+    /// The seat named the sampled journey's own reader — refused, never rendered as a ruling.
+    SelfJudge,
+    Rendered(Value, Box<lens::LensView>),
+}
+
 /// `epr flow memory recall judge --event <cid> --as <seat> --mistaken <n> --reason <text>`.
 ///
-/// Dispatched from `mod.rs::run()` BEFORE a session is opened (see the module doc). Refuses
-/// outright — bypassing the usual `--json` envelope, printing the literal refusal line whichever
-/// way it was invoked — when `seat` names the sampled journey's own reader: a second seat is the
-/// whole point of a judge, and a reader grading its own journey is not a second seat.
+/// Dispatched from `mod.rs::run()` BEFORE a session is opened (see the module doc) — `--session`
+/// is not even required (fix round 1, S1). The outer shell owns rendering: [`judge_inner`] does
+/// the work and returns either [`JudgeOutcome::SelfJudge`] or a rendered view; every ordinary
+/// `Err` this leg can produce (a missing flag, an unknown `--event`) is caught HERE and routed
+/// through the same `--json`-aware [`print_refusal`] envelope every other operation uses — fixing
+/// a latent gap where those errors would otherwise propagate past this whole executor's rendering
+/// contract and surface as a bare `main.rs` stderr line instead.
 pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
+    match judge_inner(args, contract) {
+        Ok(JudgeOutcome::SelfJudge) => judge_self_refusal(&args.session, args.json),
+        Ok(JudgeOutcome::Rendered(view, resolved_lens)) => {
+            let render_floor = lens::RenderFloor::declared();
+            let raw = super::encode(&view, &resolved_lens, &render_floor, args.json)?;
+            print!("{raw}");
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => print_refusal(&error.to_string(), &args.session, None, args.json),
+    }
+}
+
+/// Fix round 1, D2: the self-judge refusal keeps the standard refusal ENVELOPE (so `--json`
+/// still parses, and `next`/`session` are still present) while carrying the brief's exact
+/// wording — `"refused: a reader never judges its own journey"` — literally inside
+/// `unresolved[0]` in `--json`, so the substring holds under both renderings without the ordinary
+/// `refusal_lines` human template doubling the `"refused: "` prefix on the human rendering.
+fn judge_self_refusal(session: &str, json_output: bool) -> FlowResult<ExitCode> {
+    const MESSAGE: &str = "a reader never judges its own journey";
+    let remedy = remedy_for(MESSAGE, session);
+    if !json_output {
+        print!("{}", refusal_lines(MESSAGE, &remedy));
+        return Ok(ExitCode::from(2));
+    }
+    let failure = json!({
+        "unresolved": [format!("refused: {MESSAGE}")],
+        "session": session,
+        "next": remedy,
+        "accounting": "Session unavailable; refusal outside session accounting.",
+    });
+    println!("{}", serde_json::to_string(&failure)?);
+    Ok(ExitCode::from(2))
+}
+
+/// The whole of `judge`'s work: resolve arguments, load the sampled event, decide self-judge vs.
+/// a genuine second seat, and — for a genuine seat — write the verdict note and its fold and
+/// render the view. Every early exit here is an ordinary `FlowResult::Err`, caught by the caller.
+fn judge_inner(args: &Args, contract: &Contract) -> FlowResult<JudgeOutcome> {
     let event_raw = args
         .event
         .clone()
         .ok_or_else(|| refused("judge needs --event <cid>"))?;
-    let seat = args
+    let seat_raw = args
         .seat
         .clone()
         .ok_or_else(|| refused("judge needs --as <seat>"))?;
@@ -340,6 +418,12 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
         .reason
         .clone()
         .ok_or_else(|| refused("judge needs --reason <text>"))?;
+
+    // Fix round 1, Q1: parsed and trimmed exactly as `sample` validates `--reader` — a leading/
+    // trailing space or a malformed shape must not slip an untrimmed string past the self-judge
+    // comparison below.
+    let seat = seat_raw.trim().to_string();
+    parse_agent_ref(&seat)?;
 
     let event_cid: Cid = event_raw
         .trim()
@@ -356,19 +440,18 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
         })
         .ok_or_else(|| refused("--event does not name a recorded FlowEvent"))?;
 
-    // A reader never judges its own journey. Printed directly — not through the standard
-    // `--json`-aware refusal envelope — because this is the one judgment this verb can reach
-    // before it has decided anything else, and it must read the same whichever way it was asked.
     if seat == event.provider.0 {
-        println!("refused: a reader never judges its own journey");
-        return Ok(ExitCode::from(2));
+        return Ok(JudgeOutcome::SelfJudge);
     }
 
+    // Fix round 1, D1: read the `env:k=v` slots back the same way `note::observe` writes them.
     let mut env: BTreeMap<String, String> = BTreeMap::new();
     for slot in &event.classified_as {
-        if let Some((key, value)) = slot.split_once(':') {
-            if ENV_SLOT_KEYS.contains(&key) {
-                env.insert(key.to_string(), value.to_string());
+        if let Some(pair) = slot.strip_prefix("env:") {
+            if let Some((key, value)) = pair.split_once('=') {
+                if ENV_SLOT_KEYS.contains(&key) {
+                    env.insert(key.to_string(), value.to_string());
+                }
             }
         }
     }
@@ -404,13 +487,18 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
     };
     let verdict_json = serde_json::to_string(&verdict)?;
 
+    // Fix round 1, Q5 (controller ruling): the verdict's subject/fold target is the governed
+    // recall contract already loaded — the method whose cid every receipt in this file pins —
+    // never a dated plan path that would need re-pointing every time the plan moves or archives.
+    let contract_rel = rel_to_root(&args.root, &contract.path);
+
     let seat_actor = note::NoteActor {
         as_ref: Some(seat.clone()),
         session: Some(args.session.clone()),
     };
     let plan_note = note::note(
         &args.root,
-        PLAN_REL,
+        &contract_rel,
         "verdict",
         &verdict_json,
         None,
@@ -434,7 +522,10 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
         &measures_path,
     )?;
 
-    let reader = lens::reader_from_session(&args.root, &args.session);
+    // Fix round 1, Q4: the lens is the SEAT's own reading, resolved directly from `--as` — never
+    // from the session claim (`judge` registers no actor claim of its own; the seat claims
+    // nothing).
+    let reader = lens::ReaderRef::Agent(AgentRef(seat.clone()));
     let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
     let mut view = json!({
         "operation": "judge",
@@ -467,7 +558,7 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
         "execution_method": {
             "method": contract.method_cid(),
             "recall-contract.json": contract.sha256(),
-            "contract_path": rel_to_root(&args.root, &contract.path),
+            "contract_path": contract_rel,
             "executor": "epr flow memory recall",
         },
         "usage": {},
@@ -476,8 +567,5 @@ pub(super) fn judge(args: &Args, contract: &Contract) -> FlowResult<ExitCode> {
     });
     view["lens"] = resolved_lens.to_value();
 
-    let render_floor = lens::RenderFloor::declared();
-    let raw = super::encode(&view, &resolved_lens, &render_floor, args.json)?;
-    print!("{raw}");
-    Ok(ExitCode::SUCCESS)
+    Ok(JudgeOutcome::Rendered(view, Box::new(resolved_lens)))
 }

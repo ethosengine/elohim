@@ -206,6 +206,16 @@ fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
     assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 1);
     assert_eq!(v["reached"], true);
     assert_eq!(v["folds"].as_array().unwrap().len(), 3);
+    // Fix round 1, C1: located == declared on this fixture, so the view names the match rather
+    // than a divergence.
+    assert_eq!(v["location"], "located tooling/skill.md (matches declared)");
+    // Fix round 1, Q2: the honesty floor's `outcome.receipts`/`first_screen.ranking` read real
+    // data off the aggregate view, not an absent default.
+    assert!(
+        !v["outcome"]["receipts"].as_array().unwrap().is_empty(),
+        "{v:#}"
+    );
+    assert!(!v["first_screen"].is_null(), "{v:#}");
 
     let folds = common::flows(dir.path());
     let metered = folds
@@ -213,19 +223,54 @@ fn sample_reaches_authority_on_the_fixture_and_folds_its_measures() {
         .filter(|r| r["measure"] == "recall-metered-bytes@1")
         .count();
     assert_eq!(metered, 1, "folds: {folds:?}");
-    assert_eq!(
-        folds
-            .iter()
-            .filter(|r| r["measure"] == "recall-screens-to-shape@1")
-            .count(),
-        1
-    );
+    let screens = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-screens-to-shape@1")
+        .expect("recall-screens-to-shape@1 folded");
+    // Fix round 1, Q3 (controller ruling): reached → fold 1.
+    assert_eq!(screens["value"], 1.0);
     let unmetered = folds
         .iter()
         .find(|r| r["measure"] == "recall-unmetered-bytes@1")
         .expect("recall-unmetered-bytes@1 folded");
     assert_eq!(unmetered["value"], 0.0);
     assert_eq!(unmetered["env"]["question"], "q-fixture");
+}
+
+/// S1 (spec miss): `judge`'s argv carries no `--session` at all — the brief's own shape. It must
+/// not refuse on a missing session; `judge` claims no session of its own.
+#[test]
+fn judge_needs_no_session_at_all() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp-s1",
+        &[
+            "sample",
+            "--question",
+            "q-fixture",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    let cid = v["event"]["cid"].as_str().unwrap().to_string();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(["flow", "memory", "recall", "judge"])
+        .args(["--event", &cid])
+        .args(["--as", "agent:seat@claude-opus-5"])
+        .args(["--mistaken", "0"])
+        .args(["--reason", "clean journey"])
+        .args(["--root", &dir.path().to_string_lossy()])
+        .args(["--json"])
+        .output()
+        .expect("epr runs");
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
 }
 
 /// A reader named as the second seat is refused outright — a journey is never its own judge.
@@ -253,6 +298,47 @@ fn a_reader_cannot_judge_its_own_journey() {
             cid,
             "--as",
             "agent:reader@claude-sonnet-5",
+            "--mistaken",
+            "0",
+            "--reason",
+            "self",
+        ],
+    );
+    assert_eq!(r.code, 2, "{}{}", r.stdout, r.stderr);
+    assert!(
+        r.stdout
+            .contains("refused: a reader never judges its own journey"),
+        "{}",
+        r.stdout
+    );
+}
+
+/// Q1: a leading/trailing space on `--as` must not slip an untrimmed seat past the self-judge
+/// comparison — `sample` validates `--reader` the same trimmed way.
+#[test]
+fn a_reader_cannot_judge_its_own_journey_even_with_untrimmed_as() {
+    let dir = common::repo_with_bank();
+    let v = common::ok_in_bank(
+        dir.path(),
+        "smp2b",
+        &[
+            "sample",
+            "--question",
+            "q-fixture",
+            "--reader",
+            "agent:reader@claude-sonnet-5",
+        ],
+    );
+    let cid = v["event"]["cid"].as_str().unwrap();
+    let r = common::run_in_bank(
+        dir.path(),
+        "smp2b",
+        &[
+            "judge",
+            "--event",
+            cid,
+            "--as",
+            " agent:reader@claude-sonnet-5 ",
             "--mistaken",
             "0",
             "--reason",
@@ -302,6 +388,16 @@ fn a_second_seat_verdict_folds_mistaken_assertions() {
     );
     assert_eq!(j["verdict"]["witness"]["checks"][0]["observed"], 1);
     assert_eq!(j["verdict"]["decision"], "refuse");
+    // Fix round 1, Q4: the lens is the SEAT's own reading (`agent:seat@claude-opus-5` → `standard`
+    // in this fixture's `lens_table.stated`) — `smp3-seat` never claimed anything, so a
+    // session-derived lens would read `none` here instead.
+    assert!(
+        j["lens"]["provenance"]["stated"][0]
+            .as_str()
+            .unwrap()
+            .contains("claude-opus-5"),
+        "{j:#}"
+    );
 
     let folds = common::flows(dir.path());
     let mistaken = folds
@@ -331,4 +427,13 @@ fn a_sample_whose_terms_are_absent_writes_no_fulfillment() {
     );
     assert_eq!(v["reached"], false);
     assert_eq!(v["event"]["fulfills"].as_array().unwrap().len(), 0);
+
+    // Fix round 1, Q3 (controller ruling): not reached → the journey's rendered-screen count
+    // (open, read, finish = 3) plus one — 4, not the flat 1 a reached journey folds.
+    let folds = common::flows(dir.path());
+    let screens = folds
+        .iter()
+        .find(|r| r["measure"] == "recall-screens-to-shape@1")
+        .expect("recall-screens-to-shape@1 folded");
+    assert_eq!(screens["value"], 4.0, "{screens:?}");
 }

@@ -325,10 +325,12 @@ pub fn ok_in_bank(root: &Path, session: &str, args: &[&str]) -> Value {
 /// located source but names `reached_when.terms` that never appear in it, for the "terms absent
 /// from the excerpt" case.
 ///
-/// Also writes a stub of the real plan doc `judge` notes onto (`PLAN_REL` in `sample.rs`) and a
-/// minimal `.claude/epr-meta/measures.yaml` declaring the four `recall-journey` measures — both
-/// are real repository facts in the live tree; a fixture standing in for it needs its own copies
-/// since `note`/`observe` read them from disk, not from any live-repo assumption.
+/// Also writes a minimal `.claude/epr-meta/measures.yaml` declaring the four `recall-journey`
+/// measures — a real repository fact in the live tree; a fixture standing in for it needs its
+/// own copy since `note::observe` reads it from disk, not from any live-repo assumption. `judge`'s
+/// verdict note lands on the fixture's own `recall::CONTRACT_REL` file (fix round 1, Q5 — the
+/// governed method already loaded, never a separately-stubbed plan doc), which this fixture
+/// already writes below.
 #[allow(dead_code)]
 pub fn repo_with_bank() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -338,11 +340,6 @@ pub fn repo_with_bank() -> TempDir {
         root,
         "tooling/skill.md",
         "---\ntitle: Stamping\n---\n# Stamping\nThe stamp rule and the remine cadence are recorded here for the ceremony.\n",
-    );
-    write(
-        root,
-        "genesis/docs/superpowers/plans/2026-09-11-governed-discovery-stations-0-3-plan.md",
-        "# Governed discovery stations 0-3\nFixture stub for task 3.2 tests.\n",
     );
     write(
         root,
