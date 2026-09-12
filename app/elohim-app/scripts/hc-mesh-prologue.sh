@@ -584,6 +584,14 @@ if [ "$fixture_rc" -ne 0 ]; then
   echo "  ^ MUST-SUCCEED leg failed — the prologue's overall exit code will be non-zero." >&2
 fi
 say "household fixture manifest written: $FIXTURE_PATH"
+# The writer above rebuilds storagePeers from ports alone, so it DROPS the
+# agentPubKey / conductorAppUrl that `storage-restart` had stamped through
+# refresh_fixture_pids. A lane that starts on that keyless manifest fails every
+# hosted-cell scenario with "no household fixture storage peer matches the pool
+# conductor's origin … set agentPubKey on that peer" (measured 2026-09-12, lane
+# 20260912T010759Z, fixture written 01:07:37Z, lane started 01:07:59Z). Re-stamp
+# right here so the manifest a lane reads is complete at the moment it exists.
+refresh_fixture_pids
 
 # ---------------------------------------------------------------------------
 # a2o env block — the vars the mesh profile (genesis/a2o/layering/profiles.md
