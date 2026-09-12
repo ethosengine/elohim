@@ -1369,3 +1369,21 @@ lenses:
     hard: 6
     status: active
     established_by: bounded-recall-mastery-sprint-2026-09-11
+
+  # Station 3 (2026-09-11): the four ceilings above each read the LATEST journey alone, so one
+  # clean journey right after a bad one reads green with no memory of the bad one. This row reads
+  # a ROLLING QUARTER instead — the fraction of the last `window_days` worth of folds (drawn from
+  # both middot below) that were NOT clean. `derive: rate-over-window` in report.rs; fewer than 3
+  # journeys in the window is `skipped`, never a rate.
+  - id: recall-journey-window-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: inject
+    derive: rate-over-window
+    consumes: [recall-mistaken-assertions@1, recall-unmetered-bytes@1]
+    window_days: 91
+    context: recall-journey
+    hard: 0.2
+    status: active
+    established_by: bounded-recall-mastery-sprint-2026-09-11

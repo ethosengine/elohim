@@ -40,6 +40,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use chrono::{DateTime, Utc};
 use cid::Cid;
 use elohim_epr_rea::{FlowRecord, FlowStore, SidecarFlowStore};
 use serde::Serialize;
@@ -799,6 +800,9 @@ fn evaluate(root: &Path, bound: &Bound, folds: &[Fold], recipe: &RecipeRef) -> B
         if derive.reads_tree() {
             return evaluate_surface_walk(root, bound, derive, recipe, watermarks);
         }
+        if derive.reads_window() {
+            return evaluate_rate_over_window(bound, derive, folds, recipe, watermarks, Utc::now());
+        }
         return evaluate_derived(bound, derive, folds, recipe, watermarks);
     }
     let latest = folds
@@ -1223,6 +1227,10 @@ fn evaluate_derived(
         // panicking keeps a future third tree-derive from taking the whole headline down, and the
         // `reads_tree` guard is the thing that must stay true.
         Derive::FilesNewerThan => 0.0,
+        // Unreachable by construction: `evaluate` routes every window-reading derive to
+        // `evaluate_rate_over_window` before this function is entered — the `reads_window` guard's
+        // sibling promise to `reads_tree`'s above.
+        Derive::RateOverWindow => 0.0,
     };
 
     // The LENS's unit, not a contributing fold's: an accumulation over `documents` and `seeds` and
@@ -1292,6 +1300,121 @@ fn evaluate_derived(
         contributing_folds: Some(contributing.len()),
         recipe: recipe.clone(),
     }
+}
+
+/// How far back a `rate-over-window` bound looks when the row declares no `window_days:` — a
+/// quarter, matching the recall habit's own "the last quarter's journeys" framing.
+const DEFAULT_WINDOW_DAYS: f64 = 91.0;
+
+/// Evaluate a bound whose value is a RATE OVER A ROLLING TIME WINDOW — never an accumulation
+/// since a reset, because a window has no reset: folds age out on their own as they fall past the
+/// cutoff, so the population re-derives itself on every read.
+///
+/// The population is every admissible fold (drawn from every measure the row `consumes:`, exactly
+/// like the reset-accumulation derives) whose `occurred_at` is within `window_days` of `now`. The
+/// observed value is the fraction of that population whose value is positive — the same
+/// "something happened" reading `count-since-reset` gives a single measure, generalized to a rate
+/// over several.
+///
+/// **Fewer than 3 folds in the window is `skipped`, never a rate.** A fraction over one or two
+/// journeys is not evidence of a trend; it is that trend's number wearing more confidence than the
+/// population earns. This is the same three-valued discipline the module doc opens with, applied
+/// to a population size rather than to a reset's presence.
+fn evaluate_rate_over_window(
+    bound: &Bound,
+    derive: Derive,
+    folds: &[Fold],
+    recipe: &RecipeRef,
+    watermarks: Watermarks,
+    now: DateTime<Utc>,
+) -> BoundOutcome {
+    let window_days = bound.window_days.unwrap_or(DEFAULT_WINDOW_DAYS);
+    let cutoff = now - chrono::Duration::seconds((window_days * 86_400.0) as i64);
+
+    let subject = bound
+        .subject
+        .as_deref()
+        .map(|s| normalize_subject(s).to_string())
+        .unwrap_or_else(|| REPO_SUBJECT.to_string());
+
+    // Ordering is (occurred_at, seq), the same discriminator every other derive uses: notes share
+    // a HEAD-derived date, so append position is the real tie-break within one dated commit.
+    let mut windowed: Vec<&Fold> = folds
+        .iter()
+        .filter(|fold| admissible(bound, fold) && fold_within_window(fold, cutoff))
+        .collect();
+    windowed.sort_by(|a, b| {
+        a.occurred_at
+            .cmp(&b.occurred_at)
+            .then_with(|| a.seq.cmp(&b.seq))
+    });
+
+    if windowed.len() < 3 {
+        return BoundOutcome {
+            bound: bound.id.clone(),
+            measure: bound.measure.to_string(),
+            subject,
+            outcome: OutcomeStatus::Skipped,
+            summary: format!(
+                "fewer than 3 journeys in window — {} fold(s) in the last {} days",
+                windowed.len(),
+                trim_number(window_days)
+            ),
+            observed: None,
+            unit: None,
+            watermarks,
+            fold_cid: None,
+            source: bound.source.as_str().to_string(),
+            binding: bound.binding.clone(),
+            compare: bound.compare.as_str().to_string(),
+            derive: Some(derive.as_str().to_string()),
+            reset_measure: None,
+            reset_fold_cid: None,
+            contributing_folds: Some(windowed.len()),
+            recipe: recipe.clone(),
+        };
+    }
+
+    let positive = windowed.iter().filter(|fold| fold.value > 0.0).count();
+    let observed = positive as f64 / windowed.len() as f64;
+
+    let basis = format!(
+        "{positive} of {} journeys in the last {} days",
+        windowed.len(),
+        trim_number(window_days)
+    );
+    let (outcome, summary) = judge(bound, observed, &basis, watermarks);
+
+    BoundOutcome {
+        bound: bound.id.clone(),
+        measure: bound.measure.to_string(),
+        subject,
+        outcome,
+        summary,
+        observed: Some(observed),
+        unit: bound.unit.clone(),
+        watermarks,
+        // The newest fold in the window — the most recent evidence behind the rate. The rate
+        // itself is reproducible from `derive` + `window_days` + the sidecar.
+        fold_cid: windowed.last().map(|f| f.cid.clone()),
+        source: bound.source.as_str().to_string(),
+        binding: bound.binding.clone(),
+        compare: bound.compare.as_str().to_string(),
+        derive: Some(derive.as_str().to_string()),
+        reset_measure: None,
+        reset_fold_cid: None,
+        contributing_folds: Some(windowed.len()),
+        recipe: recipe.clone(),
+    }
+}
+
+/// Whether a fold's `occurred_at` falls on or after `cutoff` — an unparseable timestamp is
+/// excluded rather than guessed into the window, the same refusal-over-guess discipline
+/// `admissible` and the reset derives hold.
+fn fold_within_window(fold: &Fold, cutoff: DateTime<Utc>) -> bool {
+    DateTime::parse_from_rfc3339(&fold.occurred_at)
+        .map(|dt| dt.with_timezone(&Utc) >= cutoff)
+        .unwrap_or(false)
 }
 
 fn describe_watermarks(bound: &Bound) -> String {

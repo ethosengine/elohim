@@ -21,7 +21,7 @@ active: false
 checks:
   - "a2o @concern:recall-reaches-authority (genesis/a2o/features/devflow/ceremony-reconciliation.feature — a fresh agent opens with its own question, the orientation carries it, a passage under .claude/skills/ is readable and receipted, and finish reports the question with bounded bytes)"
   - "just gate memory-ceremony (the native recall executor, corrections view and footprint suites plus the hook, lens and cucumber legs)"
-  - "epr flow report --bound recall-unmetered-bytes-ceiling (and its three siblings recall-metered-bytes / recall-mistaken-assertions / recall-screens-to-shape): the latest journey's folds against the declared ceilings — a fold is written per journey by the reader's own honest account and by `recall measure --phase close`; no fold is `skipped`, never green"
+  - "epr flow report --bound recall-journey-window-ceiling (the rolling-quarter rate over recall-mistaken-assertions@1 and recall-unmetered-bytes@1 — the fraction of the last window_days worth of journeys that were NOT clean; fewer than 3 journeys in the window is `skipped`, never a rate); its four siblings recall-metered-bytes-ceiling / recall-unmetered-bytes-ceiling / recall-mistaken-assertions-ceiling / recall-screens-to-shape-ceiling stay the per-journey reading — a fold is written per journey by the reader's own honest account and by `recall measure --phase close`; no fold is `skipped`, never green"
 guard: >
   Regression risks: (1) greening by widening source_roots to everything — the private recall
   store and other worktrees stay refused, and a scope that admits scratch is not a governed
@@ -93,3 +93,10 @@ sidecar (unknown = deny) against one pinned policy row `destructive-git-requires
 classification, deny-on-ambiguity scoped to destructive inner text, wrappers/exec/xargs/line-continuation/$PWD targets
 covered: 56 gate tests, hook suite 106/108 (the memory-index idempotence red is a worktree-ledger artifact). Five review
 rounds to the cap; residuals ruled out of class (interpreter strings, script files, encodings, remote exec — evasion, not tiering).
+DELTA 2026-09-12 (station 3 — the standing reader; GREEN preserved, check 3 re-pointed): `derive: rate-over-window`
+lands in report.rs beside `count-since-reset` — the fraction of a rolling `window_days` (default 91, declared 91 on
+`recall-journey-window-ceiling@1`) worth of folds across recall-mistaken-assertions@1 and recall-unmetered-bytes@1
+whose value is positive, `skipped` (never a zero) under 3 folds in the window. 3 new `flow_report.rs` tests green
+(99/99 in the file; 0.2 exactly at the hard watermark reads `passed … within` under the default `above` comparator;
+2 folds skips; a fold outside the window is excluded from both the count and the rate). Check 3 now reads the window
+bound, naming the four per-journey ceilings as the still-live per-journey reading.

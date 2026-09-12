@@ -2959,3 +2959,168 @@ fn the_derived_cleanup_slot_can_fail_when_it_drifts() {
     assert_eq!(outcome.outcome, OutcomeStatus::Failed);
     assert!(payload.headline_line("cleanup").contains('⚠'));
 }
+
+// ── (13) rate over a rolling window — the recall habit reads a quarter of journeys, not one ──
+//
+// `derive: rate-over-window` is a different shape than the reset-accumulations above: there is no
+// reset, and the population is every admissible fold whose `occurred_at` falls in the last
+// `window_days`, drawn from every measure the row `consumes:` (mirroring
+// `recall-journey-window-ceiling@1`'s two middot, `recall-mistaken-assertions@1` and
+// `recall-unmetered-bytes@1`). The observed value is the fraction of that windowed population
+// whose fold value is greater than zero — "how many of the last quarter's journeys were NOT
+// clean" — and `skipped` (never a zero) is the answer when fewer than three folds fall in the
+// window, since a rate over one or two journeys is noise wearing a percentage.
+
+/// Mirrors the shape of the live `recall-journey-window-ceiling@1` row, at a `window_days` small
+/// enough for a test to control by hand. No `compare:` is declared (default `above`), so a
+/// windowed rate exactly AT the hard watermark reads as `within` rather than `failed` — the
+/// boundary the first fixture below exercises.
+const RATE_MEASURES: &str = r#"measures-version: 1
+measures:
+  - id: recall-mistaken-assertions
+    version: 1
+    unit: count
+    default-authority: observation
+    status: active
+  - id: recall-unmetered-bytes
+    version: 1
+    unit: bytes
+    default-authority: observation
+    status: active
+
+lenses:
+  - id: recall-journey-window-ceiling
+    version: 1
+    binding: binding-local
+    class: inject
+    derive: rate-over-window
+    consumes:
+      - recall-mistaken-assertions@1
+      - recall-unmetered-bytes@1
+    window-days: 10
+    context: recall-journey
+    hard: 0.2
+    status: active
+"#;
+
+fn rate_fixture() -> TempDir {
+    let dir = fixture();
+    write(dir.path(), ".claude/epr-meta/measures.yaml", RATE_MEASURES);
+    dir
+}
+
+fn git_at(root: &Path, when: &str, args: &[&str]) {
+    let out = elohim_epr_cli::process::build_command("git", args, root, &[])
+        .env("GIT_AUTHOR_NAME", "Fixture Author")
+        .env("GIT_AUTHOR_EMAIL", "author@example.test")
+        .env("GIT_COMMITTER_NAME", "Fixture Author")
+        .env("GIT_COMMITTER_EMAIL", "author@example.test")
+        .env("GIT_AUTHOR_DATE", when)
+        .env("GIT_COMMITTER_DATE", when)
+        .output()
+        .expect("git runs");
+    assert!(out.status.success(), "git {args:?} failed");
+}
+
+/// A fold is dated by the git HEAD it is authored against (see the module doc), so giving a fold
+/// a date in the past means advancing HEAD to a commit dated in the past FIRST. One throwaway
+/// marker file per call keeps each commit non-empty and distinct.
+static MARKER_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+fn fold_at(root: &Path, when: &str, measure: &str, subject: &str, value: f64) -> String {
+    let n = MARKER_SEQ.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    write(root, &format!(".markers/m{n}"), when);
+    git_at(root, when, &["add", "-A"]);
+    git_at(root, when, &["commit", "-qm", &format!("marker {n}")]);
+    fold(root, measure, subject, value)
+}
+
+/// An RFC 3339 timestamp `days` ago from the moment the test runs — the same clock
+/// `evaluate_rate_over_window` reads `now` from, so the fixture and the derive agree on "recent".
+fn days_ago(days: i64) -> String {
+    (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339()
+}
+
+#[test]
+fn rate_over_window_reads_the_fraction_of_recent_folds_with_any_positive_value() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    // 5 folds inside the 10-day window, 1 of them positive: 1/5 = 0.20, exactly the hard
+    // watermark — and `above` (the default compare) reads "at" as still within, not crossed.
+    fold_at(root, &days_ago(1), "recall-mistaken-assertions@1", ".", 0.0);
+    fold_at(root, &days_ago(3), "recall-unmetered-bytes@1", ".", 0.0);
+    fold_at(root, &days_ago(5), "recall-mistaken-assertions@1", ".", 0.0);
+    fold_at(root, &days_ago(7), "recall-unmetered-bytes@1", ".", 0.0);
+    fold_at(root, &days_ago(9), "recall-mistaken-assertions@1", ".", 1.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.observed,
+        Some(0.2),
+        "1 of the 5 windowed folds is positive"
+    );
+    assert_eq!(outcome.contributing_folds, Some(5));
+    assert_eq!(outcome.derive.as_deref(), Some("rate-over-window"));
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Passed,
+        "0.20 has not gone PAST the hard watermark 0.2 under the default `above` comparator"
+    );
+    assert!(
+        outcome.summary.contains("within hard 0.2"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn fewer_than_three_folds_in_the_window_is_skipped_not_a_rate() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    fold_at(root, &days_ago(1), "recall-mistaken-assertions@1", ".", 0.0);
+    fold_at(root, &days_ago(2), "recall-unmetered-bytes@1", ".", 1.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.outcome,
+        OutcomeStatus::Skipped,
+        "two journeys is not a rate — a percentage over that few is noise wearing a number"
+    );
+    assert!(outcome.observed.is_none());
+    assert!(
+        outcome.summary.contains("fewer than 3 journeys in window"),
+        "{}",
+        outcome.summary
+    );
+}
+
+#[test]
+fn a_fold_older_than_the_window_does_not_count_toward_the_rate() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    // Two folds well outside the 10-day window (they would make the rate 2/5 = 0.4 and FAIL if
+    // wrongly admitted) plus three inside it, none positive.
+    fold_at(
+        root,
+        &days_ago(30),
+        "recall-mistaken-assertions@1",
+        ".",
+        1.0,
+    );
+    fold_at(root, &days_ago(45), "recall-unmetered-bytes@1", ".", 1.0);
+    fold_at(root, &days_ago(1), "recall-mistaken-assertions@1", ".", 0.0);
+    fold_at(root, &days_ago(2), "recall-unmetered-bytes@1", ".", 0.0);
+    fold_at(root, &days_ago(3), "recall-mistaken-assertions@1", ".", 0.0);
+
+    let payload = report(root, &options(root)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(
+        outcome.contributing_folds,
+        Some(3),
+        "the two 30+ day old folds are outside the 10-day window"
+    );
+    assert_eq!(outcome.observed, Some(0.0));
+    assert_eq!(outcome.outcome, OutcomeStatus::Passed);
+}

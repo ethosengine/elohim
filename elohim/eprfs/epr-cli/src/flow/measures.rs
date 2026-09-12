@@ -262,6 +262,21 @@ pub enum Derive {
     /// measured. The config fallback is kept (it is the kit's, and it is a real timestamp); only
     /// the epoch-0 arm becomes a refusal.
     FilesNewerThan,
+    /// The fraction of a ROLLING TIME WINDOW's folds whose value is positive — a rate, not a count
+    /// since a reset.
+    ///
+    /// `recall-journey-window-ceiling@1` is the first consumer: the per-journey ceilings
+    /// (`recall-mistaken-assertions-ceiling`, `recall-unmetered-bytes-ceiling`, …) each read the
+    /// LATEST journey alone, so one clean journey right after a bad one reads green with no memory
+    /// of the bad one. This derive is the mishpat's actual claim — "the last quarter's journeys are
+    /// mostly clean" — read over every consumed measure's folds whose `occurred_at` falls in the
+    /// declared `window_days` (default 91, a quarter). No reset exists for a window: the population
+    /// ages out on its own as folds fall past the cutoff, so there is nothing to drain.
+    ///
+    /// **Fewer than 3 folds in the window is `skipped`, never a rate.** A percentage over one or
+    /// two journeys is noise wearing a number — the same three-valued discipline the other derives
+    /// hold, moved from "no reset yet" to "not enough population yet".
+    RateOverWindow,
 }
 
 impl Derive {
@@ -270,6 +285,7 @@ impl Derive {
             "count-since-reset" => Some(Derive::CountSinceReset),
             "distinct-subjects-since-reset" => Some(Derive::DistinctSubjectsSinceReset),
             "files-newer-than" => Some(Derive::FilesNewerThan),
+            "rate-over-window" => Some(Derive::RateOverWindow),
             other => {
                 eprintln!(
                     "report: bound `{row}` declares unknown derive `{other}` — \
@@ -285,6 +301,7 @@ impl Derive {
             Derive::CountSinceReset => "count-since-reset",
             Derive::DistinctSubjectsSinceReset => "distinct-subjects-since-reset",
             Derive::FilesNewerThan => "files-newer-than",
+            Derive::RateOverWindow => "rate-over-window",
         }
     }
 
@@ -294,6 +311,13 @@ impl Derive {
     /// (so `admits_measure` must not gate it), and it can never be `skipped` for want of a reset.
     pub fn reads_tree(self) -> bool {
         matches!(self, Derive::FilesNewerThan)
+    }
+
+    /// Whether this derive reads a bounded TIME WINDOW of folds rather than an accumulation since
+    /// a reset. Load-bearing at the same call site `reads_tree` is: it routes `evaluate` to the
+    /// window-reading evaluator instead of the reset-reading one, and it has no `reset:` measure.
+    pub fn reads_window(self) -> bool {
+        matches!(self, Derive::RateOverWindow)
     }
 }
 
@@ -368,6 +392,11 @@ pub struct Bound {
     pub binding: Option<String>,
     /// The surfaces a tree-reading derive walks. `Some` exactly when `derive` reads the tree.
     pub walk: Option<SurfaceWalk>,
+    /// `window_days:` (or `window-days:`) — how far back a `rate-over-window` derive looks.
+    /// `None` when undeclared; the evaluator's own default (91, a quarter) applies then, kept out
+    /// of this crate's parsing so the declared-vs-defaulted distinction stays visible to a reader
+    /// of the row rather than being baked into a silently-filled field.
+    pub window_days: Option<f64>,
     /// The row's `status:`. `superseded` takes the bound OUT of evaluation — see [`Bound::retired`].
     pub status: Option<String>,
     /// `superseded_by:` — what replaced it. The registry's never-delete rule: a version with live
@@ -635,6 +664,14 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         derive
     };
 
+    // Accepted as `window_days:` (the spelling `recall-journey-window-ceiling@1` declares) or
+    // `window-days:` (this registry's own hyphenated house style) — the row's owner should not
+    // have to remember which convention the parser insists on.
+    let window_days = number_at(row, "window_days")
+        .or_else(|| number_at(row, "window-days"))
+        .or_else(|| block.and_then(|m| number_at(m, "window_days")))
+        .or_else(|| block.and_then(|m| number_at(m, "window-days")));
+
     Some(Bound {
         id: format!("{bare_id}@{version}"),
         bare_id,
@@ -651,6 +688,7 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         headline,
         binding: string_at(row, "binding"),
         walk,
+        window_days,
         status: string_at(row, "status"),
         superseded_by: string_at(row, "superseded_by").or_else(|| string_at(row, "superseded-by")),
         superseded_reason: string_at(row, "superseded_reason")
