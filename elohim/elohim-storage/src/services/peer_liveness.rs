@@ -179,6 +179,28 @@ pub fn connected_snapshot() -> Option<HashSet<String>> {
     Some(out)
 }
 
+/// This node's OWN labels, or `None` while the registry is unarmed.
+///
+/// Published separately from [`connected_snapshot`] because they answer a
+/// different question. The connected set is evidence about OTHER peers — it is
+/// assembled from `ConnectionEstablished`, and a node is never in its own. The
+/// local labels are not evidence at all: a peer that is answering the request is
+/// alive by definition, and no transport event can tell it so.
+///
+/// Readers that fold a household peer set (see
+/// `services::household_resilience::count_household_peers`) must union the two,
+/// or a three-peer household can never read three live from ANY member's fold —
+/// each one silently omits itself and reports `2 of 3` with nothing wrong
+/// (household mesh run 20260912T224420Z: all three peers up, connected 2/2/2,
+/// card still read the "partial" rung before a single kill).
+pub fn local_labels() -> Option<Vec<String>> {
+    let reg = match registry().read() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    Some(reg.armed.as_ref()?.own_labels.clone())
+}
+
 /// Drop the registry back to UNARMED. Test-only: the registry is process-global,
 /// so a test that arms it would otherwise leak its connected set into every
 /// later test in the same binary.
@@ -191,19 +213,26 @@ pub(crate) fn reset_for_test() {
     reg.armed = None;
 }
 
+/// The registry is process-global, so EVERY test that arms or reads it runs
+/// under this one mutex rather than racing the others — including the household
+/// -resilience folds in another module, which now read the local labels and
+/// would otherwise see a neighbouring test's arm/reset (the parallel-test flake
+/// class the env-var discipline names).
+#[cfg(test)]
+pub(crate) fn test_guard() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    match LOCK.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The registry is process-global and these tests mutate it, so they run
-    /// under one mutex rather than racing each other (the parallel-test flake
-    /// class the env-var discipline names).
     fn guard() -> std::sync::MutexGuard<'static, ()> {
-        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        match LOCK.lock() {
-            Ok(g) => g,
-            Err(p) => p.into_inner(),
-        }
+        test_guard()
     }
 
     #[test]
@@ -290,6 +319,31 @@ mod tests {
         assert!(
             connected_snapshot().unwrap().contains("agent:jessica"),
             "a ping-success refresh is what keeps a quiet-but-live peer in the set"
+        );
+        reset_for_test();
+    }
+
+    /// The local labels are the node's own, never a peer's — the union a
+    /// household fold needs so the answering peer counts itself.
+    #[test]
+    fn local_labels_are_unmeasured_until_armed_then_name_this_node() {
+        let _g = guard();
+        reset_for_test();
+        assert!(
+            local_labels().is_none(),
+            "unarmed is UNMEASURED here too — a reader must fall back, not assume"
+        );
+        arm(
+            vec!["12D3KooWSelf".into(), "uhCAkSelf".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
+        record_connected("12D3KooWJessica", vec!["uhCAkJessica".into()]);
+        let local = local_labels().expect("armed");
+        assert_eq!(local.len(), 2);
+        assert!(local.contains(&"uhCAkSelf".to_string()));
+        assert!(
+            !local.contains(&"uhCAkJessica".to_string()),
+            "a connected peer is not this node"
         );
         reset_for_test();
     }

@@ -638,6 +638,10 @@ pub(crate) struct HouseholdPeerCounts {
 /// already dead (blob-durability DELTA 2026-09-12c, cause 2). `known` is
 /// unaffected either way — a dark peer is still a known peer, and "1 of 3" is
 /// the honest reading.
+///
+/// On the transport-observed path the connected set is unioned with THIS node's
+/// own labels ([`local_liveness_labels`]): a peer never sees itself connect, so
+/// the intersection alone under-counts by exactly one from every member's fold.
 fn count_household_peers(
     conn: &mut diesel::SqliteConnection,
     households: &HashSet<String>,
@@ -695,9 +699,15 @@ fn count_household_peers(
 
     // Transport-observed liveness wins when it exists. Set intersection, no
     // window: the transport's set IS the measurement, and it is already bounded
-    // by the ping budget on the publishing side.
+    // by the ping budget on the publishing side — UNIONED with this node's own
+    // identity, which no transport event can ever supply (see
+    // `local_liveness_labels`).
     if let Some(connected) = connected {
-        let live = peers.iter().filter(|p| connected.contains(*p)).count() as i32;
+        let local = local_liveness_labels(conn);
+        let live = peers
+            .iter()
+            .filter(|p| connected.contains(*p) || local.contains(*p))
+            .count() as i32;
         return Ok(HouseholdPeerCounts { live, known });
     }
 
@@ -717,6 +727,55 @@ fn count_household_peers(
         .count() as i32;
 
     Ok(HouseholdPeerCounts { live, known })
+}
+
+/// Every label by which THIS node might appear in a household peer set, under
+/// the same resolution `P2PNode::publish_peer_connected` applies to a remote
+/// peer: the transport peer id, plus the `agent_cid` its active
+/// `peer_identity_bindings` row carries.
+///
+/// # Why the answering peer must count itself
+///
+/// `ConnectionEstablished` fires for peers this node connects TO; a node is
+/// never in its own connected set. Fold a three-peer household from any one
+/// member and the intersection silently omits the member doing the folding —
+/// household mesh run 20260912T224420Z had all three peers up and connected
+/// 2/2/2, and every card still read `live 2 of known 3`, dropping the chaos
+/// ladder to the "partial" rung BEFORE a single peer was killed. A peer that is
+/// answering the request is alive by definition, and that is the one liveness
+/// fact no transport event can deliver.
+///
+/// # Why both resolutions, not just the armed labels
+///
+/// `peer_liveness::arm` publishes what this node ADVERTISES (its boot-time
+/// `identity.agent_pubkey()`), while a remote peer's labels are resolved from
+/// `peer_identity_bindings` — the projected, DHT-notarized binding. The two
+/// homes can disagree (a cold boot that resolves its agent key before the cell
+/// exists advertises a placeholder), and when they do, only the remote peers
+/// match the junction. Resolving the local transport id through the SAME table
+/// closes that asymmetry instead of trusting one home.
+///
+/// Returns an empty set while the registry is unarmed — callers only consult it
+/// on the transport-observed path, where the heartbeat fallback does not apply.
+/// A binding lookup failure degrades to the labels already in hand: partial
+/// evidence, never a darkened card.
+fn local_liveness_labels(conn: &mut diesel::SqliteConnection) -> HashSet<String> {
+    let mut labels: HashSet<String> = crate::services::peer_liveness::local_labels()
+        .unwrap_or_default()
+        .into_iter()
+        .collect();
+    if labels.is_empty() {
+        return labels;
+    }
+    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    for label in labels.clone() {
+        if let Ok(Some(row)) =
+            crate::db::peer_identity_bindings::lookup_active(conn, &label, &now_iso)
+        {
+            labels.insert(row.agent_cid);
+        }
+    }
+    labels
 }
 
 /// Live-peer count alone — the reduction `compute_base` needs.
@@ -969,6 +1028,11 @@ mod tests {
     /// `known` stays 3: "2 of 3", never a bare zero and never a comforting lie.
     #[test]
     fn live_follows_the_connected_set_while_known_follows_the_junction() {
+        // The local labels this fold now unions are process-global: hold the one
+        // registry mutex and start UNARMED, so this test measures the connected
+        // set alone and a neighbour's arm cannot leak into it.
+        let _g = crate::services::peer_liveness::test_guard();
+        crate::services::peer_liveness::reset_for_test();
         let pool = test_pool();
         let mut conn = pool.get().unwrap();
         let now = chrono::Utc::now().timestamp_micros();
@@ -1024,5 +1088,74 @@ mod tests {
         )
         .unwrap();
         assert_eq!((alone.live, alone.known), (0, 3));
+    }
+
+    /// THE 20260912T224420Z red: a peer never sees ITSELF connect, so folding a
+    /// three-peer household from any one member counted two.
+    ///
+    /// All three peers were up on a clean cold-started mesh, connected 2/2/2 per
+    /// `/p2p/status`, and the chaos cascade's FIRST rung — read before a single
+    /// kill — said `"chaos-ladder" has 3 custody copies, 2 live peers, rung 2
+    /// ("partial"), expected "protected"`. Nothing was wrong with the household;
+    /// the fold omitted the peer doing the folding. A peer answering the request
+    /// is alive by definition.
+    #[test]
+    fn the_answering_peer_counts_itself_live() {
+        let _g = crate::services::peer_liveness::test_guard();
+        crate::services::peer_liveness::reset_for_test();
+
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::Utc::now().timestamp_micros();
+        for peer in ["uhCAkA", "uhCAkB", "uhCAkC"] {
+            seed_online_peer(&mut conn, peer, "hh-a", now - 60 * 1_000_000);
+        }
+        let households: HashSet<String> = HashSet::from(["hh-a".to_string()]);
+        let identity = HouseholdIdentity::load(&mut conn).expect("identity");
+
+        // This node is `a`; the transport has `b` and `c` connected — the exact
+        // shape the live mesh was in.
+        crate::services::peer_liveness::arm(
+            vec!["12D3KooWA".into(), "uhCAkA".into()],
+            crate::services::peer_liveness::DEFAULT_LIVENESS_TTL,
+        );
+        let connected: HashSet<String> =
+            HashSet::from(["uhCAkB".to_string(), "uhCAkC".to_string()]);
+        let all_up = count_household_peers(
+            &mut conn,
+            &households,
+            &identity,
+            900,
+            now,
+            Some(&connected),
+        )
+        .unwrap();
+        assert_eq!(
+            (all_up.live, all_up.known),
+            (3, 3),
+            "a three-peer household with nothing wrong must read three live from \
+             ANY member's fold — the answering peer included"
+        );
+
+        // And the signal still goes DOWN, which is the whole point of reading
+        // liveness from the transport: b's connection closes, a and c remain.
+        let after_kill: HashSet<String> = HashSet::from(["uhCAkC".to_string()]);
+        let degraded = count_household_peers(
+            &mut conn,
+            &households,
+            &identity,
+            900,
+            now,
+            Some(&after_kill),
+        )
+        .unwrap();
+        assert_eq!(
+            (degraded.live, degraded.known),
+            (2, 3),
+            "counting itself must not pin the badge up — a killed peer still \
+             leaves `live`, and `known` never moves"
+        );
+
+        crate::services::peer_liveness::reset_for_test();
     }
 }
