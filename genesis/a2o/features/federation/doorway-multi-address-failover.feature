@@ -8,6 +8,11 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
   writes tell me the truth instead of pretending, and my client remembers
   where it landed instead of flapping between addresses on every request.
 
+  # "lamad" is the learning pillar (genesis/a2o/features/lms/) — the content
+  # domain this scenario's person is browsing when the outage hits; the
+  # failover itself is content-agnostic (it operates on any /db/content/*
+  # read), lamad is just which app happened to be open.
+  #
   # This is the browser leg of "logical anycast" doorway failover (option
   # §3a, multi-A + client retry): ElohimClient SDK and the Angular
   # apiBaseUrlInterceptor both read a configured fallback list
@@ -19,6 +24,20 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
   # get this treatment — those fields are single-typed upstream and the far
   # path is a tx5-fork patch, filed separately.
   # Spec: genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md (§3a, §7)
+
+  # SUBSTRATE MODE. On the household mesh lane (E2E_DOORWAY_ALPHA and
+  # E2E_DOORWAY_B both set to real local addresses, household fixture
+  # processControl: true) every scenario below runs REAL: the "fallback
+  # doorway address" step configures the real ElohimClient against doorway
+  # "a" (primary) and doorway "b" (fallback) — the named env var
+  # "E2E_DOORWAY_ALPHA_FALLBACK" is not consulted in this mode, since the
+  # mesh's actual second address IS doorway b — and "the primary doorway
+  # address stops answering" really SIGSTOPs doorway a's process (restored by
+  # SIGCONT before the scenario ends, always). Every other substrate (the
+  # deployed fleet, a partial env) falls through to the SYNTHETIC path this
+  # feature originally shipped with: a mocked fetch standing in for both
+  # addresses, proving only the SDK's sticky-fallback logic, not a real
+  # outage. Every scenario logs and attaches which mode actually ran.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
@@ -33,7 +52,8 @@ Feature: Doorway multi-address failover — the browser keeps working when the p
     And subsequent requests from the client stay sticky to the fallback address
 
   Scenario: A write during the outage fails honestly, then later traffic moves to the fallback
-    Given the primary doorway address stops answering
+    Given the person is viewing a lamad content page served by the primary doorway address
+    And the primary doorway address stops answering
     When the person submits a write while the client is still pointed at the primary address
     Then the write fails with an honest error and is not silently retried against another address
     When the person's next read succeeds through the fallback doorway address

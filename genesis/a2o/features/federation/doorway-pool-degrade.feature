@@ -20,12 +20,17 @@ Feature: Doorway EPR router degrades through the storage pool
   2026-06-09 outage was apex's front door going dark, not alpha's.
 
   HOW THE HELD SCENARIOS EXECUTE. Each Given below that names a degraded
-  primary OBSERVES it: when the primary already holds rows (the normal state of
-  the household mesh — see the note under the evidence anchor) the step answers
-  cucumber's `skipped` status with a printed reason, so the scenario reads as
-  held, never as passed or failed. Only a mesh whose primary genuinely answers
-  zero rows runs the degrade path here; on every other substrate the degrade
-  path's proof is the doorway's mock-pool unit tests.
+  primary CONSTRUCTS it: it calls elohim-storage's admin verb
+  `POST {storage}/admin/projections/shade` (body {"kind":"project-epr",
+  "shaded":true}) to hide that peer's project-epr rows from the read route the
+  doorway's EPR router refresh consults — nothing is deleted, so there is no
+  race with the 30s projection reconcile that heals a genuine gap, and an
+  After hook always un-shades every peer this run shaded (pass, fail, or
+  held) before the scenario ends. The verb is landing separately, from the
+  storage side; until it is deployed on the build under test the route
+  answers 404 and the Given step answers cucumber's `skipped` status with a
+  printed reason naming the missing verb, so the scenario reads as held,
+  never as passed or failed on a premise the substrate does not yet offer.
 
   # Evidence anchor (2026-06-09 /deliver iter-0): doorway-B's EPR refresh
   # loop read 0 rows from its primary (adam) every 30s at DEBUG — invisible —
@@ -35,15 +40,11 @@ Feature: Doorway EPR router degrades through the storage pool
   #
   # PRECONDITION, measured 2026-08-22 on the Act I household mesh (run
   # 20260822T201747Z-3bd326d6): every household peer holds every doorway's
-  # project-epr rows, because the Prologue seeds them to all three. The
-  # "primary returns zero rows" shape is an INCIDENT shape — elohim-storage has
-  # no verb that shades or drops one peer's projections, and deleting the rows
-  # would race the 30 s projection reconcile that exists to heal exactly that
-  # gap (and "empty everywhere" would take both doorways dark for every later
-  # run). So each Given OBSERVES the precondition and holds the scenario with
-  # that reason when the primary is healthy, rather than failing on a premise
-  # the substrate does not offer. The degrade path itself is bound by the
-  # doorway's mock-pool unit tests (doorway-service/src/projection/epr_router.rs).
+  # project-epr rows, because the Prologue seeds them to all three — so the
+  # "primary returns zero rows" shape only exists on this mesh once a Given
+  # below actively shades it. The degrade path is ALSO bound by the doorway's
+  # mock-pool unit tests (doorway-service/src/projection/epr_router.rs); this
+  # feature is the household-mesh-real half of that same proof.
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
