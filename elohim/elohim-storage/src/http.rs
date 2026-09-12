@@ -2046,6 +2046,24 @@ impl HttpServer {
             // it is what a test or a mesh run drives. Node-local (deliberately
             // NOT in build_manifest); same posture as the other /admin routes.
             // All logic lives in `crate::runtime_config`.
+            // Operational (Path C) degrade lever for the a2o pool-degrade lane:
+            // HIDE one kind of this peer's projections from the read route the
+            // doorway's EPR router refresh consults, WITHOUT deleting anything
+            // (deleting would race the 30s projection reconcile that heals
+            // exactly that gap). In-process, reset on restart, never persisted
+            // and never gossiped. All logic lives in
+            // `crate::services::projection_shade`. Node-local: deliberately NOT
+            // in build_manifest() — never doorway-proxied.
+            (Method::GET, "/admin/projections/shade") => {
+                Ok(crate::services::projection_shade::handle_get())
+            }
+            (Method::POST, "/admin/projections/shade") => match req.collect().await {
+                Ok(body) => Ok(crate::services::projection_shade::handle_post(
+                    &body.to_bytes(),
+                )),
+                Err(e) => Ok(response::internal_error(&format!("read body: {e}"))),
+            },
+
             (Method::GET, "/admin/runtime-config") => {
                 Ok(response::ok(&crate::runtime_config::report_json()))
             }
@@ -14152,6 +14170,17 @@ impl HttpServer {
             return Ok(response::error_response(StorageError::InvalidInput(
                 "GET /db/rea_commitments requires doorwayId".into(),
             )));
+        }
+        // Operational shading (`POST /admin/projections/shade`): while armed,
+        // this peer answers 200 with ZERO rows of this kind — the degraded-
+        // primary shape the a2o pool-degrade lane needs the doorway's pool
+        // fallback to meet. Nothing is deleted and no other path is touched;
+        // the rows below are still in SQLite and still reconciled. Placed
+        // AFTER parameter validation so a bad request is still a 400, and
+        // BEFORE the pool checkout so a shaded read costs no connection.
+        if crate::services::projection_shade::is_shaded(action) {
+            let empty: Vec<elohim_views::projection::EprProjectionView> = Vec::new();
+            return Ok(response::ok(&empty));
         }
         let mut conn = self.get_diesel_conn()?;
         let views = db::rea_commitments::find_active_projections(&mut conn, ctx, doorway_id)?;

@@ -138,6 +138,22 @@ lazy_static! {
     )
     .expect("valid gauge");
 
+    /// Is this peer currently SHADING one kind of its projections — answering
+    /// 0 rows on the read route while still holding them? 0/1 per kind.
+    ///
+    /// Operational (Path C) state, node-local and reset on restart. Series are
+    /// materialised on first change only, so a peer that never shaded reports
+    /// no series at all rather than a fabricated zero.
+    pub static ref ELOHIM_PROJECTIONS_SHADED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projections_shaded",
+            "1 while this peer hides rows of this projection kind from its read \
+             route (nothing deleted); 0 once un-shaded.",
+        ),
+        &["kind"],
+    )
+    .expect("valid gauge");
+
     /// Boot-time cgroup CPU quota in millicores (0 = unbounded/unknown).
     pub static ref NODE_CPU_QUOTA_MILLICORES: IntGauge = IntGauge::new(
         "elohim_node_cpu_quota_millicores",
@@ -2287,6 +2303,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_USED_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODIAN_STEWARDED_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(ELOHIM_CUSTODY_CLASS_COUNT.clone()));
+        let _ = REGISTRY.register(Box::new(ELOHIM_PROJECTIONS_SHADED.clone()));
         // Rung 5 — release-adoption decisions. The pre-touch lives with the
         // controller (it owns the `(arm, reason)` reachability map, and the
         // `apply` arm is deliberately left absent), so this registers the

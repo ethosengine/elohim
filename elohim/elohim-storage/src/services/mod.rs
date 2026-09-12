@@ -109,6 +109,7 @@ pub mod peer_status_fanout; // Cross-agent PeerStatus fan-in — breaks the self
 pub mod peer_topology_view;
 pub mod presence_service;
 pub mod private_replica; // Wave 5.1 Slice-0 — encrypt-then-erasure-code + DEK envelope PROOF
+pub mod projection_shade; // Operational (Path C) admin verb — hide one projection kind from this peer's read route without deleting it
 pub mod provenance_service;
 pub mod provide_loop_status; // Workstream D — observability for the provide-loop + re-anchor backfill
 pub mod provide_reconcile;
