@@ -66,3 +66,13 @@ lamad blob resolving to localhost:8090; e09eec608 (origin-relative blob URLs in 
 between them. Apex (elohim.host) still serves face02de with an unverified landing anchor — the same address
 there renders the old shell; that is dataplane-convergence's red, not this habit's. The 3 commons scenarios stay
 @wip for the commons plan.
+
+NEXT 2026-09-12 (status unchanged — green on the frame, the commons layer is still the open half): the three @wip commons
+scenarios are now named as five affordances, and they are this habit's commons checks — (1) the governance mark (the reach
+this atom is at, the collective whose ruling set it, the doorway holding the projection contract), (2) the fair-trade receipt
+(what was exchanged for this serve, and who was credited — holder and projector separately), (3) the redress entry, (4) feedback
+that becomes a witnessed commitment with a due window (an owed response, not a hoped one), and (5) an interpretability surface
+where the elohim explains with receipts and can act — all in the friend's voice, protocol form one request away
+(.claude/memory/feedback_epr_chrome_is_the_trust_signal.md). They are the visible half of doorway-service's
+`served-under-standing` habit (doorway/doorway-service/.epr-meta/served-under-standing.habit.md), whose invariant requires the
+chrome to carry exactly these; that habit references them here rather than re-registering them, so this atom stays their one home.
