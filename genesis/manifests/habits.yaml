@@ -2961,6 +2961,7 @@ habits:
       emitted next-choice commands are the progressive-discovery payload, never optional; (3) a
       fresh-reader observation taken by the agent that made the change is not a fresh reader.
     refs:
+      - ".claude/workflows/recall-standing-reader.js — the weekly standing reader: samples every reader tier the actor sidecar has seen in 30 days x the six-question bank, judged by a seat of a different tier each time; routine: operator /schedule pending"
       - "genesis/docs/superpowers/plans/2026-09-11-bounded-recall-mastery-sprint.md"
       - "genesis/docs/superpowers/plans/2026-09-10-memory-kit-replacement-finish.md — the verdict rule this habit inherits from dev-system-equilibrium, where it never belonged"
       - "genesis/docs/analysis/2026-09-09-memory-ceremony-efficacy.md — the five fresh-start questions"

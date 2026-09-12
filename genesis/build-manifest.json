@@ -233,6 +233,8 @@
             ".claude/epr-meta/measures.yaml",
             ".claude/epr-meta/policies.yaml",
             ".epr-meta/elohim/algorithms/recall-contract.json",
+            ".epr-meta/elohim/algorithms/recall-questions.json",
+            ".claude/workflows/recall-standing-reader.js",
             "elohim/eprfs/epr-cli/tests/flow_memory_recall.rs",
             "elohim/eprfs/epr-cli/tests/flow_concerns_corrections.rs",
             "elohim/eprfs/epr-cli/tests/flow_memory_footprint.rs",
