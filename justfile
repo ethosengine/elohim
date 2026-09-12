@@ -510,7 +510,7 @@ _gate-memory-ceremony:
     # Station five (2026-09-10): the recall executor and the identity-closed corrections view are
     # native. These two binaries carry the 60 Python recall cases (54 counterparts + 6 retired as
     # out-of-process artefacts); the Python suite and its scripts are gone.
-    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint
+    cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test flow_memory_recall --test flow_concerns_corrections --test flow_memory_footprint --test flow_memory_recall_golden --test flow_memory_recall_lens --test flow_memory_recall_sample --test flow_report
     # Station four (2026-09-10): the memory-index projection router and the relocated memory
     # lenses. Station six round (b) (2026-09-11) removed the kit leg from every hook, so these
     # now pin the INVERTED contract: a drift signal is a fold and only a fold, and the index
