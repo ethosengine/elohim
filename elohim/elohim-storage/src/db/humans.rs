@@ -292,6 +292,56 @@ pub fn list_agent_pub_keys(
         .map_err(|e| StorageError::Internal(format!("Failed to list agent_pub_keys: {}", e)))
 }
 
+/// Projection-inventory rows for the `humans` reconcile arm: the
+/// `(human_id, agent_pub_key)` pairs this peer's projection currently BINDS,
+/// newest-id-first, windowed by `offset`/`cap`. Returns
+/// `(entries, total_bound_rows)`.
+///
+/// Only rows with a NON-NULL, non-empty `agent_pub_key` are returned: a human
+/// with no key yet is not a binding anyone can disagree with, and advertising it
+/// would manufacture a gap out of an absence (the same "empty is no evidence"
+/// ruling the collectives and rea arms make).
+///
+/// NOT `h_app_id`-filtered, deliberately — every other `humans` consumer
+/// (`on_membership_projected`, `household_backfill::run_once_by_membership`,
+/// the resilience holder join, `membership_identity_reconcile`) is
+/// scope-agnostic on this table, and adding a filter here alone would ship a
+/// silent no-op under the qahal/lamad/imagodei ctx drift class.
+///
+/// Discovery-only, like every inventory: the reconciler NEVER writes a
+/// peer-advertised key. A mismatch only triggers a membership-truth pass
+/// against the peer's OWN conductor.
+pub fn agent_key_inventory(
+    conn: &mut SqliteConnection,
+    offset: i64,
+    cap: i64,
+) -> Result<(Vec<(String, String)>, i64), StorageError> {
+    use crate::db::diesel_schema::humans::dsl;
+
+    let total: i64 = dsl::humans
+        .filter(dsl::agent_pub_key.is_not_null())
+        .filter(dsl::agent_pub_key.assume_not_null().ne(""))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("humans inventory count failed: {e}")))?;
+
+    let rows: Vec<(String, Option<String>)> = dsl::humans
+        .filter(dsl::agent_pub_key.is_not_null())
+        .filter(dsl::agent_pub_key.assume_not_null().ne(""))
+        .order(dsl::id.asc())
+        .offset(offset.max(0))
+        .limit(cap)
+        .select((dsl::id, dsl::agent_pub_key))
+        .load(conn)
+        .map_err(|e| StorageError::Internal(format!("humans inventory load failed: {e}")))?;
+
+    let entries = rows
+        .into_iter()
+        .filter_map(|(id, key)| key.filter(|k| !k.is_empty()).map(|k| (id, k)))
+        .collect();
+    Ok((entries, total))
+}
+
 /// Update mutable profile fields for an existing human.
 ///
 /// Only fields present in `input` (i.e., `Some(...)`) are written.

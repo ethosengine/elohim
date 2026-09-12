@@ -122,6 +122,32 @@ pub const PROJECTION_INVENTORY_TABLE_COLLECTIVES: &str = "collectives";
 /// own-conductor read.
 pub const PROJECTION_INVENTORY_TABLE_PARTICIPATIONS: &str = "collective_participations";
 
+/// The HUMANS projection table (cross-peer identity-BINDING reconcile).
+///
+/// Serves `(human_id, agent_pub_key)` for every locally-bound human. The
+/// reconciliation identity here is neither an anchor nor a cid: it is the
+/// BINDING — which agent key this peer believes a human currently holds. The
+/// `dhtAnchorHash` slot carries the `agent_pub_key`, the same slot-overload the
+/// collectives arm makes for its cid (see
+/// [`PROJECTION_INVENTORY_TABLE_COLLECTIVES`]).
+///
+/// Why this arm exists: a non-prod DNA reinstall (or any re-key) mints a NEW
+/// `AgentPubKey`, and every `humans` writer except the SELF-heal arm is
+/// NULL-only by design — so a peer's row on ANOTHER peer keeps its FOSSIL key
+/// forever. That fossil poisons both sides of the resilience stewarding join
+/// (`shard_locations.peer_id == humans.agent_pub_key` and
+/// `rea_commitments.provider == humans.agent_pub_key`), which is how three
+/// household peers testified `intraHubPeers` 3 / 2 / 2 for the same content
+/// (dataplane-convergence DELTA 2026-09-12c, "named, not fixed").
+///
+/// Discovery ONLY, and more strictly than any other arm: a peer-advertised key
+/// is NEVER written. It can do exactly one thing — say "your binding for this
+/// human disagrees with mine", which schedules a membership-truth pass against
+/// the peer's OWN conductor
+/// (`services::membership_identity_reconcile`, whose forced-bijection
+/// supersede is the only write path).
+pub const PROJECTION_INVENTORY_TABLE_HUMANS: &str = "humans";
+
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
 
@@ -881,6 +907,7 @@ fn build_inventory_payload(
         && table != PROJECTION_INVENTORY_TABLE_CONTENT
         && table != PROJECTION_INVENTORY_TABLE_COLLECTIVES
         && table != PROJECTION_INVENTORY_TABLE_PARTICIPATIONS
+        && table != PROJECTION_INVENTORY_TABLE_HUMANS
     {
         return empty();
     }
@@ -1186,6 +1213,79 @@ fn build_inventory_payload(
                         served = payload.entries.len(),
                         total,
                         "ProjectionInventory: participations inventory windowed/trimmed \
+                         (honest total on the wire lets the requester window the remainder)"
+                    );
+                }
+                tracing::info!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    entries = payload.entries.len(),
+                    total,
+                    "ProjectionInventory: serving local inventory"
+                );
+                (
+                    serde_json::to_value(payload).unwrap_or(serde_json::Value::Null),
+                    FreshnessState::Live,
+                )
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::view_federation",
+                    table = %table,
+                    error = %e,
+                    "ProjectionInventory: local inventory query failed; returning empty"
+                );
+                empty()
+            }
+        };
+    }
+
+    // Humans (cross-peer identity-BINDING reconcile) — bound rows only. The
+    // corpus is small (one row per known human), and the query is deliberately
+    // scope-agnostic (see `db::humans::agent_key_inventory`).
+    if table == PROJECTION_INVENTORY_TABLE_HUMANS {
+        return match crate::db::humans::agent_key_inventory(
+            &mut conn,
+            i64::from(offset),
+            PROJECTION_INVENTORY_CAP,
+        ) {
+            Ok((rows, db_total)) => {
+                let total = usize::try_from(db_total).unwrap_or(usize::MAX);
+                let served = rows.len();
+                let cap_truncated = (offset as usize).saturating_add(served) < total;
+                let entries = rows
+                    .into_iter()
+                    // The `dhtAnchorHash` slot carries the AGENT KEY — the
+                    // binding is the reconciliation identity for this table.
+                    .map(|(id, agent_pub_key)| ProjectionInventoryEntry {
+                        id,
+                        dht_anchor_hash: agent_pub_key,
+                        // Declared-head hints are a CONTENT-table concept.
+                        declared_head_action_hash: None,
+                        declared_head_at: None,
+                        // `humans` has no REA lifecycle state.
+                        commitment_state: None,
+                    })
+                    .collect();
+                let mut payload = ProjectionInventoryPayload {
+                    table: table.to_string(),
+                    total,
+                    entries,
+                    // `in_sync` is a CONTENT-table concept.
+                    in_sync: None,
+                    head_set_snapshot: None,
+                };
+                let byte_dropped = fit_inventory_to_budget(&mut payload, INVENTORY_PAYLOAD_BUDGET);
+                if cap_truncated || byte_dropped > 0 {
+                    tracing::warn!(
+                        target: "elohim_storage::view_federation",
+                        table = %table,
+                        cap = PROJECTION_INVENTORY_CAP,
+                        offset = offset,
+                        dropped = byte_dropped,
+                        served = payload.entries.len(),
+                        total,
+                        "ProjectionInventory: humans inventory windowed/trimmed \
                          (honest total on the wire lets the requester window the remainder)"
                     );
                 }

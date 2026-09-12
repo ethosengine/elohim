@@ -147,8 +147,8 @@ use crate::p2p::reconcile_peers::ReconcilePeers;
 use crate::p2p::reconcile_rails::GapTracker;
 use crate::p2p::view_federation::{
     PROJECTION_INVENTORY_CAP, PROJECTION_INVENTORY_TABLE_COLLECTIVES,
-    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_PARTICIPATIONS,
-    PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
+    PROJECTION_INVENTORY_TABLE_CONTENT, PROJECTION_INVENTORY_TABLE_HUMANS,
+    PROJECTION_INVENTORY_TABLE_PARTICIPATIONS, PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
 };
 use crate::services::provide_loop_status::ProvideLoopState;
 use crate::views::{ProjectionInventoryPayload, ViewFederationRequest, ViewKind};
@@ -1603,6 +1603,7 @@ pub struct SweepPlan {
     content: ContentDiscovery,
     collectives: CollectivesDiscovery,
     participations: crate::p2p::participations_reconcile::ParticipationsDiscovery,
+    humans: crate::p2p::humans_reconcile::HumansDiscovery,
 }
 
 /// What the per-tick heal scheduler should do, given whether the lamad bridge is
@@ -1882,6 +1883,7 @@ pub async fn run_discovery(
     let participations =
         crate::p2p::participations_reconcile::discover_participations(p2p, pool, window, misses)
             .await;
+    let humans = crate::p2p::humans_reconcile::discover_humans(p2p, pool, window, misses).await;
 
     // Persistent known-gap / known-divergent gauges, hosted on `misses`
     // (`MissLedger::tracked` / `divergent_tracked`) — published HERE, not in
@@ -1894,6 +1896,7 @@ pub async fn run_discovery(
         ("content", PROJECTION_INVENTORY_TABLE_CONTENT),
         ("collectives", PROJECTION_INVENTORY_TABLE_COLLECTIVES),
         ("participations", PROJECTION_INVENTORY_TABLE_PARTICIPATIONS),
+        ("humans", PROJECTION_INVENTORY_TABLE_HUMANS),
     ] {
         let known_divergent = misses.divergent_tracked(table);
         let known_gaps = misses.tracked(table).saturating_sub(known_divergent);
@@ -1930,6 +1933,11 @@ pub async fn run_discovery(
         participations_ids_discovered = participations.ids_discovered,
         participations_gaps = participations.tracker.counts().pending,
         participations_local_anchored = participations.local_anchored,
+        humans_peers_asked = humans.peers_asked,
+        humans_ids_discovered = humans.ids_discovered,
+        humans_key_divergent = humans.key_divergent,
+        humans_missing_local = humans.missing_local,
+        humans_local_bound = humans.local_bound,
         "projection-reconcile: discovery complete (heal scheduled separately)"
     );
 
@@ -1938,6 +1946,7 @@ pub async fn run_discovery(
         content,
         collectives,
         participations,
+        humans,
     }
 }
 
@@ -1971,6 +1980,7 @@ pub async fn run_heal(
         content,
         collectives,
         participations,
+        humans,
     } = plan;
     // Bounded heal pacing (per-row transient retry + per-leg wall-clock budget).
     // REA runs FIRST with its own reserved budget so its small backlog is never
@@ -2155,6 +2165,62 @@ pub async fn run_heal(
     )
     .await;
 
+    // Humans arm — LAST. Bounded by construction rather than by a wall-clock
+    // budget: its heal is ONE membership-truth pass for the whole leg, not a
+    // per-row conductor round-trip, so there is no queue here to starve or be
+    // starved by. Its divergence class is the identity BINDING, and it writes
+    // no key of its own — see `p2p::humans_reconcile`.
+    let crate::p2p::humans_reconcile::HumansDiscovery {
+        tracker: mut humans_tracker,
+        discovered_by: humans_discovered_by,
+        peer_key: _humans_peer_key,
+        missing_local: humans_missing_local,
+        key_divergent: humans_key_divergent,
+        exhausted_persistent: humans_exhausted,
+        peers_asked: humans_peers_asked,
+        ids_discovered: humans_ids_discovered,
+        local_bound: humans_local_bound,
+        measured: humans_measured,
+    } = humans;
+    // Same measured-gate as the REA arm above (see its comment for the why).
+    crate::metrics::set_projection_reconcile_measured("humans", humans_measured);
+    if humans_measured {
+        crate::metrics::set_projection_reconcile_gauges(
+            "humans",
+            humans_tracker.counts().pending as u64,
+            humans_local_bound as u64,
+            humans_exhausted as u64,
+            // Every gap this arm admits IS a divergence (a binding disagreement),
+            // so `divergent` is the key-divergent count. `divergent_refused` is
+            // published AFTER the heal, once the membership pass has said which
+            // of them it ABSTAINED on — the only honest moment to know it.
+            humans_key_divergent as u64,
+            0,
+        );
+    }
+    let crate::p2p::humans_reconcile::HumansHealOutcome {
+        healed: humans_healed,
+        unresolved: humans_unresolved,
+    } = crate::p2p::humans_reconcile::heal_humans(
+        &mut humans_tracker,
+        &humans_discovered_by,
+        hc,
+        pool,
+    )
+    .await;
+    // A binding the membership pass ABSTAINED on is adjudicated, not undone
+    // work: the conductor's household read was ambiguous / incomplete / carried
+    // a withdrawal, and superseding on a guess would mis-attribute one human's
+    // shards and commitments to another. Publishing it as refused keeps a
+    // correct abstention from pinning `converged` at 0 forever — the same
+    // discipline the content arm's `refused_declared` share carries.
+    if humans_measured {
+        crate::metrics::set_projection_reconcile_divergent_refused(
+            "humans",
+            humans_unresolved as u64,
+        );
+    }
+
     // ADOPT-BEFORE-AUTHOR context for BOTH witness sweeps below. They are the
     // two paths that MINT roots, so they are the two that must first ask whether
     // a canonical head already exists. The fetcher rides the same view-federation
@@ -2209,6 +2275,7 @@ pub async fn run_heal(
         content_tracker.counts(),
         collectives_tracker.counts(),
         participations_tracker.counts(),
+        humans_tracker.counts(),
     ]);
     // MEASURED precondition (the N2 false-green): every arm short-circuits to an
     // `empty()` discovery on a DB/query error, and those all-zero counts reach
@@ -2219,12 +2286,13 @@ pub async fn run_heal(
         && content_measured
         && collectives_measured
         && participations_measured
+        && humans_measured
         && peers_asked > 0;
     state
         .publish_sweep(
             sweep_counts,
             peers_asked,
-            rea_divergent + content_divergent,
+            rea_divergent + rea_divergent_state + content_divergent,
             rea_divergent_refused + content_divergent_refused,
             measured,
         )
@@ -2258,6 +2326,13 @@ pub async fn run_heal(
         participations_healed,
         participations_missing,
         participations_local_anchored,
+        humans_peers_asked,
+        humans_ids_discovered,
+        humans_key_divergent,
+        humans_missing_local,
+        humans_healed,
+        humans_unresolved,
+        humans_local_bound,
         "projection-reconcile: heal complete"
     );
 }

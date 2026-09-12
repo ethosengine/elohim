@@ -48,6 +48,7 @@ pub mod fanout;
 pub mod feedback_signal;
 pub mod gossip_dispatch;
 pub mod head_record_client; // adopt-before-author — fetch a peer's head Record over view-federation
+pub mod humans_reconcile; // cross-peer identity-BINDING arm of the projection reconcile
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
