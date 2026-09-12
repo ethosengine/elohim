@@ -122,7 +122,6 @@ Feature: A doorway that does not host a name still serves it, through the neares
   # finds alpha holding it and serving, forwards once, and Jessica gets the page.
   # She never learns that any of this happened. The staging is deliberately
   # one-doorway: if both held it, this scenario would pass by never routing at all.
-  @wip
   Scenario: A doorway that does not host a name serves it through the nearest live holder
     Given the household stages the root "garden" as hosted by doorway "alpha" only
     And doorway "beta" holds no hosting contract for "garden"
