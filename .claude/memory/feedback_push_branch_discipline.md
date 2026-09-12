@@ -1,11 +1,14 @@
 ---
 name: feedback_push_branch_discipline
-title: Push, branch & worktree discipline (umbrella)
-id: feedback-push-branch-discipline
 description: "Commit-only; one push per batch; never during builds — a superseding run cancels roll mid-rollout. Shared worktree: path-limited; sprint/* not CI-indexed."
-metadata:
+metadata: 
   node_type: memory
+  title: "Push, branch & worktree discipline (umbrella)"
+id: feedback-push-branch-discipline
+  id: feedback-push-branch-discipline
   type: feedback
+  originSessionId: 9f7bc2ea-78fe-4186-b2ab-836023d073e4
+  modified: 2026-09-11T13:52:23.714Z
 ---
 
 # Push, branch & worktree discipline (umbrella)
@@ -22,6 +25,8 @@ Folds the git push/branch/worktree discipline cluster — the rules governing wh
 - [[feedback_partition_compile_and_stale_dist]] — Two integration anti-patterns from 2026-07-24 overnight — commit partitions must respect COMPILE deps, and local dist/ presence proves nothing about CI stage coverage
 - [[project_sprint_branch_not_orchestrator_indexed]] — Orchestrator indexes only {PR-*, dev}: sprint/* and claude/* pushes never trigger CI ([build:*] inert, NOT_BUILT); auto-deploy only via dev-merge.
 - **Never reset by relative ref in a shared worktree (2026-08-27 near-miss).** `git reset --soft HEAD~1` meant to drop MY commit removed the sibling session's newest commit instead — three of theirs had landed on top of mine in the minutes between. Recovered from the reflog within a minute, but the rule is: name the commit (`git reset --soft <sha>` / `git revert <sha>`), re-read `git log -5` immediately before any history op, and prefer a forward correction commit over rewriting when another session is live. Corollary: an inert `[build:*]` tag buried in history is harmless — the orchestrator reads `git log -1` only — so leave it and add a commit above it rather than rebase.
+  - **2026-09-11 repeat, with a NAMED sha:** `git reset --soft aaf94beb4` to park my top commit dropped the sibling's 466536cb4 too, because it had landed between aaf94beb4 and mine and I named the sha from a stale `git log`. Naming a sha is not enough — name the sha of the commit DIRECTLY BELOW YOURS as printed by `git log -3` in the same command, and in a shared tree prefer `git branch <park> HEAD` plus a forward revert over any reset. Recovery: the dropped commit's content stays STAGED after `--soft`, so `git commit -c <dropped-sha> -- <its files>` recreates it (verify with `git diff <dropped-sha> HEAD -- <files>`).
+  - **The pre-push hook's harnesses run on the WORKING tree and under git's hook env.** Three latent push blockers surfaced on 2026-09-11 that no shift had changed: a berth CLI shape regression (`.claude/hooks/tests`), unrouted seam registries + schema-violating rows (`_lib/__tests__/seam_matrix_test.py`), and `epr_habits_test.py` failing only because git exports `GIT_DIR` into hooks (now scrubbed with `env -u` in the loop). When a push is refused by a leg you never touched, run that harness under `GIT_DIR=$PWD/.git` to reproduce before blaming the diff.
 
 **2026-08-29 — two agents committing in ONE shared worktree collide on the index.** Sweep B's `git reset`
 emptied sweep A's staged index mid-flight, and B's `git add` of its own file landed inside A's commit (A had to
@@ -118,5 +123,16 @@ reviewing it. Outcome fine, discipline not. Rule: when forks run alongside the i
 `berth claim push` (a lease the fork can see) and every fork prompt states "commit only; never push" up front, not
 mid-flight. Forks also sweep the parent's STAGED files into their own commits (two habit commits carried 90+ of my
 in-progress memory edits) — stage only what you are about to commit, immediately.
+
+**2026-09-11 — a pathspec commit still carries another lane's hunks INSIDE the file, and the pre-push gate compiles
+the working tree, not the commit.** fb4d10c7d committed `elohim-storage/src/services/mod.rs` + `api/rea_commitments.rs`
+by pathspec; both already held the operator's uncommitted hunks (three `pub(crate) mod` lines whose files were never
+added, plus a `?refresh` path calling one of them). Local gates passed (files exist on disk); CI's Build Storage failed
+`E0583 ×3` (edge #1451) — the batch's only code-caused red. **How to apply:** in a shared tree, `git diff --cached`
+every hunk before a pathspec commit of a file the other lane touches; and attest the COMMIT, not the tree — author the
+fix in `git worktree add --detach <scratch> HEAD`, `cargo check` there with the dev-family pool slot
+(`CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/<crate-slot>/dev`, minutes, no cold slot), commit there,
+`git merge --ff-only` in the main tree, then restore the other lane's working-copy content (`git show <old>:path > path`)
+so their WIP keeps compiling. Backlog: `shared-worktree-sweep-and-nextest-fail-fast-2026-09-11`.
 
 - [[project_fresh_worktree_install_state_traps]] — folded (index: false); a fresh `git worktree add` is NOT gate-ready and fails on INSTALL STATE, not code — missing deps, uninitialised submodules, gitignored generated TS, absent app dists; the mechanical fix list is in the entry (measured 2026-09-07).

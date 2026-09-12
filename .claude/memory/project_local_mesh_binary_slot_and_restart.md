@@ -8,7 +8,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 73728c2e-2397-427f-b5b0-9718f01568dd
-  modified: 2026-08-22T20:19:51.232Z
+  modified: 2026-09-12T00:23:50.977Z
 ---
 
 The household mesh (`just mesh start`) runs elohim-storage from
@@ -112,3 +112,7 @@ To measure a storage cure: after every agent's gate is done (pool admits one bui
 `CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__elohim-storage/dev cargo build
 --bin elohim-storage --features "p2p p2p-iroh"` from the worktree, then
 `STORAGE_BIN=<that binary> just mesh storage-restart <peers>`. Batch cures into ONE such build.
+
+**2026-09-12 (verified, six sheds):** after `just mesh prologue` casts the 14-name hosted lane, ONE mesh conductor holds ~13.7 GB RSS and the workspace sits at ~70 % of its 31 GB budget — every `cargo test`/`cargo check` of elohim-storage (3.3–3.6 GB at `CARGO_BUILD_JOBS=1`) is shed by the RAM guard at 80 % (exit 143, no hook denial text). `just mesh conductors-restart` dropped committed memory from 21.8 G to 7.8 G in one step. Order of operations for a storage cure on a cast mesh: conductors-restart FIRST, then the one pool build, then `storage-restart` (the peers hold stale conductor tokens after a conductor restart anyway — "ZOME CALLS ARE DEAD"), then re-prologue. Also: a pool `elohim-storage` built WITHOUT `--features "p2p p2p-iroh"` makes `just mesh storage-restart` REFUSE ("binary lacks the compiled p2p-iroh marker") while the running peers keep executing the deleted previous binary — the mesh stays up, but every process-control chapter (epr-app-deliverability restarts) is refused with "recovery executable … differs from the running bytes".
+
+**2026-09-12b (verified live, two traps in one afternoon):** (1) `source app/elohim-app/scripts/hc-mesh.sh` in a helper shell and calling `stop_all` (or `stop`) with only `MESH_DIR`/`DOORWAY_PORT` overridden STILL kills the live mesh — `stop_all` reaps by recorded pid AND by `mesh_owned_ports`, and the port list is the real mesh's unless every port var is overridden. An Opus agent smoke-testing a new start helper this way took down all 13 mesh processes (clean SIGTERM, no guard record, so it looked like an operator stop). Rule for every subagent prompt that touches hc-mesh.sh: never call stop/stop_all/reap helpers, never source the script outside `bash -n`; smoke-test new helpers against a copied script with `mesh_owned_ports` stubbed. (2) Any `cargo test --lib --bins` run in the `family/dev` storage slot (an agent's gate in a worktree still resolves to that slot) REPLACES `debug/elohim-storage` with a default-feature binary — `just mesh preflight` then refuses all three peers ("lacks the compiled p2p-iroh marker") even though the mesh binary was feature-full an hour earlier. Rebuild feature-full from the worktree AFTER every agent gate and before any start/storage-restart.

@@ -1,11 +1,13 @@
 ---
 name: feedback_agent_fleet_and_harness
-title: Agent fleet, delegation & harness traps (umbrella)
-id: feedback-agent-fleet-and-harness
 description: "Keep 3 agents max; delegate narrow tasks to cheaper tiers; avoid subagent read-set ∩ write-set overlap; trap: orphan cargo locks, StructuredOutput hangs."
-metadata:
+metadata: 
   node_type: memory
+  title: "Agent fleet, delegation & harness traps (umbrella)"
+  id: feedback-agent-fleet-and-harness
   type: feedback
+  originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
+  modified: 2026-09-11T22:54:40.933Z
 ---
 
 # Agent fleet, delegation & harness traps (umbrella)
@@ -34,5 +36,7 @@ worktree. Put the rule in every implementer dispatch that shares a tree.
 **Root cause (2026-09-04):** the waiters used `pgrep -f 'cargo (build|test|check|clippy)'` — which matches OTHER waiter shells whose command line contains that very pattern — so the loops never exited (the one-build-at-a-time hook's suggested loop has the same bug). Use `pgrep -x cargo` / `pgrep -x rustc` (exact process names), never `pgrep -f` with a pattern that appears in the waiter's own command line.
 
 **berth cannot separate seats of one session (2026-09-05):** the lease is keyed on session id, so a subagent`s `berth claim` succeeds while a sibling seat of the same session holds the resource. Rule: the controller holds mesh/cargo leases on behalf of its seats and sequences them by message; a seat never claims the mesh on its own initiative when told another seat may be measuring.
+
+**A read-only Explore (haiku) agent ran `git cherry-pick` + `git reset --hard` in the shared tree (2026-09-11 22:34Z):** the brief asked, hypothetically, whether a cherry-pick "would touch only one file (run `git show --stat`)"; the haiku tier executed the cherry-pick literally, then "undid" it with `reset --hard` to the WRONG commit — dropped a sibling session's three unpushed commits from `dev` and wiped ~27 tracked files of the operator's uncommitted elohim-storage WIP. Explore's tool list has Bash, so "read-only" is a description, not a guard. Recovery came from a dangling stash commit (`git fsck --dangling`, a 07:06Z snapshot) + dangling blobs + reversing the CI fix commit; the branch pointer was repaired by the sibling. Rules: (1) NO subagent runs git in `/projects/elohim` — every subagent brief carries "run no git commands" and any write-capable agent works in its own worktree; (2) never phrase a hypothetical git operation in a haiku/sonnet brief — ask for `git show --stat`/`git diff --stat` by name only; (3) `git status --short` at session start is the only record of another session's uncommitted set — capture it (`git diff > scratch/…`) before dispatching anything that could touch the tree; (4) the classifier refuses ref moves (`reset`, `update-ref`) after such an incident — restore CONTENT with plain writes (`git show <sha>:<path> > <path>`) and hand the pointer fix to the owning session/operator. **Push from a scratch worktree (`git worktree add --detach … origin/dev`, cherry-pick, `git push origin HEAD:dev`) does NOT run the husky pre-push gate** (measured 2026-09-11: 7-line log, no gate) — CI is the only backstop for such a push, so use it only for commits CI itself measures.
 
 - [[feedback_delegate_research_to_opus_sonnet_codex]] — folded (index: false); delegate research legwork AND plan-implementation to Opus/Sonnet/Codex; the top model spends only on decisions, coherence, judgment and delegation.

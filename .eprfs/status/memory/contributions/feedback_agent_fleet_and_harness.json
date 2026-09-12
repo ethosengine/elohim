@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_agent_fleet_and_harness.md",
-        "cid": "bafkreifqw7as6btm263zgcsm3k2vngqeowsutbcztaqthdxujgxhutktz4"
+        "cid": "bafkreih6hffkrjua42jrwrllbbsa22mhqoydvsexyugu77q2k6sopqatcu"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Agent fleet, delegation & harness traps (umbrella)",
+    "display": "feedback_agent_fleet_and_harness",
     "file": "feedback_agent_fleet_and_harness.md",
     "scopePath": ".claude/memory/feedback_agent_fleet_and_harness.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
