@@ -2932,6 +2932,21 @@ habits:
       question (intent = recipe default), `search`/`read` under `.claude/skills` refused, three refusals
       each re-printed ~900 B of orientation, the human `open` view was 12.6 KB of inline JSON. The a2o
       scenario is not yet written; the gate is green on the pre-sprint binary.
+      DELTA 2026-09-12 (station 2 — the bootstrapping head; GREEN preserved, two bootstrap reader-samples): the SessionStart
+      head is `open --purpose bootstrap`, rendered as a ProjectionRequest (top red → its check → the atom's last delta → read-only
+      handed choices, then concern edges); `load-project-context.py` and `run-projection.py` are thin projections of that one view
+      at `minimal`/`simple` (BOOTSTRAP block ≤2,000 B inside additionalContext; `--event session` a no-op), so the first screen an
+      agent sees is the journey it continues, not a second instrument. Bootstrap readers folded on `recall-screens-to-shape@1`
+      (reader=sonnet-bootstrap: 1 screen, 0 mistaken; reader=haiku-bootstrap: 1 screen, 1 mistaken — it chose the headline's bare
+      `hold --scope --apply`; frontier: report.rs hands that mutation bare, outside this sprint). Harness capability tiering landed
+      alongside (Task 2.4, operator-directed after a shared-checkout hard reset): `.claude/hooks/capability-tier-gate.py`
+      (PreToolUse Bash) denies destructive git below the declared tier — reset --hard/--merge/--keep, checkout/restore discards,
+      clean -f, push --force/--delete/+ref, branch -D, switch -C, rebase, filter-branch, reflog expire, gc --prune, update-ref,
+      stash drop/clear, worktree remove --force, rm -r ., symbolic-ref writes — reading the tier from harness env or the actor
+      sidecar (unknown = deny) against one pinned policy row `destructive-git-requires-tier@1` (tamper = fail-closed). Tokenised
+      classification, deny-on-ambiguity scoped to destructive inner text, wrappers/exec/xargs/line-continuation/$PWD targets
+      covered: 56 gate tests, hook suite 106/108 (the memory-index idempotence red is a worktree-ledger artifact). Five review
+      rounds to the cap; residuals ruled out of class (interpreter strings, script files, encodings, remote exec — evasion, not tiering).
     guard: >
       Regression risks: (1) greening by widening source_roots to everything — the private recall
       store and other worktrees stay refused, and a scope that admits scratch is not a governed
