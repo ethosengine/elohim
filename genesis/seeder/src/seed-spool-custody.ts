@@ -28,6 +28,7 @@ import {
   resolveCandidateUrls,
 } from './seed-conductor-identities.js';
 import {
+  fetchMemberAgentKeys,
   HOUSEHOLD_MEMBERS,
   resolveExistingCollectiveCid,
   type HouseholdMember,
@@ -221,6 +222,11 @@ async function findHouseholdSessions(
 ): Promise<Map<string, HouseholdSession>> {
   const entries = parseConductorUrls(rawConductorUrls);
   const sessions = new Map<string, HouseholdSession>();
+  // Agent-key fallback roster — a doorway-registered member's Human entry is
+  // UUID-minted, so `get_my_human().id` can never equal the canonical slug.
+  // Same defect (and same cure) as `findMemberSessions`; this leg reported
+  // `sessions=2/3` for exactly that reason.
+  const wantByAgentKey = await fetchMemberAgentKeys();
 
   for (const member of HOUSEHOLD_MEMBERS) {
     for (const conductorUrl of resolveCandidateUrls(member.humanId, entries)) {
@@ -234,7 +240,9 @@ async function findHouseholdSessions(
           fn_name: 'get_my_human',
           payload: null,
         });
-        if (extractHumanId(human) !== member.humanId) {
+        const matchesId = extractHumanId(human) === member.humanId;
+        const matchesKey = wantByAgentKey.get(connected.agentKey) === member.humanId;
+        if (!matchesId && !matchesKey) {
           await (connected.appWs.client as unknown as { close(): unknown }).close();
           continue;
         }

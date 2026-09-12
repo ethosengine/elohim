@@ -49,7 +49,12 @@ import {
   encodeHashToBase64,
   type AppInfo,
 } from '@holochain/client';
-import { deterministicPeerId, resolvePeerId, type Archetype } from './peer-id.js';
+import {
+  deterministicPeerId,
+  resolvePeerId,
+  storageUrlForHuman,
+  type Archetype,
+} from './peer-id.js';
 import type { CustodyPeerIds } from './seed-commitments.js';
 import { parseConductorUrls } from './seed-conductor-identities.js';
 
@@ -81,11 +86,36 @@ export const HOUSEHOLD_MEMBERS: HouseholdMember[] = [
 
 /**
  * The household charter JSON. `kind`/`rubric` select the recognition-of-given
- * membership-acquisition flow; `slugAlias` ties the collective to the
- * `family-dowell` story (validation scenarios + collectives.json).
+ * membership-acquisition flow; `slugAlias` names the local `collectives` row the
+ * DHT collective anchors onto.
+ *
+ * `slugAlias` MUST equal the slug the household's members carry in
+ * `humans.household_id` (`genesis/data/humans/humans.json` → `household-dowell`).
+ * It used to read `family-dowell`, which is a DIFFERENT seeded collective — so the
+ * DHT cid anchored onto a row no member row ever points at, and `household-dowell`
+ * stayed un-anchored on every peer. The household-resilience fold groups on the
+ * DHT `collective_cid`, so an un-anchored member slug meant two doorways grouped
+ * the same custody facts under different keys and testified different footprints
+ * (2026-09-12 doorway-footprint-convergence).
+ *
+ * One physical household, one slug. Change this only together with
+ * `humans.json`'s `householdId`.
  */
+export const HOUSEHOLD_SLUG = 'household-dowell';
+
+/**
+ * Slugs the household collective may be anchored under, newest first. The legacy
+ * entry exists only so an already-seeded mesh (anchored before the 2026-09-12
+ * slug reconciliation) is still recognised by the idempotency probe.
+ */
+export const HOUSEHOLD_SLUG_CANDIDATES = [HOUSEHOLD_SLUG, 'family-dowell'] as const;
+
 export function buildHouseholdCharter(): string {
-  return JSON.stringify({ kind: 'household', rubric: 'recognition-of-given', slugAlias: 'family-dowell' });
+  return JSON.stringify({
+    kind: 'household',
+    rubric: 'recognition-of-given',
+    slugAlias: HOUSEHOLD_SLUG,
+  });
 }
 
 /**
@@ -336,12 +366,102 @@ interface GetMyHumanResult {
  * Sessions that match no member are closed; matched sessions stay open for the
  * ceremony.
  */
+/** Timeout for one per-peer `/auth/me` probe (mirrors seed-provide-rows). */
+const AUTH_ME_TIMEOUT_MS = 8000;
+
+/**
+ * Map each household member's LIVE conductor agent key → their canonical
+ * humanId, by asking each member's own storage peer `GET /auth/me`.
+ *
+ * # Why this exists (2026-09-12, founder-unbindable)
+ *
+ * [`findMemberSessions`] binds a conductor to a member by calling
+ * `imagodei::get_my_human` and matching the returned `id` against
+ * `HOUSEHOLD_MEMBERS`. That works for a human whose Human entry was authored
+ * with the canonical slug id — but NOT for one registered through the doorway,
+ * which mints a UUID-keyed Human. `get_my_human` on that conductor returns the
+ * UUID, no member matches, and the founder is declared unbindable:
+ *
+ *   [!] founder human-matthew-manager unbindable (no conductor session matched
+ *       — likely a UUID-minted Human from doorway registration…)
+ *
+ * Formation then elected a substitute founder, whose invite the real steward
+ * could not answer (`caller is not a current Steward of collective:…`), so NO
+ * Membership entries were authored. Everything downstream that reads the
+ * membership snapshot went dark with it: the household `collective_cid`
+ * gap-fill, stale-agent-key supersession, and identity_fill's create/fill pass
+ * (`elohim_identity_fill_total{*} == 0` on every peer). One unbindable founder
+ * silently disabled the whole identity-heal layer.
+ *
+ * The agent key is the identity that actually matters here — the conductor's
+ * own key is what every downstream join (`shard_locations.peer_id`,
+ * `rea_commitments.provider`, `humans.agent_pub_key`) keys on. `/auth/me` is the
+ * SAME probe `seed-provide-rows` already uses successfully for all three
+ * members, matthew included, so this adds no new failure mode or new env: the
+ * per-peer URL comes from `PEER_STORAGE_URLS` when set, else the
+ * `storageUrlForHuman` template.
+ *
+ * Failures degrade to an absent entry (never a throw): a member whose peer is
+ * unreachable simply keeps the id-only matching it had before.
+ */
+export async function fetchMemberAgentKeys(
+  members: readonly HouseholdMember[] = HOUSEHOLD_MEMBERS,
+): Promise<Map<string, string>> {
+  const byKey = new Map<string, string>();
+
+  // PEER_STORAGE_URLS (name=host:port,…) wins, exactly as seed-provide-rows
+  // resolves it; anything uncovered falls back to the peer-id template.
+  const explicit = new Map<string, string>();
+  for (const pair of (process.env.PEER_STORAGE_URLS ?? '').split(',')) {
+    const eq = pair.indexOf('=');
+    if (eq < 0) continue;
+    const shortName = pair.slice(0, eq).trim();
+    const hostPort = pair.slice(eq + 1).trim();
+    if (shortName && hostPort) explicit.set(shortName, `http://${hostPort}`);
+  }
+
+  for (const member of members) {
+    const shortName = member.humanId.replace(/^human-/, '').split('-')[0];
+    const base = explicit.get(shortName) ?? storageUrlForHuman(member.humanId);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AUTH_ME_TIMEOUT_MS);
+    try {
+      const headers: Record<string, string> = {};
+      if (process.env.DOORWAY_API_KEY) {
+        headers['Authorization'] = `Bearer ${process.env.DOORWAY_API_KEY}`;
+      }
+      const res = await fetch(`${base.replace(/\/$/, '')}/auth/me`, {
+        signal: controller.signal,
+        headers,
+      });
+      if (!res.ok) continue;
+      const body = (await res.json()) as { agentPubKey?: unknown };
+      const key = typeof body.agentPubKey === 'string' ? body.agentPubKey : '';
+      if (key) byKey.set(key, member.humanId);
+    } catch {
+      // Unreachable peer / no session — id-only matching still applies.
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return byKey;
+}
+
+/** The agent key a connected conductor session is running as. */
+function sessionAgentKey(imagodeiCell: CellId): string {
+  return encodeHashToBase64(imagodeiCell[1]);
+}
+
 async function findMemberSessions(
   conductorUrls: string[],
   appIdPrefix: string,
 ): Promise<Map<string, MemberSession>> {
   const found = new Map<string, MemberSession>();
   const wantById = new Map(HOUSEHOLD_MEMBERS.map(m => [m.humanId, m]));
+  // Agent-key fallback roster — see `fetchMemberAgentKeys`. Built once, before
+  // any conductor is walked, so an unreachable peer costs one timeout total.
+  const wantByAgentKey = await fetchMemberAgentKeys();
 
   for (const conductorUrl of conductorUrls) {
     let session: ConductorSession | null = null;
@@ -391,7 +511,21 @@ async function findMemberSessions(
       );
     }
 
-    const member = humanId ? wantById.get(humanId) : undefined;
+    // Match by canonical humanId first; fall back to the conductor's own agent
+    // key when the Human entry is UUID-minted (doorway registration) and its id
+    // can therefore never equal a HOUSEHOLD_MEMBERS slug.
+    let member = humanId ? wantById.get(humanId) : undefined;
+    if (!member) {
+      const agentKey = sessionAgentKey(session.imagodeiCell);
+      const viaKey = wantByAgentKey.get(agentKey);
+      member = viaKey ? wantById.get(viaKey) : undefined;
+      if (member) {
+        console.log(
+          `  [~] ${member.humanId} matched by agent key ${agentKey.slice(0, 16)}… ` +
+            `(conductor's Human id is ${humanId ?? '<none>'}, not the canonical slug)`,
+        );
+      }
+    }
     if (member && !found.has(member.humanId)) {
       found.set(member.humanId, { member, conductorUrl, session });
       console.log(`  [=] ${member.humanId.padEnd(22)} ${conductorUrl}`);
@@ -451,8 +585,8 @@ const PROBE_TIMEOUT_MS = 5000;
  *
  * Soft-fails on all network / JSON errors — a probe failure never aborts seeding.
  */
-export async function resolveExistingCollectiveCid(baseUrl: string): Promise<string | null> {
-  const url = `${baseUrl.replace(/\/$/, '')}/db/collectives/family-dowell`;
+async function probeCollectiveCid(baseUrl: string, slug: string): Promise<string | null> {
+  const url = `${baseUrl.replace(/\/$/, '')}/db/collectives/${encodeURIComponent(slug)}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
@@ -475,6 +609,24 @@ export async function resolveExistingCollectiveCid(baseUrl: string): Promise<str
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function resolveExistingCollectiveCid(baseUrl: string): Promise<string | null> {
+  // Probe the CURRENT charter slug first, then the legacy one.
+  //
+  // The charter's `slugAlias` moved `family-dowell` → `household-dowell` on
+  // 2026-09-12 so the DHT household anchors onto the slug its members actually
+  // carry in `humans.household_id`. A mesh seeded BEFORE that move still has the
+  // cid anchored on `family-dowell`, and a single-slug probe would report "no
+  // collective" there and drive a duplicate formation. Trying both keeps the
+  // idempotency probe truthful across the migration window in BOTH directions.
+  for (const slug of HOUSEHOLD_SLUG_CANDIDATES) {
+    const cid = await probeCollectiveCid(baseUrl, slug);
+    if (cid) {
+      return cid;
+    }
+  }
+  return null;
 }
 
 /**

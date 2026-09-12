@@ -38,11 +38,16 @@ describe('parseHouseholdConductorUrls', () => {
 });
 
 describe('buildHouseholdCharter', () => {
-  it('declares household kind, rubric, and the family-dowell slug alias', () => {
+  it('declares household kind, rubric, and the household-dowell slug alias', () => {
     const charter = JSON.parse(buildHouseholdCharter());
     expect(charter.kind).toBe('household');
     expect(charter.rubric).toBe('recognition-of-given');
-    expect(charter.slugAlias).toBe('family-dowell');
+    // MUST equal the slug the household's members carry in
+    // `humans.household_id` (genesis/data/humans/humans.json). Anchoring the DHT
+    // cid onto any other slug leaves the member slug un-anchored, and the
+    // household-resilience fold then groups peers on different keys
+    // (2026-09-12 doorway-footprint-convergence).
+    expect(charter.slugAlias).toBe('household-dowell');
   });
 });
 
