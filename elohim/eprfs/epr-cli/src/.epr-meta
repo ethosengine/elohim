@@ -23,6 +23,7 @@ rules:
         - "fn refresh_selected("
         - "fn native_context("
         - "fn evidence_continuation("
+        - "fn parse_bank("
     dedupe-of: "elohim/eprfs/epr-cli/src/flow/memory/recall/mod.rs (module doc) + each seam file's own top-of-file `//!` purpose line — the seam boundaries are already named where they live"
     why: >
       This is the recall executor (`src/flow/memory/recall/`) — a new function belongs where its
@@ -40,10 +41,14 @@ rules:
       one refusal envelope — what went wrong, which session, what to do. MEASURE (`measure.rs`):
       the paired deterministic footprint lens and the `measure` op. RECEIPTS (`receipts.rs`):
       bounded reads and receipt adoption — the only code that touches source bytes on a reader's
-      behalf. `mod.rs` itself stays dispatch-only: `Contract`, `Execution`, `Args`, `parse_args`,
-      `run`, `usage`, the small `command`/`action`/`push_*` helpers, `encode`, `truncate`. Grep the
-      target seam file's existing top-of-file `//!` purpose line before adding a function anywhere
-      in this tree — that comment names the seam's boundary in its own words.
+      behalf. QUESTIONS (`questions.rs`, station 3): the fixed question bank — `Question`,
+      `ReachedWhen`, the wire-shape `Raw*` structs, and `parse_bank`, which turns a hand-authored
+      `question_bank` file into real `elohim_epr_rea::Intent`s (a `Cid` cannot deserialize from a
+      bare JSON string, so this is also where that detour lives). `mod.rs` itself stays
+      dispatch-only: `Contract`, `Execution`, `Args`, `parse_args`, `run`, `usage`, the small
+      `command`/`action`/`push_*` helpers, `encode`, `truncate`. Grep the target seam file's
+      existing top-of-file `//!` purpose line before adding a function anywhere in this tree —
+      that comment names the seam's boundary in its own words.
     retire-when: >
       never (a structural guardrail, not a teaching rule): the shape test enforces the ceiling on
       every module every test run, so a function still needs a seam to land in for as long as the
@@ -55,7 +60,8 @@ rules:
 
 Everything `epr` runs natively lives under here. The one concrete rule bound at this level is the
 recall executor's seam split (`flow/memory/recall/`): a session-state helper, a discovery
-traversal, a provider implementation, a render, a refusal, a measure, and a receipt each have a
-home file, and the shape test keeps every one of those files under a 1,800-line soft ceiling. See
+traversal, a provider implementation, a render, a refusal, a measure, a receipt, and a question
+bank each have a home file, and the shape test keeps every one of those files under a 1,800-line
+soft ceiling. See
 `.claude/skills/elohim-epr-metafile/SKILL.md` for the governance vocabulary this manifest uses, and
 `flow/memory/recall/mod.rs`'s own module doc for what the executor as a whole is for.

@@ -1,0 +1,120 @@
+{
+  "version": 1,
+  "recipe": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+  "questions": [
+    {
+      "id": "q-remine",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "When should verified canonical memory surfaces be re-mined, and what stamps the refresh as done?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": ".claude/skills/memory-ceremony/SKILL.md",
+        "assertion": "names the three mempalace commands — `sync --root . --apply`, `mine <surface>` for each declared surface, and stamping `date +%s.%N > .mempalace/.last-mine` — and stamps only if no step was lock-blocked",
+        "terms": ["mempalace", "sync", "mine", "last-mine", "lock-blocked"]
+      },
+      "scope": ".claude/skills"
+    },
+    {
+      "id": "q-corrections",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "Where is a witnessed correction closed, and what closes it?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": ".claude/skills/memory-ceremony/SKILL.md",
+        "assertion": "Phase 0 reads `epr flow concerns --corrections`; a correction closes only via a later note on the same subject carrying `--closes <correction-CID>` — a date or newer chronicle never closes it",
+        "terms": ["concerns", "corrections", "closes", "correction-CID", "Phase 0"]
+      },
+      "scope": ".claude/skills"
+    },
+    {
+      "id": "q-top-red",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "Which habit is top red right now, and what proves it moved to green?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": "CLAUDE.md",
+        "assertion": "Work = move the top red toward green with proof; render the register with `.claude/scripts/habits-status.py [--full]`",
+        "terms": ["top red", "habit", "habits-status.py", "proof"]
+      },
+      "scope": "."
+    },
+    {
+      "id": "q-hook-binary",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "How does a hook resolve which `epr` binary to run?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": ".claude/hooks/_observation.py",
+        "assertion": "`resolve_bin` prefers an explicit `EPR_BIN` env override, then the gate-target binary, then falls back to PATH via `shutil.which(\"epr\")`",
+        "terms": ["resolve_bin", "EPR_BIN", "gate target", "PATH", "shutil.which"]
+      },
+      "scope": ".claude/hooks"
+    },
+    {
+      "id": "q-body-scan",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "What bounds the per-file window discovery may read for term matching?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": ".epr-meta/elohim/algorithms/recall-contract.json",
+        "assertion": "`limits.body_scan_bytes` is 65536 — the per-file window discovery reads for MATCHING, spent only when there is a query or terms to match",
+        "terms": ["body_scan_bytes", "65536", "per-file window", "matching"]
+      },
+      "scope": ".epr-meta/elohim/algorithms"
+    },
+    {
+      "id": "q-journey-folds",
+      "intent": {
+        "action": "consume",
+        "resource_spec": {
+          "classifiedAs": [
+            "Where do recall-journey folds live, and how do they arrive?"
+          ]
+        },
+        "in_scope_of": "bafkreiae3a47lpamaofacc4c7zylajodtabjnycpkuw3cpw256ce7ygjlu",
+        "raised_by": "agent:steward@repo"
+      },
+      "reached_when": {
+        "path": ".claude/epr-meta/measures.yaml",
+        "assertion": "the four `recall-journey` family measures (recall-metered-bytes, recall-unmetered-bytes, recall-mistaken-assertions, recall-screens-to-shape) fold from `epr flow memory recall measure --phase close` (metered) and from the reader's own account via `epr flow note --kind observation --measure` (unmetered)",
+        "terms": ["recall-journey", "recall-metered-bytes", "recall-unmetered-bytes", "recall-mistaken-assertions", "recall-screens-to-shape"]
+      },
+      "scope": ".claude/epr-meta"
+    }
+  ]
+}

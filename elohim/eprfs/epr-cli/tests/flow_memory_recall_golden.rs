@@ -64,11 +64,16 @@ fn digest(s: &str) -> String {
 // `contract_value`) rather than only inheriting the live one. Re-baselined a THIRD time for
 // Task 1.2: the honesty floor adds one `recipe … · lens … · selection: … · omissions: … ·
 // receipts: …` line immediately after `lens:` on every view, at every lens — see
-// tests/fixtures/recall-golden/README.md's "station 1, Task 1.2" entry. GOLDEN_REFUSAL is
-// unchanged across all three rounds: a refusal never reaches `render()`'s orientation/lens/floor
-// preamble.
-const GOLDEN_FOCUSED: &str = "2b830dac46a98cfb06c865063e365f45e800a0cadcf2a640361133a1625feddf";
-const GOLDEN_WHOLE: &str = "9b5477e4eeac2a003a13fd51e3895bb868fc81ed10ff6349ef66a8c2fd09482e";
+// tests/fixtures/recall-golden/README.md's "station 1, Task 1.2" entry. Re-baselined a FOURTH
+// time for station 3 (Task 3.1): the contract bumped to v12 (`question_bank` pointer added;
+// `lens_table.levels.minimal.density_bytes` 1500 -> 2000), and `contract_value()` inherits the
+// live contract's `version`/`question_bank` fields unchanged — so the `recipe` CID every
+// rendered view prints (`Contract::method_cid()` over the WHOLE contract's bytes) moved even
+// though this fixture's own `lens_table` override did not. GOLDEN_REFUSAL is unchanged across
+// all four rounds: a refusal never reaches `render()`'s orientation/lens/floor preamble, so it
+// never prints a `recipe` line.
+const GOLDEN_FOCUSED: &str = "62b0037d87ea035b97dc2aeebb858e0cd50714c2c6e22720c28c365e917f2e6d";
+const GOLDEN_WHOLE: &str = "6f55d1ba8e0e0ba5b0cb13b050998435fe8053b0b51905cb5f9424d92e7d0f63";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

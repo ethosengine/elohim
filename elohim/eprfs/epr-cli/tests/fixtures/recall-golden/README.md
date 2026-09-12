@@ -25,8 +25,8 @@ digest, that is either a real regression (fix the split) or an intentional rende
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `2b830dac46a98cfb06c865063e365f45e800a0cadcf2a640361133a1625feddf` |
-| Whole open | `whole_open_is_byte_identical` | `9b5477e4eeac2a003a13fd51e3895bb868fc81ed10ff6349ef66a8c2fd09482e` |
+| Focused open | `focused_open_is_byte_identical` | `62b0037d87ea035b97dc2aeebb858e0cd50714c2c6e22720c28c365e917f2e6d` |
+| Whole open | `whole_open_is_byte_identical` | `6f55d1ba8e0e0ba5b0cb13b050998435fe8053b0b51905cb5f9424d92e7d0f63` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -97,3 +97,16 @@ this task also adds are untouched by these two fixtures and are covered instead 
 `flow_memory_recall_lens.rs`'s new tests. `GOLDEN_FOCUSED` and `GOLDEN_WHOLE` re-baselined;
 `GOLDEN_REFUSAL` is unchanged, for the same reason as both earlier rounds — a refusal never
 reaches `render()`'s orientation/lens/floor preamble at all.
+
+## 2026-09-11 — station 3 (Task 3.1)
+
+No rendering CODE changed. `.epr-meta/elohim/algorithms/recall-contract.json` bumped `version`
+11 -> 12, added a `"question_bank"` pointer, and moved `lens_table.levels.minimal.density_bytes`
+1500 -> 2000. `tests/common/mod.rs`'s `contract_value()` builds its fixture from
+`live_contract()` (the real file on disk) and overrides only `source_roots`,
+`ceremony.defaults.scope`, `ceremony.providers.alternative` and `lens_table` — `version` and the
+new `question_bank` key pass through unchanged. Every rendered view prints a `recipe <short cid>`
+in its honesty-floor line (Task 1.2), and that CID is `Contract::method_cid()` over the WHOLE
+contract's raw bytes, so ANY byte in the live contract moving — not only the `lens_table` this
+fixture happens to override — moves it. `GOLDEN_FOCUSED` and `GOLDEN_WHOLE` re-baselined;
+`GOLDEN_REFUSAL` is unchanged, for the same reason as every earlier round.

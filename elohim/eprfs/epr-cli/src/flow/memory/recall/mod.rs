@@ -75,6 +75,9 @@ use journey::execute;
 mod lens;
 use lens::LensLevel;
 
+mod questions;
+pub use questions::{Question, ReachedWhen};
+
 /// Where the algorithm artifact lives, relative to the repository root.
 pub const CONTRACT_REL: &str = ".epr-meta/elohim/algorithms/recall-contract.json";
 
@@ -350,6 +353,50 @@ impl Contract {
                 })
                 .unwrap_or_default()),
         }
+    }
+
+    /// The fixed question bank a `question_bank`-declaring contract names — each row an
+    /// `elohim_epr_rea::Intent` `in_scope_of` THIS contract (`method_cid()`), read from the sibling
+    /// file the contract points at (see `questions.rs` for the wire-shape/real-shape split this
+    /// needs, since a `Cid` cannot deserialize from a bare JSON string).
+    ///
+    /// Absent `question_bank` (every pre-v12 contract) is genuinely unwired, not malformed: `Ok`
+    /// with an empty bank, the same "absent means nothing to refuse about" reading `process_spec`
+    /// and `bounds` give a pre-v10 contract. A DECLARED `question_bank` is different — the
+    /// contract asserted a bank exists, so a value that is not a string, a file that cannot be
+    /// read, or a bank whose shape or pinned `recipe`/`in_scope_of` does not match this contract's
+    /// own `method_cid()` is REFUSED rather than silently treated as no bank at all.
+    pub fn question_bank(&self) -> FlowResult<Vec<Question>> {
+        let declared = match self.value.get("question_bank") {
+            None => return Ok(Vec::new()),
+            Some(value) => value,
+        };
+        let rel = declared.as_str().ok_or_else(|| {
+            refused(format!(
+                "recall contract `question_bank` is declared but malformed: expected a repository-relative path string, found {declared}"
+            ))
+        })?;
+        // The contract and its question bank are declared as siblings under the same
+        // `.epr-meta/elohim/algorithms/` directory — `CONTRACT_REL`'s own directory depth tells us
+        // how many ancestors of `self.path` to climb to reach the repository root this contract
+        // was loaded relative to. A contract built via `from_value` (no real file; `path` is the
+        // `<inline>` placeholder) or loaded from a path that does not mirror `CONTRACT_REL`'s
+        // shape cannot resolve a root this way, and gets a clear refusal rather than a panic or a
+        // silently wrong join.
+        let depth = Path::new(CONTRACT_REL).components().count();
+        let root = self.path.ancestors().nth(depth).ok_or_else(|| {
+            refused(
+                "recall contract `question_bank` is declared, but this contract was not loaded from its usual repository-relative location, so the bank path cannot be resolved",
+            )
+        })?;
+        let path = root.join(rel);
+        let raw = std::fs::read(&path).map_err(|source| {
+            refused(format!(
+                "recall contract `question_bank` names {}, which cannot be read: {source}",
+                path.display()
+            ))
+        })?;
+        questions::parse_bank(&raw, &path, &self.method_cid())
     }
 }
 
@@ -1372,6 +1419,7 @@ mod shape {
             "refusal.rs",
             "measure.rs",
             "receipts.rs",
+            "questions.rs",
         ] {
             let text = std::fs::read_to_string(
                 concat!(env!("CARGO_MANIFEST_DIR"), "/src/flow/memory/recall/").to_string() + f,

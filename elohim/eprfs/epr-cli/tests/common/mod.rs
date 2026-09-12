@@ -46,8 +46,14 @@ pub fn write(root: &Path, rel: &str, text: &str) {
 
 /// Pinned for the same reason the corrections fixture pins it: git HEAD's author date is part of a
 /// note's content address, so a fixture built a second later is a different address.
+///
+/// `#[allow(dead_code)]`: `flow_memory_recall_sample.rs` (station 3, task 3.1) exercises
+/// `Contract::question_bank()` directly against `Contract::from_value`/bare temp-dir fixtures and
+/// never needs a git-backed [`repo`] — the same per-binary dead-code note [`view_in`] documents.
+#[allow(dead_code)]
 pub const FIXTURE_DATE: &str = "2026-09-10T00:00:00+00:00";
 
+#[allow(dead_code)]
 pub fn git(root: &Path, args: &[&str]) {
     let out = elohim_epr_cli::process::build_command("git", args, root, &[])
         .env("GIT_AUTHOR_NAME", "Fixture Author")
@@ -61,6 +67,7 @@ pub fn git(root: &Path, args: &[&str]) {
     assert!(out.status.success(), "git {args:?}");
 }
 
+#[allow(dead_code)]
 pub fn edge(root: &Path, from: &str, to: &str) {
     let seal = Some(*BlobCid::compute_raw(b"old").as_cid());
     let record = DepEdge::new(
@@ -82,6 +89,7 @@ pub fn edge(root: &Path, from: &str, to: &str) {
 
 /// A synthetic repository whose declared source scope is `docs/` and whose two stale edges give the
 /// ceremony something real to select.
+#[allow(dead_code)]
 pub fn repo() -> TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
@@ -148,6 +156,7 @@ pub fn contract_value(with_measurements: bool) -> Value {
     contract
 }
 
+#[allow(dead_code)]
 pub fn save_contract(root: &Path, contract: Value) {
     write(
         root,
