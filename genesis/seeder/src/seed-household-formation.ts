@@ -56,7 +56,7 @@ import {
   type Archetype,
 } from './peer-id.js';
 import type { CustodyPeerIds } from './seed-commitments.js';
-import { parseConductorUrls } from './seed-conductor-identities.js';
+import { parseConductorUrls, selectStewardApp } from './seed-conductor-identities.js';
 
 // =============================================================================
 // Canonical household triad
@@ -293,9 +293,30 @@ async function connectToConductor(
 
   try {
     const apps = await adminWs.listApps({});
-    const matchingApp = apps.find(a => a.installed_app_id.startsWith(appIdPrefix));
+    // Use the SHARED steward-app selector, never a prefix-only `find`.
+    //
+    // 2026-09-12: a doorway-hosting conductor carries one `elohim`-prefixed app
+    // per hosted human. Measured on matthew's conductor: 16 matching apps, of
+    // which `[0]` was `elohim-conductor-0-a3fdc0` (a hosted agent, whose
+    // `get_my_human` is a UUID-minted Human) and `[15]` was the steward's own app
+    // `elohim`. A prefix-only `find` therefore bound the founder's slot to a
+    // stranger's cell — the founder read as unbindable, formation elected a
+    // substitute whose invite the real steward could not answer, and NO
+    // Membership entries were authored at all.
+    //
+    // `selectStewardApp` is the one place that rule lives (its doc records the
+    // same incident from 2026-09-11); re-deriving it here is precisely how the
+    // earlier fix drifted back to first-match-wins.
+    const matchingApp = selectStewardApp(apps, appIdPrefix);
 
     if (!matchingApp) {
+      const prefixed = apps.filter(a => a.installed_app_id.startsWith(appIdPrefix));
+      if (prefixed.length > 0) {
+        console.warn(
+          `  [~] ${appUrl}: ${prefixed.length} app(s) match "${appIdPrefix}" but all are ` +
+            `doorway-hosted (…-conductor-…) — no steward app here`,
+        );
+      }
       await adminWs.client.close();
       return null;
     }
@@ -515,8 +536,8 @@ async function findMemberSessions(
     // key when the Human entry is UUID-minted (doorway registration) and its id
     // can therefore never equal a HOUSEHOLD_MEMBERS slug.
     let member = humanId ? wantById.get(humanId) : undefined;
+    const agentKey = sessionAgentKey(session.imagodeiCell);
     if (!member) {
-      const agentKey = sessionAgentKey(session.imagodeiCell);
       const viaKey = wantByAgentKey.get(agentKey);
       member = viaKey ? wantById.get(viaKey) : undefined;
       if (member) {
@@ -525,6 +546,20 @@ async function findMemberSessions(
             `(conductor's Human id is ${humanId ?? '<none>'}, not the canonical slug)`,
         );
       }
+    }
+    // LOUD on a miss. A silent skip here is what let the founder-unbindable
+    // defect hide twice: the operator saw only the downstream "[!] founder …
+    // unbindable" line with no way to tell WHICH of the three possible causes
+    // (wrong app, wrong id, empty key roster) actually fired.
+    if (!member) {
+      console.warn(
+        `  [~] ${conductorUrl}: no household member matched — ` +
+          `app=${session.appInfo.installed_app_id} ` +
+          `get_my_human.id=${humanId ?? '<none>'} ` +
+          `agentKey=${agentKey.slice(0, 16)}… ` +
+          `(agent-key roster has ${wantByAgentKey.size} entr${wantByAgentKey.size === 1 ? 'y' : 'ies'}` +
+          `${wantByAgentKey.size === 0 ? ' — every per-member /auth/me probe failed' : ''})`,
+      );
     }
     if (member && !found.has(member.humanId)) {
       found.set(member.humanId, { member, conductorUrl, session });

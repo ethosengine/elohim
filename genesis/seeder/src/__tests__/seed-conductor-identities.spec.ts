@@ -29,6 +29,7 @@ import {
   humanShortName,
   parseConductorUrls,
   resolveCandidateUrls,
+  selectStewardApp,
   urlsAreNameAffine,
 } from '../seed-conductor-identities.js';
 
@@ -322,5 +323,52 @@ describe('own Agent onboarding', () => {
     await expect(ensureOwnAgentProfile(call, human.id, caller)).rejects.toThrow(
       'conflicts',
     );
+  });
+});
+
+/**
+ * `selectStewardApp` carries the rule that keeps a seeder off a hosted human's
+ * cell, and its doc records the 2026-09-11 incident that produced it — but it
+ * had NO test, and on 2026-09-12 the household-formation and spool-custody
+ * binders were still doing a prefix-only `find`. Measured on matthew's
+ * conductor that day: 16 `elohim`-prefixed apps, `[0]` = `elohim-conductor-0-…`
+ * (a hosted agent whose `get_my_human` is a UUID-minted Human), `[15]` = the
+ * steward's own `elohim`. The founder read as unbindable, formation elected a
+ * substitute whose invite the real steward could not answer, and NO Membership
+ * entries were authored — which in turn left every identity-heal path that
+ * reads the membership snapshot dark.
+ *
+ * The rule is pinned here so the next binder that needs it can be pointed at a
+ * test instead of re-deriving it (re-derivation is exactly how it drifted back).
+ */
+describe('selectStewardApp', () => {
+  const app = (installed_app_id: string) => ({ installed_app_id });
+
+  it('prefers the exact-prefix app over any hosted app, whatever the order', () => {
+    // The measured shape: hosted apps first, the steward's own app last.
+    const apps = [
+      app('elohim-conductor-0-a3fdc0'),
+      app('elohim-conductor-0-5d7c97'),
+      app('elohim'),
+    ];
+    expect(selectStewardApp(apps, 'elohim')?.installed_app_id).toBe('elohim');
+  });
+
+  it('falls back to a non-hosted prefix match when no exact id exists', () => {
+    const apps = [app('elohim-conductor-0-a3fdc0'), app('elohim-matthew-alpha')];
+    expect(selectStewardApp(apps, 'elohim')?.installed_app_id).toBe('elohim-matthew-alpha');
+  });
+
+  it('returns undefined rather than a hosted app when only hosted apps match', () => {
+    const apps = [app('elohim-conductor-0-a3fdc0'), app('elohim-conductor-0-5d7c97')];
+    expect(selectStewardApp(apps, 'elohim')).toBeUndefined();
+  });
+
+  it('is unaffected on a single-app conductor (jessica/james shape)', () => {
+    expect(selectStewardApp([app('elohim')], 'elohim')?.installed_app_id).toBe('elohim');
+  });
+
+  it('ignores apps that do not match the prefix at all', () => {
+    expect(selectStewardApp([app('other-app')], 'elohim')).toBeUndefined();
   });
 });

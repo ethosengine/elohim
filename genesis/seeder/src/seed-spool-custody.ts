@@ -26,6 +26,7 @@ import {
   extractHumanId,
   parseConductorUrls,
   resolveCandidateUrls,
+  selectStewardApp,
 } from './seed-conductor-identities.js';
 import {
   fetchMemberAgentKeys,
@@ -176,9 +177,12 @@ async function connectToConductor(
 
   try {
     const apps = await adminWs.listApps({});
-    const app = apps.find((candidate) =>
-      candidate.installed_app_id.startsWith(appIdPrefix),
-    );
+    // Shared steward-app selector — NEVER a prefix-only `find`. A
+    // doorway-hosting conductor carries one `elohim`-prefixed app per hosted
+    // human (16 of them on matthew), and a prefix `find` binds a stranger's
+    // cell. Same defect and same cure as `findMemberSessions`; this leg reported
+    // `sessions=2/3` for exactly that reason. See `selectStewardApp`'s doc.
+    const app = selectStewardApp(apps, appIdPrefix);
     if (!app) return null;
 
     const imagodeiCell = cellForRole(app, 'imagodei');
