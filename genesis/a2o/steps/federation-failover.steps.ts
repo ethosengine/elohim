@@ -579,6 +579,16 @@ interface PoolFailoverState {
   logOffset?: number;
   logSkipReason?: string;
   newLogs?: string;
+  /**
+   * The `fields` object of the ONE post-shade "EPR router" refresh-outcome
+   * log line the "When the EPR router refresh runs" step waited for and
+   * matched to a passing coherence read (see `markShadeArmed` /
+   * `lastRefreshOutcomeFields`). The log-assertion Then steps read this
+   * directly rather than re-parsing `newLogs`, so they assert on the EXACT
+   * event the When step already proved happened after the shade — never a
+   * different, possibly-stale line elsewhere in the slice.
+   */
+  postShadeLogFields?: Record<string, unknown>;
 }
 
 const poolFailoverStates = new WeakMap<E2EWorld, PoolFailoverState>();
@@ -712,6 +722,31 @@ function poolState(world: E2EWorld): PoolFailoverState {
 }
 
 /**
+ * Re-baseline BOTH signals the "When the EPR router refresh runs" step waits
+ * to advance past — the coherence generation and the log-tail offset — to
+ * THIS moment, right after a shade is CONFIRMED in effect (the caller has
+ * already verified the shaded peer(s) answer zero rows). Capturing them any
+ * earlier, as this file used to (at `initialPoolState` time, BEFORE
+ * shading), risks the retry loop passing on a refresh tick that ran before
+ * the shade took effect: every pool peer replicates the SAME rows as the
+ * primary, so a stale pre-shade generation bump satisfies the heads-match
+ * check vacuously. Observed for real on a cold-started mesh 2026-09-12 (run
+ * 20260912T144822Z): a doorway just SIGSTOP'd/SIGCONT'd by another lane
+ * sharing this mesh skipped its periodic refresh tick entirely, leaving NO
+ * "EPR router" line at all during the whole shade window — the WARN
+ * assertion failed honestly (no vacuous pass), but only because the
+ * generation/offset baseline was ALSO stale, since it too predated shading.
+ */
+async function markShadeArmed(state: PoolFailoverState): Promise<void> {
+  const fresh = await coherence(state.doorwayUrl);
+  state.generationBefore = fresh.generation;
+  if (state.logPath !== undefined) {
+    const text = await readFile(state.logPath, 'utf8');
+    state.logOffset = text.length;
+  }
+}
+
+/**
  * The degraded-primary shape these scenarios describe (a doorway's primary
  * storage answering ZERO project-epr rows while a pool peer holds them) used
  * to be an incident shape this lane could only OBSERVE, never construct —
@@ -818,6 +853,7 @@ Given(
     trackShaded(this, state.primaryUrl);
     const rows = await projections(state.primaryUrl, state.doorwayId);
     assert.equal(rows.length, 0, `primary ${state.primaryUrl} still returns rows after shading`);
+    await markShadeArmed(state);
     return undefined;
   }
 );
@@ -856,46 +892,128 @@ Given(
       assert.equal(rows.length, 0, `${storageUrl} still returns rows after shading`);
     }
     state.expected = 'empty';
+    await markShadeArmed(state);
     return undefined;
   }
 );
 
-When('the EPR router refresh runs', { timeout: 65_000 }, async function (this: E2EWorld) {
-  const state = poolState(this);
-  const timeoutMs = Number(process.env['E2E_EPR_REFRESH_WINDOW_MS'] ?? 55_000);
-  state.observed = await retry(
-    async () => {
-      const current = await coherence(state.doorwayUrl);
-      assert.ok(
-        current.generation > state.generationBefore,
-        `router generation has not advanced from ${state.generationBefore}`
-      );
-      if (state.expected === 'empty') {
-        assert.equal(current.heads.length, 0, 'router has not converged to genuine empty state');
-      } else {
-        for (const expected of state.expectedHeads) {
-          assert.ok(
-            current.heads.some(
-              head => head.urlPath === expected.urlPath && head.eprId === expected.eprId
-            ),
-            `router is missing pool projection ${expected.urlPath} -> ${expected.eprId}`
-          );
-        }
-      }
-      return current;
-    },
-    {
-      maxAttempts: 60,
-      initialDelayMs: 500,
-      backoffFactor: 1.2,
-      maxDelayMs: 2_000,
-      timeoutMs,
+/**
+ * The SAME env var the doorway's own periodic-refresh loop reads
+ * (`DOORWAY_EPR_REFRESH_SECS`, main.rs, default 30s) — sizing the test's
+ * wait window off this keeps it tracking whatever cadence THIS run's
+ * doorway process was actually launched with, rather than a guessed
+ * constant that silently drifts from the real interval.
+ */
+const EPR_REFRESH_INTERVAL_MS = Number(process.env['DOORWAY_EPR_REFRESH_SECS'] ?? 30) * 1000;
+
+// The four literal messages `apply_epr_fallback_outcome` (main.rs) logs for
+// each `FallbackOutcome` variant — captured verbatim from a live run's JSON
+// log line where noted, so no Rust string-continuation guessing.
+const MSG_PRIMARY_LOADED = 'EPR router: loaded projections from primary storage';
+/** Captured verbatim, run 20260912T142740Z. */
+const MSG_DEGRADED =
+  'EPR router DEGRADED: primary storage gave no projections; a pool peer supplied them. Router ' +
+  'is serving via the fallback peer — heal the primary.';
+/** Captured verbatim, run 20260912T142740Z. */
+const MSG_ALL_EMPTY =
+  'EPR router: every storage pool member returned 0 projections — genuine empty state, router cleared';
+const MSG_ALL_UNREACHABLE = 'EPR router: entire storage pool unreachable; keeping last-good table';
+const REFRESH_OUTCOME_MESSAGES = new Set([
+  MSG_PRIMARY_LOADED,
+  MSG_DEGRADED,
+  MSG_ALL_EMPTY,
+  MSG_ALL_UNREACHABLE,
+]);
+
+/**
+ * The LAST line in `logs` whose `fields.message` is EXACTLY one of the four
+ * `apply_epr_fallback_outcome` outcomes above — never a request-serving "EPR
+ * router …" line. `server/http.rs` logs several unrelated messages sharing
+ * that same prefix on the request path (e.g. "EPR router dispatching to
+ * cached bundle", "EPR router: no coherent shell to serve — converging
+ * 503"); matching the FULL literal message, not a substring, is what tells
+ * a periodic-refresh outcome apart from live request traffic sharing the
+ * same doorway process and log file.
+ */
+function lastRefreshOutcomeFields(logs: string): Record<string, unknown> | undefined {
+  let found: Record<string, unknown> | undefined;
+  for (const line of logs.split('\n')) {
+    if (!line.trim()) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
     }
-  );
-  if (state.logPath !== undefined && state.logOffset !== undefined) {
-    state.newLogs = await newLogText(state.logPath, state.logOffset);
+    const fields = (parsed as { fields?: Record<string, unknown> }).fields;
+    const message = fields?.['message'];
+    if (typeof message === 'string' && REFRESH_OUTCOME_MESSAGES.has(message)) {
+      found = fields;
+    }
   }
-});
+  return found;
+}
+
+When(
+  'the EPR router refresh runs',
+  { timeout: EPR_REFRESH_INTERVAL_MS * 2 + 60_000 },
+  async function (this: E2EWorld) {
+    const state = poolState(this);
+    const timeoutMs = Number(
+      process.env['E2E_EPR_REFRESH_WINDOW_MS'] ?? EPR_REFRESH_INTERVAL_MS * 2 + 30_000
+    );
+    state.observed = await retry(
+      async () => {
+        // A genuine post-shade refresh must have actually run — proven by a
+        // NEW "EPR router" refresh-outcome line written to the log since
+        // `markShadeArmed` re-baselined the offset. Require this BEFORE
+        // trusting the coherence read below: without it, a coincidental
+        // generation bump from an unrelated tick (every pool peer
+        // replicates the SAME rows as the primary, so a stale pre-shade
+        // table can satisfy the heads-match check too) can pass this step
+        // vacuously — observed for real on a cold-started mesh 2026-09-12
+        // (run 20260912T144822Z), where another lane's SIGSTOP/SIGCONT of
+        // this same doorway process skipped a refresh tick entirely.
+        if (state.logPath !== undefined && state.logOffset !== undefined) {
+          const freshLogs = await newLogText(state.logPath, state.logOffset);
+          state.newLogs = freshLogs;
+          const fields = lastRefreshOutcomeFields(freshLogs);
+          assert.ok(
+            fields,
+            `no "EPR router" refresh-outcome line written to ${state.logPath} since the shade ` +
+              `was armed yet (refresh interval ~${EPR_REFRESH_INTERVAL_MS}ms, waiting up to ${timeoutMs}ms)`
+          );
+          state.postShadeLogFields = fields;
+        }
+        const current = await coherence(state.doorwayUrl);
+        assert.ok(
+          current.generation > state.generationBefore,
+          `router generation has not advanced from ${state.generationBefore}`
+        );
+        if (state.expected === 'empty') {
+          assert.equal(current.heads.length, 0, 'router has not converged to genuine empty state');
+        } else {
+          for (const expected of state.expectedHeads) {
+            assert.ok(
+              current.heads.some(
+                head => head.urlPath === expected.urlPath && head.eprId === expected.eprId
+              ),
+              `router is missing pool projection ${expected.urlPath} -> ${expected.eprId}`
+            );
+          }
+        }
+        return current;
+      },
+      {
+        maxAttempts: 120,
+        initialDelayMs: 500,
+        backoffFactor: 1.15,
+        maxDelayMs: 3_000,
+        timeoutMs,
+      }
+    );
+  }
+);
 
 Then("the router table contains the pool peer's projections", function (this: E2EWorld) {
   const state = poolState(this);
@@ -905,6 +1023,28 @@ Then("the router table contains the pool peer's projections", function (this: E2
       state.observed.heads.some(
         head => head.urlPath === expected.urlPath && head.eprId === expected.eprId
       )
+    );
+  }
+  // Prove this IS the table the shade produced, not merely a table that
+  // happens to still contain the right rows (the vacuous-pass shape this
+  // scenario suffered for real 2026-09-12: a pre-shade refresh tick had
+  // already installed the identical rows, since every pool peer replicates
+  // the same data). Cross-check the coherence read against the post-shade
+  // refresh-outcome log line's OWN reported row count.
+  if (!state.logSkipReason) {
+    const fields = state.postShadeLogFields;
+    assert.ok(fields, 'no post-shade refresh-outcome log line was captured by the prior step');
+    const installed = fields['installed'];
+    assert.equal(
+      typeof installed,
+      'number',
+      `post-shade refresh-outcome line carries no numeric installed field: ${JSON.stringify(fields)}`
+    );
+    assert.equal(
+      state.observed?.heads.length,
+      installed,
+      `router table has ${state.observed?.heads.length} heads, but the post-shade refresh log ` +
+        `line reports installed=${installed} — the coherence read does not match that refresh`
     );
   }
 });
@@ -931,34 +1071,6 @@ function sameLoopbackUrl(a: string, b: string): boolean {
   return normalizeLoopback(a) === normalizeLoopback(b);
 }
 
-/**
- * Parse the doorway's JSON-lines tracing output and return the `fields`
- * object of the LAST line whose `message` contains `messageSubstring` — a
- * scenario's refresh-runs retry loop can poll the router more than once, so
- * only the most recent application of the outcome describes current state.
- */
-function lastLogFields(
-  logs: string,
-  messageSubstring: string
-): Record<string, unknown> | undefined {
-  let found: Record<string, unknown> | undefined;
-  for (const line of logs.split('\n')) {
-    if (!line.trim()) continue;
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(line);
-    } catch {
-      continue;
-    }
-    const fields = (parsed as { fields?: Record<string, unknown> }).fields;
-    const message = fields?.['message'];
-    if (typeof message === 'string' && message.includes(messageSubstring)) {
-      found = fields;
-    }
-  }
-  return found;
-}
-
 Then(
   'a WARN log names the degraded primary and the serving pool peer',
   { timeout: 15_000 },
@@ -968,18 +1080,23 @@ Then(
       console.warn(`  ⏭️  SKIPPED (no doorway log access): ${state.logSkipReason}`);
       return 'skipped';
     }
-    const logs = state.newLogs ?? '';
-    assert.match(
-      logs,
-      /EPR router DEGRADED/,
-      `doorway A's log (${state.logPath}) carries no "EPR router DEGRADED" line written since ` +
-        "the refresh began — main.rs's apply_epr_fallback_outcome WARNs exactly that message on " +
-        'FallbackOutcome::PeerServed; its absence here is a product gap, not a log-access problem.'
-    );
-    const fields = lastLogFields(logs, 'EPR router DEGRADED');
+    // Read the EXACT post-shade refresh-outcome line the prior "When the EPR
+    // router refresh runs" step already found and matched to a passing
+    // coherence read — never re-search `newLogs` here, which could contain
+    // other "EPR router" lines (request-serving traffic, or a later tick)
+    // that were not the one proven to correlate with this shade.
+    const fields = state.postShadeLogFields;
     assert.ok(
       fields,
-      'matched the DEGRADED line by regex but could not parse its JSON-lines fields'
+      'no post-shade "EPR router" refresh-outcome log line was captured by the prior "When the ' +
+        'EPR router refresh runs" step'
+    );
+    assert.equal(
+      fields['message'],
+      MSG_DEGRADED,
+      `the post-shade refresh outcome was "${String(fields['message'])}", not the DEGRADED/` +
+        "PeerServed WARN this scenario's shaded primary should provoke — a real product-behavior " +
+        'mismatch, not a log-access problem.'
     );
     const primaryUrl = fields['primary_url'];
     assert.equal(
@@ -1027,19 +1144,33 @@ Then('the empty state is logged at INFO with the consulted peer list', function 
     console.warn(`  ⏭️  SKIPPED (no doorway log access): ${state.logSkipReason}`);
     return 'skipped';
   }
-  const logs = state.newLogs ?? '';
-  assert.match(
-    logs,
-    /every storage pool member returned 0 projections/,
-    `doorway A's log (${state.logPath}) carries no "every storage pool member returned 0 ` +
-      'projections" line written since the refresh began — ' +
-      "main.rs's apply_epr_fallback_outcome INFOs exactly that message on " +
-      'FallbackOutcome::AllEmpty; its absence here is a product gap, not a log-access problem.'
+  // Same discipline as the WARN step: read the EXACT post-shade
+  // refresh-outcome line the prior "When" step already found, never
+  // re-search the raw log slice (which can hold unrelated "EPR router …"
+  // request-serving lines sharing the same prefix).
+  const fields = state.postShadeLogFields;
+  assert.ok(
+    fields,
+    'no post-shade "EPR router" refresh-outcome log line was captured by the prior "When the ' +
+      'EPR router refresh runs" step'
   );
-  const normalizedLogs = normalizeLoopback(logs);
+  assert.equal(
+    fields['message'],
+    MSG_ALL_EMPTY,
+    `the post-shade refresh outcome was "${String(fields['message'])}", not the AllEmpty INFO ` +
+      "this scenario's fully-shaded pool should provoke — a real product-behavior mismatch, not " +
+      'a log-access problem.'
+  );
+  const urlsTried = fields['urls_tried'];
+  assert.equal(
+    typeof urlsTried,
+    'string',
+    `AllEmpty line carries no urls_tried field: ${JSON.stringify(fields)}`
+  );
+  const normalizedTried = normalizeLoopback(urlsTried as string);
   for (const url of [state.primaryUrl, ...state.poolUrls]) {
     assert.ok(
-      normalizedLogs.includes(normalizeLoopback(url)),
+      normalizedTried.includes(normalizeLoopback(url)),
       `empty-state INFO did not name consulted peer ${url}`
     );
   }
