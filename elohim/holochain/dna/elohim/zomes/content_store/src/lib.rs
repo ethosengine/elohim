@@ -15837,8 +15837,63 @@ pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
 // =============================================================================
 // CreateReaCommitmentInput, ReaCommitmentOutput re-exported from shefa-types above.
 
+/// Author a REA Commitment under `input.id`, or return the one that is already
+/// there.
+///
+/// ## Why this is an ENSURE, not a bare create
+///
+/// Commitment ids in this protocol are DETERMINISTIC for a given undertaking —
+/// `elohim-storage`'s `deterministic_custody_id(provider, receiver, blob)` and
+/// the seeder's TypeScript builders derive byte-identical ids so that a retry
+/// converges on one row instead of littering the ledger. That is the right
+/// shape, but it means two INDEPENDENT authors can legitimately arrive here
+/// with the same id: the provider peer's runtime self-custody minter, and a
+/// seeder `POST` routed through some other peer's cell.
+///
+/// An unconditional `create_entry` under both authors puts TWO root `Create`s
+/// beneath one `commitment_id` anchor. [`commitment_observation::observe`] then
+/// refuses the id FOREVER — "multiple root Creates for ID" — for every read AND
+/// every write, and because `update_rea_commitment_state` is root-author-only
+/// neither peer can ever activate it. The id is unrecoverable in-DNA: nothing
+/// short of a new id heals it. (Live evidence: `custody-blob-abca87ccc3b77518`
+/// and `custody-blob-5cae43215ad73563` forked on the household mesh.)
+///
+/// ## The guard's exact semantics
+///
+/// 1. Resolve the id through the SAME `commitment_id` anchor + `IdToCommitment`
+///    links that `get_rea_commitment` and every by-id reader use — one bounded
+///    `observe` call, no second index and no re-derived anchor.
+/// 2. `Some(observed)` — a root already exists. Create NOTHING (no entry, no
+///    anchor links) and return that observation, byte-identical to what
+///    `get_rea_commitment(id)` would answer: the lifecycle HEAD, so a
+///    commitment already advanced to `active` reports `active`. Idempotent, and
+///    no wire change — `ReaCommitmentOutput` grew no flag field.
+/// 3. `None` — nothing under the anchor; create exactly as before.
+/// 4. `Err(..)` PROPAGATES, deliberately. An already-forked id, or a target
+///    record that cannot be read, means this call cannot be made safe; adding a
+///    third root would only deepen the fork. Fail closed and let the caller
+///    retry or escalate.
+///
+/// ## What the guard does NOT promise
+///
+/// It closes the wide window (minutes-to-hours apart), not the narrow one. The
+/// anchor read is subject to the same gossip-delivery gap documented on
+/// [`get_my_custody_epr_scopes`]: a link that has not yet arrived is
+/// indistinguishable from absent, so two creates inside one gossip interval can
+/// still fork. The durable cure is upstream — one author per undertaking.
+///
+/// Callers doing create-then-activate must note that an idempotent return can
+/// name an undertaking THIS agent did not author, in which case the follow-on
+/// `update_rea_commitment_state` will correctly refuse. Read the returned
+/// `state` before assuming a fresh `"created"`.
 #[hdk_extern]
 pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<ReaCommitmentOutput> {
+    // Fork guard — see the doc comment above. One anchor lookup, before any
+    // write, through the same observation path every by-id reader uses.
+    if let Some(existing) = commitment_observation::observe(&input.id)? {
+        return commitment_observation::output(existing);
+    }
+
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 

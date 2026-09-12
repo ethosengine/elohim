@@ -311,6 +311,88 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         "ActionHash must be byte-identical across peers"
     );
 
+    // --- The id anchor is a fork guard, not just an index. ---
+    // Commitment ids are DETERMINISTIC (elohim-storage's
+    // `deterministic_custody_id`, the seeder's TypeScript builders), so two
+    // independent authors legitimately arrive at `create_rea_commitment` with
+    // the same id. When that produced two root Creates under one anchor, the
+    // bounded observation refused the id FOREVER ("multiple root Creates for
+    // ID") for every read AND every write, and root-author-only
+    // `update_rea_commitment_state` left neither peer able to heal it —
+    // `custody-blob-abca87ccc3b77518` and `custody-blob-5cae43215ad73563`
+    // died that way on the household mesh (2026-09-12). The coordinator now
+    // resolves the anchor before writing and returns the existing observation.
+    //
+    // Bob's input deliberately differs in `note` and `provider`: the guard is
+    // keyed on the ID anchor alone, so what comes back must be ALICE's
+    // undertaking, not a merge of Bob's payload.
+    let mut bob_input = CreateReaCommitmentInput {
+        id: commitment_id.clone(),
+        action: "project-epr".to_string(),
+        provider: "doorway:bobs-doorway".to_string(),
+        receiver: "epr:lamad-spa".to_string(),
+        resource_classified_as: Vec::new(),
+        resource_quantity_value: None,
+        resource_quantity_unit: None,
+        effort_quantity_value: None,
+        effort_quantity_unit: None,
+        has_beginning: None,
+        has_end: None,
+        due: None,
+        clause_of: Some(format!("agreement-{commitment_id}")),
+        in_scope_of: vec!["doorway:test-doorway|epr:lamad-spa".to_string()],
+        note: Some("bob's second root, which must never exist".to_string()),
+        metadata_json: None,
+    };
+    let bob_create: ReaCommitmentOutput = cb
+        .call(&zome_b, "create_rea_commitment", bob_input.clone())
+        .await;
+    assert_eq!(
+        bob_create.action_hash, alice_output.action_hash,
+        "a same-id create from a second author must return Alice's root, not fork it"
+    );
+    assert_eq!(
+        bob_create.commitment.provider, "doorway:test-doorway",
+        "the returned commitment is Alice's undertaking, not Bob's payload"
+    );
+    assert_eq!(
+        bob_create.commitment.note, None,
+        "Bob's note must not reach the ledger — nothing was written"
+    );
+
+    // Same-author re-entry is idempotent too: a storage retry after a lost
+    // response must converge, not double-root.
+    bob_input.provider = "doorway:test-doorway".to_string();
+    bob_input.note = None;
+    let alice_recreate: ReaCommitmentOutput = ca
+        .call(&cell_a.zome(ZOME), "create_rea_commitment", bob_input)
+        .await;
+    assert_eq!(
+        alice_recreate.action_hash, alice_output.action_hash,
+        "re-creating an id this agent already authored must be a no-op"
+    );
+
+    // The id must still RESOLVE from both peers. A fork is silent at create
+    // time and only shows up here, as a refusal on every subsequent read.
+    let origin_resolved: Option<ReaCommitmentOutput> = ca
+        .call(
+            &cell_a.zome(ZOME),
+            "get_rea_commitment",
+            commitment_id.clone(),
+        )
+        .await;
+    let peer_resolved: Option<ReaCommitmentOutput> = cb
+        .call(&zome_b, "get_rea_commitment", commitment_id.clone())
+        .await;
+    for (label, resolved) in [("origin", origin_resolved), ("peer", peer_resolved)] {
+        let resolved =
+            resolved.unwrap_or_else(|| panic!("{label} must still observe the commitment"));
+        assert_eq!(
+            resolved.action_hash, alice_output.action_hash,
+            "{label} must still observe exactly one root after the duplicate creates"
+        );
+    }
+
     // Existing commitments are observations of a lifecycle, not just Creates.
     // Refuse a foreign coordinator update before any write is attempted.
     let foreign: holochain::conductor::api::error::ConductorApiResult<ReaCommitmentOutput> = cb
