@@ -307,6 +307,12 @@ impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
             note: v.note,
             metadata_json: serialize_json_opt(&v.metadata),
             supersedes: v.supersedes,
+            // The HTTP create surface NEVER declares a lifecycle state: a
+            // commitment is born `proposed` and graduates through the conductor
+            // (`UpdateReaCommitmentStateView` / `update_rea_commitment_state`).
+            // `CreateReaCommitmentInput::state` exists for the PROJECTION paths
+            // only, so a caller cannot POST itself `active`.
+            state: None,
         }
     }
 }

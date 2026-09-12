@@ -984,6 +984,8 @@ fn build_inventory_payload(
                         // requester simply ignores the keys.
                         declared_head_action_hash: r.declared_head_action_hash,
                         declared_head_at: r.declared_head_at,
+                        // `content` has no REA lifecycle state.
+                        commitment_state: None,
                     })
                     .collect();
                 let mut payload = ProjectionInventoryPayload {
@@ -1084,6 +1086,8 @@ fn build_inventory_payload(
                         // notary-head election of its own.
                         declared_head_action_hash: None,
                         declared_head_at: None,
+                        // `collectives` has no lifecycle state.
+                        commitment_state: None,
                     })
                     .collect();
                 let mut payload = ProjectionInventoryPayload {
@@ -1158,6 +1162,8 @@ fn build_inventory_payload(
                         // Declared-head hints are a CONTENT-table concept.
                         declared_head_action_hash: None,
                         declared_head_at: None,
+                        // `collective_participations` has no lifecycle state.
+                        commitment_state: None,
                     })
                     .collect();
                 let mut payload = ProjectionInventoryPayload {
@@ -1217,12 +1223,17 @@ fn build_inventory_payload(
         Ok((rows, total)) => {
             let entries = rows
                 .into_iter()
-                .map(|(id, dht_anchor_hash)| ProjectionInventoryEntry {
+                .map(|(id, dht_anchor_hash, state)| ProjectionInventoryEntry {
                     id,
                     dht_anchor_hash,
                     // REA commitments have no notary-head election either.
                     declared_head_action_hash: None,
                     declared_head_at: None,
+                    // The one table with a lifecycle state to advertise. The
+                    // requester diffs it BESIDE the anchor: an id can carry the
+                    // right anchor and the wrong standing, which is how custody
+                    // rows crossed peers while custody STANDING did not.
+                    commitment_state: Some(state),
                 })
                 .collect();
             let mut payload = ProjectionInventoryPayload {
@@ -2151,6 +2162,8 @@ mod tests {
             // is exactly the width growth `fit_inventory_to_budget` must absorb.
             declared_head_action_hash: Some(format!("uhCkk{}", "B".repeat(48))),
             declared_head_at: Some(1_753_000_000_000_000),
+            // Content rows carry no lifecycle state.
+            commitment_state: None,
         }
     }
 
@@ -2255,18 +2268,21 @@ mod tests {
                     dht_anchor_hash: "anc-a".to_string(),
                     declared_head_action_hash: None,
                     declared_head_at: None,
+                    commitment_state: None,
                 },
                 ProjectionInventoryEntry {
                     id: "epr:b".to_string(),
                     dht_anchor_hash: "anc-b".to_string(),
                     declared_head_action_hash: None,
                     declared_head_at: None,
+                    commitment_state: None,
                 },
                 ProjectionInventoryEntry {
                     id: "epr:c".to_string(),
                     dht_anchor_hash: "anc-c".to_string(),
                     declared_head_action_hash: None,
                     declared_head_at: None,
+                    commitment_state: None,
                 },
             ],
             in_sync: None,

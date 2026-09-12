@@ -534,6 +534,12 @@ impl ReaCommitmentService {
             // was already applied transactionally before the conductor round-trip;
             // never re-run it on the projection write.
             supersedes: None,
+            // The committed entry's own standing (2026-09-12). A create commits
+            // `proposed`, so this is behaviour-preserving today — but it keeps
+            // the eager path from being the ONE projection path that still
+            // hardcodes a birth state, which is how a graduated entry would land
+            // back at `proposed` on a re-project.
+            state: Some(c.state.clone()),
         };
         let commitment = rea_commitments::upsert_with_anchor(
             conn,
@@ -737,6 +743,11 @@ impl ReaCommitmentService {
             metadata_json: Some(c.metadata_json.clone()),
             // Anchor-advance only; no supersession on a state-update projection.
             supersedes: None,
+            // Carry the GRADUATED state onto the anchor advance as well. The
+            // `update_commitment_state` call above already wrote it locally;
+            // stating it here means the one projection input that describes this
+            // entry cannot disagree with the entry.
+            state: Some(c.state.clone()),
         };
         rea_commitments::upsert_with_anchor(conn, ctx, anchor_input, Some(&action_hash_str))?;
 
@@ -1389,6 +1400,7 @@ mod tests {
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
             supersedes: None,
+            state: Some(c.state.clone()),
         };
 
         assert_eq!(input.id.as_deref(), Some("test-commit-001"));

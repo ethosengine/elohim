@@ -239,6 +239,22 @@ pub struct CreateReaCommitmentInput {
     /// `GET /api/v1/commitments/{id}` with no view change.
     #[serde(default)]
     pub supersedes: Option<String>,
+    /// DHT-carried lifecycle state (`proposed` | `active` | `fulfilled` | …),
+    /// threaded by the projection paths ONLY.
+    ///
+    /// `None` is the ordinary shape for an authoring create — a commitment is
+    /// born [`DEFAULT_COMMITMENT_STATE`] by REA convention, and the HTTP
+    /// `CreateReaCommitmentInputView` deliberately has no `state` key, so a
+    /// caller cannot declare itself `active` on the way in. `Some` reaches here
+    /// only from [`crate::rea_projection::project_commitment_from_wire`], i.e.
+    /// the post-commit signal arm and the P2P projection reconciler, where the
+    /// value IS the DHT entry's.
+    ///
+    /// Added 2026-09-12: every insert path used to hardcode `"proposed"`, so a
+    /// custody-blob commitment's STANDING never crossed a peer boundary even
+    /// though its row did (blob-durability DELTA 2026-09-12c, cause 1).
+    #[serde(default)]
+    pub state: Option<String>,
 }
 
 /// Query parameters for listing REA commitments - camelCase for URL params
@@ -340,9 +356,15 @@ pub fn list_commitments(
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
+/// One advertised `rea_commitments` inventory row: `(id, dht_anchor_hash,
+/// state)`. Named because it is the diff unit BOTH the responder and the
+/// reconcile arm reason about, and because the arm compares it on TWO axes —
+/// the anchor and the standing.
+pub type ReconcileInventoryRow = (String, String, String);
+
 /// Projection-inventory rows for the P1 reconciliation stream: the
-/// `(id, dht_anchor_hash)` pairs this peer's projection holds for `table`,
-/// newest first, capped at `cap`. Returns `(entries, total_row_count)`.
+/// `(id, dht_anchor_hash, state)` triples this peer's projection holds for
+/// `table`, newest first, capped at `cap`. Returns `(entries, total_row_count)`.
 ///
 /// Discovery-only: peers exchange this so a reconciler can find ids it is
 /// missing (or holds with a stale anchor). The actual row content is NEVER
@@ -350,12 +372,18 @@ pub fn list_commitments(
 /// anchor projects as an empty string (an un-anchored bulk-seed row still
 /// counts as "present" for discovery; the reconciler heals the anchor from
 /// its own conductor).
+///
+/// `state` is the THIRD element (2026-09-12). The anchor alone cannot tell a
+/// converged row from one that travelled and then froze at `proposed` while its
+/// author graduated it to `active` — an id can carry the right anchor and the
+/// wrong standing. Advertising state makes that a visible gap; the value is
+/// still only a HINT, and the heal writes what the OWN conductor answers.
 pub fn inventory_for_reconcile(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     offset: i64,
     cap: i64,
-) -> Result<(Vec<(String, String)>, usize), StorageError> {
+) -> Result<(Vec<ReconcileInventoryRow>, usize), StorageError> {
     // `total` is already the honest whole-corpus count (offset-invariant), so the
     // requester can always tell a windowed page from the full inventory.
     let total: i64 = rea_commitments::table
@@ -364,18 +392,22 @@ pub fn inventory_for_reconcile(
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("inventory count failed: {e}")))?;
 
-    let rows: Vec<(String, Option<String>)> = rea_commitments::table
+    let rows: Vec<(String, Option<String>, String)> = rea_commitments::table
         .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
         .order(rea_commitments::created_at.desc())
         .offset(offset.max(0))
         .limit(cap)
-        .select((rea_commitments::id, rea_commitments::dht_anchor_hash))
+        .select((
+            rea_commitments::id,
+            rea_commitments::dht_anchor_hash,
+            rea_commitments::state,
+        ))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("inventory load failed: {e}")))?;
 
     let entries = rows
         .into_iter()
-        .map(|(id, anchor)| (id, anchor.unwrap_or_default()))
+        .map(|(id, anchor, state)| (id, anchor.unwrap_or_default(), state))
         .collect();
     Ok((entries, total.try_into().unwrap_or(usize::MAX)))
 }
@@ -788,6 +820,24 @@ pub fn load_replication_commitment_relation(
         .collect()
 }
 
+/// The state a commitment is born in when the wire carries none — the REA
+/// convention every insert path used to hardcode inline.
+pub const DEFAULT_COMMITMENT_STATE: &str = "proposed";
+
+/// The state to persist for a create/projection input: the DHT-carried one when
+/// the wire supplied it, else [`DEFAULT_COMMITMENT_STATE`].
+///
+/// Pure + total so the "default ONLY on a genuine omission" rule is testable
+/// without a database. An empty/whitespace value is an omission, not a state —
+/// both wire mirrors (`CommitmentEntry`, `shefa_types::Commitment`) default the
+/// field to `""`.
+pub(crate) fn state_for_insert(state: Option<&str>) -> &str {
+    match state.map(str::trim) {
+        Some(s) if !s.is_empty() => s,
+        _ => DEFAULT_COMMITMENT_STATE,
+    }
+}
+
 /// Create an REA commitment - scoped by app
 pub fn create_commitment(
     conn: &mut SqliteConnection,
@@ -822,7 +872,7 @@ pub fn create_commitment(
         clause_of: input.clause_of.as_deref(),
         in_scope_of: input.in_scope_of.as_deref(),
         medium_of_exchange_id: input.medium_of_exchange_id.as_deref(),
-        state: "proposed",
+        state: state_for_insert(input.state.as_deref()),
         finished: 0,
         note: input.note.as_deref(),
         metadata_json: input.metadata_json.as_deref(),
@@ -1041,7 +1091,7 @@ pub fn create_with_supersession(
             clause_of: input.clause_of.as_deref(),
             in_scope_of: input.in_scope_of.as_deref(),
             medium_of_exchange_id: input.medium_of_exchange_id.as_deref(),
-            state: "proposed",
+            state: state_for_insert(input.state.as_deref()),
             finished: 0,
             note: input.note.as_deref(),
             metadata_json: input.metadata_json.as_deref(),
@@ -1193,6 +1243,35 @@ pub fn upsert_with_anchor(
             .execute(conn)
             .map_err(|e| StorageError::Internal(format!("Update anchor failed: {}", e)))?;
         }
+
+        // STATE HEAL (2026-09-12), deliberately OUTSIDE the in_scope_of branch
+        // above: a custody-blob commitment carries no scope, so it takes the
+        // anchor-only arm — which touched `dht_anchor_hash` and nothing else.
+        // A row that arrived `proposed` therefore stayed `proposed` for the rest
+        // of its life even when the author had graduated it and this very upsert
+        // was re-projecting the graduated entry. Rows converged; STANDING did
+        // not, and the arm reported convergence because it compares anchors.
+        //
+        // Guarded on `input.state.is_some()`: only a projection path (signal or
+        // reconciler) carries a state, so a state-only anchor refresh or a
+        // seeder reseed can never clobber an existing state with the birth
+        // default. Heal FILLS from DHT truth; it never invents one.
+        if let Some(state) = input
+            .state
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+        {
+            diesel::update(
+                rea_commitments::table
+                    .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+                    .filter(rea_commitments::id.eq(&id))
+                    .filter(rea_commitments::state.ne(state)),
+            )
+            .set(rea_commitments::state.eq(state))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("Update state failed: {}", e)))?;
+        }
     } else {
         // PRIMARY production path ("DHT is the truth, storage is the index"):
         // this is the insert reached from the REA ProjectionSignal handler and
@@ -1221,7 +1300,7 @@ pub fn upsert_with_anchor(
             clause_of: input.clause_of.as_deref(),
             in_scope_of: input.in_scope_of.as_deref(),
             medium_of_exchange_id: input.medium_of_exchange_id.as_deref(),
-            state: "proposed",
+            state: state_for_insert(input.state.as_deref()),
             finished: 0,
             note: input.note.as_deref(),
             metadata_json: input.metadata_json.as_deref(),

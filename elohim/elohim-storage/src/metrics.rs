@@ -1085,6 +1085,35 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Last-sweep rows whose local projection carries the SAME identity as a
+    /// peer's but a DIFFERENT lifecycle state — the `rea` stream's second
+    /// divergence axis (`{stream="rea"}` is the only populated label today;
+    /// no other inventory table has a lifecycle state).
+    ///
+    /// Why it is its own series rather than folded silently into
+    /// [`PROJECTION_RECONCILE_DIVERGENT`]: a state divergence and an anchor
+    /// divergence are different failures with different cures, and the class
+    /// this series names was INVISIBLE by construction until 2026-09-12 — the
+    /// rea arm compared anchors only, so a custody-blob commitment that
+    /// travelled to a peer and froze at `proposed` while its author graduated it
+    /// to `active` was reported CONVERGED. Rows agreed; STANDING did not, and
+    /// the chaos drills read a household's custody as un-honoured on every
+    /// non-authoring peer. A subtraction against the total
+    /// (`divergent - state_divergent`) recovers the anchor-only share.
+    ///
+    /// These rows ARE actionable: they are admitted to the gap set and healed
+    /// from the peer's own conductor like any other divergence, so this gauge
+    /// draining to 0 is real convergence, not an adjudicated set-aside.
+    pub static ref PROJECTION_RECONCILE_STATE_DIVERGENT: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_state_divergent",
+            "Last-sweep rows diverging from a peer on LIFECYCLE STATE (not anchor), \
+             by reconcile stream.",
+        ),
+        &["stream"],
+    )
+    .unwrap();
+
     /// Whether the last reconcile sweep actually OBSERVED `stream`'s state (1)
     /// or short-circuited on a DB/query error or zero peers answered (0). Set
     /// UNCONDITIONALLY every sweep, unlike the value gauges above (`gaps`,
@@ -2555,6 +2584,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_EXHAUSTED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_DIVERGENT_REFUSED.clone()));
+        let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_STATE_DIVERGENT.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_MEASURED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_KNOWN_GAPS.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_RECONCILE_KNOWN_DIVERGENT.clone()));
@@ -4379,6 +4409,15 @@ pub fn set_projection_reconcile_divergent_refused(stream: &str, divergent_refuse
     PROJECTION_RECONCILE_DIVERGENT_REFUSED
         .with_label_values(&[stream])
         .set(divergent_refused as i64);
+}
+
+/// Publish the LIFECYCLE-STATE divergence count for `stream`'s last sweep — see
+/// [`PROJECTION_RECONCILE_STATE_DIVERGENT`]. Gated on the same `measured` bit as
+/// the other value gauges: an unmeasured arm must not write a false zero.
+pub fn set_projection_reconcile_state_divergent(stream: &str, state_divergent: u64) {
+    PROJECTION_RECONCILE_STATE_DIVERGENT
+        .with_label_values(&[stream])
+        .set(state_divergent as i64);
 }
 
 /// Publish whether the last sweep MEASURED `stream` — see

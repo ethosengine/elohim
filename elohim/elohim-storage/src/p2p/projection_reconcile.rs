@@ -1557,6 +1557,16 @@ pub struct ReaDiscovery {
     /// `elohim_projection_reconcile_exhausted{stream="rea"}`.
     exhausted_persistent: usize,
     local_total: usize,
+    /// Rows present locally with the SAME anchor a peer advertises but a
+    /// DIFFERENT lifecycle `state` — this arm's SECOND divergence axis, named
+    /// [`ReaRowGap::StateDivergent`].
+    ///
+    /// Counted separately from `divergent_anchor` (different failure, different
+    /// cure) and published on
+    /// `elohim_projection_reconcile_state_divergent{stream="rea"}`, but folded
+    /// into the `divergent` gauge and into the gap set exactly like an anchor
+    /// divergence — these rows are ACTIONABLE and heal from the own conductor.
+    divergent_state: usize,
     /// This arm actually OBSERVED the state it reports. False when the arm
     /// short-circuited on a DB/query error (see [`ReaDiscovery::empty`]).
     ///
@@ -1578,6 +1588,7 @@ impl ReaDiscovery {
             peers_asked: 0,
             ids_discovered: 0,
             divergent_anchor: 0,
+            divergent_state: 0,
             divergent_refused: 0,
             exhausted_persistent: 0,
             local_total: 0,
@@ -1899,6 +1910,7 @@ pub async fn run_discovery(
         rea_ids_discovered = rea.ids_discovered,
         rea_gaps = rea.tracker.counts().pending,
         rea_divergent_anchor = rea.divergent_anchor,
+        rea_divergent_state = rea.divergent_state,
         rea_divergent_refused = rea.divergent_refused,
         rea_exhausted = rea.exhausted_persistent,
         rea_local_total = rea.local_total,
@@ -1974,6 +1986,7 @@ pub async fn run_heal(
         peers_asked,
         ids_discovered,
         divergent_anchor: rea_divergent,
+        divergent_state: rea_divergent_state,
         divergent_refused: rea_divergent_refused,
         exhausted_persistent: rea_exhausted,
         local_total,
@@ -1997,9 +2010,14 @@ pub async fn run_heal(
             tracker.counts().pending as u64,
             local_total as u64,
             rea_exhausted as u64,
-            rea_divergent as u64,
+            // `divergent` is the TOTAL across both compared axes. Folding state
+            // divergence in is strictly STRICTER: a class that used to read as
+            // convergence now blocks it, which is the point. The anchor-only
+            // share stays recoverable as `divergent - state_divergent`.
+            rea_divergent.saturating_add(rea_divergent_state) as u64,
             rea_divergent_refused as u64,
         );
+        crate::metrics::set_projection_reconcile_state_divergent("rea", rea_divergent_state as u64);
     }
     let ReaHealOutcome {
         counts,
@@ -2219,6 +2237,7 @@ pub async fn run_heal(
         healed = counts.completed,
         conductor_missing = counts.failed,
         divergent_anchor = rea_divergent,
+        divergent_state = rea_divergent_state,
         divergent_refused = rea_divergent_refused,
         local_total,
         caught_up = counts.caught_up,
@@ -2778,6 +2797,58 @@ fn ghost_probe_ids(ghosts: &[(String, String, String)], max_per_tick: i64) -> Ve
         .collect()
 }
 
+/// How ONE advertised `(id, anchor, state)` triple classifies against the local
+/// `rea_commitments` projection.
+///
+/// Two divergence axes, because a commitment carries two things a peer can
+/// disagree with us about: WHICH DHT action its projection last saw
+/// (`dht_anchor_hash`) and WHAT STANDING that commitment currently has
+/// (`state`). Until 2026-09-12 only the first was compared, so a custody-blob
+/// commitment could travel to every peer and then freeze at `proposed` while the
+/// author graduated it to `active` — and this arm reported CONVERGED, because
+/// the anchors matched. Rows converged; custody STANDING did not
+/// (blob-durability DELTA 2026-09-12c, cause 1). Both axes are actionable and
+/// both heal identically (re-read from the OWN conductor); they are named and
+/// counted apart because they are different failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReaRowGap {
+    /// No local row carries this id. Heal reads the Commitment from the OWN
+    /// conductor and projects it.
+    AbsentLocal,
+    /// Present locally, but the peer advertises a DIFFERENT non-empty anchor.
+    AnchorDivergent,
+    /// Present locally with the SAME (or no peer-advertised) anchor, but a
+    /// DIFFERENT non-empty `state`. The row travelled and its standing did not.
+    StateDivergent,
+    /// Present locally and agreeing on every axis the peer offered evidence for.
+    /// An EMPTY peer value is no evidence, never divergence — an un-anchored or
+    /// pre-field peer must not manufacture a gap.
+    InSync,
+}
+
+/// Pure diff for ONE advertised `(anchor, state)` against the local row.
+///
+/// `local` is `None` when no local row carries the id. Anchor divergence is
+/// checked FIRST: an anchor move is the stronger evidence (the entry itself
+/// changed) and a state change normally rides one, so reporting both for the
+/// same row would double-count one divergence.
+pub(crate) fn classify_rea_row_gap(
+    local: Option<(&str, &str)>,
+    peer_anchor: &str,
+    peer_state: Option<&str>,
+) -> ReaRowGap {
+    let Some((local_anchor, local_state)) = local else {
+        return ReaRowGap::AbsentLocal;
+    };
+    if !peer_anchor.is_empty() && local_anchor != peer_anchor {
+        return ReaRowGap::AnchorDivergent;
+    }
+    match peer_state.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(state) if state != local_state => ReaRowGap::StateDivergent,
+        _ => ReaRowGap::InSync,
+    }
+}
+
 /// Discovery phase of the REA-commitment reconcile (steps 1–3): build the local
 /// `(id → anchor)` inventory, ask every connected peer for its
 /// `ProjectionInventory { rea_commitments }`, and diff into a per-sweep
@@ -2815,8 +2886,12 @@ async fn discover_rea(
             }
         }
     };
-    let local_anchors: std::collections::HashMap<String, String> =
-        local_pairs.iter().cloned().collect();
+    // id → (anchor, state). The state half is what makes a travelled-but-frozen
+    // row visible; see [`ReaRowGap`].
+    let local_rows: std::collections::HashMap<String, (String, String)> = local_pairs
+        .iter()
+        .map(|(id, anchor, state)| (id.clone(), (anchor.clone(), state.clone())))
+        .collect();
 
     // (2) Ask connected peers for their inventory. Collect all peer entries
     // first (one pass), THEN build the tracker — so anchor-divergent ids (present
@@ -2827,17 +2902,27 @@ async fn discover_rea(
     let mut peers_asked = 0usize;
     let mut ids_discovered = 0usize;
     let mut divergent_anchor = 0usize;
+    let mut divergent_state = 0usize;
     // The union of ids any peer advertised, with the FIRST peer that did so
     // (for the heal WARN log). Anchor-divergent ids are recorded the same way.
     let mut discovered_by: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
-    // Ids present locally but with a peer-advertised non-empty anchor that
-    // disagrees with ours — excluded from the tracker's local set so they heal.
+    // Ids present locally that disagree with a peer on EITHER compared axis
+    // (anchor or lifecycle state) — excluded from the tracker's local set so
+    // they heal. One set: both axes produce the same cure.
     let mut divergent_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
     // id → first NON-EMPTY advertised anchor. The cross-sweep [`MissLedger`]
     // keys its retry budget on this: a peer advertising a DIFFERENT anchor is
     // new evidence and re-admits an exhausted id.
     let mut advertised_anchor: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    // id → first NON-EMPTY advertised lifecycle state. Composed into the
+    // [`MissLedger`] evidence key beside the anchor, so a peer that GRADUATES a
+    // commitment (same anchor, new state) counts as new evidence and re-admits
+    // an id whose budget was spent. Without this a row wrong on state alone
+    // would exhaust once and never be re-asked — the "already-wrong rows never
+    // re-heal" half of the 2026-09-12c custody-standing red.
+    let mut advertised_state: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
 
     for peer in &peers {
@@ -2924,15 +3009,46 @@ async fn discover_rea(
                     .entry(entry.id.clone())
                     .or_insert_with(|| entry.dht_anchor_hash.clone());
             }
-            // Anchor-divergence: both present, peer carries a non-empty anchor
-            // that disagrees with ours. An empty remote anchor is not evidence
-            // of divergence (the peer is itself un-anchored).
-            if let Some(local_anchor) = local_anchors.get(&entry.id) {
-                if !entry.dht_anchor_hash.is_empty()
-                    && *local_anchor != entry.dht_anchor_hash
-                    && divergent_ids.insert(entry.id.clone())
-                {
-                    divergent_anchor += 1;
+            if let Some(state) = entry
+                .commitment_state
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+            {
+                advertised_state
+                    .entry(entry.id.clone())
+                    .or_insert_with(|| state.to_string());
+            }
+            // Divergence on either compared axis. An empty remote value is not
+            // evidence (the peer is itself un-anchored / pre-field), and an id
+            // already recorded divergent is never counted twice.
+            if let Some((local_anchor, local_state)) = local_rows.get(&entry.id) {
+                match classify_rea_row_gap(
+                    Some((local_anchor.as_str(), local_state.as_str())),
+                    &entry.dht_anchor_hash,
+                    entry.commitment_state.as_deref(),
+                ) {
+                    ReaRowGap::AnchorDivergent => {
+                        if divergent_ids.insert(entry.id.clone()) {
+                            divergent_anchor += 1;
+                        }
+                    }
+                    ReaRowGap::StateDivergent => {
+                        if divergent_ids.insert(entry.id.clone()) {
+                            divergent_state += 1;
+                            tracing::warn!(
+                                target: "elohim_storage::projection_reconcile",
+                                commitment_id = %entry.id,
+                                peer = %peer.peer_id,
+                                local_state = %local_state,
+                                peer_state = %entry.commitment_state.as_deref().unwrap_or(""),
+                                "projection-reconcile: STATE-DIVERGENT commitment — the row \
+                                 converged but its standing did not; re-reading from the own \
+                                 conductor"
+                            );
+                        }
+                    }
+                    ReaRowGap::InSync | ReaRowGap::AbsentLocal => {}
                 }
             }
         }
@@ -2962,7 +3078,7 @@ async fn discover_rea(
     // Build the tracker: local set EXCLUDES anchor-divergent ids so `discover()`
     // admits them alongside genuinely-absent ids. All discovered ids flow
     // through the one gap state machine (absence + divergence, unified).
-    let tracker_local: std::collections::HashSet<String> = local_anchors
+    let tracker_local: std::collections::HashSet<String> = local_rows
         .keys()
         .filter(|id| !divergent_ids.contains(*id))
         .cloned()
@@ -2986,11 +3102,19 @@ async fn discover_rea(
             misses.resolved(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id);
             continue;
         }
-        let evidence = advertised_anchor.get(id).map(String::as_str).unwrap_or("");
+        // Evidence spans BOTH compared axes (see `advertised_state`): a
+        // graduation that leaves the anchor untouched must still read as new
+        // evidence, or a state-divergent row exhausts once and is never
+        // re-asked.
+        let evidence = format!(
+            "{}|{}",
+            advertised_anchor.get(id).map(String::as_str).unwrap_or(""),
+            advertised_state.get(id).map(String::as_str).unwrap_or(""),
+        );
         match misses.admit(
             PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS,
             id,
-            evidence,
+            &evidence,
             divergent_ids.contains(id),
         ) {
             Admission::Retry => admitted.push(id.clone()),
@@ -3010,6 +3134,7 @@ async fn discover_rea(
         peers_asked,
         ids_discovered,
         divergent_anchor,
+        divergent_state,
         divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
@@ -3226,6 +3351,11 @@ fn heal_one(
             in_scope_of_json: Some(c.in_scope_of_json.as_str()),
             note: c.note.as_deref(),
             metadata_json: Some(c.metadata_json.as_str()),
+            // The DHT entry's own standing. Heal writes it verbatim, which is
+            // what lets a peer holding a frozen `proposed` converge onto the
+            // author's `active` — the row was never the problem, the standing
+            // was.
+            state: Some(c.state.as_str()),
         },
     );
     let mut conn = pool
@@ -6164,6 +6294,82 @@ fn heal_collective_one(
             mode: crate::db::collectives::CollectiveStampMode::GapFill,
         },
     )
+}
+
+#[cfg(test)]
+mod rea_row_gap_tests {
+    use super::*;
+
+    const ANCHOR_A: &str = "uhCkkAlphaCommitmentActionHash0000000000000";
+    const ANCHOR_B: &str = "uhCkkBravoCommitmentActionHash0000000000000";
+
+    #[test]
+    fn absent_locally_is_a_gap_regardless_of_what_the_peer_carries() {
+        assert_eq!(
+            classify_rea_row_gap(None, ANCHOR_A, Some("active")),
+            ReaRowGap::AbsentLocal
+        );
+        assert_eq!(classify_rea_row_gap(None, "", None), ReaRowGap::AbsentLocal);
+    }
+
+    #[test]
+    fn agreeing_on_both_axes_is_in_sync() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), ANCHOR_A, Some("active")),
+            ReaRowGap::InSync
+        );
+    }
+
+    /// THE 2026-09-12c class: same anchor, different standing. This read as
+    /// `InSync` before the state axis existed, which is why custody rows
+    /// travelled and custody STANDING did not.
+    #[test]
+    fn same_anchor_different_state_is_state_divergent() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "proposed")), ANCHOR_A, Some("active")),
+            ReaRowGap::StateDivergent
+        );
+    }
+
+    /// A peer that carries no anchor at all still proves a standing divergence:
+    /// an un-anchored peer is not evidence about the ANCHOR, but its state is
+    /// evidence about the state.
+    #[test]
+    fn an_unanchored_peer_can_still_prove_state_divergence() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "proposed")), "", Some("active")),
+            ReaRowGap::StateDivergent
+        );
+    }
+
+    #[test]
+    fn anchor_divergence_wins_over_state_divergence_so_one_row_counts_once() {
+        // Both axes disagree. Reporting both would double-count ONE divergence,
+        // and the anchor is the stronger evidence (the entry itself moved).
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "proposed")), ANCHOR_B, Some("active")),
+            ReaRowGap::AnchorDivergent
+        );
+    }
+
+    /// Empty peer values are NO EVIDENCE, never divergence — a pre-cure peer
+    /// (which omits `commitmentState` entirely) and an un-anchored peer must not
+    /// manufacture gaps for a row that is fine.
+    #[test]
+    fn empty_peer_values_are_no_evidence() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), "", None),
+            ReaRowGap::InSync
+        );
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), ANCHOR_A, Some("")),
+            ReaRowGap::InSync
+        );
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), ANCHOR_A, Some("  ")),
+            ReaRowGap::InSync
+        );
+    }
 }
 
 #[cfg(test)]

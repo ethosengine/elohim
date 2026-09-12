@@ -42,4 +42,31 @@ declaredHeadActionHash: string | null,
  * observability and for the conductor to arbitrate, never for a
  * Rust-side "newest wins" election.
  */
-declaredHeadAt: number | null, };
+declaredHeadAt: number | null, 
+/**
+ * ADDITIVE (2026-09-12, custody standing on the wire): the responder's
+ * projected LIFECYCLE STATE for this row, when the table has one.
+ * `rea_commitments` does (`proposed` | `active` | `fulfilled` | …); the
+ * other three inventory tables do not and always send `None`.
+ *
+ * # Why a second comparison axis exists at all
+ *
+ * The rea arm used to diff on `dht_anchor_hash` ALONE. A custody-blob
+ * commitment therefore reached every peer and then FROZE at the state the
+ * receiving peer happened to insert it with (`proposed`), while the author
+ * held `active` — and the arm reported CONVERGED, because the anchors
+ * matched. Rows travelled; standing did not. The chaos drills read that as
+ * "custody is only proposed here" on every non-authoring peer
+ * (blob-durability DELTA 2026-09-12c, cause 1).
+ *
+ * So state is advertised beside the anchor and a mismatch on EITHER axis is
+ * a gap. Like every other value in this payload it is a HINT, never truth:
+ * it triggers a fetch from the peer's OWN conductor, and the state written
+ * is the one the DHT entry carries.
+ *
+ * `#[serde(default, skip_serializing_if = "Option::is_none")]` keeps this
+ * bidirectionally wire-compatible AND byte-identical to the pre-field shape
+ * when absent — the same discipline `in_sync` / `declared_head_action_hash`
+ * follow. No protocol-version bump.
+ */
+commitmentState: string | null, };

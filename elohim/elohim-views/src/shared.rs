@@ -337,6 +337,32 @@ pub struct ProjectionInventoryEntry {
     #[serde(default)]
     #[ts(type = "number | null")]
     pub declared_head_at: Option<i64>,
+    /// ADDITIVE (2026-09-12, custody standing on the wire): the responder's
+    /// projected LIFECYCLE STATE for this row, when the table has one.
+    /// `rea_commitments` does (`proposed` | `active` | `fulfilled` | …); the
+    /// other three inventory tables do not and always send `None`.
+    ///
+    /// # Why a second comparison axis exists at all
+    ///
+    /// The rea arm used to diff on `dht_anchor_hash` ALONE. A custody-blob
+    /// commitment therefore reached every peer and then FROZE at the state the
+    /// receiving peer happened to insert it with (`proposed`), while the author
+    /// held `active` — and the arm reported CONVERGED, because the anchors
+    /// matched. Rows travelled; standing did not. The chaos drills read that as
+    /// "custody is only proposed here" on every non-authoring peer
+    /// (blob-durability DELTA 2026-09-12c, cause 1).
+    ///
+    /// So state is advertised beside the anchor and a mismatch on EITHER axis is
+    /// a gap. Like every other value in this payload it is a HINT, never truth:
+    /// it triggers a fetch from the peer's OWN conductor, and the state written
+    /// is the one the DHT entry carries.
+    ///
+    /// `#[serde(default, skip_serializing_if = "Option::is_none")]` keeps this
+    /// bidirectionally wire-compatible AND byte-identical to the pre-field shape
+    /// when absent — the same discipline `in_sync` / `declared_head_action_hash`
+    /// follow. No protocol-version bump.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commitment_state: Option<String>,
 }
 
 /// Response payload (carried in `ViewSlice.payload`) for a `ProjectionInventory`
@@ -671,6 +697,7 @@ mod inventory_offset_wire_compat_tests {
             dht_anchor_hash: "uhCkkANCHOR".into(),
             declared_head_action_hash: Some("uhCkkDECLARED".into()),
             declared_head_at: Some(1_753_000_000_000_000),
+            commitment_state: None,
         };
 
         let msgpack = rmp_serde::to_vec_named(&new).unwrap();
@@ -685,6 +712,65 @@ mod inventory_offset_wire_compat_tests {
         assert_eq!(old_json.dht_anchor_hash, "uhCkkANCHOR");
     }
 
+    /// The 2026-09-12 additive field, held to the SAME three-legged discipline
+    /// as `declared_head_action_hash`: byte-identity when absent (so a peer that
+    /// never had this field produces the exact frame it did before), decodable
+    /// on an old struct when present, and round-tripping when it matters.
+    #[test]
+    fn none_commitment_state_is_byte_identical_to_the_pre_field_encoding() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+        #[serde(rename_all = "camelCase")]
+        struct PreStateEntry {
+            id: String,
+            dht_anchor_hash: String,
+            #[serde(default)]
+            declared_head_action_hash: Option<String>,
+            #[serde(default)]
+            declared_head_at: Option<i64>,
+        }
+
+        let new = ProjectionInventoryEntry {
+            id: "custody:blob-1".into(),
+            dht_anchor_hash: "uhCkkANCHOR".into(),
+            declared_head_action_hash: None,
+            declared_head_at: None,
+            commitment_state: None,
+        };
+        let old = PreStateEntry {
+            id: "custody:blob-1".into(),
+            dht_anchor_hash: "uhCkkANCHOR".into(),
+            declared_head_action_hash: None,
+            declared_head_at: None,
+        };
+        assert_eq!(
+            rmp_serde::to_vec_named(&new).unwrap(),
+            rmp_serde::to_vec_named(&old).unwrap(),
+            "an entry with no lifecycle state must serialize EXACTLY as it did before \
+             the field existed — the three inventory tables that have no state must \
+             not pay a byte for the one that does"
+        );
+
+        // Present: an OLD peer decodes the entry at yesterday's behavior rather
+        // than erroring the WHOLE payload (one undecodable entry drops the peer
+        // for the sweep).
+        let stated = ProjectionInventoryEntry {
+            commitment_state: Some("active".into()),
+            ..new.clone()
+        };
+        let bytes = rmp_serde::to_vec_named(&stated).unwrap();
+        let decoded_old: PreStateEntry =
+            rmp_serde::from_slice(&bytes).expect("old struct tolerates the unknown key");
+        assert_eq!(decoded_old.dht_anchor_hash, "uhCkkANCHOR");
+        let round: ProjectionInventoryEntry = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(round, stated);
+
+        // And the JSON leg (the inventory rides the ViewSlice payload as JSON
+        // before the frame is msgpack'd) defaults identically.
+        let json = serde_json::to_string(&old).unwrap();
+        let via_json: ProjectionInventoryEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(via_json.commitment_state, None);
+    }
+
     #[test]
     fn declared_head_round_trips_when_present() {
         let entry = ProjectionInventoryEntry {
@@ -692,6 +778,7 @@ mod inventory_offset_wire_compat_tests {
             dht_anchor_hash: "uhCkkANCHOR".into(),
             declared_head_action_hash: Some("uhCkkDECLARED".into()),
             declared_head_at: Some(-42),
+            commitment_state: Some("active".into()),
         };
         let bytes = rmp_serde::to_vec_named(&entry).unwrap();
         let back: ProjectionInventoryEntry = rmp_serde::from_slice(&bytes).unwrap();
@@ -1034,6 +1121,7 @@ mod head_corpus_digest_wire_compat_tests {
                 dht_anchor_hash: "anc-a".into(),
                 declared_head_action_hash: None,
                 declared_head_at: None,
+                commitment_state: None,
             }],
             in_sync: None,
             head_set_snapshot: None,
@@ -1046,6 +1134,7 @@ mod head_corpus_digest_wire_compat_tests {
                 dht_anchor_hash: "anc-a".into(),
                 declared_head_action_hash: None,
                 declared_head_at: None,
+                commitment_state: None,
             }],
         };
         let new_bytes = rmp_serde::to_vec_named(&new).unwrap();
@@ -1090,6 +1179,7 @@ mod head_set_snapshot_wire_compat_tests {
             dht_anchor_hash: "anc-a".into(),
             declared_head_action_hash: None,
             declared_head_at: None,
+            commitment_state: None,
         }
     }
 

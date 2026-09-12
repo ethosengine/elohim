@@ -497,6 +497,20 @@ pub struct CommitmentWireFields<'a> {
     pub in_scope_of_json: Option<&'a str>,
     pub note: Option<&'a str>,
     pub metadata_json: Option<&'a str>,
+    /// The commitment's LIFECYCLE STATE as the DHT entry carries it
+    /// (`proposed` | `active` | `fulfilled` | …).
+    ///
+    /// `None` — or an empty string, which is what both wire sources produce for
+    /// an entry authored before the field existed — means the wire genuinely
+    /// omits a state, and the projection falls back to the REA birth state
+    /// `proposed` (see [`crate::db::rea_commitments::DEFAULT_COMMITMENT_STATE`]).
+    /// A carried state is projected VERBATIM.
+    ///
+    /// Added 2026-09-12: without it, a custody-blob commitment reached every
+    /// peer and then froze at `proposed` on every non-authoring peer while the
+    /// author held `active` — rows travelled, standing did not
+    /// (blob-durability DELTA 2026-09-12c, cause 1).
+    pub state: Option<&'a str>,
 }
 
 /// Build the storage-side `CreateReaCommitmentInput` from the canonical
@@ -507,9 +521,20 @@ pub struct CommitmentWireFields<'a> {
 /// `supersedes` is always `None`: a projection of an already-committed entry
 /// never re-runs supersession — that happened on the originating create.
 /// `medium_of_exchange_id` is `None`: not carried on the DHT Commitment entry.
+///
+/// `state` is threaded through as `Option<String>`: `Some` ⇒ the wire carried a
+/// lifecycle state and the projection adopts it verbatim; `None` ⇒ the wire
+/// genuinely omitted one and the insert paths fall back to
+/// [`crate::db::rea_commitments::DEFAULT_COMMITMENT_STATE`]. An EMPTY string is
+/// an omission, not a state — both wire sources default the field to `""`.
 pub fn project_commitment_from_wire(fields: &CommitmentWireFields<'_>) -> CreateReaCommitmentInput {
     let classified = first_or_none(parse_json_strings(fields.resource_classified_as_json));
     let in_scope_of = first_or_none(parse_json_strings(fields.in_scope_of_json));
+    let state = fields
+        .state
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
     CreateReaCommitmentInput {
         id: Some(fields.id.to_string()),
         action: fields.action.to_string(),
@@ -530,6 +555,7 @@ pub fn project_commitment_from_wire(fields: &CommitmentWireFields<'_>) -> Create
         note: fields.note.map(str::to_string),
         metadata_json: fields.metadata_json.map(str::to_string),
         supersedes: None,
+        state,
     }
 }
 
@@ -599,6 +625,10 @@ pub fn handle_rea_signal(
                 in_scope_of_json: commitment.in_scope_of_json.as_deref(),
                 note: commitment.note.as_deref(),
                 metadata_json: commitment.metadata_json.as_deref(),
+                // `CommitmentEntry::state` is `#[serde(default)]` String — an
+                // entry that predates the field decodes to "", which
+                // `project_commitment_from_wire` reads as an omission.
+                state: Some(commitment.state.as_str()),
             });
             rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(action_hash.as_str()))?;
         }
@@ -1423,6 +1453,206 @@ mod tests {
             Some("attention"),
             "substrate_signal must reach SQL on the PRODUCTION DHT path \
              (ReaEconomicEventCommitted -> upsert_with_anchor), not just the fixture projector"
+        );
+    }
+}
+
+// ============================================================================
+// Custody standing on the wire (2026-09-12) — blob-durability DELTA 12c cause 1
+// ============================================================================
+
+/// The commitment LIFECYCLE STATE must survive the peer boundary.
+///
+/// Before this, every insert path hardcoded `"proposed"` and
+/// `CommitmentWireFields` carried no state at all, so a custody-blob commitment
+/// reached each peer's projection and then FROZE at the birth state while the
+/// author graduated it to `active`. The rows agreed, the anchors agreed, the
+/// reconcile arm reported convergence — and a household's custody read as
+/// merely *proposed* on every non-authoring peer.
+#[cfg(test)]
+mod custody_state_on_the_wire_tests {
+    use super::*;
+    use crate::db::context::AppContext;
+    use crate::db::rea_commitments;
+    use crate::db::{init_pool, run_migrations};
+
+    /// Minimal wire fields for a custody-blob commitment, with `state` supplied
+    /// exactly as the caller under test would.
+    fn wire(id: &str, state: Option<&str>) -> CreateReaCommitmentInput {
+        project_commitment_from_wire(&CommitmentWireFields {
+            id,
+            action: "custody-blob",
+            provider: "agent:matthew",
+            receiver: "agent:jessica",
+            resource_conforms_to: None,
+            resource_classified_as_json: None,
+            resource_quantity_value: None,
+            resource_quantity_unit: None,
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of_json: None,
+            note: None,
+            metadata_json: None,
+            state,
+        })
+    }
+
+    /// THE cross-peer simulation. Peer B projected the create and holds
+    /// `proposed`; peer A (the author) has since graduated the same commitment
+    /// to `active`. B's reconcile re-reads the entry from its OWN conductor and
+    /// re-projects it — after which BOTH peers read `active`.
+    #[test]
+    fn a_reconciled_peer_converges_onto_the_authors_active_standing() {
+        let pool = init_pool(":memory:").expect("in-memory pool");
+        run_migrations(&pool).expect("migrations");
+        let ctx = AppContext::new("test-app");
+        let mut conn = pool.get().expect("conn");
+
+        // --- peer B: the create signal landed; standing is the birth state.
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-1", Some("proposed")),
+            Some("uhCkkCREATE"),
+        )
+        .expect("project create");
+        let before = rea_commitments::get_commitment(&mut conn, &ctx, "custody:blob-1")
+            .expect("read")
+            .expect("row");
+        assert_eq!(
+            before.state, "proposed",
+            "a freshly-projected create is proposed on every peer"
+        );
+
+        // --- peer A graduated it. B re-reads the SAME entry from its own
+        // conductor (the reconcile heal) and re-projects.
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-1", Some("active")),
+            Some("uhCkkGRADUATED"),
+        )
+        .expect("reconcile heal");
+
+        let after = rea_commitments::get_commitment(&mut conn, &ctx, "custody:blob-1")
+            .expect("read")
+            .expect("row");
+        assert_eq!(
+            after.state, "active",
+            "custody STANDING must travel with the row — a reconciled peer that keeps \
+             reading `proposed` while the author holds `active` is the 2026-09-12c red"
+        );
+        assert_eq!(
+            after.dht_anchor_hash.as_deref(),
+            Some("uhCkkGRADUATED"),
+            "the anchor advances alongside the standing"
+        );
+    }
+
+    /// The other half of the contract: `"proposed"` is the fallback for a
+    /// GENUINE omission only. A pre-field peer (or any wire that simply carries
+    /// no state) must still land the REA birth state — never an empty string,
+    /// and never a state invented from somewhere else.
+    #[test]
+    fn a_wire_without_state_still_lands_proposed() {
+        let pool = init_pool(":memory:").expect("in-memory pool");
+        run_migrations(&pool).expect("migrations");
+        let ctx = AppContext::new("test-app");
+        let mut conn = pool.get().expect("conn");
+
+        assert_eq!(
+            wire("custody:blob-2", None).state,
+            None,
+            "an omitted state stays None through the shared mapping"
+        );
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-2", None),
+            Some("uhCkkCREATE2"),
+        )
+        .expect("project");
+        assert_eq!(
+            rea_commitments::get_commitment(&mut conn, &ctx, "custody:blob-2")
+                .expect("read")
+                .expect("row")
+                .state,
+            "proposed"
+        );
+
+        // An EMPTY string is what both wire mirrors produce for an absent field
+        // (`#[serde(default)]` on a `String`); it is an omission, not a state.
+        assert_eq!(wire("custody:blob-3", Some("")).state, None);
+        assert_eq!(wire("custody:blob-4", Some("   ")).state, None);
+    }
+
+    /// A state-less projection input must never CLOBBER an existing standing.
+    /// The anchor-only refresh path (`update_state_via_conductor`, a seeder
+    /// reseed) carries no state, and a heal that reset `active` back to the
+    /// birth default would be worse than the freeze it cures.
+    #[test]
+    fn an_anchor_only_refresh_never_resets_an_existing_standing() {
+        let pool = init_pool(":memory:").expect("in-memory pool");
+        run_migrations(&pool).expect("migrations");
+        let ctx = AppContext::new("test-app");
+        let mut conn = pool.get().expect("conn");
+
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-5", Some("active")),
+            Some("uhCkkA"),
+        )
+        .expect("project active");
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-5", None),
+            Some("uhCkkB"),
+        )
+        .expect("anchor-only refresh");
+
+        let row = rea_commitments::get_commitment(&mut conn, &ctx, "custody:blob-5")
+            .expect("read")
+            .expect("row");
+        assert_eq!(
+            row.state, "active",
+            "heal FILLS standing, it never resets it"
+        );
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkkB"));
+    }
+
+    /// The projection inventory a peer advertises must carry the state, or the
+    /// reconcile arm has nothing to compare and the freeze stays invisible.
+    #[test]
+    fn the_advertised_inventory_carries_the_standing() {
+        let pool = init_pool(":memory:").expect("in-memory pool");
+        run_migrations(&pool).expect("migrations");
+        let ctx = AppContext::new("test-app");
+        let mut conn = pool.get().expect("conn");
+
+        rea_commitments::upsert_with_anchor(
+            &mut conn,
+            &ctx,
+            wire("custody:blob-6", Some("active")),
+            Some("uhCkkA"),
+        )
+        .expect("project");
+
+        let (entries, total) =
+            rea_commitments::inventory_for_reconcile(&mut conn, &ctx, 0, i64::MAX).expect("inv");
+        assert_eq!(total, 1);
+        assert_eq!(
+            entries[0],
+            (
+                "custody:blob-6".to_string(),
+                "uhCkkA".to_string(),
+                "active".to_string()
+            ),
         );
     }
 }
