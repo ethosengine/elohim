@@ -395,6 +395,22 @@ pub fn snapshot_with_staleness_secs(
         }
     };
 
+    // Floor-relative coverage shortfall, stated from the SAME floor the felt
+    // projection above compares against (tier "standard" until the
+    // content-declared resilience-tier primitive lands; deliberately NOT derived
+    // from reach). Present-vs-absent is the contract, not zero-vs-null: a
+    // MEASURED snapshot always states the number (0 ≡ "the floor is met", itself
+    // a real measurement), while an UNMEASURED one omits the key — a shortfall
+    // computed over a non-measurement would fabricate a measurement. Never a
+    // present null. Saturating: extra collectives past the floor read 0, not a
+    // negative "surplus".
+    let coverage_shortfall: Option<u32> = if distribution_state == "measured" {
+        let floor = resiliency::floor_for_tier("standard");
+        Some((floor - base.households_stewarding).max(0) as u32)
+    } else {
+        None
+    };
+
     Ok(ResilienceSnapshotView {
         content_id: base.content_id.clone(),
         distribution_state,
@@ -414,9 +430,7 @@ pub fn snapshot_with_staleness_secs(
             health_score: base.details.health_score,
         }),
         felt_status,
-        // The graph branch computes coverage_shortfall via CoverageRollup;
-        // the relational path does not select that lens — missing ≡ not-selected.
-        coverage_shortfall: None,
+        coverage_shortfall,
         // The commitment-backed replication fold `compute_base` ALREADY ran over
         // the `rea_commitments` replication relation (loaded once per request);
         // surface it on the served snapshot instead of computing-then-dropping it.

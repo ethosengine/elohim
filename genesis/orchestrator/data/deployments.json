@@ -269,6 +269,8 @@
       "role": "aunt",
       "humanLabel": "susan-household",
       "humanId": "human-susan-household",
+      "edgenodeArcFactor": "0",
+      "$arcFactorComment": "2026-09-12: target_arc_factor 1->0 (leecher) — the one immediate relief lever the 2026-09-11 saturation atom names (genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md): every full-arc alpha conductor has been CFS-throttled >= 0.95 for a week (susan 1.0 at her 3000m situational bump, the fleet's highest actionable divergence with zero heal outcomes), kitsune2 publish has no sender back-off, and the genesis pair (adam/matthew) cannot shed. susan is shem-only, non-genesis, the weakest hardware class (recycled laptop) and a separate household: as a leecher she serves from her local store + peers (validated 2026-06-15 on jessica, boots HolochainP2pConfig{target_arc_factor:0}); household durability rides the storage plane, not the authority arc; 6 full holders remain (adam, matthew, jessica, james, gertrude, eve). Reversible: set back to \"1\" to undo. Measure: her CFS throttle ratio and adam's publish-queue-Full lines after the roll (ConductorCfsThrottleSustained alert rule).",
       "pattern": "consolidated",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-recycled-laptop",

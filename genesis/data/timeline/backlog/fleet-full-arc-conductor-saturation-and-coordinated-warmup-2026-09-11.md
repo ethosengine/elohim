@@ -52,6 +52,10 @@ Demand-driven ramp at the three seams we own, smallest slice first:
 
 Caveat: the present condition is steady-state saturation of full-arc holders, not only post-roll churn — the ramp removes spikes and reconnect storms; capacity needs sharding (upstream) or fewer full holders. Immediate operator lever (cluster-owned, not the repo's): flip one shem full-arc conductor to leecher, as james/jessica were.
 
+## Progress 2026-09-12
+- The "immediate operator lever" is repo-declared after all: `edgenodeArcFactor` per human in `genesis/orchestrator/data/deployments.json`, rendered into `target_arc_factor` by `elohim/holochain/Jenkinsfile` (`TARGET_ARC_FACTOR_PLACEHOLDER`). Pulled: **susan 1 → 0 (leecher)** — shem-only, non-genesis, recycled-laptop class, the fleet's highest actionable divergence with zero heal outcomes, CFS-throttled 1.0 at her 3000m bump. Rationale beside the jessica/james precedents in her `$arcFactorComment`; reversible by setting `"1"`. 6 full holders remain (adam, matthew, jessica, james, gertrude, eve). Lands with the next edge deploy; measure = her throttle ratio and adam's publish-queue-Full rate afterwards, which the new `ConductorCfsThrottleSustained` rule now watches.
+- Sensing legs of the sibling atom landed the same night (alert rules + harvester hook), so the next week of saturation cannot go unwatched.
+
 ## Done when
 
 - `rate(container_cpu_cfs_throttled_periods_total)/rate(container_cpu_cfs_periods_total)` < 0.9 on every alpha conductor for 24 h after a fleet roll; adam's publish-queue-Full lines drop to zero.

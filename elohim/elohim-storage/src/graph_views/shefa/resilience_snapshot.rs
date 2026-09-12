@@ -132,7 +132,15 @@ pub fn build(engine: &GraphEngine, cid: &str) -> Result<ResilienceSnapshotView, 
         felt_status: None,
         // Descent: how many additional distinct-collective slots short of the floor.
         // Derived from steward_rollup.deficit — the genuine cure surfaced to callers.
-        coverage_shortfall: Some(shortfall),
+        // Gated on the SAME predicate as `distribution_state` above (present-vs-absent,
+        // not zero-vs-null): a zero-edge atom is unmeasured, and a shortfall stated
+        // over a non-measurement would fabricate one — `Some(0)` stays a measurement
+        // ("the floor is met"), `None` says we never looked.
+        coverage_shortfall: if stewarding_count > 0 {
+            Some(shortfall)
+        } else {
+            None
+        },
         // Honesty boundary (same rule as `placement_gaps` / `felt_status` above):
         // the per-tier replication-commitment fold reads the RELATIONAL
         // `rea_commitments` relation, which is unreachable from the Cozo graph

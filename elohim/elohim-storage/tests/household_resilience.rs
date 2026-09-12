@@ -390,6 +390,9 @@ fn d1_missing_manifest_snapshot_is_unmeasured_not_zero() {
     let details = snapshot.details.expect("details present");
     assert_eq!(details.online_peers.live, 0);
     assert_eq!(details.online_peers.known, 0);
+    // Absent ≠ 0: a shortfall over a non-measurement would fabricate a
+    // measurement, so the key is OMITTED on the unmeasured path.
+    assert_eq!(snapshot.coverage_shortfall, None);
 }
 
 #[test]
@@ -399,6 +402,25 @@ fn d1_manifest_present_snapshot_is_measured() {
     let content_id = seed_protection_case(&mut conn, "d1-measured", &[("home-a", 0)]);
     let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
     assert_eq!(snapshot.distribution_state, "measured");
+    // A MEASURED snapshot always STATES the floor-relative shortfall as a
+    // number: one stewarding collective against the "standard" floor of 3.
+    assert_eq!(snapshot.coverage_shortfall, Some(2));
+}
+
+#[test]
+fn d1_measured_at_floor_states_zero_shortfall_not_absent() {
+    // 0 is a MEASUREMENT ("the floor is met"), not a missing lens — the
+    // consumer distinguishes present-0 from absent, so the key must be there.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let content_id = seed_protection_case(
+        &mut conn,
+        "d1-shortfall-met",
+        &[("home-a", 1), ("home-b", 1), ("home-c", 0)],
+    );
+    let snapshot = household_resilience::snapshot(&pool, &ctx(), &content_id, None).unwrap();
+    assert_eq!(snapshot.distribution_state, "measured");
+    assert_eq!(snapshot.coverage_shortfall, Some(0));
 }
 
 // =============================================================================
@@ -1257,13 +1279,23 @@ fn golden_resilience_snapshot_json_baseline() {
     // `commonsCommitments: 1` (not zeros): the relation is genuinely folded, not
     // defaulted. The unmeasured/intra cases have no replication commitments, so
     // their blocks are true measured zeros.
-    const GOLDEN_LIT_CARD: &str = r#"{"contentId":"lit-card-content","distributionState":"measured","stewardingCollectives":3,"commitmentBackedCollectives":3,"diversityScore":0.42857143,"regionalDistribution":{"local":0,"regional":0,"global":3,"unknown":0},"placementGaps":[],"protectionStatus":"protected","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"onlinePeers":{"live":3,"known":3},"healthScore":1.0},"feltStatus":{"headline":"Held by 3 households: church-bethel, home-dowell, home-ruth","reassurance":"protected","heldBy":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":3}},"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":1,"totalPledgedBytes":0}}"#;
+    //
+    // AMENDED 2026-09-12 — second sanctioned drift, same honesty rule: the
+    // `coverageShortfall` key on the two MEASURED goldens (lit-card `0`, intra
+    // `1`). The relational path computed the floor comparison all along and hard-
+    // set the field to `None`, so `feltStatus.floor` stated the shortfall while
+    // the dedicated field withheld it. Present-0 on the lit card is part of the
+    // baseline BECAUSE 0 is a measurement ("3 of 3 households, the floor is met")
+    // and a reader must be able to tell it from "we never looked" — which is why
+    // the UNMEASURED golden keeps NO key at all. Again purely additive: every
+    // pre-existing key and value is byte-identical to the Phase-0 capture.
+    const GOLDEN_LIT_CARD: &str = r#"{"contentId":"lit-card-content","distributionState":"measured","stewardingCollectives":3,"commitmentBackedCollectives":3,"diversityScore":0.42857143,"regionalDistribution":{"local":0,"regional":0,"global":3,"unknown":0},"placementGaps":[],"protectionStatus":"protected","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"onlinePeers":{"live":3,"known":3},"healthScore":1.0},"feltStatus":{"headline":"Held by 3 households: church-bethel, home-dowell, home-ruth","reassurance":"protected","heldBy":[{"id":"church-bethel","kind":"household","label":"church-bethel","intraHubPeers":1},{"id":"home-dowell","kind":"household","label":"home-dowell","intraHubPeers":1},{"id":"home-ruth","kind":"household","label":"home-ruth","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":3}},"coverageShortfall":0,"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":1,"totalPledgedBytes":0}}"#;
     const GOLDEN_UNMEASURED: &str = r#"{"contentId":"content-never-seeded","distributionState":"unmeasured","stewardingCollectives":0,"commitmentBackedCollectives":0,"diversityScore":0.0,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":0},"placementGaps":[],"protectionStatus":"at-risk","reciprocatingCollectives":0,"details":{"stewardingCollectives":[],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"We can't confirm these are backed up yet","reassurance":"not-yet-seen","heldBy":[],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":0},"suggestedAction":"Invite a household to help hold these"},"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
     // diversityScore = 2/7 (0.2857143): the intra case has 2 distinct household
     // fault domains (home-multi, home-solo). Under the OLD commitment-clamped proxy
     // this read 1/7 (0.14285715) — 0 commitments capped it; the fault-domain fold
     // corrects it to the real distinct-household count over the RS baseline.
-    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.2857143,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}},"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
+    const GOLDEN_INTRA: &str = r#"{"contentId":"content-intra","distributionState":"measured","stewardingCollectives":2,"commitmentBackedCollectives":0,"diversityScore":0.2857143,"regionalDistribution":{"local":0,"regional":0,"global":0,"unknown":2},"placementGaps":[],"protectionStatus":"partial","reciprocatingCollectives":0,"details":{"stewardingCollectives":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"onlinePeers":{"live":0,"known":0},"healthScore":0.0},"feltStatus":{"headline":"Held by 2 of the 3 households this should live in","reassurance":"watching","heldBy":[{"id":"home-multi","kind":"household","intraHubPeers":2},{"id":"home-solo","kind":"household","intraHubPeers":1}],"floor":{"tier":"standard","tierDeclared":false,"wantsHouseholds":3,"hasHouseholds":2}},"coverageShortfall":1,"commitmentBackedReplication":{"dwellingCommitments":0,"collectiveCommitments":0,"commonsCommitments":0,"totalPledgedBytes":0}}"#;
 
     assert_eq!(
         lit, GOLDEN_LIT_CARD,

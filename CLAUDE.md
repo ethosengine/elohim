@@ -44,7 +44,7 @@ just --list
 just gate                     # changed projects, including worktree edits
 just gate elohim-storage      # explicit manifest project or owning path
 just test app                 # focused test family
-just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped)
+just test mesh [scope]        # Act I a2o lane against the local mesh (scope = feature path or tag expr; scoped runs stay scoped); REFUSES before launch when the prologue's hosted-human roster is missing or older than the doorway archive (a cold start drops the archive and the roster with it — without this the lane fails as sixteen opaque `Invalid credentials` 401s); MESH_ALLOW_NO_PROLOGUE=1 for a lane that casts nobody
 just dev start                # isolated conductor + storage + doorway
 just dev package app/elohim-app # build, check and package an Angular EPR app locally; no upload
 # EPR_APP_ADAPTER=./my-adapter.mjs just dev package ./my-client selects a local adapter

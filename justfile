@@ -77,6 +77,31 @@ test target="changed" scope="":
         else
           unset E2E_HOUSEHOLD_FIXTURE_PATH
         fi
+        # CAST PREFLIGHT — refuse before launch, the same contract the portal check below
+        # holds for browser lanes. Every hosted-human / humans-served scenario logs in as a
+        # cast member the prologue registered in the doorway archive; a cold start drops that
+        # archive (hc-mesh.sh) and a lane run without a fresh prologue fails as sixteen
+        # opaque `Invalid credentials` 401s with nothing naming the cause (measured
+        # 2026-09-11, run 20260911T223432Z). The roster file is written by the prologue and
+        # removed with the archive, so "present and newer than the archive's birth" is the whole
+        # precondition. The archive's birth is storage.bson (written once when mongod initialises
+        # the dbpath, never touched again) — NOT the mongo directory, whose mtime moves on every
+        # collection file mongod creates. MESH_ALLOW_NO_PROLOGUE=1 runs anyway (a scoped lane
+        # that casts no one).
+        roster="$MESH_DIR/prologue-hosted-humans.json"
+        archive_birth="$MESH_DIR/mongo/storage.bson"
+        if [[ "${MESH_ALLOW_NO_PROLOGUE:-0}" != "1" ]]; then
+          if [[ ! -f "$roster" ]]; then
+            echo "REFUSED: no hosted-human roster at $roster — the doorway archive has no cast." >&2
+            echo "  Run \`just mesh prologue\` first (or MESH_ALLOW_NO_PROLOGUE=1 for a lane that casts nobody)." >&2
+            exit 2
+          fi
+          if [[ -f "$archive_birth" && "$archive_birth" -nt "$roster" ]]; then
+            echo "REFUSED: the doorway archive was (re)created after the hosted-human roster ($roster)." >&2
+            echo "  The cast it names was dropped by a cold start; run \`just mesh prologue\` before this lane." >&2
+            exit 2
+          fi
+        fi
         export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE="{{ root }}/genesis/manifests/cluster-state.act1-household.yaml"
         export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
         # DURABLE TRACE. Reports live under the REPO (genesis/a2o/reports/, gitignored),

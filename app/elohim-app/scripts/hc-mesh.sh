@@ -3172,6 +3172,12 @@ start_all() {
       else
         echo "cold start: dropping the doorway archive ($MONGO_DIR) — its account rows name cells the conductor regenerate destroys"
         rm -rf "$MONGO_DIR"
+        # The prologue's hosted-human roster describes rows in THAT archive. Left behind, a
+        # later `just test mesh` reads names with no account and fails as sixteen opaque
+        # `Invalid credentials` 401s (measured 2026-09-11, lane 20260911T223432Z: every
+        # hosted-cell and humans-served scenario) instead of telling the operator to run
+        # `just mesh prologue`. Drop the roster with the archive it names.
+        rm -f "$MESH_DIR/prologue-hosted-humans.json"
       fi
     fi
   fi

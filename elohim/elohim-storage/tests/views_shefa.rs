@@ -145,6 +145,9 @@ fn resilience_snapshot_counts_steward_nodes() {
     assert_eq!(view.content_id, "content-cid-1");
     assert_eq!(view.stewarding_collectives, 3);
     assert_eq!(view.protection_status, "protected");
+    // Measured: the shortfall is STATED, and 3 stewards at the "standard" floor
+    // of 3 states it as 0 — a measurement ("the floor is met"), not a gap.
+    assert_eq!(view.coverage_shortfall, Some(0));
 }
 
 #[test]
@@ -156,6 +159,10 @@ fn resilience_snapshot_at_risk_when_no_stewards() {
 
     assert_eq!(view.stewarding_collectives, 0);
     assert_eq!(view.protection_status, "at-risk");
+    // A zero-edge atom is UNMEASURED, so the shortfall key is omitted entirely:
+    // stating "3 short" over a content we never saw would fabricate a measurement.
+    assert_eq!(view.distribution_state, "unmeasured");
+    assert_eq!(view.coverage_shortfall, None);
 }
 
 // ---------------------------------------------------------------------------

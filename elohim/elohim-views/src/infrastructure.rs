@@ -1471,12 +1471,21 @@ pub struct ResilienceSnapshotView {
     /// Wire: `feltStatus` in `resilience-snapshot-view.schema.json`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub felt_status: Option<FeltStatusView>,
-    /// How many additional distinct-collective slots short of the diversity floor.
-    /// Derived from `CoverageRollup::deficit.measure()` in the graph-backed branch.
-    /// `None` when the relational path (household_resilience::snapshot) is used
-    /// (missing ≡ not-selected, never a present null — same contract as
-    /// `intra_hub_peers`). Wire: `coverageShortfall` in
-    /// `resilience-snapshot-view.schema.json`.
+    /// How many additional distinct-collective slots short of the resilience
+    /// floor this content is.
+    ///
+    /// Present-vs-absent is the contract, not zero-vs-null: `Some(n)` whenever
+    /// `distribution_state == "measured"` — INCLUDING `Some(0)`, which is itself
+    /// a measurement ("the floor is met"), never a missing lens. `None` when the
+    /// snapshot is unmeasured, because a shortfall computed over a
+    /// non-measurement would fabricate a measurement. Never a present null.
+    ///
+    /// The relational path (`household_resilience::snapshot`) computes it by
+    /// comparing `stewarding_collectives` against
+    /// `elohim_facings::folds::resiliency::floor_for_tier` — the same floor
+    /// `felt_status.floor.wants_households` states. The graph-backed branch
+    /// derives it from `CoverageRollup::deficit.measure()`.
+    /// Wire: `coverageShortfall` in `resilience-snapshot-view.schema.json`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[ts(optional)]
     pub coverage_shortfall: Option<u32>,

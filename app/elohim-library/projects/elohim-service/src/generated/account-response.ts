@@ -62,7 +62,7 @@ export interface AccountResponse {
    */
   isSteward: boolean;
   /**
-   * ISO-8601 timestamp when stewardship was confirmed. Absent when not a steward (serde skip_serializing_if)
+   * RFC3339 UTC timestamp (seconds precision) when stewardship was confirmed — stamped through routes::hosted_cell::rfc3339_utc_secs, the same helper hostedCellValidUntil uses, so one response never speaks two dialects of time. NOT bson::DateTime's Display, which is the time crate's own format and makes Angular's DatePipe throw NG02100. Absent when not a steward (serde skip_serializing_if)
    */
   stewardshipAt?: string;
   /**
@@ -70,11 +70,11 @@ export interface AccountResponse {
    */
   keyExported: boolean;
   /**
-   * ISO-8601 timestamp when the account was created. Absent when unknown (serde skip_serializing_if)
+   * RFC3339 UTC timestamp (seconds precision) when the account was created — see stewardshipAt for why the format is pinned. Absent when unknown (serde skip_serializing_if)
    */
   createdAt?: string;
   /**
-   * ISO-8601 timestamp of the last login. Absent when never logged in (serde skip_serializing_if)
+   * RFC3339 UTC timestamp (seconds precision) of the last login — see stewardshipAt for why the format is pinned. Absent when never logged in (serde skip_serializing_if)
    */
   lastLoginAt?: string;
   /**

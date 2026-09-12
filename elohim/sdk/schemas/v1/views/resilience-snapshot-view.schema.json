@@ -70,7 +70,7 @@
         "healthScore":     { "type": "number",  "minimum": 0, "maximum": 1 }
       }
     },
-    "coverageShortfall": { "type": "integer", "minimum": 0, "description": "How many additional distinct-collective slots short of the diversity floor (CoverageRollup deficit measure). Derived in the graph-backed branch via CoverageRollup.deficit.measure(). Present with value 0 when the graph branch measures the floor exactly met; absent (not-selected) only on the relational household_resilience::snapshot path." },
+    "coverageShortfall": { "type": "integer", "minimum": 0, "description": "How many additional distinct-collective slots short of the resilience floor this content is. PRESENT as a non-negative integer whenever distributionState is \"measured\" — including the value 0, which is itself a measurement (\"the floor is met\"), never a missing lens. ABSENT when distributionState is \"unmeasured\": a shortfall computed over a non-measurement would fabricate a measurement. Absent is NOT 0, and the key is never a present null. The relational household_resilience::snapshot path computes it by comparing stewardingCollectives against the tier floor (elohim_facings::folds::resiliency::floor_for_tier, the same floor feltStatus.floor.wantsHouseholds states); the graph-backed branch derives it via CoverageRollup.deficit.measure()." },
     "commitmentBackedReplication": {
       "type": "object",
       "additionalProperties": false,
