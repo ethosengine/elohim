@@ -393,6 +393,21 @@
       "supersededBy": null
     },
     {
+      "id": "destructive-git-requires-tier",
+      "version": 1,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f",
+      "sha256Computed": "sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f",
+      "pinState": "verified",
+      "cid": "bafyreidmgsrdcdkiews5qqbojz3aeid22wmhpbkufdntxa4m4urruaunn4",
+      "bodyBytes": 4789,
+      "supersedes": [],
+      "supersededBy": null
+    },
+    {
       "id": "eprfs-meta-domain-neutrality",
       "version": 1,
       "registry": "policies.yaml",

@@ -468,6 +468,27 @@
       }
     },
     {
+      "citesContentCid": "bafyreidmgsrdcdkiews5qqbojz3aeid22wmhpbkufdntxa4m4urruaunn4",
+      "citesContentSha256": "sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "destructive-git-requires-tier@1",
+        "title": "Destructive git requires a declared tier or a team check",
+        "summary": "Destructive git requires a declared tier or a team check",
+        "full_reasoning": "2026-09-11 22:34Z: a Haiku-tier subagent of another session ran `git reset --hard 466536cb4` on the shared /projects/elohim checkout — three commits left the `dev` branch pointer (objects intact) and ~27 tracked files' uncommitted work across several lanes was wiped; recovery took two sessions an hour (see .claude/memory/feedback_tiered_agent_capabilities_destructive_git.md). Operator direction: \"haiku and sonnet should not have git reset level capabilities to do that kind of thing without checking with the team first\" — tiered permissions keyed by the same `agent:<role>@<model>` vocabulary the reader lens already uses. Destructive git (history- rewriting, working-tree-discarding, or ref-mutating) is refused below the declared tier floor UNLESS the acting tier resolves at or above it. Tier resolution order (fail-closed): `CLAUDE_MODEL` env ONLY (fix round 1 dropped `ANTHROPIC_MODEL` — a process-wide config value would be a blanket bypass, not a per-actor declaration; fix round 2: this harness does not export `CLAUDE_MODEL` at all, so in practice the ladder is honour-system via `epr actor claim`, and absent a claim it is a uniform deny), then the actor sidecar's latest claim (`.eprfs/status/actors.jsonl`, ActorClaim `{claimed: \"agent:<role>@<model>\", session, claimedAt}` — elohim/epr-rea/src/actor.rs) for the session id (`CLAUDE_CODE_ SESSION_ID` read first — fix round 2: this is the harness's REAL session-id env var, round 1 read only `CLAUDE_SESSION_ID`, which this harness never sets, so the sidecar lookup never matched and every actor silently resolved `unknown`; `CLAUDE_SESSION_ID` stays as a fallback for any harness that does use it), then `unknown`. `unknown-tier: deny` is fail-closed on purpose: an unclaimed actor is treated as below the floor, never assumed safe. The tier is SELF-ASSERTED either way — an honesty fence, not a control; `.claude/worktrees/<plan>` (a worktree per plan) is the structural half of this discipline, this row the behavioral half. The remedy is deliberately narrowed to escalation only — \"ask the controller/operator to run this\" — never a self-claim hint: a remedy that teaches the denied actor how to raise its own tier is a bypass wearing a help message. `capability-tier-gate.py` verifies this row's own `contentHash` pin (via `_lib.epr_meta.policy_content_hash`, the SAME canonicalization `epr-meta-pin.py` writes) BEFORE trusting it for classification — a pin mismatch denies every git/rm candidate outright (fail-closed: a tampered table cannot be trusted to say what ISN'T destructive either), distinct from a merely malformed row, which stays `skipped —` and spoken.",
+        "binding": "constitutional",
+        "scope_json": "{}",
+        "citations": null,
+        "status": "active",
+        "established_by": "governed-discovery-task-2.4-2026-09-11",
+        "established_at": null,
+        "superseded_by": null,
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"deny\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"version\":1}"
+      }
+    },
+    {
       "citesContentCid": "bafyreiexwdgxm7llrkikznadlrxwlfvkwwztzx7twg3lk6tdf2kexehl6i",
       "citesContentSha256": "sha256:97b0cd767d6b8a90acb4035c6f6596aab5b33cdff3b1b6b57a632e944b90ebf2",
       "registry": "policies.yaml",

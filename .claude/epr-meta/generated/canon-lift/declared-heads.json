@@ -440,6 +440,28 @@
       ]
     },
     {
+      "id": "destructive-git-requires-tier",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "head": {
+        "registry": "policies.yaml",
+        "version": 1,
+        "cid": "bafyreidmgsrdcdkiews5qqbojz3aeid22wmhpbkufdntxa4m4urruaunn4",
+        "sha256Pin": "sha256:6c34a2310d4825a5d8402e4e7602207ad59877855428db3b838ce5231a028d6f"
+      },
+      "tipBasis": "sole-active",
+      "competing": false,
+      "versions": [
+        {
+          "registry": "policies.yaml",
+          "version": 1,
+          "status": "active",
+          "cid": "bafyreidmgsrdcdkiews5qqbojz3aeid22wmhpbkufdntxa4m4urruaunn4",
+          "supersededBy": null
+        }
+      ]
+    },
+    {
       "id": "eprfs-meta-domain-neutrality",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
