@@ -2,7 +2,7 @@
 name: feedback_framing_guards
 title: Framing & ontology guards (umbrella)
 id: feedback-framing-guards
-description: "Guards: self-sovereign ≠ apex; justice = Mishpat/capability, not punishment; human-in-loop ≠ terminal; peer collectives are starved, not failing."
+description: "Guards: self-sovereign ≠ apex; justice = Mishpat/capability, not punishment; human-in-loop ≠ terminal; peer collectives are starved, not failing; hosted cost is anti-capture, doorways are a bridge."
 metadata:
   node_type: memory
   type: feedback
@@ -32,3 +32,14 @@ The pedagogy's addition the engineering forgets: the point is WITHDRAWAL — a s
 comes down is capture. Hence `retire-when:` on every habit, reach earned then the check retired,
 reader-context presets reviewed and revealed rather than set once, and graduation from eprfs to
 p2p. See [[feedback_reader_context_shapes_recall_defaults]].
+
+**Hosted-human cost is a feature, not a bottleneck (operator 2026-09-12).** A hosted human costs
+~786 MB of conductor heap and a conductor carries ~25 agents; that expense is anti-capture
+pressure that keeps a doorway from BECOMING a town. Doorways are documented as a bridge and a
+flywheel for the transitional agency phase — they help a person feel the real values they gain
+by crossing to device stewardship (custody of their own keys and record, standing in the
+collective, serving credit, a lighter load on the commons). Guard: never "fix" hosting cost by
+packing more agents per conductor or lowering the arc; the ceiling is a design number to ratify
+(conductor-capacity habit), the measure of health is the hosted→steward transition rate, and the
+chrome carries the invitation ("this doorway hosts N of its M"), not an apology. See
+[[feedback_doorway_projection_is_commons_privilege]], [[feedback_epr_chrome_is_the_trust_signal]].
