@@ -1,10 +1,16 @@
-# BORN @wip, EVERY SCENARIO. No step definition in this file exists yet: the
-# serving path today folds nothing at serve time, and the doorway's warm shell
-# and file cache answer from bytes alone. So a run of this file reports
-# undefined steps, and undefined is not evidence. Each scenario below is the
-# assertion that must be true before the matching Rust may be called done; the
-# habit atom doorway/doorway-service/.epr-meta/served-under-standing.habit.md
-# is the only thing that flips them.
+# BORN @wip, EVERY SCENARIO — because at birth no step definition in this file
+# existed: the serving path folded nothing at serve time, and the doorway's warm
+# shell and file cache answered from bytes alone. A run reported undefined steps,
+# and undefined is not evidence. Each scenario below is the assertion that must
+# be true before the matching Rust may be called done; the habit atom
+# doorway/doorway-service/.epr-meta/served-under-standing.habit.md is the only
+# thing that flips them.
+#
+# The LAST TWO scenarios have lost their @wip: the chrome's two remaining
+# affordances — the fair-trade receipt and the owed response — now have glue and
+# the Rust they read. The first three keep theirs; what still gates them is a
+# device persona's standing reaching a doorway, which is a red of its own and
+# not this file's to claim.
 #
 # Design source: the 2026-09-12 operator ruling, recorded in the read-path
 # workstream of
@@ -236,7 +242,6 @@ Feature: A doorway serves only under a standing it re-asks, and shows the person
   # the chrome telling the visitor so in a sentence they would say themselves, with
   # the ledger record behind it for anyone who asks for the precise form. A doorway
   # that credits itself for a holder's work is the failure this pins.
-  @wip
   Scenario: The fair-trade receipt names what was exchanged for this serve and who was credited
     Given "community-garden-club" is at a reach that admits Matthew
     When Matthew is served "community-garden-club" through doorway "beta"
@@ -258,7 +263,6 @@ Feature: A doorway serves only under a standing it re-asks, and shows the person
   # doorway's to set or to answer: the doorway carries his challenge to the
   # collective that ruled, and then gets out of the way. A challenge that lands in a
   # queue nobody owes anything to is the suggestion box this protocol replaces.
-  @wip
   Scenario: A visitor's challenge becomes a witnessed commitment with a due window
     Given the collective "the Dowell household" has ruled that "community-garden-club" is no longer at commons reach
     And James asked doorway "beta" for "community-garden-club" and was refused naming reach

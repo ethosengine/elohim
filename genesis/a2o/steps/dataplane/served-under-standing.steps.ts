@@ -1,6 +1,67 @@
 /**
- * Step glue for features/dataplane/served-under-standing.feature, scenarios 1-3
+ * Step glue for features/dataplane/served-under-standing.feature, scenarios 1-5
  * (@concern:served-under-standing, @requires:owned-substrate).
+ *
+ * SCENARIOS 4 AND 5 — THE TWO CHROME AFFORDANCES BEYOND THE REFUSAL.
+ *
+ * 4 (the fair-trade receipt). An admitted serve now carries
+ * `x-elohim-receipt: /api/v1/receipt/<eprId>` beside `x-elohim-standing`
+ * (`doorway/doorway-service/src/services/serve_receipt.rs`, stamped by
+ * `dispatch_to_projected_epr`; relayed VERBATIM by a courier). That route
+ * reads THREE already-notarized REA commitments and says what each one is:
+ * the `hosting-agreement` (what was given so this could be kept ready), the
+ * `project-epr` contract (who holds the bytes), and the asked doorway's own
+ * `operate-doorway` binding (who runs the doorway that projected them). Three
+ * records, which is what makes "credits the holder separately from the
+ * doorway" structurally true. On a RELAY, beta takes alpha's `exchanged` +
+ * `held` clauses over the one-hop budget and substitutes its OWN projection
+ * credit — a doorway crediting itself for a holder's work is unreachable,
+ * not discouraged. Nothing is minted: a per-serve `serve-blob` EconomicEvent
+ * was declined at the design gate (10^4-10^6 heads/year against a plane whose
+ * measured anchor is ~3,469), so the receipt names who was CREDITED and never
+ * who was SERVED.
+ *
+ * 5 (the owed response). `WHERE_TO_BE_HEARD` now points at
+ * `POST /api/v1/challenge` (`doorway/doorway-service/src/routes/challenge.rs`),
+ * which witnesses the challenge as an REA `Commitment` with
+ * `action: "respond-to-challenge"`. `provider` is copied VERBATIM from the
+ * challenged contract's own `responsiveReach.party` — the doorway never sets
+ * who owes — `receiver` is the challenger as the SAME verifier the fold used
+ * to refuse them states it, `clauseOf` is the contract, and `due` is the
+ * window that contract declared BEFORE the challenge existed. `carriedBy` in
+ * the metadata is the doorway; that it differs from `provider` is the record
+ * that no doorway answered for the collective. It repoints from
+ * `/api/v1/feedback/operations` deliberately: that outbox binds a feedback
+ * signal to a CONTENT action, and a reach challenge targets an REA
+ * Commitment, so `create_feedback_signal` would fail at the conductor — the
+ * old pointer was a door that could not open.
+ *
+ * WHAT THE MESH MUST HAVE STAGED for these two to run. `stageRoot` below now
+ * also stages a `hosting-agreement` commitment scoped
+ * `["epr_root:{contentId}","doorway:{doorwayId}"]` (torn down with the root),
+ * and `buildMetadata` writes the `responsiveReach` term and the
+ * `hostingAgreementId` pointer onto every staged contract. Both are the
+ * STEWARD's declarations, authored at staging time and therefore strictly
+ * before any challenge — which is exactly what makes scenario 5's "declared
+ * before James sent it" checkable rather than asserted. Scenario 4
+ * additionally needs the asked doorway to hold its OWN `operate-doorway`
+ * binding; `just mesh prologue` seeds one for `alpha-elohim-host` and one for
+ * `apex-elohim-host` (which is what the household lane calls "beta"), so on a
+ * seeded mesh that clause is already there and on an unseeded one the receipt
+ * honestly reports `unrecorded: ["projected"]` rather than inventing a credit.
+ *
+ * SCENARIO 5 NARROWS TO `private`, ON PURPOSE. `classify_reach('private')`
+ * yields `BeneficiaryOnly`, which refuses an AUTHENTICATED requester too — so
+ * James is genuinely refused naming reach without this file asserting the
+ * false premise scenario 2 has to stay honest about (the real household triad
+ * are all members of household-dowell, so no fixture human stands in for "a
+ * household non-member"). The feature's own REACH paragraph licenses it: where
+ * a narrowing lands is the collective's to say, and these scenarios never fix
+ * it.
+ *
+ * TEARDOWN LEAVES THE OWED RESPONSE STANDING. Withdrawing it would be the test
+ * answering for the collective — the one thing scenario 5's last line says a
+ * doorway must not do, and a test is no more entitled to it.
  *
  * THE MECHANISM UNDER TEST. `doorway/doorway-service/src/services/serve_eligibility.rs`
  * folds REACH + STANDING for every cached-serve path from the EPR router's CURRENT
@@ -498,10 +559,17 @@ interface GateHint {
   relation: string;
 }
 
+interface ResponsiveReach {
+  party: string;
+  partyLabel: string | null;
+  withinHours: number;
+}
+
 function buildMetadata(
   mount: string,
   reach: string,
-  gateHints: GateHint[]
+  gateHints: GateHint[],
+  redress?: { responsiveReach: ResponsiveReach; hostingAgreementId: string }
 ): Record<string, unknown> {
   return {
     urlPath: mount,
@@ -516,6 +584,35 @@ function buildMetadata(
     stewardDirectEndpoint: null,
     routeClaims: null,
     redirectTemplates: [],
+    // The two redress terms, on EVERY staged contract from the moment it is
+    // staged — never added later. That ordering is the whole point: the
+    // contract's own createdAt predates any challenge against it, so
+    // "a due window declared before the visitor sent it" reads back to a
+    // record that already stood rather than being something the doorway
+    // asserted. They are also projection-relevant (PROJECTION_RELEVANT_FIELDS),
+    // so a change to either re-grants through supersession rather than
+    // mutating a standing contract.
+    responsiveReach: redress?.responsiveReach ?? null,
+    hostingAgreementId: redress?.hostingAgreementId ?? null,
+  };
+}
+
+/**
+ * The responsive-reach term a collective's steward declares on its own
+ * contract: who answers a challenge to this projection's standing, and how
+ * soon.
+ *
+ * The doorway copies `party` VERBATIM onto the commitment it witnesses and
+ * never chooses it — so this fixture is standing in for exactly one thing, the
+ * collective's own declaration. 72 hours is a real window a household could
+ * keep; the number matters only in that a reader can redo the arithmetic from
+ * it.
+ */
+function householdResponsiveReach(collectiveName: string): ResponsiveReach {
+  return {
+    party: HOUSEHOLD_COLLECTIVE_ID,
+    partyLabel: collectiveName,
+    withinHours: 72,
   };
 }
 
@@ -554,6 +651,51 @@ interface StagedRoot {
   contentId: string;
   commitmentId: string;
   currentReach: string;
+  /** The reciprocal term a fair-trade receipt reads as "what was given". */
+  hostingAgreementId: string;
+  /** The steward's declaration of who answers a challenge, and how soon. */
+  responsiveReach: ResponsiveReach;
+}
+
+function hostingAgreementIdFor(doorwayId: string, label: string): string {
+  const digest = createHash('sha256')
+    .update(`hosting|${doorwayId}|${label}|${requireRunStamp()}|${requireScenarioNonce()}`, 'utf8')
+    .digest('hex')
+    .slice(0, 16);
+  return `hosting-agreement-sus-${digest}`;
+}
+
+/**
+ * Stage the reciprocal term: an in-kind compute pledge scoped to THIS root and
+ * THIS doorway, the same shape `genesis/seeder/src/seed-operator-bindings.ts`
+ * seeds for the real landing surface.
+ *
+ * Without it the receipt honestly reports `unrecorded: ["exchanged"]` — which
+ * is correct behaviour and useless as a test, because "the receipt names what
+ * was given in exchange" would then be asserting against an absence the
+ * scenario itself created.
+ */
+async function stageHostingAgreement(staged: StagedRoot): Promise<void> {
+  const provider = testStewardPeerId();
+  const body = {
+    id: staged.hostingAgreementId,
+    action: 'hosting-agreement',
+    provider,
+    receiver: provider,
+    resourceClassifiedAs: JSON.stringify(['compute']),
+    inScopeOf: JSON.stringify([`epr_root:${staged.contentId}`, `doorway:${staged.doorwayId}`]),
+    note: `[a2o served-under-standing] in-kind compute hosting for ${staged.contentId} on ${staged.doorwayId}`,
+    metadataJson: JSON.stringify({
+      signalKind: 'compute-allocation',
+      triggerKind: 'subscription',
+    }),
+  };
+  const created = await adminCall('POST', `${staged.doorwayUrl}/api/v1/commitments`, body);
+  assert.ok(
+    created.status === 201 || created.status === 409,
+    `staging the hosting agreement ${staged.hostingAgreementId} failed: HTTP ${created.status} ` +
+      created.text.slice(0, 300)
+  );
 }
 
 /** PUT a real ZIP (containing the marked `index.html`) and create the
@@ -627,7 +769,10 @@ async function stageRoot(world: E2EWorld, doorwayId: string, label: string): Pro
 
   const commitmentId = commitmentIdFor(resolvedDoorwayId, label);
   const provider = testStewardPeerId();
-  const metadata = buildMetadata(mount, 'commons', []);
+  const hostingAgreementId = hostingAgreementIdFor(resolvedDoorwayId, label);
+  const responsiveReach = householdResponsiveReach(getState(world).collectiveName);
+  const redress = { responsiveReach, hostingAgreementId };
+  const metadata = buildMetadata(mount, 'commons', [], redress);
   const body = {
     id: commitmentId,
     action: 'project-epr',
@@ -668,7 +813,12 @@ async function stageRoot(world: E2EWorld, doorwayId: string, label: string): Pro
     contentId,
     commitmentId,
     currentReach: 'commons',
+    hostingAgreementId,
+    responsiveReach,
   };
+  // The reciprocal term, staged against the SAME doorway that holds the
+  // contract — the holder is the peer whose receipt names what was given.
+  await stageHostingAgreement(staged);
   await waitForLocalServe(staged, 65_000);
   return staged;
 }
@@ -705,7 +855,10 @@ async function narrowReach(
   reach: string,
   gateHints: GateHint[] = []
 ): Promise<void> {
-  const metadata = buildMetadata(staged.mount, reach, gateHints);
+  const metadata = buildMetadata(staged.mount, reach, gateHints, {
+    responsiveReach: staged.responsiveReach,
+    hostingAgreementId: staged.hostingAgreementId,
+  });
   const currentState = await currentCommitmentState(staged.doorwayUrl, staged.commitmentId);
   const res = await adminCall(
     'PATCH',
@@ -727,8 +880,20 @@ async function cancelQuiet(staged: StagedRoot): Promise<void> {
   try {
     await adminCall('PATCH', `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`, {
       state: 'cancelled',
-      metadata: buildMetadata(staged.mount, 'commons', []),
+      metadata: buildMetadata(staged.mount, 'commons', [], {
+        responsiveReach: staged.responsiveReach,
+        hostingAgreementId: staged.hostingAgreementId,
+      }),
     });
+  } catch {
+    // best-effort cleanup
+  }
+  try {
+    await adminCall(
+      'PATCH',
+      `${staged.doorwayUrl}/api/v1/commitments/${staged.hostingAgreementId}`,
+      { state: 'cancelled' }
+    );
   } catch {
     // best-effort cleanup
   }
@@ -830,6 +995,58 @@ interface Refusal {
   /** The route that reads the reach declaration itself back (the REA
    * commitment carrying reach + audience terms). */
   declaredIn?: string;
+  /** WHO owes an answer if this refusal is challenged, and how soon — read
+   * from the contract's own `responsiveReach`, which was declared before the
+   * request existed. Present-and-NULL when the collective declared nobody;
+   * never omitted, so a reader can tell the two apart. */
+  owed?: OwedResponse | null;
+}
+
+interface OwedResponse {
+  party: string;
+  partyLabel?: string;
+  withinHours: number;
+  declaredBy: string;
+  declaredAt: string;
+}
+
+interface Credit {
+  role: 'held' | 'projected';
+  party: string;
+  partyLabel?: string;
+  sentence: string;
+  commitment: string;
+  record: string;
+}
+
+interface ReceiptBody {
+  sentence: string;
+  epr: string;
+  exchanged: {
+    what: string;
+    sentence: string;
+    party: string;
+    resource?: string;
+    commitment: string;
+    record: string;
+  } | null;
+  credits: Credit[];
+  unrecorded: string[];
+  protocolForm: string;
+  servedBy?: string;
+}
+
+interface ChallengeAnswer {
+  outcome: string;
+  reason: string;
+  epr: string;
+  challenge?: string;
+  record?: string;
+  owed: OwedResponse | null;
+  due?: string;
+  contract?: string;
+  carriedBy?: string;
+  servedBy?: string;
 }
 
 interface ScenarioState {
@@ -840,6 +1057,21 @@ interface ScenarioState {
   reconcileWindowMs: number;
   lastRefusal?: { status: number; headers: Record<string, string | undefined>; body?: Refusal };
   lastServed?: { status: number; text: string; headers: Record<string, string | undefined> };
+  /** The receipt fetched for the last serve, and the raw bytes it arrived as
+   * (so "no identifier is the FIRST thing it says" is checkable on the wire,
+   * not on a re-serialized object). */
+  receipt?: { body: ReceiptBody; raw: string; askedAt: string };
+  /** The doorway scenarios 4/5 asked — the one that must credit ITSELF for the
+   * projection, and the one that must not answer a challenge for a collective. */
+  askedDoorwayId?: string;
+  askedDoorwayUrl?: string;
+  /** James's bearer, minted once per scenario 5 run. */
+  challengerToken?: string;
+  challengerHumanId?: string;
+  /** When the challenge was sent — the instant every "declared before" check
+   * is made against. */
+  challengeSentAt?: number;
+  challengeAnswer?: { status: number; body: ChallengeAnswer };
 }
 
 const states = new WeakMap<E2EWorld, ScenarioState>();
@@ -1159,10 +1391,18 @@ Then(
       typeof refusal.hear === 'string' && refusal.hear.length > 0,
       `refusal carries no "hear" redress route: ${JSON.stringify(refusal)}`
     );
+    // The way to be heard must be the route that WITNESSES a challenge, not
+    // merely a route that accepts one. `/api/v1/feedback/operations` was the
+    // previous pointer and could never have carried this redress: that outbox
+    // binds a feedback signal to a CONTENT action, and a reach challenge
+    // targets an REA Commitment, so the write would fail at the conductor. A
+    // refusal pointing at a door that does not open IS the suggestion box this
+    // story exists to replace.
     assert.equal(
       refusal.hear,
-      '/api/v1/feedback/operations',
-      `refusal "hear" route is "${refusal.hear}", not the declared feedback-operations outbox`
+      '/api/v1/challenge',
+      `refusal "hear" route is "${refusal.hear}", not the route that witnesses a challenge ` +
+        'as a commitment with a named party who owes an answer'
     );
   }
 );
@@ -1628,6 +1868,622 @@ Then('no eviction of those bytes was required for the refusal', function (this: 
 });
 
 // =============================================================================
+// Scenario 4 — the fair-trade receipt names what was exchanged for this serve
+// and who was credited.
+// =============================================================================
+
+/** GET a JSON body from a doorway, asserting the status and parsing once. */
+async function getJson(
+  url: string,
+  headers: Record<string, string> | undefined,
+  what: string
+): Promise<{ raw: string; body: unknown }> {
+  const res = await rawGet(url, headers);
+  assert.equal(
+    res.status,
+    200,
+    `${what}: GET ${url} answered HTTP ${res.status} — ${res.text.slice(0, 300)}`
+  );
+  let body: unknown;
+  try {
+    body = JSON.parse(res.text);
+  } catch {
+    throw new Error(`${what}: GET ${url} did not answer JSON: ${res.text.slice(0, 300)}`);
+  }
+  return { raw: res.text, body };
+}
+
+Given(
+  '{string} is at a reach that admits Matthew',
+  { timeout: 30_000 },
+  function (this: E2EWorld, eprLabel: string): void {
+    const state = getState(this);
+    assert.equal(eprLabel, state.label);
+    const holder = requireHolder(this);
+    // The Background staged this root at `commons`, which is the widest rung
+    // and therefore admits Matthew along with everybody else. This scenario
+    // deliberately does NOT narrow: what it pins is the ACCOUNT of the serve,
+    // not the fold's discrimination (scenario 2 is where the fold has to
+    // discriminate, and it needs a device-persona bearer to do it). Narrowing
+    // here would couple the receipt's evidence to that separate red for no
+    // gain — and would make an "admits Matthew" premise that this file cannot
+    // check without his conductor's standing.
+    assert.equal(
+      holder.currentReach,
+      'commons',
+      `the staged reach is "${holder.currentReach}", so "admits Matthew" is no longer ` +
+        "true by construction — this step asserts the Background's own commons staging"
+    );
+  }
+);
+
+When(
+  'Matthew is served {string} through doorway {string}',
+  { timeout: 180_000 },
+  async function (this: E2EWorld, eprLabel: string, doorwayId: string): Promise<void> {
+    const state = getState(this);
+    assert.equal(eprLabel, state.label);
+    const holder = requireHolder(this);
+    const doorway = this.getDoorway(doorwayId);
+    state.askedDoorwayId = await resolveDoorwayId(this, doorwayId, doorway.url);
+    state.askedDoorwayUrl = doorway.url;
+
+    // Matthew's own bearer when one can be minted — a serve to a NAMED person,
+    // which is what the Gherkin says. When it cannot be (the device-persona
+    // standing path is a separate, named red), the commons reach admits him
+    // anyway and the receipt is the same receipt: it accounts for who was
+    // CREDITED, never for who was served.
+    const bearer = await loginDevicePersonaBearer(this, 'Matthew');
+    const headers = bearer ? { Authorization: `Bearer ${bearer.token}` } : undefined;
+
+    const marker = markerFor(eprLabel);
+    const deadline = Date.now() + 150_000;
+    let last: RawResponse | undefined;
+    for (;;) {
+      last = await rawGet(`${doorway.url}${holder.path}`, headers);
+      if (last.status === 200 && last.text.includes(marker)) break;
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `doorway "${doorwayId}" did not serve "${eprLabel}" (${holder.path}) within 150s: ` +
+            `HTTP ${last.status}, marker present=${last.text.includes(marker)}`
+        );
+      }
+      await delay(RECONCILE_POLL_INTERVAL_MS);
+    }
+    state.lastServed = last;
+    state.lastRefusal = undefined;
+  }
+);
+
+Then(
+  'the chrome carries a fair-trade receipt for this serve',
+  { timeout: 30_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    assert.ok(state.lastServed, 'no served response captured');
+    assert.equal(state.lastServed.status, 200);
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(askedUrl, 'the "served through doorway" step must run first');
+
+    // The pointer, said ON THE SERVE — so the chrome never has to guess that a
+    // visit had an economic account at all. A relayed serve carries the
+    // HOLDER's value verbatim, and the pointer is relative, so it resolves
+    // against the doorway the visitor is actually talking to.
+    const pointer = state.lastServed.headers['x-elohim-receipt'];
+    assert.ok(
+      pointer?.startsWith('/api/v1/receipt/'),
+      `a served (200) response carries no "x-elohim-receipt" pointer (got: ${JSON.stringify(pointer)}) ` +
+        '— the serve said nothing about what was traded for it'
+    );
+
+    const { raw, body } = await getJson(`${askedUrl}${pointer}`, undefined, 'the receipt');
+    state.receipt = { body: body as ReceiptBody, raw, askedAt: askedUrl };
+    assert.equal(
+      state.receipt.body.epr,
+      requireHolder(this).contentId,
+      'the receipt must be about the record that was just served'
+    );
+  }
+);
+
+Then('the receipt names what was given in exchange for the serve', function (this: E2EWorld): void {
+  const receipt = getState(this).receipt?.body;
+  assert.ok(receipt, 'no receipt captured — the preceding step must run first');
+  assert.ok(
+    receipt.exchanged,
+    'the receipt names no exchange: ' +
+      `unrecorded=${JSON.stringify(receipt.unrecorded)}. A null here is the doorway being ` +
+      'HONEST that it holds no hosting agreement for this record — so if this fails, the ' +
+      "staging (stageRoot's hosting-agreement) did not land, not the receipt."
+  );
+  assert.ok(
+    receipt.exchanged.what.trim().length > 0,
+    'the exchange must say WHAT was given, in words'
+  );
+  assert.ok(
+    receipt.exchanged.sentence.includes(receipt.exchanged.what),
+    `the clause must SAY what was given, not only carry it in a field: "${receipt.exchanged.sentence}"`
+  );
+  assert.ok(
+    !receipt.unrecorded.includes('exchanged'),
+    'a named exchange and an "exchanged" entry in unrecorded cannot both be true'
+  );
+});
+
+Then(
+  'the receipt credits the holder peer that provided the bytes',
+  function (this: E2EWorld): void {
+    const state = getState(this);
+    const receipt = state.receipt?.body;
+    const holder = requireHolder(this);
+    assert.ok(receipt, 'no receipt captured');
+    const held = receipt.credits.find(c => c.role === 'held');
+    assert.ok(
+      held,
+      `the receipt credits no holder: credits=${JSON.stringify(receipt.credits.map(c => c.role))}, ` +
+        `unrecorded=${JSON.stringify(receipt.unrecorded)}`
+    );
+    assert.equal(
+      held.commitment,
+      holder.commitmentId,
+      'the held credit must read back to the projection contract this scenario staged, not to ' +
+        'some other record the doorway happened to hold'
+    );
+  }
+);
+
+Then(
+  'the receipt credits doorway {string} for the projection, separately from the holder',
+  function (this: E2EWorld, doorwayId: string): void {
+    const state = getState(this);
+    const receipt = state.receipt?.body;
+    const holder = requireHolder(this);
+    assert.ok(receipt, 'no receipt captured');
+    const projected = receipt.credits.find(c => c.role === 'projected');
+    assert.ok(
+      projected,
+      `the receipt credits no projecting doorway: unrecorded=${JSON.stringify(receipt.unrecorded)}. ` +
+        `That is the doorway being HONEST that it holds no "operate-doorway" binding for ` +
+        `"${state.askedDoorwayId}" — "just mesh prologue" seeds one for alpha-elohim-host and ` +
+        'apex-elohim-host, so a miss here is a staging gap, never an invented credit.'
+    );
+    const held = receipt.credits.find(c => c.role === 'held');
+    assert.ok(held, 'the holder credit must be present for "separately" to mean anything');
+    // SEPARATELY: two records, two parties. One record credited twice would be
+    // the doorway crediting itself for the holder's work.
+    assert.notEqual(
+      projected.commitment,
+      held.commitment,
+      `doorway "${doorwayId}" credited the SAME record for holding and for projecting ` +
+        `(${projected.commitment}) — the two clauses must read back to two different commitments`
+    );
+    assert.notEqual(
+      projected.commitment,
+      holder.commitmentId,
+      "the projection credit must not be the holder's own projection contract"
+    );
+  }
+);
+
+/**
+ * Follow one clause's `record` route until some origin answers with the very
+ * commitment the clause NAMES. Tried in order and stopped at the first match —
+ * a record that reads back as a DIFFERENT id has not been dereferenced, it has
+ * been confused with something else.
+ */
+async function dereferenceClause(
+  origins: string[],
+  record: string,
+  commitment: string
+): Promise<{ resolved: boolean; last?: { status: number; id?: string } }> {
+  let last: { status: number; id?: string } | undefined;
+  for (const origin of origins) {
+    const res = await rawGet(`${origin}${record}`);
+    last = { status: res.status };
+    if (res.status !== 200) continue;
+    const parsed = safeParseId(res.text);
+    last.id = parsed;
+    if (parsed === commitment) return { resolved: true, last };
+  }
+  return { resolved: false, last };
+}
+
+function safeParseId(text: string): string | undefined {
+  try {
+    return (JSON.parse(text) as { id?: string }).id;
+  } catch {
+    return undefined;
+  }
+}
+
+Then(
+  'every credit on the receipt reads back to a record on the shared ledger',
+  { timeout: 60_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const receipt = state.receipt?.body;
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(receipt && askedUrl, 'no receipt captured');
+    const clauses: { commitment: string; record: string; what: string }[] = receipt.credits.map(
+      c => ({ commitment: c.commitment, record: c.record, what: `the ${c.role} credit` })
+    );
+    if (receipt.exchanged) {
+      clauses.push({
+        commitment: receipt.exchanged.commitment,
+        record: receipt.exchanged.record,
+        what: 'the exchange clause',
+      });
+    }
+    assert.ok(clauses.length > 0, 'a receipt with no clause at all proves nothing');
+
+    // The ledger is SHARED, so either doorway may answer for a record. Ask the
+    // doorway that gave the receipt first; fall back to the holder it named,
+    // because whether a holder's commitment row has replicated to the courier's
+    // own storage peer yet is dataplane-convergence's subject, not this
+    // scenario's.
+    const origins = [askedUrl];
+    if (receipt.servedBy && !originsEqual(receipt.servedBy, askedUrl)) {
+      origins.push(receipt.servedBy);
+    }
+
+    for (const clause of clauses) {
+      const seen = await dereferenceClause(origins, clause.record, clause.commitment);
+      assert.ok(
+        seen.resolved,
+        `${clause.what} names record "${clause.record}" which does not read back to commitment ` +
+          `"${clause.commitment}" on any of ${JSON.stringify(origins)} (last observed: ` +
+          `${JSON.stringify(seen.last)}). A credit that cannot be dereferenced is a number the ` +
+          'doorway made up, which is exactly what this assertion exists to refuse.'
+      );
+    }
+  }
+);
+
+Then(
+  'the receipt is written in the words a friend would use, with the protocol form one request away',
+  { timeout: 30_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const captured = state.receipt;
+    const askedUrl = state.askedDoorwayUrl;
+    const holder = requireHolder(this);
+    assert.ok(captured && askedUrl, 'no receipt captured');
+    const receipt = captured.body;
+
+    // The checkable half #1: no protocol identifier is the FIRST thing said.
+    // Asserted on the WIRE bytes, not on a re-serialized object, because key
+    // order is exactly what "the first thing it says" means.
+    assert.ok(
+      captured.raw.trimStart().startsWith('{"sentence":"'),
+      `the first thing the receipt says is not its sentence: ${captured.raw.slice(0, 120)}`
+    );
+    for (const identifier of [
+      holder.contentId,
+      holder.commitmentId,
+      holder.hostingAgreementId,
+      'hosting-agreement',
+      'project-epr',
+      'operate-doorway',
+      'commitment',
+      'REA',
+    ]) {
+      assert.ok(
+        !receipt.sentence.includes(identifier),
+        `the lead sentence carries the protocol identifier "${identifier}": "${receipt.sentence}"`
+      );
+    }
+
+    // The checkable half #2: the precise form is reachable in ONE request.
+    assert.ok(
+      typeof receipt.protocolForm === 'string' && receipt.protocolForm.length > 0,
+      'the receipt offers no route to its protocol form'
+    );
+    const { body } = await getJson(
+      `${askedUrl}${receipt.protocolForm}`,
+      undefined,
+      'the protocol form'
+    );
+    const form = body as { commitments?: unknown[] };
+    assert.ok(
+      Array.isArray(form.commitments) && form.commitments.length > 0,
+      `the protocol form returned no commitments verbatim: ${JSON.stringify(body).slice(0, 300)}`
+    );
+
+    // The half a machine cannot settle is left to a person, on purpose — the
+    // feature says so. Print it so a reviewer reads the actual sentence.
+    // eslint-disable-next-line no-console -- the human half of this assertion
+    console.log(`[served-under-standing] receipt sentence: ${receipt.sentence}`);
+  }
+);
+
+// =============================================================================
+// Scenario 5 — a visitor's challenge becomes a witnessed commitment with a due
+// window.
+// =============================================================================
+
+/** The words James sends. Fixed, so a re-run of this scenario is a REPLAY of
+ * the same challenge rather than a second one — the doorway's ensure-not-create
+ * is what makes that safe, and exercising it here is free. */
+const JAMES_CHALLENGE_WORDS =
+  'I live in this household and I think this should still be readable by people like me. ' +
+  'Please look at it again.';
+
+Given(
+  'the collective {string} has ruled that {string} is no longer at commons reach',
+  { timeout: 60_000 },
+  async function (this: E2EWorld, collectiveName: string, eprLabel: string): Promise<void> {
+    const state = getState(this);
+    assert.equal(eprLabel, state.label);
+    assert.equal(collectiveName, state.collectiveName);
+    // `private` on purpose. `classify_reach('private')` is BeneficiaryOnly,
+    // which refuses an AUTHENTICATED requester too — so James is genuinely
+    // refused naming reach without this file asserting the false premise
+    // scenario 2 has to stay honest about (the real household triad are all
+    // members of household-dowell, so no fixture human stands in for "a
+    // household non-member"). The feature's REACH paragraph licenses it: where
+    // a narrowing lands is the collective's to say.
+    await narrowReach(requireHolder(this), 'private', householdAudience(collectiveName));
+  }
+);
+
+Given(
+  'James asked doorway {string} for {string} and was refused naming reach',
+  { timeout: 180_000 },
+  async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void | 'pending'> {
+    const state = getState(this);
+    assert.equal(eprLabel, state.label);
+    const holder = requireHolder(this);
+    const doorway = this.getDoorway(doorwayId);
+    state.askedDoorwayId = await resolveDoorwayId(this, doorwayId, doorway.url);
+    state.askedDoorwayUrl = doorway.url;
+
+    // A challenge needs somebody to answer TO, so this half genuinely needs
+    // James's verified standing — an anonymous challenge is a named 401 by
+    // design, not a witnessed record against nobody.
+    const bearer = await loginDevicePersonaBearer(this, 'James');
+    if (!bearer) {
+      console.warn(`  ⏭️  PENDING: ${NO_DEVICE_STANDING_PATH_REASON('James')}`);
+      return 'pending';
+    }
+    state.challengerToken = bearer.token;
+    state.challengerHumanId = bearer.humanId;
+
+    const headers = { Authorization: `Bearer ${bearer.token}` };
+    const raw = await pollUntilStatus(
+      `${doorway.url}${holder.path}`,
+      headers,
+      403,
+      state.reconcileWindowMs + OWN_REFRESH_BUDGET_MS
+    );
+    const refusal = parseRefusalBody(raw.text);
+    assert.ok(refusal, `James's 403 carried no parseable refusal JSON: ${raw.text.slice(0, 300)}`);
+    assert.equal(
+      refusal.refused,
+      'reach',
+      `the refusal named term "${refusal.refused}", not "reach"`
+    );
+    state.lastRefusal = { status: raw.status, headers: raw.headers, body: refusal };
+    state.lastServed = undefined;
+  }
+);
+
+When(
+  "James uses the way to be heard in that refusal's chrome to challenge the standing",
+  { timeout: 60_000 },
+  async function (this: E2EWorld): Promise<void | 'pending'> {
+    const state = getState(this);
+    const holder = requireHolder(this);
+    const refusal = state.lastRefusal?.body;
+    assert.ok(refusal, 'no refusal captured — the preceding step must run first');
+    if (!state.challengerToken) return 'pending';
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(askedUrl, 'the refusal step must record which doorway was asked');
+
+    // THE WAY TO BE HEARD IS TAKEN FROM THE REFUSAL ITSELF — never hardcoded
+    // here. That is the whole point of the assertion in scenario 1: the route
+    // a refusal advertises has to be the route that works.
+    assert.ok(refusal.hear, 'the refusal offered no way to be heard');
+
+    state.challengeSentAt = Date.now();
+    const res = await fetch(`${askedUrl}${refusal.hear}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${state.challengerToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ epr: holder.contentId, words: JAMES_CHALLENGE_WORDS }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    const text = await res.text();
+    let body: ChallengeAnswer;
+    try {
+      body = JSON.parse(text) as ChallengeAnswer;
+    } catch {
+      throw new Error(
+        `POST ${askedUrl}${refusal.hear} did not answer JSON: HTTP ${res.status} ${text.slice(0, 300)}`
+      );
+    }
+    state.challengeAnswer = { status: res.status, body };
+  }
+);
+
+Then('his challenge is witnessed on the shared ledger as a commitment', function (this: E2EWorld):
+  | void
+  | 'pending' {
+  const state = getState(this);
+  if (!state.challengeAnswer) return 'pending';
+  const { status, body } = state.challengeAnswer;
+  assert.ok(
+    status === 201 || status === 200,
+    `the challenge answered HTTP ${status}: ${JSON.stringify(body).slice(0, 400)}`
+  );
+  assert.ok(
+    body.outcome === 'witnessed' || body.outcome === 'replay',
+    `the challenge outcome was "${body.outcome}" (${body.reason}) — only "witnessed" and ` +
+      '"replay" mean a commitment stands on the ledger. "nothingOwed" means the staged ' +
+      'contract carried no responsiveReach term, which is a staging gap, not a doorway defect.'
+  );
+  assert.ok(body.challenge, 'the answer names no commitment');
+  assert.ok(body.record, 'the answer offers no route to read that commitment back');
+});
+
+Then(
+  'the commitment names {string} as the party that owes the response',
+  function (this: E2EWorld, collectiveName: string): void | 'pending' {
+    const state = getState(this);
+    if (!state.challengeAnswer) return 'pending';
+    const owed = state.challengeAnswer.body.owed;
+    assert.ok(owed, 'the answer names nobody as owing a response');
+    assert.equal(
+      owed.party,
+      HOUSEHOLD_COLLECTIVE_ID,
+      `the owed party is "${owed.party}", not the household collective — the doorway must copy ` +
+        "the contract's own responsiveReach.party verbatim, never choose one"
+    );
+    assert.equal(
+      owed.partyLabel,
+      collectiveName,
+      `the owed party is not SAID as "${collectiveName}" (got: ${JSON.stringify(owed.partyLabel)})`
+    );
+    // …and it must not be the doorway. A doorway answering for a collective is
+    // exactly what the scenario's last line refuses.
+    assert.notEqual(
+      owed.party,
+      state.askedDoorwayId,
+      'the doorway named ITSELF as the party that owes the response'
+    );
+  }
+);
+
+Then(
+  'the commitment carries a due date that was declared before James sent it',
+  function (this: E2EWorld): void | 'pending' {
+    const state = getState(this);
+    if (!state.challengeAnswer) return 'pending';
+    const { body } = state.challengeAnswer;
+    const owed = body.owed;
+    assert.ok(owed, 'no owed term to check a due window against');
+    assert.ok(body.due, 'the commitment carries no due date');
+    const due = Date.parse(body.due);
+    assert.ok(Number.isFinite(due), `the due date "${body.due}" is not a date`);
+
+    // "Declared before he sent it" is checkable because the WINDOW lives on the
+    // contract, whose own timestamp predates the challenge. The date is
+    // arithmetic over that window — which is why this asserts the declaration's
+    // age, not the doorway's word for it.
+    const declaredAt = Date.parse(owed.declaredAt);
+    assert.ok(
+      Number.isFinite(declaredAt),
+      `the owed term names no readable declaration time: ${JSON.stringify(owed.declaredAt)}`
+    );
+    const sentAt = state.challengeSentAt ?? Date.now();
+    assert.ok(
+      declaredAt < sentAt,
+      `the redress term was declared at ${owed.declaredAt}, which is NOT before James sent his ` +
+        `challenge at ${new Date(sentAt).toISOString()} — a window agreed after the fact is not a ` +
+        'window that was fixed before he sent anything'
+    );
+    assert.ok(owed.withinHours > 0, 'a window of no time at all is not a window');
+    assert.ok(
+      owed.declaredBy.startsWith('/api/v1/commitments/'),
+      `the window must read back to the record that declared it (got: "${owed.declaredBy}")`
+    );
+    // The arithmetic a reader can redo: the due date is the declared window
+    // counted from receipt, never a number the doorway chose.
+    const drift = Math.abs(due - (sentAt + owed.withinHours * 3_600_000));
+    assert.ok(
+      drift < 5 * 60_000,
+      `the due date is ${new Date(due).toISOString()}, which is not ${owed.withinHours}h after ` +
+        'the challenge was received — the window on the contract and the date on the record disagree'
+    );
+  }
+);
+
+Then(
+  'James can read the owed response and its due date from the same chrome',
+  { timeout: 30_000 },
+  async function (this: E2EWorld): Promise<void | 'pending'> {
+    const state = getState(this);
+    if (!state.challengeAnswer?.body.challenge) return 'pending';
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(askedUrl, 'no doorway recorded');
+    const answer = state.challengeAnswer.body;
+
+    // THE SAME CHROME: the same doorway James was refused at and challenged
+    // through, read back live. Not the holder, not an admin surface.
+    const { body } = await getJson(
+      `${askedUrl}/api/v1/challenge/${encodeURIComponent(answer.challenge!)}`,
+      { Authorization: `Bearer ${state.challengerToken ?? ''}` },
+      'the standing challenge'
+    );
+    const standing = body as {
+      challenge: string;
+      owed: OwedResponse | null;
+      due?: string;
+      state: string;
+      finished: boolean;
+      words?: string;
+    };
+    assert.equal(standing.challenge, answer.challenge);
+    assert.ok(standing.owed, 'the standing record names nobody as owing a response');
+    assert.equal(standing.owed.party, HOUSEHOLD_COLLECTIVE_ID);
+    assert.equal(
+      standing.due,
+      answer.due,
+      'the due date read back does not match the one the challenge was witnessed with — a due ' +
+        'date that moves is not a due date'
+    );
+    assert.equal(
+      standing.words,
+      JAMES_CHALLENGE_WORDS,
+      "the record does not carry James's own words"
+    );
+  }
+);
+
+Then(
+  "doorway {string} did not answer the challenge on the collective's behalf",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<void | 'pending'> {
+    const state = getState(this);
+    if (!state.challengeAnswer?.body.challenge) return 'pending';
+    const answer = state.challengeAnswer.body;
+    const owed = answer.owed;
+    assert.ok(owed, 'no owed term recorded');
+
+    // The record of the doorway's restraint is structural: it CARRIED the
+    // challenge and is named as having carried it, and the party that owes the
+    // answer is somebody else.
+    assert.ok(
+      answer.carriedBy,
+      `doorway "${doorwayId}" did not record itself as having carried the challenge`
+    );
+    assert.notEqual(
+      answer.carriedBy,
+      owed.party,
+      `doorway "${doorwayId}" is named as BOTH the carrier and the party that owes the answer`
+    );
+
+    // …and nothing has been answered yet. A doorway that resolved the challenge
+    // on the collective's behalf would have closed it in the same breath.
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(askedUrl, 'no doorway recorded');
+    const { body } = await getJson(
+      `${askedUrl}/api/v1/challenge/${encodeURIComponent(answer.challenge!)}`,
+      { Authorization: `Bearer ${state.challengerToken ?? ''}` },
+      'the standing challenge'
+    );
+    const standing = body as { finished: boolean; state: string };
+    assert.equal(
+      standing.finished,
+      false,
+      `the challenge is already finished — doorway "${doorwayId}" answered it rather than ` +
+        'carrying it to the collective that ruled'
+    );
+  }
+);
+
+// =============================================================================
 // Teardown — restore reach to commons and cancel every staged commitment.
 // =============================================================================
 
@@ -1636,5 +2492,11 @@ After({ tags: '@concern:served-under-standing', timeout: 30_000 }, async functio
   if (state?.holder) {
     await cancelQuiet(state.holder);
   }
+  // The owed-response commitment scenario 5 witnesses is LEFT STANDING on
+  // purpose. Withdrawing it would be this test answering for the collective —
+  // the one thing scenario 5's last line says a doorway must not do, and a test
+  // is no more entitled to it. It is agent-scoped and content-addressed over
+  // (challenger, contract, words), so a re-run replays the same record rather
+  // than accumulating new ones.
   states.delete(this);
 });
