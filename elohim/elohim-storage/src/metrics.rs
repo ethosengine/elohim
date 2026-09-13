@@ -1813,6 +1813,24 @@ lazy_static! {
     /// "infra" | "mishpat" | "elohim_content". Additive only — the atomics stay
     /// as the in-process status-surface source of truth; this is the durable,
     /// graphable twin, same idiom as `IDENTITY_NAMESPACE_VIOLATIONS`.
+    /// Read-path caller resolutions that ended in a 401, by REASON —
+    /// `no_identity_header` (the caller asserted nothing) vs
+    /// `agent_cid_unresolved` (the doorway DID assert an identity and this node
+    /// could not resolve it). The two are the same status and completely
+    /// different problems: the first is an anonymous read, the second is a
+    /// hosted session whose account is not bound to any `humans` row — the
+    /// identity-plane gap measured on the household mesh 2026-09-13, which read
+    /// as an indistinguishable 401 from the outside.
+    /// label: reason.
+    pub static ref ACCOUNT_CALLER_UNRESOLVED_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_account_caller_unresolved_total",
+            "Read-path 401s by caller-resolution failure reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
     pub static ref SIGNAL_DECODE_MISS_TOTAL: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_signal_decode_miss_total",
@@ -2316,6 +2334,15 @@ pub fn register_all() {
                 },
             ])
             .inc_by(0);
+        let _ = REGISTRY.register(Box::new(ACCOUNT_CALLER_UNRESOLVED_TOTAL.clone()));
+        // Pre-touch both reasons so "no unresolved callers" reads as a measured
+        // 0 rather than an absent series — the same pre-touch discipline the
+        // decode-miss counter below was flagged for missing.
+        for reason in ["no_identity_header", "agent_cid_unresolved"] {
+            ACCOUNT_CALLER_UNRESOLVED_TOTAL
+                .with_label_values(&[reason])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(SIGNAL_DECODE_MISS_TOTAL.clone()));
         // Pre-touch the three signal families so zero-misses reads as a
         // measured 0, never as an absent series (the exact ambiguity the
@@ -3196,6 +3223,15 @@ pub fn inc_identity_namespace_violation(column: &str, got: &str) {
 /// Increment the durable signal decode-miss mirror (paired with the
 /// per-family `AtomicU64` in `signals.rs`, additive only). `family` is
 /// "infra" | "mishpat" | "elohim_content".
+/// Record one read-path 401, labelled by WHY the caller could not be resolved.
+/// `reason` is `"no_identity_header"` | `"agent_cid_unresolved"`, produced by
+/// `api::account::caller_unresolved_reason`.
+pub fn inc_account_caller_unresolved(reason: &str) {
+    ACCOUNT_CALLER_UNRESOLVED_TOTAL
+        .with_label_values(&[reason])
+        .inc();
+}
+
 pub fn inc_signal_decode_miss(family: &str) {
     SIGNAL_DECODE_MISS_TOTAL.with_label_values(&[family]).inc();
 }

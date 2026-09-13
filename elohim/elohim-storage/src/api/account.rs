@@ -121,7 +121,7 @@ async fn get_account(
     // 1. Resolve calling agent
     let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => return Ok(unauthorized_no_caller()),
+        None => return Ok(unauthorized_no_caller(&req)),
     };
 
     // 2. Resolve Human from agent key
@@ -297,7 +297,7 @@ async fn get_account_keys(
 
     let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => return Ok(unauthorized_no_caller()),
+        None => return Ok(unauthorized_no_caller(&req)),
     };
 
     use crate::db::diesel_schema::key_rotations::dsl;
@@ -341,7 +341,7 @@ async fn get_account_revocations(
 
     let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => return Ok(unauthorized_no_caller()),
+        None => return Ok(unauthorized_no_caller(&req)),
     };
 
     // Resolve human_id from agent_key
@@ -385,7 +385,7 @@ async fn get_pending_recovery(
 
     let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => return Ok(unauthorized_no_caller()),
+        None => return Ok(unauthorized_no_caller(&req)),
     };
 
     let human = match get_human_by_agent_key(&mut conn, &agent_key)? {
@@ -451,7 +451,7 @@ async fn get_portal_hosts(
 
     let agent_key = match resolve_account_caller(&req, &mut conn)? {
         Some(k) => k,
-        None => return Ok(unauthorized_no_caller()),
+        None => return Ok(unauthorized_no_caller(&req)),
     };
 
     let human = match get_human_by_agent_key(&mut conn, &agent_key)? {
@@ -1070,18 +1070,82 @@ pub(crate) fn resolve_account_caller<B>(
     }
 }
 
+/// Why [`resolve_account_caller`] answered `None`, as a stable label.
+///
+/// `resolve_account_caller` returns `None` for two categorically different
+/// situations that used to share one message and one metric:
+///
+/// - **`no_identity_header`** — the caller asserted no identity at all. An
+///   anonymous read. Working as designed; the 401 is the whole answer.
+/// - **`agent_cid_unresolved`** — the caller DID assert an identity
+///   (`X-Agent-Cid` was present) and this node could not resolve it: the value
+///   is neither `uhCA…`-shaped nor a `humans` slug with a bound
+///   `agent_pub_key`. This is not an anonymous read. It is an identity-plane
+///   gap — a hosted session whose account has never been joined to a human row
+///   (measured on the household mesh 2026-09-13: James's session carried
+///   `human_id = uhCHk493b9cfa…`, matched nothing, and answered the same 401 a
+///   stranger gets).
+///
+/// PURE and header-derived on purpose — no second database read to explain a
+/// failure, and directly unit-testable.
+///
+/// The status does NOT change. A caller that cannot be resolved is
+/// unauthenticated either way; only the operator-facing reason improves.
+pub(crate) fn caller_unresolved_reason<B>(req: &Request<B>) -> &'static str {
+    if extract_agent_cid_explicit(req).is_some() || extract_agent_key_explicit(req).is_some() {
+        "agent_cid_unresolved"
+    } else {
+        "no_identity_header"
+    }
+}
+
 /// 401 for a read whose caller cannot be resolved from the request itself.
 ///
 /// This was a 400 while the ambient session made "no identity" unreachable;
 /// with the fallback gone the condition is missing authentication, not a
 /// malformed request.
-fn unauthorized_no_caller() -> Response<Full<Bytes>> {
+///
+/// The MESSAGE now distinguishes the two ways a caller goes unresolved (see
+/// [`caller_unresolved_reason`]) and the same label is counted on
+/// `elohim_account_caller_unresolved_total`. Same status, same shape, one more
+/// field — an operator reading a 401 can tell "nobody asked" from "somebody
+/// asked and this node does not know who they are", which is the difference
+/// between correct behaviour and an unbound hosted account.
+///
+/// `pub(crate)` so `api::identity`'s `GET /me` answers through this ONE helper
+/// rather than the hand-rolled copy of its body it used to carry — the two
+/// drifting apart is exactly how a diagnostic stops being trustworthy.
+pub(crate) fn unauthorized_no_caller<B>(req: &Request<B>) -> Response<Full<Bytes>> {
+    let reason = caller_unresolved_reason(req);
+    crate::metrics::inc_account_caller_unresolved(reason);
+
+    if reason == "agent_cid_unresolved" {
+        tracing::warn!(
+            reason,
+            "read-path caller asserted an identity this node cannot resolve — \
+             the asserted id matches no humans row with a bound agent_pub_key"
+        );
+    } else {
+        tracing::debug!(reason, "read-path caller asserted no identity");
+    }
+
     response::json_response(
         hyper::StatusCode::UNAUTHORIZED,
-        &serde_json::json!({
-            "error": "authentication required: no X-Agent-Id or X-Agent-Cid on the request"
-        }),
+        &unauthorized_no_caller_body(reason),
     )
+}
+
+/// The 401 body for a given [`caller_unresolved_reason`] label. Split out so the
+/// message/reason pairing is testable without a body-collect round trip.
+fn unauthorized_no_caller_body(reason: &str) -> serde_json::Value {
+    let error = if reason == "agent_cid_unresolved" {
+        "authentication required: the asserted identity could not be resolved \
+         (X-Agent-Id / X-Agent-Cid present but it matches no known agent key \
+         and no human record bound to one)"
+    } else {
+        "authentication required: no X-Agent-Id or X-Agent-Cid on the request"
+    };
+    serde_json::json!({ "error": error, "reason": reason })
 }
 
 // ---------------------------------------------------------------------------
@@ -1285,6 +1349,95 @@ mod tests {
                 .unwrap()
                 .as_deref(),
             Some("uhCAkVISITOR")
+        );
+    }
+
+    // ── 401 reason distinction ────────────────────────────────────────────
+    //
+    // Same status, two different problems. An anonymous read is the system
+    // working; an asserted-but-unresolvable identity is a hosted account that
+    // was never joined to a human row. Before this they were one message and
+    // the household-mesh gap was invisible from the outside.
+
+    /// No identity header at all → the anonymous reason.
+    #[test]
+    fn caller_unresolved_reason_is_no_identity_header_when_nothing_asserted() {
+        let anonymous = Request::builder().uri("/api/v1/account").body(()).unwrap();
+        assert_eq!(
+            caller_unresolved_reason(&anonymous),
+            "no_identity_header",
+            "a request asserting nothing is an anonymous read"
+        );
+    }
+
+    /// A bearer token is not an identity assertion to THIS node — storage never
+    /// validates one — so it still reads as anonymous, not as unresolvable.
+    #[test]
+    fn caller_unresolved_reason_treats_a_bare_bearer_as_anonymous() {
+        let bearer_only = Request::builder()
+            .uri("/api/v1/account")
+            .header("Authorization", "Bearer bogus")
+            .body(())
+            .unwrap();
+        assert_eq!(caller_unresolved_reason(&bearer_only), "no_identity_header");
+    }
+
+    /// The measured gap: the doorway asserted a `uhCHk…` account id, it matches
+    /// no human row, and the 401 must say so rather than claiming no identity
+    /// was offered.
+    #[test]
+    fn caller_unresolved_reason_is_agent_cid_unresolved_when_an_id_was_asserted() {
+        let hosted = Request::builder()
+            .uri("/api/v1/identity/me")
+            .header("X-Agent-Cid", "uhCHk493b9cfa")
+            .body(())
+            .unwrap();
+        assert_eq!(
+            caller_unresolved_reason(&hosted),
+            "agent_cid_unresolved",
+            "an asserted-but-unresolvable identity is not an anonymous read"
+        );
+    }
+
+    /// `X-Agent-Id` is an assertion too — an unresolvable one is reported the
+    /// same way.
+    #[test]
+    fn caller_unresolved_reason_covers_an_asserted_agent_id() {
+        let asserted = Request::builder()
+            .uri("/api/v1/account")
+            .header("X-Agent-Id", "uhCAkUnknownKey")
+            .body(())
+            .unwrap();
+        assert_eq!(caller_unresolved_reason(&asserted), "agent_cid_unresolved");
+    }
+
+    /// The status does NOT change, and the reason rides the body where an
+    /// operator (and a test) can read it.
+    #[test]
+    fn unauthorized_no_caller_keeps_401_and_carries_the_reason() {
+        let anonymous = Request::builder().uri("/api/v1/account").body(()).unwrap();
+        let resp = unauthorized_no_caller(&anonymous);
+        assert_eq!(resp.status(), hyper::StatusCode::UNAUTHORIZED);
+
+        let hosted = Request::builder()
+            .uri("/api/v1/identity/me")
+            .header("X-Agent-Cid", "uhCHk493b9cfa")
+            .body(())
+            .unwrap();
+        let resp_hosted = unauthorized_no_caller(&hosted);
+        assert_eq!(
+            resp_hosted.status(),
+            hyper::StatusCode::UNAUTHORIZED,
+            "distinguishing the reason must not change the status"
+        );
+
+        let anon_body = unauthorized_no_caller_body(caller_unresolved_reason(&anonymous));
+        let hosted_body = unauthorized_no_caller_body(caller_unresolved_reason(&hosted));
+        assert_eq!(anon_body["reason"], "no_identity_header");
+        assert_eq!(hosted_body["reason"], "agent_cid_unresolved");
+        assert_ne!(
+            anon_body["error"], hosted_body["error"],
+            "the two failures must not share one message"
         );
     }
 

@@ -186,12 +186,11 @@ async fn get_me(
                 "No human record found for current agent",
             ))
         }
-        None => Ok(response::json_response(
-            hyper::StatusCode::UNAUTHORIZED,
-            &serde_json::json!({
-                "error": "authentication required: no X-Agent-Id or X-Agent-Cid on the request"
-            }),
-        )),
+        // ONE 401 helper, shared with `api::account` — it distinguishes "nobody
+        // asserted an identity" from "an identity was asserted and this node
+        // cannot resolve it", and counts the reason. The second is the hosted-
+        // account-not-bound-to-a-human case this endpoint is the front door for.
+        None => Ok(crate::api::account::unauthorized_no_caller(&req)),
     }
 }
 
