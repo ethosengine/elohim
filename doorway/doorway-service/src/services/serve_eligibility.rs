@@ -959,6 +959,8 @@ mod tests {
             epr_id: "community-garden-club".into(),
             doorway_id: "doorway:beta".into(),
             url_path: "/community-garden-club".into(),
+            hostnames: vec![],
+            channel: elohim_views::projection::Channel::Converged,
             mode: ProjectionMode::Cached,
             reach: reach.into(),
             base_href: "/community-garden-club/".into(),

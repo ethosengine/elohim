@@ -1739,6 +1739,22 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
             .and_then(|v| v.as_str())
             .unwrap_or("/")
             .to_string(),
+        // Rung 4 slice 1. Absent = ANY host / converged — byte-for-byte the
+        // behaviour of every contract written before these keys existed, and
+        // the SAME defaults the seeder materializes on both sides of its drift
+        // compare (`projectionRelevantMetadata`), so the fields' arrival
+        // supersedes nothing. A malformed value degrades to the default rather
+        // than poisoning the row: a contract that cannot be read as host-bound
+        // answers for every host, which is strictly today's behaviour.
+        hostnames: metadata
+            .get("hostnames")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        channel: metadata
+            .get("channel")
+            .cloned()
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default(),
         mode: metadata
             .get("mode")
             .cloned()
@@ -1845,8 +1861,15 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
         return parse_projection_scope(&healed);
     }
 
+    // `doorway:{id}|epr:{id}` names the projection; ADDITIONAL refs after it
+    // are scope DISCRIMINATORS, not projection identity, and are ignored here.
+    // The one in use is `|host:{name}`, which lets a candidate-channel contract
+    // stand BESIDE the converged contract for the same (doorway, EPR) with its
+    // own content-addressed id — a new row, deliberately, instead of two
+    // authors forking one id. This function answers "which projection is this",
+    // and that answer is unchanged by the discriminator.
     let parts: Vec<&str> = scope.split('|').collect();
-    if parts.len() != 2 {
+    if parts.len() < 2 {
         return Err(StorageError::Internal(format!(
             "Malformed projection scope: {}",
             scope

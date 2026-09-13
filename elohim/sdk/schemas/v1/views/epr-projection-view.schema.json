@@ -41,6 +41,18 @@
       "pattern": "^/",
       "description": "Absolute URL path at which this EPR is projected on the doorway."
     },
+    "hostnames": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Public names this contract answers for. EMPTY = any host, which is every contract before rung 4 and remains today's routing. A LIST (Gateway API 'hostnames'): one contract per (doorway, EPR) names many names — the field never multiplies rows. Absent reads as any-host, so no existing contract becomes unroutable when the field arrives."
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["converged", "candidate"],
+      "default": "converged",
+      "description": "Which TIER of the EPR's canonical-head election these hostnames serve. 'converged' = the earned winner; 'candidate' = the staging declaration standing beneath it (the next version awaiting promotion). A label on the contract, never a stored version — promotion stays the collective's one notarized act. Where 'candidate' has no staging declaration the name answers a NAMED ABSENCE and never falls through to the converged head. Absent reads as 'converged'."
+    },
     "mode": {
       "type": "string",
       "enum": ["cached", "stewardDirect"],

@@ -33,6 +33,7 @@ export * from "./CastVoteInputView.js";
 export * from "./CeilingLimitView.js";
 export * from "./ChallengeOutcomeView.js";
 export * from "./ChallengeView.js";
+export * from "./Channel.js";
 export * from "./Circularity.js";
 export * from "./CollabAgreementStatus.js";
 export * from "./CollabAgreementView.js";

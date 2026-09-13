@@ -417,6 +417,8 @@ mod tests {
             epr_id: "lamad-spa".into(),
             doorway_id: "doorway:test".into(),
             url_path: "/lamad".into(),
+            hostnames: vec![],
+            channel: elohim_views::projection::Channel::Converged,
             mode: ProjectionMode::Cached,
             reach: "commons".into(),
             base_href: "/lamad/".into(),

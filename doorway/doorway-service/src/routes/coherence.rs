@@ -349,6 +349,8 @@ pub(crate) fn sample_projection(
         epr_id: epr_id.into(),
         doorway_id: "doorway:test".into(),
         url_path: url_path.into(),
+        hostnames: vec![],
+        channel: elohim_views::projection::Channel::Converged,
         mode: ProjectionMode::Cached,
         reach: "commons".into(),
         base_href: if url_path == "/" {

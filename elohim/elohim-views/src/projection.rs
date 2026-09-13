@@ -27,6 +27,30 @@ pub struct EprProjectionView {
     pub doorway_id: String,
     /// URL path this projection is served from (e.g. "/lamad").
     pub url_path: String,
+    /// The public names this contract answers for. EMPTY = ANY host, which is
+    /// every contract before rung 4 and remains byte-for-byte today's routing.
+    ///
+    /// A LIST, matching Gateway API `hostnames`: ONE contract per (doorway,
+    /// EPR) names many names — the field never multiplies rows. The router
+    /// indexes each name as its own `RouteKey { host, path }`; a host-BOUND
+    /// contract outranks an any-host one at equal path.
+    ///
+    /// `serde(default)`: a contract written before this field existed reads as
+    /// any-host, so no existing contract becomes unroutable when the field
+    /// arrives (C3 liveness), and nothing is defaulted into a NEW meaning
+    /// (C10 contract-evolution honesty).
+    #[serde(default)]
+    pub hostnames: Vec<String>,
+    /// WHICH TIER of the canonical-head election these hostnames serve.
+    ///
+    /// A label on the contract, never a stored version: nothing here pins a
+    /// head, so promotion stays the collective's one notarized act
+    /// (`declare_earned_canonical_head`) and no doorway gets a vote.
+    ///
+    /// `serde(default)` = [`Channel::Converged`] — today's behaviour for every
+    /// contract that does not say otherwise.
+    #[serde(default)]
+    pub channel: Channel,
     /// How the doorway serves this projection — cached build vs steward-direct relay.
     pub mode: ProjectionMode,
     /// Reach class of the projected EPR atom.
@@ -62,6 +86,35 @@ pub struct EprProjectionView {
     pub seeded_at: String,
     /// PeerId of the steward node that seeded this projection.
     pub seeded_by: String,
+}
+
+/// WHICH TIER of an EPR's canonical-head election a hostname serves.
+///
+/// The two tiers are not invented here: `content_store` already notarizes
+/// them as the `canonical-head:earned` and `canonical-head:staging` link tags
+/// on a `Content` id's `canonical_head` anchor, arbitrated by the pure
+/// `select_canonical_winner` / `select_staging_candidate` pair every peer runs
+/// identically. This enum only names WHICH of them a contract's hostnames
+/// answer from — it adds no head, no row and no election candidate.
+///
+/// [`Channel::Converged`] is the default everywhere absence is possible: an
+/// older contract, an older peer, a wire payload written before the field
+/// existed. Defaulting the other way would silently serve unreleased bytes.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum Channel {
+    /// The EARNED winner of the election — what the collective has promoted.
+    #[default]
+    Converged,
+    /// The STAGING declaration standing beneath the earned winner: the next
+    /// version awaiting promotion.
+    ///
+    /// Where no staging declaration stands, this channel answers a NAMED
+    /// ABSENCE. It must never fall through to the converged head — silently
+    /// serving production bytes at a staging name is how a candidate channel
+    /// stops meaning anything (C4 honest absence).
+    Candidate,
 }
 
 /// How the doorway serves a projected EPR.
@@ -184,6 +237,8 @@ mod tests {
             epr_id: "lamad-spa".into(),
             doorway_id: "doorway:alpha-elohim-host".into(),
             url_path: "/lamad".into(),
+            hostnames: vec![],
+            channel: Channel::Converged,
             mode: ProjectionMode::Cached,
             reach: "commons".into(),
             base_href: "/lamad/".into(),
@@ -206,6 +261,72 @@ mod tests {
         assert!(json.contains("\"mode\":\"cached\""));
         assert!(json.contains("\"baseHref\":\"/lamad/\""));
         assert!(json.contains("\"spaFallback\":true"));
+        assert!(json.contains("\"hostnames\":[]"));
+        assert!(json.contains("\"channel\":\"converged\""));
+    }
+
+    #[test]
+    fn hostnames_and_channel_default_to_any_host_converged_when_absent() {
+        // A contract written before rung 4 omits both keys. It must read as
+        // "answers for any host, serves the earned winner" — today's exact
+        // behaviour — rather than becoming unroutable (C3) or being defaulted
+        // into serving a staging head (C4/C10).
+        let json = r#"{
+            "commitmentId": "abc",
+            "eprId": "lamad-spa",
+            "doorwayId": "doorway:alpha-elohim-host",
+            "urlPath": "/lamad",
+            "mode": "cached",
+            "reach": "commons",
+            "baseHref": "/lamad/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "seededAt": "2026-05-25T00:00:00Z",
+            "seededBy": "12D3Koo..."
+        }"#;
+        let view: EprProjectionView = serde_json::from_str(json).unwrap();
+        assert!(view.hostnames.is_empty(), "absent hostnames must mean ANY host");
+        assert_eq!(view.channel, Channel::Converged, "absent channel must mean converged");
+    }
+
+    #[test]
+    fn channel_serializes_to_camel_case_both_ways() {
+        assert_eq!(serde_json::to_string(&Channel::Converged).unwrap(), "\"converged\"");
+        assert_eq!(serde_json::to_string(&Channel::Candidate).unwrap(), "\"candidate\"");
+        assert_eq!(
+            serde_json::from_str::<Channel>("\"candidate\"").unwrap(),
+            Channel::Candidate
+        );
+    }
+
+    #[test]
+    fn a_host_bound_candidate_contract_round_trips() {
+        let json = r#"{
+            "commitmentId": "abc",
+            "eprId": "lamad-spa",
+            "doorwayId": "doorway:alpha-elohim-host",
+            "urlPath": "/lamad",
+            "hostnames": ["alpha.elohim.local"],
+            "channel": "candidate",
+            "mode": "cached",
+            "reach": "stewards-only",
+            "baseHref": "/lamad/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "seededAt": "2026-05-25T00:00:00Z",
+            "seededBy": "12D3Koo..."
+        }"#;
+        let view: EprProjectionView = serde_json::from_str(json).unwrap();
+        assert_eq!(view.hostnames, vec!["alpha.elohim.local".to_string()]);
+        assert_eq!(view.channel, Channel::Candidate);
     }
 
     #[test]
