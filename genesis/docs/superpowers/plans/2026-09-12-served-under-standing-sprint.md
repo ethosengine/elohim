@@ -77,9 +77,388 @@ Evidence today: the habit is born red with two READY stories and no glue; the ch
 
 ## Rung 4 — Hostnames become heads (design gate first)
 
-Target: `elohim.host` = the converged (elected) head at commons reach, served by both doorways; `alpha.elohim.host` = the candidate head (a CID on the staging channel) at stewards-or-collective reach, served by both doorways; promotion is the collective's election.
+### Rung 4 design (gate answered 2026-09-13)
 
-- [ ] **Step 1: design gate** — p2p-design-gate on the hosting contract growing `channel` and `reach` per host (it is a notarized commitment; entry type, head-plane cost, identity, coordinator, signal answered before any route), and on keying the route registry by host.
+**The words this section uses**, fixed here so every claim below is checkable without leaving the
+document (the wider vocabulary is `genesis/a2o/features/dataplane/served-under-standing.feature`'s own
+definitions block, which this section deliberately does not restate):
+
+- **EPR** — a published resource the protocol addresses by its own identity (a page, a site, an app
+  bundle), carrying its own declared reach.
+- **head** — WHICH version of an EPR is current. Not "the newest": a head is *declared*, and which
+  declaration wins is decided by an election, not by a timestamp race.
+- **election** — the notarized, deterministic rule every peer runs over the competing head
+  declarations for one EPR. Two tiers: an **earned** declaration beats every **staging** one
+  unconditionally; within a tier, the newest notarized declaration wins with a fixed tiebreak.
+- **channel** — WHICH TIER of that election a hostname serves. `converged` = the earned winner.
+  `candidate` = the staging declaration standing beneath it (the next version awaiting promotion).
+  A channel is a label on a contract, never a stored version.
+- **contract** — the notarized promise (an REA `project-epr` Commitment) that a named doorway will
+  project a named EPR at a named address. A doorway's licence to answer at all; it cannot write
+  itself one.
+- **reach** — WHO may receive an EPR, declared by whoever stewards it. `commons` is the widest rung.
+  Independent of head and of who holds the bytes.
+- **standing** — what a requester can show for themselves at the moment of the request, as their own
+  conductor states it.
+- **fold** — the four-term function a doorway runs per request to decide whether it may answer:
+  contract × liveness × reach × standing. It is recomputed on every serve and never cached beside
+  the bytes.
+
+**Target:** `elohim.host` = the converged (elected) head at commons reach, served by every doorway;
+`alpha.elohim.host` = the candidate head — the STAGING declaration standing beneath the earned
+winner — at stewards-or-collective reach, served by every doorway; promotion is the collective's
+election, never a doorway's config.
+
+**What the gate found before anything was designed: most of this is already notarized, and the
+missing parts are fields, not planes.** The hosting contract is an REA `Commitment` on the elohim
+DNA (`content_store_integrity::EntryTypes::Commitment`), authored by `content_store::create_rea_commitment`
+under action `project-epr`. The channel already exists as two tiers of ONE notarized election on the
+`Content` entry's `canonical_head` anchor — link tags `canonical-head:staging` and
+`canonical-head:earned`, both riding `LinkTypes::IdToContent`, arbitrated by the pure
+`select_canonical_winner` / `select_staging_candidate` pair that every peer runs identically. And the
+doorway's fold already carries a host term it never narrows on (`RouteKey { host, path }`,
+`HolderContract::host`, `host_matches`, `mount_specificity`). Rung 4 adds two contract fields, one
+router key change and one storage read arm. **It mints no entry type, no link type, no DNA-hash move
+and no new HTTP route.**
+
+#### Entity A — the hosting contract growing `hostnames` and `channel` (keeping `reach`)
+
+*Not a new entity: an entry type that already exists, gaining two metadata keys. "Entity" is the
+design gate's word for a decision point, not a claim that something is being minted.*
+
+*(The rung's title says "host"; the field is a LIST, `hostnames`, matching Gateway API. Empty list = any
+host, which is exactly today's behaviour. "host" below always means one entry of that list.)*
+
+- **Classification: Notarized (A), on an entry type that already exists.** The contract is not new —
+  it is the `project-epr` `Commitment`. `hostnames` and `channel` are keys inside that entry's own
+  `metadata_json: String`, exactly as `urlPath`, `mode`, `reach`, `baseHref`, `entryFile`,
+  `spaFallback`, `redirectsFrom`, `redirectTemplates`, `routeClaims`, `gateHints`, `deadEnd` and
+  `stewardDirectEndpoint` already are. They are therefore notarized by construction and cost nothing
+  new. **A channel does NOT need its own entry** — see Entity B: an election with two tiers already
+  exists, and a `Channel` entry would be a second authority over it (C1).
+- **Justification:** the protocol would be lying if a doorway's licence to answer for a hostname
+  could change silently — that is the whole of `served-under-standing`. But the licence is not a new
+  thing in its own right; it is the same promise the contract already carries, now stating *at which
+  name* and *on which channel* it holds.
+- **Head-plane cost budget:** contracts today = 3 EPRs × 2 doorways = 6 rows. The rule this design
+  fixes: **one contract per (doorway, EPR); `hostnames` is a LIST inside it and `channel` is a single
+  field — neither multiplies rows.** At 1 year with ~20 EPRs × 4 doorways that is ~80 contracts, each
+  one `Commitment` entry plus three anchor links (id / provider / receiver). Against the ~3,469
+  A-class content heads measured at genesis quiesce, this is order-of-magnitude noise — roughly one
+  sweep tick at 200 heads/tick, not a new quiesce regime. Order-of-magnitude reasoning from that
+  single anchor, not a computed extrapolation. Well under the ~500 fence; the bundling shape held in
+  reserve if a per-host split is ever forced is **composite root** (one contract naming many
+  hostnames — which is what `hostnames: []` already is).
+- **Network stakes:** must behave under all four declared stages (`Simulacra < Bootstrap < Coordinated
+  < Enforced` — `elohim/elohim-storage/src/trust/stage.rs`; verification cost is priced against the
+  declared stakes, and a *floor-protected* cost never cheapens at any stage). Floor-protected and
+  never stage-priceable:
+  the reach/standing refusal (Constitutional — the contract is manifest-class) and the challenge path
+  a refusal points at (CounterEvidence). Stage-priceable: full-chain re-verification of an
+  already-witnessed, digest-matching contract head.
+- **Content address strategy: Agent-Scoped Composite** — unchanged. `id =
+  project-epr-<sha256(stewardPeerId|project-epr|doorway:{id}|epr:{id})[:16]>`; the tuple is (steward
+  agent, target, type discriminator), which is Option 2 exactly. **`hostnames` and `channel` stay OUT of
+  the digest** — they are contract *terms*, not contract *identity*, and the existing re-grant
+  ceremony (`supersedes` → `mark_superseded`, successor id `-r<regrantFingerprint>`) is what carries
+  a change to them. Add both to `PROJECTION_RELEVANT_FIELDS` and the drift detector supersedes
+  correctly on day one. If two contracts for one (doorway, EPR) with genuinely different hostnames
+  are ever needed, the scope grows a third ref `host:{name}` and the digest follows — a new id, a new
+  row, deliberately. Note: the a2o lane's `testCommitmentId` hashes `doorway|mount|runStamp|scenarioNonce`
+  — that is a *test-fixture* address over the MOUNT, minted to avoid reactivation churn, and it must
+  not be read as the production shape.
+- **Transport affinity:** n/a — a contract carries no bytes. The bundle blob it points at already
+  carries its own `transport_affinity`.
+- **Source of truth:** Holochain DHT (the `Commitment` entry). The `rea_commitments` SQLite row and
+  the doorway's `EprRouter` table are both read-optimised projections.
+- **Integrity zome + DNA-hash class:** `content_store_integrity` (elohim DNA, packed from
+  `dna/elohim/`, named `lamad` in `dna.yaml`) — **DNA-hash-NEUTRAL.** No entry type, no link type, no
+  validation change: `metadata_json` is an opaque `String` to the integrity zome.
+- **Coordinator zome:** `content_store::create_rea_commitment(CreateReaCommitmentInput) ->
+  ReaCommitmentOutput { action_hash, entry_hash, commitment }`. Unchanged, including its fork guard
+  (ensure-not-create). The `cid` of this commitment is the **entry hash**; `action_hash` is only ever
+  the `dht_anchor_hash`.
+- **Projections:** SQLite `rea_commitments` (`dht_anchor_hash`: yes, stamped by the post-commit
+  signal). Automerge sync: **no** — a contract is not broadcast content. Reach tier for that
+  projection: *unresolved — reach vocabulary in declared drift* (and moot here, since it does not
+  project).
+- **Signal:** unchanged and already wired end to end — post-commit `ProjectionSignal::ReaCommitmentCommitted`
+  → `rea_projection::project_signal` (upsert with `dht_anchor_hash`) → `StorageEvent::ProjectionRegistered`
+  → SSE `projection.registered` → the doorway's `storage_events_subscriber` → re-fetch
+  `GET /db/rea_commitments?action=project-epr&doorwayId=…` → `EprRouter::replace_all`.
+- **HTTP route:** none new. `POST /api/v1/commitments` and `GET /db/rea_commitments` are already
+  declared in elohim-storage's `build_manifest()`; `{id}` carries the commitment id (a slug-shaped
+  content-addressed string), never a hash.
+- **Anti-pattern check — three caught:** (1) minting a `HostRoute` / `Channel` entry type, refused by
+  the "is a type already there / is this an attribute" tests and by Entity B; (2) keying the router
+  from a doorway-local host allowlist, refused by the four-term fold — a doorway cannot write itself
+  a contract; (3) the amber/green class — writing a per-host *mode* rather than deriving it. `channel`
+  is READ from the election on every reconcile; nothing per-doorway is ever stamped.
+- **SDO/RWA Test** (social-dominance-orientation × right-wing-authoritarianism: *if the dominant few
+  and the many who would enforce for them held this store, what could they see, join and compel?* —
+  the aggregator is the danger, never the sensor): a hosting contract is deliberately public — it is the licence the public must be
+  able to read back in order to challenge it (boundary: standing, not property). Worst holder sees
+  which doorway serves which EPR at which hostname under which reach; it names no requester, so
+  boundary 2 (activity ledgers held by the holon they describe) and boundary 6 (participation is
+  sensitive) are not crossed. The refusal this test produces: **no per-visitor serve record may ever
+  land on the contract plane.** A contract says who may serve, never who was served.
+
+#### Entity B — the head channel itself
+
+*Not a new entity either, and not even a new field on the DHT: the two tiers a channel names are
+already notarized and already shipped. What Rung 4 adds is a contract that SAYS which tier a
+hostname serves.*
+
+- **Classification: not a new entity — a LABEL on the contract naming a tier of an election that is
+  already notarized (Linked / A2, and already shipped).** `declare_canonical_content_head` writes the
+  `canonical-head:staging` tag; `declare_earned_canonical_head` writes `canonical-head:earned`; both
+  are `create_link` on the `canonical_head` `StringAnchor` reusing `LinkTypes::IdToContent`.
+  `run_election` returns `{ winner, staging_candidate }` from one bounded link gather;
+  `select_canonical_winner` arbitrates on (tier, DHT link-creation `Timestamp`, create-link
+  `ActionHash`) — **earned beats all staging unconditionally, and never on recency**. So:
+  `channel: converged` ⇒ serve the winner; `channel: candidate` ⇒ serve the staging candidate.
+- **Head-plane cost:** **zero new heads.** The staging declaration exists already for every candidate
+  release; naming it from a contract adds no row, no Kad record, no election candidate, no sweep work.
+- **Identity — correcting the plan's own phrasing:** a candidate is addressed by the **ActionHash of
+  its canonical-head declaration** (`ContentHeadWire.staging_candidate: Option<HoloHashB64>`), not by
+  a CID. The *bundle* that declaration names is addressed by a blob CID (`bafkrei…`). Both are true
+  at different layers; the contract names neither — it names the channel, and resolution happens at
+  serve time. Writing a head CID into a contract would be a frozen pin — the channel would stop
+  following the election the moment it was written, which is the whole failure this rung exists to
+  avoid.
+- **Promotion with no per-doorway config:** the collective writes ONE notarized act —
+  `declare_earned_canonical_head` on the new candidate. Because both hostnames resolve through the
+  election rather than through configuration, `elohim.host` follows the new earned winner and
+  `alpha.elohim.host` follows whatever staging declaration now postdates it. No redeploy, no manifest
+  edit, no doorway restart, and no doorway gets a vote. That is the whole reason a hostname becomes a
+  head: the promotion is the election, read identically by everyone on their next reconcile.
+- **Reach per channel:** reach is NOT a property of the channel — it stays a contract field, declared
+  per (doorway, EPR, hostname). The *default for a candidate hostname* is a restricted rung, never
+  `commons`: `classify_reach` then yields `Restricted`, `serve_eligibility` refuses an anonymous
+  visitor with the chrome's reason and the `WHERE_TO_BE_HEARD` pointer, and a steward or collective
+  member whose standing satisfies the declared audience is served. Never-widen is already the module's
+  law; the design only has to refrain from declaring `commons` on a staging name.
+- **Honest absence (the one behaviour that must be designed, not inherited):** when `channel:
+  candidate` and no staging declaration stands beneath the winner, the candidate hostname answers a
+  named "no candidate staged" — it must **never** fall through to the converged head. Silently
+  serving production bytes at the staging name is how a candidate channel stops meaning anything.
+- **Coordinator zome / DNA-hash class:** nothing to change. `content_store::declare_canonical_content_head`
+  and `declare_earned_canonical_head` already exist; `POST /db/content/{id}/canonical-head` is already
+  declared in `build_manifest()` (edge-auth gated), which is how the household lane stages a candidate.
+- **The one real gap:** `ContentHeadView` (what `GET /db/content/{id}/head` returns, built by
+  `content_head_view_from_content`) exposes only `head_action_hash` / `declared` / `dht_anchor_hash` /
+  `trust` / `blob_hash`. The staging candidate is visible today ONLY inside storage, on the conductor's
+  `ContentHeadWire`, where the release-adoption watcher reads it. Slice 1's storage work is exactly
+  this: surface `stagingCandidate` additively on the head read so the doorway can resolve a candidate
+  over HTTP. Nothing else is missing.
+- **SDO/RWA Test:** the candidate channel is the sharp one — the worst holder sees an unreleased
+  build before the collective elected it. Bounded by (a) the candidate hostname's restricted reach,
+  re-asked at serve time, and (b) the fact that staging and promotion are both public notarized acts,
+  so nothing can be promoted quietly. The refusal: **no doorway may serve a candidate no steward
+  staged** — a doorway inventing a candidate would be self-election (C1), and `classify_candidate_follow`'s
+  existing defensive refusal (candidate == winner ⇒ Leave) is the precedent.
+
+#### The routing IR vocabulary — a subset of Gateway API HTTPRoute, plus the terms only this protocol has
+
+The hosting contract **is** the routing intermediate representation. A **contract field** is declared
+by the steward and notarized; a **selector term** is derived at request time and ordered by
+`SELECTOR_TERMS`, where index IS precedence. Keeping the two apart is what keeps *"bytes may be held
+warm, the fold may not"* true: `reach` is a contract field whose *enforcement* is a fold term.
+
+| IR field | Gateway API HTTPRoute analogue | Kind | Status | Lives today in |
+|---|---|---|---|---|
+| `hostnames: [String]` (empty = any host) | `hostnames` | contract field | **slice 1** | new metadata key; `RouteKey.host`, `HolderContract.host`, `host_matches`, `mount_specificity` already carry it |
+| `channel: converged \| candidate` | — (protocol-only) | contract field | **slice 1** | new metadata key; resolves through the canonical-head election |
+| `reach` | — (protocol-only) | contract field (fold-enforced) | shipped | `EprProjectionView.reach`, `classify_reach`, `serve_eligibility` |
+| `standing` (requester) | — (protocol-only) | selector term, enforced at the holder | shipped (as enforcement); **later** as a selection term | `RequesterStanding`; `SelectorTerm::ReachStanding` declared, constant |
+| `mode: proxy \| redirect \| render \| static` | partly `filters`/`backendRefs` | contract field | `proxy` + `render`/`static` shipped (`ProjectionMode::{Cached, StewardDirect}`, `RelayMode::Proxy`); `redirect` **later** | `RelayMode::Redirect` declared, unimplemented, skipped-with-warning |
+| `match.path` (PathPrefix, segment-boundary) | `matches[].path: PathPrefix` | contract field | shipped | `urlPath`; `EprRouter::path_matches_prefix` == `mount_covers` |
+| `match.path` Exact | `matches[].path: Exact` | contract field | later | — |
+| `match.path` RegularExpression | `matches[].path: RegularExpression` | contract field | **not planned** | contracts declare mounts; a regex mount is the seam guard's wrong side |
+| `match.headers` | `matches[].headers` | contract field | later | — |
+| `match.method` | `matches[].method` | contract field | later | — |
+| `match.queryParams` | `matches[].queryParams` | contract field | later | — |
+| `filters.redirectsFrom` (alias → mount) | `filters.RequestRedirect` | contract field | shipped | `redirects_from` |
+| `filters.redirectTemplates` (`/lamad/resource/{id}` → `/epr/{id}`) | `filters.RequestRedirect` (templated) | contract field | shipped | `redirect_templates` |
+| `filters.urlRewrite` | `filters.URLRewrite` | contract field | **not planned** | contracts declare mounts, they do not rewrite them |
+| `filters.requestHeaderModifier` / `responseHeaderModifier` | same | contract field | later | doorway-minted today (`x-elohim-standing`, `x-elohim-bundle`, served-by) — doorway-owned, not contract-declared |
+| `backendRefs` (the holder set) | `backendRefs` | **derived, never declared** | shipped | the fold derives holders from contracts × liveness; a contract never names a backend |
+| `backendRefs[].weight` | `backendRefs[].weight` | selector term | later | `SelectorTerm::Weight` declared, constant |
+| `liveness` | — (Gateway leaves it to the controller) | selector term | shipped | `HolderLiveness` (serving / uncertain / shedding / unreachable) |
+| `nearest` (attested RTT; region beside it, never above it) | — | selector term | later | `SelectorTerm::Nearest` declared, constant |
+| `ownerOrder` | — | selector term | shipped | `SelectorTerm::OwnerOrder`, the stable final tiebreak |
+| `baseHref`, `entryFile`, `spaFallback` | — (bundle-serving detail) | contract field | shipped | `EprProjectionView` |
+| `gateHints` (the audience a reach names) | — | contract field | shipped | read by `serve_eligibility::AudienceTerm` |
+| `routeClaims` (content-type → mount binding) | — | contract field | shipped | `RouteClaimGrant` |
+
+**Status legend:** `shipped` = already in the tree today · `slice 1` = built by the first slice
+below · `later` = a field the shape admits and nothing yet fills · `not planned` = deliberately
+refused.
+
+**The seam guard restated against this table:** the doorway core never learns a framework. A field is
+added to the contract; a *bridge* crate translates nginx/Apache/Ingress/Caddy/Traefik declarations
+INTO contracts, and contracts project OUT to an nginx config or a Gateway controller. Any diff that
+names PHP, Next, nginx or Ingress inside `epr_router.rs` or `name_routing.rs` is in the wrong seam.
+
+#### Concern canon (C0–C14), answered at birth for the three new decision points
+
+New decision points, to be registered in `doorway/doorway-service/seam-registry.yaml` **when the code
+lands, not after**: `EprRouter::dispatch` (pure-decision-predicate, now host-keyed),
+`resolve_channel_head` (verdict-fn), `Channel` (boundary-answer-type).
+
+The canon is sixteen recurring failure classes defined in `.claude/epr-meta/concerns.yaml` (and, for
+the predicate-bearing ones, `.claude/epr-meta/policies.yaml`). Each is labelled below so the answer is
+checkable without opening them.
+
+**Answered** — logic plus a pin already exists, or the design makes it structurally true:
+
+| Class | What it asks | Answer |
+|---|---|---|
+| C0 plane location | which plane owns this concern | contract on the DHT `Commitment`; channel on the `Content` canonical-head election. Neither in k8s manifests, neither in DNS — DNS names only doorways that can ROUTE |
+| C1 anti-self-election | no component crowns what it authored | a doorway neither elects a head nor writes itself a contract; it reads both |
+| C2 monotonic authority | never backwards, and name the clock | a head moves only by tier-then-notarized-`Timestamp` (never `declared_at`, never recency); a contract term moves only by supersession |
+| C3 liveness | a legal move exists from every reachable state | empty `hostnames` matches every host, so no existing contract becomes unroutable when the field arrives; the move out of "no candidate" is to stage one |
+| C4 honest absence | absent ≠ refused ≠ unreachable | `candidate` with no staging declaration answers a named absence, never the converged head |
+| C5 evidence-not-authority | a claim confers only what the receiver re-derives | the candidate's record is re-proved in wasm by `validate_carried_head_record`; storage synthesises nothing |
+| C6a bounded work | every loop respects a declared budget | one bounded link gather per election; `bundle_heads` on a 30 s tick with a 2 s read timeout — the host key multiplies the map, not the fetch |
+| C6b idempotent effect | replay mints nothing twice | `create_rea_commitment` is an ensure with a fork guard; an identical re-seed is a quiet 409; the re-grant fingerprint is deterministic |
+| C10 contract-evolution honesty | an unknown field is rejected or observed, never defaulted into meaning | both keys are serde-defaulted and `metadata_json` is opaque to the integrity zome, so an older doorway reads exactly today's behaviour rather than mis-serving; the view is not `deny_unknown_fields` |
+| C11 externally-imposed backpressure | degrade by a declared, counted policy | unchanged — the shed path and `HolderLiveness::Shedding` already carry it |
+| C12 consent/authorization | authority verified structurally at the acting node | reach + standing re-asked at serve time; the candidate hostname's restricted reach IS the authorization |
+| C13 graduated authority | every scaffold names its successor at the gate | `hostnames: []` (any host) is the declared scaffold; its successor is a contract that names its hostnames, and the gate is the a2o scenario that asks each name of each doorway |
+
+**Partial**, with the gap named and owed:
+
+| Class | What it asks | Gap |
+|---|---|---|
+| C7 advertise/serve symmetry | what a surface advertises equals what it serves | a name advertised in the membership document must be backed by a contract someone actually holds. The household file sink is origin-keyed and knows exactly one name today, so a second name added without a matching contract advertises what nothing serves. Contract test owed |
+| C8 observability-per-decision | every outcome increments a labelled counter through a typed reason | `ReplaceOutcome { installed, rejected }` counts rows, but nothing counts refusals or absences per (host, channel). A labelled counter owed |
+| C14 witnessed residual | the outcome set closes with a witnessed arm | a reach refusal already lands in `WHERE_TO_BE_HEARD`; "no candidate staged" has no witnessed arm yet |
+
+**n-a** — **C9 identity-lineage continuity**: nothing re-keys; a hostname is not an identity and no
+state is orphaned by one.
+
+#### Step 4's rename cascade — the inventory, taken before the pass
+
+Token-boundary count (`(?<![a-zA-Z])alpha(?![a-zA-Z])`, so `alpha-a`, `ALPHA_DOORWAY_URL` and
+`alpha.yaml` all count and `alphabet`/`alphanumeric` never do). **Zero occurrences are in generated,
+lockfile or dist files — every match is hand-editable source.** The two large surfaces are
+evidence-based bucket estimates from full token-frequency tables plus sampling, not a line-by-line read.
+
+| Surface | Files | Occurrences | Excluded | Doorway-identity | Channel-name | Fleet-env name | Other |
+|---|---|---|---|---|---|---|---|
+| `genesis/a2o/` | 287 | 1871 | 22 | ~1310 | 0 | ~470 | ~91 |
+| `app/elohim-app/scripts/` | 8 | 95 | 1 | ~55 | 0 | ~38 | ~2 |
+| `app/elohim-app/src/environments/` | 5 | 33 | 0 | ~15 | ~9 | ~7 | ~2 |
+| `genesis/orchestrator/data/deployments.json` | 1 | 17 | 0 | 0 | 0 | 17 | 0 |
+| `genesis/manifests/**` | 8 | 226 | 0 | 34 | 0 | 192 | 0 |
+| `genesis/orchestrator/manifests/**` | 36 | 586 | 0 | ~39 | 0 | ~547 | 0 |
+| **Total** | **345** | **2828** | **23** | **~1453** | **~9** | **~1271** | **~95** |
+
+**Four things this changes about Step 4.**
+
+1. **It is three renames, not one, and only the first is in scope.** Doorway-identity (~1453, 51%)
+   is what moves to a channel name. Fleet-env (~1271, 45%) — the `elohim-alpha` namespace, every
+   `*-alpha` k8s object, `alpha.yaml` / `alpha-b.yaml` / `alpha-coturn-*.yaml`, `alpha-cluster-6peer`,
+   the per-human `matthew-alpha` / `pete-alpha` PVC names — is the CLUSTER's name and must not move
+   with it. A global substitution would silently rename the fleet.
+2. **`deployments.json` is 100% fleet-env** (17 occurrences, all prose naming a human's deployed
+   instance/PVC/pod). Step 4's own line below — "deployments.json loses alpha-versus-apex as doorway
+   identity" — is already true there — the doorway-identity split lives in the a2o vocabulary and the manifests, not
+   in that file.
+3. **The channel name is empty ground — ~9 occurrences, all in `src/environments/`**, where `alpha`
+   already sits on a `development → alpha → staging → production` ladder in `environment.types.ts`
+   beside its own doorway-address constants. That ladder is the only existing reading of "alpha as a
+   tier", and it is the natural anchor for the new one.
+4. **A live release-channel vocabulary already exists and must not be collided with.**
+   `deployments.json` runs `ELOHIM_RELEASE_CHANNELS` with `=observe` / `=canary` / `=apply` on channel
+   ids like `runtime:coordinators:elohim:workspace`. That is the *runtime-artifact* channel plane
+   (Entity B's `release_adoption`); the head channel this rung introduces is the *content-head* plane.
+   They share the election primitive and must not share a namespace by accident — resolve how
+   `channel: candidate` on a hosting contract reads beside `=canary` on a release channel BEFORE the
+   rename, not during it.
+
+**The target vocabulary (proposed here, confirmed at Step 4 — an implementer cannot do a
+~1453-occurrence rename without it).** Three buckets, three fates:
+
+| Today's use of "alpha" | Becomes | Why |
+|---|---|---|
+| **doorway identity** — `alpha-elohim-host` / `apex-elohim-host` as a doorway's id, `doorway-alpha.elohim.host` as its address, `E2E_DOORWAY_ALPHA`, `doorway "alpha"` in a2o steps | a **premise-named doorway id** — `doorway-ethosengine` / `doorway-shem`, matching the ingress classes Rung 5 Step 1 creates (`public-ethosengine`, `public-shem`) | a doorway's identity should name the premise that houses it, which is the one fact about it that does not change. It must stop appearing in a hostname at all |
+| **channel name** — `alpha.elohim.host` as a public address | **stays the literal string `alpha.elohim.host`**, but its meaning changes from "doorway A's address" to "the hostname whose contract carries `channel: candidate`" | nothing to rename; the word is already right once the contract says what it means. This is the only bucket where "alpha" survives |
+| **fleet-env name** — `elohim-alpha` namespace, `*-alpha` k8s objects, `alpha.yaml` / `alpha-b.yaml` / `alpha-coturn-*.yaml`, `alpha-cluster-6peer`, `matthew-alpha` PVCs | **untouched** | that is the cluster's name, not a doorway's and not a channel's |
+
+**Open before the pass, not during it:** `channel: candidate` (this design, the content-head plane)
+sits beside `=canary` (`ELOHIM_RELEASE_CHANNELS`, the runtime-artifact plane). They share the election
+primitive and must not silently share a word. Decide whether the hosting contract's `channel` values
+stay `converged`/`candidate` or align to the release vocabulary BEFORE renaming anything.
+
+**Sequencing that falls out:** the rename is a vocabulary pass over ~1453 doorway-identity uses, and it
+is only safe once the host key is live (slice 1) — until a doorway can be asked for a name, "alpha" as
+a doorway's identity is the only thing that works. Do it after Step 3 is green, in its own push, with
+`prod.yaml` retirement (`genesis/orchestrator/manifests/{doorway,edgenode,elohim-app}/prod.yaml`) as a
+separate commit inside it so a routing regression and a vocabulary churn can never be confused.
+
+#### The smallest first slice
+
+**`host` + `channel` as contract metadata, the router keyed by host, one candidate channel gated by
+reach — measured at home.** Six changes, none of them a new plane:
+
+1. **Contract** — `project-epr` metadata grows `hostnames: string[]` (default `[]` = any host, i.e.
+   byte-for-byte today's behaviour) and `channel: "converged" | "candidate"` (default `"converged"`).
+   Both join `PROJECTION_RELEVANT_FIELDS`, so a change re-grants through the supersession ceremony
+   that already exists. No DNA change.
+2. **View** — `EprProjectionView` gains `hostnames: Vec<String>` and `channel: Channel`, both
+   serde-defaulted; `commitment_to_projection_view` reads them with the same defaults; ts-rs
+   regenerates (sha256-verify the generated TS).
+3. **Router** — `EprRouter.table` is keyed by `RouteKey { host, path }` instead of a bare path string,
+   and `dispatch` takes the request's Host header (already extracted — `RelayContext::from_request`
+   captures it today and threads it into the federation fold). The three shapes are one thing at
+   three layers: a contract declares `hostnames: []` (a list); the router indexes each hostname as
+   its own `RouteKey { host, path }` row; `host: None` is the any-host wildcard. A contract with empty `hostnames` installs under
+   `host: None` and still matches everything. `mount_specificity` already ranks host-bound above
+   any-host, so the tie-break rule is not invented here.
+4. **Storage read arm** — `ContentHeadView` gains `stagingCandidate: Option<String>` (additive),
+   projected from the same conductor read the release-adoption watcher already performs. This is the
+   only genuinely new plumbing in the slice.
+5. **Head resolution** — `bundle_heads` is keyed by `(slug, channel)`; `converged` resolves the
+   declared/earned head as today, `candidate` resolves `stagingCandidate`, and absence is absence.
+6. **Home measurement surface** — the household membership authority gains a SECOND public name
+   (`MESH_MEMBERSHIP_NAME` becomes a list: `elohim.local` plus a candidate sibling), so both household
+   doorways carry both names and the lane can ask each name of each doorway. The candidate name's
+   contract declares a restricted reach; `serve_eligibility` refuses an anonymous visitor with the
+   chrome's reason, and a steward is served.
+
+**Measured by:** `just test mesh features/dataplane/served-under-standing.feature` — its scenarios run
+against the candidate hostname at home, with `features/federation/name-routing.feature` re-run
+unchanged to prove the host key did not regress path-only routing. Delta in
+`doorway/doorway-service/.epr-meta/served-under-standing.habit.md` with the run id.
+
+**Deliberately NOT in slice 1:** header / method / query matches, weighted backends, the redirect
+relay mode, any nginx / Ingress bridge crate, and the "alpha" rename (Step 4 is its own pass, and
+doing it inside this slice would make a routing regression and a vocabulary churn indistinguishable).
+
+#### Design constraints discovered during the gate
+
+- **The coherence digest is a wire contract, and the host fold reads through it.** `install_name_routes`
+  mints `HolderContract`s from `CoherenceManifest.heads` — a `Vec<EprHeadFingerprint { url_path,
+  epr_id }>` that is *also* the dag-cbor preimage of the cross-edge coherence digest (`mint_head_set_digest`).
+  Adding `hostnames`/`channel` INSIDE that struct changes the digest for everyone and makes two
+  mixed-version edges report content divergence they do not have. Slice 1 must therefore carry the new
+  terms as a **separate additive field on `CoherenceManifest`**, leaving the digest preimage alone —
+  or version the digest explicitly. This is C10 with a live blast radius.
+- **`in_scope_of` is immutable after creation** (`handle_update_state` reconciles only
+  `state`/`finished`/`metadata_json`). Any design that wanted host in the scope string would need a new
+  commitment, not a PATCH — which is another reason `hostnames` belongs in metadata.
+- **Two independent authors can reach one commitment id.** `create_rea_commitment`'s fork guard closes
+  the wide window, not the narrow one; the durable cure is still one author per undertaking. A
+  per-hostname contract seeded from two places would reopen exactly the fork this sprint's Rung 1
+  Step 6 is closing.
+- **Rung 2 already landed the host-shaped fold.** `RouteKey`, `HolderContract.host`, `host_matches`,
+  `mount_specificity` and `SELECTOR_TERMS` are in the tree and every contract is currently any-host.
+  Slice 1 is populating a seam that was built to be populated — if it needs to re-key the fold, its
+  table or its callers, something has gone wrong.
+
+- [x] **Step 1: design gate** — p2p-design-gate run 2026-09-13 on the hosting contract growing `hostnames` and `channel` (keeping `reach`) and on the head channel itself; both entities, the routing IR vocabulary, the concern-canon answers and the rename inventory are the section above. Verdict: no new entry type, no new link type, no DNA-hash move, no new route.
 - [ ] **Step 2: contracts and registry** — seed writes host + channel + reach; the doorway keys its route registry by host and picks the head by channel (reuse the bundle-heads reconciler and the canary's long-lived candidate channel).
 - [ ] **Step 3: the candidate host is reach-gated** — anonymous at alpha refused with the chrome's reason; a steward served; the A/B test as head. Measured by served-under-standing's scenarios against a real second channel.
 - [ ] **Step 4: rename cascade** — the a2o vocabulary's "alpha" moves from doorway identity to channel name (env names, fixtures, LAYERS) in one deliberate pass; `prod.yaml` retired; deployments.json loses alpha-versus-apex as doorway identity.
