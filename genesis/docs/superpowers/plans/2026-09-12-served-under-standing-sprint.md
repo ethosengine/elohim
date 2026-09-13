@@ -72,7 +72,7 @@ Evidence today: `fetch_from_remote_doorway` is defined and never called; a doorw
 Evidence today: the habit is born red with two READY stories and no glue; the chrome's five affordances are named as epr-atom-home's commons checks.
 
 - [x] **Step 1: reach at serve time** — the doorway re-asks reach against the current EPR head on every serve of a warm shell or cached bundle (bytes stay warm; permission is never cached); a collective's reach ruling propagates on the next reconcile. Scenarios 1–3 of `served-under-standing.feature` get glue; first honest reds recorded.
-- [ ] **Step 2: the fair-trade receipt and the owed response** — the chrome names what was exchanged for this serve and who was credited (REA), and a visitor's challenge becomes a witnessed commitment with a due window. Scenarios 4–5; epr-atom-home's commons checks measured.
+- [x] **Step 2: the fair-trade receipt and the owed response** — the chrome names what was exchanged for this serve and who was credited (REA), and a visitor's challenge becomes a witnessed commitment with a due window. Scenarios 4–5; epr-atom-home's commons checks measured.
 - [ ] **Step 3: the transition count** — a humans-served sibling counts hosted now, stewarding now, crossed this period, so the bridge has a number the chrome can show.
 
 ### Rung 3 step 2 design (gate answered 2026-09-13)
