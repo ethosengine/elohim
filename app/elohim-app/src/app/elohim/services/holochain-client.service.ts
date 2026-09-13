@@ -162,13 +162,48 @@ export class HolochainClientService {
       happPath: this.config.happPath,
       origin: this.config.origin,
       useLocalProxy: this.config.useLocalProxy,
-      // Where the doorway lives when it is NOT this page's origin. Resolved by
-      // the workspace-vendor fence; `null` everywhere else (deployed, plain
-      // localhost, Tauri, SSR), in which case the library uses adminUrl.
-      doorwayOrigin: workspaceDoorwayUrl() ?? undefined,
+      // Where the doorway lives when it is NOT this page's origin.
+      //
+      // The workspace-vendor fence answers first — in a dev workspace only it
+      // knows the sibling endpoint, and the token's own claim would name a
+      // host the browser cannot reach. Everywhere else the authority is the
+      // session itself: a doorway-minted JWT names the doorway that minted it,
+      // and that is the only doorway that can verify it. Falling through to
+      // the build-time `adminUrl` sent a runtime session to whatever host the
+      // environment file was compiled with — on the household mesh a
+      // localhost-minted token was redeemed at doorway-alpha, which answered
+      // (correctly) `401 Invalid or expired token`.
+      //
+      // `undefined` when neither is known, in which case the library uses
+      // adminUrl exactly as before.
+      doorwayOrigin: workspaceDoorwayUrl() ?? this.issuingDoorwayUrl(doorwayToken),
       doorwayToken,
       logger: strategyLogger,
     };
+  }
+
+  /**
+   * The doorway a session token names as its issuer, or `undefined`.
+   *
+   * Read, never trusted: the doorway re-verifies the token it is handed, and
+   * a token naming a host that cannot verify it simply fails there. What this
+   * buys is that the request goes to the host that CAN — the one that minted
+   * it — instead of whichever host the environment file was compiled against.
+   */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `string | undefined`; the rule misfires on nullable unions in this toolchain
+  private issuingDoorwayUrl(token: string | undefined): string | undefined {
+    if (!token) return undefined;
+    try {
+      const payload = token.split('.')[1];
+      if (!payload) return undefined;
+      const json = atob(payload.replaceAll('-', '+').replaceAll('_', '/'));
+      const claims = JSON.parse(json) as { doorway_url?: unknown };
+      const url = claims.doorway_url;
+      return typeof url === 'string' && url.startsWith('http') ? url : undefined;
+    } catch {
+      // Not a JWT, or not decodable here — fall back to the configured host.
+      return undefined;
+    }
   }
 
   /**

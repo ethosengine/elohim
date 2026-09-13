@@ -167,6 +167,26 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     return ws;
   }
 
+  /**
+   * The HTTP base the Chaperone lives at — the supplied doorway origin when
+   * the host application named one, otherwise the configured admin URL.
+   *
+   * `resolveAdminUrl`/`resolveAppUrl` have always honoured
+   * `config.doorwayOrigin`; the Chaperone alone read `config.adminUrl`
+   * directly, so a host that told us where its doorway actually lives was
+   * still sent to the BUILD-TIME admin host to redeem a RUNTIME-minted
+   * session. The doorway that did not mint that token cannot verify it, and
+   * the honest answer it gives is `401 Invalid or expired token` — a message
+   * about the token for a fault in the address. Same `useLocalProxy` guard as
+   * `resolveAdminUrl`, so a deployment that supplies no origin is unchanged.
+   */
+  private chaperoneBaseUrl(config: ConnectionConfig): string {
+    const supplied = config.doorwayOrigin;
+    const base = supplied && config.useLocalProxy ? supplied : config.adminUrl;
+
+    return base.replace('wss://', 'https://').replace('ws://', 'http://').replace(/\/$/, '');
+  }
+
   // ==========================================================================
   // URL Resolution
   // ==========================================================================
@@ -365,13 +385,9 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       const capSecret = await randomCapSecret();
       this.credentials = { capSecret, keyPair, signingKey };
 
-      // Step 2: Call POST /hc/connect
-      const baseUrl = config.adminUrl
-        .replace('wss://', 'https://')
-        .replace('ws://', 'http://')
-        .replace(/\/$/, '');
-
-      const chaperoneUrl = `${baseUrl}/hc/connect`;
+      // Step 2: Call POST /hc/connect — at the doorway the host named, which
+      // is the doorway that minted the token we are about to present.
+      const chaperoneUrl = `${this.chaperoneBaseUrl(config)}/hc/connect`;
       const chaperoneBody = JSON.stringify({
         signingKey: this.toBase64(signingKey),
         capSecret: this.toBase64(capSecret),
@@ -401,7 +417,13 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
           // Only retry on 502/503 — other errors are terminal
           if (response.status !== 502 && response.status !== 503) {
             const errorBody = await response.text();
-            throw new Error(`Chaperone failed (${response.status}): ${errorBody}`);
+            // Name the HOST in the failure. A 401 "Invalid or expired token"
+            // is equally the answer of a doorway that cannot verify a token
+            // another doorway minted, and a message without an address sends
+            // the reader looking at the token instead of at the address.
+            throw new Error(
+              `Chaperone failed at ${chaperoneUrl} (${response.status}): ${errorBody}`
+            );
           }
 
           if (attempt < maxRetries) {
