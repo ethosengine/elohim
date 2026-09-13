@@ -1041,8 +1041,8 @@ struct CachedIdentifyInfo {
 /// route through `is_connected` / `connected_peers` accessors.
 pub struct PeerMetrics {
     /// Whether this peer currently has an active libp2p connection.
-    /// Set to true on ConnectionEstablished; false on ConnectionClosed
-    /// (entry is also removed on disconnect, so false entries are transient).
+    /// Set to true on ConnectionEstablished; the entry is removed when the
+    /// peer's final established connection closes.
     pub(crate) is_connected: bool,
     /// Connection direction: "inbound" or "outbound"
     pub(crate) direction: &'static str,
@@ -5627,16 +5627,29 @@ impl P2PNode {
                     );
                 }
             }
-            SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
+            SwarmEvent::ConnectionClosed {
+                peer_id,
+                num_established,
+                cause,
+                ..
+            } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
-                self.peer_trust_cache.remove(&peer_id).await;
-                self.peer_metrics.remove(&peer_id.to_string());
-                self.identify_cache.remove(&peer_id.to_string());
-                // Leave the live set immediately. Paired with the ping-failure
-                // arm's explicit `close_connection`, this is what makes a
-                // SIGKILLed peer drop out of the felt badge inside the ping
-                // budget instead of lingering for the 900 s heartbeat window.
-                crate::services::peer_liveness::record_disconnected(&peer_id.to_string());
+                // A peer can have several simultaneous libp2p connections.
+                // Closing one must not erase its identity labels while another
+                // connection remains live.
+                if num_established == 0 {
+                    self.peer_trust_cache.remove(&peer_id).await;
+                    self.peer_metrics.remove(&peer_id.to_string());
+                    self.identify_cache.remove(&peer_id.to_string());
+                    // Leave the live set immediately. Paired with the ping-failure
+                    // arm's explicit `close_connection`, this is what makes a
+                    // SIGKILLed peer drop out of the felt badge inside the ping
+                    // budget instead of lingering for the 900 s heartbeat window.
+                }
+                crate::services::peer_liveness::record_connection_closed(
+                    &peer_id.to_string(),
+                    num_established,
+                );
                 self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
@@ -6939,6 +6952,16 @@ impl P2PNode {
                                             &mut conn, &row,
                                         ) {
                                             Ok(()) => {
+                                                // ConnectionEstablished can run before this
+                                                // handshake has populated the identity map. Add
+                                                // the accepted agent label now, but only if the
+                                                // peer is still present in the live registry; a
+                                                // delayed handshake must never resurrect a closed
+                                                // connection.
+                                                crate::services::peer_liveness::augment_connected_labels(
+                                                    &peer_id_str,
+                                                    [row.agent_cid.clone()],
+                                                );
                                                 debug!(
                                                     peer = %peer,
                                                     agent_cid = %row.agent_cid,
@@ -6971,6 +6994,10 @@ impl P2PNode {
                                 },
                                 None => {
                                     // No pool configured — accept but do not persist.
+                                    crate::services::peer_liveness::augment_connected_labels(
+                                        &peer_id_str,
+                                        [row.agent_cid.clone()],
+                                    );
                                     debug!(
                                         peer = %peer,
                                         "Identity handshake: no db_pool configured, skipping persistence"

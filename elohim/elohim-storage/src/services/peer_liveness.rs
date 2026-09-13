@@ -119,13 +119,44 @@ pub fn record_connected(peer_id: &str, labels: Vec<String>) {
         Err(p) => p.into_inner(),
     };
     if let Some(armed) = reg.armed.as_mut() {
-        armed.peers.insert(
-            peer_id.to_string(),
-            PeerEntry {
-                labels,
+        let entry = armed
+            .peers
+            .entry(peer_id.to_string())
+            .or_insert_with(|| PeerEntry {
+                labels: Vec::new(),
                 last_seen: Instant::now(),
-            },
-        );
+            });
+        for label in labels {
+            if !entry.labels.contains(&label) {
+                entry.labels.push(label);
+            }
+        }
+        entry.last_seen = Instant::now();
+    }
+}
+
+/// Add newly accepted handshake labels to a peer that is still connected.
+///
+/// The connection event can precede the identity handshake that teaches us an
+/// agent CID. Updating only an existing entry closes that ordering gap without
+/// allowing a delayed handshake to resurrect a peer whose disconnect event has
+/// already removed it.
+pub fn augment_connected_labels(peer_id: &str, labels: impl IntoIterator<Item = String>) {
+    let mut reg = match registry().write() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    let Some(entry) = reg
+        .armed
+        .as_mut()
+        .and_then(|armed| armed.peers.get_mut(peer_id))
+    else {
+        return;
+    };
+    for label in labels {
+        if !entry.labels.contains(&label) {
+            entry.labels.push(label);
+        }
     }
 }
 
@@ -154,6 +185,14 @@ pub fn record_disconnected(peer_id: &str) {
     };
     if let Some(armed) = reg.armed.as_mut() {
         armed.peers.remove(peer_id);
+    }
+}
+
+/// Apply one libp2p connection-close event without dropping a peer that still
+/// has another established connection.
+pub fn record_connection_closed(peer_id: &str, remaining_established: u32) {
+    if remaining_established == 0 {
+        record_disconnected(peer_id);
     }
 }
 
@@ -285,6 +324,60 @@ mod tests {
         assert!(
             snap.contains("agent:james"),
             "its household-mate is untouched"
+        );
+        reset_for_test();
+    }
+
+    #[test]
+    fn an_accepted_handshake_augments_only_an_existing_connected_peer() {
+        let _g = guard();
+        reset_for_test();
+        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+
+        record_connected("12D3KooWJessica", vec!["12D3KooWJessica".into()]);
+        augment_connected_labels(
+            "12D3KooWJessica",
+            vec!["agent:jessica".into(), "agent:jessica".into()],
+        );
+        // A second transport connection for the same peer can arrive after
+        // the accepted handshake. It refreshes the entry without discarding
+        // the identity label learned by the first connection.
+        record_connected("12D3KooWJessica", vec!["12D3KooWJessica".into()]);
+        let connected = connected_snapshot().expect("armed");
+        assert!(connected.contains("12D3KooWJessica"));
+        assert!(connected.contains("agent:jessica"));
+        assert_eq!(
+            connected.len(),
+            3,
+            "duplicate labels must not inflate the set"
+        );
+
+        record_disconnected("12D3KooWJessica");
+        augment_connected_labels("12D3KooWJessica", vec!["agent:jessica".into()]);
+        let disconnected = connected_snapshot().expect("armed");
+        assert_eq!(disconnected, HashSet::from(["agent:self".into()]));
+        reset_for_test();
+    }
+
+    #[test]
+    fn a_partial_connection_close_preserves_labels_until_the_final_close() {
+        let _g = guard();
+        reset_for_test();
+        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        record_connected(
+            "12D3KooWJessica",
+            vec!["12D3KooWJessica".into(), "agent:jessica".into()],
+        );
+
+        record_connection_closed("12D3KooWJessica", 1);
+        let partial = connected_snapshot().expect("armed");
+        assert!(partial.contains("12D3KooWJessica"));
+        assert!(partial.contains("agent:jessica"));
+
+        record_connection_closed("12D3KooWJessica", 0);
+        assert_eq!(
+            connected_snapshot().expect("armed"),
+            HashSet::from(["agent:self".into()])
         );
         reset_for_test();
     }
