@@ -139,3 +139,35 @@ after the 2026-08-22 01:19 james re-key (`chaos-rekey a2o-70809`):
    custody credits sees a promise from an agent that no longer exists. Same
    decide-point as §"What to decide" item 1: provider liveness needs to be part of the
    custody-credit read (or a supersede pass must re-home the row), not only the anchor read.
+
+
+## 2026-09-13: bounded observation during doorway/P2P sprint recovery
+
+Four current household projections reproduce the unavailable-anchor shape:
+`custody-blob-0db9adf78179f8c7`, `custody-blob-2bdb182008851a41`,
+`custody-blob-f38e5fc67c4f8088`, and `custody-blob-a74e64286757078c`.
+Their projected provider names Jessica's former `uhCAksR8…` key. An existing
+read-only `content_store::get_record_for_action` call for each stored action
+anchor returned `None` on Matthew, James, and Jessica: 12 calls, no predecessor
+hops, no capability grants or record writes. These anchors are not established
+root Creates; their signed author, action type, predecessor and root remain
+unknown because none of the three current conductor views supplied the record.
+Receipt: `genesis/a2o/reports/recovery/coordinator-head-observation-20260913/exact-anchor-read.json`.
+
+Matthew and James also return no commitment from ID discovery, before lifecycle
+CAS runs. They each report four refused/known-divergent REA items while
+`divergent_actionable=0` and `converged=1`; that settled retry classification is
+not proof of recovered authority. Jessica's local state is `superseded`, while
+Matthew and James retain `active`. The rotation path's local SQL supersession
+and the remote projection's omitted `supersedes` field do not establish an
+authenticated successor transition. The missing evidence is a retrievable signed
+predecessor or successor record from a surviving source, receipt, or snapshot.
+Do not copy peer-advertised SQL state or infer historical authorship from the
+provider string to close this gap.
+
+All four concern older `elohim-host-landing` blobs. None matches the current
+`drill-custody-pairs.json` IDs/blob hashes or the `manifesto` and `chaos-ladder`
+fixtures. They therefore remain an explicit instance of this existing backlog,
+separate from the new coordinator's passing cross-peer update proof and the
+current household chaos scenario prerequisites. No re-key, re-adoption, SQL
+repair, or supersession was performed during this observation.

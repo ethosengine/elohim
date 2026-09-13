@@ -394,6 +394,16 @@ before investing.
       an edit-after-pack fixture and a raw-build-without-repack fixture: a fresh reader should
       identify the unverified boundary and the precise rerun needed.
 
+    - **A delivered instruction is not evidence that follow-up work is running.** During
+      cross-agent review, a completed worker needed an explicit follow-up task to resume;
+      sending a message alone could leave the next review pending. The harness already offers
+      the right distinction (`send_message` versus `followup_task`); this was an orchestration
+      mistake, not proof of a missing dispatch capability. Consider showing the last completed
+      result, pending continuation and execution state together in the existing resume view.
+      Evaluate a worker finishing at the handoff boundary: a fresh coordinator should distinguish
+      delivered text from an active review and choose the existing follow-up verb without
+      creating a second task ledger.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
