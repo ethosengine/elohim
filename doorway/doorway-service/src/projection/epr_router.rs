@@ -11,6 +11,8 @@ use std::sync::RwLock;
 use elohim_views::projection::EprProjectionView;
 use infrastructure_types::DoorwayRegistration;
 
+use crate::services::name_routing::{host_matches, mount_specificity, RouteKey};
+
 /// Build the ordered candidate set used by the EPR projection fetcher.
 ///
 /// Doorway registrations are the notarized source of peer gateway addresses:
@@ -246,6 +248,21 @@ pub async fn fetch_projections_with_fallback(
 /// Concurrent access is read-mostly: requests read; only boot + SSE events
 /// write. An `RwLock<HashMap>` is appropriate (request reads don't block
 /// each other; writes are rare).
+/// The route keys one contract installs under.
+///
+/// `hostnames: []` (ANY host) is one key with `host: None`; N declared names
+/// are N keys. The contract itself is unchanged and unduplicated — these are
+/// index entries.
+fn route_keys_for(view: &EprProjectionView) -> Vec<RouteKey> {
+    if view.hostnames.is_empty() {
+        return vec![RouteKey::new(None, &view.url_path)];
+    }
+    view.hostnames
+        .iter()
+        .map(|h| RouteKey::new(Some(h), &view.url_path))
+        .collect()
+}
+
 /// A granted claim binding compiled at table-load (spec §8.5): contentType →
 /// (mount, template). Pre-resolved so dispatch stays a pure lookup (R1).
 #[derive(Debug, Clone)]
@@ -256,8 +273,16 @@ struct ClaimBinding {
 
 #[derive(Debug, Default)]
 pub struct EprRouter {
-    /// urlPath → projection.
-    table: RwLock<HashMap<String, EprProjectionView>>,
+    /// `RouteKey { host, path }` → projection.
+    ///
+    /// One contract installs ONE row per name it declares: a contract with
+    /// `hostnames: []` installs a single any-host row (`host: None`) and still
+    /// matches every request, which is byte-for-byte the pre-rung-4 table. A
+    /// contract naming two hostnames installs two rows pointing at the SAME
+    /// contract — the table is an index over contracts, never a second store
+    /// of them, which is why every contract-shaped read below goes through
+    /// [`EprRouter::projections`] and de-duplicates.
+    table: RwLock<HashMap<RouteKey, EprProjectionView>>,
     /// contentType → claimed mount binding (compiled from grants in replace_all).
     claims: RwLock<HashMap<String, ClaimBinding>>,
     /// Monotonic generation counter, bumped on every `replace_all`. Drives the
@@ -360,18 +385,24 @@ impl EprRouter {
             let mut table = self.table.write().expect("router lock poisoned");
             table.clear();
             for p in legal {
-                // Duplicate url_path keys are last-write-wins in a HashMap, which
-                // is silent data loss. Mirror the claim-index conflict WARN below
-                // so a colliding mount is visible (the duplicate row still wins,
-                // last-write — semantics documented in the test suite).
-                if let Some(existing) = table.get(&p.url_path) {
-                    tracing::warn!(url_path = %p.url_path,
-                        dropped_epr_id = %existing.epr_id, kept_epr_id = %p.epr_id,
-                        "duplicate projection url_path at router build — last-write-wins (earlier mount dropped)");
-                } else {
-                    installed += 1;
+                for key in route_keys_for(&p) {
+                    // Duplicate route keys are last-write-wins in a HashMap,
+                    // which is silent data loss. Mirror the claim-index
+                    // conflict WARN below so a colliding mount is visible (the
+                    // duplicate row still wins, last-write — semantics
+                    // documented in the test suite). Two contracts collide only
+                    // when they claim the SAME name at the SAME mount; a
+                    // host-bound contract beside an any-host one is two
+                    // DIFFERENT keys and both install.
+                    if let Some(existing) = table.get(&key) {
+                        tracing::warn!(url_path = %p.url_path, host = ?key.host,
+                            dropped_epr_id = %existing.epr_id, kept_epr_id = %p.epr_id,
+                            "duplicate projection route key at router build — last-write-wins (earlier mount dropped)");
+                    } else {
+                        installed += 1;
+                    }
+                    table.insert(key, p.clone());
                 }
-                table.insert(p.url_path.clone(), p);
             }
         }
 
@@ -380,10 +411,11 @@ impl EprRouter {
         // by ascending url_path, with a warning, if a conflict slips through).
         let mut claim_index: HashMap<String, ClaimBinding> = HashMap::new();
         {
-            let table = self.table.read().expect("router lock poisoned");
-            let mut sorted: Vec<&EprProjectionView> = table.values().collect();
-            sorted.sort_by(|a, b| a.url_path.cmp(&b.url_path));
-            for p in sorted {
+            // Over DISTINCT contracts, not route keys: a contract naming two
+            // hostnames must grant its claims once, not twice (the second pass
+            // would otherwise log a spurious self-conflict against itself).
+            let sorted = self.projections();
+            for p in &sorted {
                 if let Some(grant) = &p.route_claims {
                     for c in &grant.claims {
                         if let Some(existing) = claim_index.get(&c.content_type) {
@@ -415,18 +447,71 @@ impl EprRouter {
         }
     }
 
-    /// Dispatch a request path → the projection whose `url_path` is the
-    /// longest prefix of `request_path`. Returns `None` if no projection
-    /// matches.
+    /// Dispatch a request → the projection that answers for this `host` at this
+    /// `path`. Returns `None` if no contract matches.
     ///
-    /// `"/"` matches every request as the universal root.
-    pub fn dispatch(&self, request_path: &str) -> Option<EprProjectionView> {
+    /// TWO terms, in this precedence — the SAME `mount_specificity` the
+    /// federation fold ranks holders by, so local dispatch and the fold can
+    /// never disagree about what "serving this name" means:
+    ///
+    /// 1. **host** — a contract BOUND to the requested name beats an any-host
+    ///    contract. A contract bound to some OTHER name does not match at all.
+    /// 2. **path** — then the longest mount that covers the request wins;
+    ///    `"/"` covers everything as the universal root.
+    ///
+    /// `host: None` (the caller named no Host header) matches only any-host
+    /// contracts — a host-bound contract is not served to a request that did
+    /// not ask for its name.
+    ///
+    /// While every contract declares `hostnames: []`, term 1 is constant and
+    /// this is byte-for-byte the pre-rung-4 longest-prefix dispatch.
+    pub fn dispatch(&self, host: Option<&str>, request_path: &str) -> Option<EprProjectionView> {
+        // Normalise the ASKED host exactly as the key side does (lowercase,
+        // port stripped), so `Host: ALPHA.elohim.local:8888` matches a contract
+        // that declared `alpha.elohim.local`.
+        let asked = RouteKey::new(host, request_path).host;
         let table = self.table.read().expect("router lock poisoned");
         table
+            .iter()
+            .filter(|(key, _)| host_matches(key.host.as_deref(), asked.as_deref()))
+            .filter(|(key, _)| Self::path_matches_prefix(request_path, &key.path))
+            .max_by_key(|(key, _)| mount_specificity(key.host.as_deref(), &key.path))
+            .map(|(_, p)| p.clone())
+    }
+
+    /// Dispatch for a caller that has no request in hand — boot hydration,
+    /// telemetry, the sitemap walk. Any-host only, by construction.
+    ///
+    /// Named rather than spelled `dispatch(None, path)` at each site so the
+    /// distinction between "this request named no host" and "there is no
+    /// request" stays visible in the call.
+    pub fn dispatch_any_host(&self, request_path: &str) -> Option<EprProjectionView> {
+        self.dispatch(None, request_path)
+    }
+
+    /// Every DISTINCT contract in the table, ordered by mount then EPR id.
+    ///
+    /// The table is an index keyed by route key, so a contract naming two
+    /// hostnames appears twice in it. Every contract-shaped read — the
+    /// coherence digest, the warm-shell hydration, the bundle-head targets,
+    /// the claims index — must consult THIS, or a contract that merely named a
+    /// second hostname would double-count and (for the digest) report a
+    /// divergence that does not exist.
+    pub fn projections(&self) -> Vec<EprProjectionView> {
+        let table = self.table.read().expect("router lock poisoned");
+        let mut seen: HashSet<String> = HashSet::new();
+        let mut out: Vec<EprProjectionView> = table
             .values()
-            .filter(|p| Self::path_matches_prefix(request_path, &p.url_path))
-            .max_by_key(|p| p.url_path.len())
+            .filter(|p| seen.insert(p.commitment_id.clone()))
             .cloned()
+            .collect();
+        // Deterministic: a HashMap walk is not, and the digest reads this.
+        out.sort_by(|a, b| {
+            a.url_path
+                .cmp(&b.url_path)
+                .then_with(|| a.epr_id.cmp(&b.epr_id))
+        });
+        out
     }
 
     /// True iff `projection_path` is a path prefix of `request_path`
@@ -440,7 +525,9 @@ impl EprRouter {
             || request_path.starts_with(&format!("{}/", projection_path))
     }
 
-    /// How many projections are currently in the table (telemetry).
+    /// How many ROUTE KEYS are currently installed (telemetry). Equal to the
+    /// contract count while every contract is any-host, and the same number
+    /// `ReplaceOutcome::installed` reports.
     pub fn len(&self) -> usize {
         self.table.read().expect("router lock poisoned").len()
     }
@@ -457,19 +544,24 @@ impl EprRouter {
     }
 
     /// Snapshot of the live mount url_paths (telemetry + sitemap projection).
+    /// One entry per DISTINCT contract — a contract naming two hostnames
+    /// mounts at one path, not two.
     pub fn mount_url_paths(&self) -> Vec<String> {
-        let table = self.table.read().expect("router lock poisoned");
-        table.values().map(|p| p.url_path.clone()).collect()
+        self.projections().into_iter().map(|p| p.url_path).collect()
     }
 
     /// Snapshot of the live `(url_path, epr_id)` head fingerprints — the input
     /// to the cross-edge coherence digest (`routes::coherence::router_fingerprint`).
     /// Pure read; sibling of `mount_url_paths`.
+    ///
+    /// Over DISTINCT contracts — LOAD-BEARING. `heads` is the dag-cbor preimage
+    /// of the cross-edge coherence digest, so emitting a contract twice because
+    /// it named two hostnames would move the digest and make two edges that
+    /// hold identical content report divergence they do not have.
     pub fn head_fingerprints(&self) -> Vec<(String, String)> {
-        let table = self.table.read().expect("router lock poisoned");
-        table
-            .values()
-            .map(|p| (p.url_path.clone(), p.epr_id.clone()))
+        self.projections()
+            .into_iter()
+            .map(|p| (p.url_path, p.epr_id))
             .collect()
     }
 
@@ -490,8 +582,9 @@ impl EprRouter {
         if epr_id.is_empty() {
             return None;
         }
-        let table = self.table.read().expect("router lock poisoned");
-        table.values().find(|p| p.epr_id == epr_id).cloned()
+        // Over the DETERMINISTIC distinct-contract snapshot: a HashMap walk
+        // would pick an arbitrary contract when an EPR is mounted twice.
+        self.projections().into_iter().find(|p| p.epr_id == epr_id)
     }
 
     /// Mint the pretty-mount Location for a claimed contentType (spec §5.1).
@@ -553,15 +646,18 @@ impl EprRouter {
     /// first (they may live UNDER a live mount, e.g. /lamad/resource/{id}),
     /// then bare redirects_from prefix swaps. None = not an alias.
     pub fn resolve_alias(&self, request_path: &str) -> Option<String> {
-        let table = self.table.read().expect("router lock poisoned");
-        for p in table.values() {
+        // Distinct contracts, deterministically ordered: an alias promise is a
+        // contract term, so a contract naming two hostnames must not get two
+        // chances to win the first-match race.
+        let contracts = self.projections();
+        for p in &contracts {
             for t in &p.redirect_templates {
                 if let Some(loc) = Self::match_alias_template(request_path, &t.from, &t.to) {
                     return Some(loc);
                 }
             }
         }
-        for p in table.values() {
+        for p in &contracts {
             for bare in &p.redirects_from {
                 if let Some(loc) = Self::match_bare_alias(request_path, bare, &p.url_path) {
                     return Some(loc);
@@ -624,7 +720,7 @@ mod tests {
     #[test]
     fn dispatch_returns_none_for_empty_router() {
         let router = EprRouter::new();
-        assert!(router.dispatch("/anything").is_none());
+        assert!(router.dispatch_any_host("/anything").is_none());
         assert!(router.is_empty());
     }
 
@@ -632,10 +728,13 @@ mod tests {
     fn dispatch_returns_landing_for_root() {
         let router = EprRouter::new();
         router.replace_all(vec![make_projection("landing", "/")]);
-        assert_eq!(router.dispatch("/").unwrap().epr_id, "landing");
-        assert_eq!(router.dispatch("/anything").unwrap().epr_id, "landing");
+        assert_eq!(router.dispatch_any_host("/").unwrap().epr_id, "landing");
         assert_eq!(
-            router.dispatch("/deep/path/here").unwrap().epr_id,
+            router.dispatch_any_host("/anything").unwrap().epr_id,
+            "landing"
+        );
+        assert_eq!(
+            router.dispatch_any_host("/deep/path/here").unwrap().epr_id,
             "landing"
         );
     }
@@ -647,18 +746,24 @@ mod tests {
             make_projection("landing", "/"),
             make_projection("lamad", "/lamad"),
         ]);
-        assert_eq!(router.dispatch("/").unwrap().epr_id, "landing");
-        assert_eq!(router.dispatch("/lamad").unwrap().epr_id, "lamad");
-        assert_eq!(router.dispatch("/lamad/concept/x").unwrap().epr_id, "lamad");
-        assert_eq!(router.dispatch("/other").unwrap().epr_id, "landing");
+        assert_eq!(router.dispatch_any_host("/").unwrap().epr_id, "landing");
+        assert_eq!(router.dispatch_any_host("/lamad").unwrap().epr_id, "lamad");
+        assert_eq!(
+            router.dispatch_any_host("/lamad/concept/x").unwrap().epr_id,
+            "lamad"
+        );
+        assert_eq!(
+            router.dispatch_any_host("/other").unwrap().epr_id,
+            "landing"
+        );
     }
 
     #[test]
     fn dispatch_does_not_match_partial_segment() {
         let router = EprRouter::new();
         router.replace_all(vec![make_projection("lamad", "/lamad")]);
-        assert!(router.dispatch("/lamadx").is_none());
-        assert!(router.dispatch("/lamadextra").is_none());
+        assert!(router.dispatch_any_host("/lamadx").is_none());
+        assert!(router.dispatch_any_host("/lamadextra").is_none());
     }
 
     #[test]
@@ -668,8 +773,8 @@ mod tests {
         assert_eq!(router.len(), 1);
         router.replace_all(vec![make_projection("b", "/b")]);
         assert_eq!(router.len(), 1);
-        assert!(router.dispatch("/a").is_none());
-        assert_eq!(router.dispatch("/b").unwrap().epr_id, "b");
+        assert!(router.dispatch_any_host("/a").is_none());
+        assert_eq!(router.dispatch_any_host("/b").unwrap().epr_id, "b");
     }
 
     #[test]
@@ -688,12 +793,12 @@ mod tests {
             "only the legal /lamad projection must be in the table"
         );
         assert!(
-            router.dispatch("/epr").is_none(),
+            router.dispatch_any_host("/epr").is_none(),
             "reserved /epr mount must not be installed in the router"
         );
         // /lamad projection must survive.
         assert_eq!(
-            router.dispatch("/lamad").unwrap().epr_id,
+            router.dispatch_any_host("/lamad").unwrap().epr_id,
             "lamad",
             "legal /lamad mount must remain in the router"
         );
@@ -736,14 +841,14 @@ mod tests {
             "a poisoned row must not empty the router"
         );
         assert_eq!(
-            router.dispatch("/lamad").unwrap().epr_id,
+            router.dispatch_any_host("/lamad").unwrap().epr_id,
             "lamad",
             "the valid /lamad mount must remain reachable"
         );
         // The reserved + structurally-invalid rows must not be reachable.
-        assert!(router.dispatch("/epr").is_none());
+        assert!(router.dispatch_any_host("/epr").is_none());
         assert!(
-            router.dispatch("/lamadx").is_none(),
+            router.dispatch_any_host("/lamadx").is_none(),
             "the non-absolute 'lamad' junk key must not be installed as a reachable mount"
         );
     }
@@ -822,7 +927,7 @@ mod tests {
         );
         // Last writer wins: the second projection is the one that dispatches.
         assert_eq!(
-            router.dispatch("/dup").unwrap().epr_id,
+            router.dispatch_any_host("/dup").unwrap().epr_id,
             "second-owner",
             "the later projection at a duplicate url_path must win (last-write-wins)"
         );
@@ -1433,5 +1538,251 @@ mod tests {
                 ),
             }
         }
+    }
+}
+
+// ===========================================================================
+// Rung 4 slice 1 — the table keyed by RouteKey { host, path }
+//
+// Two claims are under test and only two. First, that nothing moved for an
+// any-host contract: every assertion in the suite above already pins that, so
+// these add only what the host key makes newly expressible. Second, that a
+// host-bound contract answers for exactly its own name — never for another's,
+// and never for a request that named no host at all.
+// ===========================================================================
+#[cfg(test)]
+mod host_keyed_tests {
+    use super::*;
+    use elohim_views::projection::{Channel, ProjectionMode};
+
+    /// An any-host contract — today's every contract.
+    fn make_projection(epr_id: &str, url_path: &str) -> EprProjectionView {
+        EprProjectionView {
+            commitment_id: format!("test-{epr_id}"),
+            epr_id: epr_id.into(),
+            doorway_id: "doorway:test".into(),
+            url_path: url_path.into(),
+            hostnames: vec![],
+            channel: Channel::Converged,
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: if url_path == "/" {
+                "/".into()
+            } else {
+                format!("{url_path}/")
+            },
+            entry_file: "index.html".into(),
+            spa_fallback: true,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            seeded_at: "2026-05-25T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        }
+    }
+
+    /// The same contract, BOUND to the names it declares.
+    fn bound(epr_id: &str, url_path: &str, hostnames: &[&str]) -> EprProjectionView {
+        EprProjectionView {
+            hostnames: hostnames.iter().map(|h| (*h).to_string()).collect(),
+            ..make_projection(epr_id, url_path)
+        }
+    }
+
+    #[test]
+    fn an_any_host_contract_answers_for_every_host() {
+        let router = EprRouter::new();
+        router.replace_all(vec![make_projection("lamad", "/lamad")]);
+        for host in [None, Some("elohim.local"), Some("alpha.elohim.local")] {
+            assert_eq!(
+                router.dispatch(host, "/lamad").unwrap().epr_id,
+                "lamad",
+                "any-host contract must answer for {host:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_host_bound_contract_answers_only_for_its_own_name() {
+        let router = EprRouter::new();
+        router.replace_all(vec![bound("staging", "/", &["alpha.elohim.local"])]);
+        assert_eq!(
+            router
+                .dispatch(Some("alpha.elohim.local"), "/")
+                .unwrap()
+                .epr_id,
+            "staging"
+        );
+        // Another name, and NO name, are both misses. A doorway that answered
+        // here would be serving somebody else's name off its own contract.
+        assert!(router.dispatch(Some("elohim.local"), "/").is_none());
+        assert!(router.dispatch(None, "/").is_none());
+        assert!(router.dispatch_any_host("/").is_none());
+    }
+
+    #[test]
+    fn host_comparison_ignores_case_and_port() {
+        let router = EprRouter::new();
+        router.replace_all(vec![bound("staging", "/", &["alpha.elohim.local"])]);
+        for asked in [
+            "alpha.elohim.local",
+            "ALPHA.elohim.local",
+            "alpha.elohim.local:8888",
+            "Alpha.Elohim.Local:443",
+        ] {
+            assert!(
+                router.dispatch(Some(asked), "/").is_some(),
+                "Host: {asked} must match the declared name"
+            );
+        }
+    }
+
+    #[test]
+    fn host_bound_beats_any_host_at_the_same_mount() {
+        // The whole point of the channel: `alpha.elohim.local` gets the
+        // candidate contract, every other name still gets the commons landing
+        // from the any-host contract at the same mount.
+        let router = EprRouter::new();
+        router.replace_all(vec![
+            make_projection("landing", "/"),
+            bound("staging", "/", &["alpha.elohim.local"]),
+        ]);
+        assert_eq!(
+            router
+                .dispatch(Some("alpha.elohim.local"), "/")
+                .unwrap()
+                .epr_id,
+            "staging"
+        );
+        assert_eq!(
+            router.dispatch(Some("elohim.local"), "/").unwrap().epr_id,
+            "landing"
+        );
+        assert_eq!(router.dispatch(None, "/").unwrap().epr_id, "landing");
+    }
+
+    #[test]
+    fn a_longer_mount_still_wins_within_the_same_host_term() {
+        let router = EprRouter::new();
+        router.replace_all(vec![
+            bound("root", "/", &["alpha.elohim.local"]),
+            bound("lamad", "/lamad", &["alpha.elohim.local"]),
+        ]);
+        let host = Some("alpha.elohim.local");
+        assert_eq!(router.dispatch(host, "/").unwrap().epr_id, "root");
+        assert_eq!(router.dispatch(host, "/lamad/x").unwrap().epr_id, "lamad");
+    }
+
+    #[test]
+    fn host_outranks_path_length_the_same_way_the_federation_fold_does() {
+        // `mount_specificity` is (host_bound, path_len) — host FIRST. A
+        // host-bound `/` beats an any-host `/lamad` for that host, because the
+        // name is the stronger claim. ONE definition, shared with the fold.
+        let router = EprRouter::new();
+        router.replace_all(vec![
+            make_projection("lamad", "/lamad"),
+            bound("staging", "/", &["alpha.elohim.local"]),
+        ]);
+        assert_eq!(
+            router
+                .dispatch(Some("alpha.elohim.local"), "/lamad")
+                .unwrap()
+                .epr_id,
+            "staging"
+        );
+        assert_eq!(
+            router
+                .dispatch(Some("elohim.local"), "/lamad")
+                .unwrap()
+                .epr_id,
+            "lamad"
+        );
+    }
+
+    #[test]
+    fn a_contract_naming_two_hostnames_installs_two_keys_but_stays_one_contract() {
+        let router = EprRouter::new();
+        let outcome = router.replace_all(vec![bound(
+            "landing",
+            "/",
+            &["elohim.local", "www.elohim.local"],
+        )]);
+        assert_eq!(outcome.installed, 2, "two names, two route keys");
+        assert_eq!(router.len(), 2);
+        // …but every CONTRACT-shaped read sees exactly one.
+        assert_eq!(router.projections().len(), 1);
+        assert_eq!(router.mount_url_paths(), vec!["/".to_string()]);
+        assert_eq!(
+            router.head_fingerprints(),
+            vec![("/".to_string(), "landing".to_string())],
+            "the coherence digest preimage must not double-count a second hostname"
+        );
+    }
+
+    #[test]
+    fn head_fingerprints_are_deterministic_across_calls() {
+        // The digest reads this; a HashMap walk is not ordered.
+        let router = EprRouter::new();
+        router.replace_all(vec![
+            bound("a", "/a", &["one.local", "two.local"]),
+            make_projection("b", "/b"),
+        ]);
+        let first = router.head_fingerprints();
+        for _ in 0..8 {
+            assert_eq!(router.head_fingerprints(), first);
+        }
+    }
+
+    #[test]
+    fn two_contracts_claiming_the_same_name_at_the_same_mount_still_collide() {
+        // Last-write-wins is unchanged — the host key widens the key space, it
+        // does not make a genuine mount collision disappear.
+        let router = EprRouter::new();
+        let outcome = router.replace_all(vec![
+            bound("first", "/", &["elohim.local"]),
+            bound("second", "/", &["elohim.local"]),
+        ]);
+        assert_eq!(outcome.installed, 1);
+        assert_eq!(router.len(), 1);
+    }
+
+    #[test]
+    fn a_poisoned_row_is_still_skipped_per_row_with_the_host_key() {
+        let router = EprRouter::new();
+        let mut bad = bound("bad", "/lamad", &["elohim.local"]);
+        bad.url_path = "/db/content".into(); // reserved service prefix (§12.1)
+        let outcome = router.replace_all(vec![bad, bound("good", "/lamad", &["elohim.local"])]);
+        assert_eq!(outcome.rejected, 1);
+        assert_eq!(outcome.installed, 1);
+        assert_eq!(
+            router
+                .dispatch(Some("elohim.local"), "/lamad")
+                .unwrap()
+                .epr_id,
+            "good"
+        );
+    }
+
+    #[test]
+    fn projection_for_epr_id_finds_a_host_bound_contract() {
+        // `/apps/{slug}` and `/blob/{hash}` reach bytes without a mount; they
+        // must still see the live contract for their reach re-ask.
+        let router = EprRouter::new();
+        router.replace_all(vec![bound("staging", "/", &["alpha.elohim.local"])]);
+        let found = router.projection_for_epr_id("staging").unwrap();
+        assert_eq!(found.hostnames, vec!["alpha.elohim.local".to_string()]);
+    }
+
+    #[test]
+    fn an_alias_promise_on_a_two_name_contract_resolves_once() {
+        let router = EprRouter::new();
+        let mut p = bound("lamad", "/lamad", &["one.local", "two.local"]);
+        p.redirects_from = vec!["/learn".into()];
+        router.replace_all(vec![p]);
+        assert_eq!(router.resolve_alias("/learn").as_deref(), Some("/lamad"));
     }
 }

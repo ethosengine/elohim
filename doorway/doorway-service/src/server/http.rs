@@ -71,7 +71,7 @@ enum Disposition {
 ///
 /// The contract: if the registry has any compiled route matching `(method, path)`,
 /// the registry decides. Otherwise, anything unmatched returns 404. (Root-path
-/// dispatch is now handled by the EPR router — `state.epr_router.dispatch(&path)`
+/// dispatch is now handled by the EPR router — `state.epr_router.dispatch(host, &path)`
 /// — which fires before this function, consulting the active projections whose
 /// `url_path == "/"` rather than a hardcoded slug env var.)
 async fn classify_dispatch(
@@ -3954,7 +3954,10 @@ mod epr_dispatch_breaker_tests {
         let before = dispatch_to_projected_epr(
             &state,
             "/",
-            state.epr_router.dispatch("/").expect("mounted at /"),
+            state
+                .epr_router
+                .dispatch_any_host("/")
+                .expect("mounted at /"),
             "{}",
             true,
             RequesterStanding::anonymous(),
@@ -3976,7 +3979,10 @@ mod epr_dispatch_breaker_tests {
         let after = dispatch_to_projected_epr(
             &state,
             "/",
-            state.epr_router.dispatch("/").expect("still mounted at /"),
+            state
+                .epr_router
+                .dispatch_any_host("/")
+                .expect("still mounted at /"),
             "{}",
             true,
             RequesterStanding::anonymous(),
@@ -4443,8 +4449,13 @@ mod epr_dispatch_breaker_tests {
 /// path and keep the claims table — only the universal-address 302 is removed.)
 fn epr_universal_root(
     router: &crate::projection::EprRouter,
+    host: Option<&str>,
 ) -> Option<elohim_views::projection::EprProjectionView> {
-    router.dispatch("/")
+    // Host-aware for the same reason every other serve is: a root contract
+    // BOUND to this name outranks the any-host root, and a root bound to some
+    // other name must not answer here. `None` (no Host header) resolves the
+    // any-host root, which is today's every contract.
+    router.dispatch(host, "/")
 }
 
 /// §12.1 universal EPR address: `/epr/{id}` (and `/epr/{id}/raw`) serve the ROOT
@@ -4454,11 +4465,12 @@ fn epr_universal_root(
 async fn dispatch_epr_universal(
     state: &AppState,
     original_path: &str,
+    host: Option<&str>,
     chrome_context_json: &str,
     wants_html: bool,
     standing: RequesterStanding,
 ) -> Response<Full<Bytes>> {
-    match epr_universal_root(&state.epr_router) {
+    match epr_universal_root(&state.epr_router, host) {
         Some(root) => {
             tracing::debug!(path = %original_path,
                 "universal /epr address — serving shell (root projection bundle)");
@@ -5136,9 +5148,8 @@ pub async fn prewarm_projected_shells(state: &AppState) {
     let mut seen = std::collections::HashSet::new();
     let targets: Vec<elohim_views::projection::EprProjectionView> = state
         .epr_router
-        .mount_url_paths()
+        .projections()
         .into_iter()
-        .filter_map(|p| state.epr_router.dispatch(&p))
         .filter(|projection| {
             seen.insert((projection.epr_id.clone(), projection.entry_file.clone()))
         })
@@ -6211,7 +6222,7 @@ async fn handle_request(
                     .unwrap(),
             ));
         }
-        if let Some(projection) = state.epr_router.dispatch(&path) {
+        if let Some(projection) = state.epr_router.dispatch(relay_ctx.host.as_deref(), &path) {
             tracing::debug!(
                 path = %path,
                 epr_id = %projection.epr_id,
@@ -7105,6 +7116,7 @@ async fn handle_request(
                 dispatch_epr_universal(
                     &state,
                     p,
+                    relay_ctx.host.as_deref(),
                     &chrome_context_json,
                     wants_html,
                     standing_from_request(&state, &req),
@@ -9579,7 +9591,7 @@ mod epr_claims_dispatch_tests {
             Some("/path/abc".to_string()),
             "claim must remain in the table (sitemap depends on it)"
         );
-        let root = epr_universal_root(&router);
+        let root = epr_universal_root(&router, None);
         assert!(
             root.is_some(),
             "universal /epr/{{id}} for a claimed commons type now serves the shell (root projection), not a mount 302"
@@ -9595,7 +9607,7 @@ mod epr_claims_dispatch_tests {
         let router = router_with_path_claiming_root();
         // The resolver is purely root-driven — the same root regardless of which
         // /epr/* path the request carried (bare, /raw, or any subview).
-        assert!(epr_universal_root(&router).is_some());
+        assert!(epr_universal_root(&router, None).is_some());
     }
 
     #[test]
@@ -9604,7 +9616,7 @@ mod epr_claims_dispatch_tests {
         // dispatcher turns into a 302 to /threshold (the operator dashboard).
         let router = crate::projection::EprRouter::new();
         assert!(
-            epr_universal_root(&router).is_none(),
+            epr_universal_root(&router, None).is_none(),
             "no root projection → fall back to /threshold"
         );
     }

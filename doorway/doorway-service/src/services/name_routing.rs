@@ -111,7 +111,7 @@ pub enum HolderLiveness {
 /// = converged head at commons reach, `alpha.elohim.host` = candidate head at
 /// stewards reach, both served by every doorway) — adds host WITHOUT re-keying
 /// the fold, its table, or its callers.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RouteKey {
     /// The host the client asked for, lowercased and port-stripped. `None`
     /// when the request named none.

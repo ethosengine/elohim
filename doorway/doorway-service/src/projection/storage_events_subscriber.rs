@@ -476,7 +476,7 @@ mod tests {
         let http = reqwest::Client::new();
 
         // Precondition: empty router — the missed-event state.
-        assert!(router.dispatch("/lamad").is_none());
+        assert!(router.dispatch_any_host("/lamad").is_none());
 
         let events_url = format!("{}/api/v1/events", server.uri());
         let result = run_subscriber(
@@ -493,7 +493,7 @@ mod tests {
 
         // The router resolves /lamad purely from the on-connect re-sync.
         let hit = router
-            .dispatch("/lamad")
+            .dispatch_any_host("/lamad")
             .expect("router must be populated by on-connect re-sync (no event was sent)");
         assert_eq!(hit.epr_id, "lamad-spa");
     }

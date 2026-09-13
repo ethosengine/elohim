@@ -1038,9 +1038,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
     {
         let targets: Vec<(String, String)> = state
             .epr_router
-            .mount_url_paths()
+            .projections()
             .into_iter()
-            .filter_map(|p| state.epr_router.dispatch(&p))
             .map(|projection| (projection.epr_id, projection.entry_file))
             .collect();
         if !targets.is_empty() {
@@ -1452,9 +1451,8 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             let configured_slugs = state.renderer_registry.configured_slugs();
             let targets: doorway::render::bundle_heads::TargetSource = Arc::new(move || {
                 let mut out: Vec<BundleTarget> = router
-                    .mount_url_paths()
+                    .projections()
                     .into_iter()
-                    .filter_map(|p| router.dispatch(&p))
                     .map(|projection| BundleTarget {
                         slug: projection.epr_id,
                         entry_file: Some(projection.entry_file),

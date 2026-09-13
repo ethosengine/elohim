@@ -1067,7 +1067,7 @@ pub async fn startup_check(state: Arc<AppState>) -> Response<Full<Bytes>> {
 
     // root projection — whichever EPR commitment declares urlPath="/" is the root.
     // ROOT_APP_SLUG is gone; the router consults live projection data from storage.
-    let root_projection = state.epr_router.dispatch("/").map(|p| {
+    let root_projection = state.epr_router.dispatch_any_host("/").map(|p| {
         serde_json::json!({
             "eprId": p.epr_id,
             "urlPath": p.url_path,
