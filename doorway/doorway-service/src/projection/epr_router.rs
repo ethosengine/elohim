@@ -141,7 +141,15 @@ pub enum FallbackOutcome {
     },
     /// Primary AND every pool peer returned an EMPTY (but successful) fetch.
     /// This is a genuine empty state — replace the router, log at INFO.
-    AllEmpty { urls_tried: Vec<String> },
+    AllEmpty {
+        urls_tried: Vec<String>,
+        /// Whether the PRIMARY (idx 0) itself was the successful-but-empty
+        /// answer, vs having errored while a later pool member answered empty.
+        /// `install_from_fallback` only arms the revocation shield when this is
+        /// `true` — an errored primary must never mark anything (see
+        /// `EprRouter::shield_primary_omissions`'s doc).
+        primary_empty: bool,
+    },
     /// Primary AND every pool peer ERRORED (none returned a usable response).
     /// Caller MUST preserve the last-good table (never clear on transient
     /// unavailability).
@@ -271,7 +279,10 @@ pub async fn fetch_projections_with_fallback(
     }
 
     if any_success {
-        FallbackOutcome::AllEmpty { urls_tried }
+        FallbackOutcome::AllEmpty {
+            urls_tried,
+            primary_empty,
+        }
     } else {
         FallbackOutcome::AllUnreachable {
             urls_tried,
@@ -342,6 +353,14 @@ pub struct EprRouter {
     /// no later authoritative source has confirmed it live again since. See
     /// `mark_revoked`/`clear_revoked`/`filter_recently_revoked`.
     revoked_recently: RwLock<HashMap<String, Instant>>,
+    /// commitment_id set that THIS doorway's own primary storage most recently,
+    /// successfully (2xx) told us it has. Updated on every primary-sourced
+    /// successful fetch (non-empty, empty, or wholly poisoned all count —
+    /// they're all a genuine answer); left untouched on a primary ERROR, since
+    /// there is no fresh truth to diff against then. `shield_primary_omissions`
+    /// diffs the previous value against the new one to arm the revocation
+    /// shield for anything that dropped out.
+    primary_sourced_ids: RwLock<HashSet<String>>,
 }
 
 /// The post-validation truth of a `replace_all`: how many rows were actually
@@ -573,6 +592,50 @@ impl EprRouter {
         (kept, shielded)
     }
 
+    /// Diff `current_primary_ids` (everything THIS doorway's own primary storage
+    /// JUST, successfully, told us it has) against `primary_sourced_ids` (what it
+    /// told us last time) and arm the revocation shield (`mark_revoked`) for every
+    /// id that dropped out — BEFORE any peer-sourced batch from the SAME poll is
+    /// installed.
+    ///
+    /// Why this exists (2026-09-13 name-routing scenario-4 root cause): the
+    /// `projection.revoked` SSE that normally arms the shield rides the
+    /// conductor's post-commit signal, not the HTTP write that cancelled the
+    /// contract — it can lag the cancel by tens of seconds. In that window, this
+    /// doorway's own periodic refresh (`DOORWAY_EPR_REFRESH_SECS`) can already
+    /// see the primary's honest, successful, EMPTY answer (the cancel landed on
+    /// THIS doorway's own storage) and fall back to a sibling doorway whose
+    /// storage hasn't caught up yet — resurrecting the very row the primary just
+    /// omitted. A primary's own successful (2xx) answer that omits an id it
+    /// previously listed IS authoritative revocation evidence; it must not wait on
+    /// the SSE.
+    ///
+    /// Call ONLY when the primary answered successfully (2xx) — pass an empty set
+    /// for a successful-but-empty (or wholly poisoned, per `batch_has_installable_row`'s
+    /// doc) answer. NEVER call this for a primary ERROR/timeout: that is exactly the
+    /// resilience case the pool fallback exists for (a primary wiped/unreachable
+    /// while peers still hold the routes), and marking anything revoked there would
+    /// defeat it — the caller (`install_from_fallback`) gates every call site on
+    /// `primary_empty` (true = successful-empty, false = errored) for exactly this
+    /// reason.
+    ///
+    /// An id that was never primary-sourced (only ever installed via a peer echo)
+    /// is untouched: it isn't in `primary_sourced_ids` to begin with, so it can
+    /// never appear in the diff.
+    fn shield_primary_omissions(&self, current_primary_ids: &HashSet<String>) {
+        let mut tracked = self
+            .primary_sourced_ids
+            .write()
+            .expect("router lock poisoned");
+        for dropped in tracked
+            .iter()
+            .filter(|id| !current_primary_ids.contains(*id))
+        {
+            self.mark_revoked(dropped);
+        }
+        *tracked = current_primary_ids.clone();
+    }
+
     /// Install a fetched batch, applying the revocation shield in the direction that
     /// matches WHO the batch came from — the one mechanical step both
     /// [`Self::install_from_fallback`] arms below share.
@@ -622,6 +685,14 @@ impl EprRouter {
     pub fn install_from_fallback(&self, outcome: FallbackOutcome) -> FallbackInstallOutcome {
         match outcome {
             FallbackOutcome::PrimaryNonEmpty { url, projections } => {
+                // The primary answered successfully — diff what it lists NOW against
+                // what it listed last time and shield anything that dropped out,
+                // BEFORE installing (see `shield_primary_omissions`'s doc).
+                let current_primary_ids: HashSet<String> = projections
+                    .iter()
+                    .map(|p| p.commitment_id.clone())
+                    .collect();
+                self.shield_primary_omissions(&current_primary_ids);
                 let (result, _shielded_always_zero) = self.install_projections(projections, false);
                 FallbackInstallOutcome::Primary {
                     url,
@@ -635,6 +706,17 @@ impl EprRouter {
                 serving_url,
                 projections,
             } => {
+                // `primary_empty == true` means the primary answered successfully
+                // (2xx) with nothing installable — an authoritative "I have none of
+                // these" answer, so anything it previously listed is shielded BEFORE
+                // the peer batch below is filtered and installed.
+                // `primary_empty == false` means the primary ERRORED/timed out — this
+                // is exactly the resilience case the fallback exists for (a primary
+                // wiped/unreachable while peers still hold the routes); never shield
+                // on that (see `shield_primary_omissions`'s doc).
+                if primary_empty {
+                    self.shield_primary_omissions(&HashSet::new());
+                }
                 let (result, shielded) = self.install_projections(projections, true);
                 FallbackInstallOutcome::Peer {
                     primary_url,
@@ -645,9 +727,17 @@ impl EprRouter {
                     shielded,
                 }
             }
-            FallbackOutcome::AllEmpty { urls_tried } => {
+            FallbackOutcome::AllEmpty {
+                urls_tried,
+                primary_empty,
+            } => {
                 // Genuine empty state — every pool member returned 0 rows. Replace with
-                // an honest empty table; nothing to shield (there is nothing to install).
+                // an honest empty table. Shield only when the PRIMARY itself was the
+                // successful-empty answer (never on a primary error, even if a later
+                // pool member happened to answer empty too) — same rule as `PeerServed`.
+                if primary_empty {
+                    self.shield_primary_omissions(&HashSet::new());
+                }
                 self.replace_all(Vec::new());
                 FallbackInstallOutcome::AllEmpty { urls_tried }
             }
@@ -1618,8 +1708,12 @@ mod tests {
             let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
 
             match outcome {
-                FallbackOutcome::AllEmpty { urls_tried } => {
+                FallbackOutcome::AllEmpty {
+                    urls_tried,
+                    primary_empty,
+                } => {
                     assert_eq!(urls_tried.len(), 2);
+                    assert!(primary_empty, "primary itself answered empty, not errored");
                 }
                 other => panic!("expected AllEmpty, got {other:?}"),
             }
@@ -1658,8 +1752,12 @@ mod tests {
             let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
 
             match outcome {
-                FallbackOutcome::AllEmpty { urls_tried } => {
+                FallbackOutcome::AllEmpty {
+                    urls_tried,
+                    primary_empty,
+                } => {
                     assert_eq!(urls_tried, vec![primary.uri()]);
+                    assert!(primary_empty, "primary itself answered empty, not errored");
                 }
                 other => panic!("expected AllEmpty for single empty primary, got {other:?}"),
             }
@@ -1726,8 +1824,15 @@ mod tests {
             let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
 
             match outcome {
-                FallbackOutcome::AllEmpty { urls_tried } => {
+                FallbackOutcome::AllEmpty {
+                    urls_tried,
+                    primary_empty,
+                } => {
                     assert_eq!(urls_tried.len(), 2);
+                    assert!(
+                        primary_empty,
+                        "a wholly-poisoned primary is classified as empty, not errored"
+                    );
                 }
                 other => panic!(
                     "a wholly-poisoned pool is a genuine empty state; expected AllEmpty, got {other:?}"
@@ -1748,8 +1853,15 @@ mod tests {
             let outcome = fetch_projections_with_fallback(&urls, "apex-elohim-host", &http).await;
 
             match outcome {
-                FallbackOutcome::AllEmpty { urls_tried } => {
+                FallbackOutcome::AllEmpty {
+                    urls_tried,
+                    primary_empty,
+                } => {
                     assert_eq!(urls_tried, vec![primary.uri()]);
+                    assert!(
+                        primary_empty,
+                        "a lone poisoned primary is classified as empty, not errored"
+                    );
                 }
                 other => panic!(
                     "a lone poisoned primary is a genuine empty state; expected AllEmpty, got {other:?}"
@@ -1827,6 +1939,174 @@ mod tests {
                 router.dispatch(None, "/nrt-garden").unwrap().epr_id,
                 "garden"
             );
+        }
+    }
+
+    // ── Primary-omission shield: THIS doorway's own primary answering
+    // successfully (2xx) with an id it previously listed now OMITTED is itself
+    // authoritative revocation evidence — the shield must arm from that BEFORE
+    // any peer-sourced fallback batch from the same poll is installed, without
+    // waiting on the `projection.revoked` SSE (2026-09-13 name-routing
+    // scenario-4 root cause — see `shield_primary_omissions`'s doc). ──────────
+    mod primary_omission_shield {
+        use super::make_projection;
+        use super::{EprRouter, FallbackInstallOutcome, FallbackOutcome};
+
+        #[test]
+        fn a_primary_omission_shields_the_dropped_id_from_a_later_peer_echo() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+            let b = make_projection("lamad", "/lamad");
+
+            // Primary lists {A, B} — both install, both tracked primary-sourced.
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            assert!(router.dispatch(None, "/nrt-garden").is_some());
+            assert!(router.dispatch(None, "/lamad").is_some());
+
+            // Primary later, successfully, answers with only {B} — A dropped out.
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![b.clone()],
+            });
+
+            // A later poll: THIS doorway's own primary ERRORS (unrelated transient
+            // failure — never a fresh "successful empty" answer), so no new shield
+            // decision is made this cycle; the shield armed for A above still
+            // stands (its 10-minute TTL). A stale peer echo carries the peer's own
+            // full replica of self's commitments — still {A, B}, since the peer
+            // hasn't caught up on the earlier revoke of A. A must be filtered out
+            // of that batch by the standing shield; B (never omitted by the
+            // primary) installs normally.
+            let outcome = router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: false,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            match outcome {
+                FallbackInstallOutcome::Peer {
+                    installed,
+                    shielded,
+                    ..
+                } => {
+                    assert_eq!(shielded, 1, "the dropped primary id must be shielded");
+                    assert_eq!(installed, 1, "B must still install from the peer batch");
+                }
+                other => panic!("expected Peer install outcome, got {other:?}"),
+            }
+            assert!(
+                router.dispatch(None, "/nrt-garden").is_none(),
+                "A must stay dropped — the primary's own omission is authoritative"
+            );
+            assert!(
+                router.dispatch(None, "/lamad").is_some(),
+                "B was never omitted by the primary and must remain reachable"
+            );
+        }
+
+        #[test]
+        fn a_primary_error_never_shields_anything() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone()],
+            });
+
+            // Primary ERRORS (not a successful empty answer) — the fallback exists
+            // precisely for this; nothing may be shielded.
+            let outcome = router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: false,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone()],
+            });
+            match outcome {
+                FallbackInstallOutcome::Peer {
+                    installed,
+                    shielded,
+                    ..
+                } => {
+                    assert_eq!(shielded, 0, "a primary ERROR must never shield anything");
+                    assert_eq!(installed, 1);
+                }
+                other => panic!("expected Peer install outcome, got {other:?}"),
+            }
+            assert!(
+                router.dispatch(None, "/nrt-garden").is_some(),
+                "the peer's copy must install as today — this is the resilience case"
+            );
+        }
+
+        #[test]
+        fn an_id_only_ever_peer_served_is_never_shielded_by_a_primary_omission() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+
+            // A is served ONLY by a peer — never by this doorway's own primary.
+            router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: true,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone()],
+            });
+            assert!(router.dispatch(None, "/nrt-garden").is_some());
+
+            // The primary answers successfully-empty again (as it always has) —
+            // A was never primary-sourced, so this must not shield it.
+            let outcome = router.install_from_fallback(FallbackOutcome::PeerServed {
+                primary_url: "http://primary".to_string(),
+                primary_empty: true,
+                serving_url: "http://peer".to_string(),
+                projections: vec![a.clone()],
+            });
+            match outcome {
+                FallbackInstallOutcome::Peer {
+                    installed,
+                    shielded,
+                    ..
+                } => {
+                    assert_eq!(shielded, 0);
+                    assert_eq!(installed, 1);
+                }
+                other => panic!("expected Peer install outcome, got {other:?}"),
+            }
+        }
+
+        #[test]
+        fn the_primary_listing_an_id_again_clears_its_shield() {
+            let router = EprRouter::new();
+            let a = make_projection("garden", "/nrt-garden");
+            let b = make_projection("lamad", "/lamad");
+
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+            // Primary drops A — the shield arms for it.
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![b.clone()],
+            });
+            let (kept, shielded) = router.filter_recently_revoked(vec![a.clone()]);
+            assert_eq!(shielded, 1);
+            assert!(kept.is_empty());
+
+            // ...then the primary legitimately re-lists it (a reactivation).
+            router.install_from_fallback(FallbackOutcome::PrimaryNonEmpty {
+                url: "http://primary".to_string(),
+                projections: vec![a.clone(), b.clone()],
+            });
+
+            // The shield is cleared immediately — a peer echo of A is no longer
+            // shielded now that the primary itself confirmed it live again.
+            let (kept, shielded) = router.filter_recently_revoked(vec![a]);
+            assert_eq!(shielded, 0);
+            assert_eq!(kept.len(), 1);
         }
     }
 }
