@@ -250,18 +250,21 @@ grep -q 'DEGRADED — Prometheus at' "${TEST_ROOT}/gate-promdown.log" || fail 'd
 grep -q 'throttle-leg=degraded' "${STATE}.summary" || fail 'degraded leg not recorded in the summary'
 
 # ── 7. Fair-share clamp keeps the phase inside its budget ───────────────────
-# 5 gates left against a 20s budget => 4s share, under the 10s per-peer ceiling.
+# 5 gates left against a 30s budget => 6s share, under the 10s per-peer ceiling.
+# Six seconds leaves scheduler headroom for the two complete fake
+# status/throttle/parse cycles this release assertion requires.
 new_fake clamp
 pr true 10 0 5 > "${FAKE_DIR}/status-1.json"
 pr true 10 0 6 > "${FAKE_DIR}/status.json"
 STATE="${TEST_ROOT}/state-clamp"
+printf 'BUDGET_LEFT=30\n' > "${STATE}"
 set +e
 ROLL_PEER_DEADLINE_SECS=10 bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 5 "${STATE}" \
   > "${TEST_ROOT}/gate-clamp.log" 2>&1
 RC=$?
 set -e
 [ "${RC}" -eq 0 ] || fail "clamp case should still release (got ${RC})"
-grep -q 'deadline=4s (ceiling=10s, budget-left=20s over 5 remaining gate(s)' "${TEST_ROOT}/gate-clamp.log" \
+grep -q 'deadline=6s (ceiling=10s, budget-left=30s over 5 remaining gate(s)' "${TEST_ROOT}/gate-clamp.log" \
   || { cat "${TEST_ROOT}/gate-clamp.log"; fail 'fair-share clamp did not divide the phase budget across the remaining gates'; }
 
 # ── 7b. Remaining phase budget beats the floor and bounds slow calls ────────
