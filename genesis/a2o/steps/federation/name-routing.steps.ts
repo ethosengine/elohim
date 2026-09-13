@@ -95,7 +95,7 @@
  * the assertion message. `@requires:owned-substrate` forbids restarting a
  * doorway with `FEDERATION_PEERS` set from here (a hard rule of this run) —
  * the fix belongs in `hc-mesh.sh`'s doorway launch, a mesh-launcher gap, not
- * a `name_routing.rs` defect. Scenario 3 ("the holder sheds") does NOT depend
+ * a `name_routing.rs` defect. Scenario 3 ("the holder is paused") does NOT depend
  * on this: it stages the root on BOTH doorways, so the doorway Jessica asks
  * always finds a LOCAL mount and never needs the relay/registry at all — this
  * is genuinely, independently green on the current mesh.
@@ -122,6 +122,7 @@ import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
 import { getRawWithHeaders } from '../../src/framework/dataplane/surfaces.js';
 import {
+  assertStillOwnedProcess,
   resolveOwnedMeshProcess,
   signalOwnedMeshProcess,
   type OwnedProcessHandle,
@@ -152,7 +153,7 @@ const CONFIRM_DROP_GAP_MS = 500;
  * window (SSE re-fetch / EprRouter install can still be completing a beat after the local
  * dispatch itself already answers 404 twice). */
 const SETTLE_AFTER_DROP_MS = 1_000;
-const SHED_SETTLE_MS = 5_000;
+const PAUSE_SETTLE_MS = 5_000;
 const RESTORE_BUDGET_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 10_000;
 
@@ -860,9 +861,9 @@ async function waitForLocalMount(
 async function assertNoLocalContract(
   doorwayUrl: string,
   doorwayLabel: string,
-  root: string
+  root: string,
+  path: string
 ): Promise<void> {
-  const path = nrtRequestPath(root);
   const marker = nrtMarker(root);
   const res = await localOnlyGet(`${doorwayUrl}${path}`);
   assert.ok(
@@ -930,17 +931,15 @@ async function waitForRegistryToKnowHolder(
 async function waitForOwnDispatchToDrop(
   doorwayUrl: string,
   doorwayLabel: string,
-  root: string,
+  path: string,
   budgetMs: number
 ): Promise<void> {
-  const path = nrtRequestPath(root);
-  const marker = nrtMarker(root);
   const deadline = Date.now() + budgetMs;
   let last: RawResponse | undefined;
   let consecutiveDrops = 0;
   for (;;) {
     last = await localOnlyGet(`${doorwayUrl}${path}`);
-    const dropped = !(last.status === 200 && last.text.includes(marker));
+    const dropped = last.status === 404;
     if (dropped) {
       consecutiveDrops += 1;
       if (consecutiveDrops >= 2) return;
@@ -951,7 +950,7 @@ async function waitForOwnDispatchToDrop(
     consecutiveDrops = 0;
     if (Date.now() >= deadline) {
       throw new Error(
-        `doorway "${doorwayLabel}" still serves the lapsed contract's marker at ${path} after ` +
+        `doorway "${doorwayLabel}" has not refused the lapsed contract's entry at ${path} after ` +
           `${budgetMs}ms (HTTP ${last.status}) — its own EprRouter refresh (DOORWAY_EPR_REFRESH_SECS, ` +
           `default 30s) has not caught up with the cancellation yet`
       );
@@ -1172,7 +1171,7 @@ async function acquireLease(world: E2EWorld): Promise<void> {
   ]);
   assert.ok(
     granted,
-    'household mesh is already in use by another fault-injecting scenario; refusing to shed'
+    'household mesh is already in use by another fault-injecting scenario; refusing to pause'
   );
 }
 
@@ -1187,10 +1186,12 @@ function releaseLease(world: E2EWorld): void {
 
 interface AskCapture {
   askedId: string;
+  requestUrl: string;
   response: RawResponse;
   elapsedMs: number;
   /** New log lines written by the ASKED doorway during this ask (relay evidence). */
   askedNewLines: LogLineFields[];
+  otherNewLines: LogLineFields[];
   /** New request-log hits against `path` on the OTHER doorway during this ask ("was it contacted"). */
   otherRequestHits: number;
   otherId: string;
@@ -1200,12 +1201,13 @@ interface NameRoutingState {
   root: string;
   /** The project-epr commitment's `urlPath` (no trailing slash — `/nrt-garden`). */
   mount: string;
-  /** What Jessica actually asks for (trailing slash, extension-less — `/nrt-garden/`). */
+  /** The visitor's path: the mount root, or its explicit entry for the lapse scenario. */
   path: string;
   staged: StagedContract[];
   paused: Map<string, OwnedProcessHandle>; // fixture id -> handle, while SIGSTOP'd
   ask?: AskCapture;
   secondAsk?: AskCapture;
+  staleRegistry?: { doorwayId: string; holderId: string; tickAt: number };
 }
 
 const states = new WeakMap<E2EWorld, NameRoutingState>();
@@ -1397,22 +1399,33 @@ Given(
  * duplicate. Two misses in a row fails naming the exact timing gap, rather than silently
  * asserting on a premise that was never actually true.
  */
-Given(
-  'the registry still names doorway {string} as a holder of {string} from a contract that has lapsed',
+When(
+  'the household withdraws the contract for {string} on doorway {string} before doorway {string} next refreshes its registry',
   { timeout: STALE_REGISTRY_ATTEMPT_BUDGET_MS * STALE_REGISTRY_MAX_ATTEMPTS },
-  async function (this: E2EWorld, holderId: string, root: string): Promise<void> {
-    const state = beginScenario(this, root);
+  async function (
+    this: E2EWorld,
+    root: string,
+    holderId: string,
+    relayingId: string
+  ): Promise<void> {
+    const state = getState(this);
+    assert.equal(state.root, root);
+    // The lapsed site's entry must be absent, not replaced by the unrelated
+    // root SPA's extension-less route fallback. While this contract is live,
+    // the same entry is served and relayed with this scenario's own marker.
+    state.path = `${state.mount}/index.html`;
     const holder = this.getDoorway(holderId);
     const otherId = otherFixtureId(holderId);
+    assert.equal(otherId, relayingId, 'the stale registry belongs to the other household doorway');
     const other = this.getDoorway(otherId);
-    const holderDoorwayId = await resolvedDoorwayId(this, holderId, holder.url);
     const otherLogPath = await doorwayLogPath(MESH_LETTER[otherId], `doorway ${otherId}`);
 
-    let staged: StagedContract | undefined;
+    const staged = state.staged.find(contract => contract.doorwayUrl === holder.url);
+    assert.ok(staged, `no staged contract for ${root} on ${holderId}`);
     let lastFailure: unknown;
 
     for (let attempt = 1; attempt <= STALE_REGISTRY_MAX_ATTEMPTS; attempt += 1) {
-      if (staged) {
+      if (attempt > 1) {
         // A previous attempt's OUTCOME is unknown here: it may have already lapsed this
         // row and confirmed the drop (the common case — the margin check itself is what
         // failed), or it may have thrown before ever reaching `lapseContract` (the tick
@@ -1425,7 +1438,7 @@ Given(
         // SSE-driven refresh can leave `holder`'s local view stuck on neither state for
         // the remainder of `waitForLocalMount`'s budget.
         await lapseContract(staged);
-        await waitForOwnDispatchToDrop(holder.url, holderId, root, OWN_REFRESH_BUDGET_MS);
+        await waitForOwnDispatchToDrop(holder.url, holderId, state.path, OWN_REFRESH_BUDGET_MS);
 
         // Now bring it back live so THIS attempt's premise (a GENUINELY live contract at
         // the moment `other` ticks) is real, not a leftover from the previous attempt.
@@ -1440,9 +1453,6 @@ Given(
           `re-activating ${staged.commitmentId} on "${holderId}" for a retry of the stale-registry ` +
             `premise failed: HTTP ${reactivated.status} ${reactivated.text.slice(0, 300)}`
         );
-      } else {
-        staged = await stageRoot(holder.url, holderDoorwayId, state.mount, root);
-        state.staged.push(staged);
       }
       await waitForLocalMount(holder.url, holderId, state.path, root);
 
@@ -1469,7 +1479,7 @@ Given(
               `${STALE_REGISTRY_SAFETY_MARGIN_MS}ms)`
           );
         }
-        await waitForOwnDispatchToDrop(holder.url, holderId, root, remainingMs);
+        await waitForOwnDispatchToDrop(holder.url, holderId, state.path, remainingMs);
 
         const elapsedSinceTick = Date.now() - tickAt;
         if (elapsedSinceTick > STALE_REGISTRY_SAFETY_MARGIN_MS) {
@@ -1498,6 +1508,7 @@ Given(
           state.mount,
           staged.commitmentId
         );
+        state.staleRegistry = { doorwayId: otherId, holderId, tickAt };
         return;
       } catch (error) {
         lastFailure = error;
@@ -1513,20 +1524,20 @@ Given(
 );
 
 Given(
-  'doorway {string} holds no hosting contract for {string}',
+  'doorway {string} has no contract to host {string} locally',
   { timeout: 15_000 },
   async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
     const doorway = this.getDoorway(doorwayId);
-    await assertNoLocalContract(doorway.url, doorwayId, root);
+    await assertNoLocalContract(doorway.url, doorwayId, root, getState(this).path);
   }
 );
 
 Given(
-  'doorway {string} holds no live hosting contract for {string}',
+  'doorway {string} has observed the withdrawal of its local hosting contract for {string}',
   { timeout: 15_000 },
   async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
     const doorway = this.getDoorway(doorwayId);
-    await assertNoLocalContract(doorway.url, doorwayId, root);
+    await assertNoLocalContract(doorway.url, doorwayId, root, getState(this).path);
   }
 );
 
@@ -1572,6 +1583,39 @@ Given(
   }
 );
 
+Then(
+  'doorway {string} still resolves {string} to doorway {string} in its local registry',
+  { timeout: 20_000 },
+  async function (
+    this: E2EWorld,
+    relayingId: string,
+    root: string,
+    holderId: string
+  ): Promise<void> {
+    const state = getState(this);
+    assert.equal(state.root, root);
+    if (state.staleRegistry) {
+      const stale = state.staleRegistry;
+      assert.equal(stale.doorwayId, relayingId);
+      assert.equal(stale.holderId, holderId);
+      const log = await doorwayLogPath(MESH_LETTER[relayingId], `doorway ${relayingId}`);
+      assert.equal(await lastTickAt(log), stale.tickAt, 'the registry refreshed after withdrawal');
+      assert.ok(
+        Date.now() - stale.tickAt < STALE_REGISTRY_SAFETY_MARGIN_MS,
+        'the measured stale-registry window expired before the visitor request'
+      );
+      return;
+    }
+    await waitForRegistryToKnowHolder(
+      this.getDoorway(relayingId).url,
+      relayingId,
+      state.path,
+      this.getDoorway(holderId).url,
+      5_000
+    );
+  }
+);
+
 Given(
   'both doorways are registered in the registry',
   { timeout: 15_000 },
@@ -1612,7 +1656,7 @@ Given(
 // =============================================================================
 
 When(
-  'Jessica asks doorway {string} for {string}',
+  'Jessica asks doorway {string} for {string}( at its published entry document)',
   { timeout: OWN_REFRESH_BUDGET_MS + 30_000 },
   async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
     const state = getState(this);
@@ -1639,9 +1683,11 @@ When(
 
     const capture: AskCapture = {
       askedId: doorwayId,
+      requestUrl: `${asked.url}${state.path}`,
       response,
       elapsedMs,
       askedNewLines,
+      otherNewLines: parseLogLines(otherNewText),
       otherRequestHits,
       otherId,
     };
@@ -1678,7 +1724,7 @@ Then('Jessica is served {string}', function (this: E2EWorld, root: string): void
 });
 
 Then(
-  'the page Jessica received is the one doorway {string} would have served her directly',
+  'the relayed page matches a direct request to doorway {string}',
   { timeout: 15_000 },
   async function (this: E2EWorld, holderId: string): Promise<void> {
     const state = getState(this);
@@ -1699,7 +1745,7 @@ Then(
 );
 
 Then(
-  'doorway {string} resolved the holder from the registry, not from a configured peer list',
+  'doorway {string} logged a relay resolved through its hosting-contract registry',
   function (this: E2EWorld, relayingId: string): void {
     const state = getState(this);
     const ask = requireAsk(state);
@@ -1778,7 +1824,7 @@ Then(
 );
 
 When(
-  "Jessica's client asks for {string} again",
+  'the test client representing Jessica uses the returned origin to ask for {string} again',
   { timeout: 20_000 },
   async function (this: E2EWorld, root: string): Promise<void> {
     const state = getState(this);
@@ -1800,10 +1846,12 @@ When(
     const newLines = parseLogLines(await logSince(relayingLog, relayingOffset));
 
     state.secondAsk = {
+      requestUrl: `${servedBy}${state.path}`,
       askedId: relayingId, // placeholder id label; the relaying doorway's log is what "forwarded nothing" reads
       response,
       elapsedMs,
       askedNewLines: newLines,
+      otherNewLines: [],
       otherRequestHits: 0,
       otherId: relayingId,
     };
@@ -1825,9 +1873,11 @@ Then(
       !second.response.headers['x-elohim-name-route'],
       'the direct second request still carries a relay marker header — it was not answered locally'
     );
-    // Trivially true by construction (the When step dialed holder.url directly), asserted
-    // here so a future refactor that breaks that construction fails loudly.
-    assert.ok(holder.url.length > 0);
+    assert.equal(second.requestUrl, `${holder.url}${state.path}`);
+    assert.ok(
+      second.response.text.includes(nrtMarker(state.root)),
+      'the direct holder address returned unrelated content instead of the staged site'
+    );
   }
 );
 
@@ -1854,12 +1904,12 @@ Then(
 );
 
 // =============================================================================
-// Scenario 3 — the holder sheds; the doorway Jessica reaches serves itself
+// Scenario 3 — the holder is paused; the doorway Jessica reaches serves itself
 // =============================================================================
 
 When(
-  'the household makes doorway {string} shed',
-  { timeout: SHED_SETTLE_MS + 20_000 },
+  'the household pauses doorway {string}',
+  { timeout: PAUSE_SETTLE_MS + 20_000 },
   async function (this: E2EWorld, doorwayId: string): Promise<void> {
     const state = getState(this);
     await acquireLease(this);
@@ -1870,7 +1920,14 @@ When(
     );
     await signalOwnedMeshProcess(handle, 'SIGSTOP', `doorway ${doorwayId}`);
     state.paused.set(doorwayId, handle);
-    await delay(SHED_SETTLE_MS);
+    await delay(PAUSE_SETTLE_MS);
+    await assertStillOwnedProcess(handle, `doorway ${doorwayId}`);
+    const status = await readFile(`/proc/${handle.pid}/status`, 'utf8');
+    assert.match(
+      status,
+      /^State:\s+T(?:\s|$)/m,
+      `doorway "${doorwayId}" did not enter the stopped state`
+    );
   }
 );
 
@@ -1901,44 +1958,35 @@ Then(
       !ask.response.headers['x-elohim-served-by'],
       `doorway "${servingId}"'s answer names a served-by origin — it was relayed, not served locally`
     );
+    const relayAttempts = ask.askedNewLines.filter(
+      f => f['path'] === state.path && (f.message === MSG_RELAYED || f.message === MSG_ALL_FAILED)
+    );
+    assert.equal(
+      relayAttempts.length,
+      0,
+      `doorway "${servingId}" logged a relay attempt before serving locally`
+    );
   }
 );
 
 Then(
   'doorway {string} was never contacted for that request',
-  function (this: E2EWorld, shedId: string): void {
+  function (this: E2EWorld, pausedId: string): void {
     const state = getState(this);
     const ask = requireAsk(state);
     assert.equal(
       ask.otherId,
-      shedId,
-      `the captured ask tracked doorway "${ask.otherId}" as the sibling, not "${shedId}"`
+      pausedId,
+      `the captured ask tracked doorway "${ask.otherId}" as the sibling, not "${pausedId}"`
     );
     assert.equal(
       ask.otherRequestHits,
       0,
-      `doorway "${shedId}"'s access log gained ${ask.otherRequestHits} new request line(s) for ${state.path} ` +
+      `doorway "${pausedId}"'s access log gained ${ask.otherRequestHits} new request line(s) for ${state.path} ` +
         `during Jessica's ask — it WAS contacted`
     );
   }
 );
-
-Then("the shedding holder's answer was never handed to Jessica", function (this: E2EWorld): void {
-  const state = getState(this);
-  const ask = requireAsk(state);
-  // Alpha's shed answer is `converging_shell_response`/a 503 "catching-up" body — Jessica's
-  // response carries neither that status nor any relay marker (asserted above), so it cannot
-  // be alpha's answer under any code path this build has.
-  assert.notEqual(
-    ask.response.status,
-    503,
-    "Jessica's response carries the shedding doorway's own 503 status"
-  );
-  assert.ok(
-    !ask.response.text.includes('catching-up'),
-    "Jessica's response body carries the shedding doorway's own converging-shell body"
-  );
-});
 
 When(
   'the household restores doorway {string}',
@@ -1988,6 +2036,12 @@ Then(
     const state = getState(this);
     const ask = requireAsk(state);
     assert.equal(ask.askedId, relayingId);
+    assert.equal(
+      ask.otherRequestHits,
+      1,
+      `doorway "${holderId}" received ${ask.otherRequestHits} request(s) for ${state.path}; ` +
+        `expected one forwarded request (visitor HTTP ${ask.response.status})`
+    );
     // A sibling's own 404 (the lapsed holder answering honestly) is a FAILED attempt in
     // relay_one_hop terms — the log line is the WARN "every holder failed", carrying
     // `attempted`, never the "relayed" INFO line (that is reserved for a 2xx/3xx serve).
@@ -1998,7 +2052,8 @@ Then(
       failed.length,
       1,
       `doorway "${relayingId}" logged ${failed.length} "${MSG_ALL_FAILED}" line(s) for ${state.path}, expected ` +
-        'exactly one'
+        `exactly one (visitor HTTP ${ask.response.status}; ` +
+        `relay messages: ${JSON.stringify(ask.askedNewLines.filter(f => f['path'] === state.path))})`
     );
     assert.equal(
       failed[0]?.['attempted'],
@@ -2010,27 +2065,7 @@ Then(
 );
 
 Then(
-  'the forwarded request carried the mark that says it was forwarded',
-  function (this: E2EWorld): void {
-    const state = getState(this);
-    const ask = requireAsk(state);
-    // By construction: `fetch_from_holder` (server/http.rs) unconditionally stamps
-    // `FEDERATION_HOP_HEADER` on every outbound relay attempt before it is ever sent — the
-    // "every holder failed" log line asserted in the previous step is proof a relay attempt
-    // reached the holder at all, and this file's http.rs reading confirms that attempt ALWAYS
-    // carries the mark. No independent wire-level probe is available from this test surface.
-    const failed = ask.askedNewLines.filter(
-      f => f.message === MSG_ALL_FAILED && f['path'] === state.path
-    );
-    assert.ok(
-      failed.length > 0,
-      'no relay attempt was logged at all — cannot have carried the mark'
-    );
-  }
-);
-
-Then(
-  'doorway {string} answered that request itself rather than forwarding it onward',
+  'doorway {string} received the forwarded request exactly once',
   function (this: E2EWorld, holderId: string): void {
     const state = getState(this);
     const ask = requireAsk(state);
@@ -2050,28 +2085,42 @@ Then(
 );
 
 Then(
-  'Jessica received a refusal naming that no doorway holds a live contract for {string}',
-  function (this: E2EWorld, root: string): void {
+  'doorway {string} forwarded nothing onward for that request',
+  function (this: E2EWorld, holderId: string): void {
     const state = getState(this);
     const ask = requireAsk(state);
-    assert.equal(
-      ask.response.status,
-      404,
-      `Jessica's request for "${root}" answered HTTP ${ask.response.status}, not a refusal`
+    assert.equal(ask.otherId, holderId);
+    const onward = ask.otherNewLines.filter(
+      f => f['path'] === state.path && (f.message === MSG_RELAYED || f.message === MSG_ALL_FAILED)
     );
-    // The literal wording is implementation-specific (`{"error": "File not found in app: ..."}`
-    // — elohim-storage's generic app-bundle 404, not a name-routing-specific message). This
-    // step asserts the STATUS (a genuine refusal, not content) and records that gap honestly
-    // rather than inventing a string match the API does not carry.
-    assert.ok(
-      ask.response.text.length > 0,
-      'the refusal carries an empty body — cannot confirm it is a real refusal, not a hang-turned-empty-response'
+    assert.equal(
+      onward.length,
+      0,
+      `doorway "${holderId}" attempted another relay for ${state.path}`
     );
   }
 );
 
+Then('Jessica received HTTP 404 for {string}', function (this: E2EWorld, root: string): void {
+  const state = getState(this);
+  const ask = requireAsk(state);
+  assert.equal(
+    ask.response.status,
+    404,
+    `Jessica's request for "${root}" answered HTTP ${ask.response.status}, not a refusal`
+  );
+  // The literal wording is implementation-specific (`{"error": "File not found in app: ..."}`
+  // — elohim-storage's generic app-bundle 404, not a name-routing-specific message). This
+  // step asserts the STATUS (a genuine refusal, not content) and records that gap honestly
+  // rather than inventing a string match the API does not carry.
+  assert.ok(
+    ask.response.text.length > 0,
+    'the refusal carries an empty body — cannot confirm it is a real refusal, not a hang-turned-empty-response'
+  );
+});
+
 Then(
-  'being registered was not enough for either doorway to be chosen as holder',
+  'neither registered doorway served content for the lapsed site',
   function (this: E2EWorld): void {
     const state = getState(this);
     const ask = requireAsk(state);
@@ -2091,18 +2140,15 @@ Then(
   }
 );
 
-Then(
-  'Jessica received that refusal rather than waiting out a timeout',
-  function (this: E2EWorld): void {
-    const state = getState(this);
-    const ask = requireAsk(state);
-    assert.ok(
-      ask.elapsedMs < REQUEST_TIMEOUT_MS,
-      `Jessica's request took ${ask.elapsedMs}ms (bounded fetch is ${REQUEST_TIMEOUT_MS}ms) — this looks like a ` +
-        'timeout, not a fast honest refusal'
-    );
-  }
-);
+Then('Jessica received that refusal in less than 15 seconds', function (this: E2EWorld): void {
+  const state = getState(this);
+  const ask = requireAsk(state);
+  assert.ok(
+    ask.elapsedMs < REQUEST_TIMEOUT_MS,
+    `Jessica's request took ${ask.elapsedMs}ms (bounded fetch is ${REQUEST_TIMEOUT_MS}ms) — this looks like a ` +
+      'timeout, not a fast honest refusal'
+  );
+});
 
 // =============================================================================
 // Teardown — restoration has priority over everything else. A scenario that

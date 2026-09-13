@@ -422,7 +422,7 @@ export function membershipLaneForChannel(
   fixture: HouseholdMeshFixture,
   channel: 'converged' | 'candidate'
 ): MembershipLaneFixture | undefined {
-  return membershipLanes(fixture).find((lane) => lane.channel === channel);
+  return membershipLanes(fixture).find(lane => lane.channel === channel);
 }
 
 export function requireFixturePrimaryStorageUrl(
