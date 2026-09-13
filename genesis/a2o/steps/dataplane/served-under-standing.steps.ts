@@ -54,31 +54,42 @@
  * mesh says James holds the membership (expected, given the above), that half
  * returns 'pending' naming this exact reason rather than asserting a false premise.
  *
- * TWO GAPS THIS FILE MEASURES HONESTLY RED, TRACED FROM SOURCE (never faked
- * green — matches the habit's own "the anonymous-after-narrowing scenario must
- * FAIL on today's binaries, or it is not measuring the gap it was written for"):
+ * THE TWO CHROME CLAUSES, AND WHAT NOW ANSWERS THEM. Both were measured RED on
+ * the household mesh 2026-09-13 and closed in the same pass — the assertions
+ * below are unchanged; the source they read now exists.
  *
- *   1. `serve_eligibility::serve_eligibility`'s ANONYMOUS-restricted refusal
- *      reason ("Its stewards narrowed it to {declared}, which does not admit a
- *      visitor who has shown nothing. If you are one of the people it now names,
- *      sign in and ask again.") never names the collective — only the
- *      AUTHENTICATED-wrong-membership branch says "which admits {audience}". So
- *      "the refusal names {household} as the collective whose ruling narrowed
- *      it" (scenario 1) has no source text to satisfy for an ANONYMOUS refusal
- *      and is measured as a real assertion that fails today, not skipped.
- *   2. `dispatch_to_projected_epr`'s Serve branch (`ServeEligibility::Serve`)
- *      returns `None` and falls through to the ordinary byte path with NO extra
- *      header — `x-elohim-standing` is minted ONLY by `refusal_response`. So
- *      "the chrome names the reach that admitted him" (scenario 2, success case)
- *      has no header to read and is measured as a real assertion that fails
- *      today.
+ *   1. "the refusal names {household} as the collective whose ruling narrowed
+ *      it" (scenario 1). `serve_eligibility`'s ANONYMOUS-restricted branch now
+ *      says "…narrowed it to {declared} reach, which admits members of {the
+ *      collective} and not a visitor who has shown nothing", and the refusal
+ *      JSON carries `collective: {id,label,record}` plus `declaredIn` — the
+ *      route that reads the reach declaration itself back. The name comes from
+ *      the declaration's OWN audience term, so it is a record the visitor can
+ *      follow, never a doorway-local string. Which is also why the RULING now
+ *      writes that term (`householdAudience` below): a ruling that named no
+ *      collective would leave the doorway nothing it could honestly say, and
+ *      would narrow to a rung that admits any authenticated requester at all —
+ *      wider than this feature's own REACH paragraph allows.
+ *   2. "the chrome names the reach that admitted him" (scenario 2, success
+ *      case). An admitted serve now carries
+ *      `x-elohim-standing: admitted;reach=<reach>`
+ *      (`serve_eligibility::stamp_admitted_standing`, stamped by
+ *      `dispatch_to_projected_epr` and by the SSR branch) — the same sentence
+ *      shape the refusal uses, so a reader never has to infer the fold's answer
+ *      from a status code. A relay carries the HOLDER's value verbatim rather
+ *      than restating it, so beta shows alpha's standing.
  *
- * Both are the fold's chrome/governance-mark surface, not its reach/standing
- * decision — the habit's own checks list assigns the five chrome affordances to
- * `epr-atom-home.habit.md` "deliberately not re-registered here". This file still
- * asserts them (rather than omitting the clause) because a silently-omitted
- * assertion is a false green; a written, failing assertion is the honest measure
- * this habit's evidence ledger runs on.
+ * A THIRD RED, in the substrate under both, is why scenario 2's premise could
+ * not converge: `GET /db/participations/{human_id}` — the ONE read the fold
+ * makes for a restricted-reach serve (`serve_eligibility::read_memberships`) —
+ * 404'd "Unknown database endpoint" on every household peer, because
+ * "participations" was missing from `extract_app_context`'s `legacy_prefixes`
+ * (elohim-storage http.rs) and was eaten as an `h_app_id`. The fold read that
+ * failure as "this requester presented no standing" — correctly, since a
+ * membership read that cannot be completed is never permission — so a
+ * household member was refused their own household's record and the refusal
+ * blamed reach. Fixed storage-side in the same pass; regression test
+ * `participations_namespace_survives_app_context_extraction`.
  *
  * SCENARIO 3's "still holds the bytes warm" is checked by a SECOND, AUTHENTICATED
  * serve of the same root succeeding (200 + the archive's own marker) — never by
@@ -508,6 +519,32 @@ function buildMetadata(
   };
 }
 
+/** The audience term a ruling by the household writes onto the contract.
+ *
+ * A ruling NAMES its collective — that is what makes "the refusal names the
+ * collective whose ruling narrowed it" checkable from a record rather than
+ * from a doorway-local string. It is also what the feature's own REACH
+ * paragraph asks a narrowing to be: "the new reach admits the household's
+ * members and no longer admits an anonymous stranger". A narrowing that
+ * carried NO audience term would satisfy neither — it would admit any
+ * authenticated requester at all (serve_eligibility.rs: "the rung itself is
+ * the audience"), which is wider than the story says, and it would leave the
+ * refusal with no collective to name.
+ *
+ * `membershipPrerequisite` is the projected relation the doorway's fold reads
+ * as an audience (`audience_from_projection`), so this needs no new entry
+ * type, no new column and no new doorway persistence.
+ */
+function householdAudience(collectiveName: string): GateHint[] {
+  return [
+    {
+      eprRef: HOUSEHOLD_COLLECTIVE_ID,
+      label: collectiveName,
+      relation: 'membershipPrerequisite',
+    },
+  ];
+}
+
 interface StagedRoot {
   label: string;
   doorwayUrl: string;
@@ -786,6 +823,13 @@ interface Refusal {
   hear: string;
   epr: string;
   contract: string;
+  /** The collective the declared reach names, with the route that reads it
+   * back. Absent when the reach names no audience — a doorway that holds no
+   * such record says nothing rather than inventing a name. */
+  collective?: { id: string; label?: string; record: string };
+  /** The route that reads the reach declaration itself back (the REA
+   * commitment carrying reach + audience terms). */
+  declaredIn?: string;
 }
 
 interface ScenarioState {
@@ -1009,7 +1053,7 @@ When(
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     assert.equal(collectiveName, state.collectiveName);
-    await narrowReach(requireHolder(this), 'local');
+    await narrowReach(requireHolder(this), 'local', householdAudience(collectiveName));
   }
 );
 
@@ -1072,17 +1116,35 @@ Then(
     const state = getState(this);
     const refusal = state.lastRefusal?.body;
     assert.ok(refusal, 'no refusal body captured to assert against');
-    // HONEST RED (file header, gap 1): serve_eligibility.rs's anonymous-
-    // restricted refusal reason ("Its stewards narrowed it to {declared}...")
-    // never names the collective — only the authenticated-wrong-membership
-    // branch says "which admits {audience}". This assertion measures that
-    // gap rather than skipping it.
+    // The name must be SAID, in the sentence a person reads — not only carried
+    // in a field a chrome might render. (serve_eligibility.rs, the
+    // ReachClass::Restricted !authenticated branch.)
     assert.ok(
       refusal.reason.toLowerCase().includes(collectiveName.toLowerCase()),
-      `refusal reason does not name "${collectiveName}": "${refusal.reason}" — ` +
-        "serve_eligibility.rs's anonymous-restricted refusal text never names the collective " +
-        '(doorway/doorway-service/src/services/serve_eligibility.rs, the ReachClass::Restricted ' +
-        '!authenticated branch); this is a real, currently-unmet clause of the habit, not a test defect.'
+      `refusal reason does not name "${collectiveName}": "${refusal.reason}" — the ` +
+        "anonymous-restricted refusal text is built from the reach declaration's own audience " +
+        'term (doorway/doorway-service/src/services/serve_eligibility.rs). An unnamed collective ' +
+        'here means either the ruling wrote no audience term onto the contract, or this doorway ' +
+        "re-folded from a row that predates it — never that the doorway 'forgot' to say it."
+    );
+    // …and it must READ BACK to a record, which is the half a doorway-local
+    // list could never produce: the collective's own row, and the reach
+    // declaration that named it.
+    assert.ok(
+      refusal.collective?.id === HOUSEHOLD_COLLECTIVE_ID,
+      `refusal names no collective record (want id "${HOUSEHOLD_COLLECTIVE_ID}"): ` +
+        JSON.stringify(refusal.collective)
+    );
+    assert.equal(
+      refusal.collective?.record,
+      `/db/collectives/${HOUSEHOLD_COLLECTIVE_ID}`,
+      'the named collective must be dereferenceable on the doorway that refused'
+    );
+    assert.equal(
+      refusal.declaredIn,
+      `/api/v1/commitments/${requireHolder(this).commitmentId}`,
+      'the refusal must point at the reach declaration it read, so "decided by the fold" is ' +
+        'checkable as "the reason it gave reads back to a record"'
     );
   }
 );
@@ -1222,13 +1284,7 @@ Given(
     assert.equal(eprLabel, state.label);
     assert.equal(collectiveName, state.collectiveName);
     const holder = requireHolder(this);
-    await narrowReach(holder, 'household', [
-      {
-        eprRef: HOUSEHOLD_COLLECTIVE_ID,
-        label: collectiveName,
-        relation: 'membershipPrerequisite',
-      },
-    ]);
+    await narrowReach(holder, 'household', householdAudience(collectiveName));
     // Wait for the HOLDER's own EprRouter refresh to pick up the new gate
     // hints, checking BOTH sides at once — a bearer-only poll for 200 is
     // trivially true while the reach is still `commons` (before the
@@ -1396,19 +1452,23 @@ Then(
       !servedBy || originsEqual(servedBy, holder.doorwayUrl),
       `"x-elohim-served-by" (${servedBy}) does not name the holder (${holder.doorwayUrl})`
     );
-    // HONEST RED (file header, gap 2): dispatch_to_projected_epr's Serve
-    // branch returns None and falls through to the ordinary byte path with
-    // no extra header — x-elohim-standing is minted ONLY by refusal_response.
-    // There is today no response signal naming the reach that admitted a
-    // successful serve; this assertion measures that absence rather than
-    // silently passing on the holder-half alone.
+    // The admitting reach, said on the way IN — the same sentence shape the
+    // refusal uses (`admitted;reach=<reach>` vs `refused;reach=<reach>`), so
+    // the chrome never has to infer the fold's answer from a status code.
+    // Stamped by serve_eligibility::stamp_admitted_standing; a relayed serve
+    // carries the HOLDER's value verbatim.
     const standingHeader = state.lastServed.headers['x-elohim-standing'];
     assert.ok(
       standingHeader?.includes(`reach=${holder.currentReach}`),
-      'a served (200) response carries no "x-elohim-standing" header naming the admitting reach — ' +
-        "doorway/doorway-service/src/server/http.rs::dispatch_to_projected_epr's Serve branch adds " +
-        'no such header today (only refusal_response does); the chrome cannot yet show this from the ' +
-        'wire, so this is a real gap, not a test defect.'
+      `a served (200) response's "x-elohim-standing" (${JSON.stringify(standingHeader)}) does not ` +
+        `name the admitting reach "${holder.currentReach}" — either the row this doorway folded ` +
+        'against still carries the pre-narrowing reach, or the serve took a byte path that never ' +
+        'passed through the fold (doorway/doorway-service/src/server/http.rs).'
+    );
+    assert.ok(
+      standingHeader?.startsWith('admitted;'),
+      `"x-elohim-standing" (${JSON.stringify(standingHeader)}) does not say the fold ADMITTED this ` +
+        'serve — a 200 alone does not distinguish "the fold said yes" from "no fold ran"'
     );
   }
 );
