@@ -1816,6 +1816,25 @@ fn commitment_to_projection_view(c: ReaCommitment) -> Result<EprProjectionView, 
                 serde_json::from_value(v.clone()).ok()
             }
         }),
+        // The redress terms. Absent = the collective has not declared one,
+        // which is the honest reading of every contract written before they
+        // existed — and the reading a doorway MUST take, because the
+        // alternative is naming a party the collective never named. A
+        // malformed value degrades to absent for the same reason: a term this
+        // row cannot state is a term this row does not state.
+        responsive_reach: metadata.get("responsiveReach").and_then(|v| {
+            if v.is_null() {
+                None
+            } else {
+                serde_json::from_value(v.clone()).ok()
+            }
+        }),
+        hosting_agreement_id: metadata
+            .get("hostingAgreementId")
+            .and_then(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(String::from),
         seeded_at: c.created_at.to_string(),
         seeded_by: c.provider,
     })
@@ -2502,6 +2521,78 @@ mod projection_resolver_tests {
         );
         assert_eq!(view.redirect_templates[0].from, "/lamad/resource/{id}");
         assert_eq!(view.redirect_templates[0].to, "/epr/{id}");
+    }
+
+    /// The redress terms project from the contract's own metadata — the
+    /// collective's declaration, read through unchanged.
+    #[test]
+    fn the_redress_terms_project_from_the_contract_metadata() {
+        let metadata = serde_json::json!({
+            "urlPath": "/garden",
+            "reach": "private",
+            "responsiveReach": {
+                "party": "household-dowell",
+                "partyLabel": "the Dowell household",
+                "withinHours": 72
+            },
+            "hostingAgreementId": "hosting-agreement-ef5a1e65191a56a9"
+        });
+        let row = ReaCommitment {
+            id: "test-redress".into(),
+            action: "project-epr".into(),
+            provider: "p".into(),
+            receiver: "p".into(),
+            in_scope_of: Some("doorway:alpha-elohim-host|epr:community-garden-club".into()),
+            note: None,
+            metadata_json: Some(metadata.to_string()),
+            ..make_test_commitment_row()
+        };
+        let view = commitment_to_projection_view(row).unwrap();
+        let term = view.responsive_reach.expect("the term is declared");
+        assert_eq!(term.party, "household-dowell");
+        assert_eq!(term.party_label.as_deref(), Some("the Dowell household"));
+        assert_eq!(term.within_hours, 72);
+        assert_eq!(
+            view.hosting_agreement_id.as_deref(),
+            Some("hosting-agreement-ef5a1e65191a56a9")
+        );
+    }
+
+    /// An UNDECLARED term is undeclared, and a MALFORMED one is undeclared too
+    /// — never a default party, never a poisoned row. A contract whose redress
+    /// term cannot be read says nothing about redress; it still routes.
+    #[test]
+    fn an_absent_or_malformed_redress_term_reads_as_undeclared_not_as_a_default() {
+        for metadata in [
+            serde_json::json!({ "urlPath": "/garden" }),
+            serde_json::json!({ "urlPath": "/garden", "responsiveReach": null,
+                                "hostingAgreementId": null }),
+            // withinHours missing — the window is the whole point of the term,
+            // so a term without one is not a term.
+            serde_json::json!({ "urlPath": "/garden",
+                                "responsiveReach": { "party": "household-dowell" },
+                                "hostingAgreementId": "   " }),
+        ] {
+            let row = ReaCommitment {
+                id: "test-redress-absent".into(),
+                action: "project-epr".into(),
+                provider: "p".into(),
+                receiver: "p".into(),
+                in_scope_of: Some("doorway:alpha-elohim-host|epr:community-garden-club".into()),
+                note: None,
+                metadata_json: Some(metadata.to_string()),
+                ..make_test_commitment_row()
+            };
+            let view = commitment_to_projection_view(row)
+                .expect("an unreadable redress term must never poison the row");
+            assert!(
+                view.responsive_reach.is_none(),
+                "metadata {metadata} must yield no declared party"
+            );
+            assert!(view.hosting_agreement_id.is_none());
+            // …and the routing law is untouched.
+            assert_eq!(view.url_path, "/garden");
+        }
     }
 
     // =========================================================================

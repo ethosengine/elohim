@@ -367,6 +367,8 @@ pub(crate) fn sample_projection(
         gate_hints: vec![],
         dead_end: false,
         steward_direct_endpoint: None,
+        responsive_reach: None,
+        hosting_agreement_id: None,
         seeded_at: "2026-05-25T00:00:00Z".into(),
         seeded_by: "test".into(),
     }

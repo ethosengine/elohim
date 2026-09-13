@@ -3958,6 +3958,8 @@ fn epr_projection_view_cached_mode_matches_schema() {
         }],
         dead_end: false,
         steward_direct_endpoint: None,
+        responsive_reach: None,
+        hosting_agreement_id: None,
         seeded_at: "2026-05-25T00:00:00Z".into(),
         seeded_by: "12D3KooWMatthewBlade01AlphaNode".into(),
     };
@@ -4019,6 +4021,8 @@ fn epr_projection_view_with_route_claims_matches_schema() {
         gate_hints: vec![],
         dead_end: false,
         steward_direct_endpoint: None,
+        responsive_reach: None,
+        hosting_agreement_id: None,
         seeded_at: "2026-06-06T00:00:00Z".into(),
         seeded_by: "12D3KooWTest".into(),
     };
@@ -4092,6 +4096,8 @@ fn epr_projection_view_steward_direct_populated_matches_schema() {
                 "bafyreib2vq7elohimAppEPR012345678901234567890123456789012345".into(),
             ],
         }),
+        responsive_reach: None,
+        hosting_agreement_id: None,
         seeded_at: "2026-05-25T10:30:00Z".into(),
         seeded_by: "12D3KooWShemBlade02".into(),
     };

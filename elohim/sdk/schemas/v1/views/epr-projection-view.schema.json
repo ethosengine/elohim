@@ -110,6 +110,16 @@
       ],
       "description": "Present only when mode=stewardDirect. Describes the steward node the doorway proxies to. Null when mode=cached."
     },
+    "responsiveReach": {
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/ResponsiveReach" }],
+      "default": null,
+      "description": "Who answers a challenge to the standing this contract projects under, and within how long. Authored by the collective's own steward on the contract, never by a doorway — a doorway copies 'party' verbatim onto the commitment it witnesses and never sets it. Because the term lives on the contract, its created_at and dhtAnchorHash predate any challenge against it, which is what makes 'a due window declared before the visitor sent it' checkable. Absent/null = the collective has not said who answers; the honest answer to a challenge is then owed:null with the reason, never a party the doorway picked."
+    },
+    "hostingAgreementId": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "The hosting-agreement commitment id that bounds this projection — the reciprocal term a fair-trade receipt reads as 'what was given in exchange'. A POINTER, never a copy: the agreement is its own notarized record with its own provider, scopes and lifecycle. Absent/null is reported by a receipt as the named absence unrecorded:['exchanged'], never as a synthesized figure."
+    },
     "seededAt": {
       "type": "string",
       "format": "date-time",
@@ -179,6 +189,26 @@
             "witnessToInvolve"
           ],
           "description": "Semantic relation type classifying what role the referenced EPR plays as a gate."
+        }
+      }
+    },
+    "ResponsiveReach": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["party", "withinHours"],
+      "properties": {
+        "party": {
+          "type": "string",
+          "description": "The party that owes the response — a collective id, as the contract's steward declared it. Copied VERBATIM onto any commitment witnessing a challenge; a doorway never substitutes its own."
+        },
+        "partyLabel": {
+          "type": ["string", "null"],
+          "description": "The name a person would use for that party, when the contract holds one. A refusal SAYS this and falls back to 'party' when absent."
+        },
+        "withinHours": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How long the declared party has to answer, in hours, counted from when the challenge was received. The WINDOW is what the contract fixes; the date it lands on is arithmetic any reader can redo."
         }
       }
     },

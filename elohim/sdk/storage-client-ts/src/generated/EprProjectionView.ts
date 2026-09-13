@@ -3,6 +3,7 @@ import type { Channel } from "./Channel";
 import type { GateHintRef } from "./GateHintRef";
 import type { ProjectionMode } from "./ProjectionMode";
 import type { RedirectTemplate } from "./RedirectTemplate";
+import type { ResponsiveReach } from "./ResponsiveReach";
 import type { RouteClaimGrant } from "./RouteClaimGrant";
 import type { StewardDirectEndpoint } from "./StewardDirectEndpoint";
 
@@ -115,6 +116,31 @@ deadEnd: boolean,
  * Steward-direct endpoint, populated when mode is StewardDirect.
  */
 stewardDirectEndpoint: StewardDirectEndpoint | null, 
+/**
+ * WHO answers a challenge to this projection's standing, and HOW SOON.
+ *
+ * Authored by the collective's own steward on the contract, never by a
+ * doorway — which is the whole point: a doorway carries a visitor's
+ * challenge to the party the collective NAMED and then gets out of the
+ * way. Absent means the collective has not said who answers, and the
+ * honest answer to a challenge is then `owed: null` with the reason, never
+ * a party this doorway picked.
+ *
+ * `serde(default)` = `None`: every contract written before this term
+ * existed reads as "no term declared", which is true of them.
+ */
+responsiveReach: ResponsiveReach | null, 
+/**
+ * The `hosting-agreement` commitment that bounds this projection — the
+ * reciprocal term a fair-trade receipt reads as "what was given in
+ * exchange".
+ *
+ * A POINTER, never a copy: the agreement is its own notarized record with
+ * its own provider, scopes and lifecycle, and the receipt dereferences it
+ * rather than restating any of it. `serde(default)` = `None`, which a
+ * receipt reports as the named absence `unrecorded: ["exchanged"]`.
+ */
+hostingAgreementId: string | null, 
 /**
  * RFC3339 timestamp of when the projection was seeded into the doorway.
  */

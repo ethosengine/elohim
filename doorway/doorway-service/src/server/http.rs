@@ -3912,6 +3912,8 @@ mod epr_dispatch_breaker_tests {
             gate_hints: vec![],
             dead_end: false,
             steward_direct_endpoint: None,
+            responsive_reach: None,
+            hosting_agreement_id: None,
             seeded_at: "2026-06-06T00:00:00Z".into(),
             seeded_by: "test".into(),
         }
@@ -9641,6 +9643,8 @@ mod epr_claims_dispatch_tests {
             gate_hints: vec![],
             dead_end: false,
             steward_direct_endpoint: None,
+            responsive_reach: None,
+            hosting_agreement_id: None,
             seeded_at: "2026-06-06T00:00:00Z".into(),
             seeded_by: "test".into(),
         };
@@ -9730,6 +9734,8 @@ mod epr_claims_dispatch_tests {
             gate_hints: vec![],
             dead_end: false,
             steward_direct_endpoint: None,
+            responsive_reach: None,
+            hosting_agreement_id: None,
             seeded_at: "2026-06-06T00:00:00Z".into(),
             seeded_by: "test".into(),
         };

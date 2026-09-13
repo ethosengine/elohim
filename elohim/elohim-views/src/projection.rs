@@ -82,10 +82,65 @@ pub struct EprProjectionView {
     pub dead_end: bool,
     /// Steward-direct endpoint, populated when mode is StewardDirect.
     pub steward_direct_endpoint: Option<StewardDirectEndpoint>,
+    /// WHO answers a challenge to this projection's standing, and HOW SOON.
+    ///
+    /// Authored by the collective's own steward on the contract, never by a
+    /// doorway — which is the whole point: a doorway carries a visitor's
+    /// challenge to the party the collective NAMED and then gets out of the
+    /// way. Absent means the collective has not said who answers, and the
+    /// honest answer to a challenge is then `owed: null` with the reason, never
+    /// a party this doorway picked.
+    ///
+    /// `serde(default)` = `None`: every contract written before this term
+    /// existed reads as "no term declared", which is true of them.
+    #[serde(default)]
+    pub responsive_reach: Option<ResponsiveReach>,
+    /// The `hosting-agreement` commitment that bounds this projection — the
+    /// reciprocal term a fair-trade receipt reads as "what was given in
+    /// exchange".
+    ///
+    /// A POINTER, never a copy: the agreement is its own notarized record with
+    /// its own provider, scopes and lifecycle, and the receipt dereferences it
+    /// rather than restating any of it. `serde(default)` = `None`, which a
+    /// receipt reports as the named absence `unrecorded: ["exchanged"]`.
+    #[serde(default)]
+    pub hosting_agreement_id: Option<String>,
     /// RFC3339 timestamp of when the projection was seeded into the doorway.
     pub seeded_at: String,
     /// PeerId of the steward node that seeded this projection.
     pub seeded_by: String,
+}
+
+/// The responsive-reach term: who owes an answer when a visitor challenges the
+/// standing this contract projects under, and within how long.
+///
+/// Two keys inside the collective's own `project-epr` contract metadata,
+/// alongside `urlPath`/`mode`/`reach`/`gateHints` — NOT a new entry type, not a
+/// new column, and not doorway state. That placement is what makes "a due date
+/// declared BEFORE the visitor sent it" checkable: the contract's own
+/// `created_at` and `dht_anchor_hash` predate any challenge against it, so the
+/// window a challenge is witnessed under can be read back to a record that
+/// already stood.
+///
+/// A doorway copies [`Self::party`] VERBATIM onto the commitment it mints and
+/// never sets it: the substrate allocates, the collective declares, and a
+/// doorway that chose who owes an answer would be answering on the collective's
+/// behalf.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResponsiveReach {
+    /// The party that owes the response — a collective id, as the contract's
+    /// steward declared it.
+    pub party: String,
+    /// The name a person would use for that party, when the contract holds one.
+    /// A refusal SAYS this; it falls back to [`Self::party`] when absent.
+    #[serde(default)]
+    pub party_label: Option<String>,
+    /// How long the declared party has to answer, in hours, counted from when
+    /// the challenge was received. The WINDOW is what the contract fixes; the
+    /// date it lands on is arithmetic a reader can redo.
+    pub within_hours: u32,
 }
 
 /// WHICH TIER of an EPR's canonical-head election a hostname serves.
@@ -251,6 +306,8 @@ mod tests {
             gate_hints: vec![],
             dead_end: false,
             steward_direct_endpoint: None,
+            responsive_reach: None,
+            hosting_agreement_id: None,
             seeded_at: "2026-05-25T00:00:00Z".into(),
             seeded_by: "12D3Koo...".into(),
         };
@@ -298,6 +355,94 @@ mod tests {
             Channel::Converged,
             "absent channel must mean converged"
         );
+    }
+
+    /// The redress terms are ADDITIVE. A contract written before they existed
+    /// reads as "this collective has not said who answers a challenge, and
+    /// names no hosting agreement" — which is TRUE of it, and is the only
+    /// reading that keeps a doorway from inventing either.
+    #[test]
+    fn the_redress_terms_default_to_undeclared_when_absent() {
+        let json = r#"{
+            "commitmentId": "abc",
+            "eprId": "lamad-spa",
+            "doorwayId": "doorway:alpha-elohim-host",
+            "urlPath": "/lamad",
+            "mode": "cached",
+            "reach": "commons",
+            "baseHref": "/lamad/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "seededAt": "2026-05-25T00:00:00Z",
+            "seededBy": "12D3Koo..."
+        }"#;
+        let view: EprProjectionView = serde_json::from_str(json).unwrap();
+        assert!(
+            view.responsive_reach.is_none(),
+            "an undeclared responsive-reach term must read as undeclared, never as a default party"
+        );
+        assert!(view.hosting_agreement_id.is_none());
+    }
+
+    #[test]
+    fn a_declared_responsive_reach_round_trips_with_its_label() {
+        let json = r#"{
+            "commitmentId": "abc",
+            "eprId": "community-garden-club",
+            "doorwayId": "doorway:alpha-elohim-host",
+            "urlPath": "/garden",
+            "mode": "cached",
+            "reach": "private",
+            "baseHref": "/garden/",
+            "entryFile": "index.html",
+            "redirectsFrom": [],
+            "previewEprRef": null,
+            "gateHints": [],
+            "deadEnd": false,
+            "stewardDirectEndpoint": null,
+            "responsiveReach": {
+                "party": "household-dowell",
+                "partyLabel": "the Dowell household",
+                "withinHours": 72
+            },
+            "hostingAgreementId": "hosting-agreement-ef5a1e65191a56a9",
+            "seededAt": "2026-05-25T00:00:00Z",
+            "seededBy": "12D3Koo..."
+        }"#;
+        let view: EprProjectionView = serde_json::from_str(json).unwrap();
+        let term = view.responsive_reach.as_ref().expect("the term is declared");
+        assert_eq!(term.party, "household-dowell");
+        assert_eq!(term.party_label.as_deref(), Some("the Dowell household"));
+        assert_eq!(term.within_hours, 72);
+        assert_eq!(
+            view.hosting_agreement_id.as_deref(),
+            Some("hosting-agreement-ef5a1e65191a56a9")
+        );
+
+        // …and rides the wire in camelCase both ways.
+        let out = serde_json::to_string(&view).unwrap();
+        assert!(out.contains("\"responsiveReach\":{"), "{out}");
+        assert!(out.contains("\"withinHours\":72"), "{out}");
+        assert!(
+            out.contains("\"hostingAgreementId\":\"hosting-agreement-ef5a1e65191a56a9\""),
+            "{out}"
+        );
+    }
+
+    /// A party with no label is still a party. The refusal falls back to the id
+    /// rather than dropping the term, because a term that named somebody is a
+    /// term even when this doorway holds no pretty name for them.
+    #[test]
+    fn a_responsive_reach_without_a_label_is_still_a_declared_term() {
+        let term: ResponsiveReach =
+            serde_json::from_str(r#"{"party":"household-dowell","withinHours":24}"#).unwrap();
+        assert_eq!(term.party, "household-dowell");
+        assert!(term.party_label.is_none());
+        assert_eq!(term.within_hours, 24);
     }
 
     #[test]

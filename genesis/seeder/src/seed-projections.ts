@@ -84,6 +84,26 @@ export interface RedirectTemplate {
   to: string;
 }
 
+/**
+ * Who answers a challenge to the standing this contract projects under, and
+ * within how long.
+ *
+ * Declared by the collective's own steward ON THE CONTRACT — never by a
+ * doorway. That placement is the whole point: the contract's `createdAt` and
+ * `dhtAnchorHash` predate any challenge against it, so the window a challenge
+ * is witnessed under reads back to a record that already stood. A doorway
+ * copies `party` verbatim and never chooses it.
+ *
+ * Absent ⇒ this collective has not said who answers, and a challenge is
+ * honestly answered `owed: null` with the reason rather than against a party
+ * nobody named.
+ */
+export interface ResponsiveReach {
+  party: string;
+  partyLabel: string | null;
+  withinHours: number;
+}
+
 export interface ProjectionSpec {
   stewardHumanId: string;
   stewardArchetype: Archetype;
@@ -126,6 +146,14 @@ export interface ProjectionSpec {
   stewardDirectEndpoint: StewardDirectEndpoint | null;
   routeClaims: RouteClaimGrant | null;
   redirectTemplates: RedirectTemplate[];
+  /** Who answers a challenge to this projection's standing, and how soon. */
+  responsiveReach: ResponsiveReach | null;
+  /**
+   * The `hosting-agreement` commitment that bounds this projection — what a
+   * fair-trade receipt reads as "what was given in exchange". A POINTER to a
+   * record with its own provider, scopes and lifecycle; never a copy of it.
+   */
+  hostingAgreementId: string | null;
 }
 
 interface CommitmentBody {
@@ -205,6 +233,8 @@ export interface ProjectionRelevantMetadata {
   gateHints: GateHintRef[];
   deadEnd: boolean;
   stewardDirectEndpoint: StewardDirectEndpoint | null;
+  responsiveReach: ResponsiveReach | null;
+  hostingAgreementId: string | null;
 }
 
 /** The ordered field list documented in the Jenkinsfile seed-stage comment. */
@@ -227,6 +257,12 @@ export const PROJECTION_RELEVANT_FIELDS = [
   'gateHints',
   'deadEnd',
   'stewardDirectEndpoint',
+  // The redress terms. Operative routing law in the same sense the reach is:
+  // they decide what a doorway may SAY when it refuses and who it may name as
+  // owing an answer, so a change to either re-grants through the supersession
+  // ceremony that already exists rather than mutating a standing contract.
+  'responsiveReach',
+  'hostingAgreementId',
 ] as const;
 
 /**
@@ -260,6 +296,11 @@ export function projectionRelevantMetadata(
     gateHints: m.gateHints ?? [],
     deadEnd: m.deadEnd ?? false,
     stewardDirectEndpoint: m.stewardDirectEndpoint ?? null,
+    // Absent ⇒ undeclared, on BOTH sides of the compare — so a contract
+    // written before these terms existed and a seed that omits them are
+    // indistinguishable, and their arrival supersedes nothing.
+    responsiveReach: m.responsiveReach ?? null,
+    hostingAgreementId: m.hostingAgreementId ?? null,
   };
 }
 
@@ -390,6 +431,8 @@ export function buildProjectionCommitmentBody(
     stewardDirectEndpoint: spec.stewardDirectEndpoint,
     routeClaims: spec.routeClaims,
     redirectTemplates: spec.redirectTemplates,
+    responsiveReach: spec.responsiveReach,
+    hostingAgreementId: spec.hostingAgreementId,
   };
 
   const base = baseProjectionId(spec);
@@ -433,6 +476,8 @@ export function specToMetadata(spec: ProjectionSpec): ProjectionRelevantMetadata
     gateHints: spec.gateHints,
     deadEnd: spec.deadEnd,
     stewardDirectEndpoint: spec.stewardDirectEndpoint,
+    responsiveReach: spec.responsiveReach,
+    hostingAgreementId: spec.hostingAgreementId,
   });
 }
 
@@ -458,6 +503,16 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     stewardDirectEndpoint: null,
     routeClaims: null as RouteClaimGrant | null,
     redirectTemplates: [] as RedirectTemplate[],
+    // UNDECLARED, deliberately. Naming a responsive-reach party here would be
+    // the seeder deciding who answers challenges about a collective's own
+    // record — exactly the choice that is the collective's to make on its own
+    // contract. Until a steward declares one, a challenge is answered honestly
+    // with `owed: null` and the reason. Same for the hosting agreement: the
+    // default set projects commons surfaces whose reciprocal term, where one
+    // exists, is seeded separately (seed-operator-bindings.ts) and pointed at
+    // by the steward, not inferred here.
+    responsiveReach: null as ResponsiveReach | null,
+    hostingAgreementId: null as string | null,
     // ANY host, converged channel — byte-for-byte today's routing. Naming the
     // hostnames here would bind each contract to the addresses its doorway
     // happens to be reached at (localhost:8888 at home, doorway-alpha.elohim.host
