@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::auth::{
     extract_token_from_header, hash_password, verify_password, Claims, JwtValidator,
@@ -1929,6 +1929,13 @@ async fn handle_register(
         body.identifier
     );
 
+    // The JOIN. A registrant who NAMED a canonical human (`humanId` on the
+    // request body — the household prologue passes `human-james-son`) has just
+    // been minted an agent key. Carry that key through to the projection row
+    // that already bears the name, so the seeded persona and the hosted account
+    // stop being two unlinked identities.
+    bind_human_projection_key(&state, &human_id, &actual_agent_pub_key, &body.human_id).await;
+
     generate_auth_response(
         &jwt,
         &state,
@@ -1946,6 +1953,118 @@ async fn handle_register(
         hosted_cell.as_ref(),
     )
     .await
+}
+
+/// Bind a freshly-registered account's agent key to the `humans` projection row
+/// that already carries its canonical id.
+///
+/// # The gap this closes
+///
+/// A seeded persona (`human-james-son`, from `genesis/data/humans/humans.json`)
+/// and a doorway account (`james@localhost`) were two unlinked identities. The
+/// seeder writes the projection row through `POST /api/v1/identity/register`
+/// with `agentPubKey: null` on purpose — at seed time there is no truthful key,
+/// and a wrong key breaks the snapshot joins worse than a NULL
+/// (`seed-humans.ts`, `seedProjectionRow`). Registration is where the truthful
+/// key first exists. So registration is where the binding belongs.
+///
+/// # Why `POST /api/v1/identity/heal`, and not `membership_identity_reconcile`
+///
+/// `heal` (elohim-storage `api/identity.rs`, `db::humans::heal_human_identity`)
+/// is the existing binding surface and is NULL-ONLY: it fills a currently-NULL
+/// `agent_pub_key` and never clobbers a set one. That is exactly the shape of
+/// this join — the seeder leaves NULL, we fill it once, and a row already
+/// carrying conductor truth is left alone. It is idempotent, and it needs no
+/// new route on either side.
+///
+/// `services::membership_identity_reconcile` is NOT this path. Its truth source
+/// is the qahal `Membership` entry's `member_cid`, paired to a `humans` row by
+/// forced 1:1 household bijection; it SUPERSEDES a set-but-stale key and
+/// abstains whenever the pairing is ambiguous or any member has withdrawn. It
+/// cures rekey fossils after a DNA reinstall. It has no way to learn that a
+/// doorway account belongs to a persona, and on a NULL key it is not even the
+/// writer (that is `services::identity_fill`). Reaching for it here would be a
+/// silent no-op dressed as a design.
+///
+/// # Design gate
+///
+/// No doorway-local identity table is created or consulted. The doorway carries
+/// a value it already holds to the storage surface that owns the projection;
+/// the DHT `Human` authored on the registrant's own conductor remains the truth
+/// this projection answers to, and the NULL-only rule is what keeps that
+/// ordering honest.
+///
+/// # Best-effort, by the same rule the hosting promise follows
+///
+/// An unconfigured or unreachable storage leaves the binding unmade and the
+/// registration untouched: refusing to create a person over an unwritten
+/// projection row is the wrong trade. A missing row (the first prologue pass
+/// registers BEFORE it seeds the projection) answers 404 and is logged at debug
+/// — `seedProjectionRow` carries the key itself on that pass.
+async fn bind_human_projection_key(
+    state: &AppState,
+    human_id: &str,
+    agent_pub_key: &str,
+    caller_supplied_human_id: &str,
+) {
+    // Only for a registrant that NAMED its canonical human. Without that, the
+    // id is a doorway-minted UUID / `uhCHk…` that matches no projection row,
+    // and the call would be a guaranteed 404 on every registration.
+    if caller_supplied_human_id.is_empty() || agent_pub_key.is_empty() {
+        return;
+    }
+
+    let Some(storage_base) = state.args.storage_url.as_deref() else {
+        debug!(
+            human_id = %human_id,
+            "Registration binding skipped: STORAGE_URL is not configured"
+        );
+        return;
+    };
+
+    let url = format!(
+        "{}/api/v1/identity/heal",
+        storage_base.trim_end_matches('/')
+    );
+    let body = serde_json::json!({
+        "id": human_id,
+        "agentPubKey": agent_pub_key,
+    });
+
+    let client = reqwest::Client::new();
+    match client
+        .post(&url)
+        .timeout(std::time::Duration::from_secs(5))
+        .json(&body)
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => {
+            info!(
+                human_id = %human_id,
+                "Registration bound the account's agent key to its projection row"
+            );
+        }
+        Ok(resp) if resp.status() == StatusCode::NOT_FOUND => {
+            debug!(
+                human_id = %human_id,
+                "Registration binding found no projection row yet (seeded after registration)"
+            );
+        }
+        Ok(resp) => {
+            warn!(
+                human_id = %human_id,
+                status = %resp.status(),
+                "Registration binding was refused by storage (non-fatal)"
+            );
+        }
+        Err(e) => {
+            warn!(
+                human_id = %human_id,
+                "Registration binding could not reach storage (non-fatal): {}", e
+            );
+        }
+    }
 }
 
 /// POST /auth/login
@@ -5420,6 +5539,146 @@ pub fn validate_ws_token(state: &AppState, token: &str) -> Option<Claims> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── the registration→projection binding ───────────────────────────────
+    //
+    // A registrant that NAMES a canonical human (`humanId` on the body — the
+    // household prologue passes `human-james-son`) must leave the account's
+    // freshly-minted agent key on the `humans` projection row that already
+    // bears that name. Before this, the seeded persona and the hosted account
+    // were two unlinked identities and the session resolved to nothing.
+    mod registration_binding {
+        use super::*;
+        use hyper::service::service_fn;
+        use hyper::{server::conn::http1, Request as HyperRequest};
+        use hyper_util::rt::TokioIo;
+        use std::convert::Infallible;
+        use std::net::SocketAddr;
+        use std::sync::Arc as StdArc;
+        use tokio::net::TcpListener;
+
+        type Captured = StdArc<tokio::sync::Mutex<Vec<(String, String)>>>;
+
+        /// Mock storage capturing `(path, body)` of every request it receives.
+        async fn spawn_capturing_storage() -> (SocketAddr, Captured, tokio::task::JoinHandle<()>) {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let captured: Captured = StdArc::new(tokio::sync::Mutex::new(Vec::new()));
+            let captured_clone = StdArc::clone(&captured);
+
+            let handle = tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let io = TokioIo::new(stream);
+                    let per_conn = StdArc::clone(&captured_clone);
+                    tokio::spawn(async move {
+                        let _ = http1::Builder::new()
+                            .serve_connection(
+                                io,
+                                service_fn(move |req: HyperRequest<hyper::body::Incoming>| {
+                                    let per_req = StdArc::clone(&per_conn);
+                                    async move {
+                                        let path = req.uri().path().to_string();
+                                        let body =
+                                            http_body_util::BodyExt::collect(req.into_body())
+                                                .await
+                                                .map(|c| {
+                                                    String::from_utf8_lossy(&c.to_bytes())
+                                                        .to_string()
+                                                })
+                                                .unwrap_or_default();
+                                        per_req.lock().await.push((path, body));
+                                        let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                            Ok(Response::builder()
+                                                .status(200u16)
+                                                .header("Content-Type", "application/json")
+                                                .body(Full::new(Bytes::from("{}")))
+                                                .unwrap());
+                                        resp
+                                    }
+                                }),
+                            )
+                            .await;
+                    });
+                }
+            });
+
+            (addr, captured, handle)
+        }
+
+        fn state_with_storage(addr: SocketAddr) -> AppState {
+            use clap::Parser;
+            let mut args = crate::config::Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+            args.storage_url = Some(format!("http://{addr}"));
+            AppState::new(args)
+        }
+
+        /// A caller-supplied canonical id sends the binding through the
+        /// EXISTING NULL-only heal surface — `POST /api/v1/identity/heal` —
+        /// carrying the canonical id and the minted key.
+        #[tokio::test]
+        async fn a_named_human_is_bound_through_the_heal_surface() {
+            let (addr, captured, _h) = spawn_capturing_storage().await;
+            let state = state_with_storage(addr);
+
+            bind_human_projection_key(
+                &state,
+                "human-james-son",
+                "uhCAkmnTjJamesSessionKey",
+                "human-james-son",
+            )
+            .await;
+
+            let seen = captured.lock().await.clone();
+            assert_eq!(seen.len(), 1, "exactly one binding call");
+            assert_eq!(seen[0].0, "/api/v1/identity/heal");
+            assert!(
+                seen[0].1.contains("human-james-son"),
+                "the binding names the canonical human: {}",
+                seen[0].1
+            );
+            assert!(
+                seen[0].1.contains("uhCAkmnTjJamesSessionKey"),
+                "the binding carries the minted agent key: {}",
+                seen[0].1
+            );
+            assert!(
+                seen[0].1.contains("agentPubKey"),
+                "camelCase wire shape, as HealHumanInputView expects: {}",
+                seen[0].1
+            );
+        }
+
+        /// A registrant that named NO canonical human has a doorway-minted id
+        /// that matches no projection row. Calling would be a guaranteed 404 on
+        /// every ordinary registration, so it does not call.
+        #[tokio::test]
+        async fn an_unnamed_registrant_makes_no_binding_call() {
+            let (addr, captured, _h) = spawn_capturing_storage().await;
+            let state = state_with_storage(addr);
+
+            bind_human_projection_key(&state, "uhCHk493b9cfa", "uhCAkSomeKey", "").await;
+
+            assert!(
+                captured.lock().await.is_empty(),
+                "no caller-supplied humanId means no binding attempt"
+            );
+        }
+
+        /// No key, no binding — an empty `agent_pub_key` would write nothing
+        /// useful and the heal surface would ignore it anyway.
+        #[tokio::test]
+        async fn an_empty_agent_key_makes_no_binding_call() {
+            let (addr, captured, _h) = spawn_capturing_storage().await;
+            let state = state_with_storage(addr);
+
+            bind_human_projection_key(&state, "human-james-son", "", "human-james-son").await;
+
+            assert!(captured.lock().await.is_empty());
+        }
+    }
 
     fn authorize_params(prompt: Option<&str>) -> OAuthAuthorizeRequest {
         OAuthAuthorizeRequest {

@@ -223,6 +223,14 @@ interface RegisterResult {
   identifier: string;
   result: Result;
   error?: string;
+  /**
+   * The conductor-minted agent key this account now holds, as returned by
+   * `/auth/register` (or by the `/auth/login` verification of an existing
+   * account). This is the ONLY truthful source of the key at seed time, and it
+   * is what `seedProjectionRow` writes into `humans.agent_pub_key` so the
+   * seeded persona and the hosted account are one identity rather than two.
+   */
+  agentPubKey?: string;
 }
 
 async function registerHuman(
@@ -234,6 +242,15 @@ async function registerHuman(
   const isAdmin = human.id === ADMIN_HUMAN_ID;
 
   const body: Record<string, unknown> = {
+    // THE CANONICAL ID. Without it the doorway mints a random UUID (hosted) or
+    // a `uhCHk…` account id for this registrant's Human, and the account can
+    // never be matched to the seeded persona of the same name — the two-unlinked-
+    // identities gap measured on the household mesh 2026-09-13, where James's
+    // session resolved to no human row at all. `/auth/register` already PREFERS
+    // a caller-supplied `humanId` in both the `hosted` and `doorway` arms
+    // (doorway-service/src/routes/auth_routes.rs) and warns loudly when one is
+    // absent; the seeder is the caller that knows it.
+    humanId: human.id,
     identifier: creds.identifier,
     password: creds.password,
     displayName: creds.displayName,
@@ -255,7 +272,13 @@ async function registerHuman(
     });
 
     if (res.ok) {
-      return { displayName: human.displayName, identifier: creds.identifier, result: 'registered' };
+      const auth = (await res.json().catch(() => ({}))) as { agentPubKey?: string };
+      return {
+        displayName: human.displayName,
+        identifier: creds.identifier,
+        result: 'registered',
+        agentPubKey: auth.agentPubKey,
+      };
     }
 
     // 409 Conflict — already registered, verify credentials match via login
@@ -302,7 +325,13 @@ async function verifyExisting(
     });
 
     if (loginRes.ok) {
-      return { displayName, identifier: creds.identifier, result: 'exists' };
+      const auth = (await loginRes.json().catch(() => ({}))) as { agentPubKey?: string };
+      return {
+        displayName,
+        identifier: creds.identifier,
+        result: 'exists',
+        agentPubKey: auth.agentPubKey,
+      };
     }
 
     return {
@@ -336,13 +365,18 @@ type BridgeResult = 'created' | 'exists' | 'skipped' | 'failed';
  * `household_backfill` only fills already-NULL rows from an external mapping
  * (see elohim-storage/src/api/identity.rs and tests/human_household_create_bridge.rs).
  *
- * `agentPubKey` is deliberately null: agent keys are conductor-minted
- * per-deployment, so the seed corpus has no truthful source for them at seed
- * time — a wrong key silently breaks the snapshot joins worse than NULL.
- * The substrate paths expected to fill `humans.agent_pub_key` are the DHT
- * humans-replayer (services/holochain_humans_replayer.rs, currently a stub)
- * and the authenticated in-app registration flow (identity-api.service.ts),
- * which posts the live session's key through this same create surface.
+ * `agentPubKey` comes from the registration that just ran for this same human
+ * (`RegisterResult.agentPubKey` — what `/auth/register` or the `/auth/login`
+ * verification returned). The seed CORPUS still has no truthful key, and
+ * inventing one would break the snapshot joins worse than NULL; but the
+ * registration one line earlier has just minted the real one, so this row is
+ * born bound instead of waiting to be healed. When registration returned no key
+ * (an older doorway, a failed provision) this stays null and the NULL-only
+ * substrate healers remain the path: the doorway's own registration
+ * write-through (`POST /api/v1/identity/heal`, which fires on every subsequent
+ * registration for a caller-supplied humanId), the DHT humans-replayer
+ * (services/holochain_humans_replayer.rs, currently a stub), and the
+ * authenticated in-app registration flow (identity-api.service.ts).
  *
  * Idempotency: the create surface INSERTs — a row that already exists (e.g.
  * a re-run against a non-wiped projection DB) is reported as 'exists' and
@@ -351,7 +385,8 @@ type BridgeResult = 'created' | 'exists' | 'skipped' | 'failed';
  */
 async function seedProjectionRow(
   doorwayUrl: string,
-  human: HumansJsonHuman
+  human: HumansJsonHuman,
+  agentPubKey?: string
 ): Promise<{ result: BridgeResult; error?: string }> {
   if (!human.householdId) {
     return { result: 'skipped' };
@@ -359,7 +394,7 @@ async function seedProjectionRow(
 
   const body: CreateHumanInputView = {
     id: human.id,
-    agentPubKey: null,
+    agentPubKey: agentPubKey && agentPubKey.length > 0 ? agentPubKey : null,
     displayName: human.displayName,
     bio: human.bio ?? null,
     affinities: human.affinities ?? [],
@@ -514,13 +549,18 @@ async function main(): Promise<void> {
     // when registration didn't hard-fail (the human is live/known).
     let bridgeSuffix = '';
     if (result.result !== 'failed') {
-      const bridge = await seedProjectionRow(doorwayUrl, human);
+      const bridge = await seedProjectionRow(doorwayUrl, human, result.agentPubKey);
       if (bridge.result === 'created') {
         bridgeCreated++;
         bridgeSuffix = ` household=${human.householdId}`;
       } else if (bridge.result === 'exists') {
         bridgeExists++;
-        bridgeSuffix = ` household=${human.householdId} (projection row exists — not healed here)`;
+        // Not healed HERE — but the doorway's registration write-through
+        // (`POST /api/v1/identity/heal`) has already run for this human on the
+        // line above, and it fills a NULL agent_pub_key without clobbering a
+        // set one. A re-run against a non-wiped projection DB therefore still
+        // converges on the binding.
+        bridgeSuffix = ` household=${human.householdId} (projection row exists — key bound at registration)`;
       } else if (bridge.result === 'failed') {
         bridgeFailures.push({ displayName: human.displayName, error: bridge.error ?? 'unknown' });
         bridgeSuffix = ` household=${human.householdId} BRIDGE-FAILED`;
