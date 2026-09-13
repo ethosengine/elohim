@@ -951,6 +951,13 @@ pub struct P2PNode {
     pending_shamir_shares: PendingShamirShareMap,
     /// T16: custody reconciliation counters — incremented by reconcile_pass.
     pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
+    /// T23: cross-pass fetch-kick gate. Node-lifetime (NOT per pass, unlike
+    /// `kick_semaphore`) so a race started by one pass suppresses the same
+    /// hash in every later pass until it resolves and its cooldown elapses.
+    /// Without it, event-triggered passes re-race the same unfetchable blobs
+    /// every few seconds — the 2026-09-13 household-mesh serve→timeout→churn
+    /// →pass→kick→serve loop. See [`crate::reconcile::custody_sweep::KickGate`].
+    pub kick_gate: std::sync::Arc<crate::reconcile::custody_sweep::KickGate>,
     /// T18: shared cache of last gossiped inventory hashes.
     /// Stage 2 broadcaster timer will write here; the parity diagnostic HTTP
     /// endpoint reads via `P2PHandle::last_gossiped_inventory()`.
@@ -2988,6 +2995,16 @@ impl P2PNode {
 
         // Wave 3: size the commitment-fetch semaphore before `config` is moved into Self.
         let commitment_fetch_concurrency = config.fetch_blob_parallelism.max(1) * 4;
+        // T23: the kick gate's cooldown IS the declared sweep cadence — read it
+        // before `config` is moved into Self. A 0-override disables the sweep
+        // TIMER, not the event triggers, so the gate keeps the default cadence
+        // rather than degrading to no cooldown at all.
+        let kick_cooldown = Duration::from_secs(
+            config
+                .custody_sweep_seconds
+                .filter(|s| *s > 0)
+                .unwrap_or(crate::reconcile::custody_sweep::DEFAULT_KICK_COOLDOWN_SECONDS),
+        );
 
         Ok(Self {
             identity,
@@ -3078,6 +3095,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
+            kick_gate: std::sync::Arc::new(crate::reconcile::custody_sweep::KickGate::new(
+                kick_cooldown,
+            )),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             // Station 1 of the sync-state contract: sequences carry this
             // process's boot epoch in their high 32 bits, so a restart is
@@ -3490,7 +3510,12 @@ impl P2PNode {
             fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
             metrics: self.reconciliation_metrics.clone(),
             kick_semaphore: Arc::new(tokio::sync::Semaphore::new(kick_concurrency)),
+            kick_gate: self.kick_gate.clone(),
         };
+
+        // Retire cooled-out entries once per pass so the gate tracks live
+        // custody work, not every hash this node has ever kicked.
+        self.kick_gate.sweep_expired(std::time::Instant::now());
 
         let cfg = ReconcileConfig {
             placement_grace_seconds: self.config.placement_grace_seconds,
