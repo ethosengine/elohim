@@ -14,9 +14,8 @@
 //! Also provides a transparent proxy to elohim-storage `/api/v1/identity/*`.
 
 use bytes::Bytes;
-use http_body_util::{BodyExt, Full};
-use hyper::body::Incoming;
-use hyper::{Method, Request, Response, StatusCode};
+use http_body_util::Full;
+use hyper::{Request, Response, StatusCode};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use tracing::{debug, warn};
@@ -360,14 +359,34 @@ fn json_error(status: StatusCode, msg: &str) -> Response<Full<Bytes>> {
 
 /// Transparent proxy to elohim-storage `/api/v1/identity/*`
 ///
-/// Forwards all HTTP methods verbatim, preserving status codes and
-/// content-type from the upstream response. Mirrors the pattern used
-/// by `handle_presence_request` in presence.rs.
-pub async fn handle_identity_api_request(
-    req: Request<Incoming>,
+/// Forwards all HTTP methods, preserving status codes and content-type from
+/// the upstream response, via the SAME `forward_to_storage` discipline the
+/// registry-routed storage-proxy disposition uses
+/// (`server/http.rs`'s `Disposition::StorageProxy` arm) — one forwarding
+/// path, not two. In particular this resolves the caller's agent cid from
+/// the bearer's verified claims exactly as that path does
+/// (`resolve_agent_cid_from_request`) and injects it as `X-Agent-Cid` via
+/// `ForwardCtx`, so elohim-storage's `resolve_account_caller`
+/// (`GET /api/v1/identity/me` → `elohim/elohim-storage/src/api/identity.rs`,
+/// which resolves ONLY from `X-Agent-Id` then `X-Agent-Cid`) can identify a
+/// hosted session bearer instead of reading it as anonymous.
+///
+/// `forward_to_storage` builds the outbound request from an explicit header
+/// allowlist (content-type, authorization, x-observation-id,
+/// x-schema-version) plus whatever `ForwardCtx` injects — it never copies an
+/// inbound `X-Agent-Id` / `X-Agent-Cid` from the client, so a client-supplied
+/// value can never reach storage under any name. Identity headers are the
+/// doorway's to mint, never the caller's to hand it.
+pub async fn handle_identity_api_request<B>(
+    req: Request<B>,
     state: Arc<AppState>,
     path: &str,
-) -> Response<Full<Bytes>> {
+) -> Response<Full<Bytes>>
+where
+    B: hyper::body::Body + Send + 'static,
+    B::Data: Send,
+    B::Error: std::fmt::Display,
+{
     let storage_url = match &state.args.storage_url {
         Some(url) => url.clone(),
         None => {
@@ -377,112 +396,24 @@ pub async fn handle_identity_api_request(
             );
         }
     };
-    forward_identity_to_storage(req, &storage_url, path).await
-}
 
-async fn forward_identity_to_storage(
-    req: Request<Incoming>,
-    storage_url: &str,
-    path: &str,
-) -> Response<Full<Bytes>> {
-    let storage_endpoint = format!("{}{}", storage_url.trim_end_matches('/'), path);
-
-    let query = req.uri().query();
-    let full_url = match query {
-        Some(q) => format!("{storage_endpoint}?{q}"),
-        None => storage_endpoint,
+    let agent_cid_owned = crate::server::http::resolve_agent_cid_from_request(&state, &req);
+    let ctx = crate::routes::ForwardCtx {
+        agent_cid: agent_cid_owned.as_deref(),
+        pantry: Some(state.freshness_pantry.as_ref()),
+        stage: Some(state.network_stage),
+        ..Default::default()
     };
 
-    let method = req.method().clone();
-    debug!(method = %method, url = %full_url, "Forwarding identity request to elohim-storage");
-
-    let client = reqwest::Client::new();
-    let mut builder = match method {
-        Method::GET => client.get(&full_url),
-        Method::POST => client.post(&full_url),
-        Method::PUT => client.put(&full_url),
-        Method::DELETE => client.delete(&full_url),
-        Method::HEAD => client.head(&full_url),
-        Method::PATCH => client.patch(&full_url),
-        _ => {
-            return Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(r#"{"error": "Method not allowed"}"#)))
-                .unwrap();
-        }
-    };
-
-    if let Some(ct) = req.headers().get("content-type") {
-        if let Ok(ct_str) = ct.to_str() {
-            builder = builder.header("Content-Type", ct_str);
-        }
-    }
-
-    if let Some(auth) = req.headers().get("authorization") {
-        if let Ok(auth_str) = auth.to_str() {
-            builder = builder.header("Authorization", auth_str);
-        }
-    }
-
-    if matches!(method, Method::POST | Method::PUT | Method::PATCH) {
-        match req.collect().await {
-            Ok(collected) => {
-                builder = builder.body(collected.to_bytes().to_vec());
-            }
-            Err(e) => {
-                warn!(error = %e, "Failed to read identity request body");
-                return Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .header("Content-Type", "application/json")
-                    .body(Full::new(Bytes::from(format!(
-                        r#"{{"error": "Failed to read request body: {e}"}}"#
-                    ))))
-                    .unwrap();
-            }
-        }
-    }
-
-    match builder.send().await {
-        Ok(response) => {
-            let status = response.status();
-            let content_type = response
-                .headers()
-                .get("content-type")
-                .and_then(|v| v.to_str().ok())
-                .unwrap_or("application/json")
-                .to_string();
-
-            match response.bytes().await {
-                Ok(body) => Response::builder()
-                    .status(StatusCode::from_u16(status.as_u16()).unwrap_or(StatusCode::OK))
-                    .header("Content-Type", content_type)
-                    .header("Cross-Origin-Resource-Policy", "cross-origin")
-                    .body(Full::new(Bytes::from(body.to_vec())))
-                    .unwrap(),
-                Err(e) => {
-                    warn!(error = %e, "Failed to read identity storage response body");
-                    Response::builder()
-                        .status(StatusCode::BAD_GATEWAY)
-                        .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(format!(
-                            r#"{{"error": "Failed to read storage response: {e}"}}"#
-                        ))))
-                        .unwrap()
-                }
-            }
-        }
-        Err(e) => {
-            warn!(error = %e, path = %path, "Failed to forward identity request to storage");
-            Response::builder()
-                .status(StatusCode::BAD_GATEWAY)
-                .header("Content-Type", "application/json")
-                .body(Full::new(Bytes::from(format!(
-                    r#"{{"error": "Failed to connect to storage: {e}"}}"#
-                ))))
-                .unwrap()
-        }
-    }
+    crate::routes::forward_to_storage(
+        req,
+        &storage_url,
+        path,
+        &state.storage_proxy_client,
+        &state.upstream_breakers,
+        ctx,
+    )
+    .await
 }
 
 fn identity_service_unavailable(msg: &str) -> Response<Full<Bytes>> {
@@ -496,6 +427,7 @@ fn identity_service_unavailable(msg: &str) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use http_body_util::BodyExt;
 
     async fn read_body(resp: Response<Full<Bytes>>) -> String {
         let collected = resp.into_body().collect().await.unwrap().to_bytes();
@@ -530,21 +462,188 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 
-    #[test]
-    fn identity_storage_url_built_with_query() {
-        let base = "http://localhost:8090";
-        let path = "/api/v1/identity";
-        let query = "agentId=abc";
-        let url = format!("{}{}?{}", base.trim_end_matches('/'), path, query);
-        assert_eq!(url, "http://localhost:8090/api/v1/identity?agentId=abc");
-    }
+    // ── /api/v1/identity/* forwarding: caller resolution ──────────────────────
+    //
+    // `handle_identity_api_request` must resolve the caller exactly as the
+    // registry-routed storage-proxy disposition does
+    // (`resolve_agent_cid_from_request`, sourced ONLY from the bearer's
+    // verified JWT claims) and inject it as `X-Agent-Cid` via
+    // `forward_to_storage`'s `ForwardCtx` — never trusting a client-supplied
+    // `X-Agent-Id` / `X-Agent-Cid` header, which `forward_to_storage`'s
+    // header allowlist never copies in the first place.
+    mod identity_proxy_forwarding {
+        use super::*;
+        use crate::auth::{JwtValidator, TokenInput};
+        use crate::config::Args;
+        use clap::Parser;
+        use http_body_util::Empty;
+        use hyper::service::service_fn;
+        use hyper::{server::conn::http1, StatusCode as HttpStatusCode};
+        use hyper_util::rt::TokioIo;
+        use std::convert::Infallible;
+        use std::net::SocketAddr;
+        use std::sync::Arc as StdArc;
+        use tokio::net::TcpListener;
 
-    #[test]
-    fn identity_storage_url_built_without_query() {
-        let base = "http://localhost:8090/";
-        let path = "/api/v1/identity/abc-123";
-        let url = format!("{}{}", base.trim_end_matches('/'), path);
-        assert_eq!(url, "http://localhost:8090/api/v1/identity/abc-123");
+        const TEST_SECRET: &str = "test-secret-that-is-at-least-32-characters-long";
+
+        fn test_state() -> AppState {
+            let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+            args.dev_mode = false;
+            args.jwt_secret = Some(TEST_SECRET.to_string());
+            AppState::new(args)
+        }
+
+        fn bearer_jwt(human_id: &str) -> String {
+            let validator = JwtValidator::new(TEST_SECRET.into(), 3600).unwrap();
+            validator
+                .generate_token(TokenInput {
+                    human_id: human_id.into(),
+                    agent_pub_key: "uhCAkTestAgentKey".into(),
+                    identifier: "human@example.com".into(),
+                    permission_level: crate::auth::PermissionLevel::Authenticated,
+                    session_id: None,
+                    doorway_id: None,
+                    doorway_url: None,
+                    conductor_id: None,
+                    installed_app_id: None,
+                    is_steward: false,
+                    has_local_conductor: false,
+                })
+                .unwrap()
+        }
+
+        /// Spawn a mock elohim-storage that captures the most recent
+        /// `X-Agent-Cid` header observed on inbound requests.
+        async fn spawn_capturing_mock_storage() -> (
+            SocketAddr,
+            StdArc<tokio::sync::Mutex<Option<String>>>,
+            tokio::task::JoinHandle<()>,
+        ) {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let captured: StdArc<tokio::sync::Mutex<Option<String>>> =
+                StdArc::new(tokio::sync::Mutex::new(None));
+            let captured_clone = StdArc::clone(&captured);
+
+            let handle = tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let io = TokioIo::new(stream);
+                    let captured_per_conn = StdArc::clone(&captured_clone);
+                    tokio::spawn(async move {
+                        let _ = http1::Builder::new()
+                            .serve_connection(
+                                io,
+                                service_fn(move |req: Request<hyper::body::Incoming>| {
+                                    let captured_per_req = StdArc::clone(&captured_per_conn);
+                                    async move {
+                                        let cid = req
+                                            .headers()
+                                            .get("X-Agent-Cid")
+                                            .and_then(|v| v.to_str().ok())
+                                            .map(String::from);
+                                        *captured_per_req.lock().await = cid;
+                                        let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                            Ok(Response::builder()
+                                                .status(200u16)
+                                                .header("Content-Type", "application/json")
+                                                .body(Full::new(Bytes::from("{}")))
+                                                .unwrap());
+                                        resp
+                                    }
+                                }),
+                            )
+                            .await;
+                    });
+                }
+            });
+
+            (addr, captured, handle)
+        }
+
+        fn identity_me_request(
+            bearer: Option<&str>,
+            spoof_agent_cid: Option<&str>,
+        ) -> Request<Empty<Bytes>> {
+            let mut builder = Request::builder().method("GET").uri("/api/v1/identity/me");
+            if let Some(t) = bearer {
+                builder = builder.header(hyper::header::AUTHORIZATION, format!("Bearer {t}"));
+            }
+            if let Some(spoof) = spoof_agent_cid {
+                // A client trying to hand the doorway its own identity claim.
+                builder = builder.header("X-Agent-Cid", spoof);
+            }
+            builder.body(Empty::<Bytes>::new()).unwrap()
+        }
+
+        /// A valid session bearer resolves the caller's agent cid from the
+        /// verified JWT and injects it as `X-Agent-Cid` on the storage hop —
+        /// the gap this fix closes (`GET /api/v1/identity/me` no longer
+        /// reads a signed-in human as anonymous).
+        #[tokio::test]
+        async fn valid_session_bearer_yields_injected_agent_cid() {
+            let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
+            let mut state = test_state();
+            state.args.storage_url = Some(format!("http://{addr}"));
+            let state = StdArc::new(state);
+
+            let token = bearer_jwt("human-matthew-manager");
+            let req = identity_me_request(Some(&token), None);
+            let resp = handle_identity_api_request(req, state, "/api/v1/identity/me").await;
+            assert_eq!(resp.status(), HttpStatusCode::OK);
+
+            assert_eq!(
+                captured.lock().await.clone(),
+                Some("human-matthew-manager".to_string()),
+                "the resolved bearer identity must reach storage as X-Agent-Cid"
+            );
+        }
+
+        /// A client-supplied `X-Agent-Cid` header, with no session bearer at
+        /// all, must never reach storage — identity headers are the
+        /// doorway's to mint, never the caller's to hand it.
+        #[tokio::test]
+        async fn client_supplied_agent_cid_without_a_session_never_reaches_storage() {
+            let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
+            let mut state = test_state();
+            state.args.storage_url = Some(format!("http://{addr}"));
+            let state = StdArc::new(state);
+
+            let req = identity_me_request(None, Some("attacker-supplied-cid"));
+            let resp = handle_identity_api_request(req, state, "/api/v1/identity/me").await;
+            assert_eq!(resp.status(), HttpStatusCode::OK);
+
+            assert_eq!(
+                captured.lock().await.clone(),
+                None,
+                "a client-supplied X-Agent-Cid must never be forwarded to storage"
+            );
+        }
+
+        /// A client-supplied `X-Agent-Cid` header presented ALONGSIDE a valid
+        /// session bearer must not override the resolved identity — the
+        /// resolved value wins, the spoofed one is dropped on the floor.
+        #[tokio::test]
+        async fn client_supplied_agent_cid_cannot_override_a_valid_session() {
+            let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
+            let mut state = test_state();
+            state.args.storage_url = Some(format!("http://{addr}"));
+            let state = StdArc::new(state);
+
+            let token = bearer_jwt("human-matthew-manager");
+            let req = identity_me_request(Some(&token), Some("attacker-supplied-cid"));
+            let resp = handle_identity_api_request(req, state, "/api/v1/identity/me").await;
+            assert_eq!(resp.status(), HttpStatusCode::OK);
+
+            assert_eq!(
+                captured.lock().await.clone(),
+                Some("human-matthew-manager".to_string()),
+                "the resolved session identity must win over a client-supplied header"
+            );
+        }
     }
 
     // ── did:web document (GET /.well-known/did.json) ──────────────────────────

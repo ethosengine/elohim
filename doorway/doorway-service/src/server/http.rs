@@ -1462,7 +1462,16 @@ pub(crate) fn resolve_verified_claims_from_request<B>(
     result.claims
 }
 
-fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
+/// Resolve the caller's agent cid from the bearer's verified claims
+/// (alpha-substrate: `claims.human_id` IS agent_cid). `pub(crate)` so the
+/// identity-API forwarder (`routes::identity::handle_identity_api_request`)
+/// resolves the caller the same way the registry-routed storage-proxy
+/// disposition does — one resolution rule, not two — before injecting
+/// `X-Agent-Cid` on the outbound hop via `ForwardCtx`.
+pub(crate) fn resolve_agent_cid_from_request<B>(
+    state: &AppState,
+    req: &Request<B>,
+) -> Option<String> {
     resolve_verified_claims_from_request(state, req).map(|c| c.human_id)
 }
 
