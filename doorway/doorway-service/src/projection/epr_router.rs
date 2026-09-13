@@ -7,6 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
+use std::time::{Duration, Instant};
 
 use elohim_views::projection::EprProjectionView;
 use infrastructure_types::DoorwayRegistration;
@@ -271,6 +272,14 @@ struct ClaimBinding {
     template: String,
 }
 
+/// How long a revoked commitment id is shielded from a stale peer's echo
+/// (`FallbackOutcome::PeerServed`) reinstalling it before THIS doorway's OWN
+/// primary storage confirms it live again. Generous relative to every known
+/// convergence window it stands guard over: the ~30s periodic EPR-refresh
+/// cadence (`DOORWAY_EPR_REFRESH_SECS`), the ~60s federation coherence tick,
+/// and ordinary P2P/DHT reconciliation lag on a sibling doorway's own replica.
+const REVOCATION_SHIELD_TTL: Duration = Duration::from_secs(600);
+
 #[derive(Debug, Default)]
 pub struct EprRouter {
     /// `RouteKey { host, path }` → projection.
@@ -288,6 +297,11 @@ pub struct EprRouter {
     /// Monotonic generation counter, bumped on every `replace_all`. Drives the
     /// sitemap's event-invalidated materialized projection (spec §7.5).
     generation: AtomicU64,
+    /// commitment_id → when THIS doorway's own storage told us (via an
+    /// authoritative `projection.revoked` SSE event) that it was revoked, and
+    /// no later authoritative source has confirmed it live again since. See
+    /// `mark_revoked`/`clear_revoked`/`filter_recently_revoked`.
+    revoked_recently: RwLock<HashMap<String, Instant>>,
 }
 
 /// The post-validation truth of a `replace_all`: how many rows were actually
@@ -445,6 +459,78 @@ impl EprRouter {
             installed,
             rejected,
         }
+    }
+
+    /// Record that `commitment_id` was just revoked, per an authoritative
+    /// `projection.revoked` SSE event sourced from THIS doorway's own storage
+    /// (`storage_events_subscriber.rs`'s `handle_event`).
+    ///
+    /// Why this exists: `fetch_projections_with_fallback`'s pool-fallback
+    /// (`main.rs`'s periodic `DOORWAY_EPR_REFRESH_SECS` task) deliberately
+    /// falls back to a sibling doorway's OWN storage when THIS doorway's
+    /// primary answers empty — real resilience for a primary that lost data
+    /// it once had (the apex adam/matthew incident this mechanism was built
+    /// for; see `.claude/deliver/journal-resilient-dual-doorway.md`). But a
+    /// sibling doorway's storage can ALSO hold a DHT-replicated copy of a
+    /// project-epr commitment THIS doorway just explicitly revoked, lagging
+    /// the revocation by however long P2P propagation/reconcile takes on ITS
+    /// side. Without this shield, that lag lets a legitimately-revoked
+    /// mount flicker back onto THIS doorway's own route table purely from a
+    /// peer's stale echo — a doorway-local re-grant this protocol forbids (a
+    /// hosting contract is either live or it is not; a sibling's gossip lag
+    /// is not standing to re-grant it). The shield is one-directional: it
+    /// only ever suppresses a PEER-sourced install (`filter_recently_revoked`,
+    /// consulted at `main.rs::apply_epr_fallback_outcome`'s `PeerServed` arm)
+    /// — THIS doorway's own primary is always trusted immediately and
+    /// unconditionally (`clear_revoked`, consulted on every primary-sourced
+    /// sync, whether SSE-triggered or the periodic refresh's own primary hit).
+    pub fn mark_revoked(&self, commitment_id: &str) {
+        self.revoked_recently
+            .write()
+            .expect("router lock poisoned")
+            .insert(commitment_id.to_string(), Instant::now());
+    }
+
+    /// Clear a shield entry — called whenever THIS doorway's own primary
+    /// storage (never a pool peer) reports `commitment_id` active again
+    /// (e.g. a legitimate reactivation). See `mark_revoked`'s doc.
+    pub fn clear_revoked(&self, commitment_id: &str) {
+        self.revoked_recently
+            .write()
+            .expect("router lock poisoned")
+            .remove(commitment_id);
+    }
+
+    /// Filter a PEER-sourced projection batch (`FallbackOutcome::PeerServed`)
+    /// against the revocation shield, dropping any row whose commitment was
+    /// recently, authoritatively revoked by THIS doorway's own storage.
+    /// Expired shield entries (older than [`REVOCATION_SHIELD_TTL`]) are
+    /// pruned first, so the map never grows unboundedly across a
+    /// long-running process. Returns the filtered batch and how many rows
+    /// were shielded, for the caller's log. See `mark_revoked`'s doc for why
+    /// this exists; NEVER call this on a primary-sourced batch — the
+    /// doorway's own primary is always authoritative, shield or not.
+    pub fn filter_recently_revoked(
+        &self,
+        projections: Vec<EprProjectionView>,
+    ) -> (Vec<EprProjectionView>, usize) {
+        let now = Instant::now();
+        let mut shield = self.revoked_recently.write().expect("router lock poisoned");
+        shield.retain(|_, at| now.duration_since(*at) < REVOCATION_SHIELD_TTL);
+        if shield.is_empty() {
+            drop(shield);
+            return (projections, 0);
+        }
+        let mut kept = Vec::with_capacity(projections.len());
+        let mut shielded = 0usize;
+        for p in projections {
+            if shield.contains_key(&p.commitment_id) {
+                shielded += 1;
+            } else {
+                kept.push(p);
+            }
+        }
+        (kept, shielded)
     }
 
     /// Dispatch a request → the projection that answers for this `host` at this
@@ -1537,6 +1623,78 @@ mod tests {
                     "a lone poisoned primary is a genuine empty state; expected AllEmpty, got {other:?}"
                 ),
             }
+        }
+    }
+
+    // ── Revocation shield: a stale peer echo must never re-grant a
+    // commitment THIS doorway's own storage already revoked (name-routing
+    // scenario 4's own root cause — see mark_revoked's doc). ──────────────
+    mod revocation_shield {
+        use super::make_projection;
+        use super::EprRouter;
+
+        #[test]
+        fn a_revoked_commitment_is_dropped_from_a_peer_sourced_batch() {
+            let router = EprRouter::new();
+            let garden = make_projection("garden", "/nrt-garden");
+            router.mark_revoked(&garden.commitment_id);
+
+            let (kept, shielded) = router.filter_recently_revoked(vec![garden]);
+            assert_eq!(shielded, 1);
+            assert!(kept.is_empty());
+        }
+
+        #[test]
+        fn an_unrelated_commitment_in_the_same_batch_is_unaffected() {
+            let router = EprRouter::new();
+            let garden = make_projection("garden", "/nrt-garden");
+            router.mark_revoked(&garden.commitment_id);
+
+            let lamad = make_projection("lamad", "/lamad");
+            let (kept, shielded) = router.filter_recently_revoked(vec![garden, lamad]);
+            assert_eq!(shielded, 1);
+            assert_eq!(kept.len(), 1);
+            assert_eq!(kept[0].epr_id, "lamad");
+        }
+
+        #[test]
+        fn clearing_the_shield_lets_a_reactivation_through() {
+            let router = EprRouter::new();
+            let garden = make_projection("garden", "/nrt-garden");
+            router.mark_revoked(&garden.commitment_id);
+            router.clear_revoked(&garden.commitment_id);
+
+            let (kept, shielded) = router.filter_recently_revoked(vec![garden]);
+            assert_eq!(shielded, 0);
+            assert_eq!(kept.len(), 1);
+        }
+
+        #[test]
+        fn a_never_revoked_commitment_passes_through_untouched() {
+            let router = EprRouter::new();
+            let landing = make_projection("landing", "/");
+            let (kept, shielded) = router.filter_recently_revoked(vec![landing]);
+            assert_eq!(shielded, 0);
+            assert_eq!(kept.len(), 1);
+        }
+
+        #[test]
+        fn the_shield_never_blocks_replace_all_directly() {
+            // The shield only gates `filter_recently_revoked` (consulted at the
+            // PeerServed call site) — it must never reach into `replace_all`
+            // itself, which is what THIS doorway's own primary-sourced installs
+            // (PrimaryNonEmpty, and every SSE-triggered sync) call directly and
+            // unconditionally, per mark_revoked's doc.
+            let router = EprRouter::new();
+            let garden = make_projection("garden", "/nrt-garden");
+            router.mark_revoked(&garden.commitment_id);
+
+            let outcome = router.replace_all(vec![garden]);
+            assert_eq!(outcome.installed, 1);
+            assert_eq!(
+                router.dispatch(None, "/nrt-garden").unwrap().epr_id,
+                "garden"
+            );
         }
     }
 }

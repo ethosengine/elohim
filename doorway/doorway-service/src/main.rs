@@ -1861,6 +1861,13 @@ fn apply_epr_fallback_outcome(
 ) {
     match outcome {
         FallbackOutcome::PrimaryNonEmpty { url, projections } => {
+            // This IS THIS doorway's own primary — always authoritative.
+            // Whatever it confirms live must never stay revocation-shielded
+            // (a prior revoke-then-reactivate must be observable immediately).
+            // See `EprRouter::mark_revoked`'s doc.
+            for p in &projections {
+                router.clear_revoked(&p.commitment_id);
+            }
             // Log the POST-validation truth: a fetched batch may install fewer
             // rows than it carried (poisoned rows skipped per-row). Reporting
             // `installed` (not the input length) is the Fix-2 observability seam.
@@ -1880,11 +1887,20 @@ fn apply_epr_fallback_outcome(
             serving_url,
             projections,
         } => {
+            // A PEER's answer, never this doorway's own primary — shield out
+            // any commitment THIS doorway's own storage told us (via a
+            // `projection.revoked` SSE event) was revoked, so a sibling's
+            // stale DHT-replicated echo can never resurrect it here. See
+            // `EprRouter::mark_revoked`'s doc for why this exists (the apex
+            // adam/matthew resilience case this fallback exists for never
+            // revokes, so it is unaffected).
+            let (projections, shielded) = router.filter_recently_revoked(projections);
             let outcome = router.replace_all(projections);
             warn!(
                 phase,
                 installed = outcome.installed,
                 rejected = outcome.rejected,
+                shielded_from_revocation = shielded,
                 doorway_id = %doorway_id,
                 primary_url = %primary_url,
                 primary_state = if primary_empty { "empty" } else { "unreachable" },

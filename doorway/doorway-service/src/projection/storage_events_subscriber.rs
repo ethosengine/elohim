@@ -236,6 +236,15 @@ async fn sync_router_from_storage(
 ) {
     match fetch_projections_from_storage(storage_base_url, doorway_id, http).await {
         Ok(projections) => {
+            // This fetch is THIS doorway's own primary/authoritative source
+            // (never a pool-fallback peer) — any commitment id present here is
+            // confirmed live by THIS doorway's own storage right now, so it
+            // must never stay shielded (a prior revoke-then-reactivate must be
+            // observable immediately, not for up to REVOCATION_SHIELD_TTL).
+            // See `EprRouter::mark_revoked`'s doc.
+            for p in &projections {
+                epr_router.clear_revoked(&p.commitment_id);
+            }
             // Log the POST-validation truth (installed, not the fetched length):
             // a batch of N rows that installs 0 is the Welcome-at-`/` incident
             // class, and the fetched count hides it.
@@ -322,6 +331,26 @@ async fn handle_event(
         }
 
         "projection.registered" | "projection.revoked" => {
+            if event_type == "projection.revoked" {
+                // Shield BEFORE the authoritative re-sync below so the periodic
+                // pool-fallback refresh (main.rs's DOORWAY_EPR_REFRESH_SECS
+                // task, running on its own independent timer) can never install
+                // a sibling doorway's stale DHT-replicated copy of THIS
+                // commitment in the window between "revoked" and the next time
+                // THIS doorway's own primary confirms it live again. See
+                // `EprRouter::mark_revoked`'s doc.
+                if let Some(commitment_id) = parse_commitment_id_from_data(event_data) {
+                    epr_router.mark_revoked(&commitment_id);
+                } else {
+                    debug!(
+                        event_type = %event_type,
+                        data = %event_data,
+                        "storage_events_subscriber: projection.revoked without a parseable \
+                         commitmentId; re-sync will still drop the row locally, but the \
+                         revocation shield cannot be armed for it"
+                    );
+                }
+            }
             sync_router_from_storage(storage_base_url, doorway_id, epr_router, http, event_type)
                 .await;
         }
@@ -341,6 +370,18 @@ async fn handle_event(
 fn parse_id_from_data(data: &str) -> Option<String> {
     let v: serde_json::Value = serde_json::from_str(data).ok()?;
     v.get("id").and_then(|x| x.as_str()).map(|s| s.to_string())
+}
+
+/// Pull the `commitmentId` field out of a `projection.{registered,revoked}`
+/// SSE event's JSON data payload.
+///
+/// Storage's sse.rs encodes both events as `{"commitmentId":"<id>"}`
+/// (`event_data` in `elohim-storage/src/sse.rs`).
+fn parse_commitment_id_from_data(data: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(data).ok()?;
+    v.get("commitmentId")
+        .and_then(|x| x.as_str())
+        .map(|s| s.to_string())
 }
 
 #[cfg(test)]
