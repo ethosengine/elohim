@@ -36,6 +36,11 @@ export interface OwnedProcessHandle {
   executable: string;
 }
 
+function processIsGone(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException).code;
+  return code === 'ENOENT' || code === 'ESRCH';
+}
+
 /** The kernel's start-tick field (field 22 of /proc/<pid>/stat) for `pid`. */
 export async function processStartTicks(pid: number): Promise<string> {
   const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
@@ -93,4 +98,40 @@ export async function signalOwnedMeshProcess(
 ): Promise<void> {
   await assertStillOwnedProcess(handle, label);
   process.kill(handle.pid, signal);
+}
+
+async function waitForIncarnationExit(
+  handle: OwnedProcessHandle,
+  deadline: number
+): Promise<boolean> {
+  while (Date.now() < deadline) {
+    try {
+      if ((await processStartTicks(handle.pid)) !== handle.ticks) return true;
+    } catch (error) {
+      if (processIsGone(error)) return true;
+      throw error;
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return false;
+}
+
+/** Stop an owned child, escalating only after a bounded graceful wait. */
+export async function stopOwnedProcess(
+  handle: OwnedProcessHandle,
+  label: string,
+  graceMs = 10_000
+): Promise<'term' | 'kill' | 'already-exited'> {
+  try {
+    await assertStillOwnedProcess(handle, label);
+  } catch (error) {
+    if (processIsGone(error)) return 'already-exited';
+    throw error;
+  }
+  process.kill(handle.pid, 'SIGTERM');
+  if (await waitForIncarnationExit(handle, Date.now() + graceMs)) return 'term';
+  await assertStillOwnedProcess(handle, label);
+  process.kill(handle.pid, 'SIGKILL');
+  if (await waitForIncarnationExit(handle, Date.now() + graceMs)) return 'kill';
+  throw new Error(`${label} pid ${handle.pid} survived SIGKILL for ${graceMs}ms`);
 }

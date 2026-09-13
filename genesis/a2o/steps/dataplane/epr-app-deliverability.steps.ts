@@ -22,7 +22,7 @@
 import { strict as assert } from 'node:assert';
 import { createHash, randomBytes } from 'node:crypto';
 
-import { Given, When, Then, After } from '@cucumber/cucumber';
+import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
 import {
   getRaw,
@@ -40,6 +40,8 @@ import {
   doorwayIncarnations,
   doorwayRestartLog,
   meshControl,
+  restartStoryDoorway,
+  startOwnedDoorwayPair,
   CONVERGENCE_BOUND_MS,
   pollUntil,
   postFixtureCommitment,
@@ -100,6 +102,47 @@ const MAX_COMMITMENT_PAGES = 10;
 const householdPeers = new WeakMap<E2EWorld, HouseholdTopology>();
 const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
 const browserVisits = new WeakMap<E2EWorld, Map<string, BrowserVisit>>();
+
+function isDeliverabilityFeature(uri?: string): boolean {
+  return Boolean(
+    uri?.replaceAll('\\', '/').endsWith('features/dataplane/epr-app-deliverability.feature')
+  );
+}
+
+Before(async function (this: E2EWorld, scenario) {
+  if (!isDeliverabilityFeature(scenario.gherkinDocument.uri)) return;
+  const fixture = loadHouseholdMeshFixture();
+  assert.equal(fixture.processControl, true, 'owned doorway pair requires processControl=true');
+  const previous = Object.fromEntries(
+    ['E2E_DOORWAY_ALPHA', 'E2E_DOORWAY_B', 'E2E_DOORWAY_BETA'].map(key => [key, process.env[key]])
+  );
+  const pair = await startOwnedDoorwayPair(this, fixture);
+  process.env['E2E_DOORWAY_ALPHA'] = pair.url('a');
+  process.env['E2E_DOORWAY_B'] = pair.url('b');
+  process.env['E2E_DOORWAY_BETA'] = pair.url('b');
+  // Registered first, therefore run last: bundle cleanup and the explicit root-cancellation
+  // hook may still restart/read these doorways before their owned processes disappear.
+  this.onCleanup(
+    async () => {
+      let cleanupError: unknown;
+      try {
+        await pair.close();
+      } catch (error) {
+        cleanupError = error;
+      }
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      this.attach(
+        JSON.stringify({ kind: 'owned-doorway-pair', ...pair.receipt() }),
+        'application/json'
+      );
+      if (cleanupError) throw cleanupError;
+    },
+    { required: true }
+  );
+});
 
 function app(world: E2EWorld): PublishedApp {
   const record = publishedApps.get(world);
@@ -271,7 +314,7 @@ Given(
 );
 When('this run builds a next coherent browser and server version', function (this: E2EWorld) {
   buildNextFixture.call(this);
-  app(this).upgradeIncarnations = doorwayIncarnations();
+  app(this).upgradeIncarnations = doorwayIncarnations(this);
 });
 
 /**
@@ -391,7 +434,7 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
     }
   }
   // Head reconciliation targets configured apps, including CSR fallbacks.
-  for (const doorway of ['a', 'b']) await meshControl('doorway-restart', doorway, record.slug);
+  for (const doorway of ['a', 'b']) await restartStoryDoorway(this, doorway, record.slug);
   for (const doorway of DOORWAYS) {
     const ready = await pollUntil(
       async () =>
@@ -637,8 +680,8 @@ When(
     );
     assert.equal(alive, false, `${peer} must refuse connections before doorway restarts`);
     const name = doorway === 'alpha-A' ? 'a' : 'b';
-    const logOffset = doorwayRestartLog(name).length;
-    await meshControl('doorway-restart', name);
+    const logOffset = doorwayRestartLog(name, this).length;
+    await restartStoryDoorway(this, name);
     record.restarts = (record.restarts ?? 0) + 1;
     const ready = await pollUntil(
       async () =>
@@ -649,7 +692,7 @@ When(
     const failedLookup = await pollUntil(
       async () =>
         await Promise.resolve(
-          doorwayRestartLog(name)
+          doorwayRestartLog(name, this)
             .slice(logOffset)
             .split('\n')
             .some(line => line.includes(record.slug) && line.includes('content GET failed'))
@@ -1075,7 +1118,7 @@ Given(
   'both doorways are configured to render this run-owned site',
   { timeout: 180_000 },
   async function (this: E2EWorld) {
-    for (const doorway of ['a', 'b']) await meshControl('doorway-restart', doorway, app(this).slug);
+    for (const doorway of ['a', 'b']) await restartStoryDoorway(this, doorway, app(this).slug);
     app(this).rendererAdoptionAt = Date.now();
   }
 );
@@ -1221,7 +1264,7 @@ Then(
   function (this: E2EWorld) {
     assert.ok(app(this).upgradeIncarnations, 'no running-renderer baseline was captured');
     assert.deepEqual(
-      doorwayIncarnations(),
+      doorwayIncarnations(this),
       app(this).upgradeIncarnations,
       'renderer upgrade must happen in the same doorway process incarnation'
     );

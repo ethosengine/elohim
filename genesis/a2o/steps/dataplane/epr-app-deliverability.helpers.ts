@@ -13,12 +13,18 @@
  * Spec: genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md
  */
 
+import { strict as assert } from 'node:assert';
 import { execFile } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+
+import { OwnedDoorwayPair } from '../../src/framework/fixtures/owned-doorway-pair.js';
+
+import type { HouseholdMeshFixture } from '../../src/framework/fixtures/household-mesh.js';
+import type { E2EWorld } from '../../src/framework/world.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -270,6 +276,32 @@ export async function meshControl(action: string, ...args: string[]): Promise<vo
   );
 }
 
+const ownedDoorwayPairs = new WeakMap<E2EWorld, OwnedDoorwayPair>();
+
+export async function startOwnedDoorwayPair(
+  world: E2EWorld,
+  fixture: HouseholdMeshFixture
+): Promise<OwnedDoorwayPair> {
+  const pair = await OwnedDoorwayPair.start({ storagePeers: fixture.storagePeers ?? {} });
+  ownedDoorwayPairs.set(world, pair);
+  return pair;
+}
+
+export function ownedDoorwayPair(world: E2EWorld): OwnedDoorwayPair | undefined {
+  return ownedDoorwayPairs.get(world);
+}
+
+export async function restartStoryDoorway(
+  world: E2EWorld,
+  name: string,
+  extraSsrSlug?: string
+): Promise<void> {
+  const pair = ownedDoorwayPairs.get(world);
+  if (!pair) return meshControl('doorway-restart', name, ...(extraSsrSlug ? [extraSsrSlug] : []));
+  assert.ok(name === 'a' || name === 'b', `story doorway must be a or b (got ${name})`);
+  await pair.restart(name, extraSsrSlug);
+}
+
 /** Deliberate fault injection after the normal package/publish path refused. */
 export async function stageInvalidFixture(
   bundle: FixtureBundle,
@@ -307,14 +339,18 @@ export async function stageInvalidFixture(
 }
 
 /** Recorded PID plus start tick: PID reuse cannot disguise a renderer restart. */
-export function doorwayIncarnations(): string[] {
+export function doorwayIncarnations(world?: E2EWorld): string[] {
+  const pair = world && ownedDoorwayPairs.get(world);
+  if (pair) return pair.incarnations();
   // eslint-disable-next-line sonarjs/publicly-writable-directories -- Read-only owned-mesh PID receipts; no temporary file creation.
   const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
   return ['a', 'b'].map(name => readFileSync(join(mesh, 'pids', `doorway-${name}`), 'utf8').trim());
 }
 
 /** Read only the owned doorway's restart log; offsets distinguish this incarnation. */
-export function doorwayRestartLog(name: string): string {
+export function doorwayRestartLog(name: string, world?: E2EWorld): string {
+  const pair = world && ownedDoorwayPairs.get(world);
+  if (pair && (name === 'a' || name === 'b')) return pair.log(name);
   // eslint-disable-next-line sonarjs/publicly-writable-directories -- read-only owned mesh receipt
   const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
   try {

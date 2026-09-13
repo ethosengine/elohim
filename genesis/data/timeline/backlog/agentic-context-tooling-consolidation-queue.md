@@ -374,6 +374,11 @@ before investing.
       existing sources: current decision, implemented-but-unverified changes, last measured
       failure and next runnable check. Preserve timestamps, commit identity and disagreement;
       never infer acceptance from an old green build or promote the view into a second ledger.
+      Include a check's recorded fixture premises: the doorway habit already documented that
+      the root deliverability station requires an unclaimed `/`, whereas the mesh prologue
+      stages the household landing there. Recovering the command without that premise caused
+      another predictable setup refusal. A fresh coordinator should find the premise alongside
+      the next check and distinguish apparatus refusal from a product regression.
 
     - **Review loops need observable cost and closure.** Feature-story blind review usefully
       exposed claims broader than the routing assertions, but successive fresh readers also
@@ -403,6 +408,17 @@ before investing.
       Evaluate a worker finishing at the handoff boundary: a fresh coordinator should distinguish
       delivered text from an active review and choose the existing follow-up verb without
       creating a second task ledger.
+
+    - **Recording evidence can change the identity of what was measured.** The serving
+      receipt hashes whole component subtrees, including the owning `.epr-meta/*.habit.md`.
+      Appending a result to that habit after a run therefore invalidates the receipt; committing
+      a tested dirty subtree also changes its identity to a clean Git tree. The current gate
+      requires a fresh run in those cases. Consider separating runtime/build inputs from
+      evidence-only outputs using the existing component ownership contract, while retaining
+      any governance input that actually affects execution. Evaluate a habit-only evidence
+      append, a real source edit, and a dirty-to-committed transition: recall should explain
+      which proof remains valid and why. This is a future refinement, not permission to bypass
+      the current receipt rule or to exclude all metadata indiscriminately.
 
 ## Exit criteria
 

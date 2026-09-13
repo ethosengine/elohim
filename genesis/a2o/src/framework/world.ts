@@ -90,8 +90,8 @@ export class E2EWorld extends World {
    */
   scenarioCreatedHumans: ScenarioCreatedHuman[] = [];
 
-  /** Cleanup callbacks to run after each scenario */
-  private cleanupCallbacks: (() => Promise<void>)[] = [];
+  /** Cleanup callbacks to run after each scenario. Required callbacks fail the scenario. */
+  private cleanupCallbacks: { fn: () => Promise<void>; required: boolean }[] = [];
 
   /** Cached admin client per doorway URL (for ephemeral user cleanup) */
   private readonly adminClients = new Map<string, DoorwayClient>();
@@ -183,18 +183,22 @@ export class E2EWorld extends World {
     return h;
   }
 
-  onCleanup(fn: () => Promise<void>): void {
-    this.cleanupCallbacks.push(fn);
+  onCleanup(fn: () => Promise<void>, options: { required?: boolean } = {}): void {
+    this.cleanupCallbacks.push({ fn, required: options.required === true });
   }
 
   async runCleanup(): Promise<void> {
-    for (const fn of [...this.cleanupCallbacks].reverse()) {
+    const requiredFailures: unknown[] = [];
+    for (const cleanup of [...this.cleanupCallbacks].reverse()) {
       try {
-        await fn();
-      } catch {
-        // best-effort cleanup
+        await cleanup.fn();
+      } catch (error) {
+        if (cleanup.required) requiredFailures.push(error);
       }
     }
     this.cleanupCallbacks = [];
+    if (requiredFailures.length) {
+      throw new AggregateError(requiredFailures, 'required scenario cleanup failed');
+    }
   }
 }

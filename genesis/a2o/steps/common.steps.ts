@@ -957,34 +957,53 @@ After(async function (this: E2EWorld, scenario) {
   const featureSlug = this.featureSlug ?? 'unknown-feature';
   const scenarioSlug = this.scenarioSlug ?? 'unknown-scenario';
 
-  // Universal capture: every Playwright device gets a screenshot regardless
-  // of pass/fail outcome. Failures additionally get a sibling .error.json,
-  // and the existing console-errors / trace artifacts (failure-only).
-  await captureAllDeviceScreenshots(this, featureSlug, scenarioSlug);
+  let evidenceFailure: unknown;
+  try {
+    // Universal capture: every Playwright device gets a screenshot regardless
+    // of pass/fail outcome. Failures additionally get a sibling .error.json,
+    // and the existing console-errors / trace artifacts (failure-only).
+    await captureAllDeviceScreenshots(this, featureSlug, scenarioSlug);
 
-  if (scenario.result?.status === Status.FAILED) {
-    const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
-    const failureMessage = scenario.result.message ?? 'unknown failure';
-    // Write console-errors JSON and trace under reports/console and reports/traces.
-    // We no longer write a FAIL- prefixed screenshot — the universal capture above
-    // covered it and a sidecar .error.json carries the failure context.
-    await captureAllFailureArtifacts(this, featureSlug, scenarioSlug, safeName, failureMessage);
-  }
-
-  // For passing scenarios, assert that no real console errors were logged.
-  // This makes console cleanliness an automatic test contract for all browser scenarios.
-  if (scenario.result?.status === Status.PASSED) {
-    const errorReport = collectBrowserErrors(this, scenario.pickle.name);
-    if (errorReport.length) {
-      throw new Error(
-        `Scenario passed but had ${errorReport.length} browser error(s):\n` +
-          errorReport.map(e => `  ${e}`).join('\n')
-      );
+    if (scenario.result?.status === Status.FAILED) {
+      const safeName = scenario.pickle.name.replace(/[^a-zA-Z0-9]/g, '-');
+      const failureMessage = scenario.result.message ?? 'unknown failure';
+      // Write console-errors JSON and trace under reports/console and reports/traces.
+      // We no longer write a FAIL- prefixed screenshot — the universal capture above
+      // covered it and a sidecar .error.json carries the failure context.
+      await captureAllFailureArtifacts(this, featureSlug, scenarioSlug, safeName, failureMessage);
     }
+
+    // For passing scenarios, assert that no real console errors were logged.
+    // This makes console cleanliness an automatic test contract for all browser scenarios.
+    if (scenario.result?.status === Status.PASSED) {
+      const errorReport = collectBrowserErrors(this, scenario.pickle.name);
+      if (errorReport.length) {
+        throw new Error(
+          `Scenario passed but had ${errorReport.length} browser error(s):\n` +
+            errorReport.map(e => `  ${e}`).join('\n')
+        );
+      }
+    }
+
+    await collectObservationReport(this, scenario);
+  } catch (error) {
+    evidenceFailure = error;
   }
 
-  await collectObservationReport(this, scenario);
-  await this.runCleanup();
+  let cleanupFailure: unknown;
+  try {
+    await this.runCleanup();
+  } catch (error) {
+    cleanupFailure = error;
+  }
+  if (evidenceFailure && cleanupFailure) {
+    throw new AggregateError(
+      [evidenceFailure, cleanupFailure],
+      'scenario evidence capture and required cleanup both failed'
+    );
+  }
+  if (evidenceFailure) throw evidenceFailure;
+  if (cleanupFailure) throw cleanupFailure;
 });
 
 /**

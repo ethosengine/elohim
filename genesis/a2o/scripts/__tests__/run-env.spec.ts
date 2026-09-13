@@ -125,7 +125,18 @@ void describe('sut — the system under test in the derivation key', () => {
   void it('populates unknown — never omits it — for parts it cannot hash', () => {
     const identity = computeSut(makeProbe({}));
     // No E2E_DNA_HASH and no fixture manifest in this world.
-    assert.deepEqual(identity.unknown, [UNKNOWN_DNA_HASH, UNKNOWN_FIXTURES]);
+    assert.deepEqual(identity.unknown, [
+      'sut.a2o',
+      'sut.appPackaging',
+      'sut.appStaging',
+      'sut.appContracts',
+      'sut.dependencies',
+      'sut.workspace',
+      'sut.meshLauncher',
+      'sut.renderer',
+      UNKNOWN_DNA_HASH,
+      UNKNOWN_FIXTURES,
+    ]);
     assert.equal(identity.sutParts['dnaHash'], undefined);
     assert.equal(identity.sutParts['fixtures'], undefined);
     // and the named-but-absent parts are LEFT OUT of the hash, not hashed as ''
@@ -140,8 +151,16 @@ void describe('sut — the system under test in the derivation key', () => {
     const nothing = computeSut(probe);
     assert.deepEqual(nothing.sutParts, {});
     assert.deepEqual(nothing.unknown, [
+      'sut.a2o',
+      'sut.appPackaging',
+      'sut.appStaging',
+      'sut.appContracts',
+      'sut.dependencies',
+      'sut.workspace',
+      'sut.meshLauncher',
       'sut.storage',
       'sut.doorway',
+      'sut.renderer',
       'sut.conductor',
       'sut.dna',
       UNKNOWN_DNA_HASH,
