@@ -10,7 +10,20 @@
 #   kind: "browser" (default) or "server"
 # Env:   STORAGE_API_KEY_ADMIN  admin key for the PATCH+verify step
 #        DO_PATCH               "1" to PATCH+verify, anything else skips (WARN)
-#        STAGE_BLOB_ATTEMPTS    max attempts per leg (default 3)
+#        STAGE_BLOB_BUDGET_SECS total wall-clock retry budget per host+leg
+#                               (default 360s) — the head PATCH ladder honors
+#                               an advertised retryAfter (JSON body field or
+#                               Retry-After header, the doorway's
+#                               catching-up shed envelope carries both) and
+#                               keeps re-offering within this budget instead
+#                               of giving up inside the single shed window it
+#                               was told about (elohim #1710, 2026-09-13).
+#        STAGE_BLOB_ATTEMPTS    safety-net CEILING on attempt count, on top
+#                               of the budget above (default 60 — well above
+#                               what either cadence needs to fill 360s). A
+#                               caller that wants the old fast-fail
+#                               count-only behaviour can still pass a low
+#                               value, e.g. STAGE_BLOB_ATTEMPTS=3.
 set -euo pipefail
 
 DIST_DIR="$1"
@@ -18,7 +31,11 @@ SLUG="$2"
 DOORWAY_EPR_URL="$3"
 KIND="${4:-browser}"
 DO_PATCH="${DO_PATCH:-0}"
-ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-3}"
+ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-60}"
+STAGE_BUDGET_SECS="${STAGE_BLOB_BUDGET_SECS:-360}"
+# Set by stage_once's PATCH leg when the peer's shed envelope advertises a
+# retryAfter (seconds) — read and cleared by the outer retry loop below.
+RETRY_AFTER_HINT=""
 
 # DECLARE-ONLY mode (canonical-head propagation). Cross-peer DHT gossip of the
 # canonical link can lag or degrade (the F-T19 outbound class), leaving the
@@ -357,14 +374,69 @@ stage_once() {
     fi
 
     if [ "${DO_PATCH}" = "1" ]; then
-        local patch_response
-        if ! patch_response=$(curl --fail-with-body -sS -X PATCH \
+        # Retry-aware PATCH. Modeled on the DECLARE_ONLY ladder above (same
+        # shed envelope, same conductor-admission gate): capture the status
+        # code AND response headers so a 503/429 shed can be classified and,
+        # when the peer advertised HOW LONG the window is (Retry-After
+        # header, or a "retryAfter" field in the JSON body — the doorway's
+        # catching-up envelope carries both), that hint rides back to the
+        # caller via RETRY_AFTER_HINT instead of the caller guessing with a
+        # fixed 5/10s backoff. A "not retrievable" body is the pre-existing
+        # DHT-publish-lag class and stays retryable. Any OTHER 4xx (not 429,
+        # not "not retrievable") is a structural answer — return 3 so the
+        # outer loop fails fast instead of burning the time budget on a
+        # question the peer has already answered.
+        local patch_headers_file
+        patch_headers_file="$(mktemp)"
+        local patch_raw patch_status patch_body
+        if ! patch_raw=$(curl -sS -D "${patch_headers_file}" -o - -w '\n%{http_code}' -X PATCH \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
             -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
-            "${DOORWAY_EPR_URL}${PATCH_PATH}"); then
-            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed: ${patch_response}" >&2
+            "${DOORWAY_EPR_URL}${PATCH_PATH}" 2>&1); then
+            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} curl error: ${patch_raw}" >&2
+            rm -f "${patch_headers_file}"
             return 1
+        fi
+        patch_status="${patch_raw##*$'\n'}"
+        patch_body="${patch_raw%$'\n'*}"
+
+        if [ "${patch_status#2}" != "${patch_status}" ]; then
+            rm -f "${patch_headers_file}"
+        else
+            local retry_after=""
+            # grep exits 1 when the header is absent (the common case) — under
+            # pipefail that would abort the whole script via set -e without
+            # this guard, same trap the head_hash extraction above avoids.
+            retry_after=$(grep -i '^Retry-After:' "${patch_headers_file}" 2>/dev/null \
+                | tail -1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//') || retry_after=""
+            if [ -z "${retry_after}" ]; then
+                retry_after=$(printf '%s' "${patch_body}" \
+                    | sed -n 's/.*"retryAfter"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+            fi
+            rm -f "${patch_headers_file}"
+
+            case "${patch_status}" in
+                503|429)
+                    if [ -n "${retry_after}" ]; then
+                        RETRY_AFTER_HINT="${retry_after}"
+                    fi
+                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} shed (HTTP ${patch_status}${retry_after:+, retryAfter=${retry_after}s}): ${patch_body}" >&2
+                    return 1
+                    ;;
+                4*)
+                    if printf '%s' "${patch_body}" | grep -q "not retrievable"; then
+                        echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} — target not retrievable yet (HTTP ${patch_status}): ${patch_body}" >&2
+                        return 1
+                    fi
+                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed structurally (HTTP ${patch_status}): ${patch_body}" >&2
+                    return 3
+                    ;;
+                *)
+                    echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} failed (HTTP ${patch_status}): ${patch_body}" >&2
+                    return 1
+                    ;;
+            esac
         fi
         echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
 
@@ -471,15 +543,29 @@ stage_once() {
     return 0
 }
 
-# Bounded retry with linear backoff. A conductor-bridged backend can 503
-# transiently during cluster churn (the notarized PATCH round-trips the
-# conductor); retry rather than surrender on a blip. A PERSISTENT non-zero exit
-# is meaningful: for a byte-seed (DO_PATCH!=1) it means the blob upload failed;
-# for an author attempt (DO_PATCH=1) it means THIS doorway could not author (no
-# live conductor bridge / persistent 503), and the Jenkinsfile fails the head
+# Bounded retry, budget-first. A TIME BUDGET (STAGE_BLOB_BUDGET_SECS, default
+# 360s) is now the primary bound so a shedding conductor gets several windows
+# — the old fixed-3-attempts ladder (5s, 10s backoff) spent only 15s total
+# before declaring the host STALE, inside the single ~30s catching-up window
+# the peer advertised (elohim #1710, 2026-09-13: byte upload succeeded, the
+# blobHash/serverBlobHash PATCH shed with {"status":"catching-up",
+# "retryAfter":30,...} on both alpha and elohim.host, and the ladder gave up
+# before the window it was told about even closed). STAGE_BLOB_ATTEMPTS is a
+# safety-net CEILING on attempt count on top of the budget (default 60 — see
+# header comment); a caller that wants the old fast-fail count-only
+# behaviour can still pass a low value (run-mesh-quiesce-stage.sh does).
+#
+# A conductor-bridged backend can 503 transiently during cluster churn (the
+# notarized PATCH round-trips the conductor); retry rather than surrender on
+# a blip. A PERSISTENT non-zero exit is meaningful: for a byte-seed
+# (DO_PATCH!=1) it means the blob upload failed; for an author attempt
+# (DO_PATCH=1) it means THIS doorway could not author (no live conductor
+# bridge / persistent backpressure), and the Jenkinsfile fails the head
 # author over to the next doorway. The deploy is only UNSTABLE if NO doorway
 # in the fabric can author the single head.
+MAX_WAIT_SECS=60
 attempt=1
+start_ts=$(date +%s)
 while true; do
     rc=0
     stage_once || rc=$?
@@ -488,17 +574,42 @@ while true; do
     fi
     # A deterministic peer VERDICT (broken bundle, or NOT-JUDGED under strict
     # mode) is not a transport blip — retrying re-asks a question the peer has
-    # already answered. Terminal, immediately, never counted against ATTEMPTS.
+    # already answered. Terminal, immediately, never counted against the budget.
     if [ "${rc}" -eq 2 ]; then
         echo "ERROR: [${SLUG}] the peer judged ${SPA_HASH} BROKEN — not retrying a deterministic verdict" >&2
         exit 2
     fi
-    if [ "${attempt}" -ge "${ATTEMPTS}" ]; then
-        echo "ERROR: [${SLUG}] stage failed after ${ATTEMPTS} attempt(s) against ${DOORWAY_EPR_URL} — host left STALE" >&2
+    # A structural 4xx (not 429, not the "not retrievable" DHT-lag class) is
+    # a real answer, not backpressure — retrying just burns the budget on a
+    # question the peer has already answered (stage_once already logged the
+    # HTTP status/body above).
+    if [ "${rc}" -eq 3 ]; then
+        echo "ERROR: [${SLUG}] structural failure against ${DOORWAY_EPR_URL} (see above) — not retrying — host left STALE" >&2
         exit 1
     fi
-    backoff=$(( attempt * 5 ))
-    echo "  ⚠ [${SLUG}] attempt ${attempt}/${ATTEMPTS} against ${DOORWAY_EPR_URL} failed — retrying in ${backoff}s" >&2
+
+    now_ts=$(date +%s)
+    elapsed=$(( now_ts - start_ts ))
+    remaining=$(( STAGE_BUDGET_SECS - elapsed ))
+    if [ "${attempt}" -ge "${ATTEMPTS}" ] || [ "${remaining}" -le 0 ]; then
+        echo "ERROR: [${SLUG}] stage failed after ${attempt} attempt(s) / ${elapsed}s against ${DOORWAY_EPR_URL} (budget ${STAGE_BUDGET_SECS}s, attempt cap ${ATTEMPTS}) — host left STALE" >&2
+        exit 1
+    fi
+
+    if [ -n "${RETRY_AFTER_HINT}" ]; then
+        wait_s="${RETRY_AFTER_HINT}"
+        if [ "${wait_s}" -gt "${MAX_WAIT_SECS}" ]; then
+            wait_s="${MAX_WAIT_SECS}"
+        fi
+        echo "  ⚠ [${SLUG}] attempt ${attempt}/${ATTEMPTS} against ${DOORWAY_EPR_URL} failed — server advertised retryAfter=${RETRY_AFTER_HINT}s, waiting ${wait_s}s (elapsed ${elapsed}s, ${remaining}s left of ${STAGE_BUDGET_SECS}s budget)" >&2
+    else
+        wait_s=$(( attempt * 5 ))
+        if [ "${wait_s}" -gt "${MAX_WAIT_SECS}" ]; then
+            wait_s="${MAX_WAIT_SECS}"
+        fi
+        echo "  ⚠ [${SLUG}] attempt ${attempt}/${ATTEMPTS} against ${DOORWAY_EPR_URL} failed — retrying in ${wait_s}s (elapsed ${elapsed}s, ${remaining}s left of ${STAGE_BUDGET_SECS}s budget)" >&2
+    fi
+    RETRY_AFTER_HINT=""
     attempt=$(( attempt + 1 ))
-    sleep "${backoff}"
+    sleep "${wait_s}"
 done
