@@ -3413,7 +3413,7 @@ async fn heal_rea(
         .await;
         circuit.record(&attempt.result);
         let kind = match attempt.result {
-            Ok(Some(output)) => match heal_one(&output, pool, &app_ctx) {
+            Ok(Some(output)) => match heal_one(&output, pool, &app_ctx, hc).await {
                 Ok(ReaHealWrite::Wrote(ReaAnchorWrite::Advanced)) => {
                     tracker.mark_completed(&id);
                     let peer = discovered_by
@@ -3456,10 +3456,11 @@ async fn heal_rea(
                     );
                     HealOutcomeKind::ConductorBehind
                 }
-                Ok(ReaHealWrite::Wrote(ReaAnchorWrite::Refreshed)) => {
-                    // The own conductor answered with the anchor this row ALREADY
-                    // holds: the value columns refreshed, but the ANCHOR did not
-                    // move, so the peer-advertised divergence that enqueued this
+                Ok(ReaHealWrite::Wrote(ReaAnchorWrite::NoAdvance)) => {
+                    // No newer AUTHORITY was applied: the own conductor answered
+                    // with the action this row already anchors, or with a
+                    // strictly older signed version of the same lineage. Nothing
+                    // moved, so the peer-advertised divergence that enqueued this
                     // row is UNCHANGED. Deliberately NOT logged as HEALED (the
                     // `Refreshed` discipline the content arm established) and
                     // ADJUDICATED: heal has done everything it can here, and only
@@ -3471,12 +3472,26 @@ async fn heal_rea(
                     tracing::info!(
                         target: "elohim_storage::projection_reconcile",
                         commitment_id = %id,
-                        "projection-reconcile[rea]: anchor unchanged — refreshed row, divergence NOT resolved (own conductor answered the anchor this row already holds)"
+                        "projection-reconcile[rea]: no newer authority applied — divergence NOT resolved (own conductor answered the version this row already holds)"
                     );
                     HealOutcomeKind::Refreshed
                 }
+                Ok(ReaHealWrite::DeferredRace) => {
+                    // Another writer (the commitment-signal worker, an HTTP
+                    // update) moved this row between the authority read and the
+                    // CAS. Leave it PENDING and spend no retry: the tracker is
+                    // per-sweep, so the next sweep re-attempts it fresh against
+                    // whatever the winner wrote. `Unattempted` exists for exactly
+                    // this — not an error, not progress.
+                    tracing::debug!(
+                        target: "elohim_storage::projection_reconcile",
+                        commitment_id = %id,
+                        "projection-reconcile[rea]: row moved under the authority read — re-attempted next sweep, no retry spent"
+                    );
+                    HealOutcomeKind::Unattempted
+                }
                 Err(e) => {
-                    tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: upsert failed; retry next sweep");
+                    tracing::warn!(commitment_id = %id, error = %e, "projection-reconcile: authenticated lifecycle application failed; retry next sweep");
                     tracker.mark_failed(&id);
                     HealOutcomeKind::Failed
                 }
@@ -3571,8 +3586,8 @@ async fn heal_rea(
 struct ReaHealOutcome {
     counts: crate::p2p::reconcile_rails::GapCounts,
     /// Divergent rows the own conductor ADJUDICATED this sweep — either by
-    /// answering with the anchor the local row already holds
-    /// ([`ReaAnchorWrite::Refreshed`]) or by answering from BEHIND the local
+    /// answering with no newer authority than the local row already holds
+    /// ([`ReaAnchorWrite::NoAdvance`]) or by answering from BEHIND the local
     /// row's standing ([`ReaHealWrite::RefusedConductorBehind`]). The heal-side
     /// half of this arm's `divergent_refused`, added to
     /// [`ReaDiscovery::divergent_refused`] before `publish_sweep`.
@@ -3583,43 +3598,33 @@ struct ReaHealOutcome {
     divergent_refused: usize,
 }
 
-/// Did the own conductor's answer MOVE this row's anchor, or merely confirm the
-/// anchor it already holds? The REA analog of the content arm's
+/// Did VERIFIED NEWER authority move this row, or did an identical/older
+/// observation leave it unchanged? The REA analog of the content arm's
 /// [`crate::db::content_diesel::StampOutcome`] split.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReaAnchorWrite {
-    /// The row was absent, un-anchored, or carried a DIFFERENT anchor — the
-    /// write advanced it. Real convergence.
+    /// A verified newer observation was applied atomically — the row was absent,
+    /// or the answered action is a strictly later signed version of the lineage
+    /// this row already holds. Real convergence.
     Advanced,
-    /// The row ALREADY held exactly the anchor the own conductor answered with.
-    /// The write refreshed the value columns, but the ANCHOR did not move — so
-    /// the peer-advertised divergence that enqueued this row is UNCHANGED and
-    /// will re-enqueue next sweep. Not progress, and not a defect: this peer and
-    /// its peers hold genuinely different roots and no amount of own-conductor
-    /// healing can converge them.
-    Refreshed,
-}
-
-/// Pure + total, so the adjudication rule is testable without a conductor or a
-/// database. An EMPTY stored anchor is not a confirmation (the row is
-/// un-anchored — the write fills it, which is a forward move).
-fn classify_rea_anchor_write(existing_anchor: Option<&str>, answered: &str) -> ReaAnchorWrite {
-    match existing_anchor {
-        Some(a) if !a.is_empty() && a == answered => ReaAnchorWrite::Refreshed,
-        _ => ReaAnchorWrite::Advanced,
-    }
+    /// An identical or strictly older verified observation left the row
+    /// unchanged, so the peer-advertised divergence that enqueued this row is
+    /// UNCHANGED and will re-enqueue next sweep. Not progress, and not a defect:
+    /// this peer and its peers hold genuinely different roots and no amount of
+    /// own-conductor healing can converge them.
+    NoAdvance,
 }
 
 /// What one heal attempt DID to the local row — which now includes the case
 /// where it correctly did NOTHING.
 ///
-/// [`ReaAnchorWrite`] answers "did the anchor move"; this answers the question
-/// that comes BEFORE it: was the own conductor's answer allowed to be written at
-/// all. Composed rather than merged so the anchor classifier keeps its pure,
-/// single-axis meaning (and its tests).
+/// [`ReaAnchorWrite`] answers "did verified newer authority land"; this answers
+/// the question that comes BEFORE it: was the own conductor's answer allowed to
+/// be written at all. Composed rather than merged so the authority classifier
+/// keeps its pure, single-axis meaning (and its tests).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReaHealWrite {
-    /// The answer was written; the inner value says whether the anchor moved.
+    /// The answer was written; the inner value says whether authority advanced.
     Wrote(ReaAnchorWrite),
     /// REFUSED: the own conductor answered from BEHIND the local row's standing,
     /// so writing it would have REGRESSED a settled commitment back into a live
@@ -3632,134 +3637,54 @@ enum ReaHealWrite {
     /// again, the `ProjectionSignal` re-installs the route, and the visitor gets
     /// a 200 from a contract nobody holds.
     RefusedConductorBehind,
+    /// Another writer moved the row between this leg's authority read and its
+    /// compare-and-swap. Not an error and not progress: the id is left PENDING
+    /// so the next sweep re-attempts it fresh, and — critically — no
+    /// [`MissLedger`] retry is spent. The commitment-signal worker writes the
+    /// same rows this sweep does, so a lost race is ROUTINE; charging it to the
+    /// retry budget would exhaust ids that nothing is actually wrong with.
+    DeferredRace,
 }
 
-/// Would writing the own conductor's `answered` state REGRESS this row —
-/// move it BACKWARDS through [`crate::db::models::commitment_lifecycle_order`],
-/// a settled obligation back into a live one?
+/// Authenticate the exact returned action through the SHARED lifecycle path,
+/// then apply it under the projection's compare-and-swap.
 ///
-/// STRICT: an equal rank is not a regression. That is what keeps the anchor axis
-/// working — the own conductor re-answering `active` over a local `active` with
-/// a NEW action hash is a real anchor advance and must still be written.
+/// The answered action is a HINT, never the write:
+/// [`crate::services::rea_commitment_record::observe`] loads the exact record
+/// for that action from the own conductor, verifies its signature and entry
+/// definition, walks its signed `Update` lineage back to the root, and refuses
+/// anything that is not a strictly later signed version of the lineage this row
+/// already anchors. An identical or older observation returns
+/// [`ReaAnchorWrite::NoAdvance`] and touches nothing.
 ///
-/// NARROW on unknown vocabulary. When either side is outside the order this
-/// returns `false` (write, as before): the guard fires only where it can PROVE
-/// backwards motion. This is the opposite conservatism from
-/// [`compare_rea_states`], and deliberately so — there, an unknown string must
-/// not be read as agreement (so it counts as a gap); here, an unknown string
-/// must not be read as evidence that the own conductor is stale (so it does not
-/// freeze a row heal is supposed to fill). Both rules refuse to infer from
-/// ignorance; they just have opposite safe sides.
-///
-/// ## Why this is needed even with a lifecycle-ordered gap classifier
-///
-/// [`classify_rea_row_gap`] already stops a peer's BEHIND state from enqueuing
-/// this row: a peer advertising `active` against a local `cancelled` is
-/// `LocalAtOrAhead` → `InSync` on the STATE axis. But the two axes are checked
-/// independently and ANCHOR is checked FIRST. A peer still holding the
-/// pre-cancel entry advertises a different ANCHOR, which is `AnchorDivergent` —
-/// a real, actionable gap — and the heal leg answers it by re-reading the OWN
-/// conductor. If that conductor has not yet been moved by the cancel, its answer
-/// carries BOTH the old anchor and the old `active` state, and
-/// [`crate::db::rea_commitments::upsert_with_anchor`]'s state-heal block writes
-/// the state verbatim. So a gap admitted entirely on the anchor axis regresses
-/// the STATE axis. The classifier governs which rows are asked about; this
-/// governs what an answer is allowed to do.
-fn heal_would_regress_state(local_state: &str, answered_state: &str) -> bool {
-    use crate::db::models::commitment_lifecycle_order::rank;
-    match (rank(local_state), rank(answered_state)) {
-        (Some(local), Some(answered)) => answered < local,
-        _ => false,
-    }
-}
-
-/// Project one conductor-read Commitment into local SQL via the SHARED mapping.
-/// Row content comes exclusively from the own conductor's `ReaCommitmentOutput`.
-///
-/// Returns whether the write ADVANCED the row's anchor, merely REFRESHED it
-/// under the anchor it already held, or was REFUSED because the conductor's
-/// answer sat behind the row's standing — the fact the divergence adjudication
-/// in [`heal_rea`] turns on. The read is taken BEFORE the upsert (which is
-/// idempotent on the anchor, so the after-state cannot tell the two apart).
-fn heal_one(
+/// The `answered < local` STANDING guard that 493adaabb put in front of the
+/// upsert now lives at the actual write site
+/// ([`crate::db::rea_commitment_lifecycle::would_regress_state`], enforced
+/// inside [`crate::db::rea_commitment_lifecycle::apply`]'s transaction), so it
+/// covers EVERY projection path — signal, HTTP create/update, refresh and this
+/// heal — rather than the heal leg alone. It surfaces here unchanged, as
+/// [`ReaHealWrite::RefusedConductorBehind`].
+async fn heal_one(
     output: &shefa_types::ReaCommitmentOutput,
     pool: &DbPool,
     app_ctx: &crate::db::AppContext,
+    hc: &Arc<HcClient>,
 ) -> Result<ReaHealWrite, crate::error::StorageError> {
-    heal_one_row(
-        &output.commitment,
-        &format!("{}", output.action_hash),
+    use crate::db::rea_commitment_lifecycle::ApplyOutcome;
+    match crate::services::rea_commitment_projection::project(
+        hc,
         pool,
         app_ctx,
+        &output.commitment.id,
+        &output.action_hash.to_string(),
     )
-}
-
-/// [`heal_one`] over the parts it actually uses. Split out so the write rules
-/// are testable against a real projection without constructing a `holo_hash`
-/// `ActionHash` (whose prefix bytes vary by hash type — the same reason
-/// `services::rea_commitment_service`'s round-trip tests exercise the inner
-/// `Commitment` rather than the full `ReaCommitmentOutput`).
-fn heal_one_row(
-    c: &shefa_types::Commitment,
-    action_hash: &str,
-    pool: &DbPool,
-    app_ctx: &crate::db::AppContext,
-) -> Result<ReaHealWrite, crate::error::StorageError> {
-    let input = crate::rea_projection::project_commitment_from_wire(
-        &crate::rea_projection::CommitmentWireFields {
-            id: &c.id,
-            action: &c.action,
-            provider: &c.provider,
-            receiver: &c.receiver,
-            resource_conforms_to: c.resource_conforms_to.as_deref(),
-            // shefa_types::Commitment carries `_json` as non-optional String;
-            // an empty string parses to an empty Vec in the shared mapping.
-            resource_classified_as_json: Some(c.resource_classified_as_json.as_str()),
-            resource_quantity_value: c.resource_quantity_value,
-            resource_quantity_unit: c.resource_quantity_unit.as_deref(),
-            effort_quantity_value: c.effort_quantity_value,
-            effort_quantity_unit: c.effort_quantity_unit.as_deref(),
-            has_beginning: c.has_beginning.as_deref(),
-            has_end: c.has_end.as_deref(),
-            due: c.due.as_deref(),
-            clause_of: c.clause_of.as_deref(),
-            in_scope_of_json: Some(c.in_scope_of_json.as_str()),
-            note: c.note.as_deref(),
-            metadata_json: Some(c.metadata_json.as_str()),
-            // The DHT entry's own standing. Heal writes it verbatim — but only
-            // FORWARD (see the `heal_would_regress_state` gate below). Writing
-            // it verbatim is what lets a peer holding a frozen `proposed`
-            // converge onto the author's `active`; writing it BACKWARDS is what
-            // resurrected a cancelled hosting contract.
-            state: Some(c.state.as_str()),
-        },
-    );
-    let mut conn = pool
-        .get()
-        .map_err(|e| crate::error::StorageError::Internal(format!("pool: {e}")))?;
-    // Read the PRE-write row: `upsert_with_anchor` is idempotent on the anchor
-    // column, so after the write "confirmed what we held" and "advanced to a new
-    // head" are indistinguishable — and its state-heal block writes `state`
-    // verbatim, so the only place to refuse a regression is before it.
-    let existing = crate::db::rea_commitments::get_commitment(&mut conn, app_ctx, &c.id)?;
-
-    // A heal may ADVANCE this row or move its anchor; it may never walk the
-    // row's standing backwards. When the own conductor answers from behind the
-    // local row, the row is left ENTIRELY untouched — the anchor half of that
-    // same answer is the stale one too, and writing it would relabel the row as
-    // `healed` onto a superseded action.
-    if let Some(row) = existing.as_ref() {
-        if heal_would_regress_state(&row.state, &c.state) {
-            return Ok(ReaHealWrite::RefusedConductorBehind);
-        }
+    .await?
+    {
+        ApplyOutcome::Advanced => Ok(ReaHealWrite::Wrote(ReaAnchorWrite::Advanced)),
+        ApplyOutcome::Unchanged => Ok(ReaHealWrite::Wrote(ReaAnchorWrite::NoAdvance)),
+        ApplyOutcome::RefusedConductorBehind => Ok(ReaHealWrite::RefusedConductorBehind),
+        ApplyOutcome::Deferred => Ok(ReaHealWrite::DeferredRace),
     }
-
-    let existing_anchor = existing.and_then(|row| row.dht_anchor_hash);
-    crate::db::rea_commitments::upsert_with_anchor(&mut conn, app_ctx, input, Some(action_hash))?;
-    Ok(ReaHealWrite::Wrote(classify_rea_anchor_write(
-        existing_anchor.as_deref(),
-        action_hash,
-    )))
 }
 
 // ============================================================================
@@ -7293,92 +7218,6 @@ mod tests {
     }
 
     #[test]
-    fn rea_conductor_confirming_the_held_anchor_is_a_refresh_not_a_heal() {
-        // The live REA shape (matthew, 23:56Z): rea_divergent_anchor=12 against a
-        // heal leg that reports success every sweep. Discovery counts a row
-        // divergent vs a PEER's anchor; the own conductor then answers with the
-        // anchor the row ALREADY holds, so the write moves nothing. Calling that
-        // `healed` is what made a spinning plane read as a working one — and
-        // leaving it unadjudicated is what pinned `converged` at 0 fleet-wide.
-        assert_eq!(
-            classify_rea_anchor_write(
-                Some("uhCkA-peer-disagrees-with-this"),
-                "uhCkA-peer-disagrees-with-this"
-            ),
-            ReaAnchorWrite::Refreshed,
-            "the own conductor confirmed the anchor the row already holds — nothing converged"
-        );
-    }
-
-    #[test]
-    fn rea_anchor_write_that_moves_the_row_is_advanced() {
-        // The honest half: a row with no anchor, an EMPTY anchor, or a genuinely
-        // different one is FILLED / MOVED FORWARD by the write. That is real
-        // convergence and must never be adjudicated away as a refusal.
-        assert_eq!(
-            classify_rea_anchor_write(None, "uhCkA-fresh"),
-            ReaAnchorWrite::Advanced,
-            "an absent row is filled, not refreshed"
-        );
-        assert_eq!(
-            classify_rea_anchor_write(Some(""), "uhCkA-fresh"),
-            ReaAnchorWrite::Advanced,
-            "an un-anchored row is filled, not refreshed"
-        );
-        assert_eq!(
-            classify_rea_anchor_write(Some("uhCkA-old"), "uhCkA-new"),
-            ReaAnchorWrite::Advanced,
-            "a different conductor answer advances the anchor"
-        );
-    }
-
-    // ------------------------------------------------------------------
-    // Heal may advance standing, never regress it (2026-09-13)
-    // ------------------------------------------------------------------
-
-    #[test]
-    fn heal_regression_guard_fires_only_on_proven_backwards_motion() {
-        // The live shape: a cancelled hosting contract against a conductor that
-        // still answers `active`.
-        assert!(
-            heal_would_regress_state("cancelled", "active"),
-            "settled -> live is the regression this guard exists for"
-        );
-        assert!(
-            heal_would_regress_state("active", "proposed"),
-            "live -> birth is backwards too"
-        );
-
-        // Forward and level motion must still write. Level is the load-bearing
-        // one: it is what keeps the ANCHOR axis working when both sides agree on
-        // standing.
-        assert!(
-            !heal_would_regress_state("proposed", "active"),
-            "the whole point of the state heal — a frozen row learning the author's standing"
-        );
-        assert!(
-            !heal_would_regress_state("active", "active"),
-            "an equal rank is not a regression; the anchor half of this answer may still be news"
-        );
-        assert!(
-            !heal_would_regress_state("cancelled", "revoked"),
-            "two settled states are level, not backwards"
-        );
-
-        // Unknown vocabulary: NARROW. The guard fires only where it can PROVE
-        // backwards motion, so a state the substrate has grown past never
-        // freezes a row heal is supposed to fill.
-        assert!(
-            !heal_would_regress_state("cancelled", "some-future-state"),
-            "an unordered answer is not evidence the conductor is stale"
-        );
-        assert!(
-            !heal_would_regress_state("some-future-state", "active"),
-            "an unordered local row is not evidence it is ahead"
-        );
-    }
-
-    #[test]
     fn conductor_behind_is_counted_apart_from_a_heal() {
         // The refusal must never be folded into `healed` — that fold is exactly
         // what let a resurrected contract read as convergence.
@@ -7390,171 +7229,6 @@ mod tests {
         assert_ne!(
             HealOutcomeKind::ConductorBehind.label(),
             HealOutcomeKind::Healed.label()
-        );
-    }
-
-    /// A `project-epr` hosting commitment as the own conductor answers it.
-    fn rea_commitment_wire(id: &str, state: &str) -> shefa_types::Commitment {
-        shefa_types::Commitment {
-            id: id.to_string(),
-            action: "project-epr".to_string(),
-            provider: "doorway:alpha-elohim-host".to_string(),
-            receiver: format!("epr:{id}"),
-            resource_conforms_to: None,
-            resource_inventoried_as: None,
-            resource_classified_as_json: "[]".to_string(),
-            resource_quantity_value: None,
-            resource_quantity_unit: None,
-            effort_quantity_value: None,
-            effort_quantity_unit: None,
-            has_point_in_time: None,
-            has_beginning: None,
-            has_end: None,
-            due: None,
-            clause_of: None,
-            agreed_in: None,
-            input_of: None,
-            output_of: None,
-            satisfies: None,
-            in_scope_of_json: format!("[\"doorway:alpha-elohim-host|epr:{id}\"]"),
-            finished: false,
-            state: state.to_string(),
-            note: None,
-            metadata_json: "{}".to_string(),
-            created_at: "2026-09-13T05:00:00Z".to_string(),
-            updated_at: "2026-09-13T05:00:00Z".to_string(),
-        }
-    }
-
-    /// Seed a projection row through the PRODUCTION heal write (the row is
-    /// absent, so no guard can fire and the write must report `Advanced`).
-    fn seed_rea_row(
-        pool: &DbPool,
-        ctx: &crate::db::AppContext,
-        id: &str,
-        state: &str,
-        anchor: &str,
-    ) {
-        let wire = rea_commitment_wire(id, state);
-        assert_eq!(
-            heal_one_row(&wire, anchor, pool, ctx).expect("seed write succeeds"),
-            ReaHealWrite::Wrote(ReaAnchorWrite::Advanced),
-            "an absent row is FILLED by the heal — seeding must not be a refusal"
-        );
-    }
-
-    fn rea_row(
-        pool: &DbPool,
-        ctx: &crate::db::AppContext,
-        id: &str,
-    ) -> crate::db::models::ReaCommitment {
-        let mut conn = pool.get().expect("pool conn");
-        crate::db::rea_commitments::get_commitment(&mut conn, ctx, id)
-            .expect("row query succeeds")
-            .expect("row exists")
-    }
-
-    #[test]
-    fn heal_refuses_to_resurrect_a_cancelled_contract_from_a_behind_conductor() {
-        // The household red, exactly (a2o `A doorway never forwards a forwarded
-        // request`, 2026-09-13 05:17–05:18Z): the contract is cancelled through
-        // the doorway's admin path, alpha's own dispatch correctly 404s, a peer
-        // still holding the pre-cancel entry advertises the OLD anchor, the gap
-        // is admitted on the ANCHOR axis, and the own conductor answers with the
-        // pre-cancel entry. Writing that answer walked `cancelled` back to
-        // `active` and re-installed the route.
-        let pool = crate::test_util::test_pool();
-        let ctx = crate::db::AppContext::default_lamad();
-        seed_rea_row(
-            &pool,
-            &ctx,
-            "project-epr-nrt-cancelled",
-            "cancelled",
-            "uhCkA-cancel-head",
-        );
-
-        let stale = rea_commitment_wire("project-epr-nrt-cancelled", "active");
-        let outcome = heal_one_row(&stale, "uhCkA-precancel-root", &pool, &ctx)
-            .expect("heal_one_row succeeds");
-        assert_eq!(
-            outcome,
-            ReaHealWrite::RefusedConductorBehind,
-            "a conductor answering from behind a settled row must be refused"
-        );
-
-        let row = rea_row(&pool, &ctx, "project-epr-nrt-cancelled");
-        assert_eq!(
-            row.state, "cancelled",
-            "the cancelled standing must survive the heal"
-        );
-        assert_eq!(
-            row.dht_anchor_hash.as_deref(),
-            Some("uhCkA-cancel-head"),
-            "the row is left ENTIRELY untouched — the stale answer's anchor is stale too"
-        );
-    }
-
-    #[test]
-    fn heal_still_advances_a_row_that_is_genuinely_behind() {
-        // The honest half, and the reason the guard is STRICT: a projection that
-        // froze at `proposed` while the author graduated the commitment must
-        // still learn the author's standing from its own conductor.
-        let pool = crate::test_util::test_pool();
-        let ctx = crate::db::AppContext::default_lamad();
-        seed_rea_row(
-            &pool,
-            &ctx,
-            "project-epr-nrt-behind",
-            "proposed",
-            "uhCkA-root",
-        );
-
-        let ahead = rea_commitment_wire("project-epr-nrt-behind", "active");
-        let outcome =
-            heal_one_row(&ahead, "uhCkA-activated", &pool, &ctx).expect("heal_one_row succeeds");
-        assert_eq!(
-            outcome,
-            ReaHealWrite::Wrote(ReaAnchorWrite::Advanced),
-            "a forward answer is written, and it moved the anchor"
-        );
-
-        let row = rea_row(&pool, &ctx, "project-epr-nrt-behind");
-        assert_eq!(row.state, "active", "standing advanced");
-        assert_eq!(
-            row.dht_anchor_hash.as_deref(),
-            Some("uhCkA-activated"),
-            "anchor advanced with it"
-        );
-    }
-
-    #[test]
-    fn heal_writes_an_anchor_divergent_answer_that_agrees_on_standing() {
-        // The case the guard must NOT catch: the two sides hold the same
-        // standing and a different anchor. That is a real anchor advance — the
-        // axis the discovery arm admitted this row on — and refusing it would
-        // freeze the very rows the reconciler exists to converge.
-        let pool = crate::test_util::test_pool();
-        let ctx = crate::db::AppContext::default_lamad();
-        seed_rea_row(&pool, &ctx, "project-epr-nrt-level", "active", "uhCkA-old");
-
-        let level = rea_commitment_wire("project-epr-nrt-level", "active");
-        let outcome =
-            heal_one_row(&level, "uhCkA-new", &pool, &ctx).expect("heal_one_row succeeds");
-        assert_eq!(
-            outcome,
-            ReaHealWrite::Wrote(ReaAnchorWrite::Advanced),
-            "equal standing does not block an anchor advance"
-        );
-
-        let row = rea_row(&pool, &ctx, "project-epr-nrt-level");
-        assert_eq!(
-            row.dht_anchor_hash.as_deref(),
-            Some("uhCkA-new"),
-            "the anchor moved"
-        );
-        assert_eq!(
-            row.state, "active",
-            "and the standing was left where it was"
         );
     }
 

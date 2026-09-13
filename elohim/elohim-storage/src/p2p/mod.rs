@@ -36,6 +36,7 @@ pub mod behaviour;
 pub mod binding_cross_signature;
 pub mod binding_mint;
 pub mod binding_proof_wire;
+pub mod binding_recovery;
 pub mod blob_fetch;
 pub mod blob_protocol;
 pub mod blob_swarm;

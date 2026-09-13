@@ -32,7 +32,7 @@ use crate::db::agreements::{self, CreateAgreementInput};
 use crate::db::content_diesel::{self, ContentProjectionPatch};
 use crate::db::context::AppContext;
 use crate::db::economic_events::{self, CreateEconomicEventInput};
-use crate::db::rea_commitments::{self, CreateReaCommitmentInput};
+use crate::db::rea_commitments::CreateReaCommitmentInput;
 use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::signals::HoloHashB64;
@@ -509,8 +509,40 @@ pub struct CommitmentWireFields<'a> {
     /// Added 2026-09-12: without it, a custody-blob commitment reached every
     /// peer and then froze at `proposed` on every non-authoring peer while the
     /// author held `active` — rows travelled, standing did not
-    /// (blob-durability DELTA 2026-09-12c, cause 1).
+    /// (blob-durability DELTA 2026-09-12c, cause 1). The projection-reconcile
+    /// discovery arm compares this field across peers
+    /// (`p2p::projection_reconcile::classify_rea_row_gap`), so dropping it here
+    /// would silently un-measure every state-only divergence on the fleet.
     pub state: Option<&'a str>,
+}
+
+/// Map the canonical typed coordinator/record Commitment through the existing wire mapper.
+pub(crate) fn project_typed_commitment(c: &shefa_types::Commitment) -> CreateReaCommitmentInput {
+    project_commitment_from_wire(&CommitmentWireFields {
+        id: &c.id,
+        action: &c.action,
+        provider: &c.provider,
+        receiver: &c.receiver,
+        resource_conforms_to: c.resource_conforms_to.as_deref(),
+        // shefa_types::Commitment carries `_json` as non-optional String;
+        // an empty string parses to an empty Vec in the shared mapping.
+        resource_classified_as_json: Some(c.resource_classified_as_json.as_str()),
+        resource_quantity_value: c.resource_quantity_value,
+        resource_quantity_unit: c.resource_quantity_unit.as_deref(),
+        effort_quantity_value: c.effort_quantity_value,
+        effort_quantity_unit: c.effort_quantity_unit.as_deref(),
+        has_beginning: c.has_beginning.as_deref(),
+        has_end: c.has_end.as_deref(),
+        due: c.due.as_deref(),
+        clause_of: c.clause_of.as_deref(),
+        in_scope_of_json: Some(c.in_scope_of_json.as_str()),
+        note: c.note.as_deref(),
+        metadata_json: Some(c.metadata_json.as_str()),
+        // The authenticated entry's own standing, projected verbatim. The
+        // lifecycle CAS re-states it authoritatively, but the mapped input must
+        // not disagree with the record it was built from.
+        state: Some(c.state.as_str()),
+    })
 }
 
 /// Build the storage-side `CreateReaCommitmentInput` from the canonical
@@ -600,37 +632,10 @@ pub fn handle_rea_signal(
             };
             agreements::upsert_agreement(&mut conn, ctx, input, Some(action_hash.as_str()))?;
         }
-        ReaProjectionSignal::ReaCommitmentCommitted {
-            action_hash,
-            commitment,
-            ..
-        } => {
-            info!(id = %commitment.id, hash = %action_hash, "Projecting Commitment from DHT");
-            // Single mapping site shared with the P1 projection reconciler.
-            let input = project_commitment_from_wire(&CommitmentWireFields {
-                id: &commitment.id,
-                action: &commitment.action,
-                provider: &commitment.provider,
-                receiver: &commitment.receiver,
-                resource_conforms_to: commitment.resource_conforms_to.as_deref(),
-                resource_classified_as_json: commitment.resource_classified_as_json.as_deref(),
-                resource_quantity_value: commitment.resource_quantity_value,
-                resource_quantity_unit: commitment.resource_quantity_unit.as_deref(),
-                effort_quantity_value: commitment.effort_quantity_value,
-                effort_quantity_unit: commitment.effort_quantity_unit.as_deref(),
-                has_beginning: commitment.has_beginning.as_deref(),
-                has_end: commitment.has_end.as_deref(),
-                due: commitment.due.as_deref(),
-                clause_of: commitment.clause_of.as_deref(),
-                in_scope_of_json: commitment.in_scope_of_json.as_deref(),
-                note: commitment.note.as_deref(),
-                metadata_json: commitment.metadata_json.as_deref(),
-                // `CommitmentEntry::state` is `#[serde(default)]` String — an
-                // entry that predates the field decodes to "", which
-                // `project_commitment_from_wire` reads as an omission.
-                state: Some(commitment.state.as_str()),
-            });
-            rea_commitments::upsert_with_anchor(&mut conn, ctx, input, Some(action_hash.as_str()))?;
+        ReaProjectionSignal::ReaCommitmentCommitted { .. } => {
+            return Err(StorageError::InvalidInput(
+                "REA lifecycle requires authenticated async projection".into(),
+            ));
         }
         ReaProjectionSignal::ReaEconomicEventCommitted {
             action_hash, event, ..
@@ -837,6 +842,40 @@ pub fn handle_rea_signal(
         notify_content_touched(&id);
     }
 
+    Ok(())
+}
+
+/// Process a commitment notification as a hint to read its exact own-conductor
+/// record; never project lifecycle or parties from the unverified signal payload.
+pub async fn handle_authenticated_commitment_signal(
+    signal: ReaProjectionSignal,
+    hc: &std::sync::Arc<crate::hc_client::HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<(), StorageError> {
+    let ReaProjectionSignal::ReaCommitmentCommitted {
+        action_hash,
+        commitment,
+        ..
+    } = signal
+    else {
+        return Err(StorageError::InvalidInput(
+            "expected Commitment signal".into(),
+        ));
+    };
+    let outcome = crate::services::rea_commitment_projection::project(
+        hc,
+        pool,
+        ctx,
+        &commitment.id,
+        action_hash.as_str(),
+    )
+    .await?;
+    if outcome == crate::db::rea_commitment_lifecycle::ApplyOutcome::Deferred {
+        return Err(StorageError::InvalidInput(
+            "REA lifecycle concurrent change; deferred".into(),
+        ));
+    }
     Ok(())
 }
 

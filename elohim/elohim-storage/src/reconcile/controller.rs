@@ -300,7 +300,11 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             DnaSignal::AgentPeerBinding(b) => {
                 debug!(peer_id = %b.peer_id, agent_cid = %b.agent_cid, "dispatching AgentPeerBinding signal");
                 self.observe_kind("agentPeerBinding");
-                self.on_agent_peer_binding(b).await
+                self.on_agent_peer_binding(b, false).await
+            }
+            DnaSignal::AgentPeerBindingRecovery(b) => {
+                self.observe_kind("agentPeerBinding");
+                self.on_agent_peer_binding(b, true).await
             }
             DnaSignal::RevocationAttestation(a) => {
                 debug!(revocation_id = %a.revocation_id, "dispatching RevocationAttestation signal");
@@ -574,6 +578,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     async fn on_agent_peer_binding(
         &mut self,
         signal: AgentPeerBindingSignal,
+        preserve_supersession: bool,
     ) -> Result<(), ReconcileError> {
         // Step 1: write the authoritative DHT-arrival row into the
         // `peer_identity_bindings` projection. The DNA-arrival path is the
@@ -584,6 +589,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // `new_with_storage`), log at debug level and skip persistence — do NOT
         // propagate as an error. This preserves backward compatibility with the
         // A.4 stub-only test suite.
+        let mut may_publish = !preserve_supersession;
         match self.db_pool.as_ref() {
             Some(pool) => match pool.get() {
                 Ok(mut conn) => {
@@ -620,12 +626,36 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                             &signal.signature,
                         ),
                     };
-                    match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
-                        Ok(()) => debug!(
+                    let write = if preserve_supersession {
+                        // A supersession may arrive after recovery enqueues its
+                        // original. Check and preserve it under the same write
+                        // lock as the replay, with no authority I/O in the lock.
+                        use diesel::prelude::*;
+                        conn.immediate_transaction(|conn| {
+                            crate::db::peer_identity_bindings::upsert_preserving_supersession(
+                                conn, &row,
+                            )?;
+                            use crate::db::diesel_schema::peer_identity_bindings::dsl;
+                            let superseded = dsl::peer_identity_bindings
+                                .filter(dsl::peer_id.eq(&row.peer_id))
+                                .filter(dsl::dht_anchor_hash.eq(&row.dht_anchor_hash))
+                                .select(dsl::superseded_by)
+                                .first::<Option<String>>(conn)
+                                .map_err(|e| crate::error::StorageError::Database(e.to_string()))?;
+                            Ok(superseded.is_none())
+                        })
+                    } else {
+                        crate::db::peer_identity_bindings::upsert(&mut conn, &row).map(|()| true)
+                    };
+                    match write {
+                        Ok(can_publish) => {
+                            may_publish = can_publish;
+                            debug!(
                             peer_id = %signal.peer_id,
                             agent_cid = %signal.agent_cid,
                             "peer_identity_bindings upserted from DHT signal (source='dht')"
-                        ),
+                            );
+                        }
                         Err(e) => warn!(
                             peer_id = %signal.peer_id,
                             agent_cid = %signal.agent_cid,
@@ -647,6 +677,12 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 "on_agent_peer_binding: no db_pool wired — projection write skipped \
                  (use new_with_storage for production or persistence tests)"
             ),
+        }
+
+        // Recovery cannot re-advertise a known superseded original, or one
+        // whose local projection failed. Its caller still requires exact ack.
+        if !may_publish {
+            return Ok(());
         }
 
         // Step 2: build the gossip payload from the DHT signal fields.

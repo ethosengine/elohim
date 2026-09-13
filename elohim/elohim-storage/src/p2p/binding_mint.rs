@@ -48,9 +48,10 @@
 //!
 //! ## Failure direction
 //!
-//! Degrade to the sentinel, never to a bad proof. Every failure path here logs
-//! and emits NOTHING: an unverified binding is honest, a forged-looking one is
-//! not. The proof is self-verified twice before it leaves this process — once
+//! Pre-publication failures leave the existing binding posture in place. A
+//! successful publication whose projection acknowledgement is lost is recovered
+//! by its original signed action before another mint may proceed. The proof is
+//! self-verified twice before it leaves this process — once
 //! through the pure algebra, once through the very chokepoint every receiving
 //! peer will run — so a proof that could not classify `cross_signed` on arrival
 //! is never published.
@@ -130,8 +131,9 @@ const CREATE_BINDING_FN: &str = "create_agent_peer_binding";
 // Errors
 // =============================================================================
 
-/// Why a mint attempt produced no binding. Every variant means "emitted
-/// nothing"; none of them means "emitted something questionable".
+/// Why an attempt could not confirm a usable local binding. A storage error
+/// after publication can mean its exact projection acknowledgement is pending;
+/// the production driver recovers the original before considering another mint.
 #[derive(Debug, thiserror::Error)]
 pub enum MintError {
     /// The libp2p keypair is not Ed25519, or refused to sign.
@@ -615,18 +617,41 @@ pub fn spawn_binding_mint_task(
     agent_cid: String,
     transport_keypair: libp2p::identity::Keypair,
     device_archetype: String,
-    subscription_ready: tokio::sync::oneshot::Receiver<()>,
+    subscription_ready: tokio::sync::oneshot::Receiver<
+        super::binding_recovery::OwnBindingProjection,
+    >,
 ) {
     tokio::spawn(async move {
-        run_binding_mint_after_subscription(subscription_ready, || {
-            mint_own_binding(
-                &hc,
-                &pool,
-                &agent_cid,
-                &transport_keypair,
-                &device_archetype,
-                Utc::now(),
-            )
+        run_binding_mint_after_subscription(subscription_ready, |projection| {
+            let hc = Arc::clone(&hc);
+            let pool = pool.clone();
+            let agent = agent_cid.clone();
+            let transport = transport_keypair.clone();
+            let archetype = device_archetype.clone();
+            async move {
+                let peer = transport.public().to_peer_id().to_string();
+                super::binding_recovery::recover_before_mint(
+                    &hc,
+                    &pool,
+                    &peer,
+                    &agent,
+                    &projection,
+                    Utc::now(),
+                )
+                .await?;
+                let outcome =
+                    mint_own_binding(&hc, &pool, &agent, &transport, &archetype, Utc::now())
+                        .await?;
+                if let MintOutcome::Minted(_) = outcome {
+                    // A gossip row can claim an anchor without proving its
+                    // record. Only the next existing recovery pass compares
+                    // the authenticated original's complete proof and window.
+                    return Err(MintError::Storage(StorageError::Internal(
+                        "binding published; authenticated original projection acknowledgement pending".into(),
+                    )));
+                }
+                Ok(outcome)
+            }
         })
         .await;
     });
@@ -634,18 +659,19 @@ pub fn spawn_binding_mint_task(
 
 // One readiness acknowledgement, no timer or additional publication loop. A
 // dropped readiness sender (failed/disabled subscriber) must never mint.
-async fn run_binding_mint_after_subscription<F, Fut>(
-    subscription_ready: tokio::sync::oneshot::Receiver<()>,
-    mint: F,
+async fn run_binding_mint_after_subscription<T, F, Fut>(
+    subscription_ready: tokio::sync::oneshot::Receiver<T>,
+    mut mint: F,
 ) where
-    F: FnMut() -> Fut,
+    T: Clone,
+    F: FnMut(T) -> Fut,
     Fut: std::future::Future<Output = Result<MintOutcome, MintError>>,
 {
-    if subscription_ready.await.is_err() {
+    let Ok(projection) = subscription_ready.await else {
         warn!("binding mint: signal subscription unavailable — no binding published");
         return;
-    }
-    run_binding_mint_task(mint).await;
+    };
+    run_binding_mint_task(|| mint(projection.clone())).await;
 }
 
 // The production retry driver accepts one mint attempt so tests can advance the
@@ -699,7 +725,7 @@ mod tests {
         let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
         let attempts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let observed = Arc::clone(&attempts);
-        let task = tokio::spawn(run_binding_mint_after_subscription(ready_rx, move || {
+        let task = tokio::spawn(run_binding_mint_after_subscription(ready_rx, move |_| {
             observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             std::future::ready(Ok(MintOutcome::Minted("one-owned-action".into())))
         }));
@@ -713,11 +739,11 @@ mod tests {
 
     #[tokio::test]
     async fn failed_subscription_never_attempts_publication() {
-        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel::<()>();
         drop(ready_tx);
         run_binding_mint_after_subscription(
             ready_rx,
-            || -> std::future::Ready<Result<MintOutcome, MintError>> {
+            |_| -> std::future::Ready<Result<MintOutcome, MintError>> {
                 panic!("subscription failure must not call the mint operation")
             },
         )

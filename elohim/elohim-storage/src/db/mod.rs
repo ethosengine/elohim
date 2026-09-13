@@ -46,6 +46,7 @@ pub mod local_sessions;
 pub mod manifests;
 pub mod memberships;
 pub mod places;
+pub(crate) mod rea_commitment_lifecycle;
 pub mod rea_commitments;
 pub mod relationships_diesel;
 pub mod risk_alerts;

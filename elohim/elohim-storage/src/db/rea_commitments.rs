@@ -1156,6 +1156,41 @@ pub fn update_commitment_state(
         .ok_or_else(|| StorageError::Internal("Failed to retrieve updated commitment".into()))
 }
 
+/// Write a caller's re-declared `metadata_json` and NOTHING else.
+///
+/// `metadata_json` is PROJECTION-OWNED by construction: the zome's
+/// `UpdateReaCommitmentStateInput` carries `{id, state, finished}`, so a
+/// notarized state move can never carry a steward's re-declaration and the
+/// authenticated record this projection is built from still holds the
+/// CREATE-TIME metadata. Any path that projects exclusively from that record
+/// therefore has to state the caller's declaration separately, or lose it.
+///
+/// MEASURED on the household mesh (run 20260912T225331Z): a steward narrowing an
+/// EPR's reach from `commons` to a narrower rung got 200 and both doorways kept
+/// serving it at `commons` indefinitely — every doorway's serving fold reads
+/// `metadata.reach` (`commitment_to_projection_view`), so the narrowing could
+/// reach nobody. That build wrote the declaration and then clobbered it from the
+/// entry's stale copy; projecting only from the record would not write it at
+/// all, which is worse. This is the one field where the CALLER is the authority.
+pub fn set_metadata_json(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    metadata_json: &str,
+) -> Result<ReaCommitment, StorageError> {
+    diesel::update(
+        rea_commitments::table
+            .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+            .filter(rea_commitments::id.eq(id)),
+    )
+    .set(rea_commitments::metadata_json.eq(metadata_json))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("Metadata update failed: {}", e)))?;
+
+    get_commitment(conn, ctx, id)?
+        .ok_or_else(|| StorageError::Internal("Failed to retrieve updated commitment".into()))
+}
+
 /// REKEY CASCADE (membership-truth identity supersede): re-attribute every
 /// commitment authored by a stale `old_provider` (an `agent_cid`) to
 /// `new_provider` within an app scope. Called INSIDE the supersede transaction

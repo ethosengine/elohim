@@ -1851,9 +1851,32 @@ async fn async_main(
                             tokio::spawn(async move {
                                 let pool = subscriber_pool;
                                 let ctx = ctx_sub;
+                                // Same bounded queue capacity as the imagodei signal stream.
+                                // One worker awaits exact authority reads; other signal families
+                                // keep their existing synchronous projection path.
+                                let (commitment_tx, mut commitment_rx) =
+                                    tokio::sync::mpsc::channel(256);
+                                let worker_hc = Arc::clone(&hc_sub);
+                                let worker_pool = pool.clone();
+                                let worker_ctx = ctx.clone();
+                                tokio::spawn(async move {
+                                    while let Some(signal) = commitment_rx.recv().await {
+                                        if let Err(e) = elohim_storage::rea_projection::handle_authenticated_commitment_signal(
+                                            signal, &worker_hc, &worker_pool, &worker_ctx,
+                                        ).await {
+                                            warn!(error = %e, "REA lifecycle signal deferred");
+                                        }
+                                    }
+                                });
                                 let handle_id = hc_sub
                                 .subscribe_rea_projection_signals(
                                     move |signal: elohim_storage::rea_projection::ReaProjectionSignal| {
+                                        if matches!(signal, elohim_storage::rea_projection::ReaProjectionSignal::ReaCommitmentCommitted { .. }) {
+                                            if let Err(e) = commitment_tx.try_send(signal) {
+                                                warn!(error = %e, "REA lifecycle queue full or closed; deferred to reconciliation");
+                                            }
+                                            return;
+                                        }
                                         if let Err(e) =
                                             elohim_storage::rea_projection::handle_rea_signal(
                                                 signal, &pool, &ctx,
@@ -5017,6 +5040,10 @@ async fn async_main(
             // reconnect loop rather than giving up.
             #[cfg(feature = "p2p")]
             let mut binding_subscription_ready_tx = Some(binding_subscription_ready_tx);
+            #[cfg(feature = "p2p")]
+            let mut binding_projection: Option<
+                elohim_storage::p2p::binding_recovery::OwnBindingProjection,
+            > = None;
             let mut reconcile_shutdown = shutdown_tx.subscribe();
             tokio::spawn(async move {
                 use elohim_storage::hc_client_registry::{
@@ -5090,8 +5117,15 @@ async fn async_main(
                     // retained stream queues arrivals before run_loop starts.
                     // Consume once: reconnect must never schedule another mint.
                     #[cfg(feature = "p2p")]
-                    if let Some(ready) = binding_subscription_ready_tx.take() {
-                        let _ = ready.send(());
+                    if let Some(projection) = stream.own_binding_projection() {
+                        if let Some(current) = binding_projection.as_ref() {
+                            if let Err(error) = current.use_connected_stream(&projection) {
+                                warn!(%error, "binding recovery stream refresh deferred");
+                            }
+                        } else if let Some(ready) = binding_subscription_ready_tx.take() {
+                            binding_projection = Some(projection.clone());
+                            let _ = ready.send(projection);
+                        }
                     }
 
                     // Build controller. new_with_storage when db_pool available

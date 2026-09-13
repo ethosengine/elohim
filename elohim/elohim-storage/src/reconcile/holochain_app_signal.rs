@@ -352,6 +352,33 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
     }
 }
 
+/// Reuse the live binding translator for an authenticated original entry.
+/// Recovery rejects invalid timestamps instead of accepting the live decoder's
+/// historical fallback-to-now behavior.
+pub(crate) fn binding_signal_from_record(
+    action_hash: String,
+    bytes: &[u8],
+) -> Result<AgentPeerBindingSignal, crate::error::StorageError> {
+    let invalid =
+        || crate::error::StorageError::InvalidInput("invalid original binding entry".into());
+    let binding: crate::signals::AgentPeerBindingPayload =
+        rmp_serde::from_slice(bytes).map_err(|_| invalid())?;
+    if DateTime::<Utc>::from_timestamp_micros(binding.valid_from).is_none()
+        || binding
+            .valid_until
+            .is_some_and(|t| DateTime::<Utc>::from_timestamp_micros(t).is_none())
+    {
+        return Err(invalid());
+    }
+    match translate_imagodei(ImagodeiSignal::AgentPeerBindingCreated {
+        action_hash: crate::signals::HoloHashB64(action_hash),
+        binding,
+    }) {
+        Some(DnaSignal::AgentPeerBinding(signal)) => Ok(signal),
+        _ => Err(invalid()),
+    }
+}
+
 /// Parse a device archetype string (snake_case) into `DeviceArchetype`.
 ///
 /// Defaults to `DeviceArchetype::Node` on unknown values with a warning.
@@ -490,6 +517,8 @@ pub struct HolochainAppSignalStream {
     rx: mpsc::Receiver<DnaSignal>,
     /// Count of delivered signals (for cursor tracking).
     delivered: u64,
+    /// Weak capability: retaining this must not hold a disconnected stream open.
+    own_binding_projection: Option<crate::p2p::binding_recovery::OwnBindingProjection>,
     /// Live AppWebsocket connection — MUST NOT drop.
     ///
     /// The `on_signal` callback is registered inside the `AppWebsocket` struct.
@@ -519,8 +548,16 @@ impl HolochainAppSignalStream {
         Self {
             rx,
             delivered: 0,
+            own_binding_projection: None,
             _app_ws: None,
         }
+    }
+
+    /// Available only after the live signal callback has been registered.
+    pub fn own_binding_projection(
+        &self,
+    ) -> Option<crate::p2p::binding_recovery::OwnBindingProjection> {
+        self.own_binding_projection.clone()
     }
 
     /// Connect to the imagodei app interface and subscribe to signals.
@@ -656,13 +693,14 @@ impl HolochainAppSignalStream {
                     if let Some(dns) = try_decode_and_translate(&bytes, None) {
                         // `try_send` is non-blocking. If the channel is full
                         // (controller is lagging), drop the signal and warn.
-                        // The DHT is the source of truth; the controller can
-                        // recover from a full rescan on reconnect.
+                        // The DHT retains the authoritative record. Recovery
+                        // needs the owning family's explicit reconciliation
+                        // path; reconnect alone does not replay missed signals.
                         if let Err(e) = tx_clone.try_send(dns) {
                             warn!(
                                 error = %e,
                                 "HolochainAppSignalStream: channel full or closed — \
-                                 signal dropped (will be recovered from DHT on reconnect)"
+                                 signal dropped; owning-family reconciliation required"
                             );
                         }
                     }
@@ -679,6 +717,9 @@ impl HolochainAppSignalStream {
         Ok(Self {
             rx,
             delivered: 0,
+            own_binding_projection: Some(crate::p2p::binding_recovery::OwnBindingProjection::new(
+                &tx,
+            )),
             // CRITICAL: keep app_ws alive — the on_signal callback lives inside
             // AppWebsocket. Dropping app_ws here would close the WS and make tx
             // unreachable, causing next_signal() to return None immediately.

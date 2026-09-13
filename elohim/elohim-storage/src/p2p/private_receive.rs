@@ -197,6 +197,10 @@ fn log_skip_once(sender: &Requester, ward: Option<&str>, reason: WithholdReason,
 }
 
 #[cfg(test)]
+#[path = "private_receive_ingest_tests.rs"]
+mod ingest_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::services::custody_standing::FakeCustodyStanding;

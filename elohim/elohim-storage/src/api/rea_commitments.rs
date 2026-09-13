@@ -72,6 +72,26 @@ pub async fn handle(
         // in the http.rs manifest (asserted by test_manifest_builds).
         (&Method::GET, "facing/rea") => handle_facing_rea(pool).await,
 
+        // POST /api/v1/commitments/{id}/refresh — explicit RECONSTRUCTION of an
+        // existing notarized projection from the own conductor's exact records.
+        //
+        // A named, `.auth_required()` operation rather than a query flag on the
+        // anonymous read below: one call costs a `get_rea_commitment` plus up to
+        // 64 bounded `get_record_for_action` round-trips and a write
+        // transaction, all on the conductor whose ADMISSION SHEDDING is the
+        // fleet's named remaining red. An anonymous flag on a cached GET would
+        // be a compute-amplification vector aimed straight at that bottleneck —
+        // and per the substrate discipline a privileged reconstruction is a
+        // bounded operation with standing, never an unauthenticated hint.
+        (&Method::POST, p) if refresh_target(p).is_some() => {
+            let id = refresh_target(p).expect("guarded by the match arm");
+            let hc = hc_lamad.as_ref().ok_or_else(|| {
+                StorageError::Conductor("REA refresh requires own lamad conductor".into())
+            })?;
+            crate::services::rea_commitment_projection::refresh_by_id(hc, pool, ctx, id).await?;
+            handle_get_by_id(id, pool, ctx, hc_lamad.as_ref()).await
+        }
+
         // GET /api/v1/commitments/{id}
         (&Method::GET, id) if !id.contains('/') => {
             handle_get_by_id(id, pool, ctx, hc_lamad.as_ref()).await
@@ -507,5 +527,38 @@ mod tests {
             Some(r#"["compute","storage"]"#)
         );
         assert_eq!(input.in_scope_of.as_deref(), Some(r#"["[not json"]"#));
+    }
+}
+
+/// The commitment id a `POST …/{id}/refresh` names, or `None` when the path is
+/// not that operation. Pure, so the one arm that spends conductor budget on an
+/// anonymous-reachable prefix is pinned by a test rather than by reading a
+/// match guard. An EMPTY id is refused — `POST /refresh` must not reconcile
+/// "the commitment named empty string".
+fn refresh_target(path: &str) -> Option<&str> {
+    let id = path.strip_suffix("/refresh")?;
+    (!id.is_empty() && !id.contains('/')).then_some(id)
+}
+
+#[cfg(test)]
+mod refresh_route_tests {
+    use super::refresh_target;
+
+    #[test]
+    fn refresh_names_exactly_one_commitment_or_nothing() {
+        assert_eq!(refresh_target("abc/refresh"), Some("abc"));
+        assert_eq!(
+            refresh_target("project-epr-my.app/refresh"),
+            Some("project-epr-my.app")
+        );
+        // Not the operation.
+        assert_eq!(refresh_target(""), None);
+        assert_eq!(refresh_target("abc"), None);
+        assert_eq!(refresh_target("capacity"), None);
+        // No nesting, no empty id, no trailing-segment tricks.
+        assert_eq!(refresh_target("/refresh"), None);
+        assert_eq!(refresh_target("agent/abc/refresh"), None);
+        assert_eq!(refresh_target("abc/refresh/refresh"), None);
+        assert_eq!(refresh_target("abc/refreshed"), None);
     }
 }

@@ -16295,6 +16295,19 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // POST /api/v1/commitments/{id}/refresh — explicit reconstruction of an
+        // existing notarized projection from the own conductor's exact records.
+        // AUTH-REQUIRED and uncached by construction: one call costs up to 64
+        // bounded conductor record reads plus a write transaction, on the
+        // conductor whose admission shedding is the fleet's named remaining red.
+        // A privileged reconstruction is a named operation with standing, never
+        // a query flag on the anonymous read above.
+        .route(
+            Route::post("/api/v1/commitments/{id}/refresh")
+                .handler("refresh_commitment")
+                .auth_required()
+                .build(),
+        )
         // =====================================================================
         // /api/v1/pins — the acquisition-pin consent surface. The handlers have
         // been live on the node-local listener since the demand-autopin work

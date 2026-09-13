@@ -309,6 +309,10 @@ pub enum DnaSignal {
     KeyRevocation(KeyRevocationSignal),
     /// An agent–peer libp2p binding has been notarized on the DHT.
     AgentPeerBinding(AgentPeerBindingSignal),
+    /// Locally authenticated original replay. Never decoded from an external
+    /// signal; the controller must preserve already-observed supersession.
+    #[serde(skip)]
+    AgentPeerBindingRecovery(AgentPeerBindingSignal),
     /// A steward has submitted a revocation request or cast a vote.
     RevocationAttestation(RevocationAttestationSignal),
     /// A portal host (doorway registration) has been created on the DHT.

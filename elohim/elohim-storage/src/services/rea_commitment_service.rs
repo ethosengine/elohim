@@ -28,6 +28,7 @@ use crate::db::rea_commitments::{
 };
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
+#[cfg(test)]
 use crate::rea_projection::{first_or_none, parse_json_strings};
 use crate::services::conductor_writes;
 use crate::services::events::{EventBus, StorageEvent};
@@ -69,6 +70,28 @@ pub enum EnsureCustodyOutcome {
 /// The DHT entry hash remains the notarized identity; this deterministic
 /// logical id makes retries of one `(provider, receiver, exact blob address)`
 /// tuple converge on the same projection row.
+///
+/// ## Convergence is only safe because the substrate guards the id
+///
+/// Determinism here means two INDEPENDENT authors can compute the same id —
+/// this peer's runtime self-custody minter, and a seeder `POST` routed through
+/// another peer's cell. An unconditional DHT create under both would put two
+/// root `Create`s beneath one `commitment_id` anchor, and the DNA's bounded
+/// observation then refuses that id forever ("multiple root Creates for ID")
+/// for every read AND every write, with no in-DNA heal. Two live ids forked
+/// exactly that way on the household mesh (2026-09-12).
+///
+/// The substrate now closes it: `content_store::create_rea_commitment` is an
+/// ENSURE — it resolves the `commitment_id` anchor first and, when a root
+/// already exists, returns that observation's lifecycle HEAD and creates
+/// nothing. So a second author converges on the first author's commitment
+/// instead of forking it. Two consequences for callers here: the returned
+/// `state` may already be `active` (do not assume a fresh `"created"`), and the
+/// returned commitment may be authored by another agent, in which case the
+/// root-author-only `update_rea_commitment_state` will correctly refuse. The
+/// guard narrows the fork window; it does not abolish it (two creates inside
+/// one gossip interval can still race), so one author per undertaking remains
+/// the durable discipline.
 pub fn deterministic_custody_id(provider: &str, receiver: &str, blob_marker: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(format!("{provider}|{receiver}|{blob_marker}").as_bytes());
@@ -484,22 +507,8 @@ impl ReaCommitmentService {
         //    rea_projection::project_signal — upsert with dht_anchor_hash.
         let output_bytes = conductor_writes::call_create_rea_commitment(hc, &shefa_input).await?;
 
-        // 2. Eagerly project the SQL row from the zome output (Gap-F fix).
-        //
-        //    The post-commit signal is unreliable under deployed conductor
-        //    latency — it arrives asynchronously and may land after the HTTP
-        //    request has already timed out. We can derive the full projection
-        //    from the zome output directly: it carries the committed entry
-        //    (same data the signal would carry) plus the ActionHash. This
-        //    write is idempotent with the signal path: both call
-        //    rea_commitments::upsert_with_anchor with the same anchor string,
-        //    so a later signal arrival is a harmless no-op update.
-        //
-        //    Field mapping mirrors rea_projection.rs::ReaCommitmentCommitted arm
-        //    exactly: parse_json_strings + first_or_none for multi-value fields,
-        //    f64→f32 downcast for quantities. The action_hash string is derived
-        //    from the holo_hash ActionHash Display impl which produces the same
-        //    "uhCkk…" base32 form the signal carries.
+        // The acknowledged action is a hint for the same authenticated
+        // prepare/CAS path used by signals and reconciliation.
         let output = rmp_serde::from_slice::<shefa_types::ReaCommitmentOutput>(&output_bytes)
             .map_err(|e| {
                 StorageError::Internal(format!(
@@ -507,46 +516,7 @@ impl ReaCommitmentService {
                      output could not be decoded as ReaCommitmentOutput: {e}"
                 ))
             })?;
-        let action_hash_str = format!("{}", output.action_hash);
-        let c = &output.commitment;
-        let classified = first_or_none(parse_json_strings(Some(&c.resource_classified_as_json)));
-        let in_scope_of = first_or_none(parse_json_strings(Some(&c.in_scope_of_json)));
-        let projection_input = CreateReaCommitmentInput {
-            id: Some(c.id.clone()),
-            action: c.action.clone(),
-            provider: c.provider.clone(),
-            receiver: c.receiver.clone(),
-            resource_conforms_to: c.resource_conforms_to.clone(),
-            resource_classified_as: classified,
-            resource_quantity_value: c.resource_quantity_value.map(|v| v as f32),
-            resource_quantity_unit: c.resource_quantity_unit.clone(),
-            effort_quantity_value: c.effort_quantity_value.map(|v| v as f32),
-            effort_quantity_unit: c.effort_quantity_unit.clone(),
-            has_beginning: c.has_beginning.clone(),
-            has_end: c.has_end.clone(),
-            due: c.due.clone(),
-            clause_of: c.clause_of.clone(),
-            in_scope_of,
-            medium_of_exchange_id: None, // storage-only field; not on DNA wire
-            note: c.note.clone(),
-            metadata_json: Some(c.metadata_json.clone()),
-            // Projecting the conductor's committed entry — supersession (if any)
-            // was already applied transactionally before the conductor round-trip;
-            // never re-run it on the projection write.
-            supersedes: None,
-            // The committed entry's own standing (2026-09-12). A create commits
-            // `proposed`, so this is behaviour-preserving today — but it keeps
-            // the eager path from being the ONE projection path that still
-            // hardcodes a birth state, which is how a graduated entry would land
-            // back at `proposed` on a re-project.
-            state: Some(c.state.clone()),
-        };
-        let commitment = rea_commitments::upsert_with_anchor(
-            conn,
-            ctx,
-            projection_input,
-            Some(&action_hash_str),
-        )?;
+        let commitment = Self::project_conductor_observation(conn, ctx, hc, &output).await?;
 
         if let Some(bus) = events {
             bus.emit(StorageEvent::ProjectionRegistered {
@@ -665,6 +635,33 @@ impl ReaCommitmentService {
         Ok(commitment_view(commitment))
     }
 
+    async fn project_conductor_observation(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        hc: &Arc<HcClient>,
+        output: &shefa_types::ReaCommitmentOutput,
+    ) -> Result<crate::db::models::ReaCommitment, StorageError> {
+        use crate::db::rea_commitment_lifecycle::{self, ApplyOutcome};
+        use crate::services::rea_commitment_projection;
+        let id = &output.commitment.id;
+        let expected = rea_commitment_lifecycle::snapshot(conn, ctx, id)?;
+        if let Some(prepared) =
+            rea_commitment_projection::prepare(hc, id, &output.action_hash.to_string(), expected)
+                .await?
+        {
+            if rea_commitment_projection::apply_prepared(conn, ctx, prepared)?
+                == ApplyOutcome::Deferred
+            {
+                return Err(StorageError::InvalidInput(
+                    "REA projection changed during authority read; deferred".into(),
+                ));
+            }
+        }
+        rea_commitments::get_commitment(conn, ctx, id)?.ok_or_else(|| {
+            StorageError::InvalidInput("REA projection unavailable after conductor write".into())
+        })
+    }
+
     async fn update_state_via_conductor(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -688,22 +685,8 @@ impl ReaCommitmentService {
         let output_bytes =
             conductor_writes::call_update_rea_commitment_state(hc, &zome_input).await?;
 
-        // Eagerly project the state update from the zome output (Gap-F fix).
-        //
-        //    The conductor returned a ReaCommitmentOutput carrying the full
-        //    updated entry + new ActionHash. We apply two synchronous writes:
-        //    (1) update_commitment_state to write the new state + finished flag
-        //    into the SQL row (the field the caller is polling for), and
-        //    (2) upsert_with_anchor to advance dht_anchor_hash to the new entry
-        //    (the `update_rea_commitment_state` zome fn writes a new DHT entry
-        //    via update_entry, producing a new ActionHash distinct from the
-        //    original create ActionHash).
-        //
-        //    The signal path (ReaCommitmentCommitted on update) fires
-        //    upsert_with_anchor with the new entry too, but only updates the
-        //    anchor column (not state) — so the signal path has always been
-        //    incomplete for state propagation. This eager path is correct and
-        //    complete; a later signal arrival is a harmless anchor-only update.
+        // Never split lifecycle and anchor writes: a delayed HTTP response
+        // must not overwrite a newer signal/reconciliation observation.
         let output = rmp_serde::from_slice::<shefa_types::ReaCommitmentOutput>(&output_bytes)
             .map_err(|e| {
                 StorageError::Internal(format!(
@@ -711,77 +694,25 @@ impl ReaCommitmentService {
                      output could not be decoded as ReaCommitmentOutput: {e}"
                 ))
             })?;
-        let action_hash_str = format!("{}", output.action_hash);
+        let commitment = Self::project_conductor_observation(conn, ctx, hc, &output).await?;
 
-        // Write new state + finished flag.
-        let commitment = rea_commitments::update_commitment_state(conn, ctx, id, update)?;
-
-        // Advance dht_anchor_hash to the new update entry's ActionHash.
-        // upsert_with_anchor on an existing row only updates dht_anchor_hash,
-        // which is exactly what we need here.
-        let c = &output.commitment;
-        let classified = first_or_none(parse_json_strings(Some(&c.resource_classified_as_json)));
-        let in_scope_of = first_or_none(parse_json_strings(Some(&c.in_scope_of_json)));
-        let anchor_input = CreateReaCommitmentInput {
-            id: Some(c.id.clone()),
-            action: c.action.clone(),
-            provider: c.provider.clone(),
-            receiver: c.receiver.clone(),
-            resource_conforms_to: c.resource_conforms_to.clone(),
-            resource_classified_as: classified,
-            resource_quantity_value: c.resource_quantity_value.map(|v| v as f32),
-            resource_quantity_unit: c.resource_quantity_unit.clone(),
-            effort_quantity_value: c.effort_quantity_value.map(|v| v as f32),
-            effort_quantity_unit: c.effort_quantity_unit.clone(),
-            has_beginning: c.has_beginning.clone(),
-            has_end: c.has_end.clone(),
-            due: c.due.clone(),
-            clause_of: c.clause_of.clone(),
-            in_scope_of,
-            medium_of_exchange_id: None,
-            note: c.note.clone(),
-            // THE NEWER DECLARATION WINS (2026-09-12).
-            //
-            // The zome's `UpdateReaCommitmentStateInput` carries `{id, state,
-            // finished}` and nothing else -- metadata is not a DHT term of a
-            // state update at all, it is this projection's own field. So after a
-            // state update the DHT entry still holds the CREATE-TIME metadata,
-            // and `c.metadata_json` is stale by construction.
-            //
-            // Passing that stale copy here silently undid the caller's
-            // re-declaration: `update_commitment_state` above writes
-            // `update.metadata_json`, and then this anchor advance takes
-            // `upsert_with_anchor`'s scope-carrying branch (a project-epr row
-            // always has an `in_scope_of`, so the `in_scope_of.is_some()` guard
-            // that was meant to keep this path metadata-free never holds) and
-            // rewrites `metadata_json` from the entry's old value. The PATCH
-            // answered 200 and the change went nowhere.
-            //
-            // MEASURED on the household mesh (run 20260912T225331Z): a steward
-            // re-declaring an EPR's reach from `commons` to a narrower rung got
-            // 200, and both doorways kept serving it at commons indefinitely --
-            // every doorway's serving fold reads `metadata.reach`
-            // (`commitment_to_projection_view`), so the narrowing could reach
-            // nobody. A project-epr row is created in state `created`, so EVERY
-            // reach re-declaration is also a state transition and this was the
-            // only path such a PATCH could take.
-            //
-            // When the caller declared metadata, that IS the newer truth and it
-            // is what BOTH writes must state, so the two cannot disagree. With
-            // no caller metadata this is byte-identical to today.
-            metadata_json: Some(anchor_metadata_json(update, &c.metadata_json)),
-            // Anchor-advance only; no supersession on a state-update projection.
-            supersedes: None,
-            // Carry the GRADUATED state onto the anchor advance as well. The
-            // `update_commitment_state` call above already wrote it locally;
-            // stating it here means the one projection input that describes this
-            // entry cannot disagree with the entry.
-            state: Some(c.state.clone()),
+        // THE NEWER DECLARATION WINS (2026-09-12), restated for the authenticated
+        // path. The projection above is built EXCLUSIVELY from the notarized
+        // record, and that record cannot carry `metadata_json`: the zome's
+        // `UpdateReaCommitmentStateInput` is `{id, state, finished}`, so after a
+        // state update the entry still holds its CREATE-TIME metadata. A caller
+        // that re-declared metadata alongside the transition would otherwise have
+        // its declaration silently dropped — the steward's reach-narrowing that
+        // both doorways kept serving at `commons` (household run
+        // 20260912T225331Z). This field is projection-authored; the caller is its
+        // authority, and this is the one write that states it.
+        let commitment = match update.metadata_json.as_deref() {
+            Some(declared) => rea_commitments::set_metadata_json(conn, ctx, id, declared)?,
+            None => commitment,
         };
-        rea_commitments::upsert_with_anchor(conn, ctx, anchor_input, Some(&action_hash_str))?;
 
         if let Some(bus) = events {
-            if commitment.action == PROJECT_EPR_ACTION && update.state == "cancelled" {
+            if commitment.action == PROJECT_EPR_ACTION && commitment.state == "cancelled" {
                 bus.emit(StorageEvent::ProjectionRevoked {
                     commitment_id: commitment.id.clone(),
                 });
@@ -789,22 +720,6 @@ impl ReaCommitmentService {
         }
         Ok(commitment_view(commitment))
     }
-}
-
-/// Which `metadata_json` the anchor-advance projection must state.
-///
-/// The caller's declaration when there is one, else the entry's. See the call
-/// site in `update_state_via_conductor` for why the entry's copy is stale by
-/// construction after a state update.
-///
-/// Pure so the rule is checkable without a conductor: the arm that lost a
-/// steward's re-declaration is a one-line choice, and a one-line choice that
-/// costs a governance act deserves a test that names it.
-fn anchor_metadata_json(update: &UpdateReaCommitmentState, entry_metadata_json: &str) -> String {
-    update
-        .metadata_json
-        .clone()
-        .unwrap_or_else(|| entry_metadata_json.to_string())
 }
 
 /// Bridge the storage-layer input shape (Option<String> id, single-string
@@ -1445,6 +1360,8 @@ mod tests {
             note: c.note.clone(),
             metadata_json: Some(c.metadata_json.clone()),
             supersedes: None,
+            // The committed entry's own standing (2026-09-12): no projection
+            // path may hardcode a birth state when the record carries one.
             state: Some(c.state.clone()),
         };
 
@@ -1551,43 +1468,5 @@ mod tests {
         let browser = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-browser");
         let server = deterministic_custody_id("uhCAk-self", "uhCAk-self", "sha256-server");
         assert_ne!(browser, server);
-    }
-
-    // -- the anchor advance must not undo a steward's re-declaration ---------
-
-    fn state_update(metadata_json: Option<&str>) -> UpdateReaCommitmentState {
-        UpdateReaCommitmentState {
-            state: "proposed".into(),
-            finished: None,
-            metadata_json: metadata_json.map(str::to_string),
-        }
-    }
-
-    /// THE REGRESSION. A PATCH that re-declares metadata AND moves lifecycle
-    /// used to have its declaration rewritten from the DHT entry, which cannot
-    /// carry it: the zome's update input is `{id, state, finished}`, so the
-    /// entry still holds the create-time metadata. The anchor advance must
-    /// state what the caller declared.
-    #[test]
-    fn a_declared_metadata_wins_over_the_entry_s_stale_copy() {
-        let declared = r#"{"urlPath":"/garden","reach":"household"}"#;
-        let entry_says = r#"{"urlPath":"/garden","reach":"commons"}"#;
-        assert_eq!(
-            anchor_metadata_json(&state_update(Some(declared)), entry_says),
-            declared,
-            "the caller's re-declaration is the newer truth and must survive the \
-             anchor advance that follows it"
-        );
-    }
-
-    /// And with nothing declared, the entry's copy still governs -- so a plain
-    /// lifecycle transition is byte-identical to its previous behaviour.
-    #[test]
-    fn an_undeclared_metadata_leaves_the_entry_s_copy_governing() {
-        let entry_says = r#"{"urlPath":"/garden","reach":"commons"}"#;
-        assert_eq!(
-            anchor_metadata_json(&state_update(None), entry_says),
-            entry_says
-        );
     }
 }

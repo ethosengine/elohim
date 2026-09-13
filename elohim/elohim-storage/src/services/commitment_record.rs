@@ -1,6 +1,5 @@
 //! Authenticate immutable grant content and its exact Holochain authoring act.
 //! No authority, issuer/recipient binding, freshness, or activation permission is implied.
-use ed25519_dalek::VerifyingKey;
 use holochain_types::prelude::*;
 
 use super::conductor_writes::CreateMishpatCommitmentInput;
@@ -55,56 +54,24 @@ pub(crate) fn verify_commitment_record(
     bytes: &[u8],
     pins: CommitmentRecordPins,
 ) -> Result<Option<AuthenticatedCommitmentRecord>, StorageError> {
-    if bytes.len() > MAX_COMMITMENT_RECORD_BYTES {
-        return Err(invalid("record exceeds byte limit"));
-    }
-    let record: Option<Record> =
-        rmp_serde::from_slice(bytes).map_err(|_| invalid("malformed record"))?;
-    let Some(record) = record else {
+    let Some(record) = super::authenticated_record::verify_record(
+        bytes,
+        super::authenticated_record::RecordRequirements {
+            action_hash: &pins.action_hash,
+            entry_hash: Some(&pins.entry_hash),
+            author: Some(&pins.author),
+            zome_index: COMMITMENT_ZOME,
+            entry_index: COMMITMENT_ENTRY,
+            allow_update: false,
+            max_bytes: MAX_COMMITMENT_RECORD_BYTES,
+        },
+    )?
+    else {
         return Ok(None);
     };
-    let ActionData::Create(create) = &record.action().data else {
-        return Err(invalid("expected Create"));
-    };
-    let EntryType::App(def) = &create.entry_type else {
-        return Err(invalid("expected app entry"));
-    };
-    if def.zome_index != ZomeIndex(COMMITMENT_ZOME)
-        || def.entry_index != EntryDefIndex(COMMITMENT_ENTRY)
-        || def.visibility != EntryVisibility::Public
-    {
-        return Err(invalid("wrong Commitment entry definition"));
-    }
-    if record.action().author() != &pins.author {
-        return Err(invalid("author pin mismatch"));
-    }
-    let Some(entry @ Entry::App(app)) = record.entry().as_option() else {
+    let Some(Entry::App(app)) = record.entry().as_option() else {
         return Err(invalid("missing app entry"));
     };
-    if app.bytes().len() > MAX_COMMITMENT_RECORD_BYTES {
-        return Err(invalid("entry exceeds byte limit"));
-    }
-    let action_hash = ActionHash::with_data_sync(record.action());
-    if action_hash != pins.action_hash || record.action_address() != &action_hash {
-        return Err(invalid("action pin mismatch"));
-    }
-    let entry_hash = EntryHash::with_data_sync(entry);
-    if entry_hash != pins.entry_hash || create.entry_hash != entry_hash {
-        return Err(invalid("entry pin mismatch"));
-    }
-    // Holochain signs serialized Action bytes, not its digest or JSON.
-    let action_bytes = holochain_types::prelude::encode(record.action())
-        .map_err(|_| invalid("action encoding failed"))?;
-    let key_bytes: [u8; 32] = pins
-        .author
-        .get_raw_32()
-        .try_into()
-        .map_err(|_| invalid("malformed author key"))?;
-    let key = VerifyingKey::from_bytes(&key_bytes).map_err(|_| invalid("invalid author key"))?;
-    let signature = ed25519_dalek::Signature::from_slice(record.signature().as_ref())
-        .map_err(|_| invalid("malformed signature"))?;
-    key.verify_strict(&action_bytes, &signature)
-        .map_err(|_| invalid("signature verification failed"))?;
     let content =
         rmp_serde::from_slice(app.bytes()).map_err(|_| invalid("malformed Commitment content"))?;
     Ok(Some(AuthenticatedCommitmentRecord { pins, content }))
@@ -238,7 +205,7 @@ mod tests {
             let (mut record, mut pins) = fixture(1).await;
             let action = &mut record.signed_action.hashed.content;
             match mutation {
-                0 | 1 | 2 => {
+                0..=2 => {
                     if let ActionData::Create(c) = &mut action.data {
                         c.entry_type = EntryType::App(AppEntryDef::new(
                             EntryDefIndex(if mutation == 0 { 7 } else { 8 }),
