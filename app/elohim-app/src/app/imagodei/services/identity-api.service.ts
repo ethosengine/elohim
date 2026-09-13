@@ -9,12 +9,14 @@
  * until the provenance query endpoint is built.
  */
 
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 import { catchError } from 'rxjs/operators';
 
 import { firstValueFrom } from 'rxjs';
+
+import { BrowserSessionTokenStore } from './browser-session-token.store';
 
 import type { IIdentityApi } from '../interfaces/identity.interface';
 import type {
@@ -23,6 +25,9 @@ import type {
   RegisterHumanPayload,
   UpdateHumanPayload,
 } from '../models/identity.model';
+
+/** The identity-scoped read/write route (doorway -> elohim-storage). */
+const IDENTITY_ME = '/api/v1/identity/me';
 
 /** Response shape from /api/v1/identity endpoints (matches HumanView in storage) */
 interface HumanApiResponse {
@@ -78,6 +83,27 @@ function toUpdateResult(response: HumanApiResponse): HumanUpdateResult {
 @Injectable({ providedIn: 'root' })
 export class IdentityApiService implements IIdentityApi {
   private readonly http = inject(HttpClient);
+  private readonly sessionStore = inject(BrowserSessionTokenStore);
+
+  /**
+   * The session bearer, or null when nobody is signed in.
+   *
+   * `/api/v1/identity/*` is an identity-scoped read: the doorway resolves the
+   * caller from this bearer's claims and tells storage who is asking. Without
+   * it the request is anonymous by construction and storage answers 401 —
+   * which is correct, and which every reader of this service was swallowing
+   * while the browser logged it as a console error. Read from the same token
+   * store AuthService hydrates from, so there is one source of session truth
+   * and no service-level cycle back through AuthService.
+   */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `string | null`; the rule misfires on nullable unions in this toolchain
+  private bearer(): string | null {
+    return this.sessionStore.get()?.token ?? null;
+  }
+
+  private authHeaders(token: string): { headers: HttpHeaders } {
+    return { headers: new HttpHeaders({ Authorization: `Bearer ${token}` }) };
+  }
 
   async createHuman(payload: RegisterHumanPayload): Promise<HumanSessionResult> {
     const response = await firstValueFrom(
@@ -87,10 +113,16 @@ export class IdentityApiService implements IIdentityApi {
   }
 
   async getMyHuman(): Promise<HumanSessionResult | null> {
+    const token = this.bearer();
+    // "Who am I?" is not a question an anonymous visitor can ask. Asking it
+    // anyway sent a credential-less request whose only possible answer was
+    // 401 — swallowed here, but logged by the browser on every page load.
+    if (!token) return null;
+
     try {
       const response = await firstValueFrom(
         this.http
-          .get<HumanApiResponse>('/api/v1/identity/me')
+          .get<HumanApiResponse>(IDENTITY_ME, this.authHeaders(token))
           .pipe(catchError(() => [null as unknown as HumanApiResponse]))
       );
       return response ? toSessionResult(response) : null;
@@ -100,8 +132,11 @@ export class IdentityApiService implements IIdentityApi {
   }
 
   async updateHuman(payload: UpdateHumanPayload): Promise<HumanUpdateResult> {
+    const token = this.bearer();
     const response = await firstValueFrom(
-      this.http.put<HumanApiResponse>('/api/v1/identity/me', payload)
+      token
+        ? this.http.put<HumanApiResponse>(IDENTITY_ME, payload, this.authHeaders(token))
+        : this.http.put<HumanApiResponse>(IDENTITY_ME, payload)
     );
     return toUpdateResult(response);
   }
