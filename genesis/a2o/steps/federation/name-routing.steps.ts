@@ -145,6 +145,21 @@ const SHED_SETTLE_MS = 5_000;
 const RESTORE_BUDGET_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 10_000;
 
+/** Scenario 4's own timing contract (see that Given step's doc): once the OTHER doorway's
+ * registry has just relearned the holder from a tick, that knowledge is trustworthy only
+ * until its NEXT ~60s tick re-syncs and drops the meanwhile-lapsed contract. Everything
+ * between "confirm the tick" and "Jessica's ask lands" must fit inside this margin. */
+const STALE_REGISTRY_SAFETY_MARGIN_MS = 45_000;
+/** One federation-discovery interval (60s, main.rs) plus buffer for the coherence probe
+ * itself to complete and be logged. */
+const TICK_WAIT_BUDGET_MS = 90_000;
+/** "retry the whole premise once" — this scenario's own stated timing contract. */
+const STALE_REGISTRY_MAX_ATTEMPTS = 2;
+/** Generous per-attempt ceiling: local-mount warm-up + one tick wait + a short registry
+ * confirm + the own-dispatch-drop margin + buffer. */
+const STALE_REGISTRY_ATTEMPT_BUDGET_MS =
+  65_000 + TICK_WAIT_BUDGET_MS + 15_000 + STALE_REGISTRY_SAFETY_MARGIN_MS + 15_000;
+
 /** Fixture doorway id -> hc-mesh.sh's own PID-ledger letter (apex-transition.steps.ts convention). */
 const MESH_LETTER: Readonly<Record<string, 'a' | 'b'>> = { alpha: 'a', beta: 'b' };
 
@@ -959,6 +974,81 @@ async function logSince(path: string, offset: number): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// The federation discovery loop's own tick — the timestamp anchor scenario 4's premise
+// needs (see that Given step's own doc for why: there is no admin endpoint exposing "when
+// did this doorway's name-route table last refresh", so the log line is the only observable
+// proxy).
+// ---------------------------------------------------------------------------
+
+/** `spawn_peer_discovery_task`'s own marker (federation.rs `refresh_peer_cache`) — logged
+ * once per loop iteration, gated on `peers.len() > 0`. The SAME iteration calls
+ * `refresh_coherence` immediately afterward with no intervening sleep (see that function's
+ * doc in federation.rs), so this line's timestamp is, for this test surface's purposes, the
+ * moment the doorway's name-route table last refreshed too. */
+const TICK_LOG_MESSAGE = 'Federation peer cache refreshed';
+
+interface TimestampedLogLine {
+  atMs: number;
+  fields: LogLineFields;
+}
+
+/** Same JSON-line parsing as `parseLogLines`, additionally keeping the envelope's own
+ * `timestamp` field (tracing_subscriber's `fmt::layer().json()` default, RFC3339). */
+function parseTimestampedLogLines(text: string): TimestampedLogLine[] {
+  const out: TimestampedLogLine[] = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    try {
+      const parsed = JSON.parse(line) as { timestamp?: unknown; fields?: LogLineFields };
+      if (!parsed.fields || typeof parsed.timestamp !== 'string') continue;
+      const atMs = Date.parse(parsed.timestamp);
+      if (!Number.isNaN(atMs)) out.push({ atMs, fields: parsed.fields });
+    } catch {
+      // Non-JSON line (startup banner, panic backtrace, …) — skip, matches parseLogLines.
+    }
+  }
+  return out;
+}
+
+/** Timestamp (ms since epoch) of the most recent tick logged so far in `logPath`, or
+ * `undefined` if the discovery loop has not logged one yet (fresh boot, or peers still
+ * empty — the line itself is gated on `peers.len() > 0`). */
+async function lastTickAt(logPath: string): Promise<number | undefined> {
+  const text = await readFile(logPath, 'utf8').catch(() => '');
+  let latest: number | undefined;
+  for (const { atMs, fields } of parseTimestampedLogLines(text)) {
+    if (fields.message === TICK_LOG_MESSAGE && (latest === undefined || atMs > latest)) {
+      latest = atMs;
+    }
+  }
+  return latest;
+}
+
+/** Poll `logPath` until a tick strictly after `afterMs` appears (the FIRST-ever tick counts
+ * when `afterMs` is `undefined`), returning its timestamp — the moment this doorway's
+ * registry last relearned who holds what. */
+async function waitForNextTick(
+  logPath: string,
+  afterMs: number | undefined,
+  budgetMs: number
+): Promise<number> {
+  const deadline = Date.now() + budgetMs;
+  for (;;) {
+    const latest = await lastTickAt(logPath);
+    if (latest !== undefined && (afterMs === undefined || latest > afterMs)) return latest;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `no "${TICK_LOG_MESSAGE}" tick observed in ${logPath} within ${budgetMs}ms (after ` +
+          `${afterMs === undefined ? 'boot' : new Date(afterMs).toISOString()}) — the federation ` +
+          'discovery loop (60s cadence, `spawn_peer_discovery_task`) does not appear to be running ' +
+          'on this doorway process'
+      );
+    }
+    await delay(2_000);
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Household mesh lease (mirrors dataplane/apex-transition.steps.ts's acquireLease —
 // coordinates fault injection across every scenario sharing this mesh, any lane).
 // ---------------------------------------------------------------------------
@@ -1179,35 +1269,119 @@ Given(
   }
 );
 
+/**
+ * The stale-registry premise, made deterministic against doorway "other"'s own ~60s
+ * coherence-discovery cadence rather than against wall-clock luck.
+ *
+ * WHY THIS EXISTED AS A FLAKE: the old arrangement staged the root, waited (via a real
+ * relayed GET) for `other`'s registry to know the holder, then IMMEDIATELY lapsed the
+ * contract. That "immediately" carried no relationship to `other`'s OWN tick clock — the
+ * confirming GET could have succeeded off a tick that fired anywhere from 0ms to just under
+ * 60s ago (`waitForRegistryToKnowHolder` only proves "true as of the LAST completed tick",
+ * never "true as of NOW"). So the very next tick — due at any point in that unknown
+ * remaining window — could (and, per live observation, often did) land before the "Jessica
+ * asks" step's GET, silently re-syncing `other`'s registry past the lapse and erasing the
+ * premise: `other` would then answer with an immediate local refusal (0 relay attempts),
+ * not the one attempted-and-failed hop this scenario measures.
+ *
+ * THE FIX: anchor on `other`'s own tick log ("Federation peer cache refreshed" —
+ * `federation.rs::refresh_peer_cache`, the SAME loop iteration that calls
+ * `refresh_coherence`/`install_name_routes` right after, no intervening sleep — see that
+ * function's doc). Wait for a tick strictly AFTER the one observed before staging (so it is
+ * known to have read the just-warmed, still-live contract), confirm the registry picked it
+ * up, THEN lapse and drop the holder's own local dispatch — all within
+ * `STALE_REGISTRY_SAFETY_MARGIN_MS` of that tick, comfortably inside the ~60s before
+ * `other`'s NEXT tick could re-sync. The subsequent "Jessica asks" step is a single bounded
+ * GET issued immediately once this `Given` returns, so keeping this arrangement inside the
+ * margin is what keeps that ask's premise real.
+ *
+ * A miss (own dispatch too slow to drop, or the margin otherwise blown) retries the WHOLE
+ * premise once against the doorway's NEXT tick — reusing the SAME staged contract via its
+ * own reactivation branch (deterministic id — see `stageRoot`'s doc), never minting a
+ * duplicate. Two misses in a row fails naming the exact timing gap, rather than silently
+ * asserting on a premise that was never actually true.
+ */
 Given(
   'the registry still names doorway {string} as a holder of {string} from a contract that has lapsed',
-  { timeout: REGISTRY_FILL_BUDGET_MS + OWN_REFRESH_BUDGET_MS + 60_000 },
+  { timeout: STALE_REGISTRY_ATTEMPT_BUDGET_MS * STALE_REGISTRY_MAX_ATTEMPTS },
   async function (this: E2EWorld, holderId: string, root: string): Promise<void> {
     const state = beginScenario(this, root);
     const holder = this.getDoorway(holderId);
-    const other = this.getDoorway(otherFixtureId(holderId));
+    const otherId = otherFixtureId(holderId);
+    const other = this.getDoorway(otherId);
     const holderDoorwayId = await resolvedDoorwayId(this, holderId, holder.url);
-    const staged = await stageRoot(holder.url, holderDoorwayId, state.mount, root);
-    state.staged.push(staged);
-    await waitForLocalMount(holder.url, holderId, state.path, root);
+    const otherLogPath = await doorwayLogPath(MESH_LETTER[otherId], `doorway ${otherId}`);
 
-    // The stale-registry premise (feature comment on this scenario): the OTHER
-    // doorway must have learned the holder BEFORE it lapses, so its next ask still
-    // reads a since-lapsed contract from its own registry. Requires the discovery
-    // loop to genuinely be running — see waitForRegistryToKnowHolder's thrown
-    // message for the mesh-launcher gap this run is very likely to hit.
-    await waitForRegistryToKnowHolder(
-      other.url,
-      otherFixtureId(holderId),
-      state.path,
-      holder.url,
-      REGISTRY_FILL_BUDGET_MS
+    let staged: StagedContract | undefined;
+    let lastFailure: unknown;
+
+    for (let attempt = 1; attempt <= STALE_REGISTRY_MAX_ATTEMPTS; attempt += 1) {
+      if (staged) {
+        // A previous attempt lapsed this same row chasing a tick it then missed the
+        // margin for — bring it back live so this attempt's premise (a GENUINELY live
+        // contract at the moment `other` ticks) is real, not a leftover from attempt 1.
+        const reactivated = await adminCall(
+          'PATCH',
+          `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`,
+          { state: 'proposed' }
+        );
+        assert.equal(
+          reactivated.status,
+          200,
+          `re-activating ${staged.commitmentId} on "${holderId}" for a retry of the stale-registry ` +
+            `premise failed: HTTP ${reactivated.status} ${reactivated.text.slice(0, 300)}`
+        );
+      } else {
+        staged = await stageRoot(holder.url, holderDoorwayId, state.mount, root);
+        state.staged.push(staged);
+      }
+      await waitForLocalMount(holder.url, holderId, state.path, root);
+
+      try {
+        // Anchor on `other`'s own cadence: wait for a tick strictly after the last one
+        // observed now (i.e., after the contract above is confirmed genuinely live).
+        const baseline = await lastTickAt(otherLogPath);
+        const tickAt = await waitForNextTick(otherLogPath, baseline, TICK_WAIT_BUDGET_MS);
+
+        // Confirm the tick really did pick up the still-live contract. Short budget: if
+        // the tick fired, the registry write is synchronous with it (same loop
+        // iteration) — this is a confirmation, not another open-ended wait.
+        await waitForRegistryToKnowHolder(other.url, otherId, state.path, holder.url, 15_000);
+
+        // From this instant, "`other` names `holder` as holder" is STALE — true only
+        // until `other`'s NEXT tick, due at roughly tickAt + 60s.
+        await lapseContract(staged);
+
+        const remainingMs = tickAt + STALE_REGISTRY_SAFETY_MARGIN_MS - Date.now();
+        if (remainingMs <= 0) {
+          throw new Error(
+            `confirming the stale holder for "${root}" left no safety margin before doorway ` +
+              `"${otherId}"'s next tick (tick observed at ${new Date(tickAt).toISOString()}, margin ` +
+              `${STALE_REGISTRY_SAFETY_MARGIN_MS}ms)`
+          );
+        }
+        await waitForOwnDispatchToDrop(holder.url, holderId, root, remainingMs);
+
+        const elapsedSinceTick = Date.now() - tickAt;
+        if (elapsedSinceTick > STALE_REGISTRY_SAFETY_MARGIN_MS) {
+          throw new Error(
+            `doorway "${holderId}"'s own dispatch dropped ${elapsedSinceTick}ms after doorway ` +
+              `"${otherId}"'s tick at ${new Date(tickAt).toISOString()} — past the ` +
+              `${STALE_REGISTRY_SAFETY_MARGIN_MS}ms safety margin before its next tick would re-sync ` +
+              "the registry and erase the stale-holder premise before Jessica's ask can land"
+          );
+        }
+        return;
+      } catch (error) {
+        lastFailure = error;
+      }
+    }
+
+    throw new Error(
+      `could not arrange the stale-registry premise for "${root}" on doorway "${holderId}" within ` +
+        `${STALE_REGISTRY_MAX_ATTEMPTS} attempt(s) against doorway "${otherId}"'s ~60s coherence tick: ` +
+        (lastFailure instanceof Error ? lastFailure.message : String(lastFailure))
     );
-
-    // Now lapse it — and wait for the HOLDER's own dispatch to catch up, so the
-    // upcoming forwarded hop meets a genuine local 404, not a stale 200.
-    await lapseContract(staged);
-    await waitForOwnDispatchToDrop(holder.url, holderId, root, OWN_REFRESH_BUDGET_MS);
   }
 );
 
