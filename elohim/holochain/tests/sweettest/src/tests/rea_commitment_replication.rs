@@ -169,6 +169,12 @@ struct CarriedRecordOutput {
     record: Vec<u8>,
 }
 
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+struct ReaEconomicEventOutput {
+    #[serde(default)]
+    fulfillment_links: Vec<ActionHash>,
+}
+
 // ---------------------------------------------------------------------------
 // Scenario: Alice creates a project-epr commitment; Bob reads it after gossip.
 // ---------------------------------------------------------------------------
@@ -415,7 +421,7 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         .call(&cell_a.zome(ZOME), "get_my_custody_epr_scopes", ())
         .await;
     assert!(before.contains(&scope));
-    let mut previous = alice_output.action_hash;
+    let mut previous = alice_output.action_hash.clone();
     for (state, finished) in [("active", false), ("cancelled", true)] {
         let changed: ReaCommitmentOutput = ca
             .call(
@@ -503,6 +509,29 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
             .await;
         assert_eq!(agreement_rows.len(), 1);
         assert_eq!(agreement_rows[0].action_hash, changed.action_hash);
+
+        if state == "active" {
+            let event: ReaEconomicEventOutput = ca
+                .call(
+                    &cell_a.zome(ZOME),
+                    "create_rea_economic_event",
+                    serde_json::json!({
+                        "id": unique_id("head-link-root-selection"),
+                        "action": "use",
+                        "provider": "doorway:test-doorway",
+                        "receiver": "epr:lamad-spa",
+                        "has_point_in_time": "2026-09-13T00:00:00Z",
+                        "fulfills": [commitment_id.clone()]
+                    }),
+                )
+                .await;
+            assert_eq!(
+                event.fulfillment_links,
+                vec![alice_output.action_hash.clone()],
+                "fulfillment must bind the root Create, not a head-linked Update"
+            );
+        }
+
         previous = changed.action_hash;
     }
     let after: Vec<String> = ca
@@ -513,6 +542,45 @@ async fn project_epr_commitment_replicates_to_peer_b() -> Result<()> {
         "cancelled history must not preserve the original undertaking"
     );
     assert!(foreign.is_err(), "Bob must not update Alice's undertaking");
+
+    // A compute request may advance many times while retaining one immutable
+    // submission root. Those head links must not consume the submission
+    // budget or be passed to `status`, which accepts Create actions only.
+    let task_cid = unique_id("head-link-compute-budget");
+    let submit = serde_json::json!({
+        "operation": "submit",
+        "taskCid": task_cid,
+        "provider": a1.to_string(),
+        "grantActionHash": alice_output.action_hash.to_string(),
+        "envelope": {
+            "schemaVersion": 1,
+            "taskKind": "feedback_signal",
+            "requester": a1.to_string(),
+            "provider": a1.to_string()
+        }
+    });
+    let submitted: serde_json::Value = ca
+        .call(&cell_a.zome(ZOME), "compute_task", submit.clone())
+        .await;
+    let compute_id = format!("compute:{}:{}", a1, task_cid);
+    for advance in 0..8 {
+        let _: ReaCommitmentOutput = ca
+            .call(
+                &cell_a.zome(ZOME),
+                "update_rea_commitment_state",
+                UpdateCommitmentStateInput {
+                    id: compute_id.clone(),
+                    state: format!("advanced-{advance}"),
+                    finished: Some(false),
+                },
+            )
+            .await;
+    }
+    let resubmitted: serde_json::Value = ca.call(&cell_a.zome(ZOME), "compute_task", submit).await;
+    assert_eq!(
+        resubmitted["requestActionHash"], submitted["requestActionHash"],
+        "head links must not consume the compute submission budget"
+    );
 
     Ok(())
 }

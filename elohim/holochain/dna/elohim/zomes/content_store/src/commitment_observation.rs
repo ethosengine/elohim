@@ -12,7 +12,10 @@ pub(crate) struct Observation {
     pub record: Record,
     pub commitment: Commitment,
     updates: Vec<ActionHash>,
+    root_action_hash: Option<ActionHash>,
 }
+
+pub(crate) const MAX_HEAD_ANCHOR_CANDIDATES: usize = 8;
 
 fn unavailable(reason: &str) -> WasmError {
     wasm_error!(WasmErrorInner::Guest(format!(
@@ -46,9 +49,6 @@ fn read_observation(hash: &ActionHash) -> ExternResult<Observation> {
     if !details.deletes.is_empty() {
         return Err(unavailable("observed delete"));
     }
-    if details.updates.len() > MAX_LINEAGE_CANDIDATES {
-        return Err(unavailable("update metadata budget exceeded"));
-    }
     Ok(Observation {
         record,
         commitment,
@@ -57,6 +57,7 @@ fn read_observation(hash: &ActionHash) -> ExternResult<Observation> {
             .into_iter()
             .map(|update| update.action_address().clone())
             .collect(),
+        root_action_hash: None,
     })
 }
 
@@ -101,33 +102,73 @@ where
 {
     let mut cache = HashMap::new();
     let mut root: Option<ActionHash> = None;
+    let mut accepted_anchor_path = HashSet::new();
     let mut distinct_targets = HashSet::new();
     for target in targets {
         if !distinct_targets.insert(target.clone()) {
             continue;
         }
-        let mut current = target;
-        let mut ancestors = HashSet::new();
-        loop {
-            if ancestors.len() >= MAX_LINEAGE_DEPTH || !ancestors.insert(current.clone()) {
-                return Err(unavailable("cyclic or over-depth lineage"));
-            }
-            let observed = load(&current, &mut cache, &mut read)?;
-            if observed.commitment.id != id {
-                return Err(unavailable("anchor target has another commitment ID"));
-            }
-            match &observed.record.action().data {
-                ActionData::Create(_) => {
-                    if root.as_ref().is_some_and(|known| known != &current) {
-                        return Err(unavailable("multiple root Creates for ID"));
-                    }
-                    root = Some(current);
-                    break;
+        let candidate = (|| -> ExternResult<(ActionHash, Vec<ActionHash>)> {
+            let mut current = target;
+            let mut ancestors = HashSet::new();
+            let mut path = Vec::new();
+            let candidate_root = loop {
+                if ancestors.len() >= MAX_LINEAGE_DEPTH {
+                    return Err(unavailable("over-depth anchor lineage"));
                 }
-                ActionData::Update(update) => current = update.original_action_address.clone(),
-                _ => return Err(unavailable("root is not a Create")),
+                if !ancestors.insert(current.clone()) {
+                    return Err(unavailable("cyclic or over-depth lineage"));
+                }
+                if !cache.contains_key(&current) && cache.len() >= MAX_LINEAGE_CANDIDATES {
+                    return Err(unavailable("record budget exceeded"));
+                }
+                let observed = load(&current, &mut cache, &mut read)?;
+                if observed.commitment.id != id {
+                    return Err(unavailable("anchor target has another commitment ID"));
+                }
+                path.push(current.clone());
+                match &observed.record.action().data {
+                    ActionData::Create(_) => break current,
+                    ActionData::Update(update) => current = update.original_action_address.clone(),
+                    _ => return Err(unavailable("root is not a Create")),
+                }
+            };
+
+            // A head link is only a discovery hint. Validate every edge it
+            // claims before its cached records can join the forward walk.
+            let original = load(&candidate_root, &mut cache, &mut read)?;
+            let mut parent_hash = candidate_root.clone();
+            let mut parent = original.clone();
+            for child_hash in path.iter().rev().skip(1) {
+                let child = load(child_hash, &mut cache, &mut read)?;
+                if child.record.action().author() != original.record.action().author()
+                    || !same_undertaking(&original.commitment, &child.commitment)
+                {
+                    return Err(unavailable("anchor target changes the undertaking"));
+                }
+                let ActionData::Update(update) = &child.record.action().data else {
+                    return Err(unavailable("anchor lineage child is not an Update"));
+                };
+                if update.original_action_address != parent_hash
+                    || parent.record.action().entry_hash() != Some(&update.original_entry_address)
+                    || child.record.action().action_seq() <= parent.record.action().action_seq()
+                {
+                    return Err(unavailable(
+                        "invalid anchor predecessor binding or sequence",
+                    ));
+                }
+                parent_hash = child_hash.clone();
+                parent = child;
             }
+            Ok((candidate_root, path))
+        })();
+
+        let (candidate_root, path) = candidate?;
+        if root.as_ref().is_some_and(|known| known != &candidate_root) {
+            return Err(unavailable("multiple root Creates for ID"));
         }
+        root = Some(candidate_root);
+        accepted_anchor_path.extend(path);
     }
     let Some(root_hash) = root else {
         return Ok(None);
@@ -136,7 +177,10 @@ where
     // Own-chain queries can already name an Update before its reverse metadata
     // arrives. Check its claimed predecessor edge in the same forward walk.
     let mut known_children: HashMap<ActionHash, Vec<ActionHash>> = HashMap::new();
-    for (hash, observation) in &cache {
+    for hash in &accepted_anchor_path {
+        let observation = cache
+            .get(hash)
+            .expect("accepted anchor records remain cached");
         if let ActionData::Update(update) = &observation.record.action().data {
             known_children
                 .entry(update.original_action_address.clone())
@@ -148,7 +192,7 @@ where
     let mut sequences = HashMap::from([(original.record.action().action_seq(), root_hash.clone())]);
     let mut visited = HashSet::new();
     let mut scheduled = HashSet::from([root_hash.clone()]);
-    let mut pending = VecDeque::from([(root_hash, 0usize)]);
+    let mut pending = VecDeque::from([(root_hash.clone(), 0usize)]);
     while let Some((hash, depth)) = pending.pop_front() {
         if !visited.insert(hash.clone()) {
             continue;
@@ -157,6 +201,9 @@ where
             return Err(unavailable("update depth exceeded"));
         }
         let parent = load(&hash, &mut cache, &mut read)?;
+        if parent.updates.len() > MAX_LINEAGE_CANDIDATES {
+            return Err(unavailable("update metadata budget exceeded"));
+        }
         let mut children = parent.updates.clone();
         if let Some(known) = known_children.get(&hash) {
             children.extend(known.iter().cloned());
@@ -199,6 +246,7 @@ where
             }
         }
     }
+    selected.root_action_hash = Some(root_hash);
     Ok(Some(selected))
 }
 
@@ -208,16 +256,52 @@ pub(crate) fn observe(id: &str) -> ExternResult<Option<Observation>> {
         id,
     )))?;
     let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::IdToCommitment)?,
+        LinkQuery::try_new(anchor.clone(), LinkTypes::IdToCommitment)?,
         GetStrategy::default(),
     )?;
-    let targets = links
+    // Empty-tag links retain the legacy root discovery contract: every action
+    // target is validated and any unavailable/foreign/conflicting evidence
+    // fails closed. This coordinator-only slice does not claim ownership for
+    // arbitrary string IDs; that requires an integrity-level namespace rule.
+    let roots = links
         .into_iter()
+        .filter(|link| link.tag.0.is_empty())
         .map(|link| {
-            ActionHash::try_from(link.target).map_err(|_| unavailable("non-action anchor target"))
+            link.target
+                .into_action_hash()
+                .ok_or_else(|| unavailable("non-action root anchor target"))
         })
         .collect::<ExternResult<Vec<_>>>()?;
-    observe_targets(id, targets)
+    let Some(root_observation) = observe_with(id, roots, read_observation)? else {
+        return Ok(None);
+    };
+    let root = root_action_hash(&root_observation)?;
+    let author = root_observation.record.action().author().clone();
+
+    // Head links live on the proven root action and are queried by its author.
+    // Other agents therefore cannot crowd out an authentic head. Refuse
+    // instead of sampling if more authored heads are live than the bounded
+    // replacement contract permits, so no evidence is silently discarded.
+    let head_links = get_links(
+        LinkQuery::try_new(root.clone(), LinkTypes::IdToCommitment)?
+            .tag_prefix(LinkTag::new(crate::COMMITMENT_HEAD_LINK_TAG))
+            .author(author),
+        GetStrategy::default(),
+    )?;
+    let mut heads: Vec<_> = head_links
+        .into_iter()
+        .filter(|link| link.tag.0.as_slice() == crate::COMMITMENT_HEAD_LINK_TAG)
+        .filter_map(|link| link.target.into_action_hash())
+        .collect();
+    heads.sort();
+    heads.dedup();
+    if heads.len() > MAX_HEAD_ANCHOR_CANDIDATES {
+        return Err(unavailable("head anchor candidate budget exceeded"));
+    }
+    let mut targets = Vec::with_capacity(1 + heads.len());
+    targets.push(root);
+    targets.extend(heads);
+    observe_with(id, targets, read_observation)
 }
 
 pub(crate) fn observe_targets(
@@ -238,6 +322,13 @@ pub(crate) fn output(observed: Observation) -> ExternResult<shefa_types::ReaComm
             .ok_or_else(|| unavailable("selected record has no entry hash"))?,
         commitment: crate::commitment_to_wire(&observed.commitment),
     })
+}
+
+pub(crate) fn root_action_hash(observed: &Observation) -> ExternResult<ActionHash> {
+    observed
+        .root_action_hash
+        .clone()
+        .ok_or_else(|| unavailable("validated root action missing"))
 }
 
 #[cfg(test)]
@@ -319,6 +410,7 @@ mod tests {
             ),
             commitment,
             updates: updates.iter().copied().map(ah).collect(),
+            root_action_hash: None,
         }
     }
 
@@ -451,6 +543,54 @@ mod tests {
             .unwrap();
         assert_eq!(result.commitment.state, "created");
         assert!(resolve(vec![], &[]).unwrap().is_none());
+    }
+
+    /// The head-link contract: `update_rea_commitment_state` points the root
+    /// action at the ADVANCE's action hash, so a reader can be handed a target
+    /// that is an Update while the root's reverse `UpdateRecord` metadata has
+    /// not arrived. The walk-back must find the root on its own and the forward
+    /// walk must still select the advance.
+    ///
+    /// This is the regression seatbelt for the reader half of the contract —
+    /// it proves `observe_with` needed no change to accept head links.
+    #[test]
+    fn observed_commitment_head_link_target_alone_walks_back_to_root() {
+        let result = resolve(
+            vec![
+                // No reverse metadata anywhere: the root does not yet know it
+                // has been updated.
+                node(1, None, 1, "created", &[]),
+                node(2, Some(1), 5, "active", &[]),
+            ],
+            // Head link only — the root link has not gossiped.
+            &[2],
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(result.record.action_address(), &ah(2));
+        assert_eq!(result.record.action().entry_hash(), Some(&eh(2)));
+        assert_eq!(result.commitment.state, "active");
+        assert!(!result.commitment.finished);
+    }
+
+    /// A depth-2 head (two advances) reached with the root link present but no
+    /// reverse metadata on ANY record — the second advance is visible solely
+    /// because its head link named it.
+    #[test]
+    fn observed_commitment_depth_two_head_link_selects_latest_without_metadata() {
+        let result = resolve(
+            vec![
+                node(1, None, 1, "created", &[]),
+                node(2, Some(1), 5, "active", &[]),
+                node(3, Some(2), 9, "cancelled", &[]),
+            ],
+            &[1, 3],
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(result.record.action_address(), &ah(3));
+        assert_eq!(result.commitment.state, "cancelled");
+        assert!(result.commitment.finished);
     }
 
     #[test]

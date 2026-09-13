@@ -208,20 +208,46 @@ pub fn compute_task(input: serde_json::Value) -> ExternResult<serde_json::Value>
                 LinkQuery::try_new(anchor("commitment_id", &id)?, LinkTypes::IdToCommitment)?,
                 GetStrategy::default(),
             )?;
-            if links.len() > 8 {
+            // Link tags are discovery hints, not authority. Bound all
+            // plausible empty-tag roots before any target can trigger network
+            // work; never sample a set that could hide an idempotent match.
+            let mut seen = std::collections::HashSet::new();
+            let candidates: Vec<_> = links
+                .into_iter()
+                .filter(|link| link.tag.0.is_empty())
+                .filter_map(|link| link.target.into_action_hash())
+                .filter(|hash| seen.insert(hash.clone()))
+                .collect();
+            if candidates.len() > 8 {
+                return Err(bad("compute submission candidate budget exceeded"));
+            }
+            let mut roots = 0usize;
+            let mut exact = None;
+            for hash in candidates {
+                let Ok((request, meta)) = read_request(&hash.to_string()) else {
+                    continue;
+                };
+                if request.id != id {
+                    continue;
+                }
+                roots += 1;
+                if request.receiver == requester
+                    && meta["envelope"] == *envelope
+                    && meta["grantActionHash"] == grant
+                {
+                    exact = Some(hash);
+                }
+            }
+            // Idempotence precedes the cap: an existing exact submission
+            // remains readable even at the boundary.
+            if let Some(hash) = exact {
+                return status(&hash.to_string());
+            }
+            if roots >= 8 {
                 return Err(bad("compute submission budget exceeded"));
             }
-            for link in links {
-                if let Some(hash) = link.target.into_action_hash() {
-                    let existing = status(&hash.to_string())?;
-                    if existing["requester"] == requester {
-                        if existing["envelope"] != *envelope || existing["grantActionHash"] != grant
-                        {
-                            return Err(bad("task CID already bound to different input"));
-                        }
-                        return Ok(existing);
-                    }
-                }
+            if roots > 0 {
+                return Err(bad("task CID already bound to different input"));
             }
             let metadata = json!({"kind":"rakia-compute-request-v1","taskCid":task_cid,"grantActionHash":grant,"envelope":envelope});
             let creation: CreateReaCommitmentInput = serde_json::from_value(json!({"id":id,"action":"work","provider":provider,"receiver":requester,"metadata_json":metadata.to_string()})).map_err(|_|bad("invalid request"))?;

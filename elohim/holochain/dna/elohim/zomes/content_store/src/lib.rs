@@ -16084,6 +16084,34 @@ fn decode_in_scope_of(json: &str) -> Vec<String> {
     serde_json::from_str::<Vec<String>>(json).unwrap_or_default()
 }
 
+/// Link tag marking a root-scoped `IdToCommitment` link that names the HEAD of
+/// a Commitment lineage — the action hash of a state advance.
+///
+/// The ID anchor continues to carry only empty-tag root links. Head links carry
+/// this tag and use the immutable root ActionHash as their base.
+pub(crate) const COMMITMENT_HEAD_LINK_TAG: &[u8] = b"head";
+
+fn authored_commitment_head_links(
+    root: &ActionHash,
+    author: AgentPubKey,
+) -> ExternResult<Vec<Link>> {
+    let links: Vec<_> = get_links(
+        LinkQuery::try_new(root.clone(), LinkTypes::IdToCommitment)?
+            .tag_prefix(LinkTag::new(COMMITMENT_HEAD_LINK_TAG))
+            .author(author),
+        GetStrategy::default(),
+    )?
+    .into_iter()
+    .filter(|link| link.tag.0.as_slice() == COMMITMENT_HEAD_LINK_TAG)
+    .collect();
+    if links.len() > commitment_observation::MAX_HEAD_ANCHOR_CANDIDATES {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Commitment head replacement budget exceeded".into()
+        )));
+    }
+    Ok(links)
+}
+
 /// Update an REA Commitment's state field (e.g., transition to "cancelled").
 ///
 /// Substrate-correct PATCH path for /api/v1/commitments/{id} per
@@ -16099,12 +16127,14 @@ pub fn update_rea_commitment_state(
 ) -> ExternResult<ReaCommitmentOutput> {
     let observed = commitment_observation::observe(&input.id)?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment root unavailable".into())))?;
+    let author = agent_info()?.agent_initial_pubkey;
     // This coordinator restriction is not a network-enforced provider binding.
-    if observed.record.action().author() != &agent_info()?.agent_initial_pubkey {
+    if observed.record.action().author() != &author {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only the Commitment root author may update its observed lifecycle".into()
         )));
     }
+    let root_action_hash = commitment_observation::root_action_hash(&observed)?;
     let prev_action_hash = observed.record.action_address().clone();
     let mut commitment = observed.commitment;
 
@@ -16115,6 +16145,10 @@ pub fn update_rea_commitment_state(
     }
     commitment.updated_at = format!("{:?}", sys_time()?);
 
+    // Snapshot prior authored heads before writing. Cleanup later can only
+    // delete this snapshot, never a head created by a racing later call.
+    let old_head_links = authored_commitment_head_links(&root_action_hash, author)?;
+
     // 4. Write the update entry. Integrity validator allows updates on
     //    Commitment entries (content_store_integrity/src/lib.rs:4352-4364
     //    falls through to validate_create_entry, which Commitment passes).
@@ -16123,6 +16157,36 @@ pub fn update_rea_commitment_state(
         &EntryTypes::Commitment(commitment.clone()),
     )?;
     let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
+
+    // 5. Head link — a SECOND, independent path to this advance.
+    //
+    //    Without it the id anchor only ever names the root Create, so a
+    //    NON-AUTHORING peer can resolve the advance only through the
+    //    `UpdateRecord` reverse metadata held at the root action's authority.
+    //    That op carries a sys-validation dependency on
+    //    `original_action_address` and cannot integrate until the dependency
+    //    resolves; a `CreateLink` op has no such dependency and integrates
+    //    immediately at the link base. Pointing the immutable root action at
+    //    the update's own action hash therefore surfaces the same fact through
+    //    a different op class at a different authority.
+    //
+    //    The reader first proves the root and its author, then asks the DHT for
+    //    only that author's head links. It refuses an oversized set instead of
+    //    sampling away evidence, and validates every admitted lineage edge.
+    //
+    //    ID-anchor root links stay unchanged. Replace the prior authored head
+    //    after publishing the new one so a normal lifecycle keeps one live
+    //    head without a gap. Holochain stages all three actions in this call's
+    //    scratch and flushes only after the extern succeeds.
+    create_link(
+        root_action_hash,
+        new_action_hash.clone(),
+        LinkTypes::IdToCommitment,
+        LinkTag::new(COMMITMENT_HEAD_LINK_TAG),
+    )?;
+    for old_head in old_head_links {
+        delete_link(old_head.create_link_hash, GetOptions::default())?;
+    }
 
     Ok(ReaCommitmentOutput {
         action_hash: new_action_hash,
@@ -16319,17 +16383,11 @@ pub fn create_rea_economic_event(
     // Fulfillment links: Event -> Commitment
     let mut fulfillment_links = Vec::new();
     for commitment_id in &input.fulfills {
-        let commitment_anchor = StringAnchor::new("commitment_id", commitment_id);
-        let commitment_anchor_hash = hash_entry(&EntryTypes::StringAnchor(commitment_anchor))?;
-
-        let query = LinkQuery::try_new(commitment_anchor_hash, LinkTypes::IdToCommitment)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        if let Some(link) = links.first() {
-            let commitment_action_hash =
-                ActionHash::try_from(link.target.clone()).map_err(|_| {
-                    wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".into()))
-                })?;
+        // IdToCommitment links are unauthenticated discovery hints. Resolve
+        // and validate the observed lineage, then bind fulfillment to its
+        // proven root Create rather than trusting an empty tag or link order.
+        if let Some(observed) = commitment_observation::observe(commitment_id)? {
+            let commitment_action_hash = commitment_observation::root_action_hash(&observed)?;
             create_link(
                 action_hash.clone(),
                 commitment_action_hash.clone(),
