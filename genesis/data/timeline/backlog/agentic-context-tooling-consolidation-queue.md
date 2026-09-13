@@ -344,6 +344,45 @@ before investing.
     loses only the second opinion. The palace itself stays, as one declared provider with
     `ranking_known: false` under the six-part admission contract (confidentiality row 10).
 
+25. **In-flight recall friction during interrupted-sprint recovery (2026-09-13; operator-requested capture).**
+    Observations from Codex resuming the doorway/P2P sprint; ideas for a later memory-system
+    revisit, not an implementation commitment or a new authority source. Related habit:
+    `.epr-meta/recall-reaches-authority.habit.md`; builds on items 23–24.
+
+    - **Discovery can spend its budget before finding the work.** A broad governed search for
+      the interrupted DNS/anycast/federation work exhausted discovery and advised narrowing;
+      recovery then depended on bounded direct file reads, Git/worktree comparison and Jenkins
+      evidence. This is one observed journey, not a measured failure rate. Consider a cheap
+      metadata-first recovery entry that returns the concern's habit, latest evidence delta,
+      active plan and likely source paths before scanning bodies. On exhaustion, offer a
+      concrete narrowed continuation and reserve enough budget to read the selected authority;
+      do not silently widen the budget or reset accounting. Verify with a fresh reader finding
+      the interrupted sprint and its next justified action, with direct-read bytes accounted.
+
+    - **Operational prose can lag the native value it describes.** In `genesis/agentic/pool-policy.json`,
+      the I/O explanation still described `max_concurrent_heavy=1`, while the actual value was
+      `2` with a dated operator capacity decision. Reading the comment first caused an incorrect
+      instruction to serialize builds; reading the value corrected it. Consider deriving mutable
+      numeric explanations from their owning fields, or displaying the effective value and its
+      decision provenance together during recall. Test disagreement explicitly: the reader should
+      identify current authority without treating older prose as a competing instruction.
+
+    - **Evidence-linked habit atoms supported recovery better than scattered narrative.** The
+      doorway and dataplane habit deltas connected named failures to actual runs and preserved
+      unresolved boundaries. The agent still had to join plan, worktree, unpushed commits and
+      Jenkins head manually. Consider a read-only "resume this concern" view composed from those
+      existing sources: current decision, implemented-but-unverified changes, last measured
+      failure and next runnable check. Preserve timestamps, commit identity and disagreement;
+      never infer acceptance from an old green build or promote the view into a second ledger.
+
+    - **Review loops need observable cost and closure.** Feature-story blind review usefully
+      exposed claims broader than the routing assertions, but successive fresh readers also
+      introduced new phrasing demands after earlier repairs. Consider measuring review rounds,
+      time/tokens and semantic defects resolved alongside the verdict, and distinguishing
+      correctness/interpretability gaps from stylistic preference in the existing review
+      contract. Evaluate with independent readers; do not weaken the current review gate or let
+      familiarity substitute for a fresh read. This remains an efficiency hypothesis.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
