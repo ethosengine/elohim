@@ -281,6 +281,26 @@ pub struct ForwardCtx<'a> {
     /// (no bearer / invalid bearer / Session Visitor), no header is set and storage
     /// falls back to its `local_sessions`-based resolution or treats as visitor.
     pub agent_cid: Option<&'a str>,
+    /// `agent_id` resolved from the bearer's claims (`claims.agent_pub_key` — the
+    /// Holochain agent-key namespace, `uhCAk…`). When `Some`, the forwarder emits
+    /// `X-Agent-Id: <value>` to storage.
+    ///
+    /// This rides ALONGSIDE `agent_cid`, not instead of it, because the two name
+    /// DIFFERENT namespaces and storage reads them in a fixed order.
+    /// `resolve_account_caller` (elohim-storage `api/account.rs`) takes
+    /// `X-Agent-Id` verbatim as an agent key, and only then falls back to
+    /// `X-Agent-Cid` — which it accepts verbatim when it is `uhCA…`-shaped and
+    /// otherwise resolves as a SLUG through `humans.agent_pub_key`.
+    ///
+    /// A hosted registrant's `claims.human_id` is neither: it is a `uhCHk…`
+    /// hash-shaped account id minted at `/auth/register`. Sent alone it misses
+    /// the `uhCA` branch, falls to the slug branch, finds no `humans` row, and
+    /// resolves to `None` — every hosted session reading as anonymous
+    /// (`GET /api/v1/identity/me` → 401, measured on the household mesh
+    /// 2026-09-13). Sending the agent key as `X-Agent-Id` gives storage the
+    /// namespace it prefers, while `X-Agent-Cid` stays exactly what it was for
+    /// every caller that resolves by slug or by cid today.
+    pub agent_id: Option<&'a str>,
     /// Doorway-verified performer for an ALLOWED operator verb (op-gate
     /// Allow on `/api/v1/operator/*`). When `Some`, the forwarder emits
     /// `x-elohim-verified-performer: <value>` on the internal hop — storage's
@@ -614,6 +634,16 @@ where
     // the wire shape.
     if let Some(cid) = ctx.agent_cid {
         builder = builder.header("X-Agent-Cid", cid);
+    }
+
+    // Inject X-Agent-Id from the bearer's `claims.agent_pub_key`. Storage's
+    // `resolve_account_caller` reads this FIRST and takes it verbatim as an
+    // agent key, so a hosted session resolves even when its `human_id` claim is
+    // an account-shaped `uhCHk…` value that no `humans` slug lookup can match.
+    // Both headers ride together (see `ForwardCtx::agent_id`): this adds a
+    // resolution path, it never removes the `X-Agent-Cid` one.
+    if let Some(agent_id) = ctx.agent_id {
+        builder = builder.header("X-Agent-Id", agent_id);
     }
 
     // Inject the doorway-verified performer for allowed operator verbs (see

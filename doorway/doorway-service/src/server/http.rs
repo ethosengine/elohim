@@ -1475,6 +1475,36 @@ pub(crate) fn resolve_agent_cid_from_request<B>(
     resolve_verified_claims_from_request(state, req).map(|c| c.human_id)
 }
 
+/// Resolve the caller's Holochain agent key from the bearer's verified claims.
+///
+/// The sibling of [`resolve_agent_cid_from_request`], and deliberately a
+/// SEPARATE function rather than a widening of it: the two answer in different
+/// identity namespaces and storage consumes them under different headers.
+/// `human_id` is the doorway account id (`uhCHk…` for a hosted registrant, or a
+/// canonical `human-<name>` slug when the registrant named one);
+/// `agent_pub_key` is the Holochain agent key (`uhCAk…`) that
+/// `humans.agent_pub_key` is expressed in.
+///
+/// Returns `None` for an absent/invalid bearer AND for a verified token whose
+/// `agent_pub_key` is empty (legacy/visitor shapes). Empty is `None`, never
+/// `Some("")` and never a `human_id` fallback: emitting an account id under
+/// `X-Agent-Id` would hand storage a cross-namespace value in the one header it
+/// takes VERBATIM as an agent key, which is the failure this pair exists to
+/// end. `resolve_op_gate_performer_from_request` does fall back to `human_id`
+/// on purpose — a gate needs a stable performer to find no grant for — and that
+/// asymmetry is why these are three functions and not one.
+///
+/// Same C8 trust class as its sibling: sourced from the verified JWT only,
+/// never from a client header.
+pub(crate) fn resolve_agent_key_from_request<B>(
+    state: &AppState,
+    req: &Request<B>,
+) -> Option<String> {
+    resolve_verified_claims_from_request(state, req)
+        .map(|c| c.agent_pub_key)
+        .filter(|k| !k.is_empty())
+}
+
 /// Performer identity for the delegates-compute op-gate.
 ///
 /// A `delegates-compute` grant names its `recipient` in the Holochain agent-key
@@ -7402,8 +7432,10 @@ async fn handle_request(
                     // blobs. Visitor / invalid-bearer paths get None and storage
                     // falls back to its local_sessions resolution or visitor branch.
                     let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
+                    let agent_id_owned = resolve_agent_key_from_request(&state, &req);
                     let ctx = routes::ForwardCtx {
                         agent_cid: agent_cid_owned.as_deref(),
+                        agent_id: agent_id_owned.as_deref(),
                         pantry: Some(state.freshness_pantry.as_ref()),
                         stage: Some(state.network_stage),
                         ..Default::default()

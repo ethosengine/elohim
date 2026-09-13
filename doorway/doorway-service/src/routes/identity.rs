@@ -363,13 +363,23 @@ fn json_error(status: StatusCode, msg: &str) -> Response<Full<Bytes>> {
 /// the upstream response, via the SAME `forward_to_storage` discipline the
 /// registry-routed storage-proxy disposition uses
 /// (`server/http.rs`'s `Disposition::StorageProxy` arm) — one forwarding
-/// path, not two. In particular this resolves the caller's agent cid from
-/// the bearer's verified claims exactly as that path does
-/// (`resolve_agent_cid_from_request`) and injects it as `X-Agent-Cid` via
-/// `ForwardCtx`, so elohim-storage's `resolve_account_caller`
+/// path, not two. In particular this resolves the caller from the bearer's
+/// verified claims exactly as that path does and injects BOTH identity headers
+/// via `ForwardCtx`:
+///
+/// - `X-Agent-Id` ← `claims.agent_pub_key` (`resolve_agent_key_from_request`)
+/// - `X-Agent-Cid` ← `claims.human_id` (`resolve_agent_cid_from_request`)
+///
+/// so elohim-storage's `resolve_account_caller`
 /// (`GET /api/v1/identity/me` → `elohim/elohim-storage/src/api/identity.rs`,
-/// which resolves ONLY from `X-Agent-Id` then `X-Agent-Cid`) can identify a
+/// which resolves from `X-Agent-Id` FIRST, then `X-Agent-Cid`) can identify a
 /// hosted session bearer instead of reading it as anonymous.
+///
+/// Sending only the cid was the measured gap: a hosted registrant's
+/// `claims.human_id` is a `uhCHk…` account id, which is neither the `uhCA…`
+/// agent key `resolve_account_caller` accepts verbatim nor a `humans` slug it
+/// can look up, so the caller resolved to `None` and every hosted session read
+/// as anonymous. The cid header is unchanged — this ADDS the agent-key path.
 ///
 /// `forward_to_storage` builds the outbound request from an explicit header
 /// allowlist (content-type, authorization, x-observation-id,
@@ -398,8 +408,10 @@ where
     };
 
     let agent_cid_owned = crate::server::http::resolve_agent_cid_from_request(&state, &req);
+    let agent_id_owned = crate::server::http::resolve_agent_key_from_request(&state, &req);
     let ctx = crate::routes::ForwardCtx {
         agent_cid: agent_cid_owned.as_deref(),
+        agent_id: agent_id_owned.as_deref(),
         pantry: Some(state.freshness_pantry.as_ref()),
         stage: Some(state.network_stage),
         ..Default::default()
@@ -495,11 +507,19 @@ mod tests {
         }
 
         fn bearer_jwt(human_id: &str) -> String {
+            bearer_jwt_with_key(human_id, "uhCAkTestAgentKey")
+        }
+
+        /// A bearer whose two identity claims are set INDEPENDENTLY — the shape
+        /// a hosted registrant actually carries (`human_id` is a `uhCHk…`
+        /// account id, `agent_pub_key` is the `uhCAk…` session key), and the
+        /// shape that makes the two headers distinguishable in an assertion.
+        fn bearer_jwt_with_key(human_id: &str, agent_pub_key: &str) -> String {
             let validator = JwtValidator::new(TEST_SECRET.into(), 3600).unwrap();
             validator
                 .generate_token(TokenInput {
                     human_id: human_id.into(),
-                    agent_pub_key: "uhCAkTestAgentKey".into(),
+                    agent_pub_key: agent_pub_key.into(),
                     identifier: "human@example.com".into(),
                     permission_level: crate::auth::PermissionLevel::Authenticated,
                     session_id: None,
@@ -642,6 +662,161 @@ mod tests {
                 captured.lock().await.clone(),
                 Some("human-matthew-manager".to_string()),
                 "the resolved session identity must win over a client-supplied header"
+            );
+        }
+
+        // ── BOTH identity headers on the storage hop ──────────────────────
+        //
+        // The measured gap (household mesh, 2026-09-13): a hosted registrant's
+        // session carries `human_id = uhCHk493b9cfa…` (an account id minted at
+        // `/auth/register`) and `agent_pub_key = uhCAkmnTj…`. Forwarding only
+        // the cid left storage's `resolve_account_caller` with a value that is
+        // neither `uhCA…`-shaped nor a `humans` slug, so it resolved `None` and
+        // `GET /api/v1/identity/me` answered 401 for a signed-in person.
+
+        /// Capture BOTH identity headers: `(X-Agent-Id, X-Agent-Cid)`.
+        #[allow(clippy::type_complexity)]
+        async fn spawn_dual_capturing_mock_storage() -> (
+            SocketAddr,
+            StdArc<tokio::sync::Mutex<(Option<String>, Option<String>)>>,
+            tokio::task::JoinHandle<()>,
+        ) {
+            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let captured: StdArc<tokio::sync::Mutex<(Option<String>, Option<String>)>> =
+                StdArc::new(tokio::sync::Mutex::new((None, None)));
+            let captured_clone = StdArc::clone(&captured);
+
+            let handle = tokio::spawn(async move {
+                loop {
+                    let Ok((stream, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let io = TokioIo::new(stream);
+                    let captured_per_conn = StdArc::clone(&captured_clone);
+                    tokio::spawn(async move {
+                        let _ = http1::Builder::new()
+                            .serve_connection(
+                                io,
+                                service_fn(move |req: Request<hyper::body::Incoming>| {
+                                    let captured_per_req = StdArc::clone(&captured_per_conn);
+                                    async move {
+                                        let header = |name: &str| {
+                                            req.headers()
+                                                .get(name)
+                                                .and_then(|v| v.to_str().ok())
+                                                .map(String::from)
+                                        };
+                                        *captured_per_req.lock().await =
+                                            (header("X-Agent-Id"), header("X-Agent-Cid"));
+                                        let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                            Ok(Response::builder()
+                                                .status(200u16)
+                                                .header("Content-Type", "application/json")
+                                                .body(Full::new(Bytes::from("{}")))
+                                                .unwrap());
+                                        resp
+                                    }
+                                }),
+                            )
+                            .await;
+                    });
+                }
+            });
+
+            (addr, captured, handle)
+        }
+
+        async fn forward_and_capture(
+            req: Request<Empty<Bytes>>,
+        ) -> (Option<String>, Option<String>) {
+            let (addr, captured, _handle) = spawn_dual_capturing_mock_storage().await;
+            let mut state = test_state();
+            state.args.storage_url = Some(format!("http://{addr}"));
+            let state = StdArc::new(state);
+
+            let resp = handle_identity_api_request(req, state, "/api/v1/identity/me").await;
+            assert_eq!(resp.status(), HttpStatusCode::OK);
+            let seen = captured.lock().await.clone();
+            seen
+        }
+
+        /// A hosted session reaches storage under BOTH names: the agent key as
+        /// `X-Agent-Id` (which `resolve_account_caller` reads first and takes
+        /// verbatim) and the account id as `X-Agent-Cid` (unchanged).
+        #[tokio::test]
+        async fn hosted_session_bearer_yields_both_identity_headers() {
+            let token = bearer_jwt_with_key("uhCHk493b9cfa", "uhCAkmnTjHostedSessionKey");
+            let (agent_id, agent_cid) =
+                forward_and_capture(identity_me_request(Some(&token), None)).await;
+
+            assert_eq!(
+                agent_id,
+                Some("uhCAkmnTjHostedSessionKey".to_string()),
+                "claims.agent_pub_key must reach storage as X-Agent-Id"
+            );
+            assert_eq!(
+                agent_cid,
+                Some("uhCHk493b9cfa".to_string()),
+                "claims.human_id must still reach storage as X-Agent-Cid"
+            );
+        }
+
+        /// A verified token with an EMPTY `agent_pub_key` (legacy/visitor
+        /// shapes) emits no `X-Agent-Id` at all. It must never fall back to
+        /// `human_id`: `X-Agent-Id` is the one header storage takes verbatim as
+        /// an agent key, so a cross-namespace value there is worse than absence.
+        #[tokio::test]
+        async fn empty_agent_pub_key_claim_emits_no_agent_id_header() {
+            let token = bearer_jwt_with_key("human-matthew-manager", "");
+            let (agent_id, agent_cid) =
+                forward_and_capture(identity_me_request(Some(&token), None)).await;
+
+            assert_eq!(agent_id, None, "an empty agent_pub_key emits no X-Agent-Id");
+            assert_eq!(
+                agent_cid,
+                Some("human-matthew-manager".to_string()),
+                "the cid path is untouched by the agent-key addition"
+            );
+        }
+
+        /// `X-Agent-Id` is doorway-minted like its sibling: a client-supplied
+        /// one, with no session bearer, never reaches storage.
+        #[tokio::test]
+        async fn client_supplied_agent_id_without_a_session_never_reaches_storage() {
+            let req = Request::builder()
+                .method("GET")
+                .uri("/api/v1/identity/me")
+                .header("X-Agent-Id", "uhCAkAttackerSuppliedKey")
+                .body(Empty::<Bytes>::new())
+                .unwrap();
+            let (agent_id, agent_cid) = forward_and_capture(req).await;
+
+            assert_eq!(
+                agent_id, None,
+                "a client-supplied X-Agent-Id must never be forwarded to storage"
+            );
+            assert_eq!(agent_cid, None);
+        }
+
+        /// A client-supplied `X-Agent-Id` presented ALONGSIDE a valid session
+        /// cannot override the doorway-resolved key.
+        #[tokio::test]
+        async fn client_supplied_agent_id_cannot_override_a_valid_session() {
+            let token = bearer_jwt_with_key("uhCHk493b9cfa", "uhCAkmnTjHostedSessionKey");
+            let req = Request::builder()
+                .method("GET")
+                .uri("/api/v1/identity/me")
+                .header(hyper::header::AUTHORIZATION, format!("Bearer {token}"))
+                .header("X-Agent-Id", "uhCAkAttackerSuppliedKey")
+                .body(Empty::<Bytes>::new())
+                .unwrap();
+            let (agent_id, _) = forward_and_capture(req).await;
+
+            assert_eq!(
+                agent_id,
+                Some("uhCAkmnTjHostedSessionKey".to_string()),
+                "the resolved session key must win over a client-supplied header"
             );
         }
     }
