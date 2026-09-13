@@ -1365,7 +1365,11 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
       .map(result => String(result.reason))
       .join('; ')}`
   );
-  const deadline = Date.now() + 45_000;
+  // A sibling-primary doorway may learn the author's cancellation only after
+  // DHT propagation and its next 30s projection refresh. Use the same two-tick
+  // convergence contract as head publication so refresh phase cannot expire
+  // the cleanup check just before the observation that clears the route.
+  const deadline = Date.now() + CONVERGENCE_BOUND_MS;
   await Promise.all(
     DOORWAYS.map(async peer => {
       const restored = await pollUntil(
