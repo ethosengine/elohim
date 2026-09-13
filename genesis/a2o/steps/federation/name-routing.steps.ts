@@ -141,6 +141,17 @@ const REGISTRY_POLL_INTERVAL_MS = 5_000;
 /** `DOORWAY_EPR_REFRESH_SECS` default (main.rs) + buffer: how long a doorway's OWN
  * EprRouter can take to notice a commitment it just had cancelled. */
 const OWN_REFRESH_BUDGET_MS = 45_000;
+/** Gap between the first and second confirmation checks in `waitForOwnDispatchToDrop` —
+ * a single 404 can be a transient between two independent SSE-triggered re-syncs (storage
+ * can emit `projection.revoked` more than once for the same commitment, e.g. a retried
+ * PATCH each taking its own conductor round trip), so one dropped answer is never trusted
+ * alone; two dropped answers this far apart are. */
+const CONFIRM_DROP_GAP_MS = 500;
+/** After `waitForOwnDispatchToDrop` confirms the drop, how much longer the stale-registry
+ * premise waits before letting the visitor's ask fire — clear of the revoke's own settle
+ * window (SSE re-fetch / EprRouter install can still be completing a beat after the local
+ * dispatch itself already answers 404 twice). */
+const SETTLE_AFTER_DROP_MS = 1_000;
 const SHED_SETTLE_MS = 5_000;
 const RESTORE_BUDGET_MS = 30_000;
 const HEALTH_TIMEOUT_MS = 10_000;
@@ -906,7 +917,16 @@ async function waitForRegistryToKnowHolder(
 
 /** Poll until `doorwayUrl`'s OWN local dispatch for `path` has dropped to 404 — used after
  * lapsing a contract, to know the doorway's own EprRouter refresh has caught up before the
- * "asks doorway" step fires (so a forwarded hop genuinely meets a local 404, not a stale 200). */
+ * "asks doorway" step fires (so a forwarded hop genuinely meets a local 404, not a stale 200).
+ *
+ * Requires TWO CONSECUTIVE dropped answers, `CONFIRM_DROP_GAP_MS` apart, before returning.
+ * A single 404 is not trusted alone: storage can emit `projection.revoked` more than once for
+ * the same commitment (e.g. a retried PATCH, each independently taking the conductor-write
+ * round trip and its own write-then-emit — see the storage-side ordering investigation this
+ * guards against), and the doorway's re-sync in between two such events can transiently
+ * observe the row as still-active before the settled state lands. One 404 sandwiched between
+ * two re-syncs must never read as "dropped" — only a confirmed, repeated drop does.
+ */
 async function waitForOwnDispatchToDrop(
   doorwayUrl: string,
   doorwayLabel: string,
@@ -917,9 +937,18 @@ async function waitForOwnDispatchToDrop(
   const marker = nrtMarker(root);
   const deadline = Date.now() + budgetMs;
   let last: RawResponse | undefined;
+  let consecutiveDrops = 0;
   for (;;) {
     last = await localOnlyGet(`${doorwayUrl}${path}`);
-    if (!(last.status === 200 && last.text.includes(marker))) return;
+    const dropped = !(last.status === 200 && last.text.includes(marker));
+    if (dropped) {
+      consecutiveDrops += 1;
+      if (consecutiveDrops >= 2) return;
+      // First drop observed — confirm it holds before trusting it.
+      await delay(CONFIRM_DROP_GAP_MS);
+      continue;
+    }
+    consecutiveDrops = 0;
     if (Date.now() >= deadline) {
       throw new Error(
         `doorway "${doorwayLabel}" still serves the lapsed contract's marker at ${path} after ` +
@@ -1451,6 +1480,14 @@ Given(
               "the registry and erase the stale-holder premise before Jessica's ask can land"
           );
         }
+
+        // `waitForOwnDispatchToDrop` just confirmed the drop (two consecutive 404s); the
+        // margin check above is measured against THAT confirmation instant, unchanged. What
+        // follows is additional settle time so the visitor's ask (fired the instant this
+        // `Given` returns) never lands inside the revoke's own settle window — the doorway's
+        // broader re-sync (SSE re-fetch, EprRouter install) can still be finishing a beat
+        // after the local dispatch itself already reads dropped.
+        await delay(SETTLE_AFTER_DROP_MS);
 
         // Never let a second, unnoticed contract at this SAME mount decide the outcome
         // Jessica's ask is about to measure (see `nrtMount`'s doc for the mechanism this
