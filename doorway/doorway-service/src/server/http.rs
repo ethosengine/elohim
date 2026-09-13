@@ -7321,6 +7321,31 @@ async fn handle_request(
             ));
         }
 
+        // Redress with teeth: a visitor's challenge to a standing becomes a
+        // witnessed commitment with a named party who owes an answer. The
+        // doorway CARRIES it — it never decides who owes, and it never answers
+        // on the collective's behalf. See `routes::challenge`.
+        (Method::POST, crate::services::CHALLENGE_ROUTE) => {
+            return Ok(to_boxed(
+                routes::handle_challenge_post(Arc::clone(&state), req, relay_ctx.hop_seen).await,
+            ));
+        }
+
+        // …and the same chrome reads the owed response and its due date back,
+        // live, so state/finished/overdue are current rather than whatever was
+        // true when the challenge was sent.
+        (Method::GET, p) if routes::match_challenge_read(p).is_some() => {
+            let commitment_id = routes::match_challenge_read(p).expect("matched above");
+            return Ok(to_boxed(
+                routes::handle_challenge_read(
+                    Arc::clone(&state),
+                    &commitment_id,
+                    relay_ctx.hop_seen,
+                )
+                .await,
+            ));
+        }
+
         // Journal routing (intent analysis + suggestion generation)
         (Method::POST, "/api/v1/journal/analyze") => {
             return Ok(to_boxed(

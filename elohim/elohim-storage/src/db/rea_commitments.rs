@@ -1367,6 +1367,25 @@ pub const OPERATE_DOORWAY_ACTION: &str = "operate-doorway";
 /// idempotency of every existing seed.
 pub const PROJECT_EPR_ACTION: &str = "project-epr";
 
+/// REA action discriminator for a WITNESSED CHALLENGE to a standing — the
+/// commitment a doorway mints when a refused visitor takes up the offer to be
+/// heard. `provider` is the party the challenged contract's own
+/// `responsiveReach` named; `receiver` is the challenger; `due` is the window
+/// that contract declared before the challenge existed.
+///
+/// A new ACTION VALUE on the existing `Commitment` entry type — never a new
+/// entry type — mirroring the `operate-doorway` / `project-epr` pattern. The
+/// DNA's `REA_ACTIONS` array is declared and never validated by any integrity
+/// rule, so this value is DNA-hash-NEUTRAL and the array append rides the next
+/// deliberate DNA move rather than forcing one; the action takes the
+/// diesel-direct create path meanwhile (it is not in `CONDUCTOR_SOFT_ACTIONS`
+/// and is not `project-epr`).
+///
+/// The string is content-addressed into every challenge commitment id
+/// (`services::owed_response::challenge_commitment_id` in the doorway crate),
+/// so changing it re-mints every standing challenge.
+pub const RESPOND_TO_CHALLENGE_ACTION: &str = "respond-to-challenge";
+
 /// Actions that round-trip the conductor when one is connected (anchored,
 /// gossiped) but degrade gracefully to diesel-direct when not. custody-blob
 /// joined 2026-06-04 (household formation spec §5.3) — it is in the elohim
@@ -3029,6 +3048,31 @@ mod operator_helper_tests {
         // Schema-first codegen of this vocabulary is a future refactor; until
         // then this test is the drift detector.
         assert_eq!(PROJECT_EPR_ACTION, "project-epr");
+    }
+
+    /// Drift detector for the witnessed-challenge action.
+    ///
+    /// The value is NOT yet in the DNA's `REA_ACTIONS` array — and it does not
+    /// have to be, because that array is declared and never validated by any
+    /// integrity rule, so appending it is DNA-hash-NEUTRAL and rides the next
+    /// deliberate DNA move rather than forcing a reinstall. Until then the
+    /// action takes the diesel-direct create path (it is neither
+    /// `PROJECT_EPR_ACTION` nor a member of `CONDUCTOR_SOFT_ACTIONS`), which is
+    /// exactly the path every other non-anchored action already takes.
+    ///
+    /// This test is the drift detector for the two places the string lives: here
+    /// and `doorway::services::owed_response::RESPOND_TO_CHALLENGE_ACTION`,
+    /// which content-addresses it into every challenge commitment id — so a
+    /// silent change would re-mint every standing challenge.
+    #[test]
+    fn respond_to_challenge_action_matches_the_doorway_vocabulary() {
+        assert_eq!(RESPOND_TO_CHALLENGE_ACTION, "respond-to-challenge");
+        assert!(
+            !CONDUCTOR_SOFT_ACTIONS.contains(&RESPOND_TO_CHALLENGE_ACTION),
+            "a witnessed challenge takes the diesel-direct path until the REA_ACTIONS \
+             append rides a DNA move — adding it here would route it through a zome \
+             that does not yet know the word"
+        );
     }
 
     // -------------------------------------------------------------------------

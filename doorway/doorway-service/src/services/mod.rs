@@ -17,6 +17,8 @@
 //! - **DIDResolver**: W3C DID resolution for doorway federation
 //! - **NameRouting**: registry fold + one-hop federated relay for a name this
 //!   doorway does not serve (Category C, Operational)
+//! - **OwedResponse**: the redress term a refusal advertises and a challenge is
+//!   witnessed under — read from the contract, never chosen by the doorway
 //! - **ServeReceipt**: the fair-trade receipt — a READING of the REA
 //!   commitments that already account for a serve (Category C, nothing minted)
 //! - **ServeEligibility**: the reach + standing terms of the serving fold,
@@ -34,6 +36,7 @@ pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
 pub mod name_routing;
+pub mod owed_response;
 pub mod pkarr_resolver;
 pub mod recording;
 pub mod route_registry;
@@ -75,6 +78,10 @@ pub use import_orchestrator::{
     ZomeClient,
 };
 pub use name_routing::{NameRouteTable, FEDERATION_HOP_HEADER, SERVED_BY_HEADER};
+pub use owed_response::{
+    challenge_commitment_id, due_from_responsive_reach, owed_from_contract, OwedResponse,
+    CHALLENGE_ROUTE, RESPOND_TO_CHALLENGE_ACTION,
+};
 pub use recording::{
     spawn_recording_cleanup_task, AudioCodec, ContainerFormat, RecordingCmd, RecordingConfig,
     RecordingError, RecordingService, RecordingServiceConfig, RecordingSession, RecordingStatus,

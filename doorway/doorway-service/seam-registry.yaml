@@ -3412,3 +3412,108 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/serve_receipt.rs
         testName: challenge_outcomes_serialize_as_words_a_reader_can_match_on
         kind: unit
+
+  - name: due_from_responsive_reach
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/owed_response.rs
+      modulePath: services::owed_response::due_from_responsive_reach
+      line: 131
+    summary: >
+      Computes the instant a challenged party's answer comes due, from the WINDOW the challenged
+      contract declared (`responsiveReach.withinHours`) and the moment the challenge was
+      received. Returns None when the term allows no time at all or the arithmetic would
+      overflow.
+    notes: >
+      The window is the collective's declaration on its own contract, whose created_at and
+      dhtAnchorHash predate any challenge against it — which is what makes "a due window declared
+      before the visitor sent it" checkable rather than asserted. The date itself is arithmetic a
+      reader can redo from the commitment's own hasBeginning and the contract's own term, so the
+      doorway is never the authority for it. `due` is structurally immutable on the substrate
+      (handle_update_state reconciles only state/finished/metadata), so a witnessed window moves
+      only by supersession.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          An un-computable due date is reported ABSENT rather than rounded into one the doorway
+          made up: a_window_of_no_time_yields_no_due_date_rather_than_this_instant and
+          an_uncomputable_window_is_absent_never_rounded pin both arms. The sibling
+          owed_from_contract answers the same way for the party — a contract that declared
+          nobody owes nobody, and the doorway names no substitute.
+      - id: C6b
+        status: answered
+        justification: >
+          Idempotent effect: the challenge id this window is witnessed under is an agent-scoped
+          composite over (challenger, action, contract, reference), so re-sending the same
+          challenge mints nothing twice. the_same_challenge_sent_twice_is_the_same_record pins
+          the repeat application, and two_people_challenging_the_same_contract_are_two_records
+          is the anti-collapse half — an id that deduped across PEOPLE would silently drop the
+          second person's challenge.
+    contractTests:
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: the_due_instant_is_the_declared_window_from_when_it_was_received
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: a_window_of_no_time_yields_no_due_date_rather_than_this_instant
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: an_uncomputable_window_is_absent_never_rounded
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: the_same_challenge_sent_twice_is_the_same_record
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: two_people_challenging_the_same_contract_are_two_records
+        kind: unit
+
+  - name: owed_from_contract
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/owed_response.rs
+      modulePath: services::owed_response::owed_from_contract
+      line: 103
+    summary: >
+      Decides WHO a doorway may name as owing an answer to a challenge — and the answer is always
+      and only the party the challenged contract's own `responsiveReach` declares. A contract
+      that declares no term, names nobody, or allows no time yields None, and the refusal then
+      offers a challenge that names no party rather than one the doorway chose.
+    notes: >
+      Authority semantics, hence verdict-fn: this is the one place a doorway could have
+      substituted its own judgement for a collective's, and the whole design of the slice is that
+      it cannot. The party is copied VERBATIM onto the minted commitment (`provider`), and
+      `carriedBy` records the doorway separately — that the two differ IS the record that no
+      doorway answered on a collective's behalf.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          a_contract_with_no_term_owes_nothing_and_the_doorway_names_nobody and
+          a_term_that_names_nobody_or_allows_no_time_is_not_a_term pin that absence stays absence.
+          The route then answers ChallengeOutcome::NothingOwed with `owed` present-and-null —
+          nothing_owed_says_owed_null_out_loud_rather_than_omitting_it (routes/challenge.rs) —
+          so a chrome can tell "nobody was declared" from "the doorway forgot to say".
+      - id: C7
+        status: answered
+        justification: >
+          Advertise/serve symmetry between the refusal and the witness: the term a refusal
+          advertises (`Refusal.owed`) and the term a challenge is witnessed under come from this
+          one function reading one record, and `declaredBy` points back at that record.
+          a_refusal_carries_the_contracts_own_redress_term asserts the advertised window and its
+          record route on the refusal side.
+    contractTests:
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: the_owed_party_comes_from_the_contract_and_reads_back_to_it
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: a_contract_with_no_term_owes_nothing_and_the_doorway_names_nobody
+        kind: unit
+      - path: doorway/doorway-service/src/services/owed_response.rs
+        testName: a_term_that_names_nobody_or_allows_no_time_is_not_a_term
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_eligibility.rs
+        testName: a_refusal_carries_the_contracts_own_redress_term
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_eligibility.rs
+        testName: a_refusal_with_no_declared_term_says_owed_null_rather_than_naming_anybody
+        kind: unit

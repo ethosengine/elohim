@@ -69,12 +69,18 @@ use serde::Serialize;
 
 /// Where a refused visitor is pointed so they can be heard about the decision.
 ///
-/// The accountable-correction submission outbox — a real, witnessed route
-/// (`POST /api/v1/feedback/operations`, declared by storage's manifest and
-/// compiled into the doorway's route registry), not a mailto or a dead link. A
-/// challenge that lands in a queue nobody owes anything to is the suggestion
-/// box this protocol replaces.
-pub const WHERE_TO_BE_HEARD: &str = "/api/v1/feedback/operations";
+/// `POST /api/v1/challenge` — the route that turns a challenge into a WITNESSED
+/// commitment with a named party who owes an answer and a due window declared
+/// before the visitor sent anything. A challenge that lands in a queue nobody
+/// owes anything to is the suggestion box this protocol replaces.
+///
+/// REPOINTED from `/api/v1/feedback/operations`. That outbox binds a feedback
+/// signal to a CONTENT action; a reach challenge targets an REA Commitment, so
+/// `create_feedback_signal`'s content-action binding would fail at the
+/// conductor — the old pointer was a redress route that could not have carried
+/// this redress. Linking the correction outbox to a witnessed challenge is a
+/// backlog row, not a reason to keep advertising a door that does not open.
+pub const WHERE_TO_BE_HEARD: &str = crate::services::owed_response::CHALLENGE_ROUTE;
 
 /// Response header the chrome (and the a2o glue) reads to see the standing the
 /// doorway resolved for this request. Shape: `refused;reach=<reach>` on a
@@ -209,6 +215,11 @@ pub struct ContractTerms {
     pub commitment_id: String,
     /// The audience the declared reach names, if any.
     pub audience: Vec<AudienceTerm>,
+    /// WHO owes an answer if this refusal is challenged, as the contract
+    /// declares it. `None` when the collective declared nobody — and a refusal
+    /// then offers a challenge that names no party rather than one the doorway
+    /// chose.
+    pub owed: Option<crate::services::owed_response::OwedResponse>,
 }
 
 /// What the requester can show for themselves at the moment of the request.
@@ -317,6 +328,16 @@ pub struct Refusal {
     /// ledger record that carries it, dereferenceable in one request.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub declared_in: Option<String>,
+    /// WHO owes an answer if the visitor challenges this refusal, and how soon
+    /// — read from the contract's own `responsiveReach`, which was declared
+    /// before this request existed.
+    ///
+    /// Present-or-NULL, never omitted: a chrome that saw no `owed` key could
+    /// not tell "the collective has not said who answers" from "this doorway
+    /// forgot to say". `null` means the collective declared nobody, and the
+    /// honest offer is then a challenge that names no party rather than one
+    /// this doorway invented.
+    pub owed: Option<crate::services::owed_response::OwedResponse>,
 }
 
 impl Refusal {
@@ -388,6 +409,9 @@ pub fn serve_eligibility(
             contract: contract.commitment_id.clone(),
             collective: contract.audience.first().map(collective_ref),
             declared_in: declaration_record(&contract.commitment_id),
+            // Carried, never decided: `ContractTerms::owed` is the contract's
+            // own declaration, read by the caller off the live projection row.
+            owed: contract.owed.clone(),
         }))
     };
 
@@ -652,6 +676,7 @@ pub fn contract_from_projection(projection: &EprProjectionView) -> ContractTerms
         epr_id: projection.epr_id.clone(),
         commitment_id: projection.commitment_id.clone(),
         audience: audience_from_projection(projection),
+        owed: crate::services::owed_response::owed_from_contract(projection),
     }
 }
 
@@ -804,6 +829,7 @@ mod tests {
             epr_id: "community-garden-club".into(),
             commitment_id: "commitment-abc".into(),
             audience,
+            owed: None,
         }
     }
 
@@ -1246,6 +1272,7 @@ mod tests {
             contract: "c".into(),
             collective: None,
             declared_in: None,
+            owed: None,
         };
         let response = refusal_response(&refusal);
         assert_eq!(
@@ -1254,6 +1281,60 @@ mod tests {
                 .get(STANDING_HEADER)
                 .and_then(|v| v.to_str().ok()),
             Some("refused;reach=undeclared")
+        );
+    }
+
+    // ── the redress the refusal offers ──────────────────────────────────────
+
+    /// Scenario 5's premise, at the unit: a refusal advertises WHO owes an
+    /// answer and HOW SOON, read from the contract the visitor was refused
+    /// under — so the window was fixed before they sent anything.
+    #[test]
+    fn a_refusal_carries_the_contracts_own_redress_term() {
+        let mut terms = contract(vec![household()]);
+        terms.owed = Some(crate::services::owed_response::OwedResponse {
+            party: "household-dowell".into(),
+            party_label: Some("the Dowell household".into()),
+            within_hours: 72,
+            declared_by: "/api/v1/commitments/commitment-abc".into(),
+            declared_at: "2026-09-01T00:00:00Z".into(),
+        });
+        let verdict = fold(Some("local"), &terms, &RequesterStanding::anonymous());
+        let refusal = verdict.refusal().expect("anonymous must be refused");
+        let owed = refusal.owed.as_ref().expect("the contract declared a term");
+        assert_eq!(owed.party, "household-dowell");
+        assert_eq!(owed.within_hours, 72);
+        assert_eq!(
+            owed.declared_by, "/api/v1/commitments/commitment-abc",
+            "the window must read back to the record that declared it"
+        );
+        assert_eq!(
+            refusal.hear, "/api/v1/challenge",
+            "the way to be heard must be the route that WITNESSES a challenge — a \
+             refusal pointing at a door that does not open is the suggestion box"
+        );
+    }
+
+    /// …and when the collective declared nobody, the refusal says so out loud
+    /// rather than omitting the key or naming a party this doorway picked.
+    #[test]
+    fn a_refusal_with_no_declared_term_says_owed_null_rather_than_naming_anybody() {
+        let verdict = fold(
+            Some("local"),
+            &contract(vec![household()]),
+            &RequesterStanding::anonymous(),
+        );
+        let refusal = verdict.refusal().expect("anonymous must be refused");
+        assert!(refusal.owed.is_none());
+        let json = serde_json::to_value(refusal).expect("a refusal serializes");
+        assert!(
+            json.get("owed").is_some() && json["owed"].is_null(),
+            "`owed` must be present-and-null, never absent: a chrome cannot tell a \
+             missing key from an undeclared term"
+        );
+        assert_eq!(
+            json["hear"], "/api/v1/challenge",
+            "a way to be heard is still offered — what is absent is the party, not the door"
         );
     }
 

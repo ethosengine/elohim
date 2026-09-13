@@ -12,6 +12,7 @@ pub mod auth_routes;
 pub mod blob;
 pub mod bootstrap_coherence;
 pub mod catching_up;
+pub mod challenge;
 pub mod chrome;
 pub mod coherence;
 pub mod collectives;
@@ -100,6 +101,7 @@ pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
 pub use upstream_health::UpstreamBreakers;
 
+pub use challenge::{handle_challenge_post, handle_challenge_read, match_challenge_read};
 pub use collectives::handle_collectives_request;
 pub use elohim_agent::handle_elohim_agent_request;
 pub use epr::handle_epr_head_request;
