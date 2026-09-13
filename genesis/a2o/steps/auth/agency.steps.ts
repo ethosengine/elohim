@@ -80,6 +80,14 @@ import { E2EWorld } from '../../src/framework/world.js';
 const VISIBLE = 'visible';
 const WAIT_MS = 20_000;
 const THRESHOLD_PATH = '/threshold/login';
+/** elohim-app's OAuth redirect target (app.routes.ts `auth/callback`). */
+const APP_CALLBACK_PATH = '/auth/callback';
+/** The doorway's authorization endpoint (.well-known/elohim-auth `endpoints.authorize`). */
+const AUTHORIZE_PATH = '/auth/authorize';
+/** elohim-app's registered OAuth client id (OAuthAuthProvider.beginAuthorizeFlow). */
+const OAUTH_CLIENT_ID = 'elohim-app';
+/** elohim-app's CSRF-state key (OAuthAuthProvider — sessionStorage, app origin). */
+const OAUTH_STATE_KEY = 'elohim-oauth-state';
 /** A route that mounts `app-elohim-navigator`, whose profile tray hosts the badge. */
 const BADGE_HOST_ROUTE = '/community';
 /** doorway-app is proxied under /threshold/ by doorway-service. */
@@ -303,33 +311,71 @@ async function trimmedText(locator: PWLocator): Promise<string> {
 }
 
 /**
- * Drive the real doorway OAuth login UI: elohim-app /identity/login redirects
- * to the doorway's /threshold/login form, which redirects back through
- * /auth/callback. Same flow as steps/ui/auth.steps.ts; settled on
- * `domcontentloaded` so a deliberately-held request cannot stall the wait.
+ * Drive the real doorway OAuth authorization-code login, end to end.
+ *
+ * The human is a RELYING-PARTY visitor at elohim-app: the app leaves for the
+ * doorway's `/auth/authorize`, the doorway's own portal (`/threshold/login`)
+ * takes the password, and the doorway redirects back to the app's
+ * `/auth/callback` with a code the app exchanges at `/auth/token`. Only after
+ * that exchange does elohim-app hold a session — which is the precondition
+ * every badge assertion in this feature depends on.
+ *
+ * Why the authorize endpoint and not the portal directly: `/threshold/login`
+ * is a portal, not a hand-off. With no OAuth params on the URL it signs the
+ * human in to the DOORWAY and lands them on `/threshold/dashboard`
+ * (threshold-login.component.ts — `this.router.navigate(['/dashboard'])`),
+ * and it never reads a `returnUrl`. elohim-app is left anonymous, so the next
+ * step times out on a profile bubble that was never going to render.
+ *
+ * The one thing staged here is the CSRF nonce elohim-app itself writes before
+ * it leaves (`OAuthAuthProvider.beginAuthorizeFlow` → sessionStorage
+ * `elohim-oauth-state`). It is written with the same shape and the same
+ * origin the app writes it from, standing in for the `/identity/login` step
+ * that precedes the hand-off — nothing about the doorway's half of the dance
+ * is simulated. Settled on `domcontentloaded` so a deliberately-held request
+ * cannot stall the wait.
  */
 async function loginViaDoorwayOAuth(
   device: PlaywrightDevice,
   human: Human,
-  appUrl: string
+  appUrl: string,
+  doorwayUrl: string
 ): Promise<void> {
-  // The doorway's portal is where a hosted human signs in — it owns the password
-  // and the session. Navigating to the app's own login route and waiting for the
-  // portal's form asserted an OAuth redirect the app does not perform: it renders
-  // sign-in inline through the shared elohim-imagodei elements, deliberately
-  // ("ZERO third portal"). Going to the portal directly makes the next failure an
-  // honest one — about the session reaching the app, not about a missing form.
-  const doorwayOrigin = new URL(appUrl).origin;
-  await device.page.goto(`${doorwayOrigin}${THRESHOLD_PATH}?returnUrl=${encodeURIComponent('/')}`, {
-    waitUntil: 'domcontentloaded',
-  });
+  const appOrigin = new URL(appUrl).origin;
+  const redirectUri = `${appOrigin}${APP_CALLBACK_PATH}`;
+  const oauthState = `a2o-${randomUUID()}`;
+
+  // sessionStorage is origin-scoped: be standing on the app's origin before
+  // writing the nonce the app's callback will read back.
+  await device.page.goto(`${appOrigin}/`, { waitUntil: 'domcontentloaded' });
+  await device.page.evaluate(
+    (seed: { key: string; state: string; doorwayUrl: string; redirectUri: string }) => {
+      sessionStorage.setItem(
+        seed.key,
+        JSON.stringify({
+          state: seed.state,
+          doorwayUrl: seed.doorwayUrl,
+          redirectUri: seed.redirectUri,
+          timestamp: Date.now(),
+        })
+      );
+    },
+    { key: OAUTH_STATE_KEY, state: oauthState, doorwayUrl, redirectUri }
+  );
+
+  const authorize = new URL(`${doorwayUrl}${AUTHORIZE_PATH}`);
+  authorize.searchParams.set('client_id', OAUTH_CLIENT_ID);
+  authorize.searchParams.set('redirect_uri', redirectUri);
+  authorize.searchParams.set('response_type', 'code');
+  authorize.searchParams.set('state', oauthState);
+  await device.page.goto(authorize.toString(), { waitUntil: 'domcontentloaded' });
 
   const loginPage = new ThresholdLoginPage(device.page);
   await loginPage.login(human.credentials.identifier, human.credentials.password);
 
   await device.page.waitForURL(
     (url: URL) =>
-      !url.pathname.includes(THRESHOLD_PATH) && !url.pathname.includes('/auth/callback'),
+      !url.pathname.includes(THRESHOLD_PATH) && !url.pathname.includes(APP_CALLBACK_PATH),
     { timeout: 30_000 }
   );
   await device.page.waitForLoadState('domcontentloaded');
@@ -487,11 +533,8 @@ When(
   async function (this: E2EWorld, humanName: string) {
     const device = await ensurePlaywrightDevice(this, humanName);
     if (!device) return 'pending';
-    await loginViaDoorwayOAuth(
-      device,
-      this.getHuman(humanName),
-      doorwayToAppUrl(requireDoorwayUrl(this))
-    );
+    const doorway = requireDoorwayUrl(this);
+    await loginViaDoorwayOAuth(device, this.getHuman(humanName), doorwayToAppUrl(doorway), doorway);
     return undefined;
   }
 );
@@ -541,6 +584,16 @@ When(
       return Promise.resolve();
     });
 
+    // Sign in FIRST, then hold. A page route matches by URL, not by who asked:
+    // where the doorway serves the app (the household mesh — app origin IS
+    // doorway origin), holding `/auth/account` across the login would also hold
+    // the PORTAL's own post-credential account refresh, which it awaits before
+    // it will navigate anywhere. The portal then sits on "Verifying your
+    // credentials…" forever and the failure reads as a login timeout instead of
+    // the badge observation this scenario is about. The window this scenario
+    // needs opens after the human is authenticated, so the hold opens there too.
+    await loginViaDoorwayOAuth(device, this.getHuman(humanName), appUrl, doorway);
+
     await device.page.route('**/auth/account*', async (route: PWRoute) => {
       await gate;
       await route.fulfill({
@@ -550,7 +603,6 @@ When(
       });
     });
 
-    await loginViaDoorwayOAuth(device, this.getHuman(humanName), appUrl);
     await surfaceAgencyBadge(device, appUrl);
     return undefined;
   }

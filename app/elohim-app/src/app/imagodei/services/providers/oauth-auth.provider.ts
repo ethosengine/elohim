@@ -251,6 +251,27 @@ export class OAuthAuthProvider implements AuthProvider {
       storedState.redirectUri
     );
 
+    // Adopt the doorway that just authenticated this human.
+    //
+    // Until now the ONLY thing that selected a doorway was the resolver step on
+    // `/identity/login` (LoginComponent.onResolved → selectProbedDoorwayUrl), so
+    // any entry that skips it — a portal-initiated sign-in, a deep link onto
+    // `/auth/callback`, an app the doorway serves from its own origin — left the
+    // app authenticated with `doorwayRegistry.selectedUrl()` still null. Every
+    // doorway-scoped read then silently no-ops: `HostingAccountService.loadAccount()`
+    // returns early ("no doorway selected") so `GET /auth/account` is never sent,
+    // `AgencyService.hostedOrHostedSteward()` never sees `isSteward`, and a
+    // graduated steward's badge is stuck reading "Hosted Visitor".
+    //
+    // Selection still costs a proof: `selectProbedDoorwayUrl` asks the host to
+    // answer for itself at `/.well-known/elohim-auth` before adopting it, and a
+    // host that does not answer is simply not selected. The URL here is the one
+    // the app itself wrote before leaving (sessionStorage CSRF state) and just
+    // redeemed a code against — not anything the redirect handed us.
+    if (result.success) {
+      await this.doorwayRegistry.selectProbedDoorwayUrl(storedState.doorwayUrl);
+    }
+
     // Clear stored state on success or permanent failure
     if (result.success || result.code !== 'NETWORK_ERROR') {
       // eslint-disable-next-line no-restricted-syntax -- SSR-safe: browser-only oauth surface, never SSR-rendered

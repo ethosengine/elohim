@@ -25,7 +25,12 @@ describe('OAuthAuthProvider', () => {
     sessionStorage.clear();
 
     // Create mock doorway registry
-    mockDoorwayRegistry = { selectedUrl: vi.fn().mockReturnValue('https://doorway.example.com') };
+    mockDoorwayRegistry = {
+      selectedUrl: vi.fn().mockReturnValue('https://doorway.example.com'),
+      // The callback adopts the doorway it just redeemed a code against; the
+      // real one probes /.well-known/elohim-auth before selecting.
+      selectProbedDoorwayUrl: vi.fn().mockResolvedValue(true),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -235,6 +240,31 @@ describe('OAuthAuthProvider', () => {
         expect(authResult.agentPubKey).toBe('agent-pub-key-123');
         expect(authResult.identifier).toBe('user@example.com');
       }
+    });
+
+    it('adopts the doorway it authenticated against, so doorway-scoped reads have a base', async () => {
+      const result = provider.handleCallback('auth-code-123', 'test-state-123');
+
+      httpMock.expectOne('https://doorway.example.com/auth/token').flush(mockTokenResponse);
+      await result;
+
+      // Without this the app is signed in with no selected doorway, and every
+      // doorway-scoped read (GET /auth/account → the agency badge's isSteward)
+      // silently no-ops.
+      expect(mockDoorwayRegistry.selectProbedDoorwayUrl).toHaveBeenCalledWith(
+        'https://doorway.example.com'
+      );
+    });
+
+    it('adopts no doorway when the code exchange fails', async () => {
+      const result = provider.handleCallback('auth-code-123', 'test-state-123');
+
+      httpMock
+        .expectOne('https://doorway.example.com/auth/token')
+        .flush({ error: 'invalid_grant' }, { status: 400, statusText: 'Bad Request' });
+      await result;
+
+      expect(mockDoorwayRegistry.selectProbedDoorwayUrl).not.toHaveBeenCalled();
     });
 
     it('should clear stored state on success', async () => {
