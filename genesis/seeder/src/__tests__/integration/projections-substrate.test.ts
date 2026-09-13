@@ -132,6 +132,8 @@ describe.skipIf(!RUN_INTEGRATION)(
         urlPath: '/gated',
         mode: 'cached',
         reach: 'household', // gated reach — must supply hints or deadEnd
+        responsiveReach: null,
+        hostingAgreementId: null,
         baseHref: '/gated/',
         entryFile: 'index.html',
         redirectsFrom: [],
