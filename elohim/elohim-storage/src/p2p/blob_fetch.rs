@@ -532,6 +532,37 @@ pub fn verify_blob_hash(bytes: &[u8], expected_hex: &str) -> bool {
     actual_hex == expected
 }
 
+/// Bytes-per-second a peer transfer is assumed to sustain when sizing a
+/// per-peer deadline. Deliberately pessimistic: the point is to stop timing out
+/// a transfer that is *working*, not to predict throughput.
+const ASSUMED_TRANSFER_BYTES_PER_SEC: u64 = 1024 * 1024;
+
+/// **Pure.** A per-peer deadline that scales with the object being moved.
+///
+/// `Config::fetch_blob_timeout_seconds` defaults to **5 s**, which is sized for
+/// the small-object blob heals it was written for. The first live run of this
+/// source asked peers for a **10 MB** `.happ` under that same 5 s (measured
+/// 2026-09-04, station 7): a transfer that is merely *large* is
+/// indistinguishable from a peer that is *dead*, and the sweep records a miss
+/// either way. Scaling the floor by declared size makes the deadline mean "this
+/// peer has stopped answering" instead of "this object is big".
+///
+/// The configured timeout is the FLOOR, never a ceiling that shrinks — an
+/// operator who raises it is raising it for every object — and the result is
+/// capped so one artifact can never own a whole sweep.
+pub fn size_aware_timeout(
+    declared_bytes: u64,
+    floor: std::time::Duration,
+    cap: std::time::Duration,
+) -> std::time::Duration {
+    let scaled = std::time::Duration::from_secs(
+        declared_bytes
+            .div_ceil(ASSUMED_TRANSFER_BYTES_PER_SEC)
+            .max(1),
+    );
+    scaled.max(floor).min(cap.max(floor))
+}
+
 /// Extract race-fetch parameters from the runtime `Config`.
 pub fn fetch_params_from_config(config: &Config) -> (usize, Duration) {
     (

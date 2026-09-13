@@ -1132,6 +1132,30 @@ pub mod contribution_types {
     }
 }
 
+/// REA `Commitment.state` values that mean the commitment no longer obliges
+/// anyone — it was withdrawn, ended, or replaced.
+///
+/// A retired commitment is still a row: the ledger keeps what was promised
+/// even after the promise ends. So every sweep that reads commitments as
+/// *live obligations* must filter on this, or it re-decides work nobody owes.
+/// matthew's custody sweep did not (2026-09-13): five rows named one blob, one
+/// of them cancelled, and each pass raced them all again.
+///
+/// `superseded` belongs here with the other two — `custody_rotation` sets it
+/// precisely to retire a commitment in favour of a newer one.
+pub mod commitment_withdrawn_states {
+    pub const CANCELLED: &str = "cancelled";
+    pub const TERMINATED: &str = "terminated";
+    pub const SUPERSEDED: &str = "superseded";
+
+    pub const ALL: [&str; 3] = [CANCELLED, TERMINATED, SUPERSEDED];
+
+    /// Whether `state` names a commitment that no longer obliges anyone.
+    pub fn is_withdrawn(state: &str) -> bool {
+        ALL.contains(&state)
+    }
+}
+
 /// Governance state constants for stewardship allocations
 pub mod allocation_governance_states {
     pub const ACTIVE: &str = "active";

@@ -86,6 +86,10 @@ pub fn plan_shard_holders(
 /// call sites (each already assembling most of these for their own
 /// `race_fetch` call) can build one struct instead of threading eight
 /// positional args.
+/// Ceiling on a size-scaled per-shard deadline, so one oversized shard can
+/// never own a whole heal round. Mirrors the release-pull cap.
+const MAX_PER_SHARD_TIMEOUT: Duration = Duration::from_secs(600);
+
 pub struct SwarmFetchParams<'a> {
     pub cmd_tx: &'a mpsc::Sender<crate::p2p::P2PCommand>,
     /// Snapshot of currently-connected peer ids — mirrors the `is_connected`
@@ -214,7 +218,17 @@ pub async fn fetch_shards_via_swarm(
     let cmd_tx = params.cmd_tx;
     let connected = params.connected;
     let per_shard_parallelism = params.per_shard_parallelism;
-    let per_peer_timeout = params.per_peer_timeout;
+    // A deadline sized to the shard, not to the small-blob heal
+    // `fetch_blob_timeout_seconds` (default 5 s) was tuned for. matthew's
+    // rs-4-7 object bands into 57,948,918-byte shards: under a flat 5 s a
+    // peer that is *transferring* is indistinguishable from a peer that is
+    // *dead*, and the round records a miss either way. The configured value
+    // stays the FLOOR — raising it raises it for every object.
+    let per_peer_timeout = crate::p2p::blob_fetch::size_aware_timeout(
+        manifest.shard_size,
+        params.per_peer_timeout,
+        MAX_PER_SHARD_TIMEOUT,
+    );
     let make_race = |(index, shard_hash, candidates): (usize, String, Vec<String>)| {
         let landed = Arc::clone(&landed);
         async move {

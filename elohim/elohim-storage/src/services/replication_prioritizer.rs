@@ -73,8 +73,11 @@ pub fn active_commitments_for_provider(
     let rows: Vec<crate::db::models::ReaCommitment> = rc::rea_commitments
         .filter(rc::provider.eq(self_cid))
         .filter(rc::action.eq("replicates-dwelling"))
-        .filter(rc::state.ne("cancelled"))
-        .filter(rc::state.ne("terminated"))
+        // Same concern as the custody passes: a retired commitment is still a
+        // row, and only live obligations drive work. `superseded` joins the
+        // list here because `custody_rotation` sets it precisely to retire a
+        // commitment in favour of a newer one.
+        .filter(rc::state.ne_all(crate::db::models::commitment_withdrawn_states::ALL))
         .load(conn)
         .map_err(|e| StorageError::Database(format!("active_commitments_for_provider: {e}")))?;
 

@@ -170,8 +170,14 @@ pub fn reconcile_pass(
     let inventory_freshness_seconds = cfg.inventory_freshness_seconds;
     let mut outcome = ReconcileOutcome::default();
 
+    // Only LIVE obligations drive a pass. A cancelled, terminated or
+    // superseded row records what was once promised; it asks nothing of this
+    // node now. Sweeping them was half of matthew's 2026-09-13 saturation —
+    // five rows named the same 231 MB blob, one of them cancelled, and every
+    // pass re-raced a commitment nobody held.
     let custody_rows = rea_commitments::table
         .filter(rea_commitments::action.eq("custody-blob"))
+        .filter(rea_commitments::state.ne_all(crate::db::models::commitment_withdrawn_states::ALL))
         .load::<ReaCommitment>(conn)
         .map_err(|e| StorageError::Database(format!("load custody-blob commitments: {e}")))?;
 
@@ -462,8 +468,14 @@ pub fn salvage_pass(
     use std::collections::{BTreeMap, BTreeSet};
     let mut outcome = SalvageOutcome::default();
 
+    // Only LIVE obligations drive a pass. A cancelled, terminated or
+    // superseded row records what was once promised; it asks nothing of this
+    // node now. Sweeping them was half of matthew's 2026-09-13 saturation —
+    // five rows named the same 231 MB blob, one of them cancelled, and every
+    // pass re-raced a commitment nobody held.
     let custody_rows = rea_commitments::table
         .filter(rea_commitments::action.eq("custody-blob"))
+        .filter(rea_commitments::state.ne_all(crate::db::models::commitment_withdrawn_states::ALL))
         .load::<ReaCommitment>(conn)
         .map_err(|e| StorageError::Database(format!("load custody-blob commitments: {e}")))?;
 
