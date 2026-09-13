@@ -383,6 +383,17 @@ before investing.
       contract. Evaluate with independent readers; do not weaken the current review gate or let
       familiarity substitute for a fresh read. This remains an efficiency hypothesis.
 
+    - **A remembered green needs an artifact chain back to its source.** The recovered
+      coordinator's passing cross-peer test loaded a packed DNA older than the final source
+      edit. A newer raw WASM file had not been repacked either. Comparing the preview's
+      coordinator hash with the claimed tested artifact exposed the discrepancy before apply;
+      the earlier result was withdrawn as proof of the final patch. Consider having the existing
+      build/test receipts bind source inputs, packed bundle, exact loaded artifact and outcome
+      together, with recall showing whether that chain still covers the proposed change.
+      A commit name or a recently modified binary alone must not imply coverage. Evaluate with
+      an edit-after-pack fixture and a raw-build-without-repack fixture: a fresh reader should
+      identify the unverified boundary and the precise rerun needed.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
