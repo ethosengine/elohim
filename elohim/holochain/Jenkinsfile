@@ -778,65 +778,175 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
     }
     parallel(branches)
 
-    // ── Rung 3: staggered conductor phase ───────────────────────────────────
-    // Sequential, non-genesis first, genesis peers last (matthew — the
-    // always-on genesis anchor — very last). Soak between peers only after an
-    // apply that actually CHANGED a StatefulSet, so steady-state deploys pay
-    // zero extra wall-clock. Soak seconds: CONDUCTOR_STAGGER_SOAK_SECS
-    // (default 90) — long enough for the restarted conductor to rejoin
-    // gossip before the next one drops.
-    def ordered = []
-    for (h in humans) { if (!(h.genesisPeer == true)) { ordered.add(h) } }
-    for (h in humans) { if (h.genesisPeer == true && h.name != 'matthew') { ordered.add(h) } }
-    for (h in humans) { if (h.genesisPeer == true && h.name == 'matthew') { ordered.add(h) } }
+    // ── Rung 3 + slice 4: SEQUENCED conductor phase ─────────────────────────
+    // Slice 4 of backlog/fleet-full-arc-conductor-saturation-and-coordinated-
+    // warmup-2026-09-11.md. Rung 3 already rolled conductors sequentially with a
+    // FIXED soak; what it could not do is wait for the peer it just restarted to
+    // actually settle. The atom measured the cost: every full-arc alpha conductor
+    // CFS-throttled at 1.0 for a week, adam's log a wall of `could not insert
+    // incoming publish ops request into queue (Full)`, and the quiesce legs used
+    // only to MEASURE a finished deploy, never to SEQUENCE one.
+    //
+    // Ordering now comes from scripts/ci/sequenced-roll-plan.sh (suspended
+    // skipped, arc-0 leechers first, full-arc holders one per step, genesis pair
+    // last with matthew very last) and the pause between steps is
+    // scripts/ci/peer-roll-gate.sh — that peer's OWN projection-reconcile
+    // convergence and its OWN conductor CFS-throttle ratio, fair-share clamped
+    // against a whole-phase budget. Both bodies live in bash, not here: the
+    // pipeline block is at the JVM 64KB CPS ceiling and the script-security
+    // sandbox has killed Groovy arithmetic in this pipeline twice (#1403
+    // Double.parseDouble, #1404 DGM toBigDecimal).
+    //
+    // Escape hatch: ROLL_SEQUENCED=0 restores the pre-slice-4 shape — one
+    // ungated step, legacy order, paced only by CONDUCTOR_STAGGER_SOAK_SECS.
+    // Default is sequenced. There is deliberately NO timer that re-rolls an
+    // unchanged commit; a conductor still rolls only when a SHARED artifact moved.
+    def byName = [:]
+    for (h in humans) { byName[h.name] = h }
+    def plan = sequencedConductorPlan(humans)
     def soakSecs = env.CONDUCTOR_STAGGER_SOAK_SECS ?: '90'
-    // HALT-ON-FIRST-FAILURE (2026-09-02, edge #1413/#1414). The storage phase
-    // above is parallel and per-peer-independent, so one peer's rollout failure
-    // is genuinely a per-peer test failure there. This phase is NOT that: a
-    // conductor only rolls when a SHARED artifact moved (hApp bytes / conductor
-    // pin — see resolveConductorWorkloadImage), so the first peer whose
-    // conductor will not come Ready is a leading indicator for every peer
-    // behind it. #1413 proved the cost of continuing: it captured failed-rollout
-    // evidence for jessica, gertrude, susan and eve in ONE run and kept going,
-    // walking `ordered` at one 600s rollout timeout per peer while each freshly
-    // rolled conductor reinstalled a drifted DNA and tore its source chain.
-    // A skipped peer keeps its RUNNING conductor — the safe state.
-    // Compounding tell this cures: the soak below sits AFTER the throw point, so
+    def stateFile = "${env.WORKSPACE}/.conductor-roll-gate.state"
+    sh "rm -f '${stateFile}' '${stateFile}.summary'"
+    def gateState = [left: 0]
+    for (s in plan) { if (s.gate) { gateState.left = gateState.left + 1 } }
+    // HALT-ON-FIRST-FAILURE (2026-09-02, edge #1413/#1414 — museum trap #18).
+    // The storage phase above is parallel and per-peer-independent, so one peer's
+    // rollout failure is genuinely a per-peer test failure there. This phase is
+    // NOT that: a conductor only rolls when a SHARED artifact moved (hApp bytes /
+    // conductor pin — see resolveConductorWorkloadImage), so the first peer whose
+    // conductor will not come Ready is a leading indicator for every peer behind
+    // it. #1413 proved the cost of continuing: it captured failed-rollout evidence
+    // for jessica, gertrude, susan and eve in ONE run and kept going, at one 600s
+    // rollout timeout per peer, while each freshly rolled conductor reinstalled a
+    // drifted DNA and tore its source chain. A skipped peer keeps its RUNNING
+    // conductor — the safe state.
+    // Compounding tell this cures: the pause sits AFTER the throw point, so
     // pre-halt a FAILING peer advanced to the next one faster than a healthy one.
+    // The slice-4 gate inherits that placement unchanged — a halted phase runs NO
+    // gate, so a broken roll cannot spend the settle budget on peers it will not
+    // touch.
     // Escape hatch (operator, deliberate): CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1.
     // Map mutation, not local reassignment — the capture-by-reference idiom this
     // function already uses for `outcomes`.
-    def rollState = [halted: false]
+    def rollState = [halted: false, lastRolled: null]
     def haltOnFailure = (env.CONDUCTOR_ROLL_CONTINUE_ON_FAILURE ?: '0') != '1'
-    for (h in ordered) {
-        def queued = CONDUCTOR_DEPLOY_QUEUE[h.resourcePrefix]
-        if (queued == null) {
-            echo "conductor phase: ${h.resourcePrefix} has no queued conductor deploy (storage phase failed) — skipping"
-            continue
-        }
-        if (rollState.halted) {
-            echo "conductor phase: HALTED — NOT rolling ${h.resourcePrefix}-conductor. An earlier peer's conductor rollout failed, and this phase only runs when a shared artifact moved, so the same failure is expected here. ${h.resourcePrefix} keeps its RUNNING conductor. Fix the failed peer and re-deploy, or set CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1 to roll the whole fleet anyway."
-            continue
-        }
-        // Pessimistic: cleared only on a clean return from the block below.
-        rollState.halted = haltOnFailure
-        catchError(
-            buildResult: 'UNSTABLE',
-            stageResult: 'UNSTABLE',
-            message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; remaining conductors HELD; see log",
-        ) {
-            def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin)
-            // Only reached on clean return — catchError swallows exceptions
-            // before this line on any failure path.
-            rollState.halted = false
-            if (changed) {
-                echo "conductor ${h.resourcePrefix}-conductor CHANGED — soaking ${soakSecs}s before the next peer (staggered roll)"
-                // shell sleep: zero Groovy conversions, zero sandbox surface
-                sh "sleep ${soakSecs}"
+    for (step in plan) {
+        def stepNames = step.names
+        rollState.lastRolled = null
+        for (int i = 0; i < stepNames.size(); i++) {
+            def h = byName[stepNames[i]]
+            if (h == null) { continue }
+            def isLastInStep = (i == stepNames.size() - 1)
+            def queued = CONDUCTOR_DEPLOY_QUEUE[h.resourcePrefix]
+            if (queued == null) {
+                echo "conductor phase: ${h.resourcePrefix} has no queued conductor deploy (storage phase failed) — skipping"
+                continue
+            }
+            if (rollState.halted) {
+                echo "conductor phase: HALTED — NOT rolling ${h.resourcePrefix}-conductor. An earlier peer's conductor rollout failed, and this phase only runs when a shared artifact moved, so the same failure is expected here. ${h.resourcePrefix} keeps its RUNNING conductor. Fix the failed peer and re-deploy, or set CONDUCTOR_ROLL_CONTINUE_ON_FAILURE=1 to roll the whole fleet anyway."
+                continue
+            }
+            // Pessimistic: cleared only on a clean return from the block below.
+            rollState.halted = haltOnFailure
+            catchError(
+                buildResult: 'UNSTABLE',
+                stageResult: 'UNSTABLE',
+                message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; remaining conductors HELD; see log",
+            ) {
+                def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin)
+                // Only reached on clean return — catchError swallows exceptions
+                // before this line on any failure path.
+                rollState.halted = false
+                if (changed) {
+                    rollState.lastRolled = h.name
+                    // The gate REPLACES the soak between steps. Inside a step
+                    // (the leecher group) the soak still paces peer-to-peer, and
+                    // in ROLL_SEQUENCED=0 mode every peer keeps the legacy soak.
+                    if (!step.gate || !isLastInStep) {
+                        echo "conductor ${h.resourcePrefix}-conductor CHANGED — soaking ${soakSecs}s before the next peer (staggered roll)"
+                        // shell sleep: zero Groovy conversions, zero sandbox surface
+                        sh "sleep ${soakSecs}"
+                    }
+                }
             }
         }
+        if (step.gate) {
+            if (rollState.halted) {
+                echo "roll gate step ${step.index} (${step.phase}): HALTED — no gate run, the settle budget is preserved for a re-deploy."
+            } else if (rollState.lastRolled == null) {
+                echo "roll gate step ${step.index} (${step.phase}): no conductor CHANGED in this step — nothing restarted, nothing to settle, no gate. Steady-state deploys pay zero gate wall-clock."
+            } else {
+                runPeerRollGate(byName[rollState.lastRolled], "${gateState.left}", stateFile)
+            }
+            gateState.left = gateState.left - 1
+        }
     }
+    echo "─── sequenced conductor roll summary (peer|outcome|spent|readings) ───"
+    sh "cat '${stateFile}.summary' 2>/dev/null || echo '(no gate ran — nothing restarted, or ROLL_SEQUENCED=0)'"
     emitDeployJunit((humans[0]?.env ?: 'unknown'), humans, outcomes)
+}
+
+/**
+ * Build the ordered conductor-roll plan by shelling out to
+ * scripts/ci/sequenced-roll-plan.sh and parsing its pipe-delimited records.
+ *
+ * Its own top-level def (its own CPS method) for the reason the rest of this
+ * file gives: the pipeline block is at the JVM 64KB CPS ceiling. The bash side
+ * owns the ordering contract AND the worst-case arithmetic — both are printed
+ * here verbatim, so the stage log names the budget before it spends any of it.
+ *
+ * Returns a list of [index, phase, names, gate] maps; an empty list means there
+ * is nothing to roll (or the helper could not parse the registry, in which case
+ * it already said so on stderr and this phase simply rolls nothing — the safe
+ * state, since every peer keeps its RUNNING conductor).
+ */
+def sequencedConductorPlan(List humans) {
+    def names = humans.collect { it.name }.join(',')
+    def raw = sh(
+        script: "bash '${env.WORKSPACE}/scripts/ci/sequenced-roll-plan.sh' genesis/orchestrator/data/deployments.json '${names}'",
+        returnStdout: true,
+    ).trim()
+    echo "─── sequenced conductor roll plan (worst-case budget printed below) ───\n${raw}"
+    def steps = []
+    for (line in raw.split('\n')) {
+        def t = line.trim()
+        if (!t.startsWith('STEP|')) { continue }
+        def parts = t.split('\\|')
+        if (parts.length < 5) { continue }
+        steps.add([
+            index: parts[1],
+            phase: parts[2],
+            names: (parts[3].split(',') as List),
+            gate: (parts[4] == 'gate'),
+        ])
+    }
+    return steps
+}
+
+/**
+ * Hold the roll on ONE peer until it settles, then release to the next.
+ *
+ * Non-fatal BY CONSTRUCTION: exit 3 (deadline reached) and any other non-zero
+ * exit are logged and CONTINUE. A stalled peer must not abort a fleet roll —
+ * that is museum trap #1's discipline applied to a deploy predicate: a
+ * no-measure outcome is not a failure verdict. The unsettled peer is recorded
+ * in the roll summary and Dataplane Validation's fleet-quiesce gate judges the
+ * fleet afterwards.
+ */
+def runPeerRollGate(Map humanConfig, String gatesLeft, String stateFile) {
+    def storageUrl = "http://${humanConfig.resourcePrefix}.${humanConfig.namespace}.svc.cluster.local:8090"
+    def pod = "${humanConfig.resourcePrefix}-conductor-0"
+    def rc = sh(
+        returnStatus: true,
+        script: "bash '${env.WORKSPACE}/scripts/ci/peer-roll-gate.sh' '${humanConfig.name}' '${storageUrl}' '${humanConfig.namespace}' '${pod}' '${gatesLeft}' '${stateFile}'",
+    )
+    if (rc == 0) {
+        echo "roll gate: ${humanConfig.name} settled — releasing the roll to the next peer"
+    } else if (rc == 3) {
+        echo "roll gate: ${humanConfig.name} did not settle inside its deadline — CONTINUING to the next peer. Recorded in the roll summary; Dataplane Validation judges the fleet. This is a no-measure outcome, not a verdict."
+    } else {
+        echo "roll gate: ${humanConfig.name} gate helper exited ${rc} (usage or environment) — CONTINUING. The roll is never aborted by its own gate."
+    }
 }
 
 /**
