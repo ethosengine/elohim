@@ -70,13 +70,38 @@ export interface StoragePeerFixture {
  * binary). The absence is the honest signal: a scenario then reports that the
  * household owns no membership authority, rather than reading a stale set.
  */
+/**
+ * ONE public name the household's legs project, and the document that names it.
+ *
+ * One membership document names one public name, so a household carrying two
+ * names has two documents maintained by the SAME two legs — both doorways own
+ * an entry in both. `channel` is what the name is FOR: the tier of the
+ * canonical-head election a hosting contract at this name declares
+ * (`converged` = the earned winner, `candidate` = the staging declaration
+ * standing beneath it). The beacon knows nothing about that; it projects
+ * eligibility, and the contract decides which head.
+ */
+export interface MembershipLaneFixture {
+  publicName: string;
+  membershipFile: string;
+  channel: 'converged' | 'candidate';
+}
+
 export interface MembershipAuthorityFixture {
   /** What projects the set — `relay-addr-beacon-file-sink` on the household. */
   kind?: string;
-  /** The public name this set serves (e.g. `elohim.local`). */
+  /**
+   * The CONVERGED public name (e.g. `elohim.local`). Kept alongside `lanes`
+   * for every reader that predates the second name.
+   */
   publicName?: string;
-  /** Absolute path to the membership document the beacon legs maintain. */
+  /** Absolute path to the CONVERGED membership document. */
   membershipFile?: string;
+  /**
+   * EVERY lane, converged first. Absent on a manifest staged before the
+   * household carried a second name — read it as the single converged lane.
+   */
+  lanes?: MembershipLaneFixture[];
   /** Where each leg logs (`<logDir>/beacon-<owner>.log`). */
   logDir?: string;
   /** Fixture doorway id -> the owner slug that doorway's leg writes under. */
@@ -362,6 +387,42 @@ export function requireMembershipAuthority(
     membershipFile: authority.membershipFile,
     owners: authority.owners,
   };
+}
+
+/**
+ * Every lane this household projects, converged first.
+ *
+ * Falls back to the single converged lane when the manifest predates `lanes`,
+ * so a scenario written against the list works on both. Returns `[]` when the
+ * household owns no authority at all — use `requireMembershipAuthority` first
+ * if the absence should be a named refusal.
+ */
+export function membershipLanes(fixture: HouseholdMeshFixture): MembershipLaneFixture[] {
+  const authority = fixture.membershipAuthority;
+  if (!authority) return [];
+  if (authority.lanes?.length) return authority.lanes;
+  if (!authority.publicName || !authority.membershipFile) return [];
+  return [
+    {
+      publicName: authority.publicName,
+      membershipFile: authority.membershipFile,
+      channel: 'converged',
+    },
+  ];
+}
+
+/**
+ * The one lane serving `channel`, or undefined.
+ *
+ * Undefined for `candidate` is an honest absence — this household stages no
+ * candidate name — and a scenario must report it as that, never fall back to
+ * the converged lane.
+ */
+export function membershipLaneForChannel(
+  fixture: HouseholdMeshFixture,
+  channel: 'converged' | 'candidate'
+): MembershipLaneFixture | undefined {
+  return membershipLanes(fixture).find((lane) => lane.channel === channel);
 }
 
 export function requireFixturePrimaryStorageUrl(

@@ -167,7 +167,16 @@
 #                   join2/leave3 hysteresis the fleet's Cloudflare shared lane
 #                   runs — the household owns the routing apparatus and its
 #                   fault controls instead of renting them. Set 0 to skip.
-#                   MESH_MEMBERSHIP_NAME (default elohim.local) names it;
+#                   MESH_MEMBERSHIP_NAME (default elohim.local) names the
+#                   CONVERGED lane; MESH_MEMBERSHIP_CANDIDATE_NAME (default
+#                   alpha.elohim.local) names the CANDIDATE lane beside it, so
+#                   both household doorways carry both names and a scenario can
+#                   ask each name of each doorway. Set it empty for one lane.
+#                   `--shared-record` is repeatable and the file sink writes ONE
+#                   DOCUMENT PER NAME (one membership document names one public
+#                   name), so --membership-file is passed directory-shaped and
+#                   each lane lands at <dir>/<public-name>.json — which is the
+#                   same path the single-lane era wrote for elohim.local.
 #                   MESH_MEMBERSHIP_PROBE_SECS (default 3) sets the probe
 #                   cadence, so a withdraw resolves in ~10s and a rejoin in ~6s.
 #                   BEACON_BIN overrides the binary (default: the pool debug
@@ -272,6 +281,12 @@ DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
 # than reading a stale set.
 MESH_MEMBERSHIP="${MESH_MEMBERSHIP:-1}"
 MESH_MEMBERSHIP_NAME="${MESH_MEMBERSHIP_NAME:-elohim.local}"
+# The CANDIDATE-channel public name, carried beside the converged one by the
+# SAME legs. A hostname is a head channel (rung 4): `elohim.local` is served by
+# the contract whose channel is `converged`, `alpha.elohim.local` by the one
+# whose channel is `candidate`. Both names live on both doorways — a doorway's
+# identity is not a hostname. Empty = the single-lane household.
+MESH_MEMBERSHIP_CANDIDATE_NAME="${MESH_MEMBERSHIP_CANDIDATE_NAME:-alpha.elohim.local}"
 MESH_MEMBERSHIP_PROBE_SECS="${MESH_MEMBERSHIP_PROBE_SECS:-3}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1483,29 +1498,44 @@ EOF
 # prologue copies into the household fixture so a2o resolves the public name
 # through the document rather than through a hardcoded port.
 # ---------------------------------------------------------------------------
-membership_file_path() { echo "$MESH_DIR/membership/$MESH_MEMBERSHIP_NAME.json"; }
+# Every public name the household's legs project, converged first.
+membership_names() {
+  echo "$MESH_MEMBERSHIP_NAME"
+  [ -n "$MESH_MEMBERSHIP_CANDIDATE_NAME" ] && echo "$MESH_MEMBERSHIP_CANDIDATE_NAME"
+  return 0
+}
+
+# ONE DOCUMENT NAMES ONE PUBLIC NAME. This is the path relay-addr-beacon's file
+# sink derives for a lane from the directory-shaped --membership-file below
+# (membership_path_for: <dir>/<public-name>.json), so the two cannot drift.
+membership_file_path() { echo "$MESH_DIR/membership/${1:-$MESH_MEMBERSHIP_NAME}.json"; }
 
 # What the household's public-name authority currently SAYS, read from the
 # document itself — not from whether the legs are running. A live leg whose
 # doorway sheds is correctly absent from the set, and that distinction is the
 # whole point of the apparatus.
 membership_status_rows() {
-  local doc; doc="$(membership_file_path)"
-  printf "membership %s " "$MESH_MEMBERSHIP_NAME"
   if [ "$MESH_MEMBERSHIP" != "1" ]; then
-    echo "disabled (MESH_MEMBERSHIP=0 — no household public-name authority)"
+    echo "membership disabled (MESH_MEMBERSHIP=0 — no household public-name authority)"
     return 0
   fi
-  if [ ! -s "$doc" ]; then
-    echo "NO DOCUMENT at $doc (legs never started? $LOGDIR/beacon-*.log)"
-    return 0
-  fi
-  python3 -c '
+  local name doc channel
+  while read -r name; do
+    [ -n "$name" ] || continue
+    if [ "$name" = "$MESH_MEMBERSHIP_NAME" ]; then channel=converged; else channel=candidate; fi
+    doc="$(membership_file_path "$name")"
+    printf "membership %s (%s) " "$name" "$channel"
+    if [ ! -s "$doc" ]; then
+      echo "NO DOCUMENT at $doc (legs never started? $LOGDIR/beacon-*.log)"
+      continue
+    fi
+    python3 -c '
 import json, sys
 members = json.load(open(sys.argv[1])).get("members", [])
 parts = [m["owner"] + "=" + m["origin"] for m in members]
 print("eligible: " + ", ".join(parts) if parts else "EMPTY (no origin is eligible to serve)")
 ' "$doc" 2>/dev/null || echo "unreadable document at $doc"
+  done <<< "$(membership_names)"
   local owner pid
   for owner in alpha apex; do
     printf "  leg %-6s " "$owner"
@@ -1529,7 +1559,21 @@ start_membership_beacons() {
   fi
   local dir; dir="$MESH_DIR/membership"
   mkdir -p "$dir"
+  # Directory-shaped ON PURPOSE (trailing slash): relay-addr-beacon's file sink
+  # writes one document per public name, and a plain file path is REFUSED at two
+  # or more lanes rather than silently meaning whichever lane parsed last. At one
+  # lane the derived path is byte-identical to the single-lane era's.
+  local doc_dir; doc_dir="$dir/"
   local doc; doc="$(membership_file_path)"
+  # Every public name the legs project. Both household doorways carry BOTH
+  # names — a doorway's identity is not a hostname; which head a name serves is
+  # the contract's `channel`, not this script's business.
+  local -a lane_names=()
+  local _name
+  while read -r _name; do
+    [ -n "$_name" ] || continue
+    lane_names+=("$_name")
+  done <<< "$(membership_names)"
 
   # owner|origin|probe-url, one per doorway. The owner slug matches the
   # household fixture's doorway id so a scenario joins them structurally.
@@ -1544,23 +1588,30 @@ start_membership_beacons() {
       echo "membership leg $owner already running (pid $(live_recorded_pid beacon "$owner"))"
       continue
     fi
+    # One repeatable `--shared-record <name>=<owner>` per lane, this leg's owner.
+    local -a owner_lanes=()
+    for _name in "${lane_names[@]}"; do
+      owner_lanes+=(--shared-record "$_name=$owner")
+    done
     RUST_LOG="${MESH_MEMBERSHIP_RUST_LOG:-info}" nohup "$BEACON_BIN" \
       --sink file \
-      --shared-record "$MESH_MEMBERSHIP_NAME=$owner" \
-      --membership-file "$doc" \
+      "${owner_lanes[@]}" \
+      --membership-file "$doc_dir" \
       --member-origin "$origin" \
       --serving-probe-url "$probe" \
       --serving-probe-interval-secs "$MESH_MEMBERSHIP_PROBE_SECS" \
       --state-file "$dir/$owner.state.json" \
       > "$LOGDIR/beacon-$owner.log" 2>&1 &
     record_mesh_pid beacon "$owner" "$!" || true
-    echo "membership leg $owner -> $origin (probe $probe, ${MESH_MEMBERSHIP_PROBE_SECS}s)"
+    echo "membership leg $owner -> $origin on [$(membership_names | tr '\n' ' ')] (probe $probe, ${MESH_MEMBERSHIP_PROBE_SECS}s)"
   done
 
   # The declaration a2o reads. Written here, at the staging site that owns the
   # ports and owner slugs, rather than re-derived by the prologue.
   MESH_MEMBERSHIP_DOC="$doc" \
   MESH_MEMBERSHIP_NAME="$MESH_MEMBERSHIP_NAME" \
+  MESH_MEMBERSHIP_CANDIDATE_NAME="$MESH_MEMBERSHIP_CANDIDATE_NAME" \
+  MESH_MEMBERSHIP_DIR="$dir" \
   MESH_MEMBERSHIP_PROBE_SECS="$MESH_MEMBERSHIP_PROBE_SECS" \
   MESH_MEMBERSHIP_LOGDIR="$LOGDIR" \
   python3 - <<'PYEOF' > "$dir/authority.json"
@@ -1571,13 +1622,28 @@ join, leave = 2, 3  # relay-addr-beacon --serving-join-after / --serving-leave-a
 # beacon sizes at min(interval, 15s)) before the next tick, so budget two
 # intervals per probe, plus one for the tick already in flight when the fault
 # lands. These are upper bounds the household may assert against, not targets.
+membership_dir = os.environ["MESH_MEMBERSHIP_DIR"]
+converged = os.environ["MESH_MEMBERSHIP_NAME"]
+candidate = os.environ.get("MESH_MEMBERSHIP_CANDIDATE_NAME", "").strip()
+# One document names ONE public name, so a lane is (name, document, channel).
+# `channel` here is what the name is FOR — the tier of the canonical-head
+# election a hosting contract at this name declares. The beacon knows nothing
+# about it: it projects eligibility, the contract decides which head.
+lanes = [{"publicName": converged, "membershipFile": os.path.join(membership_dir, converged + ".json"), "channel": "converged"}]
+if candidate:
+    lanes.append({"publicName": candidate, "membershipFile": os.path.join(membership_dir, candidate + ".json"), "channel": "candidate"})
 print(json.dumps({
     "$comment": "Written by hc-mesh.sh start_membership_beacons. The household's public-name membership authority.",
     "kind": "relay-addr-beacon-file-sink",
-    "publicName": os.environ["MESH_MEMBERSHIP_NAME"],
+    # publicName/membershipFile name the CONVERGED lane and stay for every
+    # reader that predates multi-lane. `lanes` is the complete list.
+    "publicName": converged,
     "membershipFile": os.environ["MESH_MEMBERSHIP_DOC"],
+    "lanes": lanes,
     "logDir": os.environ["MESH_MEMBERSHIP_LOGDIR"],
-    # fixture doorway id -> the owner slug that leg writes its entry under
+    # fixture doorway id -> the owner slug that leg writes its entry under.
+    # BOTH doorways own an entry in BOTH lanes: a doorway's identity is not a
+    # hostname, so the lane a name belongs to never narrows who may serve it.
     "owners": {"alpha": "alpha", "apex": "apex"},
     "probeIntervalSecs": probe,
     "joinAfterProbes": join,
@@ -1586,7 +1652,11 @@ print(json.dumps({
     "rejoinBoundMs": (join + 1) * 2 * probe * 1000,
 }, indent=2))
 PYEOF
-  echo "membership document: $doc (public name $MESH_MEMBERSHIP_NAME)"
+  local _n
+  while read -r _n; do
+    [ -n "$_n" ] || continue
+    echo "membership document: $(membership_file_path "$_n") (public name $_n)"
+  done <<< "$(membership_names)"
 }
 
 patch_mesh_gossip_config() { # <conductor-config.yaml>
