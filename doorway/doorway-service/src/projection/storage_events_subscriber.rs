@@ -271,7 +271,9 @@ async fn sync_router_from_storage(
     let outcome = fetch_projections_with_fallback(pool_urls, doorway_id, http).await;
     match epr_router.install_from_fallback(outcome) {
         FallbackInstallOutcome::Primary {
-            installed, rejected, ..
+            installed,
+            rejected,
+            ..
         } => {
             // Log the POST-validation truth (installed, not the fetched length):
             // a batch of N rows that installs 0 is the Welcome-at-`/` incident
