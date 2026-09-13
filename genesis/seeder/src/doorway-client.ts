@@ -457,10 +457,21 @@ export class DoorwayClient {
    *
    * This is the recommended method for preflight checks before seeding.
    * It provides much more detail than checkHealth().
+   *
+   * Fetches `/status.json`, NOT `/status` — `/status` (routes::status_page,
+   * doorway-service/src/routes/status.rs) has served an operator-facing Askama
+   * HTML dashboard unconditionally since fa909fe2c4 (2026-03-12); there is no
+   * content negotiation on it. `/status.json` (routes::status_check) is the
+   * machine-readable contract, serializing the same StatusResponse this method
+   * parses — same conductor/storage field shapes, so no other change is
+   * needed here. Fetching `/status` instead throws `SyntaxError: Unexpected
+   * token '<'` on `response.json()` the instant an HTML response body starts
+   * with `<!DOCTYPE`, which stalled the household-formation prologue's
+   * doorway-readiness leg.
    */
   async checkStatus(): Promise<DoorwayStatus | null> {
     try {
-      const response = await this.fetch('/status', {
+      const response = await this.fetch('/status.json', {
         method: 'GET',
         timeout: 10000,
       });

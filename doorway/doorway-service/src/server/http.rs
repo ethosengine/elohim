@@ -10470,3 +10470,175 @@ mod op_gate_performer_tests {
         );
     }
 }
+
+/// Full-stack regression coverage for the "root projection shadows every
+/// service path" incident shape (the `/auth/portal` trap, recurring). Every
+/// other guard for this shape in this file exercises `is_service_path` in
+/// isolation; NONE of them drive an actual request through `handle_request`
+/// with a root ("/") EPR projection registered in the router the way a
+/// household doorway running `just mesh prologue` really has one. That gap
+/// is exactly how a real household mesh proved `GET /status` served the SPA
+/// shell instead of `routes::status_page` while every unit-level
+/// `is_service_path("/status")` assertion kept passing — the predicate was
+/// never wrong, so predicate-only tests could never have caught the caller
+/// reaching a different code path than the one the predicate gates. This
+/// module drives one real TCP connection through `handle_request` per case,
+/// against an `AppState` whose `EprRouter` holds a live root mount, and
+/// proves every `is_service_path` family member still reaches its OWN
+/// explicit handler rather than the projected root bundle.
+#[cfg(test)]
+mod root_projection_shadow_regression_tests {
+    use super::*;
+    use crate::config::Args;
+    use clap::Parser;
+
+    /// A root ("/") commons projection with SPA fallback on — the exact shape
+    /// every household doorway holds once `just mesh prologue` stages the
+    /// landing app. If the router ever gets consulted for a service path,
+    /// THIS is the projection that would answer instead.
+    fn root_projection() -> elohim_views::projection::EprProjectionView {
+        use elohim_views::projection::{EprProjectionView, ProjectionMode};
+        EprProjectionView {
+            commitment_id: "test-root".into(),
+            epr_id: "elohim-host-landing".into(),
+            doorway_id: "doorway:test".into(),
+            url_path: "/".into(),
+            hostnames: vec![],
+            channel: elohim_views::projection::Channel::Converged,
+            mode: ProjectionMode::Cached,
+            reach: "commons".into(),
+            base_href: "/".into(),
+            entry_file: "index.html".into(),
+            spa_fallback: true,
+            redirects_from: vec![],
+            redirect_templates: vec![],
+            route_claims: None,
+            preview_epr_ref: None,
+            gate_hints: vec![],
+            dead_end: false,
+            steward_direct_endpoint: None,
+            responsive_reach: None,
+            hosting_agreement_id: None,
+            seeded_at: "2026-06-06T00:00:00Z".into(),
+            seeded_by: "test".into(),
+        }
+    }
+
+    /// Binds a real ephemeral TCP listener and serves `handle_request` on it —
+    /// the SAME `service_fn`/`http1::Builder` shape as `run()`'s accept loop,
+    /// minus everything that isn't needed to drive one request at a time.
+    async fn spawn_test_doorway(state: Arc<AppState>) -> SocketAddr {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind ephemeral test listener");
+        let local_addr = listener.local_addr().expect("listener local_addr");
+        tokio::spawn(async move {
+            loop {
+                let (stream, peer_addr) = match listener.accept().await {
+                    Ok(pair) => pair,
+                    Err(_) => return,
+                };
+                let state = Arc::clone(&state);
+                tokio::spawn(async move {
+                    let io = TokioIo::new(stream);
+                    let service = service_fn(move |req: Request<Incoming>| {
+                        let state = Arc::clone(&state);
+                        async move { handle_request(state, peer_addr, req).await }
+                    });
+                    let _ = http1::Builder::new().serve_connection(io, service).await;
+                });
+            }
+        });
+        local_addr
+    }
+
+    fn state_with_root_projection() -> Arc<AppState> {
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let state = AppState::new(args);
+        state.epr_router.replace_all(vec![root_projection()]);
+        Arc::new(state)
+    }
+
+    /// One GET through a real listener, with a hard 5s timeout: a shadowed
+    /// service path dispatching into the projected-bundle machinery (no
+    /// storage configured) must fail loud in a test, never hang the suite.
+    async fn get(addr: SocketAddr, path: &str) -> reqwest::Response {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            reqwest::Client::new()
+                .get(format!("http://{addr}{path}"))
+                .send(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("GET {path} did not answer within 5s — likely shadowed into the projected-bundle dispatch path instead of its own service handler"))
+        .unwrap_or_else(|e| panic!("GET {path} transport error: {e}"))
+    }
+
+    /// The incident scenario itself: `/status` must reach `routes::status_page`
+    /// (identifiable by its Askama template title), never the root projection.
+    #[tokio::test]
+    async fn status_is_not_shadowed_by_root_projection() {
+        let addr = spawn_test_doorway(state_with_root_projection()).await;
+        let resp = get(addr, "/status").await;
+        assert_eq!(resp.status(), reqwest::StatusCode::OK);
+        let body = resp.text().await.expect("response body");
+        assert!(
+            body.contains("Doorway Status"),
+            "GET /status must serve routes::status_page's Askama template, not the \
+             root EPR projection's SPA bundle — got: {body:.200}"
+        );
+    }
+
+    /// Parametrised over the whole `is_service_path` family named in the
+    /// `/auth/portal` shadow-guard comments scattered through this file —
+    /// each one already has an `is_service_path` unit assertion; this proves
+    /// the SAME guarantee survives an actual `handle_request` dispatch with a
+    /// live root mount in the router, not just the predicate in isolation.
+    /// Every path here must answer with something other than a bare 200
+    /// `text/html` SPA shell (content-type is the only signal every one of
+    /// these routes — health/JSON/proxy/404 alike — shares in its negation).
+    #[tokio::test]
+    async fn service_paths_are_never_answered_by_the_spa_shell() {
+        let addr = spawn_test_doorway(state_with_root_projection()).await;
+        for path in [
+            "/status",
+            "/status.json",
+            "/health",
+            "/healthz",
+            "/ready",
+            "/readyz",
+            "/version",
+            "/metrics",
+            "/p2p/status",
+            "/p2p",
+            "/db/schema",
+            "/api/v1/federation/doorways",
+            "/auth/login",
+            // NOT "/threshold": that arm proxies to `state.args.threshold_url`
+            // (a real external Angular dev server in some environments), so its
+            // response is legitimately `text/html` SPA-shaped content on its
+            // own account — the body-heuristic below would false-positive on
+            // it. Its own-arm-reachability is covered by `is_service_path`'s
+            // dedicated prefix coverage instead.
+            "/epr-head/does-not-exist",
+            "/.well-known/did.json",
+        ] {
+            let resp = get(addr, path).await;
+            let content_type = resp
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("")
+                .to_string();
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            let looks_like_spa_shell = content_type.starts_with("text/html")
+                && (body.contains("<app-root") || body.contains("id=\"app\""));
+            assert!(
+                !looks_like_spa_shell,
+                "{path} must reach its own service handler, not the root EPR \
+                 projection's SPA shell (status={status}, content-type={content_type})"
+            );
+        }
+    }
+}
