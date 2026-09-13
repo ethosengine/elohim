@@ -1439,6 +1439,7 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             use doorway::render::bundle_heads::{
                 BundleHeadsReconciler, BundleTarget, HeadProjection, HeadSource, HttpHeadSource,
             };
+            use elohim_views::projection::Channel;
             // The targets are the apps this doorway declares a head for: every
             // EPR-mounted bundle (the same derivation the warm-shell hydration
             // uses — the ONE source of "which apps does `/` serve"), unioned
@@ -1450,19 +1451,30 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             // the router self-heals and a mount can appear after boot.
             let configured_slugs = state.renderer_registry.configured_slugs();
             let targets: doorway::render::bundle_heads::TargetSource = Arc::new(move || {
+                // The CHANNEL comes off the contract, never off this doorway:
+                // a `candidate` contract makes its EPR a candidate target and
+                // a `converged` one makes it a converged target, so one app
+                // mounted on both channels reconciles twice under two keys.
                 let mut out: Vec<BundleTarget> = router
                     .projections()
                     .into_iter()
                     .map(|projection| BundleTarget {
                         slug: projection.epr_id,
                         entry_file: Some(projection.entry_file),
+                        channel: projection.channel,
                     })
                     .collect();
+                // A slug configured for SSR but not EPR-mounted has no
+                // contract, so no contract can say otherwise: converged.
                 for slug in configured_slugs.iter().cloned() {
-                    if !out.iter().any(|t| t.slug == slug) {
+                    if !out
+                        .iter()
+                        .any(|t| t.slug == slug && t.channel == Channel::Converged)
+                    {
                         out.push(BundleTarget {
                             slug,
                             entry_file: None,
+                            channel: Channel::Converged,
                         });
                     }
                 }

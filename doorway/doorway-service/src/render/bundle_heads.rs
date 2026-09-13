@@ -36,6 +36,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
+use elohim_views::projection::Channel;
+
 use crate::render::warm_shell::WarmShellStore;
 
 /// Seconds between full reconcile passes. Env-tunable via
@@ -47,22 +49,54 @@ pub const BUNDLE_HEADS_TICK_SECS: u64 = 30;
 /// stalled one must not hold the tick.
 pub const BUNDLE_HEADS_READ_TIMEOUT_SECS: u64 = 2;
 
-/// An app this doorway declares a head for. `entry_file` is `None` for a slug
-/// configured for SSR but not EPR-mounted — there is no shell to evict, but its
-/// server head still reconciles.
+/// An app this doorway declares a head for, ON ONE CHANNEL. `entry_file` is
+/// `None` for a slug configured for SSR but not EPR-mounted — there is no shell
+/// to evict, but its server head still reconciles.
+///
+/// The channel comes from the CONTRACT (`EprProjectionView::channel`), which is
+/// why one slug can appear twice: a `converged` contract and a `candidate`
+/// contract for the same app are two targets, reconciled independently and
+/// stored under two keys. Nothing configures a channel per doorway — the
+/// contract says which tier its hostnames serve, and the doorway reads it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BundleTarget {
     pub slug: String,
     pub entry_file: Option<String>,
+    pub channel: Channel,
 }
 
-/// The heads a storage content row declares. Both fields are optional because
+/// The heads a storage content row declares. Every field is optional because
 /// absence is an honest state, never an error: a browser-only app declares no
 /// `serverBlobHash`, and a peer mid-deploy may declare neither.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HeadDoc {
     pub browser: Option<String>,
     pub server: Option<String>,
+    /// The STAGING canonical-head declaration this channel resolved to,
+    /// addressed by the ActionHash of the DECLARATION (never a blob CID).
+    ///
+    /// Only ever `Some` on [`Channel::Candidate`]. The converged channel
+    /// resolves the earned winner, which is what `browser`/`server` already
+    /// name — a converged doc carrying a staging declaration would mean the
+    /// two tiers had been confused.
+    pub staging_declaration: Option<String>,
+}
+
+/// What ONE channel resolved to for ONE slug.
+///
+/// The second arm is the whole reason this is an enum rather than an
+/// `Option<HeadDoc>`: a candidate channel with nothing staged beneath the
+/// winner has a NAMED answer, and that answer is not the converged head.
+/// Collapsing it into "no heads" would let a caller fall back, which is exactly
+/// the failure — silently serving production bytes at a staging name is how a
+/// candidate channel stops meaning anything (C4 honest absence).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChannelHead {
+    /// The channel resolved to a declaration.
+    Resolved(HeadDoc),
+    /// `channel: candidate`, and no staging declaration stands beneath the
+    /// earned winner. NEVER the converged head.
+    NoCandidateStaged,
 }
 
 /// Reads a slug's declared heads from the storage upstream. A trait so the
@@ -70,7 +104,10 @@ pub struct HeadDoc {
 /// shape `ShellArchive` and the storage crate's `CommitmentFetcher` use.
 #[async_trait::async_trait]
 pub trait HeadSource: Send + Sync {
-    async fn fetch(&self, slug: &str) -> Result<HeadDoc, String>;
+    /// Resolve `slug` on `channel`. An `Err` is a TRANSPORT failure (the ask
+    /// could not be put) and never an answer — `NoCandidateStaged` is the
+    /// answer for "asked, nothing staged".
+    async fn fetch(&self, slug: &str, channel: Channel) -> Result<ChannelHead, String>;
 }
 
 /// Write-through target for a reconciled head: the doorway's own projection.
@@ -99,24 +136,73 @@ impl HttpHeadSource {
     }
 }
 
-#[async_trait::async_trait]
-impl HeadSource for HttpHeadSource {
-    async fn fetch(&self, slug: &str) -> Result<HeadDoc, String> {
-        let url = format!("{}/db/content/{}", self.storage_base, slug);
+impl HttpHeadSource {
+    /// GET `url`, returning the body or a transport-shaped error.
+    async fn get_body(&self, url: &str) -> Result<String, String> {
         let resp = self
             .client
-            .get(&url)
+            .get(url)
             .send()
             .await
             .map_err(|e| format!("content GET failed: {e}"))?;
         if !resp.status().is_success() {
             return Err(format!("content GET: HTTP {} for {url}", resp.status()));
         }
-        let body = resp
-            .text()
+        resp.text()
             .await
-            .map_err(|e| format!("content GET read body: {e}"))?;
-        Ok(parse_head_doc(&body))
+            .map_err(|e| format!("content GET read body: {e}"))
+    }
+}
+
+#[async_trait::async_trait]
+impl HeadSource for HttpHeadSource {
+    async fn fetch(&self, slug: &str, channel: Channel) -> Result<ChannelHead, String> {
+        match channel {
+            // Byte-for-byte the pre-rung-4 read: the earned/declared head's
+            // blob hashes off the content row.
+            Channel::Converged => {
+                let body = self
+                    .get_body(&format!("{}/db/content/{}", self.storage_base, slug))
+                    .await?;
+                Ok(ChannelHead::Resolved(parse_head_doc(&body)))
+            }
+            // The candidate is not a property of the content row — it is a
+            // pure function of the canonical-head link set, which only the
+            // storage peer's conductor can evaluate. `/head` is where storage
+            // surfaces it.
+            Channel::Candidate => {
+                let body = self
+                    .get_body(&format!("{}/db/content/{}/head", self.storage_base, slug))
+                    .await?;
+                Ok(parse_candidate_head(&body))
+            }
+        }
+    }
+}
+
+/// Parse a `/db/content/{slug}/head` body into this slug's candidate answer.
+///
+/// Absent, null or empty `stagingCandidate` is [`ChannelHead::NoCandidateStaged`]
+/// — the NAMED absence, which the caller answers with and never falls back
+/// from. A malformed body is treated the same way rather than as a head: this
+/// function's contract is that it can only ever produce a candidate the peer
+/// actually declared.
+pub fn parse_candidate_head(body: &str) -> ChannelHead {
+    let declaration = serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| {
+            v.get("stagingCandidate")
+                .and_then(|c| c.as_str())
+                .map(str::to_string)
+        })
+        .filter(|c| !c.is_empty());
+    match declaration {
+        Some(d) => ChannelHead::Resolved(HeadDoc {
+            browser: None,
+            server: None,
+            staging_declaration: Some(d),
+        }),
+        None => ChannelHead::NoCandidateStaged,
     }
 }
 
@@ -134,14 +220,29 @@ pub fn parse_head_doc(body: &str) -> HeadDoc {
         server: crate::ssr::parse_server_blob_hash(body)
             .ok()
             .and_then(non_empty),
+        // A converged read never carries one: the earned winner IS the head
+        // these blob hashes name.
+        staging_declaration: None,
     }
 }
 
-/// One slug's last observed declaration, with when it was observed.
+/// One (slug, channel)'s last observed declaration, with when it was observed.
 #[derive(Debug, Clone)]
 pub struct ObservedHeads {
     pub browser: Option<String>,
     pub server: Option<String>,
+    /// The staging declaration this channel resolved to. Only ever `Some` on
+    /// [`Channel::Candidate`].
+    pub staging_declaration: Option<String>,
+    /// TRUE when the last observation on this channel was the candidate
+    /// channel's NAMED ABSENCE: asked, and nothing is staged beneath the
+    /// earned winner.
+    ///
+    /// It is a distinct state from "no entry at all" (`get` returns `None`),
+    /// which means never asked or never answered. A serving path may say
+    /// "nothing staged" only for the former; for the latter it knows nothing.
+    /// Neither is ever a licence to serve the converged head.
+    pub no_candidate_staged: bool,
     pub observed_at: Instant,
 }
 
@@ -150,7 +251,11 @@ pub struct ObservedHeads {
 /// re-fetched by every consumer.
 #[derive(Default)]
 pub struct BundleHeadStore {
-    inner: RwLock<HashMap<String, ObservedHeads>>,
+    /// `(slug, channel)` → last observation. Keyed by the PAIR because one app
+    /// has two answers: the earned winner its converged hostnames serve, and
+    /// the staging declaration its candidate hostname serves. One key would
+    /// make the candidate overwrite the head production is serving.
+    inner: RwLock<HashMap<(String, Channel), ObservedHeads>>,
 }
 
 impl BundleHeadStore {
@@ -158,11 +263,18 @@ impl BundleHeadStore {
         Self::default()
     }
 
+    /// The CONVERGED observation for `slug` — what every pre-rung-4 caller
+    /// means by "this slug's head", and what the SSR adoption pass reads.
     pub fn get(&self, slug: &str) -> Option<ObservedHeads> {
+        self.get_channel(slug, Channel::Converged)
+    }
+
+    /// The observation for one (slug, channel).
+    pub fn get_channel(&self, slug: &str, channel: Channel) -> Option<ObservedHeads> {
         self.inner
             .read()
             .unwrap_or_else(|e| e.into_inner())
-            .get(slug)
+            .get(&(slug.to_string(), channel))
             .cloned()
     }
 
@@ -176,6 +288,8 @@ impl BundleHeadStore {
     /// into a tautology, so the post-materialize read asks for `max_age` zero
     /// and gets a live fetch.
     pub fn server_head_fresh(&self, slug: &str, max_age: Duration) -> Option<String> {
+        // CONVERGED by construction: the SSR adoption pass serves the earned
+        // winner, never a candidate.
         let observed = self.get(slug)?;
         if observed.observed_at.elapsed() > max_age {
             return None;
@@ -183,36 +297,58 @@ impl BundleHeadStore {
         observed.server
     }
 
-    /// Record a fresh observation, returning how the heads moved.
-    pub fn record(&self, slug: &str, doc: &HeadDoc) -> HeadMove {
+    /// Record a fresh observation on one channel, returning how it moved.
+    pub fn record(&self, slug: &str, channel: Channel, head: &ChannelHead) -> HeadMove {
+        let (doc, no_candidate_staged) = match head {
+            ChannelHead::Resolved(doc) => (doc.clone(), false),
+            // The named absence is RECORDED, not skipped: "asked, nothing
+            // staged" is an answer a serving path may act on, and it is
+            // distinguishable from "never asked" (no entry) only if it is
+            // written down.
+            ChannelHead::NoCandidateStaged => (HeadDoc::default(), true),
+        };
         let mut inner = self.inner.write().unwrap_or_else(|e| e.into_inner());
-        let previous = inner.get(slug).cloned();
+        let key = (slug.to_string(), channel);
+        let previous = inner.get(&key).cloned();
         inner.insert(
-            slug.to_string(),
+            key,
             ObservedHeads {
                 browser: doc.browser.clone(),
                 server: doc.server.clone(),
+                staging_declaration: doc.staging_declaration.clone(),
+                no_candidate_staged,
                 observed_at: Instant::now(),
             },
         );
         HeadMove {
             slug: slug.to_string(),
+            channel,
             browser_from: previous.as_ref().and_then(|p| p.browser.clone()),
             browser_to: doc.browser.clone(),
             server_from: previous.as_ref().and_then(|p| p.server.clone()),
             server_to: doc.server.clone(),
+            candidate_from: previous
+                .as_ref()
+                .and_then(|p| p.staging_declaration.clone()),
+            candidate_to: doc.staging_declaration.clone(),
         }
     }
 }
 
-/// How one slug's declaration changed across a reconcile.
+/// How one (slug, channel)'s declaration changed across a reconcile.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadMove {
     pub slug: String,
+    pub channel: Channel,
     pub browser_from: Option<String>,
     pub browser_to: Option<String>,
     pub server_from: Option<String>,
     pub server_to: Option<String>,
+    /// The staging declaration, before and after. Both are `None` on the
+    /// converged channel; `Some → None` on the candidate channel is a
+    /// candidate being promoted or withdrawn, which is a real move.
+    pub candidate_from: Option<String>,
+    pub candidate_to: Option<String>,
 }
 
 impl HeadMove {
@@ -224,8 +360,12 @@ impl HeadMove {
         self.server_from != self.server_to
     }
 
+    pub fn candidate_moved(&self) -> bool {
+        self.candidate_from != self.candidate_to
+    }
+
     pub fn moved(&self) -> bool {
-        self.browser_moved() || self.server_moved()
+        self.browser_moved() || self.server_moved() || self.candidate_moved()
     }
 }
 
@@ -291,17 +431,25 @@ impl BundleHeadsReconciler {
     ///
     /// `entry_file` is only used to name the shell being evicted; eviction is
     /// slug-scoped, so `None` still evicts correctly.
-    pub async fn reconcile_slug(&self, slug: &str, entry_file: Option<&str>) -> Option<HeadMove> {
+    pub async fn reconcile_slug(
+        &self,
+        slug: &str,
+        channel: Channel,
+        entry_file: Option<&str>,
+    ) -> Option<HeadMove> {
         // Tick and SSE reconciliation must not interleave old reads with newer writes.
         let _guard = self.reconcile_lock.lock().await;
-        let doc = match self.source.fetch(slug).await {
-            Ok(doc) => doc,
+        let head = match self.source.fetch(slug, channel).await {
+            Ok(head) => head,
             Err(e) => {
                 // Keep the last state. A head is NEVER fabricated, and an
                 // unreachable peer must not un-declare a head we already hold.
+                // NOTE this is the TRANSPORT arm only: "asked, nothing staged"
+                // arrives as `Ok(NoCandidateStaged)` and IS recorded below.
                 tracing::debug!(
                     target: "doorway::ssr",
                     slug = %slug,
+                    channel = ?channel,
                     error = %e,
                     "bundle heads: declared-head read failed — keeping last state, retrying next tick"
                 );
@@ -312,12 +460,21 @@ impl BundleHeadsReconciler {
         // Re-assert storage truth even when its head did not move. A Mongo outage,
         // late bulk projection, or slug-index eviction can undo a previous write.
         // Observing a head is not evidence that its projection still holds it.
-        if let Some(projection) = self.projection.as_ref() {
+        //
+        // CONVERGED ONLY. `write_heads` is the doorway's own per-SLUG
+        // declaration — the head its serving path resolves bytes from — and a
+        // candidate observation must never touch it. Writing a candidate
+        // through here would publish an unpromoted build as the doorway's
+        // declared head for every name it serves, which is the exact inversion
+        // the channel split exists to prevent.
+        if let (Channel::Converged, Some(projection), ChannelHead::Resolved(doc)) =
+            (channel, self.projection.as_ref(), &head)
+        {
             projection
                 .write_heads(slug, doc.browser.as_deref(), doc.server.as_deref())
                 .await;
         }
-        let mv = self.heads.record(slug, &doc);
+        let mv = self.heads.record(slug, channel, &head);
         if !mv.moved() {
             return None;
         }
@@ -325,16 +482,24 @@ impl BundleHeadsReconciler {
         tracing::info!(
             target: "doorway::ssr",
             slug = %slug,
+            channel = ?channel,
             entry_file = entry_file.unwrap_or("-"),
-            "bundle heads: {} browser {}->{} server {}->{}",
+            "bundle heads: {} [{:?}] browser {}->{} server {}->{} candidate {}->{}",
             slug,
+            channel,
             head12(mv.browser_from.as_deref()),
             head12(mv.browser_to.as_deref()),
             head12(mv.server_from.as_deref()),
             head12(mv.server_to.as_deref()),
+            head12(mv.candidate_from.as_deref()),
+            head12(mv.candidate_to.as_deref()),
         );
 
-        if mv.browser_moved() {
+        if mv.browser_moved() && channel == Channel::Converged {
+            // Converged only: the warm shell is the shell this doorway serves
+            // from its declared head, and a candidate observation must not
+            // evict it.
+            //
             // The hot map is consulted BEFORE the archive, so without this the
             // old shell keeps serving under the new declaration.
             //
@@ -354,7 +519,7 @@ impl BundleHeadsReconciler {
         let mut moves = Vec::new();
         for target in self.targets() {
             if let Some(mv) = self
-                .reconcile_slug(&target.slug, target.entry_file.as_deref())
+                .reconcile_slug(&target.slug, target.channel, target.entry_file.as_deref())
                 .await
             {
                 moves.push(mv);
@@ -366,10 +531,30 @@ impl BundleHeadsReconciler {
     /// Reconcile the slug named by a storage `content.{created,updated}` event,
     /// but only when it is one this doorway declares a head for. An event for
     /// any other content row is not this reconciler's business.
+    /// Every channel this doorway declares for that slug reconciles — a
+    /// content event on an app moves the earned winner AND can promote or
+    /// withdraw the candidate standing beneath it, and both are read from the
+    /// same event.
     pub async fn on_content_event(&self, id: &str) -> Option<HeadMove> {
-        let target = self.targets().into_iter().find(|t| t.slug == id)?;
-        self.reconcile_slug(&target.slug, target.entry_file.as_deref())
-            .await
+        let targets: Vec<BundleTarget> = self
+            .targets()
+            .into_iter()
+            .filter(|t| t.slug == id)
+            .collect();
+        let mut first = None;
+        for target in targets {
+            let mv = self
+                .reconcile_slug(&target.slug, target.channel, target.entry_file.as_deref())
+                .await;
+            // The converged move is the one callers log; a candidate move is
+            // still reconciled, it just does not displace the answer.
+            if first.is_none() || target.channel == Channel::Converged {
+                if let Some(mv) = mv {
+                    first = Some(mv);
+                }
+            }
+        }
+        first
     }
 }
 
@@ -415,10 +600,13 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
 
-    /// In-memory stand-in for the storage peer.
+    /// In-memory stand-in for the storage peer. Answers per channel: the
+    /// converged doc, and the candidate's staging declaration (absent by
+    /// default — the named absence).
     #[derive(Default)]
     struct FakeSource {
         doc: Mutex<Option<HeadDoc>>,
+        candidate: Mutex<Option<String>>,
         fail: Mutex<Option<String>>,
         reads: AtomicUsize,
     }
@@ -434,8 +622,14 @@ mod tests {
             *self.doc.lock().unwrap() = Some(HeadDoc {
                 browser: browser.map(str::to_string),
                 server: server.map(str::to_string),
+                staging_declaration: None,
             });
             *self.fail.lock().unwrap() = None;
+        }
+
+        /// Stage (or withdraw, with `None`) a candidate beneath the winner.
+        fn stage_candidate(&self, declaration: Option<&str>) {
+            *self.candidate.lock().unwrap() = declaration.map(str::to_string);
         }
 
         fn go_dark(&self, why: &str) {
@@ -445,16 +639,28 @@ mod tests {
 
     #[async_trait::async_trait]
     impl HeadSource for FakeSource {
-        async fn fetch(&self, _slug: &str) -> Result<HeadDoc, String> {
+        async fn fetch(&self, _slug: &str, channel: Channel) -> Result<ChannelHead, String> {
             self.reads.fetch_add(1, Ordering::SeqCst);
             if let Some(e) = self.fail.lock().unwrap().clone() {
                 return Err(e);
             }
-            self.doc
-                .lock()
-                .unwrap()
-                .clone()
-                .ok_or_else(|| "no doc".into())
+            match channel {
+                Channel::Converged => self
+                    .doc
+                    .lock()
+                    .unwrap()
+                    .clone()
+                    .map(ChannelHead::Resolved)
+                    .ok_or_else(|| "no doc".into()),
+                Channel::Candidate => Ok(match self.candidate.lock().unwrap().clone() {
+                    Some(d) => ChannelHead::Resolved(HeadDoc {
+                        browser: None,
+                        server: None,
+                        staging_declaration: Some(d),
+                    }),
+                    None => ChannelHead::NoCandidateStaged,
+                }),
+            }
         }
     }
 
@@ -487,8 +693,43 @@ mod tests {
             vec![BundleTarget {
                 slug: "landing".into(),
                 entry_file: Some("index.html".into()),
+                channel: Channel::Converged,
             }]
         })
+    }
+
+    /// The same app on BOTH channels — a converged contract and a candidate
+    /// contract for one slug, which is the whole rung-4 shape.
+    fn both_channel_targets() -> TargetSource {
+        Arc::new(|| {
+            vec![
+                BundleTarget {
+                    slug: "landing".into(),
+                    entry_file: Some("index.html".into()),
+                    channel: Channel::Converged,
+                },
+                BundleTarget {
+                    slug: "landing".into(),
+                    entry_file: Some("index.html".into()),
+                    channel: Channel::Candidate,
+                },
+            ]
+        })
+    }
+
+    fn reconciler_with_targets(
+        source: Arc<FakeSource>,
+        projection: Arc<dyn HeadProjection>,
+        warm: Arc<WarmShellStore>,
+        targets: TargetSource,
+    ) -> BundleHeadsReconciler {
+        BundleHeadsReconciler::new(
+            source,
+            Some(projection),
+            warm,
+            Arc::new(BundleHeadStore::new()),
+            targets,
+        )
     }
 
     fn reconciler(
@@ -707,5 +948,225 @@ mod tests {
         assert_eq!(head12(Some("sha256-e0e2f7bbccdd1122")), "e0e2f7bbccdd");
         assert_eq!(head12(Some("short")), "short");
         assert_eq!(head12(None), "-");
+    }
+
+    // =======================================================================
+    // Rung 4 slice 1 — heads keyed by (slug, channel)
+    //
+    // The one behaviour that had to be DESIGNED rather than inherited: a
+    // candidate channel with nothing staged answers a NAMED ABSENCE, and never
+    // the converged head. Everything else here guards the blast radius —
+    // a candidate observation must not touch the doorway's own declaration,
+    // its warm shell, or what the SSR adoption pass reads.
+    // =======================================================================
+
+    #[tokio::test]
+    async fn a_candidate_with_nothing_staged_is_a_named_absence_never_the_converged_head() {
+        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        // No candidate staged — the default.
+        let r = reconciler_with_targets(
+            source.clone(),
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await;
+
+        let heads = r.heads();
+        let candidate = heads
+            .get_channel("landing", Channel::Candidate)
+            .expect("the absence is RECORDED — distinguishable from never asked");
+        assert!(candidate.no_candidate_staged);
+        assert_eq!(candidate.staging_declaration, None);
+        assert_eq!(
+            candidate.browser, None,
+            "the candidate channel must NOT inherit the converged browser head"
+        );
+        assert_eq!(candidate.server, None);
+        // …while the converged channel is untouched and complete.
+        assert_eq!(
+            heads.get("landing").unwrap().browser.as_deref(),
+            Some("sha256-production")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_staged_candidate_resolves_its_own_declaration_beside_the_converged_head() {
+        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let r = reconciler_with_targets(
+            source.clone(),
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await;
+
+        let heads = r.heads();
+        let candidate = heads.get_channel("landing", Channel::Candidate).unwrap();
+        assert_eq!(
+            candidate.staging_declaration.as_deref(),
+            Some("uhCkkCANDIDATE01")
+        );
+        assert!(!candidate.no_candidate_staged);
+        // Two keys, two independent answers, neither overwriting the other.
+        assert_eq!(
+            heads.get("landing").unwrap().browser.as_deref(),
+            Some("sha256-production")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_candidate_observation_never_writes_the_doorways_own_declaration() {
+        // The inversion this guards: publishing an unpromoted build as the
+        // head every name this doorway serves resolves bytes from.
+        let source = FakeSource::declaring(Some("sha256-production"), Some("sha256-srv"));
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let projection = Arc::new(FakeProjection::default());
+        let r = reconciler_with_targets(
+            source.clone(),
+            projection.clone(),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await;
+
+        let writes = projection.writes.lock().unwrap().clone();
+        assert_eq!(
+            writes.len(),
+            1,
+            "exactly one write-through: the converged one"
+        );
+        assert_eq!(writes[0].browser.as_deref(), Some("sha256-production"));
+    }
+
+    #[tokio::test]
+    async fn the_ssr_adoption_pass_only_ever_reads_the_converged_head() {
+        let source = FakeSource::declaring(Some("sha256-b"), Some("sha256-serverEARNED"));
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let r = reconciler_with_targets(
+            source,
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await;
+        assert_eq!(
+            r.heads()
+                .server_head_fresh("landing", Duration::from_secs(60))
+                .as_deref(),
+            Some("sha256-serverEARNED"),
+            "server_head_fresh is converged by construction"
+        );
+    }
+
+    #[tokio::test]
+    async fn promoting_and_withdrawing_a_candidate_are_both_moves() {
+        let source = FakeSource::declaring(Some("sha256-production"), None);
+        let r = reconciler_with_targets(
+            source.clone(),
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await; // learns: converged head + no candidate
+
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let staged = r.tick().await;
+        assert_eq!(staged.len(), 1);
+        assert_eq!(staged[0].channel, Channel::Candidate);
+        assert!(staged[0].candidate_moved());
+
+        // Promotion (or withdrawal) removes the staging declaration.
+        source.stage_candidate(None);
+        let withdrawn = r.tick().await;
+        assert_eq!(withdrawn.len(), 1);
+        assert_eq!(withdrawn[0].candidate_to, None);
+        assert!(
+            r.heads()
+                .get_channel("landing", Channel::Candidate)
+                .unwrap()
+                .no_candidate_staged
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unreachable_peer_is_not_an_absent_candidate() {
+        // A transport failure must keep the last state — it is NOT the answer
+        // "nothing staged", which a caller is allowed to act on.
+        let source = FakeSource::declaring(Some("sha256-production"), None);
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let r = reconciler_with_targets(
+            source.clone(),
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        r.tick().await;
+
+        source.go_dark("connection refused");
+        assert!(r.tick().await.is_empty());
+        let candidate = r
+            .heads()
+            .get_channel("landing", Channel::Candidate)
+            .unwrap();
+        assert_eq!(
+            candidate.staging_declaration.as_deref(),
+            Some("uhCkkCANDIDATE01"),
+            "the last known candidate survives the outage"
+        );
+        assert!(!candidate.no_candidate_staged);
+    }
+
+    #[tokio::test]
+    async fn a_content_event_reconciles_every_channel_that_slug_is_mounted_on() {
+        let source = FakeSource::declaring(Some("sha256-production"), None);
+        source.stage_candidate(Some("uhCkkCANDIDATE01"));
+        let r = reconciler_with_targets(
+            source.clone(),
+            Arc::new(FakeProjection::default()),
+            Arc::new(WarmShellStore::inert()),
+            both_channel_targets(),
+        );
+        assert!(r.on_content_event("landing").await.is_some());
+        assert_eq!(source.reads.load(Ordering::SeqCst), 2, "both channels read");
+        assert!(r.heads().get("landing").is_some());
+        assert!(r
+            .heads()
+            .get_channel("landing", Channel::Candidate)
+            .is_some());
+    }
+
+    #[test]
+    fn a_head_read_with_no_staging_candidate_parses_as_the_named_absence() {
+        for body in [
+            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","declared":true,"trust":"notarized"}"#,
+            r#"{"contentId":"landing","stagingCandidate":null}"#,
+            r#"{"contentId":"landing","stagingCandidate":""}"#,
+            "not json at all",
+        ] {
+            assert_eq!(
+                parse_candidate_head(body),
+                ChannelHead::NoCandidateStaged,
+                "body {body:?} must name absence, never a head"
+            );
+        }
+    }
+
+    #[test]
+    fn a_head_read_carrying_a_staging_candidate_resolves_the_declaration() {
+        let head = parse_candidate_head(
+            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","stagingCandidate":"uhCkkCAND"}"#,
+        );
+        match head {
+            ChannelHead::Resolved(doc) => {
+                assert_eq!(doc.staging_declaration.as_deref(), Some("uhCkkCAND"));
+                assert_eq!(
+                    doc.browser, None,
+                    "a candidate names a DECLARATION, not a blob head"
+                );
+            }
+            ChannelHead::NoCandidateStaged => panic!("expected a resolved candidate"),
+        }
     }
 }
