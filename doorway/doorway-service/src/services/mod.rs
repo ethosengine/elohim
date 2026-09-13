@@ -82,8 +82,9 @@ pub use route_registry::{
     RouteRegistryConfig, RouteRegistryStats, RouteSource, RouteTarget,
 };
 pub use serve_eligibility::{
-    audience_from_projection, contract_from_projection, fold_for_projection, serve_eligibility,
-    standing_from_request, AudienceTerm, ContractTerms, ReachClass, Refusal, RequesterStanding,
+    admitted_standing_value, audience_from_projection, contract_from_projection,
+    fold_for_projection, serve_eligibility, stamp_admitted_standing, standing_from_request,
+    AudienceTerm, CollectiveRef, ContractTerms, ReachClass, Refusal, RequesterStanding,
     ServeEligibility, ServeRequest, STANDING_HEADER, WHERE_TO_BE_HEARD,
 };
 pub use shard_resolver::{

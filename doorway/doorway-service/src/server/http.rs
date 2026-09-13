@@ -3362,8 +3362,6 @@ async fn dispatch_to_projected_epr(
     wants_html: bool,
     standing: RequesterStanding,
 ) -> Response<Full<Bytes>> {
-    use elohim_views::projection::ProjectionMode;
-
     // ── THE FOLD, re-asked NOW ───────────────────────────────────────────────
     // Reach + standing, resolved against the projection row the router holds at
     // THIS moment — never a value cached beside the bytes. Everything below
@@ -3377,6 +3375,11 @@ async fn dispatch_to_projected_epr(
     // reach regardless of who was asking (so a member the narrowed reach still
     // named was refused alongside the stranger) and named no term, no record
     // and no redress.
+    //
+    // The fold is resolved HERE, once, and the byte path below it is a separate
+    // function precisely so it cannot reach the request's standing at all: the
+    // only two things that leave this function are a refusal that names its
+    // term, or bytes that say which reach admitted them.
     if let crate::services::ServeEligibility::Refuse(refusal) =
         crate::services::serve_eligibility::fold_for_projection(
             state,
@@ -3388,6 +3391,38 @@ async fn dispatch_to_projected_epr(
     {
         return crate::services::serve_eligibility::refusal_response(&refusal);
     }
+
+    // Admitted. Serve the bytes, and say on the way out WHICH reach admitted
+    // them — the chrome's half of the fold being visible (the holder's name is
+    // the relay's `x-elohim-served-by`; the two together are what the person is
+    // shown about the place they walked into).
+    let reach = projection.reach.clone();
+    let mut response = serve_admitted_projection(
+        state,
+        request_path,
+        projection,
+        chrome_context_json,
+        wants_html,
+    )
+    .await;
+    crate::services::stamp_admitted_standing(&mut response, &reach);
+    response
+}
+
+/// The byte path for a projection the fold has ALREADY admitted.
+///
+/// Split out of [`dispatch_to_projected_epr`] so the eligibility decision and
+/// the byte path are different functions: this one takes no
+/// [`RequesterStanding`] and therefore cannot re-decide, widen, or skip the
+/// fold, whatever it does with the bytes.
+async fn serve_admitted_projection(
+    state: &AppState,
+    request_path: &str,
+    projection: elohim_views::projection::EprProjectionView,
+    chrome_context_json: &str,
+    wants_html: bool,
+) -> Response<Full<Bytes>> {
+    use elohim_views::projection::ProjectionMode;
 
     // Mode gate — MVP: only Cached is implemented. StewardDirect deferred (§8.2).
     if projection.mode != ProjectionMode::Cached {
@@ -6292,18 +6327,26 @@ async fn handle_request(
                 if let Disposition::SsrRoute { spec, endpoint } = dispo {
                     // EVERY SSR shed/failure degrades to the projected bundle
                     // (chrome-carrying) — i.e. exactly today's EPR serving.
-                    return Ok(to_boxed(
-                        serve_ssr_route(
-                            &state,
-                            req,
-                            &path,
-                            spec,
-                            endpoint,
-                            observation_id.as_deref(),
-                            SsrFallback::ProjectedEpr(Box::new(projection)),
-                        )
-                        .await,
-                    ));
+                    let reach = projection.reach.clone();
+                    let mut ssr = serve_ssr_route(
+                        &state,
+                        req,
+                        &path,
+                        spec,
+                        endpoint,
+                        observation_id.as_deref(),
+                        SsrFallback::ProjectedEpr(Box::new(projection)),
+                    )
+                    .await;
+                    // The fold admitted this request above; an SSR render is
+                    // the one serve path that answers WITHOUT passing through
+                    // `dispatch_to_projected_epr`, so it states the admitting
+                    // reach here or it would be the only serve that says
+                    // nothing. (A degraded render falls back through the
+                    // projected-bundle path, which stamps it already — hence
+                    // the never-overwrite rule in `stamp_admitted_standing`.)
+                    crate::services::stamp_admitted_standing(&mut ssr, &reach);
+                    return Ok(to_boxed(ssr));
                 }
                 // Unreachable: epr_should_serve_ssr guaranteed SsrRoute.
             }

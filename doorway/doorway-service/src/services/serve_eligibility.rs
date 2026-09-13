@@ -45,14 +45,22 @@
 //! ladder refuses anonymous visitors. Only an explicitly commons reach serves a
 //! visitor who has shown nothing.
 //!
-//! ## The refusal is the fold's only observable
+//! ## The fold says which answer it gave, both ways
 //!
 //! A refusal NAMES, on its face, which term failed (`refused: "reach"`), the
-//! reach that failed it, why, and where the visitor can be heard about it. It
-//! also points at the ledger records the reason reads back to — the EPR and the
-//! REA commitment that backs the projection contract — so "decided by the fold"
-//! is checkable as "the reason it gave reads back to a record". A doorway-local
-//! allowlist can name no such record.
+//! reach that failed it, why, where the visitor can be heard about it, and —
+//! when the declaration names one — the COLLECTIVE the reach now admits, said
+//! by name. It also points at the ledger records the reason reads back to: the
+//! EPR, the REA commitment that backs the projection contract, the route that
+//! reads that commitment's reach declaration back, and the route that reads the
+//! collective back. So "decided by the fold" is checkable as "the reason it
+//! gave reads back to a record". A doorway-local allowlist can name no such
+//! record — which is why the naming, not the 403, is the observable.
+//!
+//! A SERVE says so too: [`stamp_admitted_standing`] puts
+//! `x-elohim-standing: admitted;reach=<reach>` on the way out, so the chrome can
+//! tell a person what governs the place they walked into instead of inferring
+//! "it must have been fine" from a 200.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -69,8 +77,21 @@ use serde::Serialize;
 pub const WHERE_TO_BE_HEARD: &str = "/api/v1/feedback/operations";
 
 /// Response header the chrome (and the a2o glue) reads to see the standing the
-/// doorway resolved for this request. Shape: `refused;reach=<reach>`.
+/// doorway resolved for this request. Shape: `refused;reach=<reach>` on a
+/// refusal, `admitted;reach=<reach>` on a serve the fold admitted — the same
+/// sentence either way, so a reader never has to infer the fold's answer from
+/// the status code.
 pub const STANDING_HEADER: &str = "x-elohim-standing";
+
+/// Route prefix a refusal points at so the collective it named reads back to a
+/// record. Proxied by every doorway to its own storage, so the path is
+/// relative to whichever doorway refused.
+const COLLECTIVE_RECORD_ROUTE: &str = "/db/collectives/";
+
+/// Route prefix a refusal points at so the REACH DECLARATION reads back to a
+/// record: the REA Commitment that carries this projection's reach and its
+/// audience terms.
+const REACH_DECLARATION_ROUTE: &str = "/api/v1/commitments/";
 
 /// The reach label used when the projection row carries none. A refusal at this
 /// label means "this doorway holds no reach declaration for this record" — not
@@ -241,6 +262,28 @@ pub struct ServeRequest<'a> {
     pub path: &'a str,
 }
 
+/// A collective the declared reach names, said the way a refusal must say it:
+/// a name a person recognises, and a record anyone can read it back from.
+///
+/// Every field originates in the CURRENT projection row — `id` and `label`
+/// from the reach declaration's own membership gate hint, `record` the route
+/// that reads that collective back. None of the three could be produced by a
+/// doorway-local allowlist, which is exactly why a refusal carries them: "the
+/// collective whose ruling narrowed it" has to be checkable as "the name it
+/// gave reads back to a record", not taken on the doorway's word.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CollectiveRef {
+    /// The collective's ledger identity (the gate hint's `eprRef`).
+    pub id: String,
+    /// The name a person would use, when the projection holds it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// Where to read this collective back — a real route on the doorway that
+    /// refused, so the chrome can follow it without knowing this protocol.
+    pub record: String,
+}
+
 /// A refusal that names its term, its record and its redress.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -257,6 +300,23 @@ pub struct Refusal {
     pub epr: String,
     /// The REA Commitment backing the projection contract.
     pub contract: String,
+    /// The collective the declared reach names — in the ordinary case the one
+    /// whose ruling narrowed this record. Absent when the reach names no
+    /// audience (an undeclared reach, a beneficiary-only record, or a rung
+    /// that is its own audience): a doorway that holds no such record says
+    /// nothing rather than inventing a name.
+    ///
+    /// When a reach names SEVERAL audiences this field carries the first — the
+    /// one a chrome leads with — while [`Refusal::reason`] says all of them and
+    /// `declared_in` points at the record that carries the complete list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub collective: Option<CollectiveRef>,
+    /// Where to read the reach declaration itself back: the REA Commitment
+    /// that carries this projection's reach and its audience terms. This is
+    /// the traceability the habit asks for — the named term points at the
+    /// ledger record that carries it, dereferenceable in one request.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub declared_in: Option<String>,
 }
 
 impl Refusal {
@@ -277,7 +337,11 @@ pub enum ServeEligibility {
     /// Reach and standing both admit this requester. Serve as before.
     Serve,
     /// Refused, with the term named on its face.
-    Refuse(Refusal),
+    ///
+    /// Boxed: a refusal carries the whole sentence a person reads plus the
+    /// records it reads back to, and the serve arm carries nothing at all — so
+    /// the common answer (serve) should not pay for the rare one's payload.
+    Refuse(Box<Refusal>),
 }
 
 impl ServeEligibility {
@@ -286,7 +350,7 @@ impl ServeEligibility {
     pub fn refusal(&self) -> Option<&Refusal> {
         match self {
             Self::Serve => None,
-            Self::Refuse(r) => Some(r),
+            Self::Refuse(r) => Some(r.as_ref()),
         }
     }
 }
@@ -315,14 +379,16 @@ pub fn serve_eligibility(
         .to_string();
 
     let refuse = |reason: String| {
-        ServeEligibility::Refuse(Refusal {
+        ServeEligibility::Refuse(Box::new(Refusal {
             refused: TERM_REACH,
             reach: declared.clone(),
             reason,
             hear: WHERE_TO_BE_HEARD,
             epr: contract.epr_id.clone(),
             contract: contract.commitment_id.clone(),
-        })
+            collective: contract.audience.first().map(collective_ref),
+            declared_in: declaration_record(&contract.commitment_id),
+        }))
     };
 
     match classify_reach(head_reach) {
@@ -350,13 +416,29 @@ pub fn serve_eligibility(
 
         ReachClass::Restricted => {
             if !requester_standing.authenticated {
-                return refuse(format!(
-                    "{} is no longer at commons reach. Its stewards narrowed it \
-                     to {declared}, which does not admit a visitor who has \
-                     shown nothing. If you are one of the people it now names, \
-                     sign in and ask again.",
-                    spoken_record(&contract.epr_id, request.path)
-                ));
+                // The narrowing NAMES someone. A stranger told only "not for
+                // you" learns nothing and can do nothing; told who it is now
+                // for, they can recognise themselves in it — or know whose
+                // decision it was they want to be heard about. The name is
+                // read from the declaration's own audience term, never
+                // supplied by this doorway, so it is absent (and the sentence
+                // falls back) when the record names nobody.
+                return refuse(match spoken_audience_opt(&contract.audience) {
+                    Some(audience) => format!(
+                        "{} is no longer at commons reach. Its stewards narrowed \
+                         it to {declared} reach, which admits {audience} and not \
+                         a visitor who has shown nothing. If you are one of the \
+                         people it now names, sign in and ask again.",
+                        spoken_record(&contract.epr_id, request.path)
+                    ),
+                    None => format!(
+                        "{} is no longer at commons reach. Its stewards narrowed \
+                         it to {declared}, which does not admit a visitor who has \
+                         shown nothing. If you are one of the people it now \
+                         names, sign in and ask again.",
+                        spoken_record(&contract.epr_id, request.path)
+                    ),
+                });
             }
             if contract.audience.is_empty() {
                 // The rung itself is the audience and standing was shown.
@@ -384,6 +466,41 @@ fn spoken_record(epr_id: &str, path: &str) -> String {
     } else {
         format!("\"{path}\"")
     }
+}
+
+/// The dereferenceable record for one audience term.
+fn collective_ref(term: &AudienceTerm) -> CollectiveRef {
+    CollectiveRef {
+        id: term.id.clone(),
+        label: term.label.clone(),
+        record: format!(
+            "{COLLECTIVE_RECORD_ROUTE}{}",
+            urlencoding::encode(term.id.trim())
+        ),
+    }
+}
+
+/// The dereferenceable record for the reach declaration itself. `None` when
+/// the projection row carries no commitment id — a refusal never invents a
+/// record to point at.
+fn declaration_record(commitment_id: &str) -> Option<String> {
+    let id = commitment_id.trim();
+    if id.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "{REACH_DECLARATION_ROUTE}{}",
+        urlencoding::encode(id)
+    ))
+}
+
+/// [`spoken_audience`] when the reach names an audience at all, `None` when it
+/// names none — so a sentence can be built that does not pretend otherwise.
+fn spoken_audience_opt(audience: &[AudienceTerm]) -> Option<String> {
+    if audience.is_empty() {
+        return None;
+    }
+    Some(spoken_audience(audience))
 }
 
 /// Say an audience list in a sentence: `a`, `a and b`, `a, b and c`.
@@ -446,6 +563,46 @@ pub fn refusal_response(refusal: &Refusal) -> Response<Full<Bytes>> {
         .header("cache-control", "no-store")
         .body(Full::new(Bytes::from(body)))
         .expect("infallible refusal response")
+}
+
+/// The `x-elohim-standing` value for a serve the fold ADMITTED.
+///
+/// The counterpart of [`Refusal::standing_header_value`], and deliberately the
+/// same sentence shape: `admitted;reach=<reach>`. A refusal that names its
+/// term while a serve says nothing leaves the chrome unable to tell a person
+/// what governs the place they just walked into — it could only infer "it must
+/// have been fine" from a 200, which is exactly the reading a cache with a
+/// hostname would also produce. Saying the reach out loud on the way IN is what
+/// makes the fold visible on both of its answers.
+///
+/// The reach is sanitised before it is spliced in, for the same reason the
+/// refusal's is: the value originates in a projection row.
+#[must_use]
+pub fn admitted_standing_value(head_reach: &str) -> String {
+    format!("admitted;reach={}", sanitize_reach_label(head_reach))
+}
+
+/// Stamp [`admitted_standing_value`] on a response the fold admitted.
+///
+/// Two deliberate restraints:
+/// - Only on a response that actually SERVED something (2xx/3xx). A shed, a
+///   502 or a 501 is the byte path's own answer about itself, not a statement
+///   about this requester's standing, and labelling one "admitted" would be
+///   the doorway saying something it did not resolve.
+/// - Never overwrites a header already present. A relayed answer carries the
+///   HOLDER's standing verbatim ([`crate::services::name_routing`]), and the
+///   courier does not restate it in its own voice.
+pub fn stamp_admitted_standing<B>(response: &mut hyper::Response<B>, head_reach: &str) {
+    let status = response.status();
+    if !(status.is_success() || status.is_redirection()) {
+        return;
+    }
+    if response.headers().contains_key(STANDING_HEADER) {
+        return;
+    }
+    if let Ok(value) = hyper::header::HeaderValue::from_str(&admitted_standing_value(head_reach)) {
+        response.headers_mut().insert(STANDING_HEADER, value);
+    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -751,6 +908,150 @@ mod tests {
             "the reason speaks to a person, not in record ids: {}",
             refusal.reason
         );
+        // A stranger told only "not for you" learns nothing. The narrowing
+        // NAMES someone, and the refusal says who — by the name the
+        // declaration carries, in the sentence a person reads.
+        assert!(
+            refusal.reason.contains("the Dowell household"),
+            "an anonymous refusal must name the collective the reach now admits: {}",
+            refusal.reason
+        );
+    }
+
+    /// The traceability half of the same refusal: the collective it named, and
+    /// the reach declaration it read, each read back from a record. A
+    /// doorway-local list could produce neither.
+    #[test]
+    fn an_anonymous_refusal_points_at_the_collective_and_the_declaration() {
+        let refusal = fold(
+            Some("local"),
+            &contract(vec![household()]),
+            &RequesterStanding::anonymous(),
+        )
+        .refusal()
+        .cloned()
+        .expect("anonymous must be refused");
+
+        let collective = refusal
+            .collective
+            .as_ref()
+            .expect("a reach that names an audience must name it as a record");
+        assert_eq!(collective.id, "collective-dowell-household");
+        assert_eq!(collective.label.as_deref(), Some("the Dowell household"));
+        assert_eq!(
+            collective.record, "/db/collectives/collective-dowell-household",
+            "the named collective is dereferenceable on the doorway that refused"
+        );
+        assert_eq!(
+            refusal.declared_in.as_deref(),
+            Some("/api/v1/commitments/commitment-abc"),
+            "the refusal points at the reach declaration it actually read"
+        );
+    }
+
+    /// …and says nothing it holds no record for. A reach that names no
+    /// audience yields no collective — the doorway does not invent one to fill
+    /// the field, and the sentence falls back to the one that claims less.
+    #[test]
+    fn a_reach_that_names_nobody_yields_no_collective() {
+        let refusal = fold(
+            Some("local"),
+            &contract(vec![]),
+            &RequesterStanding::anonymous(),
+        )
+        .refusal()
+        .cloned()
+        .expect("anonymous must be refused");
+        assert!(refusal.collective.is_none());
+        assert!(
+            refusal
+                .reason
+                .contains("does not admit a visitor who has shown nothing"),
+            "the fallback sentence still names reach and still offers the way back in: {}",
+            refusal.reason
+        );
+        // The declaration is still traceable — that half never depends on an
+        // audience being declared.
+        assert_eq!(
+            refusal.declared_in.as_deref(),
+            Some("/api/v1/commitments/commitment-abc")
+        );
+    }
+
+    /// A record id is not a URL path component by construction, so the routes a
+    /// refusal points at are encoded rather than spliced.
+    #[test]
+    fn record_routes_encode_the_ids_they_carry() {
+        let odd = AudienceTerm {
+            id: "collective/with space".into(),
+            label: None,
+        };
+        assert_eq!(
+            collective_ref(&odd).record,
+            "/db/collectives/collective%2Fwith%20space"
+        );
+        assert_eq!(
+            declaration_record("   "),
+            None,
+            "no id, no record to point at"
+        );
+    }
+
+    /// The fold's answer is stated on BOTH sides: a serve says which reach
+    /// admitted it, in the same sentence shape a refusal uses.
+    #[test]
+    fn an_admitted_serve_states_the_reach_that_admitted_it() {
+        assert_eq!(
+            admitted_standing_value("household"),
+            "admitted;reach=household"
+        );
+        assert_eq!(
+            admitted_standing_value("local\r\nx-injected: 1"),
+            "admitted;reach=undeclared",
+            "a projection row is not a place to trust bytes from, on this side either"
+        );
+
+        let mut served = Response::builder()
+            .status(StatusCode::OK)
+            .body(Full::new(Bytes::from_static(b"<html>")))
+            .unwrap();
+        stamp_admitted_standing(&mut served, "household");
+        assert_eq!(
+            served
+                .headers()
+                .get(STANDING_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("admitted;reach=household")
+        );
+
+        // A relayed answer already carries the HOLDER's standing: the courier
+        // does not restate it in its own voice.
+        let mut relayed = Response::builder()
+            .status(StatusCode::OK)
+            .header(STANDING_HEADER, "admitted;reach=household")
+            .body(Full::new(Bytes::from_static(b"<html>")))
+            .unwrap();
+        stamp_admitted_standing(&mut relayed, "commons");
+        assert_eq!(
+            relayed
+                .headers()
+                .get(STANDING_HEADER)
+                .and_then(|v| v.to_str().ok()),
+            Some("admitted;reach=household"),
+            "the holder's own statement survives the hop"
+        );
+
+        // A shed is the byte path's answer about itself, not a statement about
+        // this requester's standing.
+        let mut shed = Response::builder()
+            .status(StatusCode::SERVICE_UNAVAILABLE)
+            .body(Full::new(Bytes::from_static(b"{}")))
+            .unwrap();
+        stamp_admitted_standing(&mut shed, "household");
+        assert!(
+            shed.headers().get(STANDING_HEADER).is_none(),
+            "a doorway does not label its own shed 'admitted'"
+        );
     }
 
     /// SCENARIO 2's pair, at the unit: Matthew and James differ in EXACTLY one
@@ -905,6 +1206,15 @@ mod tests {
         assert!(json["reason"].as_str().is_some_and(|r| !r.is_empty()));
         assert_eq!(json["epr"], "community-garden-club");
         assert_eq!(json["contract"], "commitment-abc");
+        // The wire shape a chrome reads: who the reach now names, and where
+        // both that collective and the declaration itself read back.
+        assert_eq!(json["collective"]["id"], "collective-dowell-household");
+        assert_eq!(json["collective"]["label"], "the Dowell household");
+        assert_eq!(
+            json["collective"]["record"],
+            "/db/collectives/collective-dowell-household"
+        );
+        assert_eq!(json["declaredIn"], "/api/v1/commitments/commitment-abc");
     }
 
     /// A projection row is not a place to trust bytes from: a reach carrying
@@ -934,6 +1244,8 @@ mod tests {
             hear: WHERE_TO_BE_HEARD,
             epr: "e".into(),
             contract: "c".into(),
+            collective: None,
+            declared_in: None,
         };
         let response = refusal_response(&refusal);
         assert_eq!(
