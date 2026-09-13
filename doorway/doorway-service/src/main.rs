@@ -17,8 +17,8 @@ use doorway::{
     nats::NatsClient,
     orchestrator::{Orchestrator, OrchestratorConfig, OrchestratorState},
     projection::{
-        spawn_engine_task, spawn_subscriber, EngineConfig, EprRouter, FallbackOutcome,
-        ProjectionEngine, ProjectionSignal, SubscriberConfig,
+        spawn_engine_task, spawn_subscriber, EngineConfig, EprRouter, FallbackInstallOutcome,
+        FallbackOutcome, ProjectionEngine, ProjectionSignal, SubscriberConfig,
     },
     server,
     services::{
@@ -1512,8 +1512,14 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
             .as_deref()
             .unwrap_or(&node_id_str)
             .to_string();
+        // The SAME configured storage pool (`storage_url` primary + `storage_urls`
+        // fallbacks) the periodic `DOORWAY_EPR_REFRESH_SECS` task below consults — so a
+        // `projection.revoked` event's own re-fetch gets the same resilience-with-shield
+        // as the periodic path (`EprRouter::install_from_fallback`), never the bare
+        // single-target fetch this used to be.
+        let subscriber_pool_urls = epr_storage_pool(&state.args);
         let _events_handle = doorway::projection::storage_events_subscriber::spawn_subscriber_task(
-            storage_url.clone(),
+            subscriber_pool_urls,
             doorway_id,
             state.app_file_cache.clone(),
             Arc::clone(&state.epr_router),
@@ -1859,47 +1865,39 @@ fn apply_epr_fallback_outcome(
     router: &EprRouter,
     phase: &str,
 ) {
-    match outcome {
-        FallbackOutcome::PrimaryNonEmpty { url, projections } => {
-            // This IS THIS doorway's own primary — always authoritative.
-            // Whatever it confirms live must never stay revocation-shielded
-            // (a prior revoke-then-reactivate must be observable immediately).
-            // See `EprRouter::mark_revoked`'s doc.
-            for p in &projections {
-                router.clear_revoked(&p.commitment_id);
-            }
+    // ALL classification + shielding lives in `EprRouter::install_from_fallback` — see
+    // that method's doc for why a caller must never match on `FallbackOutcome` and call
+    // `replace_all` directly. This function's only job is logging.
+    match router.install_from_fallback(outcome) {
+        FallbackInstallOutcome::Primary {
+            url,
+            installed,
+            rejected,
+        } => {
             // Log the POST-validation truth: a fetched batch may install fewer
             // rows than it carried (poisoned rows skipped per-row). Reporting
             // `installed` (not the input length) is the Fix-2 observability seam.
-            let outcome = router.replace_all(projections);
             info!(
                 phase,
-                installed = outcome.installed,
-                rejected = outcome.rejected,
+                installed,
+                rejected,
                 doorway_id = %doorway_id,
                 serving_url = %url,
                 "EPR router: loaded projections from primary storage"
             );
         }
-        FallbackOutcome::PeerServed {
+        FallbackInstallOutcome::Peer {
             primary_url,
             primary_empty,
             serving_url,
-            projections,
+            installed,
+            rejected,
+            shielded,
         } => {
-            // A PEER's answer, never this doorway's own primary — shield out
-            // any commitment THIS doorway's own storage told us (via a
-            // `projection.revoked` SSE event) was revoked, so a sibling's
-            // stale DHT-replicated echo can never resurrect it here. See
-            // `EprRouter::mark_revoked`'s doc for why this exists (the apex
-            // adam/matthew resilience case this fallback exists for never
-            // revokes, so it is unaffected).
-            let (projections, shielded) = router.filter_recently_revoked(projections);
-            let outcome = router.replace_all(projections);
             warn!(
                 phase,
-                installed = outcome.installed,
-                rejected = outcome.rejected,
+                installed,
+                rejected,
                 shielded_from_revocation = shielded,
                 doorway_id = %doorway_id,
                 primary_url = %primary_url,
@@ -1909,10 +1907,7 @@ fn apply_epr_fallback_outcome(
                  supplied them. Router is serving via the fallback peer — heal the primary."
             );
         }
-        FallbackOutcome::AllEmpty { urls_tried } => {
-            // Genuine empty state — every pool member returned 0 rows. Replace
-            // (an honest empty router) and log at INFO.
-            router.replace_all(Vec::new());
+        FallbackInstallOutcome::AllEmpty { urls_tried } => {
             info!(
                 phase,
                 doorway_id = %doorway_id,
@@ -1921,12 +1916,10 @@ fn apply_epr_fallback_outcome(
                  genuine empty state, router cleared"
             );
         }
-        FallbackOutcome::AllUnreachable {
+        FallbackInstallOutcome::AllUnreachable {
             urls_tried,
             last_error,
         } => {
-            // Total fetch failure — preserve the last-good table (never clear on
-            // transient unavailability).
             warn!(
                 phase,
                 doorway_id = %doorway_id,

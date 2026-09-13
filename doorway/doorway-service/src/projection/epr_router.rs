@@ -151,6 +151,46 @@ pub enum FallbackOutcome {
     },
 }
 
+/// The post-validation, post-shield truth of routing a [`FallbackOutcome`] through
+/// [`EprRouter::install_from_fallback`] — carries everything a caller needs to log its
+/// OWN message (the two call sites — `main.rs`'s periodic refresh and
+/// `storage_events_subscriber`'s SSE-triggered sync — log at different levels with
+/// different fields) without re-deriving the shield decision itself.
+///
+/// THIS is "the one place" every consumer of a `FallbackOutcome` must route through —
+/// see `install_from_fallback`'s own doc. A caller that matches on `FallbackOutcome`
+/// directly and calls `replace_all` itself bypasses the revocation shield entirely; that
+/// bypass is exactly the 2026-09-13 name-routing scenario-4 defect class, and is why this
+/// type exists instead of leaving the match arms duplicated per caller.
+#[derive(Debug)]
+pub enum FallbackInstallOutcome {
+    /// The primary answered with an installable batch — trusted unconditionally.
+    Primary {
+        url: String,
+        installed: usize,
+        rejected: usize,
+    },
+    /// A pool peer's answer, consulted only because the primary itself answered empty
+    /// or errored — passed through the revocation shield before installing.
+    Peer {
+        primary_url: String,
+        primary_empty: bool,
+        serving_url: String,
+        installed: usize,
+        rejected: usize,
+        shielded: usize,
+    },
+    /// Every pool member genuinely, successfully answered empty — the router was
+    /// replaced with an honest empty table.
+    AllEmpty { urls_tried: Vec<String> },
+    /// Every pool member was unreachable — the router's last-good table was preserved
+    /// (nothing was installed or cleared).
+    AllUnreachable {
+        urls_tried: Vec<String>,
+        last_error: String,
+    },
+}
+
 /// Consult an ordered pool of storage base URLs for active project-epr
 /// projections, falling back through the pool when the primary is empty or
 /// unreachable.
@@ -531,6 +571,98 @@ impl EprRouter {
             }
         }
         (kept, shielded)
+    }
+
+    /// Install a fetched batch, applying the revocation shield in the direction that
+    /// matches WHO the batch came from — the one mechanical step both
+    /// [`Self::install_from_fallback`] arms below share.
+    ///
+    /// `is_peer_sourced = false` (this doorway's own primary/authoritative storage,
+    /// whatever the call site — a periodic pool-fallback `PrimaryNonEmpty`, a boot fetch,
+    /// or `storage_events_subscriber`'s SSE-triggered sync): every commitment it confirms
+    /// live clears the shield first (`clear_revoked`), then installs unconditionally. See
+    /// `mark_revoked`'s doc for why an immediate, unconditional clear here is correct — a
+    /// genuine reactivation must be observable right away, never held behind the shield's
+    /// TTL.
+    ///
+    /// `is_peer_sourced = true` (a pool peer, consulted only because the primary itself
+    /// answered empty or errored): the batch is filtered through the shield
+    /// (`filter_recently_revoked`) BEFORE installing, so a commitment this doorway's own
+    /// storage explicitly revoked can never be resurrected by a peer's not-yet-caught-up
+    /// replica.
+    fn install_projections(
+        &self,
+        projections: Vec<EprProjectionView>,
+        is_peer_sourced: bool,
+    ) -> (ReplaceOutcome, usize) {
+        let (to_install, shielded) = if is_peer_sourced {
+            self.filter_recently_revoked(projections)
+        } else {
+            for p in &projections {
+                self.clear_revoked(&p.commitment_id);
+            }
+            (projections, 0)
+        };
+        (self.replace_all(to_install), shielded)
+    }
+
+    /// THE single place every consumer of a [`FallbackOutcome`] must route through to
+    /// turn it into an installed router table. Never match on a `FallbackOutcome` and
+    /// call [`Self::replace_all`] directly at a call site — that bypasses the revocation
+    /// shield for a `PeerServed` batch, which is precisely the 2026-09-13 name-routing
+    /// scenario-4 defect class (a doorway's own explicit revoke, resurrected by a
+    /// sibling's not-yet-caught-up DHT replica) — and this method is what makes that
+    /// bypass impossible for a third caller to introduce by accident: there is exactly
+    /// one way to consume a `FallbackOutcome`, and it always shields.
+    ///
+    /// Returns a [`FallbackInstallOutcome`] carrying everything the caller needs to log
+    /// its own message; this method does no logging itself; different call sites
+    /// (`main.rs`'s periodic refresh, `storage_events_subscriber`'s SSE-triggered sync)
+    /// log at different levels with different fields.
+    pub fn install_from_fallback(&self, outcome: FallbackOutcome) -> FallbackInstallOutcome {
+        match outcome {
+            FallbackOutcome::PrimaryNonEmpty { url, projections } => {
+                let (result, _shielded_always_zero) = self.install_projections(projections, false);
+                FallbackInstallOutcome::Primary {
+                    url,
+                    installed: result.installed,
+                    rejected: result.rejected,
+                }
+            }
+            FallbackOutcome::PeerServed {
+                primary_url,
+                primary_empty,
+                serving_url,
+                projections,
+            } => {
+                let (result, shielded) = self.install_projections(projections, true);
+                FallbackInstallOutcome::Peer {
+                    primary_url,
+                    primary_empty,
+                    serving_url,
+                    installed: result.installed,
+                    rejected: result.rejected,
+                    shielded,
+                }
+            }
+            FallbackOutcome::AllEmpty { urls_tried } => {
+                // Genuine empty state — every pool member returned 0 rows. Replace with
+                // an honest empty table; nothing to shield (there is nothing to install).
+                self.replace_all(Vec::new());
+                FallbackInstallOutcome::AllEmpty { urls_tried }
+            }
+            FallbackOutcome::AllUnreachable {
+                urls_tried,
+                last_error,
+            } => {
+                // Total fetch failure — preserve the last-good table (never clear on
+                // transient unavailability). No install call at all.
+                FallbackInstallOutcome::AllUnreachable {
+                    urls_tried,
+                    last_error,
+                }
+            }
+        }
     }
 
     /// Dispatch a request → the projection that answers for this `host` at this
