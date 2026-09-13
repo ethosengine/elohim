@@ -665,7 +665,7 @@ mod tests {
             assert_eq!(select_target_cell(&cells, target).unwrap(), clone_id);
         }
         assert!(select_target_cell(&cells, "lamad.missing").is_err());
-        assert!(select_target_cell(&[base.clone()], "lamad.fixtures").is_err());
+        assert!(select_target_cell(&cells[..1], "lamad.fixtures").is_err());
         assert!(select_target_cell(&[clone.clone(), clone.clone()], "lamad.fixtures").is_err());
         let CellInfo::Cloned(mut disabled) = clone else {
             unreachable!()

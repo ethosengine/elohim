@@ -194,14 +194,33 @@ pub fn handle_post(body_bytes: &[u8]) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, MutexGuard};
 
     /// The shaded set is process-global, so these tests serialise against each
     /// other rather than racing under the default parallel test harness — the
     /// same discipline that keeps hot-path env vars out of tests.
-    fn guard() -> MutexGuard<'static, ()> {
-        static LOCK: Mutex<()> = Mutex::new(());
-        let g = LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    ///
+    /// A `tokio::sync::Mutex` (not `std::sync::Mutex`) because the async tests
+    /// below hold this guard across `.await` points for the whole test body —
+    /// that's the serialisation guarantee working as intended, not a bug — and
+    /// only an async-aware lock lets a guard span an await without tripping
+    /// `clippy::await_holding_lock`'s deadlock-shape lint (a std guard held
+    /// across an await can park the executor thread while still holding the
+    /// lock; tokio's guard cooperates with the runtime instead).
+    static LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    /// Guard for plain `#[test]` (synchronous) functions.
+    fn guard() -> tokio::sync::MutexGuard<'static, ()> {
+        let g = LOCK.blocking_lock();
+        // Every test starts from the un-shaded state regardless of what the
+        // previous one left behind.
+        let _ = set_shaded(PROJECT_EPR, false);
+        g
+    }
+
+    /// Guard for `#[tokio::test]` (async) functions — awaits the lock instead
+    /// of blocking the runtime thread for it.
+    async fn guard_async() -> tokio::sync::MutexGuard<'static, ()> {
+        let g = LOCK.lock().await;
         // Every test starts from the un-shaded state regardless of what the
         // previous one left behind.
         let _ = set_shaded(PROJECT_EPR, false);
@@ -275,7 +294,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_reflects_the_current_state() {
-        let _g = guard();
+        let _g = guard_async().await;
 
         let (status, value) = json_of(handle_get()).await;
         assert_eq!(status, 200);
@@ -289,7 +308,7 @@ mod tests {
 
     #[tokio::test]
     async fn post_arms_disarms_and_400s_on_an_unknown_kind() {
-        let _g = guard();
+        let _g = guard_async().await;
 
         let (status, value) =
             json_of(handle_post(br#"{"kind":"project-epr","shaded":true}"#)).await;
@@ -317,7 +336,7 @@ mod tests {
 
     #[tokio::test]
     async fn malformed_body_is_a_400() {
-        let _g = guard();
+        let _g = guard_async().await;
         let (status, _) = json_of(handle_post(b"not json")).await;
         assert_eq!(status, 400);
     }
@@ -333,7 +352,7 @@ mod tests {
             create_commitment, find_active_projections, CreateReaCommitmentInput,
         };
 
-        let _g = guard();
+        let _g = guard_async().await;
 
         let pool = crate::test_util::test_pool();
         let ctx = AppContext::default_lamad();
@@ -421,7 +440,7 @@ mod tests {
     /// not a shaded empty 200.
     #[tokio::test]
     async fn shading_does_not_swallow_parameter_validation() {
-        let _g = guard();
+        let _g = guard_async().await;
         set_shaded(PROJECT_EPR, true).unwrap();
 
         let blob_store = std::sync::Arc::new(
