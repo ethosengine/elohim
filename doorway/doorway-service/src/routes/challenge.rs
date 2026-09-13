@@ -321,6 +321,10 @@ pub async fn handle_challenge_post(
         "challengeId": reference,
         "term": TERM_REACH,
         "reach": projection.reach,
+        // The DECLARED term, verbatim — so a read-back can present the same
+        // form the POST answer did, rather than storage's chain-root-resolved
+        // `provider`. See owed_response::OwedResponse::party_record.
+        "party": owed.party,
         "partyLabel": owed.party_label,
         "withinHours": owed.within_hours,
         "declaredBy": owed.declared_by,
@@ -434,31 +438,7 @@ pub async fn handle_challenge_read(
             .map(|deadline| !finished && Utc::now() > deadline.with_timezone(&Utc))
     });
 
-    let owed = metadata
-        .get("withinHours")
-        .and_then(serde_json::Value::as_u64)
-        .map(|hours| OwedResponse {
-            party: row
-                .get("provider")
-                .and_then(|p| p.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            party_label: metadata
-                .get("partyLabel")
-                .and_then(|l| l.as_str())
-                .map(str::to_string),
-            within_hours: u32::try_from(hours).unwrap_or(u32::MAX),
-            declared_by: metadata
-                .get("declaredBy")
-                .and_then(|d| d.as_str())
-                .unwrap_or_default()
-                .to_string(),
-            declared_at: metadata
-                .get("declaredAt")
-                .and_then(|d| d.as_str())
-                .unwrap_or_default()
-                .to_string(),
-        });
+    let owed = owed_from_read_back(&metadata, row.get("provider").and_then(|p| p.as_str()));
 
     json_response(
         StatusCode::OK,
@@ -486,6 +466,54 @@ pub async fn handle_challenge_read(
             served_by,
         },
     )
+}
+
+/// Reconstruct the owed term from a commitment's own metadata, for the read
+/// path.
+///
+/// `party` is read from `metadata.party` — the DECLARED term this doorway
+/// minted, the same value the POST answer carried. It is NEVER read from
+/// `resolved_provider` (storage's chain-root-resolved `provider`, e.g.
+/// `collective:uhCkk…`): the POST and GET answers must agree on what the
+/// collective actually declared, or a reader who saw `household-dowell` at
+/// challenge time would see a different party reading the same record back.
+/// `resolved_provider` is still exposed, on [`OwedResponse::party_record`], so
+/// nothing about the resolved identity is hidden — it is just never
+/// substituted for the declared one.
+///
+/// Falls back to `resolved_provider` only for records minted before `party`
+/// rode the metadata, so an old challenge still shows a party rather than an
+/// empty string. `None` when the metadata carries no `withinHours` at all —
+/// a record that never witnessed a redress term.
+fn owed_from_read_back(
+    metadata: &serde_json::Value,
+    resolved_provider: Option<&str>,
+) -> Option<OwedResponse> {
+    let hours = metadata.get("withinHours")?.as_u64()?;
+    Some(OwedResponse {
+        party: metadata
+            .get("party")
+            .and_then(|p| p.as_str())
+            .map(str::to_string)
+            .or_else(|| resolved_provider.map(str::to_string))
+            .unwrap_or_default(),
+        party_label: metadata
+            .get("partyLabel")
+            .and_then(|l| l.as_str())
+            .map(str::to_string),
+        within_hours: u32::try_from(hours).unwrap_or(u32::MAX),
+        declared_by: metadata
+            .get("declaredBy")
+            .and_then(|d| d.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        declared_at: metadata
+            .get("declaredAt")
+            .and_then(|d| d.as_str())
+            .unwrap_or_default()
+            .to_string(),
+        party_record: resolved_provider.map(str::to_string),
+    })
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -764,6 +792,7 @@ mod tests {
             within_hours: 72,
             declared_by: "/api/v1/commitments/project-epr-garden".into(),
             declared_at: "2026-09-01T00:00:00Z".into(),
+            party_record: None,
         };
         let body = ChallengeAnswer {
             outcome: ChallengeOutcome::Witnessed,
@@ -799,5 +828,103 @@ mod tests {
         assert!(route.starts_with("/api/v1/commitments/"));
         assert!(!route.contains(' '));
         assert!(!route.contains("/../"));
+    }
+
+    // ── the read-back must agree with the POST answer on WHO owes ───────────
+
+    fn minted_metadata() -> serde_json::Value {
+        serde_json::json!({
+            "challengeId": "ref-1",
+            "term": TERM_REACH,
+            "reach": "private",
+            "party": "household-dowell",
+            "partyLabel": "the Dowell household",
+            "withinHours": 72,
+            "declaredBy": "/api/v1/commitments/project-epr-garden",
+            "declaredAt": "2026-09-01T00:00:00Z",
+            "carriedBy": "apex-elohim-host",
+        })
+    }
+
+    /// The bug this module fixed: storage projects `provider` as its own
+    /// chain-root-resolved identity (`collective:uhCkk…`), but a reader who
+    /// saw `household-dowell` in the POST answer must see the SAME value
+    /// reading the record back — never storage's resolved form silently
+    /// substituted in.
+    #[test]
+    fn the_read_back_party_is_the_declared_form_not_storages_resolved_one() {
+        let owed = owed_from_read_back(
+            &minted_metadata(),
+            Some("collective:uhCkkD_glcbk_ztLuRoi2UnrwONNXFmY3TdsksRUPUi3WR9v3k6mo"),
+        )
+        .expect("the metadata carries a term");
+        assert_eq!(
+            owed.party, "household-dowell",
+            "the read-back must present the DECLARED party, matching the POST answer"
+        );
+        assert_eq!(
+            owed.party_record.as_deref(),
+            Some("collective:uhCkkD_glcbk_ztLuRoi2UnrwONNXFmY3TdsksRUPUi3WR9v3k6mo"),
+            "storage's resolved identity is exposed, not hidden — just never substituted for party"
+        );
+    }
+
+    /// A record minted before `party` rode the metadata (pre-fix) still shows
+    /// a party — storage's resolved form — rather than an empty string.
+    #[test]
+    fn a_record_minted_before_party_rode_the_metadata_falls_back_to_the_resolved_form() {
+        let mut metadata = minted_metadata();
+        metadata.as_object_mut().unwrap().remove("party");
+        let owed = owed_from_read_back(&metadata, Some("collective:uhCkkOldRecord"))
+            .expect("the metadata still carries a term");
+        assert_eq!(owed.party, "collective:uhCkkOldRecord");
+        assert_eq!(
+            owed.party_record.as_deref(),
+            Some("collective:uhCkkOldRecord")
+        );
+    }
+
+    /// A record with no redress term at all (no `withinHours`) reads back as
+    /// no owed term — never a partially-filled one.
+    #[test]
+    fn no_within_hours_means_no_owed_term_on_read_back() {
+        assert!(owed_from_read_back(&serde_json::json!({}), None).is_none());
+    }
+
+    /// The POST mint and the GET read-back must construct the SAME `party`
+    /// from the same contract — end to end through the metadata this module
+    /// writes and reads.
+    #[test]
+    fn the_minted_metadata_and_the_read_back_owed_agree_on_party() {
+        let owed = OwedResponse {
+            party: "household-dowell".into(),
+            party_label: Some("the Dowell household".into()),
+            within_hours: 72,
+            declared_by: "/api/v1/commitments/project-epr-garden".into(),
+            declared_at: "2026-09-01T00:00:00Z".into(),
+            party_record: None,
+        };
+        let carried_by = "apex-elohim-host".to_string();
+        // The exact metadata literal handle_challenge_post writes at mint time.
+        let metadata = serde_json::json!({
+            "challengeId": "ref-1",
+            "term": TERM_REACH,
+            "reach": "private",
+            "party": owed.party,
+            "partyLabel": owed.party_label,
+            "withinHours": owed.within_hours,
+            "declaredBy": owed.declared_by,
+            "declaredAt": owed.declared_at,
+            "carriedBy": carried_by,
+        });
+        let read_back = owed_from_read_back(
+            &metadata,
+            Some("collective:uhCkkD_glcbk_ztLuRoi2UnrwONNXFmY3TdsksRUPUi3WR9v3k6mo"),
+        )
+        .expect("the metadata carries a term");
+        assert_eq!(
+            read_back.party, owed.party,
+            "the POST answer and the GET read-back must agree on owed.party"
+        );
     }
 }

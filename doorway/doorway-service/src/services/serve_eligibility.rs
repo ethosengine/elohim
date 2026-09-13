@@ -1298,6 +1298,7 @@ mod tests {
             within_hours: 72,
             declared_by: "/api/v1/commitments/commitment-abc".into(),
             declared_at: "2026-09-01T00:00:00Z".into(),
+            party_record: None,
         });
         let verdict = fold(Some("local"), &terms, &RequesterStanding::anonymous());
         let refusal = verdict.refusal().expect("anonymous must be refused");

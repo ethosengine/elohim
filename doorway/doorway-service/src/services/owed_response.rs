@@ -72,7 +72,11 @@ const COMMITMENT_RECORD_ROUTE: &str = "/api/v1/commitments/";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OwedResponse {
-    /// WHO owes the answer — copied verbatim from the contract's declaration.
+    /// WHO owes the answer — copied verbatim from the contract's declaration
+    /// (e.g. `household-dowell`), NEVER storage's chain-root-resolved form.
+    /// The POST answer and the GET read-back must agree on this value, because
+    /// it is the term the collective actually declared — [`Self::party_record`]
+    /// is where the resolved identity lives, kept separate on purpose.
     pub party: String,
     /// The name a person would use for them, when the contract holds one.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -85,6 +89,13 @@ pub struct OwedResponse {
     pub declared_by: String,
     /// When that record was written. Strictly before any challenge against it.
     pub declared_at: String,
+    /// Storage's chain-root-resolved identity for `party` (e.g.
+    /// `collective:uhCkk…`), when a read-back has one to show. `None` at mint
+    /// time — minting only ever carries the declared term, never storage's
+    /// resolution of it. Exposed so nothing about the resolved identity is
+    /// hidden, but never substituted for `party`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub party_record: Option<String>,
 }
 
 /// The declared redress term for a projection, or `None` when the collective
@@ -115,6 +126,9 @@ pub fn owed_from_contract(projection: &EprProjectionView) -> Option<OwedResponse
             urlencoding::encode(projection.commitment_id.trim())
         ),
         declared_at: projection.seeded_at.clone(),
+        // Minting never consults storage's resolution — only a read-back has
+        // one to show.
+        party_record: None,
     })
 }
 
