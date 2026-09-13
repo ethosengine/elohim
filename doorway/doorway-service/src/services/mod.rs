@@ -17,6 +17,8 @@
 //! - **DIDResolver**: W3C DID resolution for doorway federation
 //! - **NameRouting**: registry fold + one-hop federated relay for a name this
 //!   doorway does not serve (Category C, Operational)
+//! - **ServeReceipt**: the fair-trade receipt — a READING of the REA
+//!   commitments that already account for a serve (Category C, nothing minted)
 //! - **ServeEligibility**: the reach + standing terms of the serving fold,
 //!   re-asked at serve time on every cached path (Category C, Operational —
 //!   nothing is stored, the fold is resolved from the live projection)
@@ -37,6 +39,7 @@ pub mod recording;
 pub mod route_registry;
 pub mod self_uptime;
 pub mod serve_eligibility;
+pub mod serve_receipt;
 pub mod shard_resolver;
 pub mod storage_registration;
 pub mod verification;
@@ -86,6 +89,10 @@ pub use serve_eligibility::{
     fold_for_projection, serve_eligibility, stamp_admitted_standing, standing_from_request,
     AudienceTerm, CollectiveRef, ContractTerms, ReachClass, Refusal, RequesterStanding,
     ServeEligibility, ServeRequest, STANDING_HEADER, WHERE_TO_BE_HEARD,
+};
+pub use serve_receipt::{
+    build_receipt, receipt_header_value, stamp_receipt, ChallengeOutcome, Credit, CreditRole,
+    ExchangeClause, HeldClause, ProjectedClause, Receipt, RECEIPT_HEADER, RECEIPT_ROUTE_PREFIX,
 };
 pub use shard_resolver::{
     BlobResolution, ResolvedBlob, ResolverStats, ShardLocation, ShardManifest, ShardResolver,

@@ -3280,3 +3280,135 @@ decisionPoints:
       - path: doorway/doorway-service/src/conductor/registry.rs
         testName: any_spelling_of_a_key_finds_the_conductor_and_deprovisions_it
         kind: unit
+
+  - name: build_receipt
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/serve_receipt.rs
+      modulePath: services::serve_receipt::build_receipt
+      line: 308
+    summary: >
+      Decides what a fair-trade receipt may SAY about one serve, given the three REA clauses a
+      caller could read off the ledger (`hosting-agreement`, `project-epr`, `operate-doorway`):
+      a clause that is present becomes a credit or an exchange carrying the route that reads its
+      record back; a clause that is absent stays null AND has its name pushed into `unrecorded`.
+    notes: >
+      Authority semantics, hence verdict-fn rather than pure-decision-predicate: this is the one
+      place that may attribute economic credit for a serve, and the failure it exists to refuse
+      is a doorway crediting ITSELF for a holder's work. It mints nothing — the receipt is a
+      Category-C reading of commitments notarized before the request arrived. The per-serve
+      serve-blob EconomicEvent the naive shape would write was refused at the design gate
+      (10^4-10^6 heads/year against a plane whose measured anchor is ~3,469 heads); the successor
+      is one periodic aggregated event fulfilling the hosting agreement, so this function names
+      who was CREDITED and never who was SERVED.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          A missing record is reported twice — null in its own field and its NAME in
+          `unrecorded` — so absence can be neither read as "nothing was owed" nor papered over
+          with a synthesized number. a_missing_clause_is_null_and_named_never_invented and
+          a_receipt_with_nothing_to_say_names_all_three_absences pin both directions, and
+          a_complete_receipt_names_no_absence is the anti-vacuity half.
+      - id: C7
+        status: answered
+        justification: >
+          Advertise/serve symmetry: every clause the receipt advertises dereferences to the
+          commitment it names. every_credit_reads_back_to_the_record_it_names asserts the record
+          route against an independently-written literal prefix, not against the builder's own
+          helper.
+    contractTests:
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: a_missing_clause_is_null_and_named_never_invented
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: a_missing_holder_never_becomes_the_doorways_own_credit
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: a_receipt_with_nothing_to_say_names_all_three_absences
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: a_complete_receipt_names_no_absence
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: every_credit_reads_back_to_the_record_it_names
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: the_holder_and_the_doorway_are_credited_separately
+        kind: unit
+
+  - name: Receipt
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/services/serve_receipt.rs
+      modulePath: services::serve_receipt::Receipt
+      line: 178
+    summary: >
+      The chrome-facing answer type for GET /api/v1/receipt/{eprId}: a lead `sentence` in plain
+      words, the `exchanged` clause, one `credits` entry per role, the `unrecorded` names of
+      whatever had no record, and `protocolForm` — the one request that returns the underlying
+      commitments verbatim.
+    notes: >
+      Field ORDER is load-bearing: `sentence` is declared first so it is the first thing the
+      serialized receipt says. The story's one machine-checkable half of "written in the words a
+      friend would use" is exactly that no protocol identifier leads.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          The type cannot represent a silent absence: a missing clause is Option::None AND a name
+          in `unrecorded`, and is_complete() reads the second, not the first.
+          the_lead_sentence_names_no_identifier_and_the_protocol_form_is_one_request_away
+          additionally pins that the precise form stays reachable in one request rather than
+          being inlined as the first thing said.
+    contractTests:
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: the_lead_sentence_names_no_identifier_and_the_protocol_form_is_one_request_away
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: the_receipt_names_what_was_given_in_exchange
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: a_complete_receipt_names_no_absence
+        kind: unit
+
+  - name: ChallengeOutcome
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/services/serve_receipt.rs
+      modulePath: services::serve_receipt::ChallengeOutcome
+      line: 220
+    summary: >
+      The closed vocabulary of what a visitor's challenge to a standing BECAME — witnessed (201),
+      heard but nothing owed because the contract declares no responsive-reach term (200), replay
+      of a challenge already standing (200), anonymous (401), a different challenge under the
+      same reference (409), or shed (503) — each carrying its own status and its own reason in
+      words.
+    notes: >
+      Closed at birth deliberately: a reader can enumerate every arm POST /api/v1/challenge can
+      take without running one. The two 200s are the interesting pair — a replay STANDS on the
+      ledger and a nothing-owed names nobody as owing, and collapsing them would let a doorway
+      appear to have witnessed a challenge the collective never agreed to answer.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          NothingOwed is a first-class outcome rather than a silent empty field, and
+          nothing_owed_is_not_witnessed_and_a_replay_is pins that it is NOT reported as
+          witnessed. An anonymous challenge is a named 401, never attribution to nobody.
+      - id: C6b
+        status: partial
+        justification: >
+          The enum NAMES the idempotent outcome (Replay), but the ensure-not-create that PRODUCES
+          it lives in routes/challenge.rs and its replay-mints-nothing-twice property is pinned
+          there, not here. This row claims only the vocabulary.
+    contractTests:
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: every_challenge_outcome_carries_its_own_status_and_reason
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: nothing_owed_is_not_witnessed_and_a_replay_is
+        kind: unit
+      - path: doorway/doorway-service/src/services/serve_receipt.rs
+        testName: challenge_outcomes_serialize_as_words_a_reader_can_match_on
+        kind: unit
