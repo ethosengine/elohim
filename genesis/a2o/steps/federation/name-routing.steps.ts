@@ -187,9 +187,25 @@ function nrtSlug(root: string): string {
 }
 
 /** The project-epr commitment's `urlPath` — no trailing slash (validator rule 4 in
- * elohim-storage's `validate_project_epr_commitment` forbids one, except for `"/"`). */
+ * elohim-storage's `validate_project_epr_commitment` forbids one, except for `"/"`).
+ *
+ * Scoped by the SCENARIO NONCE, not just `root`: every scenario in this feature stages
+ * the SAME literal root ("garden") by narrative design, and `EprRouter`'s table is keyed
+ * by `RouteKey{host, path}` — NOT by commitment_id (`doorway/doorway-service/src/
+ * projection/epr_router.rs`) — so two DIFFERENT commitments both claiming url_path
+ * "/nrt-garden" silently coexist/last-write-win at the SAME route key. Two scenarios (or
+ * two attempts of this Given step's own retry — see `STALE_REGISTRY_MAX_ATTEMPTS`'s
+ * doc) that both stage "garden" around the same wall-clock moment therefore share a
+ * mount, and a still-live OTHER contract at that shared mount can serve Jessica's ask in
+ * place of THIS scenario's own (already-cancelled) one — measured live 2026-09-13: a
+ * second `project-epr-nrt-*` commitment for "/nrt-garden", created 0.37s after this
+ * scenario's own cancel and cancelled 35s later, served the relayed ask instead of this
+ * scenario's contract, with no peer-staleness or conductor-write defect involved at all.
+ * The nonce makes every scenario's (and every attempt's — the nonce is stable across a
+ * retry of ONE scenario, see `scenarioNonce`'s doc) mount byte-for-byte unique, so no two
+ * stagings of "garden" can ever share a route key again. */
 function nrtMount(root: string): string {
-  return `/nrt-${nrtSlug(root)}`;
+  return `/nrt-${nrtSlug(root)}-${requireScenarioNonce()}`;
 }
 
 /** What Jessica actually asks for: a trailing-slash, extension-less request against the
@@ -915,6 +931,57 @@ async function waitForOwnDispatchToDrop(
   }
 }
 
+/** A single record from `GET /api/v1/commitments?action=project-epr` — the fields this
+ * file's own assertion below reads. The endpoint returns a BARE JSON array of these
+ * (`ReaCommitmentService::list` → `commitment_view`, elohim-storage), unfiltered by
+ * url_path (the generic `ReaCommitmentQuery` has no such filter — see
+ * `elohim-storage/src/db/rea_commitments.rs`'s `ReaCommitmentQuery`), so this file filters
+ * client-side. */
+interface CommitmentListRow {
+  id: string;
+  metadata?: { urlPath?: string } | null;
+}
+
+/** Regardless of how many attempts the premise took, exactly ONE project-epr commitment
+ * must exist for `mount` on `doorwayUrl` by the time the premise is done arranging —
+ * proof that no attempt (this file's own retry, or anything else) ever minted a SECOND
+ * commitment sharing this route key. `nrtMount`'s own doc names the failure this guards:
+ * two commitments at the SAME `RouteKey{host, path}` silently coexist in the doorway's
+ * `EprRouter` (last-write-wins), so a stray second row is invisible until it happens to
+ * win a dispatch race against the one this scenario is actually testing. A large limit
+ * (well past this mesh's observed project-epr row count) is used so accumulated debris
+ * from earlier runs never causes a false negative by paging past the match. */
+async function assertExactlyOneCommitmentForMount(
+  doorwayUrl: string,
+  doorwayLabel: string,
+  mount: string,
+  expectedCommitmentId: string
+): Promise<void> {
+  const res = await rawGet(`${doorwayUrl}/api/v1/commitments?action=project-epr&limit=2000`);
+  assert.equal(
+    res.status,
+    200,
+    `listing project-epr commitments on "${doorwayLabel}" to verify mount uniqueness failed: ` +
+      `HTTP ${res.status} ${res.text.slice(0, 300)}`
+  );
+  const rows = JSON.parse(res.text) as CommitmentListRow[];
+  const matches = rows.filter(r => r.metadata?.urlPath === mount);
+  assert.equal(
+    matches.length,
+    1,
+    `doorway "${doorwayLabel}" has ${matches.length} project-epr commitment(s) at mount ` +
+      `"${mount}" (ids: ${matches.map(r => r.id).join(', ') || 'none'}), expected exactly one — ` +
+      'a second commitment sharing this route key can win a dispatch race against the one this ' +
+      'scenario is testing (EprRouter is keyed by RouteKey{host, path}, not commitment_id)'
+  );
+  assert.equal(
+    matches[0]?.id,
+    expectedCommitmentId,
+    `the one project-epr commitment at mount "${mount}" on doorway "${doorwayLabel}" is ` +
+      `"${matches[0]?.id}", not this scenario's own "${expectedCommitmentId}"`
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Structured JSON log reading (doorway's tracing_subscriber::fmt::layer().json())
 // ---------------------------------------------------------------------------
@@ -1317,9 +1384,22 @@ Given(
 
     for (let attempt = 1; attempt <= STALE_REGISTRY_MAX_ATTEMPTS; attempt += 1) {
       if (staged) {
-        // A previous attempt lapsed this same row chasing a tick it then missed the
-        // margin for — bring it back live so this attempt's premise (a GENUINELY live
-        // contract at the moment `other` ticks) is real, not a leftover from attempt 1.
+        // A previous attempt's OUTCOME is unknown here: it may have already lapsed this
+        // row and confirmed the drop (the common case — the margin check itself is what
+        // failed), or it may have thrown before ever reaching `lapseContract` (the tick
+        // wait or the registry confirm timed out), leaving the row genuinely still live.
+        // Settle it to a KNOWN state — cancelled AND confirmed dropped from `holder`'s own
+        // local dispatch, using the FULL budget rather than a tick-margin remainder —
+        // before reactivating. Skipping this settle is exactly the reactivation-races-
+        // reconciliation hazard `scenarioNonce`'s own doc names: PATCHing a row back to
+        // "proposed" while its PRIOR cancel is still winding through the doorway's
+        // SSE-driven refresh can leave `holder`'s local view stuck on neither state for
+        // the remainder of `waitForLocalMount`'s budget.
+        await lapseContract(staged);
+        await waitForOwnDispatchToDrop(holder.url, holderId, root, OWN_REFRESH_BUDGET_MS);
+
+        // Now bring it back live so THIS attempt's premise (a GENUINELY live contract at
+        // the moment `other` ticks) is real, not a leftover from the previous attempt.
         const reactivated = await adminCall(
           'PATCH',
           `${staged.doorwayUrl}/api/v1/commitments/${staged.commitmentId}`,
@@ -1371,6 +1451,16 @@ Given(
               "the registry and erase the stale-holder premise before Jessica's ask can land"
           );
         }
+
+        // Never let a second, unnoticed contract at this SAME mount decide the outcome
+        // Jessica's ask is about to measure (see `nrtMount`'s doc for the mechanism this
+        // guards against — measured live 2026-09-13).
+        await assertExactlyOneCommitmentForMount(
+          holder.url,
+          holderId,
+          state.mount,
+          staged.commitmentId
+        );
         return;
       } catch (error) {
         lastFailure = error;
