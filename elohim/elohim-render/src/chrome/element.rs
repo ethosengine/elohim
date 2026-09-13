@@ -15,7 +15,7 @@
 
 pub use elohim_chrome_asset::{
     element_js_bytes, element_js_hash, element_script_path, escape_json_for_script, inject_element,
-    ChromeContext, NavLink, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
+    ChromeContext, NavLink, ReceiptLink, CONTEXT_SCRIPT_ID, ELEMENT_JS, STABLE_ELEMENT_PATH,
 };
 
 #[cfg(test)]

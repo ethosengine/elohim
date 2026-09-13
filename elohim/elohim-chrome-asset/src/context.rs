@@ -4,7 +4,8 @@
 //! fields off the inline JSON context island via `ctx.<field>` accessors in
 //! `mount(ctx)` / `buildMarkup(ctx)` / `contextFromContentNode(slug, node)`:
 //! `slug`, `title`, `theme`, `buildMarker`, `envTier`, `showEnv`,
-//! `authenticated`, `accountHref`, `showThemeToggle`, `navBack`, `navForward`.
+//! `authenticated`, `accountHref`, `showThemeToggle`, `navBack`, `navForward`,
+//! `receipt`.
 //! This struct is the single typed producer both callers (the doorway's
 //! `build_chrome_context_json`, and any future producer) construct and
 //! serialize — closing the same class of drift that shipped the resilience
@@ -72,6 +73,37 @@ pub struct ChromeContext {
     pub nav_back: Option<NavLink>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nav_forward: Option<NavLink>,
+    /// The fair-trade receipt affordance (`ctx.receipt`): the sentence the
+    /// chrome leads with and the route that reads the whole thing back.
+    ///
+    /// `None` — and therefore ABSENT from the island — whenever the response
+    /// being framed accounted for no exchange. A chrome that always rendered a
+    /// receipt line would be asserting an exchange nobody recorded, which is the
+    /// same untruth as a synthesized credit.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<ReceiptLink>,
+}
+
+/// The chrome's receipt affordance (`ctx.receipt`). The element reads `.href`
+/// (through its own `safeHref` allowlist), `.sentence` and `.label`.
+///
+/// The SENTENCE is what a person reads; the HREF is the protocol form, one
+/// request away. Putting the precise form behind a link rather than in the
+/// island is the whole "never the first thing said" discipline — and it keeps
+/// the shell serve free of a ledger read it would otherwise have to make on the
+/// hot path.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReceiptLink {
+    /// Where the full receipt is read from — relative, so it resolves against
+    /// whichever doorway framed the page.
+    pub href: String,
+    /// The words a friend would use, shown on hover / read by a screen reader.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sentence: Option<String>,
+    /// The link text. Absent lets the element use its own default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
 }
 
 impl ChromeContext {
@@ -122,6 +154,11 @@ mod tests {
                 href: "/forward".to_string(),
                 label: None,
             }),
+            receipt: Some(ReceiptLink {
+                href: "/api/v1/receipt/community-garden-club".to_string(),
+                sentence: Some("Someone kept this ready for you.".to_string()),
+                label: None,
+            }),
         };
         let v: serde_json::Value = serde_json::from_str(&ctx.to_json()).unwrap();
         assert_eq!(v["slug"], "abc");
@@ -137,6 +174,15 @@ mod tests {
         assert_eq!(v["navBack"]["label"], "Back");
         assert_eq!(v["navForward"]["href"], "/forward");
         assert!(v["navForward"].get("label").is_none());
+        assert_eq!(
+            v["receipt"]["href"],
+            "/api/v1/receipt/community-garden-club"
+        );
+        assert_eq!(v["receipt"]["sentence"], "Someone kept this ready for you.");
+        assert!(
+            v["receipt"].get("label").is_none(),
+            "an absent label lets the element use its own default rather than an empty one"
+        );
     }
 
     #[test]

@@ -1413,6 +1413,21 @@ fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCred
 /// are omitted from the wire JSON (`skip_serializing_if`), keeping the shape
 /// identical to the hand-built `serde_json::json!` this replaces.
 fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
+    build_chrome_context_json_for(path, req, None)
+}
+
+/// [`build_chrome_context_json`] plus the fair-trade receipt affordance, for a
+/// serve that IS a projected EPR and therefore has an exchange to account for.
+///
+/// The island carries only the SENTENCE and the route — never the credits
+/// themselves. Two reasons, and they are the same reason: the precise form must
+/// be one request away rather than the first thing said, and a shell serve must
+/// not pay for a ledger read on the hot path to render one chrome line.
+fn build_chrome_context_json_for<B>(
+    path: &str,
+    req: &Request<B>,
+    receipt_for_epr: Option<&str>,
+) -> String {
     const LANDING_SLUG: &str = "elohim-host-landing";
     let trimmed = path.trim_end_matches('/');
     let slug = if trimmed.is_empty() {
@@ -1425,9 +1440,22 @@ fn build_chrome_context_json<B>(path: &str, req: &Request<B>) -> String {
             .to_string()
     };
     let authenticated = build_ssr_user_credential(req).is_some();
+    let receipt = receipt_for_epr
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(|epr_id| elohim_render::ReceiptLink {
+            href: crate::services::serve_receipt::receipt_header_value(epr_id),
+            sentence: Some(
+                "Someone kept this ready and someone put it in front of you — \
+                 see who was credited for that."
+                    .to_string(),
+            ),
+            label: None,
+        });
     elohim_render::ChromeContext {
         slug,
         authenticated,
+        receipt,
         ..Default::default()
     }
     .to_json()
@@ -3436,6 +3464,7 @@ async fn dispatch_to_projected_epr(
     // the relay's `x-elohim-served-by`; the two together are what the person is
     // shown about the place they walked into).
     let reach = projection.reach.clone();
+    let epr_id = projection.epr_id.clone();
     let mut response = serve_admitted_projection(
         state,
         request_path,
@@ -3445,6 +3474,10 @@ async fn dispatch_to_projected_epr(
     )
     .await;
     crate::services::stamp_admitted_standing(&mut response, &reach);
+    // …and WHERE the account of this serve can be read. A visit is not free and
+    // it is not a favour; saying so on the way out is what keeps the exchange
+    // from being something only the operator can see.
+    crate::services::stamp_receipt(&mut response, &epr_id);
     response
 }
 
@@ -6012,6 +6045,7 @@ async fn fetch_from_holder(
     let content_type = header(reqwest::header::CONTENT_TYPE.as_str());
     let standing = header(crate::services::name_routing::STANDING_HEADER);
     let bundle = header(crate::services::name_routing::BUNDLE_HEADER);
+    let receipt = header(crate::services::name_routing::RECEIPT_HEADER);
     let cache_control = header(reqwest::header::CACHE_CONTROL.as_str());
     let body = response.bytes().await.map_err(|e| e.to_string())?;
     if body.len() as u64 > RELAY_MAX_BYTES {
@@ -6022,6 +6056,7 @@ async fn fetch_from_holder(
         content_type,
         standing,
         bundle,
+        receipt,
         cache_control,
         body: body.to_vec(),
     })
@@ -6396,7 +6431,8 @@ async fn handle_request(
             // zero behavioral change for assets, deep links, SPA fallback, alias-
             // 302s, and the catch-all. Build the omnibar context once so the HTML
             // serve carries the trust surface.
-            let chrome_context_json = build_chrome_context_json(&path, &req);
+            let chrome_context_json =
+                build_chrome_context_json_for(&path, &req, Some(&projection.epr_id));
             let wants_html = routes::catching_up::accepts_html(req.headers());
             let local = dispatch_to_projected_epr(
                 &state,
@@ -7262,6 +7298,26 @@ async fn handle_request(
         (Method::GET, p) if p.starts_with("/api/v1/humans/") && p.ends_with("/collectives") => {
             return Ok(to_boxed(
                 routes::handle_collectives_request(req, Arc::clone(&state), p).await,
+            ));
+        }
+
+        // The fair-trade receipt for a serve — what was traded for a visit and
+        // who was credited. Doorway-operational (the answer depends on WHICH
+        // doorway was asked and WHICH holder relayed), unauthenticated (it names
+        // who was CREDITED, never who was SERVED), and matched BEFORE the
+        // storage-proxy fallthrough so `/api/v1/receipt/…` is never shipped to
+        // storage as an unknown route.
+        (Method::GET, p) if routes::match_receipt_route(p).is_some() => {
+            let epr_id = routes::match_receipt_route(p).expect("matched above");
+            let query = req.uri().query().map(str::to_string);
+            return Ok(to_boxed(
+                routes::handle_receipt_request(
+                    Arc::clone(&state),
+                    &epr_id,
+                    query.as_deref(),
+                    relay_ctx.hop_seen,
+                )
+                .await,
             ));
         }
 

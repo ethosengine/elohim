@@ -34,6 +34,7 @@ pub mod journal;
 pub mod metrics;
 pub mod p2p_manifests;
 pub mod pkarr_resolver;
+pub mod receipt;
 pub mod seed;
 pub mod self_healing;
 pub mod status;
@@ -108,3 +109,4 @@ pub use p2p_manifests::{
     handle_get_manifests, handle_post_manifest, TransportManifestAnnouncement,
     TransportManifestStore,
 };
+pub use receipt::{handle_receipt_request, match_receipt_route};

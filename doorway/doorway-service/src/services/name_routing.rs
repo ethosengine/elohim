@@ -71,6 +71,12 @@ pub use crate::services::serve_eligibility::STANDING_HEADER;
 /// The bundle-freshness marker a holder stated, relayed verbatim.
 pub const BUNDLE_HEADER: &str = "x-elohim-bundle";
 
+/// Where the holder said its receipt for this serve can be read, relayed
+/// verbatim. Minted by [`crate::services::serve_receipt`]; this module only
+/// carries it — and a courier MUST carry it, because the exchange it points at
+/// is the holder's, not the courier's.
+pub use crate::services::serve_receipt::RECEIPT_HEADER;
+
 /// A holder's **authoritative refusal**. Not a failed attempt: the holder is
 /// the doorway that holds the contract for this name, so when it says the
 /// requester may not have it, that IS the answer to the request. Trying the
@@ -446,6 +452,72 @@ pub fn fold_candidate_holders(
     ranked.into_iter().map(|(_, holder)| holder).collect()
 }
 
+/// **The widest fold**: every doorway this table holds a contract for, ordered
+/// by [`SELECTOR_TERMS`], one entry per doorway keeping its most specific mount.
+///
+/// [`fold_candidate_holders`] narrows by mount because the question it answers
+/// is "who serves this PATH". Some questions are addressed by EPR id instead —
+/// the fair-trade receipt is asked as `/api/v1/receipt/{eprId}`, and a courier
+/// doorway that holds no contract for that record also holds no mount to fold
+/// against. Narrowing on the receipt's OWN path would fold against `/api/...`,
+/// which no projection mount covers and which would silently yield only
+/// root-mount holders.
+///
+/// So this is the same fold with the mount term omitted — deliberately, and in
+/// one named place, rather than by passing a key that accidentally matches
+/// everything. Every other term (self-exclusion, liveness, owner order) is
+/// unchanged, and the ONE-hop budget still governs at the call site.
+pub fn fold_all_holders(
+    contracts: &[HolderContract],
+    liveness: &HashMap<String, HolderLiveness>,
+    self_doorway_id: &str,
+) -> Vec<NameHolder> {
+    let mut holders: Vec<(NameHolder, (u8, usize))> = Vec::new();
+    for contract in contracts {
+        if contract.doorway_id == self_doorway_id {
+            continue;
+        }
+        if contract.origin.trim().is_empty() || contract.doorway_id.trim().is_empty() {
+            continue;
+        }
+        let rank = specificity(contract);
+        match holders
+            .iter_mut()
+            .find(|(h, _)| h.doorway_id == contract.doorway_id)
+        {
+            Some((existing, existing_rank)) => {
+                if rank > *existing_rank {
+                    existing.url_path = contract.url_path.clone();
+                    existing.host = contract.host.clone();
+                    *existing_rank = rank;
+                }
+            }
+            None => holders.push((
+                NameHolder {
+                    doorway_id: contract.doorway_id.clone(),
+                    origin: contract.origin.trim_end_matches('/').to_string(),
+                    url_path: contract.url_path.clone(),
+                    host: contract.host.clone(),
+                    liveness: liveness
+                        .get(&contract.doorway_id)
+                        .copied()
+                        .unwrap_or_default(),
+                    relay_mode: RelayMode::default(),
+                },
+                rank,
+            )),
+        }
+    }
+
+    let mut ranked: Vec<(usize, NameHolder)> = holders
+        .into_iter()
+        .map(|(holder, _)| holder)
+        .enumerate()
+        .collect();
+    ranked.sort_by_key(|(owner_order, holder)| selector_rank(holder, *owner_order));
+    ranked.into_iter().map(|(_, holder)| holder).collect()
+}
+
 /// The doorway-local, in-memory name-route registry.
 ///
 /// Category C (Operational): no table, no DHT entry, no persistence. Every row
@@ -496,6 +568,15 @@ impl NameRouteTable {
         fold_candidate_holders(key, &contracts, &liveness, self_doorway_id)
     }
 
+    /// Every doorway this table holds a contract for (see
+    /// [`fold_all_holders`]) — the fold for a question addressed by EPR ID
+    /// rather than by a mount path.
+    pub fn all_holders(&self, self_doorway_id: &str) -> Vec<NameHolder> {
+        let contracts = self.contracts.read().expect("name-route lock poisoned");
+        let liveness = self.liveness.read().expect("name-route lock poisoned");
+        fold_all_holders(&contracts, &liveness, self_doorway_id)
+    }
+
     /// Record that a holder SHED a relay (503). The discovery probe cannot tell
     /// a shed from a death, but a relay can — so the one surface that observes
     /// it writes it, and the next fold orders that holder after the serving
@@ -540,6 +621,11 @@ pub struct HolderReply {
     /// The holder's `x-elohim-bundle` staleness marker, verbatim. `None` when
     /// it stated none (i.e. it confirmed the head current and deliverable).
     pub bundle: Option<String>,
+    /// The holder's `x-elohim-receipt` pointer, verbatim. `None` when it stated
+    /// none. A relative route, so it resolves against whichever doorway the
+    /// client is talking to — which is the courier, which then merges its own
+    /// projection credit into the answer (see `routes::receipt`).
+    pub receipt: Option<String>,
     /// The holder's own `cache-control` for this answer. `None` → the relay's
     /// default (`no-store`) governs.
     pub cache_control: Option<String>,
@@ -773,6 +859,9 @@ pub fn build_relayed_response(
     if let Some(bundle) = reply.bundle.as_deref() {
         builder = builder.header(BUNDLE_HEADER, bundle);
     }
+    if let Some(receipt) = reply.receipt.as_deref() {
+        builder = builder.header(RECEIPT_HEADER, receipt);
+    }
     builder
         .body(Full::new(Bytes::from(reply.body)))
         .unwrap_or_else(|_| {
@@ -820,6 +909,7 @@ mod tests {
             content_type: Some("text/html".to_string()),
             standing: None,
             bundle: None,
+            receipt: None,
             cache_control: None,
             body: body.as_bytes().to_vec(),
         }
@@ -1477,6 +1567,29 @@ mod tests {
         assert!(
             plain.headers().get(STANDING_HEADER).is_none(),
             "the relay never invents a standing the holder did not state"
+        );
+        assert!(
+            plain.headers().get(RECEIPT_HEADER).is_none(),
+            "the relay never invents a receipt pointer the holder did not state"
+        );
+    }
+
+    /// The holder's receipt pointer is the holder's statement about the
+    /// exchange ITS serve was. A courier that dropped it would leave the visitor
+    /// unable to ask what was traded; a courier that minted its own would be
+    /// accounting for work it did not do. So: verbatim, or absent.
+    #[test]
+    fn the_holders_receipt_pointer_is_relayed_verbatim() {
+        let carried = HolderReply {
+            receipt: Some("/api/v1/receipt/community-garden-club".to_string()),
+            ..reply(200, "<app-root></app-root>")
+        };
+        let response = build_relayed_response("https://b.example", "b-doorway", carried);
+        assert_eq!(
+            response.headers().get(RECEIPT_HEADER).unwrap(),
+            "/api/v1/receipt/community-garden-club",
+            "the pointer is relative, so it resolves against the courier — which is \
+             exactly where the merge that substitutes OUR projection credit happens"
         );
     }
 

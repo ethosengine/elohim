@@ -38,7 +38,7 @@ use sha2::{Digest, Sha256};
 use std::sync::OnceLock;
 
 mod context;
-pub use context::{ChromeContext, NavLink};
+pub use context::{ChromeContext, NavLink, ReceiptLink};
 
 /// The hand-written, self-contained vanilla element script, baked at compile
 /// time. Self-mounts, acquires EPR context, renders + themes + wires behavior.
@@ -437,6 +437,7 @@ mod tests {
             "showThemeToggle",
             "navBack",
             "navForward",
+            "receipt",
         ]
         .into_iter()
         .collect();
@@ -502,6 +503,11 @@ mod tests {
             }),
             nav_forward: Some(NavLink {
                 href: "/f".to_string(),
+                label: None,
+            }),
+            receipt: Some(ReceiptLink {
+                href: "/api/v1/receipt/x".to_string(),
+                sentence: None,
                 label: None,
             }),
         };

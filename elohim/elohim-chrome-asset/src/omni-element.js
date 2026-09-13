@@ -438,6 +438,26 @@
     }
     html += '</span>';
 
+    // Fair-trade receipt — what was traded for this visit, in the words a
+    // friend would use, with the precise form ONE request away (never the first
+    // thing said). Absent when the doorway that answered accounted for nothing:
+    // a chrome that always showed a receipt line would be asserting an exchange
+    // nobody recorded.
+    var receipt = ctx.receipt;
+    if (receipt && receipt.href) {
+      var receiptHref = htmlEscape(safeHref(receipt.href, ''));
+      if (receiptHref) {
+        html +=
+          '<a href="' +
+          receiptHref +
+          '" class="omni-receipt" data-omni-receipt title="' +
+          htmlEscape(receipt.sentence || '') +
+          '">' +
+          htmlEscape(receipt.label || 'What this visit traded') +
+          '</a>';
+      }
+    }
+
     // Account link — hidden + data-omni-account hook when unauthenticated.
     var accountHref = htmlEscape(safeHref(ctx.accountHref || '/account', '/account'));
     var hiddenAttr = ctx.authenticated ? '' : ' hidden';

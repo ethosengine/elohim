@@ -164,6 +164,15 @@ pub struct Exchange {
     pub what: String,
     /// The whole clause as a sentence.
     pub sentence: String,
+    /// The party who gives it, as the agreement names them.
+    pub party: String,
+    /// The resource classification the agreement carries, VERBATIM.
+    ///
+    /// Carried beside the spoken `what` so a courier doorway can restate the
+    /// holder's clause in its own sentence without re-deriving the holder's
+    /// facts, and so a reader can tell the ledger's word from ours.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
     pub commitment: String,
     pub record: String,
 }
@@ -325,6 +334,8 @@ pub fn build_receipt(
                     clause.party
                 ),
                 what,
+                party: clause.party.clone(),
+                resource: clause.resource.clone(),
                 commitment: clause.commitment_id.clone(),
                 record: commitment_record(&clause.commitment_id),
             })
