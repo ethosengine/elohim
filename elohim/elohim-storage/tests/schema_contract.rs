@@ -198,6 +198,9 @@ fn content_head_view_matches_schema() {
         trust: "notarized".to_string(),
         blob_hash: Some("sha256-abc123".to_string()),
         updated_at: Some("2026-07-04T00:00:00Z".to_string()),
+        staging_candidate: Some(
+            "uhCkkCANDIDATE012345678901234567890123456789012345678901234".to_string(),
+        ),
     };
     let json = serde_json::to_value(&declared).unwrap();
     validate_against_schema("views/content-head.schema.json", &json);
@@ -218,6 +221,7 @@ fn content_head_view_matches_schema() {
         trust: "notarized".to_string(),
         blob_hash: None,
         updated_at: None,
+        staging_candidate: None,
     };
     let json = serde_json::to_value(&anchor_only).unwrap();
     validate_against_schema("views/content-head.schema.json", &json);

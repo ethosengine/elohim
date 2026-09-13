@@ -44,4 +44,26 @@ blobHash: string | null,
 /**
  * When the resolved row was last written (mirrors `ContentView.updatedAt`).
  */
-updatedAt: string | null, };
+updatedAt: string | null, 
+/**
+ * The STAGING canonical-head declaration standing BENEATH the earned
+ * winner — the next version awaiting promotion, addressed by the
+ * **ActionHash of its declaration** (not by a CID; the bundle that
+ * declaration names carries its own blob address).
+ *
+ * Read from the conductor's `ContentHeadWire::staging_candidate`, which
+ * `content_store::select_staging_candidate` derives as a pure function of
+ * the same link set every peer holds — so every peer names the same
+ * candidate. `Some` only when the winner is EARNED and a staging
+ * declaration postdates it.
+ *
+ * `None` means one of two things and deliberately distinguishes neither:
+ * no candidate stands beneath this head, or this node could not put the
+ * ask. Both are honest absences to a caller, and NEITHER is a licence to
+ * serve the converged head at a candidate name — a candidate channel with
+ * no candidate answers a named absence, never production bytes.
+ *
+ * Additive: absent on the wire from any serving node that predates this
+ * projection.
+ */
+stagingCandidate?: string, };

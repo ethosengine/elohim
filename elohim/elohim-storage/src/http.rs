@@ -8005,6 +8005,54 @@ impl HttpServer {
         }
     }
 
+    /// The STAGING canonical-head declaration beneath the earned winner for
+    /// `content_id`, or `None`.
+    ///
+    /// BEST EFFORT, and deliberately so. Three things make `None` the only
+    /// safe failure:
+    ///
+    ///  - **No conductor configured** — nothing to ask.
+    ///  - **The ask failed or timed out** — an unreachable conductor is not
+    ///    evidence that no candidate exists, and it must not be reported as
+    ///    one; but it must also not stall a head read that is otherwise a
+    ///    single SQLite row.
+    ///  - **The election has no candidate** — the honest answer.
+    ///
+    /// All three collapse to absence, and the consumer's rule closes the gap:
+    /// a candidate channel with no candidate answers a NAMED ABSENCE, never the
+    /// converged head. So the worst an absent answer can cost is a candidate
+    /// name that says "nothing staged" for one read.
+    ///
+    /// `resolve_content_head_local` is the same read the release-adoption
+    /// watcher performs — the conductor's LOCAL view, never a network resolve.
+    /// A network `get_links` on a peer whose storage arc has not reconverged
+    /// since restart dies on the conductor's request timeout, and this is a
+    /// read on the serving hot path.
+    async fn resolve_staging_candidate(&self, content_id: &str) -> Option<String> {
+        let hc = self.hc_registry.as_ref()?.lamad_client()?;
+        let read = crate::services::conductor_writes::call_resolve_content_head_local(
+            &hc, content_id,
+        );
+        match tokio::time::timeout(std::time::Duration::from_secs(2), read).await {
+            Ok(Ok(Some(wire))) => wire.staging_candidate.map(|h| h.to_string()),
+            Ok(Ok(None)) => None,
+            Ok(Err(e)) => {
+                tracing::debug!(
+                    content_id = %content_id, error = %e,
+                    "head read: staging-candidate ask failed — reporting absence, never a head"
+                );
+                None
+            }
+            Err(_) => {
+                tracing::debug!(
+                    content_id = %content_id,
+                    "head read: staging-candidate ask timed out — reporting absence, never a head"
+                );
+                None
+            }
+        }
+    }
+
     async fn handle_content_head(
         &self,
         req: Request<Incoming>,
@@ -8038,7 +8086,18 @@ impl HttpServer {
                         content_id
                     ))),
                     Some(cwt) => match crate::views::content_head_view_from_content(&cwt.content) {
-                        Some(view) => Ok(response::ok(&view)),
+                        Some(view) => {
+                            // Rung 4: surface the STAGING candidate standing
+                            // beneath an earned winner, so a candidate-channel
+                            // hostname can resolve it over HTTP. It is not in
+                            // the row — it is a pure function of the
+                            // canonical-head link set — so only the conductor
+                            // can answer it.
+                            let candidate = self.resolve_staging_candidate(content_id).await;
+                            Ok(response::ok(&crate::views::with_staging_candidate(
+                                view, candidate,
+                            )))
+                        }
                         // Honest: the row exists but the notary holds no HEAD for it.
                         None => Ok(response::not_found(
                             "no notarized head declared for this content",

@@ -33,4 +33,8 @@ export interface ContentHeadView {
    * When the resolved row was last written (mirrors ContentView.updatedAt).
    */
   updatedAt?: string | null;
+  /**
+   * The STAGING canonical-head declaration standing beneath the earned winner — the next version awaiting promotion, addressed by the ActionHash of its DECLARATION (not by a CID). Derived by content_store::select_staging_candidate as a pure function of the same link set every peer holds, so every peer names the same candidate. Present only when the winner is EARNED and a staging declaration postdates it. Absent/null means either no candidate stands beneath this head OR the serving node could not put the ask — and NEITHER is a licence to serve the converged head at a candidate name.
+   */
+  stagingCandidate?: string | null;
 }

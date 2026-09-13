@@ -191,7 +191,31 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         trust: trust_label(c.dht_anchor_hash.is_some(), c.p2p_published_at.is_some()),
         blob_hash: c.blob_hash.clone(),
         updated_at: Some(c.updated_at.clone()),
+        // The candidate is NOT in the SQLite row: it is a pure function of the
+        // canonical-head link set, so only the conductor can answer it. This
+        // projector stays a pure row → view mapping and reports the honest
+        // `None`; the HTTP read arm fills it via `with_staging_candidate` when
+        // its conductor answers. A projector that fabricated one here would be
+        // synthesising election evidence from a projection (C5).
+        staging_candidate: None,
     })
+}
+
+/// Attach the conductor's staging candidate to a projected head view.
+///
+/// Split from [`content_head_view_from_content`] deliberately: that function is
+/// pure over a row and has six callers, only one of which can put a zome call.
+/// Passing `None` is a no-op, so a caller with no conductor — or one whose ask
+/// timed out — leaves the honest absence in place rather than clearing
+/// something it never read.
+pub fn with_staging_candidate(
+    mut view: ContentHeadView,
+    staging_candidate: Option<String>,
+) -> ContentHeadView {
+    if staging_candidate.is_some() {
+        view.staging_candidate = staging_candidate;
+    }
+    view
 }
 
 // ============================================================================
