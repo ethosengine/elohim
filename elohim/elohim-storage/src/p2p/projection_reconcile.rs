@@ -373,6 +373,22 @@ impl MissLedger {
         }
     }
 
+    /// Whether `id`'s cross-sweep retry budget is SPENT under its CURRENT
+    /// evidence — i.e. the [`Self::admit`] that just returned [`Admission::Retry`]
+    /// granted the LAST attempt this ledger will allow before the id goes
+    /// dormant for [`MISS_READMIT_SWEEPS`].
+    ///
+    /// False for an id the ledger does not hold: past [`MISS_LEDGER_CAP`] ids are
+    /// admitted WITHOUT being recorded (fail-open), and an id with no recorded
+    /// budget has spent nothing, so it is never adjudicated on this basis.
+    pub fn budget_spent(&self, stream: &'static str, id: &str) -> bool {
+        self.streams
+            .get(stream)
+            .and_then(|entries| entries.get(id))
+            .map(|e| e.misses >= MAX_RETRIES)
+            .unwrap_or(false)
+    }
+
     /// `id` is no longer a gap (in-sync, or absent-local and thus another
     /// plane's job) — forget it, so a later relapse starts from a clean budget.
     pub fn resolved(&mut self, stream: &'static str, id: &str) {
@@ -1001,6 +1017,24 @@ pub(crate) enum HealOutcomeKind {
     /// Conductor definitively could not see the row (`Ok(None)`) — retried next
     /// sweep, never immediately.
     Missing,
+    /// The own conductor answered `Ok(None)` for a DIVERGENT id on the LAST
+    /// attempt its cross-sweep [`MissLedger`] budget allows. The conductor cannot
+    /// see the commitment this projection holds, so no number of further reads
+    /// from it will converge the row: the gap is ADJUDICATED (counted into
+    /// `divergent_refused`) rather than left actionable forever.
+    ///
+    /// Honest because the gap does not vanish — it stays in the divergence TOTAL
+    /// and on `elohim_projection_reconcile_known_divergent` — it merely stops
+    /// being claimed as something THIS peer can act on. Only the peer whose
+    /// conductor holds the entry can move it.
+    ///
+    /// Deliberately NARROW: it fires only for ids this sweep classified
+    /// divergent, so `divergent_refused` can never exceed the divergence it is
+    /// subtracted from. A plain ABSENT-LOCAL miss keeps [`Self::Missing`] and
+    /// stays on the `failed` term, which the ledger already bounds by ceasing to
+    /// admit it. And it never covers a TIMEOUT: an unreachable conductor is LOAD,
+    /// and the quiesce gate must keep seeing it.
+    MissingRefused,
     /// The leg REPLAYED a cached [`Self::Missing`] answer for this id rather
     /// than re-asking the conductor for it (`services::heal_backoff`, drain
     /// lever 2). Downstream effect is identical to `Missing` in every respect —
@@ -1077,6 +1111,7 @@ impl HealOutcomeKind {
             HealOutcomeKind::TimeoutRetried => "timeout_retried",
             HealOutcomeKind::TimeoutExhausted => "timeout_exhausted",
             HealOutcomeKind::Missing => "missing",
+            HealOutcomeKind::MissingRefused => "missing_refused",
             HealOutcomeKind::MissingDeferred => "missing_deferred",
             HealOutcomeKind::Failed => "failed",
             HealOutcomeKind::RefusedDeclared => "refused_declared",
@@ -1567,6 +1602,16 @@ pub struct ReaDiscovery {
     /// into the `divergent` gauge and into the gap set exactly like an anchor
     /// divergence — these rows are ACTIONABLE and heal from the own conductor.
     divergent_state: usize,
+    /// Divergent ids whose cross-sweep [`MissLedger`] budget was spent by THIS
+    /// sweep's admission — the last attempt the ledger will grant under the
+    /// current evidence ([`MissLedger::budget_spent`]).
+    ///
+    /// Carried to the heal leg so that a conductor `Ok(None)` on one of these can
+    /// be ADJUDICATED ([`HealOutcomeKind::MissingRefused`]) instead of marked
+    /// failed for a budget that no longer exists. Discovery is the only place
+    /// that can know this — the ledger is per-node and long-lived, while the
+    /// tracker the heal leg sees is rebuilt every sweep.
+    exhausting_divergent: std::collections::HashSet<String>,
     /// This arm actually OBSERVED the state it reports. False when the arm
     /// short-circuited on a DB/query error (see [`ReaDiscovery::empty`]).
     ///
@@ -1589,6 +1634,7 @@ impl ReaDiscovery {
             ids_discovered: 0,
             divergent_anchor: 0,
             divergent_state: 0,
+            exhausting_divergent: std::collections::HashSet::new(),
             divergent_refused: 0,
             exhausted_persistent: 0,
             local_total: 0,
@@ -1997,6 +2043,7 @@ pub async fn run_heal(
         ids_discovered,
         divergent_anchor: rea_divergent,
         divergent_state: rea_divergent_state,
+        exhausting_divergent: rea_exhausting_divergent,
         divergent_refused: rea_divergent_refused,
         exhausted_persistent: rea_exhausted,
         local_total,
@@ -2032,7 +2079,15 @@ pub async fn run_heal(
     let ReaHealOutcome {
         counts,
         divergent_refused: rea_refused_by_conductor,
-    } = heal_rea(&mut tracker, &discovered_by, hc, pool, &pacing).await;
+    } = heal_rea(
+        &mut tracker,
+        &discovered_by,
+        &rea_exhausting_divergent,
+        hc,
+        pool,
+        &pacing,
+    )
+    .await;
     // The arm's FULL adjudication: the discovery-side retry-exhausted share plus
     // the heal-side own-conductor-confirms-the-held-anchor share. The two buckets
     // partition the divergence set (an exhausted id never reaches the heal leg),
@@ -2892,8 +2947,25 @@ pub(crate) enum ReaRowGap {
     AbsentLocal,
     /// Present locally, but the peer advertises a DIFFERENT non-empty anchor.
     AnchorDivergent,
-    /// Present locally with the SAME (or no peer-advertised) anchor, but a
-    /// DIFFERENT non-empty `state`. The row travelled and its standing did not.
+    /// Present locally with the SAME (or no peer-advertised) anchor, but the
+    /// peer's non-empty `state` is strictly AHEAD of the local row's in the
+    /// commitment lifecycle order — the row travelled and its standing did not,
+    /// and the local row is the one that is behind.
+    ///
+    /// DIRECTION is load-bearing (2026-09-13). Until this date any inequality
+    /// counted, so the peer holding the MORE ADVANCED standing and the peer
+    /// holding the LESS advanced one both reported the same gap for the same
+    /// row. The ahead peer then re-read its own conductor, got back the state it
+    /// already held (`Refreshed`/`NoAdvance`), and cycled the id through the
+    /// `MissLedger` forever — `divergent_actionable` plateaued at 25 fleet-wide
+    /// against a quiesce ceiling of 2, with `state_divergent` nonzero on all
+    /// seven peers. A gap this peer cannot act on is not this peer's gap: the
+    /// BEHIND peer carries it, and heals it from its own conductor.
+    ///
+    /// An UNORDERED state string (either side outside
+    /// [`crate::db::models::commitment_lifecycle_order`]) also lands here — an
+    /// unknown vocabulary is never evidence of being ahead — and is named apart
+    /// in the log by [`state_divergent_reason`].
     StateDivergent,
     /// Present locally and agreeing on every axis the peer offered evidence for.
     /// An EMPTY peer value is no evidence, never divergence — an un-anchored or
@@ -2919,8 +2991,51 @@ pub(crate) fn classify_rea_row_gap(
         return ReaRowGap::AnchorDivergent;
     }
     match peer_state.map(str::trim).filter(|s| !s.is_empty()) {
-        Some(state) if state != local_state => ReaRowGap::StateDivergent,
+        // DIRECTION, not difference: only a peer that is strictly AHEAD is
+        // teaching this row something. See `StateAdvance`.
+        Some(state) if state != local_state => match compare_rea_states(local_state, state) {
+            StateAdvance::LocalAtOrAhead => ReaRowGap::InSync,
+            StateAdvance::PeerAhead | StateAdvance::Unordered => ReaRowGap::StateDivergent,
+        },
         _ => ReaRowGap::InSync,
+    }
+}
+
+/// Which way a peer-advertised commitment state sits relative to the local row's,
+/// in the lifecycle order of [`crate::db::models::commitment_lifecycle_order`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum StateAdvance {
+    /// The peer's state is strictly AHEAD. The local row is behind and can learn
+    /// something by re-reading its own conductor — an actionable gap.
+    PeerAhead,
+    /// The local row is AT or AHEAD of the peer's state. Nothing to learn here:
+    /// the lagging peer carries this gap itself and heals it from ITS own
+    /// conductor. Not this peer's actionable gap.
+    LocalAtOrAhead,
+    /// At least one side is outside the known order. Conservative by
+    /// construction — an unknown string is never evidence of being ahead, so it
+    /// keeps the pre-2026-09-13 behaviour (counts as divergence) and is named
+    /// apart in the log.
+    Unordered,
+}
+
+/// Pure + total, so the direction rule is testable without a peer or a database.
+pub(crate) fn compare_rea_states(local_state: &str, peer_state: &str) -> StateAdvance {
+    use crate::db::models::commitment_lifecycle_order::rank;
+    match (rank(local_state), rank(peer_state)) {
+        (Some(local), Some(peer)) if peer > local => StateAdvance::PeerAhead,
+        (Some(_), Some(_)) => StateAdvance::LocalAtOrAhead,
+        _ => StateAdvance::Unordered,
+    }
+}
+
+/// Log reason for a row [`classify_rea_row_gap`] already returned
+/// [`ReaRowGap::StateDivergent`] for. Total (a `LocalAtOrAhead` pair never
+/// reaches here) so the classifier and the log line cannot disagree.
+pub(crate) fn state_divergent_reason(local_state: &str, peer_state: &str) -> &'static str {
+    match compare_rea_states(local_state, peer_state) {
+        StateAdvance::Unordered => "unordered-state",
+        StateAdvance::PeerAhead | StateAdvance::LocalAtOrAhead => "peer-ahead",
     }
 }
 
@@ -3111,12 +3226,24 @@ async fn discover_rea(
                     ReaRowGap::StateDivergent => {
                         if divergent_ids.insert(entry.id.clone()) {
                             divergent_state += 1;
+                            let advertised = entry
+                                .commitment_state
+                                .as_deref()
+                                .map(str::trim)
+                                .unwrap_or("");
                             tracing::warn!(
                                 target: "elohim_storage::projection_reconcile",
                                 commitment_id = %entry.id,
                                 peer = %peer.peer_id,
                                 local_state = %local_state,
-                                peer_state = %entry.commitment_state.as_deref().unwrap_or(""),
+                                peer_state = %advertised,
+                                // `peer-ahead` (the local row is behind and can
+                                // learn) vs `unordered-state` (a vocabulary
+                                // outside `commitment_lifecycle_order`, counted
+                                // conservatively). A rising `unordered-state`
+                                // share means the substrate grew a state this
+                                // order does not know yet.
+                                reason = %state_divergent_reason(local_state, advertised),
                                 "projection-reconcile: STATE-DIVERGENT commitment — the row \
                                  converged but its standing did not; re-reading from the own \
                                  conductor"
@@ -3171,6 +3298,10 @@ async fn discover_rea(
     // it again; counting it as unresolved divergence every sweep forever is what
     // pinned `converged` at 0 with a static residue.
     let mut exhausted_divergent = 0usize;
+    // Divergent ids on their LAST granted retry this sweep — see
+    // [`ReaDiscovery::exhausting_divergent`].
+    let mut exhausting_divergent: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
     let mut admitted: Vec<String> = Vec::new();
     for id in discovered_by.keys() {
         if tracker_local.contains(id) {
@@ -3192,7 +3323,17 @@ async fn discover_rea(
             &evidence,
             divergent_ids.contains(id),
         ) {
-            Admission::Retry => admitted.push(id.clone()),
+            Admission::Retry => {
+                // Last granted attempt AND divergent: if the own conductor
+                // answers nothing this time, the heal leg may adjudicate rather
+                // than mark it failed against a budget that is already gone.
+                if divergent_ids.contains(id)
+                    && misses.budget_spent(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id)
+                {
+                    exhausting_divergent.insert(id.clone());
+                }
+                admitted.push(id.clone());
+            }
             Admission::Exhausted => {
                 exhausted_persistent += 1;
                 if divergent_ids.contains(id) {
@@ -3210,6 +3351,7 @@ async fn discover_rea(
         ids_discovered,
         divergent_anchor,
         divergent_state,
+        exhausting_divergent,
         divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
@@ -3233,6 +3375,7 @@ async fn discover_rea(
 async fn heal_rea(
     tracker: &mut GapTracker,
     discovered_by: &std::collections::HashMap<String, String>,
+    exhausting_divergent: &std::collections::HashSet<String>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
@@ -3300,13 +3443,49 @@ async fn heal_rea(
                     HealOutcomeKind::Failed
                 }
             },
+            Ok(None) if exhausting_divergent.contains(&id) => {
+                // The own conductor cannot see a commitment this projection
+                // HOLDS, and the cross-sweep retry budget for this claim is now
+                // spent: next sweep the `MissLedger` stops admitting the id
+                // altogether, so `mark_failed` here would spend a retry that no
+                // longer exists and leave the gap counted as actionable against a
+                // peer this node cannot reach through its own conductor.
+                //
+                // Adjudicate instead. The gap does not disappear — it stays in
+                // the divergence TOTAL and on `known_divergent` — it stops being
+                // claimed as something THIS peer can act on. Only the peer whose
+                // conductor holds the entry can converge it.
+                tracker.mark_completed(&id);
+                divergent_refused += 1;
+                let peer = discovered_by
+                    .get(&id)
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
+                tracing::warn!(
+                    target: "elohim_storage::projection_reconcile",
+                    commitment_id = %id,
+                    discovered_via_peer = %peer,
+                    retries = MAX_RETRIES,
+                    "projection-reconcile[rea]: own conductor cannot see this divergent \
+                     commitment after its full retry budget — ADJUDICATED, not actionable by \
+                     this peer (only the peer whose conductor holds the entry can converge it)"
+                );
+                HealOutcomeKind::MissingRefused
+            }
             Ok(None) => {
                 // Conductor can't see it — retry on NEXT sweep, never immediate.
+                // A plain absent-local miss stays on the `failed` term; the
+                // ledger bounds it by ceasing to admit the id after MAX_RETRIES.
                 tracing::debug!(commitment_id = %id, "projection-reconcile: own conductor returned None; retry next sweep");
                 tracker.mark_failed(&id);
                 HealOutcomeKind::Missing
             }
             Err(e) => {
+                // NOT adjudicated, deliberately — including on an exhausted
+                // budget. A timeout is an UNREACHABLE conductor, which is LOAD,
+                // and load is exactly what the fleet-quiesce gate exists to see.
+                // Adjudicating `timeout_exhausted` would turn a saturated node
+                // into a converged one on paper.
                 let transient = is_transient_conductor_error(&e);
                 tracing::warn!(commitment_id = %id, error = %e, transient, "projection-reconcile: conductor get failed; retry next sweep");
                 tracker.mark_failed(&id);
@@ -6427,6 +6606,91 @@ mod rea_row_gap_tests {
         );
     }
 
+    /// THE 2026-09-13 class: the LOCAL row is the more advanced one. matthew
+    /// held `active` while a peer still advertised `proposed`, and the
+    /// direction-blind classifier made MATTHEW carry the gap — re-reading its own
+    /// conductor, getting back the state it already had, and cycling the id
+    /// through the `MissLedger` forever. The lagging peer carries this one.
+    #[test]
+    fn a_local_row_ahead_of_the_peer_is_in_sync_for_that_peer() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), ANCHOR_A, Some("proposed")),
+            ReaRowGap::InSync
+        );
+        // The live sample, verbatim: custody-blob-1f47dbf7c8d2c439 on matthew.
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), "", Some("proposed")),
+            ReaRowGap::InSync
+        );
+        // Same rank, different spelling — the DNA mints `created` where the REA
+        // default fills `proposed`. Neither teaches the other anything.
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "created")), ANCHOR_A, Some("proposed")),
+            ReaRowGap::InSync
+        );
+    }
+
+    /// A withdrawn commitment is SETTLED: it outranks every live state, so a peer
+    /// still watching it run is behind, not ahead. All three withdrawn states
+    /// behave identically (`commitment_withdrawn_states::ALL`).
+    #[test]
+    fn a_withdrawn_local_row_learns_nothing_from_a_peer_still_calling_it_live() {
+        for withdrawn in crate::db::models::commitment_withdrawn_states::ALL {
+            for peer_state in ["proposed", "created", "accepted", "activated", "active"] {
+                assert_eq!(
+                    classify_rea_row_gap(Some((ANCHOR_A, withdrawn)), ANCHOR_A, Some(peer_state)),
+                    ReaRowGap::InSync,
+                    "local {withdrawn} vs peer {peer_state}"
+                );
+            }
+        }
+    }
+
+    /// Every step of the inherited ladder, in both directions, so the order is
+    /// pinned rather than implied by two spot checks.
+    #[test]
+    fn the_lifecycle_ladder_is_ordered_in_both_directions() {
+        let ladder = ["proposed", "accepted", "active", "fulfilled"];
+        for (i, behind) in ladder.iter().enumerate() {
+            for ahead in &ladder[i + 1..] {
+                assert_eq!(
+                    classify_rea_row_gap(Some((ANCHOR_A, behind)), ANCHOR_A, Some(ahead)),
+                    ReaRowGap::StateDivergent,
+                    "local {behind} is behind peer {ahead} — actionable"
+                );
+                assert_eq!(
+                    classify_rea_row_gap(Some((ANCHOR_A, ahead)), ANCHOR_A, Some(behind)),
+                    ReaRowGap::InSync,
+                    "local {ahead} is ahead of peer {behind} — not this peer's gap"
+                );
+            }
+        }
+    }
+
+    /// An UNKNOWN state string keeps the pre-2026-09-13 behaviour (divergent) on
+    /// EITHER side: a vocabulary this order has not grown yet is never evidence
+    /// of being ahead. It is named apart in the log so a rising share is visible.
+    #[test]
+    fn an_unordered_state_keeps_the_conservative_behaviour_under_its_own_reason() {
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "active")), ANCHOR_A, Some("quiesced")),
+            ReaRowGap::StateDivergent
+        );
+        assert_eq!(
+            classify_rea_row_gap(Some((ANCHOR_A, "quiesced")), ANCHOR_A, Some("active")),
+            ReaRowGap::StateDivergent
+        );
+        assert_eq!(
+            state_divergent_reason("active", "quiesced"),
+            "unordered-state"
+        );
+        assert_eq!(
+            state_divergent_reason("quiesced", "active"),
+            "unordered-state"
+        );
+        assert_eq!(state_divergent_reason("proposed", "active"), "peer-ahead");
+    }
+
     /// Empty peer values are NO EVIDENCE, never divergence — a pre-cure peer
     /// (which omits `commitmentState` entirely) and an un-anchored peer must not
     /// manufacture gaps for a row that is fine.
@@ -7131,6 +7395,43 @@ mod tests {
             Admission::Exhausted,
             "budget spent against UNCHANGED evidence — stop asking"
         );
+    }
+
+    #[test]
+    fn budget_spent_marks_the_last_granted_attempt_not_an_earlier_one() {
+        // The heal leg's adjudication seam: `Ok(None)` on a divergent id is only
+        // refused once the ledger has granted every attempt it is going to. Any
+        // earlier, and a row the conductor simply had not caught up on yet would
+        // be written off.
+        let mut ledger = MissLedger::new();
+        for sweep in 1..MAX_RETRIES {
+            assert_eq!(
+                ledger.admit("rea", "row-1", "anchor-A|active", true),
+                Admission::Retry
+            );
+            assert!(
+                !ledger.budget_spent("rea", "row-1"),
+                "sweep {sweep} still has attempts left"
+            );
+        }
+        assert_eq!(
+            ledger.admit("rea", "row-1", "anchor-A|active", true),
+            Admission::Retry,
+            "the LAST granted attempt is still an attempt"
+        );
+        assert!(
+            ledger.budget_spent("rea", "row-1"),
+            "no further attempt will be granted under this evidence"
+        );
+        // Fresh evidence resets the budget — a graduation this peer has not seen
+        // yet is not the claim we gave up on.
+        assert_eq!(
+            ledger.admit("rea", "row-1", "anchor-A|fulfilled", true),
+            Admission::Retry
+        );
+        assert!(!ledger.budget_spent("rea", "row-1"));
+        // An id the ledger never recorded has spent nothing.
+        assert!(!ledger.budget_spent("rea", "never-seen"));
     }
 
     #[test]

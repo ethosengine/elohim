@@ -2547,8 +2547,8 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IDENTITY_KEY_SUPERSEDE.clone()));
         let _ = REGISTRY.register(Box::new(SHARD_PUSH_PEER_UNRESOLVED.clone()));
         let _ = REGISTRY.register(Box::new(PROJECTION_HEAL_OUTCOMES.clone()));
-        // Pre-touch every (stream, outcome) combination — 3 streams x 13
-        // `p2p::projection_reconcile::HealOutcomeKind` variants = 39 series —
+        // Pre-touch every (stream, outcome) combination — 3 streams x 14
+        // `p2p::projection_reconcile::HealOutcomeKind` variants = 42 series —
         // so an outcome that has literally never fired for a stream
         // still reads as a measured zero, not an absent series. Labels below
         // are the same vocabulary already used at the `inc_projection_heal_outcome`
@@ -2563,6 +2563,7 @@ pub fn register_all() {
                 "timeout_retried",
                 "timeout_exhausted",
                 "missing",
+                "missing_refused",
                 "missing_deferred",
                 "failed",
                 "refused_declared",

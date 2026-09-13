@@ -1156,6 +1156,74 @@ pub mod commitment_withdrawn_states {
     }
 }
 
+/// How far along its life a REA `Commitment.state` string sits — the LIFECYCLE
+/// ORDER the substrate already walks, written down in one place.
+///
+/// Nothing here is new vocabulary. Every member is inherited from a site that
+/// already names it:
+///
+/// * `proposed` — [`crate::db::rea_commitments::DEFAULT_COMMITMENT_STATE`], the
+///   REA birth state every insert path falls back to when the wire omits one.
+/// * `created` — what the elohim DNA mints
+///   (`content_store/src/lib.rs`, `create_commitment`), and what
+///   `services::custody_standing` reads as a live custody pledge.
+/// * `accepted` / `activated` — the accept/activate walk named verbatim by
+///   [`crate::services::spool_custody_author::RETIRED_STATES`]'s doc comment:
+///   "the DNA mints `created`, the accept/activate paths move it through
+///   `proposed`/`accepted`/`activated`/`active`".
+/// * `active` / `in-progress` — `rea_commitments::ACTIVE_PROVIDE_STATES`, the
+///   states that count as a live provide commitment.
+/// * `fulfilled` / `finished` / `completed` / `revoked` / `rejected` and the
+///   three in [`commitment_withdrawn_states`] — the obligation has ENDED,
+///   whether by completion or by withdrawal
+///   ([`crate::services::spool_custody_author::RETIRED_STATES`],
+///   `rea_commitments::ACTIVE_PROVIDE_STATES`'s exclusion list, and
+///   [`crate::rea_projection::CommitmentWireFields::state`]'s
+///   `proposed | active | fulfilled | …`).
+///
+/// ## Why a RANK and not a set
+///
+/// A projection comparing its row against a peer's needs to know DIRECTION, not
+/// merely difference. A peer whose commitment is still `proposed` while this
+/// peer's is `active` is BEHIND: it will carry that gap itself and heal it from
+/// its own conductor. Reading that as a local divergence made every ahead-of-
+/// the-pack peer carry a gap it could not act on (fleet, 2026-09-13:
+/// `state_divergent` nonzero on all seven peers, `divergent_actionable`
+/// plateaued at 25 against a gate ceiling of 2).
+///
+/// A settled commitment outranks every live one: once the obligation has ended
+/// there is nothing further to learn from a peer still watching it run.
+///
+/// `None` means the string is OUTSIDE this order — a vocabulary the substrate
+/// has grown past this list. Callers must treat an unordered string
+/// CONSERVATIVELY (as a divergence), never as agreement: an unknown state is
+/// not evidence of being ahead.
+pub mod commitment_lifecycle_order {
+    use super::commitment_withdrawn_states;
+
+    /// Minted / proposed — the commitment exists but obliges no one yet.
+    pub const RANK_BIRTH: u8 = 0;
+    /// Accepted or activated — consent has moved, the obligation has not started.
+    pub const RANK_ACCEPTED: u8 = 1;
+    /// Live obligation.
+    pub const RANK_ACTIVE: u8 = 2;
+    /// Settled: fulfilled, finished, or withdrawn. Nothing follows.
+    pub const RANK_SETTLED: u8 = 3;
+
+    /// Lifecycle rank of `state`, or `None` when the string is outside the
+    /// order this module inherits.
+    pub fn rank(state: &str) -> Option<u8> {
+        match state {
+            "created" | "proposed" => Some(RANK_BIRTH),
+            "accepted" | "activated" => Some(RANK_ACCEPTED),
+            "active" | "in-progress" => Some(RANK_ACTIVE),
+            "fulfilled" | "finished" | "completed" | "revoked" | "rejected" => Some(RANK_SETTLED),
+            s if commitment_withdrawn_states::is_withdrawn(s) => Some(RANK_SETTLED),
+            _ => None,
+        }
+    }
+}
+
 /// Governance state constants for stewardship allocations
 pub mod allocation_governance_states {
     pub const ACTIVE: &str = "active";
