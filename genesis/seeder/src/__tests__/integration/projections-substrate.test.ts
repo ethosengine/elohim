@@ -141,6 +141,8 @@ describe.skipIf(!RUN_INTEGRATION)(
         gateHints: [],       // empty — invalid for non-commons
         deadEnd: false,      // not flagged either
         stewardDirectEndpoint: null,
+        hostnames: [],
+        channel: 'converged',
       };
       const body = buildProjectionCommitmentBody(spec);
       const res = await client.createCommitment(body as never);

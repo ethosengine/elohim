@@ -39,6 +39,20 @@ import { LAMAD_ROUTE_CLAIMS, type RouteClaimTemplate } from './generated/route-c
 
 export type ProjectionMode = 'cached' | 'stewardDirect';
 
+/**
+ * WHICH TIER of the canonical-head election a hostname serves (rung 4).
+ *
+ * `converged` = the earned winner of `content_store`'s canonical-head election.
+ * `candidate` = the STAGING declaration standing beneath that winner (the next
+ * version awaiting promotion). A channel is a LABEL on a contract, never a
+ * stored version: nothing here pins a head CID, so promotion stays the
+ * collective's one notarized act and no doorway gets a vote.
+ *
+ * Absent on the wire ⇒ `converged` (C10 contract-evolution honesty: an older
+ * contract reads as exactly today's behaviour rather than mis-serving).
+ */
+export type ProjectionChannel = 'converged' | 'candidate';
+
 export interface GateHintRef {
   eprRef: string;
   label: string | null;
@@ -76,6 +90,31 @@ export interface ProjectionSpec {
   doorwayId: string;
   eprId: string;
   urlPath: string;
+  /**
+   * The public names this contract answers for. EMPTY = any host, which is
+   * byte-for-byte today's behaviour and the declared scaffold (C13): its
+   * successor is a contract that names its hostnames, gated by the a2o
+   * scenario that asks each name of each doorway.
+   *
+   * A LIST, matching Gateway API `hostnames` — one contract per (doorway, EPR)
+   * naming many names, never one row per name.
+   */
+  hostnames: string[];
+  /** Which tier of the canonical-head election these hostnames serve. */
+  channel: ProjectionChannel;
+  /**
+   * OPTIONAL third scope ref (`host:{name}`), which CHANGES the contract id.
+   *
+   * One contract per (doorway, EPR) is the rule, and `hostnames` is a list
+   * inside it — neither multiplies rows. This exists for the one shape the
+   * rule does not cover: a SECOND contract for the same (doorway, EPR) that
+   * genuinely differs, e.g. a `candidate`-channel contract standing beside the
+   * `converged` one. Then the scope grows a third ref and the digest follows —
+   * a new id, a new row, deliberately (never a silent fork of one id).
+   *
+   * Omitted on every contract today.
+   */
+  scopeHost?: string;
   mode: ProjectionMode;
   reach: string;
   baseHref: string;
@@ -154,6 +193,8 @@ export interface ProjectionRelevantMetadata {
   urlPath: string;
   mode: ProjectionMode;
   reach: string;
+  hostnames: string[];
+  channel: ProjectionChannel;
   baseHref: string;
   entryFile: string;
   spaFallback: boolean;
@@ -171,6 +212,11 @@ export const PROJECTION_RELEVANT_FIELDS = [
   'urlPath',
   'mode',
   'reach',
+  // Rung 4 slice 1. Operative routing law: which names this contract answers
+  // for and which tier of the head election they serve. A change to either
+  // re-grants through the supersession ceremony that already exists.
+  'hostnames',
+  'channel',
   'baseHref',
   'entryFile',
   'spaFallback',
@@ -197,6 +243,12 @@ export function projectionRelevantMetadata(
     urlPath: m.urlPath ?? '/',
     mode: m.mode ?? 'cached',
     reach: m.reach ?? 'commons',
+    // Absent hostnames = ANY host (today's every contract); absent channel =
+    // converged. Both defaults are materialized on BOTH sides of the compare,
+    // so a pre-rung-4 row and a seed that omits them are indistinguishable and
+    // no needless supersede churn fires.
+    hostnames: m.hostnames ?? [],
+    channel: m.channel ?? 'converged',
     baseHref: m.baseHref ?? '/',
     entryFile: m.entryFile ?? 'index.html',
     // Storage defaults spaFallback=true when absent; treat null as the default too.
@@ -274,9 +326,22 @@ export function regrantFingerprint(desired: Partial<ProjectionRelevantMetadata>)
  *   superseder = `${base}-r${sha256(stableJson(projectionRelevantMetadata))[:8]}`
  * where scope = `doorway:{doorwayId}|epr:{eprId}`.
  */
+/**
+ * The pipe-separated scope string for a projection — ONE definition, consumed
+ * by both the content-addressed id digest and the commitment's `inScopeOf`, so
+ * the two can never disagree about what this contract is scoped to.
+ *
+ * `doorway:{id}|epr:{id}` today; `|host:{name}` appended only when the spec
+ * declares `scopeHost` (see `ProjectionSpec.scopeHost`).
+ */
+export function projectionScope(spec: ProjectionSpec): string {
+  const base = `doorway:${spec.doorwayId}|epr:${spec.eprId}`;
+  return spec.scopeHost ? `${base}|host:${spec.scopeHost}` : base;
+}
+
 export function baseProjectionId(spec: ProjectionSpec): string {
   const stewardPeerId = deterministicPeerId(spec.stewardHumanId, spec.stewardArchetype);
-  const scope = `doorway:${spec.doorwayId}|epr:${spec.eprId}`;
+  const scope = projectionScope(spec);
   const idDigest = createHash('sha256')
     .update(`${stewardPeerId}|project-epr|${scope}`, 'utf8')
     .digest('hex')
@@ -314,6 +379,8 @@ export function buildProjectionCommitmentBody(
     urlPath: spec.urlPath,
     mode: spec.mode,
     reach: spec.reach,
+    hostnames: spec.hostnames,
+    channel: spec.channel,
     baseHref: spec.baseHref,
     entryFile: spec.entryFile,
     redirectsFrom: spec.redirectsFrom,
@@ -342,7 +409,7 @@ export function buildProjectionCommitmentBody(
     provider: stewardPeerId,
     receiver: stewardPeerId,
     ...(supersedePredecessorId ? { supersedes: supersedePredecessorId } : {}),
-    inScopeOf: `doorway:${spec.doorwayId}|epr:${spec.eprId}`,
+    inScopeOf: projectionScope(spec),
     note: `Project ${spec.eprId} at ${spec.urlPath} on ${spec.doorwayId}`,
     metadataJson: JSON.stringify(metadataObject),
     metadata: metadataObject,
@@ -355,6 +422,8 @@ export function specToMetadata(spec: ProjectionSpec): ProjectionRelevantMetadata
     urlPath: spec.urlPath,
     mode: spec.mode,
     reach: spec.reach,
+    hostnames: spec.hostnames,
+    channel: spec.channel,
     baseHref: spec.baseHref,
     entryFile: spec.entryFile,
     redirectsFrom: spec.redirectsFrom,
@@ -389,6 +458,16 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     stewardDirectEndpoint: null,
     routeClaims: null as RouteClaimGrant | null,
     redirectTemplates: [] as RedirectTemplate[],
+    // ANY host, converged channel — byte-for-byte today's routing. Naming the
+    // hostnames here would bind each contract to the addresses its doorway
+    // happens to be reached at (localhost:8888 at home, doorway-alpha.elohim.host
+    // on the fleet, the apex after the transition), and any name left out of
+    // that list would 404. The empty list is the DECLARED scaffold (C13); its
+    // successor is a contract that names its hostnames, and the gate is the
+    // a2o scenario that asks each name of each doorway. Bind one with
+    // `withHostnames`; stage a candidate beside it with `candidateChannelSpec`.
+    hostnames: [] as string[],
+    channel: 'converged' as ProjectionChannel,
   };
 
   const landingAt = (doorwayId: string): ProjectionSpec => ({
@@ -432,6 +511,51 @@ export function defaultProjectionSeeds(): ProjectionSpec[] {
     imagodeiPortalAt('alpha-elohim-host'),
     imagodeiPortalAt('apex-elohim-host'),
   ];
+}
+
+/**
+ * Bind an existing spec to a set of public names, leaving everything else —
+ * id scope included — untouched.
+ *
+ * The contract keeps its id (hostnames are contract TERMS, not contract
+ * IDENTITY), so this is a re-grant of the same undertaking: `seedProjections`
+ * detects the drift and supersedes through the ceremony that already exists.
+ */
+export function withHostnames(spec: ProjectionSpec, hostnames: string[]): ProjectionSpec {
+  return { ...spec, hostnames: [...hostnames] };
+}
+
+/**
+ * The candidate-channel sibling of a converged contract: same doorway, same
+ * EPR, same mount — a DIFFERENT contract standing beside it, bound to the
+ * candidate hostname and serving the staging tier of the head election.
+ *
+ * Three things make it a separate row rather than an edit:
+ *
+ *  - `scopeHost` puts the hostname into the scope, so the content-addressed id
+ *    differs and the two contracts can never collide on one id (the fork class
+ *    the ensure-not-create guard exists to close).
+ *  - `channel: 'candidate'` makes it resolve the STAGING declaration standing
+ *    beneath the earned winner. Where none stands, the name answers a named
+ *    absence — it must never fall through to the converged head.
+ *  - `reach` defaults to a RESTRICTED rung, never `commons`. A staging name
+ *    shows an unreleased build; `serve_eligibility` refuses an anonymous
+ *    visitor with the chrome's reason and serves a steward whose standing
+ *    satisfies the declared audience. Never-widen is the module's law — this
+ *    only has to refrain from declaring `commons` on a staging name.
+ */
+export function candidateChannelSpec(
+  converged: ProjectionSpec,
+  hostname: string,
+  reach = 'stewards-only',
+): ProjectionSpec {
+  return {
+    ...converged,
+    hostnames: [hostname],
+    channel: 'candidate',
+    scopeHost: hostname,
+    reach,
+  };
 }
 
 // =============================================================================

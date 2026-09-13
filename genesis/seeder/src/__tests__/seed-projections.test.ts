@@ -10,7 +10,10 @@ import {
   findActiveRowForSpec,
   seedProjections,
   PROJECTION_RELEVANT_FIELDS,
+  withHostnames,
+  candidateChannelSpec,
   type ProjectionSpec,
+  type ProjectionRelevantMetadata,
   type EprProjectionViewLite,
 } from '../seed-projections.js';
 
@@ -43,6 +46,8 @@ describe('buildProjectionCommitmentBody', () => {
     stewardDirectEndpoint: null,
     routeClaims: null,
     redirectTemplates: [],
+    hostnames: [],
+    channel: 'converged',
   };
 
   it('builds a commons-reach lamad projection at /lamad', () => {
@@ -129,6 +134,8 @@ const lamadSpec: ProjectionSpec = {
     ],
   },
   redirectTemplates: [{ from: '/lamad/resource/{id}', to: '/epr/{id}' }],
+  hostnames: [],
+  channel: 'converged',
 };
 
 describe('metadataDrift — null-vs-missing normalization', () => {
@@ -334,5 +341,118 @@ describe('seedProjections — 409 drift vs idempotent handling', () => {
     // Must NOT throw / process.exit — re-grant-already-applied is idempotent.
     await expect(seedProjections(client, [lamadSpec])).resolves.toBeUndefined();
     expect(createCommitment).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ===========================================================================
+// Rung 4 slice 1 — hostnames and channel as contract terms
+//
+// Both are keys inside the project-epr Commitment's own `metadata_json`, so
+// they are notarized by construction and cost no entry type, no link type and
+// no DNA-hash move. What these tests pin is the part that is easy to get
+// silently wrong: the DEFAULTS. `hostnames: []` must mean "any host" and an
+// absent `channel` must mean `converged`, on both sides of the drift compare —
+// otherwise the arrival of the fields re-grants every contract in the fleet
+// for no routing-law change at all.
+// ===========================================================================
+
+describe('hostnames + channel — contract terms', () => {
+  it('carries hostnames and channel through metadataJson', () => {
+    const body = buildProjectionCommitmentBody({
+      ...lamadSpec,
+      hostnames: ['elohim.local', 'elohim.host'],
+      channel: 'converged',
+    });
+    const meta = JSON.parse(body.metadataJson);
+    expect(meta.hostnames).toEqual(['elohim.local', 'elohim.host']);
+    expect(meta.channel).toBe('converged');
+  });
+
+  it('absent hostnames normalizes to any-host ([]) and absent channel to converged', () => {
+    const m = projectionRelevantMetadata({});
+    expect(m.hostnames).toEqual([]);
+    expect(m.channel).toBe('converged');
+  });
+
+  it('an any-host converged seed does NOT drift against a pre-rung-4 row (no churn)', () => {
+    // The existing row materialized neither key. The desired seed declares
+    // both at their defaults. C10: an unknown field is never defaulted into
+    // MEANING — here the default IS today's behaviour, so the compare must be
+    // equal and no supersede may fire.
+    const { hostnames: _h, channel: _c, ...existing } = specToMetadata(lamadSpec);
+    const desired = specToMetadata({ ...lamadSpec, hostnames: [], channel: 'converged' });
+    expect(metadataDrift(desired, existing as Partial<ProjectionRelevantMetadata>)).toEqual([]);
+  });
+
+  it('binding a hostname IS operative routing-law drift (re-grants)', () => {
+    const before = specToMetadata(lamadSpec);
+    const after = specToMetadata(withHostnames(lamadSpec, ['alpha.elohim.local']));
+    expect(metadataDrift(after, before)).toEqual(['hostnames']);
+  });
+
+  it('moving the channel IS operative routing-law drift (re-grants)', () => {
+    const before = specToMetadata(lamadSpec);
+    const after = specToMetadata({ ...lamadSpec, channel: 'candidate' });
+    expect(metadataDrift(after, before)).toEqual(['channel']);
+  });
+
+  it('PROJECTION_RELEVANT_FIELDS still covers exactly the normalized keys', () => {
+    const keys = Object.keys(projectionRelevantMetadata({})).sort();
+    expect([...PROJECTION_RELEVANT_FIELDS].sort()).toEqual(keys);
+  });
+
+  it('the default seed set is any-host + converged — byte-for-byte today', () => {
+    const seeds = defaultProjectionSeeds();
+    expect(seeds.every((s) => s.hostnames.length === 0)).toBe(true);
+    expect(seeds.every((s) => s.channel === 'converged')).toBe(true);
+  });
+
+  it('hostnames and channel stay OUT of the contract id digest', () => {
+    // They are contract TERMS, not contract IDENTITY: a change to either is
+    // carried by the supersession ceremony (successor id `-r<fingerprint>`),
+    // never by minting a second base id for the same undertaking.
+    const base = baseProjectionId(lamadSpec);
+    expect(baseProjectionId(withHostnames(lamadSpec, ['alpha.elohim.local']))).toBe(base);
+    expect(baseProjectionId({ ...lamadSpec, channel: 'candidate' })).toBe(base);
+  });
+
+  it('but the re-grant fingerprint DOES move, so a bound contract supersedes', () => {
+    expect(regrantFingerprint(specToMetadata(withHostnames(lamadSpec, ['a.local'])))).not.toBe(
+      regrantFingerprint(specToMetadata(lamadSpec)),
+    );
+  });
+});
+
+describe('candidateChannelSpec — a candidate standing beside a converged contract', () => {
+  const candidate = candidateChannelSpec(lamadSpec, 'alpha.elohim.local');
+
+  it('is a DIFFERENT contract id (scope grows a host ref — a new row, deliberately)', () => {
+    expect(baseProjectionId(candidate)).not.toBe(baseProjectionId(lamadSpec));
+  });
+
+  it('scopes itself by host so the two can never collide on one id', () => {
+    const body = buildProjectionCommitmentBody(candidate);
+    expect(body.inScopeOf).toBe(
+      'doorway:alpha-elohim-host|epr:lamad-spa|host:alpha.elohim.local',
+    );
+  });
+
+  it('serves the candidate channel at exactly the candidate hostname', () => {
+    const meta = JSON.parse(buildProjectionCommitmentBody(candidate).metadataJson);
+    expect(meta.channel).toBe('candidate');
+    expect(meta.hostnames).toEqual(['alpha.elohim.local']);
+  });
+
+  it('never declares commons reach on a staging name', () => {
+    expect(candidate.reach).not.toBe('commons');
+    expect(candidateChannelSpec(lamadSpec, 'a.local', 'qahal:stewards').reach).toBe(
+      'qahal:stewards',
+    );
+  });
+
+  it('leaves the converged contract untouched', () => {
+    expect(lamadSpec.channel).toBe('converged');
+    expect(lamadSpec.hostnames).toEqual([]);
+    expect(lamadSpec.scopeHost).toBeUndefined();
   });
 });
