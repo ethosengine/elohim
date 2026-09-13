@@ -11,7 +11,8 @@
 # ── THE TWO LEGS ────────────────────────────────────────────────────────────
 #
 # 1. CONVERGENCE, from this peer's own `GET <storage>/p2p/status`:
-#      projectionReconcile.converged === true
+#      projectionReconcile.converged === true on a sweep newer than the first
+#      post-restart reading
 #    OR healedTotal ADVANCING while divergentAnchor FALLS, with sweeps
 #    strictly advancing (proof a FRESH sweep produced the movement, not a
 #    stale gauge holding its last value — the same discipline
@@ -25,7 +26,9 @@
 #
 #    COUNTER-RESET NOTE: healedTotal/sweeps are per-PROCESS-LIFETIME counters.
 #    The baseline is therefore taken from the FIRST successful poll after the
-#    restart (a reading of the NEW process), never from a pre-roll value. If a
+#    restart. Even `converged: true` must then arrive with a strictly newer
+#    sweep; the storage sidecar survives a conductor restart, so its first
+#    status can still be the pre-restart snapshot. If a
 #    later poll reads LOWER than the baseline, the process restarted again
 #    (crash-loop) — the baseline is re-anchored and said so, rather than
 #    silently comparing across two process lifetimes.
@@ -62,8 +65,9 @@
 #
 # The effective per-peer deadline is FAIR-SHARE CLAMPED against a whole-phase
 # budget carried in <state-file>:
-#     effective = min(ROLL_PEER_DEADLINE_SECS,
-#                     max(ROLL_PEER_MIN_DEADLINE_SECS, budget_left / gates_left))
+#     effective = min(ROLL_PEER_DEADLINE_SECS, budget_left / gates_left)
+# The configured minimum is a requested floor only; it is subordinate to fair
+# share so it can never consume time reserved for later gates.
 # Without the clamp, 6 gates x 900s = 90 min of gate wall-clock would push the
 # Deploy stage past the pipeline-global 120-min option — and an interrupt at
 # that level cannot be caught by a stage's catchError (edge #1406-#1408: a
@@ -77,7 +81,7 @@
 # Env knobs:
 #   ROLL_PROM_URL               Prometheus query base (no trailing /api/v1)
 #   ROLL_PEER_DEADLINE_SECS     per-peer ceiling (default 900)
-#   ROLL_PEER_MIN_DEADLINE_SECS fair-share floor (default 120)
+#   ROLL_PEER_MIN_DEADLINE_SECS requested floor (default 120; fair share wins)
 #   ROLL_SEQUENCE_DEADLINE_SECS whole-phase budget seeded on first call (2700)
 #   ROLL_POLL_SECS              seconds between polls (default 30)
 #   ROLL_THROTTLE_MAX           throttle ratio ceiling (default 0.9)
@@ -110,6 +114,13 @@ for v in "$PEER" "$STORAGE_URL" "$NAMESPACE" "$POD" "$GATES_REMAINING" "$STATE_F
   if [ -z "$v" ]; then usage; exit 1; fi
 done
 
+for cmd in curl python3 awk sed tail date sleep; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "peer-roll-gate: required command not found: ${cmd}" >&2
+    exit 1
+  fi
+done
+
 PROM_URL="${ROLL_PROM_URL:-http://kube-prom-stack-kube-prometheus-prometheus.observability.svc.cluster.local:9090}"
 PROM_URL="${PROM_URL%/}"
 PEER_DEADLINE="${ROLL_PEER_DEADLINE_SECS:-900}"
@@ -119,6 +130,29 @@ POLL_SECS="${ROLL_POLL_SECS:-30}"
 THROTTLE_MAX="${ROLL_THROTTLE_MAX:-0.9}"
 WINDOW="${ROLL_THROTTLE_WINDOW:-5m}"
 CURL_TIMEOUT="${ROLL_CURL_TIMEOUT_SECS:-20}"
+
+require_positive_integer() {
+  local name="$1" value="$2"
+  if ! [[ "$value" =~ ^[1-9][0-9]*$ ]]; then
+    echo "peer-roll-gate: ${name} must be a canonical positive integer, got '${value}'" >&2
+    exit 1
+  fi
+}
+
+require_nonnegative_integer() {
+  local name="$1" value="$2"
+  if ! [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]]; then
+    echo "peer-roll-gate: ${name} must be a canonical nonnegative integer, got '${value}'" >&2
+    exit 1
+  fi
+}
+
+require_positive_integer ROLL_PEER_DEADLINE_SECS "$PEER_DEADLINE"
+require_positive_integer ROLL_PEER_MIN_DEADLINE_SECS "$MIN_DEADLINE"
+require_nonnegative_integer ROLL_SEQUENCE_DEADLINE_SECS "$SEQ_BUDGET"
+require_positive_integer ROLL_POLL_SECS "$POLL_SECS"
+require_positive_integer ROLL_CURL_TIMEOUT_SECS "$CURL_TIMEOUT"
+require_positive_integer gates-remaining "$GATES_REMAINING"
 
 SUMMARY_FILE="${STATE_FILE}.summary"
 
@@ -135,40 +169,57 @@ if [ -f "$STATE_FILE" ]; then
   if [ -n "$from_file" ]; then BUDGET_LEFT="$from_file"; fi
 fi
 
-# Non-numeric or <1 collapses to 1 — a bad gates-remaining must never reach
-# awk and divide the budget by zero.
-case "$GATES_REMAINING" in
-  ''|*[!0-9]*) gates_left=1 ;;
-  *) gates_left="$GATES_REMAINING"; [ "$gates_left" -ge 1 ] || gates_left=1 ;;
-esac
+gates_left="$GATES_REMAINING"
 
-case "$BUDGET_LEFT" in
-  ''|*[!0-9]*) BUDGET_LEFT="$SEQ_BUDGET" ;;
-esac
+require_nonnegative_integer BUDGET_LEFT "$BUDGET_LEFT"
 
 DEADLINE=$(awk -v budget="$BUDGET_LEFT" -v gates="$gates_left" \
                -v ceil="$PEER_DEADLINE" -v floor="$MIN_DEADLINE" 'BEGIN{
-  share = budget / gates;
-  if (share < floor) share = floor;
-  if (share > ceil) share = ceil;
-  if (share < 1) share = 1;
-  printf "%d", share;
+  fair = budget / gates;
+  allocation = fair;
+  if (allocation < floor) allocation = floor;
+  if (allocation > ceil) allocation = ceil;
+  # The floor is aspirational. It may never consume time reserved for later
+  # gates, so fair share is the final cap when the remaining phase budget
+  # cannot fund the configured floor for every remaining gate.
+  if (allocation > fair) allocation = fair;
+  if (allocation > budget) allocation = budget;
+  if (allocation < 0) allocation = 0;
+  printf "%d", allocation;
 }')
 
 log "gate opening — deadline=${DEADLINE}s (ceiling=${PEER_DEADLINE}s, budget-left=${BUDGET_LEFT}s over ${gates_left} remaining gate(s), floor=${MIN_DEADLINE}s) poll=${POLL_SECS}s throttle-max=${THROTTLE_MAX} window=${WINDOW}"
 
+start_ts=$(date +%s)
+deadline_ts=$((start_ts + DEADLINE))
+
+remaining_secs() {
+  local now remaining
+  now=$(date +%s)
+  remaining=$((deadline_ts - now))
+  if [ "$remaining" -lt 0 ]; then remaining=0; fi
+  printf '%s\n' "$remaining"
+}
+
+request_timeout() {
+  local remaining="$1"
+  if [ "$remaining" -lt "$CURL_TIMEOUT" ]; then
+    printf '%s\n' "$remaining"
+  else
+    printf '%s\n' "$CURL_TIMEOUT"
+  fi
+}
+
 # ── Prometheus reachability probe (once) ────────────────────────────────────
 THROTTLE_LEG="on"
-if ! curl -fsS --max-time "$CURL_TIMEOUT" -G "${PROM_URL}/api/v1/query" \
+remaining=$(remaining_secs)
+if [ "$remaining" -gt 0 ] && ! curl -fsS --max-time "$(request_timeout "$remaining")" -G "${PROM_URL}/api/v1/query" \
       --data-urlencode 'query=up' >/dev/null 2>&1; then
   THROTTLE_LEG="degraded"
   log "DEGRADED — Prometheus at ${PROM_URL} is not answering; the CFS-throttle leg is OFF for this peer and the gate runs on the convergence leg alone. Set ROLL_PROM_URL to the cluster's kube-prometheus-stack query endpoint to restore it."
 fi
 
 THROTTLE_QUERY="rate(container_cpu_cfs_throttled_periods_total{namespace=\"${NAMESPACE}\",container=\"elohim-conductor\",pod=\"${POD}\"}[${WINDOW}]) / rate(container_cpu_cfs_periods_total{namespace=\"${NAMESPACE}\",container=\"elohim-conductor\",pod=\"${POD}\"}[${WINDOW}])"
-
-start_ts=$(date +%s)
-deadline_ts=$((start_ts + DEADLINE))
 
 base_healed=""
 base_divergent=""
@@ -180,12 +231,23 @@ outcome="DEADLINE"
 while :; do
   now=$(date +%s)
 
-  status_raw=$(curl -fsS --max-time "$CURL_TIMEOUT" "${STORAGE_URL}/p2p/status" 2>/dev/null) || status_raw=""
+  if [ "$now" -ge "$deadline_ts" ]; then
+    outcome="DEADLINE"
+    log "DEADLINE ${DEADLINE}s reached — ${last_summary} — CONTINUING to the next peer. This peer is recorded as unsettled in the roll summary; Dataplane Validation's fleet-quiesce gate judges the fleet. A stalled peer does not abort the roll."
+    break
+  fi
+
+  remaining=$(remaining_secs)
+  if [ "$remaining" -le 0 ]; then continue; fi
+  status_raw=$(curl -fsS --max-time "$(request_timeout "$remaining")" "${STORAGE_URL}/p2p/status" 2>/dev/null) || status_raw=""
 
   throttle_raw=""
   if [ "$THROTTLE_LEG" = "on" ]; then
-    throttle_raw=$(curl -fsS --max-time "$CURL_TIMEOUT" -G "${PROM_URL}/api/v1/query" \
-                     --data-urlencode "query=${THROTTLE_QUERY}" 2>/dev/null) || throttle_raw=""
+    remaining=$(remaining_secs)
+    if [ "$remaining" -gt 0 ]; then
+      throttle_raw=$(curl -fsS --max-time "$(request_timeout "$remaining")" -G "${PROM_URL}/api/v1/query" \
+                       --data-urlencode "query=${THROTTLE_QUERY}" 2>/dev/null) || throttle_raw=""
+    fi
   fi
 
   parsed=$(STATUS="$status_raw" THROTTLE="$throttle_raw" python3 - <<'PYEOF'
@@ -267,24 +329,24 @@ PYEOF
   converge_ok=0
   converge_why="no-status"
   if [ "$pr_ok" = "1" ]; then
-    if [ "$converged" = "1" ]; then
+    if [ -z "$base_healed" ]; then
+      base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
+      converge_why="baseline-anchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
+    elif [ "$healed" -lt "$base_healed" ] || [ "$sweeps" -lt "$base_sweeps" ]; then
+      # Counters went backwards: the peer's process restarted under us. Two
+      # process lifetimes are not comparable — re-anchor, never subtract.
+      base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
+      converge_why="counter-reset-reanchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
+    elif [ "$sweeps" -le "$base_sweeps" ]; then
+      converge_why="awaiting-fresh-sweep(baseline=${base_sweeps},current=${sweeps})"
+    elif [ "$converged" = "1" ]; then
       converge_ok=1
-      converge_why="converged"
+      converge_why="converged(fresh-sweep ${base_sweeps}->${sweeps})"
+    elif [ "$healed" -gt "$base_healed" ] && [ "$divergent" -lt "$base_divergent" ]; then
+      converge_ok=1
+      converge_why="healing(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
     else
-      if [ -z "$base_healed" ]; then
-        base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
-        converge_why="baseline-anchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
-      elif [ "$healed" -lt "$base_healed" ] || [ "$sweeps" -lt "$base_sweeps" ]; then
-        # Counters went backwards: the peer's process restarted under us. Two
-        # process lifetimes are not comparable — re-anchor, never subtract.
-        base_healed="$healed"; base_divergent="$divergent"; base_sweeps="$sweeps"
-        converge_why="counter-reset-reanchored(healed=${healed},divergent=${divergent},sweeps=${sweeps})"
-      elif [ "$sweeps" -gt "$base_sweeps" ] && [ "$healed" -gt "$base_healed" ] && [ "$divergent" -lt "$base_divergent" ]; then
-        converge_ok=1
-        converge_why="healing(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
-      else
-        converge_why="no-movement(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
-      fi
+      converge_why="no-movement(healed ${base_healed}->${healed}, divergentAnchor ${base_divergent}->${divergent}, sweeps ${base_sweeps}->${sweeps})"
     fi
   fi
 
@@ -319,7 +381,10 @@ PYEOF
     break
   fi
 
-  sleep "$POLL_SECS"
+  remaining=$(remaining_secs)
+  sleep_for="$POLL_SECS"
+  if [ "$remaining" -lt "$sleep_for" ]; then sleep_for="$remaining"; fi
+  if [ "$sleep_for" -gt 0 ]; then sleep "$sleep_for"; fi
 done
 
 end_ts=$(date +%s)

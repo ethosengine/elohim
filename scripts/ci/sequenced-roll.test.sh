@@ -110,6 +110,9 @@ curl() {
       cat "${FAKE_DIR}/throttle.json"
       ;;
     *'/p2p/status'*)
+      if [ -f "${FAKE_DIR}/status-delay-secs" ]; then
+        sleep "$(cat "${FAKE_DIR}/status-delay-secs")"
+      fi
       n=$(cat "${FAKE_DIR}/poll" 2>/dev/null || echo 0)
       n=$((n + 1))
       printf '%s' "${n}" > "${FAKE_DIR}/poll"
@@ -146,7 +149,8 @@ export ROLL_PROM_URL='http://prom.test:9090'
 
 # ── 5. A peer that CONVERGES releases the roll (exit 0) ─────────────────────
 new_fake converged
-pr true 10 0 5 > "${FAKE_DIR}/status.json"
+pr true 10 0 5 > "${FAKE_DIR}/status-1.json" # stale pre-restart snapshot: anchor only
+pr true 10 0 6 > "${FAKE_DIR}/status.json"   # a fresh post-anchor sweep may release
 STATE="${TEST_ROOT}/state-converged"
 set +e
 ROLL_PEER_DEADLINE_SECS=10 bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 1 "${STATE}" \
@@ -155,7 +159,10 @@ RC=$?
 set -e
 [ "${RC}" -eq 0 ] || { cat "${TEST_ROOT}/gate-converged.log"; fail "converging peer should exit 0, got ${RC}"; }
 grep -q 'RELEASED' "${TEST_ROOT}/gate-converged.log" || fail 'converging peer did not log RELEASED'
-grep -q 'converge=converged' "${TEST_ROOT}/gate-converged.log" || fail 'converged reason missing'
+grep -q 'baseline-anchored(healed=10,divergent=0,sweeps=5)' "${TEST_ROOT}/gate-converged.log" \
+  || fail 'stale converged snapshot was not anchored before release'
+grep -q 'converge=converged(fresh-sweep 5->6)' "${TEST_ROOT}/gate-converged.log" \
+  || fail 'fresh converged reason missing'
 grep -q 'throttle=ratio=0.4200<0.9' "${TEST_ROOT}/gate-converged.log" || fail 'throttle leg did not read the ratio'
 grep -q '^eve|RELEASED|' "${STATE}.summary" || fail 'roll summary missing the RELEASED record'
 grep -q '^BUDGET_LEFT=' "${STATE}" || fail 'budget state not written'
@@ -182,15 +189,20 @@ grep -q 'caughtUp=1(telemetry-only)' "${TEST_ROOT}/gate-healing.log" \
 
 # ── 6. A peer that does NOT settle hits its deadline, is SKIPPED (exit 3) ───
 new_fake stalled
-pr false 100 40 7 > "${FAKE_DIR}/status.json"     # frozen: no sweep, no heal
+pr false 100 40 7 > "${FAKE_DIR}/status-1.json"   # baseline
+pr false 100 40 8 > "${FAKE_DIR}/status.json"     # fresh but no heal
 STATE="${TEST_ROOT}/state-stalled"
 set +e
-ROLL_PEER_DEADLINE_SECS=2 bash "${GATE}" gertrude http://gertrude:8090 elohim-alpha gertrude-conductor-0 1 "${STATE}" \
+# Allow enough wall-clock for two complete status/throttle/parse cycles even
+# when the host is under process pressure. A 2s allocation can expire after
+# the baseline cycle alone, making the assertion below depend on scheduler
+# timing instead of gate behavior.
+ROLL_PEER_DEADLINE_SECS=5 bash "${GATE}" gertrude http://gertrude:8090 elohim-alpha gertrude-conductor-0 1 "${STATE}" \
   > "${TEST_ROOT}/gate-stalled.log" 2>&1
 RC=$?
 set -e
 [ "${RC}" -eq 3 ] || { cat "${TEST_ROOT}/gate-stalled.log"; fail "stalled peer should exit 3 (continue), got ${RC}"; }
-grep -q 'DEADLINE 2s reached' "${TEST_ROOT}/gate-stalled.log" || fail 'stalled peer did not log its deadline'
+grep -q 'DEADLINE 5s reached' "${TEST_ROOT}/gate-stalled.log" || fail 'stalled peer did not log its deadline'
 grep -q 'CONTINUING to the next peer' "${TEST_ROOT}/gate-stalled.log" \
   || fail 'a stalled peer must explicitly continue the roll, never abort it'
 grep -q 'no-movement(healed 100->100' "${TEST_ROOT}/gate-stalled.log" || fail 'stalled reading not recorded'
@@ -210,7 +222,8 @@ grep -q 'converge=no-status' "${TEST_ROOT}/gate-unreachable.log" || fail 'missin
 
 # ── 6c. A throttled conductor holds the roll ────────────────────────────────
 new_fake throttled
-pr true 10 0 5 > "${FAKE_DIR}/status.json"
+pr true 10 0 5 > "${FAKE_DIR}/status-1.json"
+pr true 10 0 6 > "${FAKE_DIR}/status.json"
 printf '{"status":"success","data":{"result":[{"value":[0,"1.0"]}]}}' > "${FAKE_DIR}/throttle.json"
 STATE="${TEST_ROOT}/state-throttled"
 set +e
@@ -223,7 +236,8 @@ grep -q 'throttle=ratio=1.0000>=0.9' "${TEST_ROOT}/gate-throttled.log" || fail '
 
 # ── 6d. Prometheus unreachable DEGRADES the throttle leg, never wedges ──────
 new_fake promdown
-pr true 10 0 5 > "${FAKE_DIR}/status.json"
+pr true 10 0 5 > "${FAKE_DIR}/status-1.json"
+pr true 10 0 6 > "${FAKE_DIR}/status.json"
 touch "${FAKE_DIR}/prom-down"
 STATE="${TEST_ROOT}/state-promdown"
 set +e
@@ -238,7 +252,8 @@ grep -q 'throttle-leg=degraded' "${STATE}.summary" || fail 'degraded leg not rec
 # ── 7. Fair-share clamp keeps the phase inside its budget ───────────────────
 # 5 gates left against a 20s budget => 4s share, under the 10s per-peer ceiling.
 new_fake clamp
-pr true 10 0 5 > "${FAKE_DIR}/status.json"
+pr true 10 0 5 > "${FAKE_DIR}/status-1.json"
+pr true 10 0 6 > "${FAKE_DIR}/status.json"
 STATE="${TEST_ROOT}/state-clamp"
 set +e
 ROLL_PEER_DEADLINE_SECS=10 bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 5 "${STATE}" \
@@ -248,6 +263,71 @@ set -e
 [ "${RC}" -eq 0 ] || fail "clamp case should still release (got ${RC})"
 grep -q 'deadline=4s (ceiling=10s, budget-left=20s over 5 remaining gate(s)' "${TEST_ROOT}/gate-clamp.log" \
   || { cat "${TEST_ROOT}/gate-clamp.log"; fail 'fair-share clamp did not divide the phase budget across the remaining gates'; }
+
+# ── 7b. Remaining phase budget beats the floor and bounds slow calls ────────
+# Two seconds remain, two gates remain, and the configured floor is 120s. The
+# allocation must be 1s, and a slow status request must not let a throttle call
+# or poll sleep extend this gate beyond the allocated wall-clock.
+new_fake hard-budget
+pr true 10 0 5 > "${FAKE_DIR}/status.json"
+printf '1' > "${FAKE_DIR}/status-delay-secs"
+STATE="${TEST_ROOT}/state-hard-budget"
+START=$(date +%s)
+set +e
+ROLL_SEQUENCE_DEADLINE_SECS=2 ROLL_PEER_MIN_DEADLINE_SECS=120 ROLL_PEER_DEADLINE_SECS=900 \
+  bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 2 "${STATE}" \
+  > "${TEST_ROOT}/gate-hard-budget.log" 2>&1
+RC=$?
+set -e
+ELAPSED=$(( $(date +%s) - START ))
+[ "${RC}" -eq 3 ] || fail "hard-budget case should reach its measured deadline (got ${RC})"
+grep -q 'deadline=1s (ceiling=900s, budget-left=2s over 2 remaining gate(s), floor=120s)' \
+  "${TEST_ROOT}/gate-hard-budget.log" || fail 'remaining budget did not cap the minimum deadline floor'
+[ "${ELAPSED}" -le 2 ] || { cat "${TEST_ROOT}/gate-hard-budget.log"; fail "slow curl/sleep overran the 1s allocation (${ELAPSED}s)"; }
+
+# ── 7c. Runtime/deadline contract failures are loud implementation errors ──
+# Build a PATH containing every declared dependency except curl. The helper
+# must fail at entry (rc 1), before it can degrade or swallow the missing tool.
+NO_CURL_BIN="${TEST_ROOT}/no-curl-bin"
+mkdir -p "${NO_CURL_BIN}"
+for cmd in python3 awk sed tail date sleep; do
+  ln -s "$(command -v "$cmd")" "${NO_CURL_BIN}/${cmd}"
+done
+set +e
+( unset -f curl; PATH="${NO_CURL_BIN}" /bin/bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 1 "${TEST_ROOT}/state-no-curl" ) \
+  > "${TEST_ROOT}/gate-no-curl.log" 2>&1
+RC=$?
+set -e
+[ "${RC}" -eq 1 ] || fail "missing curl must be an implementation error (got ${RC})"
+grep -q 'required command not found: curl' "${TEST_ROOT}/gate-no-curl.log" \
+  || fail 'missing curl was swallowed instead of diagnosed'
+
+# Zero/malformed timing knobs must fail before awk/curl. In particular, a zero
+# curl timeout must never reach curl as `--max-time 0` (which means unlimited).
+new_fake bad-timeout
+pr true 10 0 5 > "${FAKE_DIR}/status.json"
+for bad_timeout in 0 00; do
+  set +e
+  ROLL_CURL_TIMEOUT_SECS="$bad_timeout" bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 1 "${TEST_ROOT}/state-zero-timeout" \
+    > "${TEST_ROOT}/gate-zero-timeout.log" 2>&1
+  RC=$?
+  set -e
+  [ "${RC}" -eq 1 ] || fail "curl timeout ${bad_timeout} must fail at entry (got ${RC})"
+  grep -q 'ROLL_CURL_TIMEOUT_SECS must be a canonical positive integer' "${TEST_ROOT}/gate-zero-timeout.log" \
+    || fail "curl timeout ${bad_timeout} was not diagnosed"
+  if grep -q -- '--max-time 0' "${TEST_ROOT}/gate-zero-timeout.log"; then
+    fail "curl timeout ${bad_timeout} reached curl as an unlimited request"
+  fi
+done
+
+set +e
+ROLL_PEER_DEADLINE_SECS=oops bash "${GATE}" eve http://eve:8090 elohim-alpha eve-conductor-0 1 "${TEST_ROOT}/state-bad-deadline" \
+  > "${TEST_ROOT}/gate-bad-deadline.log" 2>&1
+RC=$?
+set -e
+[ "${RC}" -eq 1 ] || fail "malformed peer deadline must fail at entry (got ${RC})"
+grep -q 'ROLL_PEER_DEADLINE_SECS must be a canonical positive integer' "${TEST_ROOT}/gate-bad-deadline.log" \
+  || fail 'malformed peer deadline was silently coerced'
 
 # ── 8. Jenkinsfile wiring ───────────────────────────────────────────────────
 grep -Fq "scripts/ci/sequenced-roll-plan.sh" "${JENKINSFILE}" || fail 'Jenkinsfile does not call the plan helper'
@@ -269,9 +349,14 @@ grep -Fq 'HALTED — no gate run' "${JENKINSFILE}" \
 if grep -Eq '^\s*(cron|triggers)\s*\(' "${JENKINSFILE}"; then
   fail 'a timer trigger appeared in the edge Jenkinsfile'
 fi
-# The gate must never be able to abort the roll.
-grep -Fq 'The roll is never aborted by its own gate.' "${JENKINSFILE}" \
-  || fail 'gate non-fatality contract missing from the Jenkinsfile'
+# A measured deadline continues, but an implementation/environment failure
+# must mark UNSTABLE and feed the existing halt-on-first-failure state.
+grep -Fq 'helper exited ${rc} (implementation or environment failure) — remaining conductors are HELD' "${JENKINSFILE}" \
+  || fail 'unexpected gate helper errors are not surfaced as UNSTABLE'
+grep -Fq 'if (!runPeerRollGate(' "${JENKINSFILE}" \
+  || fail 'gate helper result is not wired into the conductor halt state'
+grep -Fq 'rollState.halted = true' "${JENKINSFILE}" \
+  || fail 'unexpected gate helper errors do not halt remaining conductors'
 # Read-only helpers: neither script may mutate the cluster.
 for s in "${PLAN}" "${GATE}"; do
   if grep -Eq 'kubectl (apply|delete|patch|replace|rollout|scale|annotate)' "${s}"; then

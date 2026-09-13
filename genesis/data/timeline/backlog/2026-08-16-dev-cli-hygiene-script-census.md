@@ -124,6 +124,15 @@ by count alone; the next removal requires a consumer migration or deadness proof
 
 ## Evidence
 
+- **Open follow-up, 2026-09-13:** `just mesh coordswap --happ … --peers … --json`
+  exits 2 in the root dispatcher, although `hc-mesh.sh coordswap` is implemented,
+  guarded by `guard_conductor_data_roots`, and documented by the lifecycle skill.
+  Interrupted-sprint recovery had to find the lower-level entrypoint to perform
+  a local read-only preview. Add the missing arm under the existing `mesh` verb
+  in the next CLI pass, synchronizing the package-owned lifecycle guidance and
+  root gospel. Verify argument forwarding with a non-mutating preview; keep
+  `--apply` explicit. No new verb or independent rollout script is needed.
+
 - `validate-manifests.mjs`: 13 manifests, 33 build steps, 0 errors.
 - orchestrator suite: 101/101 tests green, including typed execution, path
   resolution, gate-only inputs, seeding safety, seam-contracts, and cargo

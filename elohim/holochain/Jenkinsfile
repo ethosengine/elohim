@@ -876,7 +876,12 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
             } else if (rollState.lastRolled == null) {
                 echo "roll gate step ${step.index} (${step.phase}): no conductor CHANGED in this step — nothing restarted, nothing to settle, no gate. Steady-state deploys pay zero gate wall-clock."
             } else {
-                runPeerRollGate(byName[rollState.lastRolled], "${gateState.left}", stateFile)
+                if (!runPeerRollGate(byName[rollState.lastRolled], "${gateState.left}", stateFile)) {
+                    // An implementation/environment failure is different from a
+                    // measured deadline. Preserve the shared-artifact safety
+                    // rule: mark this deploy UNSTABLE and hold every later peer.
+                    rollState.halted = true
+                }
             }
             gateState.left = gateState.left - 1
         }
@@ -926,12 +931,13 @@ def sequencedConductorPlan(List humans) {
 /**
  * Hold the roll on ONE peer until it settles, then release to the next.
  *
- * Non-fatal BY CONSTRUCTION: exit 3 (deadline reached) and any other non-zero
- * exit are logged and CONTINUE. A stalled peer must not abort a fleet roll —
+ * Exit 3 (deadline reached) is logged and CONTINUES. A stalled peer must not
+ * abort a fleet roll —
  * that is museum trap #1's discipline applied to a deploy predicate: a
  * no-measure outcome is not a failure verdict. The unsettled peer is recorded
  * in the roll summary and Dataplane Validation's fleet-quiesce gate judges the
- * fleet afterwards.
+ * fleet afterwards. Any other exit is an implementation/environment failure:
+ * mark the build UNSTABLE and return false so the caller halts later peers.
  */
 def runPeerRollGate(Map humanConfig, String gatesLeft, String stateFile) {
     def storageUrl = "http://${humanConfig.resourcePrefix}.${humanConfig.namespace}.svc.cluster.local:8090"
@@ -942,10 +948,13 @@ def runPeerRollGate(Map humanConfig, String gatesLeft, String stateFile) {
     )
     if (rc == 0) {
         echo "roll gate: ${humanConfig.name} settled — releasing the roll to the next peer"
+        return true
     } else if (rc == 3) {
         echo "roll gate: ${humanConfig.name} did not settle inside its deadline — CONTINUING to the next peer. Recorded in the roll summary; Dataplane Validation judges the fleet. This is a no-measure outcome, not a verdict."
+        return true
     } else {
-        echo "roll gate: ${humanConfig.name} gate helper exited ${rc} (usage or environment) — CONTINUING. The roll is never aborted by its own gate."
+        unstable("roll gate: ${humanConfig.name} helper exited ${rc} (implementation or environment failure) — remaining conductors are HELD")
+        return false
     }
 }
 

@@ -179,6 +179,9 @@ def mins(secs):
 
 if sequenced:
     ungated_worst = gates * peer_deadline
+    # peer-roll-gate caps every allocation, request and sleep at the remaining
+    # sequence budget, so this is a hard gate-phase bound (apart from sub-second
+    # process scheduling, reported by the gate's whole-second clock).
     effective_worst = min(ungated_worst, seq_budget)
 else:
     ungated_worst = 0

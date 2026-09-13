@@ -337,6 +337,26 @@ drifted_count() { json_field "$1" driftedCount "?"; }
 applied_count()  { json_field "$1" appliedCount "?"; }
 err_message()    { json_field "$1" error ""; }
 
+# role_errors <json> — compact, human-readable list of per-role failures.
+# The coordinator endpoint deliberately returns HTTP 200 after a partial
+# per-role sweep, so transport success alone is not a safe apply precondition.
+role_errors() {
+  if [ "${JSON_ENGINE}" = "jq" ]; then
+    printf '%s' "$1" | jq -r '
+      (.roles // [])
+      | map(select(.error != null and .error != "") | "\(.role): \(.error)")
+      | join("; ")
+    ' 2>/dev/null || true
+  else
+    python3 -c 'import json, sys
+try:
+    roles = json.loads(sys.argv[1]).get("roles", [])
+    print("; ".join("{}: {}".format(r.get("role", "?"), r.get("error")) for r in roles if isinstance(r, dict) and r.get("error")))
+except Exception:
+    pass' "$1" 2>/dev/null || true
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Per-peer report accumulator (for the final table and --json output).
 # Each report is one compact JSON object appended to REPORTS[].
@@ -389,10 +409,15 @@ run_status_sweep() {
     call_sync "${url}" "false"
 
     if [ "${LAST_HTTP_CODE}" = "200" ]; then
-      local drifted applied
+      local drifted applied role_error
       drifted="$(drifted_count "${LAST_BODY}")"
       applied="$(applied_count "${LAST_BODY}")"
-      if [ "${drifted}" = "0" ]; then
+      role_error="$(role_errors "${LAST_BODY}")"
+      if [ -n "${role_error}" ]; then
+        any_unreachable=1
+        add_report "${name}" "${url}" "error" "${LAST_HTTP_CODE}" "${drifted}" "${applied}" "${role_error}"
+        [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${drifted}" "${applied}" "ERROR: ${role_error}"
+      elif [ "${drifted}" = "0" ]; then
         add_report "${name}" "${url}" "up-to-date" "${LAST_HTTP_CODE}" "${drifted}" "${applied}" ""
         [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${drifted}" "${applied}" "up-to-date"
       else
@@ -467,8 +492,16 @@ run_rolling_apply() {
       return 1
     fi
 
-    local pre_drifted
+    local pre_drifted precheck_error
     pre_drifted="$(drifted_count "${LAST_BODY}")"
+    precheck_error="$(role_errors "${LAST_BODY}")"
+
+    if [ -n "${precheck_error}" ]; then
+      add_report "${name}" "${url}" "failed-pre-check" "${LAST_HTTP_CODE}" "${pre_drifted}" "0" "${precheck_error}"
+      [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${pre_drifted}" "0" "FAILED (pre-check): ${precheck_error}"
+      report_rollout_failure "${updated_count}" "${total}" "${i}"
+      return 1
+    fi
 
     if [ "${pre_drifted}" = "0" ]; then
       current_count=$((current_count + 1))
@@ -495,8 +528,15 @@ run_rolling_apply() {
       return 1
     fi
 
-    local applied
+    local applied apply_error
     applied="$(applied_count "${LAST_BODY}")"
+    apply_error="$(role_errors "${LAST_BODY}")"
+    if [ -n "${apply_error}" ]; then
+      add_report "${name}" "${url}" "failed-apply" "${LAST_HTTP_CODE}" "${pre_drifted}" "${applied}" "${apply_error}"
+      [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${pre_drifted}" "${applied}" "FAILED (apply): ${apply_error}"
+      report_rollout_failure "${updated_count}" "${total}" "${i}"
+      return 1
+    fi
 
     # Step 3: re-dry-run to verify drift is now 0.
     call_sync "${url}" "false"
@@ -510,8 +550,15 @@ run_rolling_apply() {
       return 1
     fi
 
-    local post_drifted
+    local post_drifted verify_error
     post_drifted="$(drifted_count "${LAST_BODY}")"
+    verify_error="$(role_errors "${LAST_BODY}")"
+    if [ -n "${verify_error}" ]; then
+      add_report "${name}" "${url}" "failed-verify" "${LAST_HTTP_CODE}" "${post_drifted}" "${applied}" "${verify_error}"
+      [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${post_drifted}" "${applied}" "FAILED (verify): ${verify_error}"
+      report_rollout_failure "${updated_count}" "${total}" "${i}"
+      return 1
+    fi
     if [ "${post_drifted}" != "0" ]; then
       add_report "${name}" "${url}" "failed-verify" "${LAST_HTTP_CODE}" "${post_drifted}" "${applied}" "drift remained after apply"
       [ "${JSON_OUT}" -eq 1 ] || print_human_line "${name}" "${post_drifted}" "${applied}" "FAILED (verify): drift remained after apply"
