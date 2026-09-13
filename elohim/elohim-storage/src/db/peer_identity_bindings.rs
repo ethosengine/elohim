@@ -182,6 +182,41 @@ pub fn list_active_for_agent(
         })
 }
 
+/// Load active cross-signed bindings for a bounded set of agent spellings.
+///
+/// This is the non-metered identity-correlation read used by operational
+/// liveness folds. Economic attribution callers use
+/// [`list_attributable_for_agent_with_posture`], whose metrics intentionally
+/// count economic joins. Both paths share [`apply_attribution_posture`], so the
+/// Enforce policy cannot drift while operational reads remain telemetry-neutral.
+pub fn list_cross_signed_for_agents(
+    conn: &mut SqliteConnection,
+    agent_cids: &[String],
+    now_iso: &str,
+) -> Result<Vec<PeerIdentityBindingRow>, StorageError> {
+    use peer_identity_bindings::dsl;
+
+    if agent_cids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let active = dsl::peer_identity_bindings
+        .filter(dsl::agent_cid.eq_any(agent_cids))
+        .filter(dsl::valid_from.le(now_iso))
+        .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now_iso)))
+        .filter(dsl::superseded_by.is_null())
+        .order(dsl::observed_at.desc())
+        .load::<PeerIdentityBindingRow>(conn)
+        .map_err(|e| {
+            StorageError::Database(format!(
+                "peer_identity_bindings list_cross_signed_for_agents: {e}"
+            ))
+        })?;
+    Ok(apply_attribution_posture(
+        active,
+        AttributionPosture::Enforce,
+    ))
+}
+
 /// Does this node already hold a CURRENT cross-signed binding for
 /// `(agent_cid, peer_id)`?
 ///
@@ -419,10 +454,7 @@ pub fn list_attributable_for_agent_with_posture(
             .inc_by(unverified_seen as u64);
     }
 
-    let rows = match posture {
-        AttributionPosture::Observe => active,
-        AttributionPosture::Enforce => active.into_iter().filter(|r| r.is_cross_signed()).collect(),
-    };
+    let rows = apply_attribution_posture(active, posture);
 
     Ok(AttributableBindings {
         rows,
@@ -430,6 +462,16 @@ pub fn list_attributable_for_agent_with_posture(
         unverified_seen,
         examined,
     })
+}
+
+fn apply_attribution_posture(
+    rows: Vec<PeerIdentityBindingRow>,
+    posture: AttributionPosture,
+) -> Vec<PeerIdentityBindingRow> {
+    match posture {
+        AttributionPosture::Observe => rows,
+        AttributionPosture::Enforce => rows.into_iter().filter(|r| r.is_cross_signed()).collect(),
+    }
 }
 
 // ============================================================================

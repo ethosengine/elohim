@@ -628,7 +628,8 @@ pub(crate) struct HouseholdPeerCounts {
 /// `connected` is the local transport's CURRENT connected-peer view
 /// ([`crate::services::peer_liveness`]), or `None` when no transport plane armed
 /// it. When present it DECIDES `live`: a household peer is live iff this node
-/// can see it right now, under either label namespace. When absent the count
+/// can see an APB-bound unit's canonical transport PeerId right now (legacy
+/// unresolved tokens retain their existing exact-match semantics). When absent the count
 /// falls back to the `peer_statuses` heartbeat window, which is what this
 /// function has always done.
 ///
@@ -648,7 +649,7 @@ fn count_household_peers(
     identity: &HouseholdIdentity,
     staleness_secs: i64,
     now_micros: i64,
-    connected: Option<&HashSet<String>>,
+    connected: Option<&crate::services::peer_liveness::ConnectedSnapshot>,
 ) -> Result<HouseholdPeerCounts, StorageError> {
     use crate::db::diesel_schema::{humans, stewarded_nodes};
 
@@ -656,14 +657,16 @@ fn count_household_peers(
         return Ok(HouseholdPeerCounts::default());
     }
 
-    // Junction 1 — registered devices, keyed on whichever local alias the writer used.
+    // Junction 1 — registered-node tokens, keyed on whichever local alias the
+    // writer used. Legacy writers did not guarantee that `id` was a PeerId, so
+    // unresolved rows retain their existing token granularity.
     let alias_ids: Vec<String> = households
         .iter()
         .flat_map(|key| identity.aliases_of(key))
         .collect::<std::collections::BTreeSet<String>>()
         .into_iter()
         .collect();
-    let mut peers: HashSet<String> = stewarded_nodes::table
+    let mut legacy_tokens: HashSet<String> = stewarded_nodes::table
         .filter(stewarded_nodes::household_id.is_not_null())
         .filter(
             stewarded_nodes::household_id
@@ -676,38 +679,110 @@ fn count_household_peers(
         .into_iter()
         .collect();
 
-    // Junction 2 — the member rows the holder relation already trusts.
-    let member_rows: Vec<(Option<String>, Option<String>)> = humans::table
+    // Junction 2 — the member rows the holder relation already trusts. A human
+    // with one or more active, cross-signed agent-to-transport bindings expands
+    // to those transport PeerIds. Multiple role keys or humans may resolve to the
+    // same transport endpoint; the set deliberately counts that PeerId once (including a
+    // registered-node id already equal to that PeerId). Only a human
+    // with NO admissible binding retains its raw agent key as a legacy unit.
+    //
+    // This is an Enforce cut even when the fleet-wide attribution posture is
+    // Observe: correlating a person namespace with a transport namespace is a
+    // consent decision, and a self-asserted row cannot make that decision.
+    let member_rows: Vec<(String, Option<String>, Option<String>)> = humans::table
         .filter(humans::agent_pub_key.is_not_null())
         .filter(humans::household_id.is_not_null())
-        .select((humans::agent_pub_key, humans::household_id))
+        .filter(humans::household_id.assume_not_null().eq_any(&alias_ids))
+        .select((humans::id, humans::agent_pub_key, humans::household_id))
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("humans by household: {e}")))?;
-    for (agent_pub_key, household_id) in member_rows {
+    let now_iso = chrono::DateTime::from_timestamp_micros(now_micros)
+        .ok_or_else(|| StorageError::Internal(format!("invalid liveness clock: {now_micros}")))?
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string();
+    let mut household_members = Vec::new();
+    let mut candidate_ids = std::collections::BTreeSet::new();
+    for (human_id, agent_pub_key, household_id) in member_rows {
         let (Some(key), Some(hh)) = (agent_pub_key, household_id) else {
             continue;
         };
-        if households.contains(&identity.group_key(&hh)) {
-            peers.insert(key);
+        if !households.contains(&identity.group_key(&hh)) {
+            continue;
+        }
+
+        // Projection writers have used all three identity spellings over time.
+        // Normalize first so an already-prefixed key never becomes
+        // `agent:agent:...`. The one batch query remains bounded by the members
+        // of this household; there is no network work or per-human DB fan-out.
+        let bare_key = key.strip_prefix("agent:").unwrap_or(&key).to_string();
+        let candidates = std::collections::BTreeSet::from([
+            human_id,
+            bare_key.clone(),
+            format!("agent:{bare_key}"),
+        ]);
+        candidate_ids.extend(candidates.iter().cloned());
+        household_members.push((key, candidates));
+    }
+    let candidate_ids: Vec<String> = candidate_ids.into_iter().collect();
+    let mut peers_by_agent: std::collections::HashMap<String, HashSet<String>> =
+        std::collections::HashMap::new();
+    for binding in crate::db::peer_identity_bindings::list_cross_signed_for_agents(
+        conn,
+        &candidate_ids,
+        &now_iso,
+    )? {
+        peers_by_agent
+            .entry(binding.agent_cid)
+            .or_default()
+            .insert(binding.peer_id);
+    }
+    let mut bound_peer_ids = HashSet::new();
+    for (key, candidates) in household_members {
+        let member_peer_ids: HashSet<String> = candidates
+            .iter()
+            .filter_map(|candidate| peers_by_agent.get(candidate))
+            .flatten()
+            .cloned()
+            .collect();
+        if member_peer_ids.is_empty() {
+            legacy_tokens.insert(key);
+        } else {
+            bound_peer_ids.extend(member_peer_ids);
         }
     }
 
+    // A registered-node token may already equal an admitted PeerId. Once that
+    // endpoint is bound, exact transport evidence takes precedence; leaving a
+    // duplicate in the legacy set would let an accepted alias light it.
+    legacy_tokens.retain(|token| !bound_peer_ids.contains(token));
+
+    let peers: HashSet<String> = legacy_tokens.union(&bound_peer_ids).cloned().collect();
     if peers.is_empty() {
         return Ok(HouseholdPeerCounts::default());
     }
     let known = peers.len() as i32;
 
-    // Transport-observed liveness wins when it exists. Set intersection, no
+    // Transport-observed liveness wins when it exists. Exact set intersection, no
     // window: the transport's set IS the measurement, and it is already bounded
     // by the ping budget on the publishing side — UNIONED with this node's own
     // identity, which no transport event can ever supply (see
-    // `local_liveness_labels`).
+    // `local_liveness_labels`). Agent labels never fan out across bound devices:
+    // they cannot establish which transport endpoint is alive. The result is a
+    // conservative lower bound when only legacy agent evidence remains.
     if let Some(connected) = connected {
         let local = local_liveness_labels(conn);
-        let live = peers
+        let mut live_units: HashSet<String> = bound_peer_ids
             .iter()
-            .filter(|p| connected.contains(*p) || local.contains(*p))
-            .count() as i32;
+            .filter(|p| connected.peer_ids.contains(*p))
+            .cloned()
+            .collect();
+        live_units.extend(
+            legacy_tokens
+                .iter()
+                .filter(|p| connected.labels.contains(*p) || local.contains(*p))
+                .cloned(),
+        );
+        let live = live_units.len() as i32;
         return Ok(HouseholdPeerCounts { live, known });
     }
 
@@ -785,7 +860,7 @@ fn count_online_peers_in_households(
     identity: &HouseholdIdentity,
     staleness_secs: i64,
     now_micros: i64,
-    connected: Option<&HashSet<String>>,
+    connected: Option<&crate::services::peer_liveness::ConnectedSnapshot>,
 ) -> Result<i32, StorageError> {
     Ok(count_household_peers(
         conn,
@@ -801,11 +876,21 @@ fn count_online_peers_in_households(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::models::NewStewardedNode;
+    use crate::db::models::{NewHuman, NewPeerIdentityBindingRow, NewStewardedNode};
     use crate::db::peer_statuses::PeerStatusRow;
     use crate::db::run_migrations;
     use diesel::r2d2::{ConnectionManager, Pool};
     use diesel::SqliteConnection;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    use crate::p2p::binding_cross_signature::{
+        canonical_bytes, BindingCore, CrossSignatureProof, AGENT_DOMAIN, SCHEME_VERSION,
+        TRANSPORT_DOMAIN, TRANSPORT_KIND_LIBP2P,
+    };
+    use crate::p2p::binding_proof_wire::{
+        agent_cid_from_agent_pubkey, classify_binding_signature, encode_proof,
+        libp2p_peer_id_from_ed25519_pubkey,
+    };
 
     fn test_pool() -> DbPool {
         let url = format!(
@@ -818,6 +903,13 @@ mod tests {
             .expect("pool");
         run_migrations(&pool).expect("migrations");
         pool
+    }
+
+    fn snapshot(
+        labels: HashSet<String>,
+        peer_ids: HashSet<String>,
+    ) -> crate::services::peer_liveness::ConnectedSnapshot {
+        crate::services::peer_liveness::ConnectedSnapshot { labels, peer_ids }
     }
 
     /// Seed a stewarded node (id == peer_id, joined by `list_by_household`) plus an
@@ -871,6 +963,95 @@ mod tests {
             },
         )
         .expect("seed peer_status");
+    }
+
+    fn seed_human(conn: &mut SqliteConnection, id: &str, agent: &str) {
+        diesel::insert_into(crate::db::diesel_schema::humans::table)
+            .values(&NewHuman {
+                id: id.into(),
+                agent_pub_key: Some(agent.into()),
+                display_name: id.into(),
+                bio: None,
+                affinities: "[]".into(),
+                profile_reach: "commons".into(),
+                location: None,
+                profile_photo_url: None,
+                h_app_id: "imagodei".into(),
+                household_id: Some("hh-a".into()),
+            })
+            .execute(conn)
+            .expect("seed human");
+    }
+
+    /// Seed through the production classifier: a test cannot spell the private
+    /// cross-signed status, so every admitted fixture proves both signatures.
+    fn seed_binding(
+        conn: &mut SqliteConnection,
+        agent_seed: u8,
+        transport_seed: u8,
+        suffix: &str,
+        valid_from: &str,
+        valid_until: Option<&str>,
+        superseded_by: Option<&str>,
+    ) -> (String, String) {
+        let agent_sk = SigningKey::from_bytes(&[agent_seed; 32]);
+        let transport_sk = SigningKey::from_bytes(&[transport_seed; 32]);
+        let agent = agent_cid_from_agent_pubkey(&agent_sk.verifying_key().to_bytes());
+        let peer = libp2p_peer_id_from_ed25519_pubkey(&transport_sk.verifying_key().to_bytes())
+            .expect("derive fixture PeerId");
+        let core = BindingCore {
+            agent_cid: agent.clone(),
+            transport_id: peer.clone(),
+            transport_kind: TRANSPORT_KIND_LIBP2P,
+            valid_from: valid_from.into(),
+            valid_until: valid_until.map(str::to_owned),
+            nonce: format!("bm9uY2UtaG91c2Vob2xkLQ{suffix}"),
+            issued_at: valid_from.into(),
+        };
+        let proof = encode_proof(&CrossSignatureProof {
+            scheme_version: SCHEME_VERSION,
+            transport_kind: TRANSPORT_KIND_LIBP2P,
+            transport_pubkey: transport_sk.verifying_key().to_bytes(),
+            transport_signature: transport_sk
+                .sign(&canonical_bytes(TRANSPORT_DOMAIN, &core))
+                .to_bytes(),
+            agent_pubkey: agent_sk.verifying_key().to_bytes(),
+            agent_signature: agent_sk
+                .sign(&canonical_bytes(AGENT_DOMAIN, &core))
+                .to_bytes(),
+            nonce: core.nonce.clone(),
+            issued_at: core.issued_at.clone(),
+        });
+        let status = classify_binding_signature(
+            &agent,
+            &peer,
+            TRANSPORT_KIND_LIBP2P,
+            valid_from,
+            valid_until,
+            &proof,
+        );
+        assert!(
+            status.is_cross_signed(),
+            "fixture must pass the real classifier"
+        );
+        crate::db::peer_identity_bindings::upsert(
+            conn,
+            &NewPeerIdentityBindingRow {
+                peer_id: peer.clone(),
+                agent_cid: agent.clone(),
+                dht_anchor_hash: format!("uhCkk-household-{suffix}"),
+                valid_from: valid_from.into(),
+                valid_until: valid_until.map(str::to_owned),
+                observed_at: "2026-09-13T00:00:00Z".into(),
+                source: "dht".into(),
+                device_archetype: "node".into(),
+                superseded_by: superseded_by.map(str::to_owned),
+                signature: proof,
+                proof_status: status,
+            },
+        )
+        .expect("seed classified binding");
+        (agent, peer)
     }
 
     /// Two humans of the SAME physical household, one recorded under the slug
@@ -1055,8 +1236,10 @@ mod tests {
         );
 
         // Transport-observed: c is gone.
-        let connected: HashSet<String> =
-            HashSet::from(["uhCAkA".to_string(), "uhCAkB".to_string()]);
+        let connected = snapshot(
+            HashSet::from(["uhCAkA".to_string(), "uhCAkB".to_string()]),
+            HashSet::new(),
+        );
         let observed = count_household_peers(
             &mut conn,
             &households,
@@ -1084,7 +1267,7 @@ mod tests {
             &identity,
             900,
             now,
-            Some(&HashSet::new()),
+            Some(&snapshot(HashSet::new(), HashSet::new())),
         )
         .unwrap();
         assert_eq!((alone.live, alone.known), (0, 3));
@@ -1116,11 +1299,14 @@ mod tests {
         // This node is `a`; the transport has `b` and `c` connected — the exact
         // shape the live mesh was in.
         crate::services::peer_liveness::arm(
+            "12D3KooWA".into(),
             vec!["12D3KooWA".into(), "uhCAkA".into()],
             crate::services::peer_liveness::DEFAULT_LIVENESS_TTL,
         );
-        let connected: HashSet<String> =
-            HashSet::from(["uhCAkB".to_string(), "uhCAkC".to_string()]);
+        let connected = snapshot(
+            HashSet::from(["uhCAkB".to_string(), "uhCAkC".to_string()]),
+            HashSet::new(),
+        );
         let all_up = count_household_peers(
             &mut conn,
             &households,
@@ -1139,7 +1325,7 @@ mod tests {
 
         // And the signal still goes DOWN, which is the whole point of reading
         // liveness from the transport: b's connection closes, a and c remain.
-        let after_kill: HashSet<String> = HashSet::from(["uhCAkC".to_string()]);
+        let after_kill = snapshot(HashSet::from(["uhCAkC".to_string()]), HashSet::new());
         let degraded = count_household_peers(
             &mut conn,
             &households,
@@ -1156,6 +1342,289 @@ mod tests {
              leaves `live`, and `known` never moves"
         );
 
+        crate::services::peer_liveness::reset_for_test();
+    }
+
+    #[test]
+    fn role_keys_and_duplicate_people_canonicalize_to_one_physical_peer() {
+        let _g = crate::services::peer_liveness::test_guard();
+        crate::services::peer_liveness::reset_for_test();
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-13T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        let until = Some("2026-10-01T00:00:00Z");
+        let from = "2026-09-01T00:00:00Z";
+        let (old_agent, peer) = seed_binding(&mut conn, 31, 41, "old", from, until, None);
+        let (new_agent, same_peer) = seed_binding(&mut conn, 32, 41, "new", from, until, None);
+        assert_eq!(peer, same_peer);
+        seed_human(&mut conn, "human-old-role", &old_agent);
+        seed_human(&mut conn, "human-new-role", &new_agent);
+        // A duplicate projection of the old role key is still the same device.
+        seed_human(&mut conn, "human-old-role-copy", &old_agent);
+        seed_online_peer(&mut conn, &peer, "hh-a", now);
+
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+        let connected = snapshot(HashSet::new(), HashSet::from([peer]));
+        let counts = count_household_peers(
+            &mut conn,
+            &households,
+            &identity,
+            900,
+            now,
+            Some(&connected),
+        )
+        .unwrap();
+        assert_eq!((counts.live, counts.known), (1, 1));
+    }
+
+    #[test]
+    fn two_bound_devices_require_exact_peer_evidence_and_degrade_three_to_two() {
+        let _g = crate::services::peer_liveness::test_guard();
+        crate::services::peer_liveness::reset_for_test();
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-13T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        let until = Some("2026-10-01T00:00:00Z");
+        let from = "2026-09-01T00:00:00Z";
+        let (shared_agent, peer_a) = seed_binding(&mut conn, 51, 61, "a", from, until, None);
+        let (_, peer_b) = seed_binding(&mut conn, 51, 62, "b", from, until, None);
+        let (third_agent, peer_c) = seed_binding(&mut conn, 52, 63, "c", from, until, None);
+        seed_human(&mut conn, "human-two-devices", &shared_agent);
+        seed_human(&mut conn, "human-third-device", &third_agent);
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+
+        let all = snapshot(
+            HashSet::new(),
+            HashSet::from([peer_a.clone(), peer_b.clone(), peer_c.clone()]),
+        );
+        assert_eq!(
+            count_household_peers(&mut conn, &households, &identity, 900, now, Some(&all)).unwrap(),
+            HouseholdPeerCounts { live: 3, known: 3 }
+        );
+        let two = snapshot(HashSet::new(), HashSet::from([peer_a, peer_c]));
+        assert_eq!(
+            count_household_peers(&mut conn, &households, &identity, 900, now, Some(&two)).unwrap(),
+            HouseholdPeerCounts { live: 2, known: 3 }
+        );
+
+        // A shared agent label identifies neither transport endpoint. It must not
+        // fan one observation out to both units.
+        let alias_only = snapshot(HashSet::from([shared_agent]), HashSet::new());
+        assert_eq!(
+            count_household_peers(
+                &mut conn,
+                &households,
+                &identity,
+                900,
+                now,
+                Some(&alias_only),
+            )
+            .unwrap(),
+            HouseholdPeerCounts { live: 0, known: 3 }
+        );
+
+        crate::services::peer_liveness::arm(
+            peer_b.clone(),
+            vec![peer_b.clone(), "unrelated-agent-label".into()],
+            crate::services::peer_liveness::DEFAULT_LIVENESS_TTL,
+        );
+        assert_eq!(
+            count_household_peers(
+                &mut conn,
+                &households,
+                &identity,
+                900,
+                now,
+                crate::services::peer_liveness::connected_snapshot().as_ref(),
+            )
+            .unwrap(),
+            HouseholdPeerCounts { live: 1, known: 3 },
+            "the answering peer counts itself by its exact bound PeerId"
+        );
+        crate::services::peer_liveness::reset_for_test();
+    }
+
+    #[test]
+    fn inadmissible_bindings_fall_back_to_unbound_agent_heartbeat() {
+        use crate::p2p::binding_proof_wire::BindingProofStatus;
+
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-13T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        let (expired_agent, _) = seed_binding(
+            &mut conn,
+            71,
+            72,
+            "expired",
+            "2026-09-01T00:00:00Z",
+            Some("2026-09-12T00:00:00Z"),
+            None,
+        );
+        let (superseded_agent, _) = seed_binding(
+            &mut conn,
+            73,
+            74,
+            "superseded",
+            "2026-09-01T00:00:00Z",
+            Some("2026-10-01T00:00:00Z"),
+            Some("replacement"),
+        );
+        let unverified_agent = "uhCAkUNVERIFIED".to_string();
+        crate::db::peer_identity_bindings::upsert(
+            &mut conn,
+            &NewPeerIdentityBindingRow {
+                peer_id: "12D3KooWUnverified".into(),
+                agent_cid: unverified_agent.clone(),
+                dht_anchor_hash: "uhCkk-unverified".into(),
+                valid_from: "2026-09-01T00:00:00Z".into(),
+                valid_until: None,
+                observed_at: "2026-09-13T00:00:00Z".into(),
+                source: "dht".into(),
+                device_archetype: "node".into(),
+                superseded_by: None,
+                signature: "self-asserted".into(),
+                proof_status: BindingProofStatus::unverified(),
+            },
+        )
+        .unwrap();
+        for (id, agent) in [
+            ("expired", expired_agent),
+            ("superseded", superseded_agent),
+            ("unverified", unverified_agent),
+            ("no-binding", "uhCAkUNBOUND".to_string()),
+        ] {
+            seed_human(&mut conn, id, &agent);
+            peer_statuses::upsert(
+                &mut conn,
+                &PeerStatusRow {
+                    peer_id: agent,
+                    status: "online".into(),
+                    general_pool_member: 1,
+                    accepting_stewardship_reserves: 1,
+                    archetype_class: None,
+                    timestamp: now,
+                    dht_anchor_hash: String::new(),
+                    updated_at: now,
+                },
+            )
+            .unwrap();
+        }
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+        assert_eq!(
+            count_household_peers(&mut conn, &households, &identity, 900, now, None).unwrap(),
+            HouseholdPeerCounts { live: 4, known: 4 }
+        );
+    }
+
+    #[test]
+    fn invalid_clock_fails_closed_before_binding_validity_is_read() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        seed_human(&mut conn, "human-clock", "uhCAkCLOCK");
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+        let error = count_household_peers(&mut conn, &households, &identity, 900, i64::MAX, None)
+            .expect_err("an unrepresentable clock cannot admit an expired binding");
+        assert!(error.to_string().contains("invalid liveness clock"));
+    }
+
+    #[test]
+    fn a_future_cross_signed_binding_is_not_active_early() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let (agent, peer) = seed_binding(
+            &mut conn,
+            81,
+            82,
+            "future",
+            "2026-09-14T00:00:00Z",
+            Some("2026-10-01T00:00:00Z"),
+            None,
+        );
+        seed_human(&mut conn, "human-future", &agent);
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+        let connected = snapshot(HashSet::new(), HashSet::from([peer]));
+        let before = chrono::DateTime::parse_from_rfc3339("2026-09-13T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(
+            count_household_peers(
+                &mut conn,
+                &households,
+                &identity,
+                900,
+                before,
+                Some(&connected),
+            )
+            .unwrap(),
+            HouseholdPeerCounts { live: 0, known: 1 },
+            "before valid_from the human retains one raw fallback unit"
+        );
+        let after = chrono::DateTime::parse_from_rfc3339("2026-09-15T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        assert_eq!(
+            count_household_peers(
+                &mut conn,
+                &households,
+                &identity,
+                900,
+                after,
+                Some(&connected),
+            )
+            .unwrap(),
+            HouseholdPeerCounts { live: 1, known: 1 },
+            "inside its window the same signed association resolves to the PeerId"
+        );
+    }
+
+    #[test]
+    fn a_connected_peers_claimed_alias_cannot_light_a_bound_peer() {
+        let _g = crate::services::peer_liveness::test_guard();
+        crate::services::peer_liveness::reset_for_test();
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let (agent, victim_peer) = seed_binding(
+            &mut conn,
+            91,
+            92,
+            "victim",
+            "2026-09-01T00:00:00Z",
+            Some("2026-10-01T00:00:00Z"),
+            None,
+        );
+        seed_human(&mut conn, "human-victim", &agent);
+        let now = chrono::DateTime::parse_from_rfc3339("2026-09-13T00:00:00Z")
+            .unwrap()
+            .timestamp_micros();
+        seed_online_peer(&mut conn, &victim_peer, "hh-a", now);
+        crate::services::peer_liveness::arm(
+            "12D3KooWSelfNotHousehold".into(),
+            vec!["12D3KooWSelfNotHousehold".into()],
+            crate::services::peer_liveness::DEFAULT_LIVENESS_TTL,
+        );
+        crate::services::peer_liveness::record_connected(
+            "12D3KooWAttacker",
+            vec!["12D3KooWAttacker".into(), victim_peer],
+        );
+        let observed = crate::services::peer_liveness::connected_snapshot().unwrap();
+        let identity = HouseholdIdentity::load(&mut conn).unwrap();
+        let households = HashSet::from(["hh-a".to_string()]);
+        assert_eq!(
+            count_household_peers(&mut conn, &households, &identity, 900, now, Some(&observed),)
+                .unwrap(),
+            HouseholdPeerCounts { live: 0, known: 1 }
+        );
         crate::services::peer_liveness::reset_for_test();
     }
 }

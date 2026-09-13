@@ -3700,6 +3700,7 @@ impl P2PNode {
         // below closes a silent peer's connection. The two mechanisms therefore
         // agree on when a dead peer stops counting.
         crate::services::peer_liveness::arm(
+            self.identity.peer_id().to_string(),
             vec![
                 self.identity.peer_id().to_string(),
                 self.identity.agent_pubkey().to_string(),

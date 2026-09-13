@@ -4444,3 +4444,48 @@ decisionPoints:
       which the single-call budget does not read — so a commitment REVOKED provider-side
       and first seen by a non-authoring peer through this path projects as unrevoked until
       a reconcile reads the links.
+
+  - name: count_household_peers
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/household_resilience.rs
+      modulePath: services::household_resilience::count_household_peers
+    summary: >
+      Computes one request-local household peer universe for both the known denominator and
+      either liveness source. Existing registered-node tokens remain at legacy granularity.
+      A household human with active Enforce-admitted AgentPeerBindings contributes distinct
+      transport PeerIds instead of role-key aliases; a human with no admissible binding retains
+      one original projected agent token. Bound devices require exact PeerId transport or heartbeat
+      evidence, so one shared agent observation cannot mark several devices live. The finite
+      household-scoped candidate set is resolved in one local batch query and creates no entry, route, signal,
+      head, or wire-shape change.
+    concernIds:
+      - { id: C0, status: answered, justification: "Existing human, registered-node and notarized binding projections are read; the fold authors no entity or head." }
+      - { id: C1, status: n-a, justification: "No author or head election occurs." }
+      - { id: C2, status: answered, justification: "Only active, non-superseded rows admitted by the existing cross-signature Enforce kernel correlate agent and transport namespaces." }
+      - { id: C3, status: answered, justification: "The result is ephemeral per request; expiry and supersession immediately remove binding-derived correlation." }
+      - { id: C4, status: answered, justification: "Database and invalid-clock errors propagate; absent admissible bindings preserve one legacy agent unit rather than claiming a device." }
+      - { id: C5, status: partial, justification: "Ingress classification re-derives both signatures and agent/transport identifiers; globally notarized proof remains outside the receiver-local projection." }
+      - { id: C6a, status: partial, justification: "One local batch binding query scales with the finite local projection of humans in the requested household aliases, but no declared cardinality/work-budget ceiling exists; there is no network fan-out, retry loop or silent member cap." }
+      - { id: C6b, status: answered, justification: "Set canonicalization is deterministic and deduplicates repeated humans, role keys and registered rows naming the same PeerId." }
+      - { id: C7, status: n-a, justification: "No serving contract or advertisement changes." }
+      - { id: C8, status: partial, justification: "Existing resilience and attribution telemetry remains; this operational read intentionally does not increment economic-join counters." }
+      - { id: C9, status: partial, justification: "Old and new role keys bound to the same PeerId deduplicate; expiry and supersession are enforced locally, while globally complete revocation knowledge remains outside this fold." }
+      - { id: C10, status: answered, justification: "The wire contract is unchanged, and unsupported signature schemes remain refused by the existing classifier rather than defaulted." }
+      - { id: C11, status: n-a, justification: "No external admission path, queue or backpressure contract is introduced." }
+      - { id: C12, status: answered, justification: "Cross-namespace device correlation requires the existing two-sided binding proof; it establishes device availability only, never person equivalence or authority." }
+      - { id: C13, status: n-a, justification: "No social tier, custody right or resource allocation changes." }
+      - { id: C14, status: partial, justification: "Source tests cover the local fold; household chaos provides the separate deployed-runtime evidence." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: role_keys_and_duplicate_people_canonicalize_to_one_physical_peer, kind: unit }
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: two_bound_devices_require_exact_peer_evidence_and_degrade_three_to_two, kind: unit }
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: inadmissible_bindings_fall_back_to_unbound_agent_heartbeat, kind: unit }
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: invalid_clock_fails_closed_before_binding_validity_is_read, kind: unit }
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: a_future_cross_signed_binding_is_not_active_early, kind: unit }
+      - { path: elohim/elohim-storage/src/services/household_resilience.rs, testName: a_connected_peers_claimed_alias_cannot_light_a_bound_peer, kind: unit }
+      - { path: elohim/elohim-storage/src/services/peer_liveness.rs, testName: an_accepted_alias_never_becomes_transport_peer_evidence, kind: unit }
+    gapNote: >
+      Registered-node ids and humans without admissible bindings retain legacy token granularity;
+      their liveness is a conservative lower-bound exact match, not proof of a distinct physical machine. A legacy `agent:`-prefixed raw human token still requires that exact spelling;
+      normalizing its liveness aliases needs separate evidence. Receiver-local binding verification does not establish globally complete
+      supersession knowledge (C2-S7 remains separate).

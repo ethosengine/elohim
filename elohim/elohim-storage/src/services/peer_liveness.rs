@@ -71,6 +71,8 @@ struct Registry {
 
 #[derive(Debug)]
 struct Armed {
+    /// Exact local transport PeerId, kept separate from accepted aliases.
+    own_peer_id: String,
     /// This node's own labels. It is never in its own connected set, yet it is
     /// plainly live, and a household of one would otherwise read `live: 0`.
     own_labels: Vec<String>,
@@ -90,13 +92,14 @@ fn registry() -> &'static RwLock<Registry> {
 ///
 /// Idempotent in effect: re-arming replaces the own-labels/ttl and KEEPS the
 /// observed peers, so a reconfiguration never blanks a live set.
-pub fn arm(own_labels: Vec<String>, ttl: Duration) {
+pub fn arm(own_peer_id: String, own_labels: Vec<String>, ttl: Duration) {
     let mut reg = match registry().write() {
         Ok(g) => g,
         Err(p) => p.into_inner(),
     };
     let peers = reg.armed.take().map(|a| a.peers).unwrap_or_default();
     reg.armed = Some(Armed {
+        own_peer_id,
         own_labels,
         ttl: if ttl.is_zero() {
             DEFAULT_LIVENESS_TTL
@@ -202,20 +205,28 @@ pub fn record_connection_closed(peer_id: &str, remaining_established: u32) {
 ///
 /// Entries older than the armed TTL are excluded: the explicit disconnect is the
 /// fast path, and this is the backstop for an event loop that stopped turning.
-pub fn connected_snapshot() -> Option<HashSet<String>> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectedSnapshot {
+    pub(crate) labels: HashSet<String>,
+    pub(crate) peer_ids: HashSet<String>,
+}
+
+pub fn connected_snapshot() -> Option<ConnectedSnapshot> {
     let reg = match registry().read() {
         Ok(g) => g,
         Err(p) => p.into_inner(),
     };
     let armed = reg.armed.as_ref()?;
     let now = Instant::now();
-    let mut out: HashSet<String> = armed.own_labels.iter().cloned().collect();
-    for entry in armed.peers.values() {
+    let mut labels: HashSet<String> = armed.own_labels.iter().cloned().collect();
+    let mut peer_ids = HashSet::from([armed.own_peer_id.clone()]);
+    for (peer_id, entry) in &armed.peers {
         if now.duration_since(entry.last_seen) <= armed.ttl {
-            out.extend(entry.labels.iter().cloned());
+            peer_ids.insert(peer_id.clone());
+            labels.extend(entry.labels.iter().cloned());
         }
     }
-    Some(out)
+    Some(ConnectedSnapshot { labels, peer_ids })
 }
 
 /// This node's OWN labels, or `None` while the registry is unarmed.
@@ -289,11 +300,15 @@ mod tests {
     fn an_armed_registry_reports_itself_live_with_no_peers() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
         let snap = connected_snapshot().expect("armed");
-        assert_eq!(snap.len(), 1);
+        assert_eq!(snap.labels.len(), 1);
         assert!(
-            snap.contains("agent:self"),
+            snap.labels.contains("agent:self"),
             "a household of one is still live"
         );
         reset_for_test();
@@ -303,7 +318,11 @@ mod tests {
     fn a_disconnected_peer_leaves_the_live_set() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
         record_connected(
             "12D3KooWJessica",
             vec!["12D3KooWJessica".into(), "agent:jessica".into()],
@@ -312,17 +331,20 @@ mod tests {
             "12D3KooWJames",
             vec!["12D3KooWJames".into(), "agent:james".into()],
         );
-        assert!(connected_snapshot().unwrap().contains("agent:jessica"));
+        assert!(connected_snapshot()
+            .unwrap()
+            .labels
+            .contains("agent:jessica"));
 
         // The ping-failure arm closes the connection of a peer gone silent.
         record_disconnected("12D3KooWJessica");
         let snap = connected_snapshot().unwrap();
         assert!(
-            !snap.contains("agent:jessica") && !snap.contains("12D3KooWJessica"),
+            !snap.labels.contains("agent:jessica") && !snap.labels.contains("12D3KooWJessica"),
             "a killed peer must leave `live` under BOTH its labels"
         );
         assert!(
-            snap.contains("agent:james"),
+            snap.labels.contains("agent:james"),
             "its household-mate is untouched"
         );
         reset_for_test();
@@ -332,7 +354,11 @@ mod tests {
     fn an_accepted_handshake_augments_only_an_existing_connected_peer() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
 
         record_connected("12D3KooWJessica", vec!["12D3KooWJessica".into()]);
         augment_connected_labels(
@@ -344,10 +370,10 @@ mod tests {
         // the identity label learned by the first connection.
         record_connected("12D3KooWJessica", vec!["12D3KooWJessica".into()]);
         let connected = connected_snapshot().expect("armed");
-        assert!(connected.contains("12D3KooWJessica"));
-        assert!(connected.contains("agent:jessica"));
+        assert!(connected.labels.contains("12D3KooWJessica"));
+        assert!(connected.labels.contains("agent:jessica"));
         assert_eq!(
-            connected.len(),
+            connected.labels.len(),
             3,
             "duplicate labels must not inflate the set"
         );
@@ -355,7 +381,30 @@ mod tests {
         record_disconnected("12D3KooWJessica");
         augment_connected_labels("12D3KooWJessica", vec!["agent:jessica".into()]);
         let disconnected = connected_snapshot().expect("armed");
-        assert_eq!(disconnected, HashSet::from(["agent:self".into()]));
+        assert_eq!(disconnected.labels, HashSet::from(["agent:self".into()]));
+        reset_for_test();
+    }
+
+    #[test]
+    fn an_accepted_alias_never_becomes_transport_peer_evidence() {
+        let _g = guard();
+        reset_for_test();
+        arm(
+            "12D3KooWSelf".into(),
+            vec!["12D3KooWSelf".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
+        record_connected(
+            "12D3KooWAttacker",
+            vec!["12D3KooWAttacker".into(), "12D3KooWVictim".into()],
+        );
+        let snapshot = connected_snapshot().unwrap();
+        assert!(snapshot.labels.contains("12D3KooWVictim"));
+        assert!(snapshot.peer_ids.contains("12D3KooWAttacker"));
+        assert!(
+            !snapshot.peer_ids.contains("12D3KooWVictim"),
+            "an accepted handshake alias is not a connection to that PeerId"
+        );
         reset_for_test();
     }
 
@@ -363,7 +412,11 @@ mod tests {
     fn a_partial_connection_close_preserves_labels_until_the_final_close() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
         record_connected(
             "12D3KooWJessica",
             vec!["12D3KooWJessica".into(), "agent:jessica".into()],
@@ -371,12 +424,12 @@ mod tests {
 
         record_connection_closed("12D3KooWJessica", 1);
         let partial = connected_snapshot().expect("armed");
-        assert!(partial.contains("12D3KooWJessica"));
-        assert!(partial.contains("agent:jessica"));
+        assert!(partial.labels.contains("12D3KooWJessica"));
+        assert!(partial.labels.contains("agent:jessica"));
 
         record_connection_closed("12D3KooWJessica", 0);
         assert_eq!(
-            connected_snapshot().expect("armed"),
+            connected_snapshot().expect("armed").labels,
             HashSet::from(["agent:self".into()])
         );
         reset_for_test();
@@ -388,15 +441,19 @@ mod tests {
     fn a_stale_entry_expires_even_without_a_close_event() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], Duration::from_nanos(1));
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            Duration::from_nanos(1),
+        );
         record_connected("12D3KooWJessica", vec!["agent:jessica".into()]);
         std::thread::sleep(Duration::from_millis(5));
         let snap = connected_snapshot().unwrap();
         assert!(
-            !snap.contains("agent:jessica"),
+            !snap.labels.contains("agent:jessica"),
             "past the TTL a peer is stale, close event or not"
         );
-        assert!(snap.contains("agent:self"));
+        assert!(snap.labels.contains("agent:self"));
         reset_for_test();
     }
 
@@ -404,13 +461,20 @@ mod tests {
     fn a_touch_keeps_a_peer_live_across_the_ttl() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], Duration::from_millis(50));
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            Duration::from_millis(50),
+        );
         record_connected("12D3KooWJessica", vec!["agent:jessica".into()]);
         std::thread::sleep(Duration::from_millis(30));
         touch("12D3KooWJessica");
         std::thread::sleep(Duration::from_millis(30));
         assert!(
-            connected_snapshot().unwrap().contains("agent:jessica"),
+            connected_snapshot()
+                .unwrap()
+                .labels
+                .contains("agent:jessica"),
             "a ping-success refresh is what keeps a quiet-but-live peer in the set"
         );
         reset_for_test();
@@ -427,6 +491,7 @@ mod tests {
             "unarmed is UNMEASURED here too — a reader must fall back, not assume"
         );
         arm(
+            "12D3KooWSelf".into(),
             vec!["12D3KooWSelf".into(), "uhCAkSelf".into()],
             DEFAULT_LIVENESS_TTL,
         );
@@ -445,11 +510,22 @@ mod tests {
     fn re_arming_keeps_the_observed_peers() {
         let _g = guard();
         reset_for_test();
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
         record_connected("12D3KooWJessica", vec!["agent:jessica".into()]);
-        arm(vec!["agent:self".into()], DEFAULT_LIVENESS_TTL);
+        arm(
+            "peer:self".into(),
+            vec!["agent:self".into()],
+            DEFAULT_LIVENESS_TTL,
+        );
         assert!(
-            connected_snapshot().unwrap().contains("agent:jessica"),
+            connected_snapshot()
+                .unwrap()
+                .labels
+                .contains("agent:jessica"),
             "a re-arm must never blank a live set"
         );
         reset_for_test();
