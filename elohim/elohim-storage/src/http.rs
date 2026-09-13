@@ -8030,9 +8030,8 @@ impl HttpServer {
     /// read on the serving hot path.
     async fn resolve_staging_candidate(&self, content_id: &str) -> Option<String> {
         let hc = self.hc_registry.as_ref()?.lamad_client()?;
-        let read = crate::services::conductor_writes::call_resolve_content_head_local(
-            &hc, content_id,
-        );
+        let read =
+            crate::services::conductor_writes::call_resolve_content_head_local(&hc, content_id);
         match tokio::time::timeout(std::time::Duration::from_secs(2), read).await {
             Ok(Ok(Some(wire))) => wire.staging_candidate.map(|h| h.to_string()),
             Ok(Ok(None)) => None,

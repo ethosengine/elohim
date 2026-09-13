@@ -289,14 +289,27 @@ mod tests {
             "seededBy": "12D3Koo..."
         }"#;
         let view: EprProjectionView = serde_json::from_str(json).unwrap();
-        assert!(view.hostnames.is_empty(), "absent hostnames must mean ANY host");
-        assert_eq!(view.channel, Channel::Converged, "absent channel must mean converged");
+        assert!(
+            view.hostnames.is_empty(),
+            "absent hostnames must mean ANY host"
+        );
+        assert_eq!(
+            view.channel,
+            Channel::Converged,
+            "absent channel must mean converged"
+        );
     }
 
     #[test]
     fn channel_serializes_to_camel_case_both_ways() {
-        assert_eq!(serde_json::to_string(&Channel::Converged).unwrap(), "\"converged\"");
-        assert_eq!(serde_json::to_string(&Channel::Candidate).unwrap(), "\"candidate\"");
+        assert_eq!(
+            serde_json::to_string(&Channel::Converged).unwrap(),
+            "\"converged\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Channel::Candidate).unwrap(),
+            "\"candidate\""
+        );
         assert_eq!(
             serde_json::from_str::<Channel>("\"candidate\"").unwrap(),
             Channel::Candidate

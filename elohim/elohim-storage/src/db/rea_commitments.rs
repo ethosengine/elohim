@@ -1861,15 +1861,27 @@ fn parse_projection_scope(scope: &str) -> Result<(String, String), StorageError>
         return parse_projection_scope(&healed);
     }
 
-    // `doorway:{id}|epr:{id}` names the projection; ADDITIONAL refs after it
-    // are scope DISCRIMINATORS, not projection identity, and are ignored here.
-    // The one in use is `|host:{name}`, which lets a candidate-channel contract
-    // stand BESIDE the converged contract for the same (doorway, EPR) with its
-    // own content-addressed id — a new row, deliberately, instead of two
-    // authors forking one id. This function answers "which projection is this",
-    // and that answer is unchanged by the discriminator.
+    // `doorway:{id}|epr:{id}` names the projection. Exactly ONE additional ref
+    // is admitted after it, and only `host:{name}`: the scope discriminator
+    // that lets a candidate-channel contract stand BESIDE the converged
+    // contract for the same (doorway, EPR) with its own content-addressed id —
+    // a new row, deliberately, instead of two authors forking one id. It is a
+    // discriminator, not identity: this function answers "which projection is
+    // this", and that answer is unchanged by it.
+    //
+    // Narrow on purpose. A permissive "ignore anything after the second ref"
+    // would also swallow the three-segment POISONED row the projection
+    // resolver's per-row degradation exists to skip, and a scope nobody can
+    // account for would start resolving to a live mount.
     let parts: Vec<&str> = scope.split('|').collect();
-    if parts.len() < 2 {
+    let shape_ok = match parts.len() {
+        2 => true,
+        3 => parts[2]
+            .strip_prefix("host:")
+            .is_some_and(|name| !name.is_empty()),
+        _ => false,
+    };
+    if !shape_ok {
         return Err(StorageError::Internal(format!(
             "Malformed projection scope: {}",
             scope
@@ -2533,6 +2545,27 @@ mod projection_resolver_tests {
                 .unwrap();
         assert_eq!(doorway, "doorway:alpha-elohim-host");
         assert_eq!(epr, "elohim-host-landing");
+    }
+
+    #[test]
+    fn parse_projection_scope_admits_a_host_discriminator() {
+        // The candidate-channel contract standing beside the converged one:
+        // a different id and a different row, resolving to the SAME projection.
+        let (doorway, epr) = parse_projection_scope(
+            "doorway:alpha-elohim-host|epr:lamad-spa|host:alpha.elohim.local",
+        )
+        .unwrap();
+        assert_eq!(doorway, "doorway:alpha-elohim-host");
+        assert_eq!(epr, "lamad-spa");
+    }
+
+    #[test]
+    fn parse_projection_scope_rejects_a_third_ref_that_is_not_a_host() {
+        // Narrowness is the point: only `host:` is accounted for. Anything
+        // else in that position is still the poisoned row the resolver skips.
+        assert!(parse_projection_scope("doorway:a|epr:b|host:").is_err());
+        assert!(parse_projection_scope("doorway:a|epr:b|channel:candidate").is_err());
+        assert!(parse_projection_scope("doorway:a|epr:b|host:x|host:y").is_err());
     }
 
     #[test]
