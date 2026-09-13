@@ -6783,6 +6783,17 @@ impl HttpServer {
             "schema",
             // Diesel entity routes
             "collectives",
+            // The membership read the doorway's serving-eligibility fold makes
+            // for every restricted-reach serve (`GET /db/participations/{human_id}`,
+            // `serve_eligibility::read_memberships`). Without this entry
+            // "participations" is consumed as an h_app_id, the dispatch arm
+            // below is dead code, and the read 404s "Unknown database
+            // endpoint" — which the fold reads (correctly, never widening) as
+            // "this requester presented no standing", so a household member is
+            // refused their own collective's record and the refusal blames
+            // reach. Same shadow class as "identity" and "p2p" below; measured
+            // live on the household mesh 2026-09-13.
+            "participations",
             "humans",
             // did:elohim resolution namespace (/db/identity/did/{did}). Without
             // this entry "identity" is consumed as an h_app_id and the
@@ -19698,6 +19709,22 @@ mod conductor_diagnostics_tests {
             resource_path,
             "identity/did/did:elohim:uhCAkAGENTKEYEXAMPLE"
         );
+    }
+
+    #[test]
+    fn participations_namespace_survives_app_context_extraction() {
+        // Same shadow class as the p2p and identity regressions above, and the
+        // one that made a household member 403 at their own household's
+        // record: "participations" absent from legacy_prefixes made
+        // extract_app_context eat it as an h_app_id (resource_path became the
+        // bare human id), so `GET /db/participations/{human_id}` 404'd
+        // "Unknown database endpoint". The doorway's serving-eligibility fold
+        // reads that failure as "no standing presented" — correctly, since a
+        // membership read that cannot be completed is never permission — and
+        // refuses. Measured live on the household mesh 2026-09-13.
+        let (_ctx, resource_path) =
+            super::HttpServer::extract_app_context("participations/human-matthew-manager");
+        assert_eq!(resource_path, "participations/human-matthew-manager");
     }
 
     #[test]
