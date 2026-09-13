@@ -110,8 +110,11 @@ pub struct BlobFetchRequest {
 /// crash.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum BlobFetchResponse {
-    /// Peer has the blob; bytes attached.
-    Found(Vec<u8>),
+    /// Peer has the blob; bytes attached. `bin`, never an integer array —
+    /// see `shard_protocol::serialize_bounded_messagepack`. The blob plane
+    /// shares the shard plane's frame budget, so it shared its 1.5× array
+    /// expansion too.
+    Found(#[serde(with = "serde_bytes")] Vec<u8>),
     /// Peer does not have the blob (and no manifest either).
     NotFound,
     /// Peer encountered an internal error trying to read the blob.

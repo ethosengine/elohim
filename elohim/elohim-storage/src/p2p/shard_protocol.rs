@@ -12,11 +12,27 @@ pub const SHARD_PROTOCOL_ID: &str = "/elohim/shard/1.0.0";
 /// Maximum serialized frame accepted by a shard-bearing transport.
 ///
 /// This is deliberately distinct from the generic 16 MiB control-frame
-/// default used by the iroh codec. A 68 MiB RS4+3 artifact produces 17 MiB
-/// raw shards, and the existing MessagePack `Vec<u8>` wire shape can expand
-/// those bytes beyond 16 MiB. The ceiling bounds that existing wire shape; it
+/// default used by the iroh codec. The ceiling bounds the wire shape; it
 /// is not a whole-blob admission limit or an arbitrary-size streaming claim.
 pub const SHARD_TRANSFER_MAX_FRAME_SIZE: usize = 64 * 1024 * 1024;
+
+/// The largest blob payload a single shard frame can carry.
+///
+/// Byte-bearing fields ride the wire as a MessagePack `bin` value, so the
+/// envelope around them is a handful of bytes (variant tag, `bin32` header,
+/// the hash string on a `Push`). One KiB of headroom keeps the arithmetic
+/// honest without pretending to be exact.
+///
+/// Ask this BEFORE materialising a payload. A provider that reads and hashes
+/// bytes it can never frame burns the request's whole cost to arrive at a
+/// refusal — which is precisely the fault of 2026-09-13 (see
+/// `serialize_bounded_messagepack`).
+pub const SHARD_PAYLOAD_MAX_BYTES: usize = SHARD_TRANSFER_MAX_FRAME_SIZE - 1024;
+
+/// Whether a payload of `len` bytes can be framed by this protocol at all.
+pub fn payload_fits_frame(len: u64) -> bool {
+    len <= SHARD_PAYLOAD_MAX_BYTES as u64
+}
 
 /// Serialize into a buffer that refuses growth beyond `max_size`.
 ///
@@ -24,6 +40,25 @@ pub const SHARD_TRANSFER_MAX_FRAME_SIZE: usize = 64 * 1024 * 1024;
 /// encoding, rather than after an unbounded `to_vec` allocation. `named`
 /// preserves the two established wire encodings: libp2p uses positional
 /// structs and iroh uses named structs.
+///
+/// **Byte fields must be `bin`, never a sequence of integers.** A `Vec<u8>`
+/// serialized by plain serde is a MessagePack *array*, one integer per byte:
+/// every byte ≥ `0x80` costs two bytes on the wire, and every byte costs one
+/// call through this `Write` adapter. Measured on matthew's live 231 MB
+/// rs-4-7 object (2026-09-13), 51.3% of its bytes are ≥ `0x80`, so each of
+/// its seven 57,948,918-byte shards encoded to **87,695,655 bytes** — past
+/// the 64 MiB ceiling. Every shard serve therefore read 58 MB off disk,
+/// logged `Serving shard`, spent seconds encoding ~58 million array elements
+/// on an HTTP worker thread, and *then* refused the frame. The bytes never
+/// reached the wire, the requesters' `missing_shards` stayed at 7 forever,
+/// and their retries pinned both workers of the 2-thread server runtime at
+/// 100% (health latency 8 s+). `serde_bytes` makes the same shard a
+/// 57,948,924-byte `bin` written with one `write_all`.
+///
+/// rmp-serde's decoder accepts `bin` where a `Vec<u8>` field is declared and
+/// a sequence where a `serde_bytes` field is declared, so this is a
+/// serializer-side change only — frames stay readable in both directions and
+/// the protocol id does not move.
 pub(crate) fn serialize_bounded_messagepack<T: Serialize>(
     value: &T,
     max_size: usize,
@@ -99,7 +134,12 @@ pub enum ShardRequest {
     /// Check if peer has a shard
     Have { hash: String },
     /// Push a shard to peer (replication)
-    Push { hash: String, data: Vec<u8> },
+    Push {
+        hash: String,
+        /// `bin`, never an integer array — see `serialize_bounded_messagepack`.
+        #[serde(with = "serde_bytes")]
+        data: Vec<u8>,
+    },
     /// List content inventory (EPR Head summaries for replication discovery)
     ListContent {
         /// Filter by reach level. None = all reachable content.
@@ -153,8 +193,9 @@ pub struct ContentRecord {
 /// Shard response types
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ShardResponse {
-    /// Shard data
-    Data(Vec<u8>),
+    /// Shard data. `bin`, never an integer array — see
+    /// `serialize_bounded_messagepack`.
+    Data(#[serde(with = "serde_bytes")] Vec<u8>),
     /// Whether peer has the shard
     Have(bool),
     /// Push acknowledgment
@@ -388,11 +429,11 @@ mod tests {
         use futures::io::Cursor;
         use libp2p::request_response::Codec;
 
-        // 0xff is encoded as a two-byte MessagePack integer in the existing
-        // Vec<u8> array wire shape, so 33 MiB crosses the 64 MiB frame ceiling.
+        // Byte fields ride as `bin` (one wire byte per payload byte), so a
+        // payload is oversize only when it genuinely exceeds the budget.
         let request = ShardRequest::Push {
             hash: "sha256-oversize".to_string(),
-            data: vec![0xff; 33 * 1024 * 1024],
+            data: vec![0xff; SHARD_TRANSFER_MAX_FRAME_SIZE + 1],
         };
         let mut framed = Vec::new();
         let mut writer = Cursor::new(&mut framed);
@@ -407,5 +448,97 @@ mod tests {
             framed.is_empty(),
             "a refused frame must write no prefix or body"
         );
+    }
+
+    /// The 2026-09-13 provider-saturation fault, as arithmetic.
+    ///
+    /// A shard of real (compressed) bytes is ~51% bytes >= 0x80. Encoded as a
+    /// MessagePack array of integers those cost two bytes each, so a
+    /// 57,948,918-byte shard became 87,695,655 wire bytes and no frame could
+    /// ever carry it. As `bin` the same shard is its own length plus a small
+    /// header.
+    #[test]
+    fn a_real_sized_shard_fits_one_frame() {
+        // Mirror the live shard's byte distribution rather than an all-0xff
+        // worst case: alternating low/high bytes is the 50% that was measured.
+        const SHARD_LEN: usize = 57_948_918;
+        let payload: Vec<u8> = (0..SHARD_LEN)
+            .map(|i| if i % 2 == 0 { 0x41 } else { 0xff })
+            .collect();
+
+        let encoded = serialize_bounded_messagepack(
+            &ShardResponse::Data(payload),
+            SHARD_TRANSFER_MAX_FRAME_SIZE,
+            false,
+            "shard response",
+        )
+        .expect("a single shard must fit a single frame");
+
+        assert!(
+            encoded.len() < SHARD_LEN + 1024,
+            "a bin-encoded shard must not expand: {} wire bytes for {SHARD_LEN} payload bytes",
+            encoded.len()
+        );
+        assert!(payload_fits_frame(SHARD_LEN as u64));
+    }
+
+    /// The whole 231 MB composite still cannot be framed — correctly. It is
+    /// reachable through the manifest pivot, and the provider must learn that
+    /// from the declared size BEFORE it reads and hashes a quarter-gigabyte.
+    #[test]
+    fn a_whole_composite_is_refused_by_declared_size() {
+        assert!(!payload_fits_frame(231_795_670));
+        assert!(payload_fits_frame(SHARD_PAYLOAD_MAX_BYTES as u64));
+        assert!(!payload_fits_frame(SHARD_PAYLOAD_MAX_BYTES as u64 + 1));
+    }
+
+    /// Wire compatibility in BOTH directions, which is what lets the
+    /// serializer change without moving `/elohim/shard/1.0.0`.
+    ///
+    /// rmp-serde reads a `bin` into a plain `Vec<u8>` field and a sequence
+    /// into a `serde_bytes` field, so a peer on either side of this change
+    /// decodes a peer on the other.
+    #[test]
+    fn bin_and_array_byte_encodings_decode_interchangeably() {
+        use serde::{Deserialize, Serialize};
+
+        // A stand-in for a peer built before this change: byte fields with no
+        // `serde_bytes`, everything else identical.
+        #[derive(Serialize, Deserialize)]
+        enum LegacyShardResponse {
+            Data(Vec<u8>),
+            #[allow(dead_code)]
+            Have(bool),
+        }
+
+        let payload: Vec<u8> = (0..=255u8).cycle().take(4096).collect();
+
+        let new_frame =
+            rmp_serde::to_vec(&ShardResponse::Data(payload.clone())).expect("new serializer");
+        let legacy_frame = rmp_serde::to_vec(&LegacyShardResponse::Data(payload.clone()))
+            .expect("legacy serializer");
+
+        assert!(
+            new_frame.len() < legacy_frame.len(),
+            "bin must be the smaller encoding: {} vs {}",
+            new_frame.len(),
+            legacy_frame.len()
+        );
+
+        // New bytes -> old peer.
+        let decoded: LegacyShardResponse =
+            rmp_serde::from_slice(&new_frame).expect("an old peer must read a bin frame");
+        let LegacyShardResponse::Data(bytes) = decoded else {
+            panic!("variant must round-trip");
+        };
+        assert_eq!(bytes, payload);
+
+        // Old bytes -> new peer.
+        let decoded: ShardResponse =
+            rmp_serde::from_slice(&legacy_frame).expect("a new peer must read an array frame");
+        let ShardResponse::Data(bytes) = decoded else {
+            panic!("variant must round-trip");
+        };
+        assert_eq!(bytes, payload);
     }
 }

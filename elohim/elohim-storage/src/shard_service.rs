@@ -320,6 +320,27 @@ impl ShardService {
                 return ShardResponse::Error(format!("reach-withheld: {reason}"));
             }
         }
+        // Size BEFORE bytes. A payload larger than one frame can never be
+        // served under this name, so reading it and hashing it only buys a
+        // refusal — at 231 MB of read + SHA-256 per ask, on a two-worker
+        // runtime, ~2 asks/minute, which is how matthew's HTTP listener came
+        // to answer /health in 8 s on 2026-09-13. An oversize whole-bytes ask
+        // is exactly the question `GetManifest` answers, so answer it.
+        if let Some(len) = self.declared_len(&hash).await {
+            if !crate::p2p::shard_protocol::payload_fits_frame(len) {
+                let pivot = self.handle_get_manifest(hash.clone());
+                info!(
+                    hash = %hash,
+                    size = len,
+                    max = crate::p2p::shard_protocol::SHARD_PAYLOAD_MAX_BYTES,
+                    pivoted = !matches!(pivot, ShardResponse::NotFound),
+                    "whole bytes exceed one shard frame — answering with the manifest pivot \
+                     instead of reading them"
+                );
+                return pivot;
+            }
+        }
+
         match self.blob_store.get(&hash).await {
             Ok(data) => {
                 info!(hash = %hash, size = data.len(), "Serving shard");
@@ -335,6 +356,27 @@ impl ShardService {
                 ShardResponse::NotFound
             }
         }
+    }
+
+    /// The payload size for `hash` without materialising the payload.
+    ///
+    /// The sha256 store answers from filesystem metadata; a composite that
+    /// lives here only as RS shards answers from its durable manifest's
+    /// `total_size`. `None` means this node cannot say — in which case the
+    /// ordinary read path runs and the frame budget is enforced where it
+    /// always was, at serialization.
+    async fn declared_len(&self, hash: &str) -> Option<u64> {
+        if let Ok(len) = self.blob_store.size(hash).await {
+            return Some(len);
+        }
+        let pool = self.db_pool.as_ref()?;
+        let mut conn = pool.get().ok()?;
+        let row = crate::db::shard_manifests::get_manifest_by_blob_hash(&mut conn, hash)
+            .ok()
+            .flatten()?;
+        crate::db::shard_manifests::hydrate_manifest(&row)
+            .ok()
+            .map(|manifest| manifest.total_size)
     }
 
     /// Serve a sha256-addressed blob from the iroh store when the sha256 store
@@ -359,11 +401,35 @@ impl ShardService {
         let iroh_hash: iroh_blobs::Hash = hex.parse().ok()?;
         match iroh.get_bytes(iroh_hash).await {
             Ok(bytes) => {
+                // Cheapest refusal first: bytes that cannot be framed must not
+                // be hashed. SHA-256 over a quarter-gigabyte is ~0.3 s of
+                // uninterruptible CPU, and this runtime has two worker threads.
+                if !crate::p2p::shard_protocol::payload_fits_frame(bytes.len() as u64) {
+                    debug!(
+                        hash = %hash,
+                        size = bytes.len(),
+                        "aliased bytes exceed one shard frame — not hashed, not served"
+                    );
+                    return None;
+                }
                 // Serve only bytes that ARE the requested address. An alias can
                 // point at a reassembled composite (RS-sharded bundle) whose
                 // sha256 is not the composite's name — those are healed through
                 // the shard manifest, never as whole bytes under this name.
-                if crate::p2p::blob_fetch::verify_blob_hash(&bytes, &normalized) {
+                //
+                // Hashing runs on the blocking pool: this is CPU measured in
+                // hundreds of milliseconds per ask, and holding a server worker
+                // for it starves every other request the runtime owes.
+                let verified = {
+                    let bytes = bytes.clone();
+                    let expected = normalized.clone();
+                    tokio::task::spawn_blocking(move || {
+                        crate::p2p::blob_fetch::verify_blob_hash(&bytes, &expected)
+                    })
+                    .await
+                    .unwrap_or(false)
+                };
+                if verified {
                     Some(bytes.to_vec())
                 } else {
                     debug!(hash = %hash, alias = %alias, "iroh alias bytes do not hash to the requested address (composite?) — not served");
