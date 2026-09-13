@@ -453,6 +453,9 @@ doing it inside this slice would make a routing regression and a vocabulary chur
 
 #### Design constraints discovered during the gate
 
+- **The commitment observation contract lags its own updates (2026-09-13, household).** `get_rea_commitment` resolves a commitment by its `IdToCommitment` link to the root Create and walks forward through Update reverse-metadata to find the head; `update_rea_commitment_state` publishes no new link, so until the `RegisterUpdate` op integrates, the author's own conductor answers the pre-update root — old anchor and old state. Storage now refuses to write such an answer over a settled row (`ReaHealWrite::RefusedConductorBehind`, 493adaabb), which closes the resurrection, but the durable answer is on the DNA: a fresh `IdToCommitment` link to the new action on every state update, so the observation's target set names the head directly. That is a p2p-design-gate decision on the observation contract's target set (coordinator-only if the link type already exists — verify against `#[hdk_link_types]` — else it rides a deliberate DNA-lineage event). Named here, not taken.
+
+
 - **The coherence digest is a wire contract, and the host fold reads through it.** `install_name_routes`
   mints `HolderContract`s from `CoherenceManifest.heads` — a `Vec<EprHeadFingerprint { url_path,
   epr_id }>` that is *also* the dag-cbor preimage of the cross-edge coherence digest (`mint_head_set_digest`).
