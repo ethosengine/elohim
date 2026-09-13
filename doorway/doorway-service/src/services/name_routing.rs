@@ -63,6 +63,21 @@ pub const NAME_ROUTE_HEADER: &str = "x-elohim-name-route";
 /// The relay budget. One. See the module doc.
 pub const MAX_FEDERATION_HOPS: u8 = 1;
 
+/// The standing the serving doorway resolved, relayed verbatim. One name for
+/// this header across the crate — it is minted by
+/// [`crate::services::serve_eligibility`] and this module only carries it.
+pub use crate::services::serve_eligibility::STANDING_HEADER;
+
+/// The bundle-freshness marker a holder stated, relayed verbatim.
+pub const BUNDLE_HEADER: &str = "x-elohim-bundle";
+
+/// A holder's **authoritative refusal**. Not a failed attempt: the holder is
+/// the doorway that holds the contract for this name, so when it says the
+/// requester may not have it, that IS the answer to the request. Trying the
+/// next holder would be shopping the refusal around the federation until some
+/// doorway with a staler projection said yes — reach-laundering by retry.
+const AUTHORITATIVE_REFUSAL: u16 = 403;
+
 /// How live a candidate holder looked at the last discovery tick.
 ///
 /// Declaration order IS the preference order (`derive(Ord)`): a serving holder
@@ -504,10 +519,30 @@ impl NameRouteTable {
 
 /// What a holder answered. Transport-agnostic so the relay loop is testable
 /// without a network.
+///
+/// # Why the standing/bundle/cache terms are carried
+///
+/// A relay is a *courier*, not a re-decider. The holder is the doorway that
+/// actually resolved the fold for this name, so the terms it stated on its own
+/// face are the terms the client must receive: the standing it resolved
+/// ([`STANDING_HEADER`]), the bundle-freshness it admitted
+/// ([`BUNDLE_HEADER`]), and how it says its own answer may be cached. Dropping
+/// them re-writes a refusal into an unexplained one and a "behind" bundle into
+/// a silently-fresh one — the two honesty markers this protocol spends the most
+/// care minting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HolderReply {
     pub status: u16,
     pub content_type: Option<String>,
+    /// The holder's `x-elohim-standing` — the standing IT resolved, verbatim.
+    /// `None` when it stated none.
+    pub standing: Option<String>,
+    /// The holder's `x-elohim-bundle` staleness marker, verbatim. `None` when
+    /// it stated none (i.e. it confirmed the head current and deliverable).
+    pub bundle: Option<String>,
+    /// The holder's own `cache-control` for this answer. `None` → the relay's
+    /// default (`no-store`) governs.
+    pub cache_control: Option<String>,
     pub body: Vec<u8>,
 }
 
@@ -544,14 +579,22 @@ pub struct RelayOutcome {
 /// all when the INBOUND request already carried it (see
 /// [`relay_precondition`]).
 ///
-/// Outcome per holder:
+/// Outcome per holder — the axis is **did this holder ANSWER**, not "did it
+/// give us bytes we like":
 /// - `2xx`/`3xx` → served, stop;
-/// - `503` → that holder is shedding: record it and **try the next holder
-///   before answering the shed**;
-/// - any other status (incl. the sibling's honest `404`) → a failed attempt,
-///   try the next holder; if it was the last, the caller keeps ITS original
-///   status. A sibling 404 therefore surfaces as our own 404, never as a
-///   rewritten one.
+/// - `403` → **answered, stop.** The holder resolved the fold and refused this
+///   requester. That is an authoritative outcome about the requester's
+///   standing, so it is relayed as-is and NO further holder is dialled. Asking
+///   the next one would be shopping a refusal around the federation until a
+///   doorway with a staler projection admitted it — see
+///   [`AUTHORITATIVE_REFUSAL`].
+/// - `503` → that holder is shedding: a statement about the HOLDER's liveness,
+///   not about the requester or the record. Record it and **try the next
+///   holder before answering the shed**;
+/// - any other status (incl. the sibling's honest `404`) → it did not serve:
+///   a failed attempt, try the next holder; if it was the last, the caller
+///   keeps ITS original status. A sibling 404 therefore surfaces as our own
+///   404, never as a rewritten one.
 /// - transport error → a failed attempt, same as above.
 pub async fn relay_one_hop<F, Fut>(holders: &[NameHolder], fetch: F) -> RelayOutcome
 where
@@ -586,7 +629,13 @@ where
         }
         attempted += 1;
         match fetch(holder.clone()).await {
-            Ok(reply) if (200..400).contains(&reply.status) => {
+            // An ANSWER from the holder that holds this name's contract. Bytes
+            // (2xx/3xx) or an authoritative refusal (403) are the same kind of
+            // thing here: the doorway that owns the fold has spoken, so the
+            // relay stops and the client receives what it said.
+            Ok(reply)
+                if (200..400).contains(&reply.status) || reply.status == AUTHORITATIVE_REFUSAL =>
+            {
                 return RelayOutcome {
                     verdict: RelayVerdict::Served {
                         doorway_id: holder.doorway_id.clone(),
@@ -680,13 +729,25 @@ pub fn inbound_hop_seen(raw_header: Option<&str>) -> bool {
     raw_header.map(|v| !v.trim().is_empty()).unwrap_or(false)
 }
 
-/// Build the client-facing response for a served relay: the holder's bytes,
-/// its content type, [`SERVED_BY_HEADER`] naming the origin so the sticky
-/// client can go direct next time, and [`NAME_ROUTE_HEADER`] marking the
-/// response as relayed.
+/// Build the client-facing response for a served relay: the holder's status
+/// and bytes, its content type, the terms it stated on its own face
+/// ([`STANDING_HEADER`], [`BUNDLE_HEADER`], its `cache-control`),
+/// [`SERVED_BY_HEADER`] naming the origin so the sticky client can go direct
+/// next time, and [`NAME_ROUTE_HEADER`] marking the response as relayed.
 ///
-/// Never cached: the relay verdict is a liveness-dependent routing decision,
-/// not content truth.
+/// # The relayed terms are the holder's, not ours
+///
+/// A relayed `403` that arrives stripped of its `x-elohim-standing` is a
+/// refusal with no face: the chrome cannot say WHICH term refused, and the
+/// visitor cannot be told what standing they would need. Same for a `behind`
+/// bundle marker — dropping it presents a stale serve as a fresh one. So both
+/// are carried verbatim when the holder stated them, and simply absent when it
+/// did not; the relay never invents either.
+///
+/// `cache-control` likewise defers to the holder — its answer, its caching
+/// terms. Absent one, the relay's own default governs (`no-store`: the relay
+/// verdict is a liveness-dependent routing decision, not content truth, and
+/// must not outlive the liveness that produced it).
 pub fn build_relayed_response(
     origin: &str,
     doorway_id: &str,
@@ -695,13 +756,24 @@ pub fn build_relayed_response(
     let status = StatusCode::from_u16(reply.status).unwrap_or(StatusCode::OK);
     let content_type = reply
         .content_type
+        .clone()
         .unwrap_or_else(|| "application/octet-stream".to_string());
-    Response::builder()
+    let mut builder = Response::builder()
         .status(status)
         .header("Content-Type", content_type)
         .header(SERVED_BY_HEADER, origin)
         .header(NAME_ROUTE_HEADER, format!("relay:{doorway_id}"))
-        .header("cache-control", "no-store")
+        .header(
+            "cache-control",
+            reply.cache_control.as_deref().unwrap_or("no-store"),
+        );
+    if let Some(standing) = reply.standing.as_deref() {
+        builder = builder.header(STANDING_HEADER, standing);
+    }
+    if let Some(bundle) = reply.bundle.as_deref() {
+        builder = builder.header(BUNDLE_HEADER, bundle);
+    }
+    builder
         .body(Full::new(Bytes::from(reply.body)))
         .unwrap_or_else(|_| {
             Response::builder()
@@ -746,7 +818,19 @@ mod tests {
         HolderReply {
             status,
             content_type: Some("text/html".to_string()),
+            standing: None,
+            bundle: None,
+            cache_control: None,
             body: body.as_bytes().to_vec(),
+        }
+    }
+
+    /// A holder's authoritative refusal, shaped exactly as
+    /// `serve_eligibility::Refusal::standing_header_value` mints it.
+    fn refusal(reach: &str) -> HolderReply {
+        HolderReply {
+            standing: Some(format!("refused;reach={reach}")),
+            ..reply(403, r#"{"term":"reach","reason":"this is held closer"}"#)
         }
     }
 
@@ -1262,6 +1346,138 @@ mod tests {
     async fn no_candidates_is_distinct_from_a_failed_attempt() {
         let outcome = relay_one_hop(&[], |_| async { Ok(reply(200, "never")) }).await;
         assert_eq!(outcome.verdict, RelayVerdict::NoCandidates);
+    }
+
+    /// THE FIX. A holder's 403 is an ANSWER about this requester's standing,
+    /// and the holder is the doorway that holds the contract for this name. So
+    /// it is relayed as-is, with the standing it named, and NO second holder is
+    /// dialled: a refusal must not be shopped around the federation until a
+    /// doorway with a staler projection says yes.
+    #[tokio::test]
+    async fn a_holders_refusal_is_relayed_with_its_standing_and_stops_the_loop() {
+        let holders = vec![
+            holder("b-doorway", "https://b.example", HolderLiveness::Serving),
+            holder("c-doorway", "https://c.example", HolderLiveness::Serving),
+        ];
+        let dialled = Mutex::new(Vec::new());
+        let outcome = relay_one_hop(&holders, |h| {
+            dialled.lock().unwrap().push(h.doorway_id.clone());
+            async move { Ok(refusal("household")) }
+        })
+        .await;
+
+        let RelayVerdict::Served {
+            origin,
+            doorway_id,
+            reply,
+        } = outcome.verdict
+        else {
+            panic!("a 403 is an authoritative outcome, not a failed attempt");
+        };
+        assert_eq!(origin, "https://b.example");
+        assert_eq!(reply.status, 403);
+        assert_eq!(
+            *dialled.lock().unwrap(),
+            vec!["b-doorway".to_string()],
+            "the refusal ends the loop -- the second holder must never be asked \
+             to overturn it"
+        );
+        assert!(
+            outcome.shed_doorways.is_empty(),
+            "a refusal says nothing about the holder's liveness"
+        );
+
+        // ...and it reaches the client with its face intact.
+        let response = build_relayed_response(&origin, &doorway_id, reply);
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        assert_eq!(
+            response.headers().get(STANDING_HEADER).unwrap(),
+            "refused;reach=household",
+            "a refusal stripped of its standing cannot tell the visitor WHICH \
+             term refused them"
+        );
+        assert_eq!(
+            response.headers().get(SERVED_BY_HEADER).unwrap(),
+            "https://b.example",
+            "and it still names who decided it"
+        );
+        assert_eq!(
+            response.headers().get(NAME_ROUTE_HEADER).unwrap(),
+            "relay:b-doorway"
+        );
+    }
+
+    /// The contrast that keeps the two statuses from collapsing into one rule:
+    /// a 503 is about the HOLDER (liveness), so the next holder is tried; a 403
+    /// is about the REQUESTER, so it is not. Same loop, opposite handling.
+    #[tokio::test]
+    async fn a_holders_shed_still_tries_the_next_holder() {
+        let holders = vec![
+            holder("b-doorway", "https://b.example", HolderLiveness::Serving),
+            holder("c-doorway", "https://c.example", HolderLiveness::Serving),
+        ];
+        let dialled = Mutex::new(Vec::new());
+        let outcome = relay_one_hop(&holders, |h| {
+            dialled.lock().unwrap().push(h.doorway_id.clone());
+            async move {
+                if h.doorway_id == "b-doorway" {
+                    Ok(reply(503, r#"{"status":"catching-up"}"#))
+                } else {
+                    Ok(reply(200, "served by c"))
+                }
+            }
+        })
+        .await;
+
+        match &outcome.verdict {
+            RelayVerdict::Served { origin, .. } => assert_eq!(origin, "https://c.example"),
+            other => panic!("expected the second holder to serve, got {other:?}"),
+        }
+        assert_eq!(
+            *dialled.lock().unwrap(),
+            vec!["b-doorway".to_string(), "c-doorway".to_string()],
+            "a shed is a liveness statement -- unlike a refusal, it MUST fall \
+             through to the next holder"
+        );
+        assert_eq!(outcome.shed_doorways, vec!["b-doorway".to_string()]);
+    }
+
+    /// The holder's own bundle marker and caching terms ride along too, and an
+    /// absent `cache-control` leaves the relay's `no-store` default governing.
+    #[test]
+    fn the_holders_bundle_and_cache_terms_are_restamped_verbatim() {
+        let carried = HolderReply {
+            bundle: Some("behind;head-unconfirmed".to_string()),
+            cache_control: Some("private, max-age=30".to_string()),
+            ..reply(200, "<app-root></app-root>")
+        };
+        let response = build_relayed_response("https://b.example", "b-doorway", carried);
+        assert_eq!(
+            response.headers().get(BUNDLE_HEADER).unwrap(),
+            "behind;head-unconfirmed",
+            "dropping the staleness marker presents a stale serve as a fresh one"
+        );
+        assert_eq!(
+            response.headers().get("cache-control").unwrap(),
+            "private, max-age=30",
+            "the holder's answer carries the holder's caching terms"
+        );
+
+        let plain = build_relayed_response(
+            "https://b.example",
+            "b-doorway",
+            reply(200, "<app-root></app-root>"),
+        );
+        assert_eq!(
+            plain.headers().get("cache-control").unwrap(),
+            "no-store",
+            "with no holder term, the relay's own default still governs"
+        );
+        assert!(plain.headers().get(BUNDLE_HEADER).is_none());
+        assert!(
+            plain.headers().get(STANDING_HEADER).is_none(),
+            "the relay never invents a standing the holder did not state"
+        );
     }
 
     #[tokio::test]

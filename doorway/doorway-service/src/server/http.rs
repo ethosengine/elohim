@@ -5908,11 +5908,22 @@ async fn fetch_from_holder(
             ));
         }
     }
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .map(|v| v.to_string());
+    // The terms the holder stated on its own face. Read BEFORE the body is
+    // consumed, and carried verbatim — this doorway is the courier for that
+    // answer, not a second decider about it. `to_str()` is the sanitiser: a
+    // header value that is not visible ASCII never reaches the client at all
+    // (it becomes `None`), so a peer cannot smuggle bytes through the relay.
+    let header = |name: &str| {
+        response
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .map(|v| v.to_string())
+    };
+    let content_type = header(reqwest::header::CONTENT_TYPE.as_str());
+    let standing = header(crate::services::name_routing::STANDING_HEADER);
+    let bundle = header(crate::services::name_routing::BUNDLE_HEADER);
+    let cache_control = header(reqwest::header::CACHE_CONTROL.as_str());
     let body = response.bytes().await.map_err(|e| e.to_string())?;
     if body.len() as u64 > RELAY_MAX_BYTES {
         return Err(format!("relayed body exceeds {RELAY_MAX_BYTES} bytes"));
@@ -5920,6 +5931,9 @@ async fn fetch_from_holder(
     Ok(crate::services::name_routing::HolderReply {
         status,
         content_type,
+        standing,
+        bundle,
+        cache_control,
         body: body.to_vec(),
     })
 }
