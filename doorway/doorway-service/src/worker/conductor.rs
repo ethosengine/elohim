@@ -93,8 +93,15 @@ impl ReconnectBackoff {
 
     /// Next delay after a session ended. Stable sessions reset the ladder;
     /// unstable ones (accept-then-drop) escalate exactly like failures.
-    fn next_after_session(&mut self, session_len: Duration) -> Duration {
-        if session_len >= STABLE_SESSION_THRESHOLD {
+    /// `stable_threshold` is [`STABLE_SESSION_THRESHOLD`] in production and
+    /// only ever shortened in tests, to exercise the reset boundary without a
+    /// real multi-second sleep.
+    fn next_after_session(
+        &mut self,
+        session_len: Duration,
+        stable_threshold: Duration,
+    ) -> Duration {
+        if session_len >= stable_threshold {
             self.delay = BASE_RECONNECT_DELAY;
         }
         self.next_after_connect_failure()
@@ -181,6 +188,33 @@ impl ConductorConnection {
         auth_token: Option<Vec<u8>>,
         token_minter: Option<TokenMinter>,
     ) -> Self {
+        Self::spawn_internal(
+            conductor_url,
+            auth_token,
+            token_minter,
+            STABLE_SESSION_THRESHOLD,
+        )
+    }
+
+    /// Test-only entry point that shortens [`STABLE_SESSION_THRESHOLD`] so a
+    /// fixture can exercise the "session outlived the stability threshold but
+    /// never authenticated" boundary without a real multi-second sleep.
+    #[cfg(test)]
+    fn spawn_with_auth_minter_and_threshold(
+        conductor_url: &str,
+        auth_token: Option<Vec<u8>>,
+        token_minter: Option<TokenMinter>,
+        stable_threshold: Duration,
+    ) -> Self {
+        Self::spawn_internal(conductor_url, auth_token, token_minter, stable_threshold)
+    }
+
+    fn spawn_internal(
+        conductor_url: &str,
+        auth_token: Option<Vec<u8>>,
+        token_minter: Option<TokenMinter>,
+        stable_threshold: Duration,
+    ) -> Self {
         let (tx, rx) = mpsc::channel::<(Vec<u8>, oneshot::Sender<Vec<u8>>)>(1000);
         let connected = Arc::new(RwLock::new(false));
 
@@ -194,7 +228,15 @@ impl ConductorConnection {
         let connected_flag = Arc::clone(&connected);
         let token_slot = Arc::new(RwLock::new(auth_token));
         tokio::spawn(async move {
-            connection_loop(url, token_slot, token_minter, rx, connected_flag).await;
+            connection_loop(
+                url,
+                token_slot,
+                token_minter,
+                rx,
+                connected_flag,
+                stable_threshold,
+            )
+            .await;
         });
 
         conn
@@ -227,13 +269,22 @@ impl ConductorConnection {
 /// Runs until every [`ConductorConnection`] handle for this loop is dropped
 /// (the request channel closes). Backoff escalates on connect failures AND on
 /// unstable sessions; it only resets after a session survives
-/// [`STABLE_SESSION_THRESHOLD`].
+/// `stable_threshold` ([`STABLE_SESSION_THRESHOLD`] in production).
+///
+/// A session that never sent an `authenticate` frame (the pool's
+/// non-blocking-startup case: `auth_token: None` + a `token_minter`) is NEVER
+/// treated as stable, no matter how long the conductor holds the socket open —
+/// a real conductor holds an unauthenticated app-interface socket for ~10s
+/// before dropping it, which can exceed `stable_threshold` and used to read as
+/// "healthy" (backoff reset to base, no re-mint), producing a permanent ~10s
+/// reconnect loop that never acquired a token. See `run_session`.
 async fn connection_loop(
     conductor_url: String,
     token_slot: Arc<RwLock<Option<Vec<u8>>>>,
     token_minter: Option<TokenMinter>,
     mut rx: mpsc::Receiver<(Vec<u8>, oneshot::Sender<Vec<u8>>)>,
     connected: Arc<RwLock<bool>>,
+    stable_threshold: Duration,
 ) {
     let mut backoff = ReconnectBackoff::new();
     let mut last_remint: Option<Instant> = None;
@@ -280,6 +331,8 @@ async fn connection_loop(
                                 &token_slot,
                                 &token_minter,
                                 &mut last_remint,
+                                true,
+                                stable_threshold,
                             )
                             .await
                         }
@@ -297,6 +350,10 @@ async fn connection_loop(
                         }
                     }
                 } else {
+                    // No token configured yet — the pool's non-blocking-startup
+                    // path (`auth_token: None` + a minter). The socket is sent
+                    // no auth frame at all; `run_session` must not let this
+                    // session's length alone read as "stable".
                     run_session(
                         ws_sink,
                         ws_stream,
@@ -307,6 +364,8 @@ async fn connection_loop(
                         &token_slot,
                         &token_minter,
                         &mut last_remint,
+                        false,
+                        stable_threshold,
                     )
                     .await
                 }
@@ -347,6 +406,11 @@ async fn connection_loop(
 
 /// Run one connected session to completion and compute the next reconnect
 /// delay. Returns `None` when the owning handle dropped (shut down).
+///
+/// `authenticated` is whether THIS session sent an `authenticate` frame
+/// (false for the pool's non-blocking-startup case, where `token_slot` is
+/// `None` and no frame is ever sent). `stable_threshold` is
+/// [`STABLE_SESSION_THRESHOLD`] in production, shortened only in tests.
 #[allow(clippy::too_many_arguments)]
 async fn run_session(
     ws_sink: WsSink,
@@ -358,6 +422,8 @@ async fn run_session(
     token_slot: &Arc<RwLock<Option<Vec<u8>>>>,
     token_minter: &Option<TokenMinter>,
     last_remint: &mut Option<Instant>,
+    authenticated: bool,
+    stable_threshold: Duration,
 ) -> Option<Duration> {
     *connected.write().await = true;
     crate::metrics::inc_sessions(); // M5: live pool-worker session begins.
@@ -393,24 +459,50 @@ async fn run_session(
         return None;
     }
 
-    // Re-mint ONLY on a confirmed auth-reject signal: a Close FRAME ending a
-    // short session is a rejection that landed AFTER the `authenticate` ack
-    // window (a slow conductor) — re-mint (rate-limited) so a token invalidated
-    // by a restart self-heals. A transport error / stream-end is a transient
-    // stall, NOT an auth signal: it escalates the backoff below but must not
-    // amplify into a mint/reconnect storm. The fast path (rejection inside the
-    // window) already re-minted in `connection_loop`.
-    if session_len < STABLE_SESSION_THRESHOLD
+    // Re-mint on either of two independent unstable-session signals:
+    //
+    // 1. A confirmed auth-reject: a Close FRAME ending a short session is a
+    //    rejection that landed AFTER the `authenticate` ack window (a slow
+    //    conductor) — re-mint (rate-limited) so a token invalidated by a
+    //    restart self-heals. A transport error / stream-end is a transient
+    //    stall, NOT an auth signal: it escalates the backoff below but must
+    //    not amplify into a mint/reconnect storm. The fast path (rejection
+    //    inside the window) already re-minted in `connection_loop`.
+    // 2. `!authenticated` (with a minter configured): this session never sent
+    //    an `authenticate` frame at all — `token_slot` was `None` the whole
+    //    time. A real conductor holds such a socket open for ~10s before
+    //    dropping it (no close frame), which can make `session_len` clear
+    //    `stable_threshold` — but the session never proved anything healthy,
+    //    so length alone must never suppress the re-mint here. Without this,
+    //    a doorway that started with `auth_token: None` (the non-blocking
+    //    startup path) never acquires a token: every session "reads stable"
+    //    by length, the remint condition below never fires, and the pool
+    //    reconnects at the conductor's timeout cadence forever.
+    let confirmed_auth_reject = session_len < stable_threshold
         && matches!(
             session_end,
             SessionEnd::ConnectionClosed { reason, .. }
                 if reason == crate::metrics::REASON_CLOSE_FRAME
-        )
-    {
+        );
+    let never_authenticated = !authenticated && token_minter.is_some();
+
+    if confirmed_auth_reject || never_authenticated {
         remint_if_due(token_minter, token_slot, last_remint).await;
     }
 
-    Some(backoff.next_after_session(session_len))
+    // A session that never authenticated must never reset the backoff ladder
+    // to base, no matter how long the conductor held the socket open — that
+    // length never proved the connection healthy, only that the conductor's
+    // own auth-timeout hadn't fired yet. Escalate exactly like a connect
+    // failure; `remint_if_due`'s own rate limit (not this ladder) is what
+    // keeps re-mint ATTEMPTS from hot-looping when the minter itself fails.
+    let next_delay = if never_authenticated {
+        backoff.next_after_connect_failure()
+    } else {
+        backoff.next_after_session(session_len, stable_threshold)
+    };
+
+    Some(next_delay)
 }
 
 /// Re-mint the app auth token if a minter is configured and the rate limit
@@ -787,9 +879,9 @@ mod tests {
         let mut backoff = ReconnectBackoff::new();
         // A session that died well before the stability threshold must NOT
         // reset the delay — this is the auth-reject storm mode.
-        let d1 = backoff.next_after_session(Duration::from_millis(20));
-        let d2 = backoff.next_after_session(Duration::from_millis(20));
-        let d3 = backoff.next_after_session(Duration::from_millis(20));
+        let d1 = backoff.next_after_session(Duration::from_millis(20), STABLE_SESSION_THRESHOLD);
+        let d2 = backoff.next_after_session(Duration::from_millis(20), STABLE_SESSION_THRESHOLD);
+        let d3 = backoff.next_after_session(Duration::from_millis(20), STABLE_SESSION_THRESHOLD);
         assert_eq!(d1, BASE_RECONNECT_DELAY);
         assert_eq!(d2, BASE_RECONNECT_DELAY * 2);
         assert_eq!(d3, BASE_RECONNECT_DELAY * 4);
@@ -801,7 +893,10 @@ mod tests {
         for _ in 0..5 {
             backoff.next_after_connect_failure();
         }
-        let d = backoff.next_after_session(STABLE_SESSION_THRESHOLD + Duration::from_secs(1));
+        let d = backoff.next_after_session(
+            STABLE_SESSION_THRESHOLD + Duration::from_secs(1),
+            STABLE_SESSION_THRESHOLD,
+        );
         assert_eq!(
             d, BASE_RECONNECT_DELAY,
             "stable session must reset the backoff to base"
@@ -912,6 +1007,100 @@ mod tests {
         assert!(
             mint_calls.load(Ordering::SeqCst) >= 1,
             "an unstable authenticated session must trigger a token re-mint"
+        );
+    }
+
+    /// Reproduces the live-conductor shape of the bug (2026-09-13): a real
+    /// Holochain conductor accepts the WebSocket handshake on an
+    /// unauthenticated app-interface connection, holds it open for ~10s, then
+    /// drops it with NO close frame (a bare TCP teardown, not
+    /// `Message::Close`). This fixture uses a shortened `stable_threshold` so
+    /// the hold time can clear it without a real multi-second sleep, while
+    /// still exercising the exact boundary: `session_len >= stable_threshold`
+    /// AND no close frame — the one combination the OLD remint condition
+    /// (`session_len < STABLE_SESSION_THRESHOLD && reason ==
+    /// REASON_CLOSE_FRAME`) could never catch, because `token_slot` was never
+    /// populated in the first place (`auth_token: None`, matching the pool's
+    /// non-blocking-startup config in main.rs).
+    #[tokio::test]
+    async fn missing_initial_token_reminted_after_stable_but_unauthenticated_session() {
+        // Short enough to keep the test fast; the hold time below is chosen to
+        // clear it, matching the real conductor's hold >> its own threshold.
+        let stable_threshold = Duration::from_millis(100);
+        let hold_before_drop = Duration::from_millis(200);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let conn_count = Arc::new(AtomicUsize::new(0));
+        let second_conn_got_frame = Arc::new(AtomicUsize::new(0));
+        let conn_count_for_server = Arc::clone(&conn_count);
+        let got_frame_for_server = Arc::clone(&second_conn_got_frame);
+
+        tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let index = conn_count_for_server.fetch_add(1, Ordering::SeqCst);
+                let got_frame = Arc::clone(&got_frame_for_server);
+                tokio::spawn(async move {
+                    let Ok(mut ws) = tokio_tungstenite::accept_async(stream).await else {
+                        return;
+                    };
+                    if index == 0 {
+                        // First connection: never sent an auth frame by the
+                        // client (auth_token starts None) — hold the socket
+                        // open past `stable_threshold`, then drop it WITHOUT a
+                        // close frame, exactly like the real conductor's
+                        // unauthenticated-socket timeout.
+                        tokio::time::sleep(hold_before_drop).await;
+                        drop(ws);
+                    } else {
+                        // Second connection: the token should have been
+                        // re-minted by now, so the client sends an
+                        // `authenticate` frame. Confirm it arrives, then hold
+                        // the socket open so this session reads as a genuine
+                        // success.
+                        if let Some(Ok(Message::Binary(_))) = ws.next().await {
+                            got_frame.fetch_add(1, Ordering::SeqCst);
+                        }
+                        while let Some(Ok(_)) = ws.next().await {}
+                    }
+                });
+            }
+        });
+
+        let url = format!("ws://{addr}");
+        let mint_calls = Arc::new(AtomicUsize::new(0));
+        let mint_calls_for_minter = Arc::clone(&mint_calls);
+        let minter: TokenMinter = Arc::new(move || {
+            let calls = Arc::clone(&mint_calls_for_minter);
+            Box::pin(async move {
+                calls.fetch_add(1, Ordering::SeqCst);
+                Some(vec![4, 2])
+            })
+        });
+
+        // Mirrors doorway/doorway-service/src/main.rs's per-conductor pool
+        // config exactly: `auth_token: None` + a `token_minter`, so startup
+        // never blocks on a synchronous mint.
+        let _conn = ConductorConnection::spawn_with_auth_minter_and_threshold(
+            &url,
+            None,
+            Some(minter),
+            stable_threshold,
+        );
+
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+
+        assert!(
+            mint_calls.load(Ordering::SeqCst) >= 1,
+            "a session that never sent an auth frame must trigger a token re-mint \
+             even though it outlived stable_threshold and closed without a close frame"
+        );
+        assert!(
+            second_conn_got_frame.load(Ordering::SeqCst) >= 1,
+            "the reconnect after re-mint must send an authenticate frame"
         );
     }
 
