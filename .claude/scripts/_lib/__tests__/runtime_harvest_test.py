@@ -194,6 +194,58 @@ caught = _win("alpha", [_sh(projector={"caughtUp": True, "lagSeconds": 2})] * rh
 check("projector-lag silent when caught up",
       not any(f["provenance"].startswith("projector:") for f in rh.evaluate(caught)))
 
+
+# ── evaluate: projector-lag reads the sweep self-report when the node publishes it ──
+# Regression guard for fp 79f357281ca5: `caughtUp: false` is true of an in-flight sweep on a
+# perfectly healthy node, so it flapped and re-dispatched triage on an unchanged condition.
+# Shapes below are the LIVE 2026-09-13 12:42Z readings from both alpha nodes.
+def _pr(healed, sweeps, divergent=59, converged=False, caught_up=False):
+    return {"healedTotal": healed, "sweeps": sweeps, "divergentAnchor": divergent,
+            "converged": converged, "caughtUp": caught_up, "completed": 0}
+
+
+def _shpr(pr, projector=None):
+    d = _sh(projector=projector or {"caughtUp": False, "lagSeconds": None})
+    d["p2p_status"] = {"projectionReconcile": pr}
+    return d
+
+
+# adam/B: healed NOTHING over a real base of sweeps against real divergence -> exhaustion.
+# Sweep counts are the LIVE non-monotonic series out of runtime-cursor.json (88, 109, 21):
+# successive polls are answered by DIFFERENT storage processes, so the predicate must not
+# subtract them. This window is the regression guard for that.
+stuck = _win("alpha-b", [_shpr(_pr(0, 88)), _shpr(_pr(0, 109)), _shpr(_pr(0, 21))])
+check("projector-lag fires when the projector heals nothing over a base of sweeps",
+      any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(stuck)))
+check("projector-lag survives a non-monotonic sweep counter (multi-process endpoint)",
+      any("healed NOTHING" in f["line"] for f in rh.evaluate(stuck)))
+check("projector-lag keeps fp 79f357281ca5 stable across the rewrite",
+      rh.fingerprint("alpha-b", rh.CLASS, "projector:reconcile") == "79f357281ca5")
+# matthew/A: caughtUp false the whole window, but it HAS healed -> busy, not exhausted
+busy = _win("alpha", [_shpr(_pr(57, 27, divergent=43)), _shpr(_pr(64, 28, divergent=43)),
+                      _shpr(_pr(73, 29, divergent=43))])
+check("projector-lag silent on a node that is healing (caughtUp=false but progressing)",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(busy)))
+# a just-booted projector has healed nothing because it has barely swept -> no base, silent
+booted = _win("alpha-b", [_shpr(_pr(0, 0)), _shpr(_pr(0, 1)), _shpr(_pr(0, 2))])
+check("projector-lag silent on a fresh boot (healed nothing, but no base of sweeps)",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(booted)))
+# nothing to heal, or fully adjudicated divergence (converged) -> silent
+idle = _win("alpha-b", [_shpr(_pr(0, 21, divergent=0)), _shpr(_pr(0, 22, divergent=0)),
+                        _shpr(_pr(0, 23, divergent=0))])
+check("projector-lag silent with no divergence to hold",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(idle)))
+adjudicated = _win("alpha-b", [_shpr(_pr(0, 21, converged=True)), _shpr(_pr(0, 22, converged=True)),
+                               _shpr(_pr(0, 23, converged=True))])
+check("projector-lag silent when divergence is adjudicated (converged=true)",
+      not any(f["provenance"] == "projector:reconcile" for f in rh.evaluate(adjudicated)))
+# lagSeconds arm still wins ahead of the self-report
+lag_with_pr = _win("alpha-b", [_shpr(_pr(9, 21), projector={"caughtUp": True, "lagSeconds": 40}),
+                               _shpr(_pr(9, 22), projector={"caughtUp": True, "lagSeconds": 40}),
+                               _shpr(_pr(9, 23), projector={"caughtUp": True, "lagSeconds": 40})])
+check("projector-lag still fires on lagSeconds regardless of the self-report",
+      any("lagSeconds" in f["line"] for f in rh.evaluate(lag_with_pr)))
+
 # absent /admin/self-healing block -> none of the pending predicates fire
 absent = _win("alpha", [{"render": {"degenerateRate": 0.0}}] * rh.WINDOW)
 check("pending predicates silent when self-healing block absent",
@@ -246,11 +298,23 @@ for _ in range(8):
         break
     _h = _h.parent
 check("runtime-harvest.py shell exists", _root is not None)
+# CLAUDE_PROJECT_DIR is NOT optional here: the shell resolves LEDGER_PATH/CURSOR_PATH from it,
+# so without an override this probe polls a fake node against the REPO'S OWN live ledger —
+# advancing poll_index, adding a clean_poll_streak to every real finding (closure-by-
+# disappearance is 3, so running the suite twice can DELETE a live triage line) and filing a
+# spurious `harvester-blind` row for `doesnotexist` that dispatches a triage agent at the next
+# SessionStart. Observed 2026-09-13 while verifying the projector-lag rewrite. The write-side
+# tests below already isolate this way; this one was the leak.
+import tempfile  # noqa: E402
+_iso = dict(os.environ, CLAUDE_PROJECT_DIR=tempfile.mkdtemp())
 _r = subprocess.run(
     ["python3", str(_root / ".claude" / "scripts" / "runtime-harvest.py"),
      "--nodes", "doesnotexist", "--base", "http://127.0.0.1:9"],
-    capture_output=True, text=True, timeout=60)
+    env=_iso, capture_output=True, text=True, timeout=60)
 check("shell degrades quietly on unreachable node (exit 0)", _r.returncode == 0)
+check("shell test writes its cursor into the isolated dir, not the repo's",
+      os.path.exists(os.path.join(_iso["CLAUDE_PROJECT_DIR"],
+                                  ".claude", "data", "runtime-cursor.json")))
 
 # ── shell write side (Task 6): hot node files a finding + idempotent + dispatch ──
 import http.server  # noqa: E402

@@ -11,8 +11,10 @@ ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 # ── exhaustion thresholds (rationale in the plan Decisions / Task 3) ──
 OPEN_POLLS = 3          # circuit Open across >= N consecutive polls
 SHED_POLLS = 3          # admission/upstream shed delta > 0 across >= N polls
-LAG_POLLS = 3           # projector caughtUp=false / lag rising across >= N polls
+LAG_POLLS = 3           # projector healing-nothing / lag rising across >= N polls
 LAG_SECONDS = 30        # projector lagSeconds threshold (seconds)
+MIN_SWEEPS = 3          # ... and >= N sweeps behind a healedTotal of 0 (healing nothing
+                        #     needs a base, exactly as DEGEN_MIN_EVENTS gives a rate one)
 DEGEN_RATE = 0.25       # render degenerateRate sustained threshold
 DEGEN_POLLS = 3         # ... across >= N consecutive polls
 DEGEN_MIN_EVENTS = 3    # ... and >= N NEW degenerate renders (a rate needs a base)
@@ -178,20 +180,95 @@ def _admission_shed(node, samples):
     return None
 
 
+def _reconcile_report(sample):
+    """The projector's OWN sweep self-report off /p2p/status, when the node publishes it.
+    `None` when this node/runtime does not (older build, or the endpoint was quiet)."""
+    ps = sample.get("p2p_status")
+    pr = ps.get("projectionReconcile") if isinstance(ps, dict) else None
+    return pr if isinstance(pr, dict) else None
+
+
+def _heals_nothing(report):
+    """One sample's answer to "is this projector running and healing nothing?" — all four
+    terms read from the SAME self-report, so no cross-process counter arithmetic. See
+    `_projector_lag` for why a cross-poll delta is wrong on these fields."""
+    healed, sweeps, divergent = (report.get("healedTotal"), report.get("sweeps"),
+                                 report.get("divergentAnchor"))
+    if not all(isinstance(v, int) for v in (healed, sweeps, divergent)):
+        return False
+    return (healed == 0 and sweeps >= MIN_SWEEPS and divergent > 0
+            and report.get("converged") is False)
+
+
 def _projector_lag(node, samples):
-    """Projector not caught up / lagSeconds over threshold for LAG_POLLS polls.
-    Absent `projector` => no signal."""
+    """Projector exhaustion: lagSeconds over threshold, or the projector is SWEEPING AND
+    HEALING NOTHING, across LAG_POLLS polls. Absent `projector` => no signal.
+
+    WHY `caughtUp` IS NOT THE PRIMARY EVIDENCE (corrected 2026-09-13, third firing of the
+    predicate family that has to learn this lesson — see the `_render_degenerate` history in
+    `genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md`).
+    `ProjectionReconcileStatus::caught_up` is documented at its source
+    (`elohim/elohim-storage/src/p2p/projection_reconcile.rs`) as "true when this SWEEP ended …
+    It is NOT a convergence signal", and "that is why `caught_up` alone overstates". It is
+    therefore false for the whole of any sweep that is merely IN FLIGHT. Measured live on
+    2026-09-13 12:42Z, both alpha nodes reported `caughtUp: false` in the same minute:
+
+      alpha   (matthew/A): healedTotal 57 -> 73, completed 4 -> 7   — healing fine
+      alpha-b (adam/B):    healedTotal 0 pinned over 21 -> 23 sweeps — the real ceiling
+
+    One of those is exhaustion and one is a busy node, and `caughtUp` cannot tell them apart.
+    Worse, it OSCILLATES: fp 79f357281ca5 filed, closed by disappearance, and re-filed as NEW
+    a day later on the same unchanged condition, costing a full triage dispatch per flap.
+
+    So the predicate reads the state the runtime already publishes for exactly this question —
+    no new threshold class, no new endpoint, no fleet roll. Every term is read WITHIN ONE
+    SAMPLE and then required across the window:
+
+      * `healedTotal == 0`            — this process has healed nothing, ever,
+      * `sweeps >= MIN_SWEEPS`        — ... over a real base of attempts (the sibling
+                                        predicate's "a rate needs a base" floor, one layer out),
+      * `divergentAnchor > 0`         — there is something to hold that we do not, and
+      * `converged is False`          — the field the source says an SLO may be offered over,
+                                        which already discounts ADJUDICATED divergence.
+
+    NO CROSS-POLL DELTA, deliberately — and this is the trap that ate the first cut of this
+    rewrite. `sweeps`/`healedTotal` are per-PROCESS counters, and consecutive polls of these
+    endpoints are NOT answered by the same process: the stored alpha-b window on 2026-09-13
+    reads `sweeps` 59, 79, 207, 207, 87, 88, 109, 21 — non-monotonic, because the doorway's
+    upstream pool (and pod churn) puts a different storage instance behind successive polls.
+    A delta over that series is the render-predicate's cumulative-counter defect wearing a
+    new costume: counters from different processes subtracted as if they were one series. The
+    per-sample form is also the STRONGER claim — not "it made no progress between two polls"
+    but "no process that has answered us has ever healed anything".
+
+    The resulting condition is STABLE while the ceiling holds (it does not flap with
+    `caughtUp`), so it files ONE ledger line that stays present — which is what stops the
+    re-dispatch. A node that does not publish `projectionReconcile` falls back to the legacy
+    `caughtUp` arm rather than going blind."""
     win = _tail(samples, LAG_POLLS)
     projs = [s["projector"] for s in win if isinstance(s.get("projector"), dict)]
     if len(projs) < LAG_POLLS:
         return None
-    not_caught = all(p.get("caughtUp") is False for p in projs)
-    lag_high = all(isinstance(p.get("lagSeconds"), (int, float))
-                   and p["lagSeconds"] >= LAG_SECONDS for p in projs)
-    if not_caught or lag_high:
-        why = "caughtUp=false" if not_caught else f"lagSeconds>={LAG_SECONDS}"
+
+    def finding(why):
         return {"node": node, "class": CLASS, "provenance": "projector:reconcile",
                 "line": f"projector {why} sustained >= {LAG_POLLS} polls"}
+
+    if all(isinstance(p.get("lagSeconds"), (int, float))
+           and p["lagSeconds"] >= LAG_SECONDS for p in projs):
+        return finding(f"lagSeconds>={LAG_SECONDS}")
+
+    reports = [r for r in (_reconcile_report(s) for s in win) if r is not None]
+    if len(reports) == LAG_POLLS:
+        if all(_heals_nothing(r) for r in reports):
+            sweeps = [r["sweeps"] for r in reports]
+            return finding(f"healed NOTHING (healedTotal 0 over {min(sweeps)}-{max(sweeps)} "
+                           f"sweeps, divergentAnchor {reports[-1]['divergentAnchor']}, "
+                           f"converged=false)")
+        return None  # it publishes the fields -> they are the authority; caughtUp adds nothing
+
+    if all(p.get("caughtUp") is False for p in projs):
+        return finding("caughtUp=false")
     return None
 
 

@@ -6,8 +6,8 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-09-12"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage)"
+updated: "2026-09-13"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence)"
 status: "wip"
 priority: "high"
 self_heal_status: blocked
@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter]
 cites:
   - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
@@ -27,6 +27,10 @@ cites:
   - https://elohim.host/p2p/status
   - .claude/scripts/_lib/runtime_harvest.py
   - genesis/data/timeline/backlog/self-heal-render-degenerate-cumulative-counter-false-positive.md
+  - genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md
+  - elohim/elohim-storage/src/conductor_admission.rs
+  - elohim/elohim-storage/src/metrics.rs
+  - .claude/scripts/_lib/__tests__/runtime_harvest_test.py
 ---
 
 # adam's post-restart catch-up cannot complete — corrected mechanism
@@ -341,3 +345,226 @@ Written as a specified follow-on, owner-assigned, not silently taken.
 - Regression signature to watch: `healedTotal` STILL 0 with `divergentAnchor` climbing
   into the hundreds or thousands, or `caughtUp` false for a wall-clock hour — that is
   the 2026-07-27 amplitude returning, and it blocks ch04/ch06 again.
+
+---
+
+# 2026-09-13 — `79f357281ca5` re-fired, and the mechanism has moved: this is the CONDUCTOR ADMISSION ceiling, not arc convergence
+
+> **SUPERSEDES the 2026-07-29 mechanism as the CURRENT cause.** That record's chain
+> (cold arc ⇒ network `get_links` ⇒ 60s timeout) is preserved because it was right in July
+> and its four cures are still deployed and still load-bearing. What is measured TODAY on
+> adam is a different link: the heal calls do not die in the network, they never leave the
+> box — the storage→conductor admission gate sheds them. The July prescription is not what
+> moves this; see "The lever, and why it is not the admission cap" below.
+
+## What is exhausted
+
+The fingerprint closed by disappearance overnight and re-filed as NEW at poll 86
+(`2026-09-13T12:32:57+00:00`) — exactly the re-dispatch hazard the 2026-09-12 section
+predicted, costing a second Opus triage on an unchanged condition. Ledger line:
+
+```
+projector caughtUp=false sustained >= 3 polls
+```
+
+**This time it did NOT self-resolve at triage.** `GET https://elohim.host/admin/self-healing`
+(12:42:18Z, HTTP 200):
+
+```json
+"projector": {"lagSeconds": null, "caughtUp": false, "divergentAnchor": 59},
+"admission": {"maxInflight": 256, "available": 256, "shedTotal": 0},
+"upstreams": [{"endpoint": "http://elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090",
+               "circuit": "closed", "errorStreak": 0, "recentFailures": 0}]
+```
+
+`GET https://elohim.host/p2p/status`, same minute:
+
+```json
+"projectionReconcile": {"pending": 11, "completed": 0, "failed": 2, "caughtUp": false,
+                        "peersAsked": 6, "divergentAnchor": 59, "healedTotal": 0,
+                        "sweeps": 23, "exhausted": 0, "converged": false}
+```
+
+**Zero healed in 23 sweeps**, six peers asked, 59 divergent anchors. Doorway-side admission
+is wide open (256 of 256 free, `shedTotal: 0`) and the upstream breaker is CLOSED — so
+nothing on the surfaces the poller reads explains it. The explanation is one layer down.
+
+## The mechanism, corrected (Prometheus, 2026-09-13, read-only)
+
+The July record says adam's problem is that its **arc is not full**, so heal reads leave the
+box. Two numbers falsify that as the current cause:
+
+| gauge (instant, all 7 alpha peers) | adam | matthew | fleet range |
+|---|---|---|---|
+| `elohim_projection_reconcile_divergent_actionable` | **11** | 28 | 11–53 (**adam is the LOWEST**) |
+| `elohim_projection_reconcile_gaps` | 12 | 9 | 9–91 (adam near the bottom) |
+| `elohim_projection_reconcile_exhausted` | **87** | 53 | 27–76 (**adam is the HIGHEST**) |
+
+adam has the *least* actionable divergence in the fleet and the *most* abandoned rows. It is
+not failing to find what to heal. It is failing to heal what it has already found.
+
+**Where the heal calls die** — `sum by (pod, outcome) (increase(elohim_projection_heal_outcomes_total{namespace="elohim-alpha"}[24h]))`:
+
+| outcome | adam | matthew |
+|---|---|---|
+| `call_failed` | 286.25 | 91.12 |
+| `timeout_exhausted` | 277.29 | 246.33 |
+| `healed` | **0** | 35.05 |
+| `refreshed` | **0** | 144.21 |
+| `missing` | **0** | 108.20 |
+| `refused_declared` / `refused_stale` / `no_row` / `unattempted` / `deferred_to_adopt` / `failed` | **0** | (nonzero) |
+
+Every hourly bucket, all 25 of them, reads the same: adam's heal outcomes are **100 %
+`call_failed` + `timeout_exhausted`, 0 % everything else, continuously for 24h** — not a
+recent onset. The taxonomy is the tell. An arc-coverage failure produces `missing` /
+`refused_declared` (the conductor answered "not in my view"); those are *entirely absent* on
+adam while matthew, on the same DNA and the same DHT, produces 108 of them. adam's calls are
+not being answered wrongly. They are not being admitted.
+
+**The gate that is shedding them** — `sum by (pod, class) (increase(elohim_conductor_admission_shed_total{namespace="elohim-alpha"}[24h]))`:
+
+| | adam | matthew |
+|---|---|---|
+| `class="interactive"` | **668.14** | 2.006 |
+| `class="background"` | **136.20** | 2.004 |
+| `avg_over_time(elohim_conductor_admission_in_flight[6h])` | **4.28 of 5 (86 %)** | 1.37 of 5 (27 %) |
+
+adam sheds ~330× matthew and runs at 86 % of its admission capacity sustained over six hours.
+Hourly interactive shed over 24h: `71.6, 82.7, 82.7, 25.2, 22.2, 23.2, 4.0, 9.1, 12.1, 18.2,
+39.3, 81.7, 63.5, 117.0, 8.1, 21.3, 0, 0, 0, 9.1, 0, 0, 12.1, 32.2, 8.1` — it eased for a
+three-hour stretch overnight and resumed. `elohim_projection_reconcile_exhausted{stream="rea"}`
+on adam's current instance climbed `2 → 32 → 87` over ~2h while `divergent_actionable` fell
+`51 → 11` in the same window: rows are transitioning from divergent into **abandoned**, not
+into healed.
+
+This is the same reading the overnight shift took from the other end (the quiesce gate and
+the app-head PATCH both answered `{"status":"catching-up","cause":"upstream"}`), now bound to
+this fingerprint.
+
+## Root-cause inventory
+
+- `elohim/elohim-storage/src/conductor_admission.rs` — the gate. Its module doc,
+  §"Sizing — borrowed from the conductor, not guessed", derives capacity as
+  **`db_max_readers − 3`**, where `db_max_readers = max(2*cpus, 8)`; every alpha peer reads
+  `elohim_conductor_admission_capacity = 5`. `:381` `inc_admission_shed(class, zome)`;
+  `:482`/`:492` publish the capacity; `:414` `is_admission_shed` is the backpressure contract.
+- `elohim/elohim-storage/src/p2p/projection_reconcile.rs:1374-1425` —
+  `ProjectionReconcileStatus`: `caught_up` is documented "true when this SWEEP ended … It is
+  NOT a convergence signal" and "that is why `caught_up` alone overstates"; `converged` is the
+  field "an SLO may be offered over"; `divergent_anchor` is deliberately the TOTAL (adjudicated
+  rows included).
+- `elohim/elohim-storage/src/p2p/projection_reconcile.rs:270-302` — `MissLedger`: the wire
+  `exhausted` is a PER-SWEEP count (reads 0 on adam) while
+  `elohim_projection_reconcile_exhausted` is the cross-sweep gauge (reads 87). Not a
+  contradiction; two different denominators, and only the gauge shows the abandonment.
+- `elohim/elohim-storage/src/metrics.rs:4551-4562` — `converged_blockers`: `pending`, `failed`,
+  `divergent_actionable`, `unmeasured`. The wire field and the gauge are written from one place.
+- `genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md`
+  — **owns the cure design**. Its 2026-09-11 measurement already recorded "admission gate cap 5
+  (adam 3/5 in flight, shed 54 in 6 h)". Two days later adam is at 4.28/5 and shedding 61
+  interactive in 6h: the saturation deepened, the diagnosis was already written.
+
+## The lever, and why it is not the admission cap
+
+The obvious move — raise the admission capacity so adam's heal calls get through — is the
+2026-07-29 "prescription that would have made it worse" in a new costume. The cap is not a
+guess to be tuned: it is *derived* from the conductor's own `db_max_readers`, reserving three
+permits so the pool's keeper is never starved by its callers. Raising it does not create
+conductor capacity; it removes the only thing currently protecting a conductor that the
+fleet record measures at **100 % CFS throttle for ~24h**. The shed is the system working.
+
+The real levers are all outside a background triage agent's hands, and all already written
+down in the fleet record: flip a full-arc shem conductor to leecher (cluster action), shard or
+cap doorway-B's hosted-agent count onto adam, raise adam's conductor CPU, or land the
+demand-driven warm-up / reconcile ramp that record designs (a `k2:` boot profile plus a
+concurrency ramp keyed on `elohim_conductor_admission_*`). The last of those is an
+**actuation** loop, which this agent's remit explicitly excludes.
+
+## Current decision
+
+**BLOCKED — same verdict, corrected blocker, and the fix that WAS bounded has landed.**
+
+1. The node condition is blocked on an operator/cluster lever (above). The cure design is
+   owned by the fleet record; nothing storage-side or DNA-side moves it, and the 2026-07-29
+   cures remain deployed and correct for the failure mode they addressed.
+2. The one storage-side surface that could publish a better projector self-report —
+   `elohim/elohim-storage/src/p2p/projection_reconcile.rs` — is under active operator WIP in
+   the working tree and is out of this pass's write-set by rule. Named, not touched.
+3. **The sensing defect WAS bounded, and is fixed** (next section). That is what stops the
+   flap that re-dispatched this triage.
+
+## The predicate that kept re-dispatching this, fixed
+
+The 2026-09-12 section reserved this to "the deterministic-layer owner" on the grounds that
+the honest cure needed "a projector self-report that distinguishes 'sweeping, making
+progress', 'sweeping, healing nothing', and 'cannot sweep' — a `projection_reconcile.rs`
+change with a fleet roll behind it". **That report already ships.** `healedTotal`, `sweeps`,
+`divergentAnchor` and `converged` are on `/p2p/status` today, sampled into the cursor on every
+poll, and simply were not consulted. No fleet roll, no new threshold class, no Rust change.
+
+The proof that `caughtUp` cannot carry this predicate is two nodes in the same fleet in the
+same minute, both reporting `caughtUp: false`:
+
+| 12:42Z | `caughtUp` | `healedTotal` | `sweeps` | verdict |
+|---|---|---|---|---|
+| alpha (matthew/A, `doorway-alpha`) | false | 57 → **73** | 29 → 32 | healing fine — a sweep merely in flight |
+| alpha-b (adam/B, `elohim.host`) | false | **0** | 21 → 23 | the ceiling |
+
+`_projector_lag` (`.claude/scripts/_lib/runtime_harvest.py`) now fires on the projector's own
+report — `healedTotal == 0` **and** `sweeps >= MIN_SWEEPS` **and** `divergentAnchor > 0`
+**and** `converged is False`, sustained across `LAG_POLLS` — falling back to the legacy
+`caughtUp` arm only for a node that does not publish `projectionReconcile`. Replayed against
+the stored cursor windows: **alpha SILENT, alpha-b fires with fingerprint `79f357281ca5`
+unchanged** (provenance is the fingerprint input, and it did not move — so the existing
+blocked ledger line keeps suppressing dispatch, and now stays present instead of flapping).
+
+**A trap found while building it, worth more than the fix.** The first cut required
+`healedTotal` unchanged and `sweeps` strictly ADVANCING across the window — a cross-poll
+delta. The stored alpha-b window reads `sweeps` **59, 79, 207, 207, 87, 88, 109, 21**:
+non-monotonic, because consecutive polls of these endpoints are answered by DIFFERENT storage
+processes (the doorway's upstream pool plus pod churn — corroborated from the other side by
+five distinct Prometheus `instance` IPs for `elohim-adam-alpha-0` inside 24h, in disjoint
+time bands, with `kube_pod_container_status_restarts_total` flat at 0). Subtracting counters
+across that series is the `_render_degenerate` cumulative-counter defect one layer out, and it
+would have gone SILENT on the very condition it was written for. Every term is now read
+within a single sample. **Standing lesson for this poller: a counter on these endpoints
+belongs to a process, not to a node — never difference one across polls.**
+
+A second, unrelated leak was found and fixed in the same file: the shell-mode test
+`shell degrades quietly on unreachable node` ran without a `CLAUDE_PROJECT_DIR` override, so
+running the suite polled a fake node against the **repo's own live ledger** — advancing
+`poll_index`, adding a `clean_poll_streak` to every real finding (closure-by-disappearance is
+3, so two suite runs can DELETE a live triage line) and filing a spurious `harvester-blind`
+row that would dispatch a triage agent at the next SessionStart. It now writes to a tmpdir
+like the write-side tests beside it, with an assertion that proves it.
+
+## The sensing gap this leaves NAMED (not built)
+
+The poller's `_admission_shed` predicate reads the **doorway's** inbound gate — `maxInflight:
+256, available: 256, shedTotal: 0` on elohim.host, healthy all day. The gate actually shedding
+is `elohim_conductor_admission_shed_total` on the **storage** peer (668 interactive in 24h),
+and storage publishes neither its capacity nor its shed count on any admin JSON the poller
+reads — only to Prometheus. That is why a conductor-admission ceiling reaches the ledger
+wearing a projector costume, and why `admission-shed` has never once fired for it. Closing it
+means adding the storage admission gauge to `/p2p/status` (or `/admin/self-healing`), which is
+a storage change plus a fleet roll — deliberately NOT taken here, and NOT a threshold question.
+
+## Verification
+
+- 2026-09-13 12:42:18Z — `/admin/self-healing`, `/p2p/status` and `/admin/render-stats`
+  re-fetched on elohim.host (HTTP 200, quoted above); `/health` `uptime: 8771` (boot ≈10:17Z).
+- Condition confirmed **LIVE**, not self-resolved: `caughtUp: false`, `divergentAnchor: 59`,
+  `healedTotal: 0` over 23 sweeps, `converged: false`.
+- Prometheus (read-only, datasource `prometheus`): the four PromQL families quoted above over
+  24h / 6h / hourly-25-bucket windows.
+- A-side control at the same minute (`doorway-alpha.elohim.host/p2p/status`):
+  `{"completed": 7, "healedTotal": 73, "sweeps": 32, "caughtUp": false, "converged": false}`.
+- `python3 .claude/scripts/_lib/__tests__/runtime_harvest_test.py` → **59 assertions passed**,
+  exit 0, with the live ledger and cursor byte-identical before and after the run (checked).
+- Replay of the fixed predicate over `.claude/data/runtime-cursor.json`: alpha SILENT,
+  alpha-b → `projector healed NOTHING (healedTotal 0 over 21-109 sweeps, divergentAnchor 59,
+  converged=false) sustained >= 3 polls`, fp `79f357281ca5`.
+- **Regression signature to watch (updated)**: `elohim_projection_heal_outcomes_total` on adam
+  showing a nonzero `healed`/`refreshed` bucket is this concern clearing. `divergent_actionable`
+  climbing past the fleet's upper range (~55) while `healed` stays 0, or the interactive shed
+  rate exceeding its 24h peak of ~117/h, is it deepening.
