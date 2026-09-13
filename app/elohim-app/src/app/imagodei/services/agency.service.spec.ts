@@ -192,6 +192,29 @@ describe('AgencyService', () => {
 
       expect(service.currentStage()).toBe('hosted');
     });
+
+    // Regression: a doorway-authenticated human mid-connect was called a
+    // Visitor. `hasStoredCredentials` is HOLOCHAIN signing credentials, which a
+    // fresh browser only has after the first connection completes — so every
+    // first page load flashed "Visitor" at a signed-in human, and a test that
+    // read the badge inside that window read it as the truth.
+    it('is hosted during connecting when the human holds a doorway session, credentials or not', () => {
+      connectionSignal.set({
+        state: 'connecting',
+        adminWs: null,
+        appWs: null,
+        cellId: null,
+        cellIds: new Map(),
+        agentPubKey: null,
+        appInfo: null,
+      });
+      mockHolochainClient.getDisplayInfo.mockReturnValue(
+        createMockDisplayInfo('connecting', 'wss://edge.elohim.network', false)
+      );
+      mockAuthService.isAuthenticated.mockReturnValue(true);
+
+      expect(service.currentStage()).toBe('hosted');
+    });
   });
 
   describe('node operator detection', () => {
@@ -848,6 +871,83 @@ describe('AgencyService', () => {
 
     it('summarises as saved DHT data, not Unknown/Unknown', () => {
       expect(stewardService.getStageSummary()).toEqual({ data: 'DHT Network', progress: 'Saved' });
+    });
+  });
+
+  // ==========================================================================
+  // Hosting-account fetch — the discriminator for hosted vs hosted-steward
+  // ==========================================================================
+
+  describe('hosting account fetch', () => {
+    /**
+     * Regression: the fetch was triggered from inside `agencyState`'s
+     * `computed()`. A computed body is a reactive context where signal WRITES
+     * throw, and `loadAccount()` writes on its very first statements — so the
+     * call threw synchronously, `void` swallowed the rejected promise, and
+     * `/auth/account` was never requested: no HTTP call, no error signal, no
+     * trace. `isSteward` could never be observed and a graduated steward's
+     * badge was permanently stuck on "Hosted Visitor".
+     *
+     * Reading `currentStage()` must NOT be what performs the fetch.
+     */
+    const flushEffects = (): void => {
+      const bed = TestBed as unknown as { tick?: () => void; flushEffects?: () => void };
+      if (typeof bed.tick === 'function') bed.tick();
+      else bed.flushEffects?.();
+    };
+
+    it('loads the hosting account for an authenticated human, from an effect', () => {
+      const loadAccount = vi.fn().mockResolvedValue(null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgencyService,
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: HolochainClientService, useValue: mockHolochainClient },
+          { provide: AuthService, useValue: { isAuthenticated: vi.fn().mockReturnValue(true) } },
+          {
+            provide: HostingAccountService,
+            useValue: {
+              account: signal(null).asReadonly(),
+              isLoading: signal(false).asReadonly(),
+              loadAccount,
+            },
+          },
+        ],
+      });
+
+      TestBed.inject(AgencyService);
+      flushEffects();
+
+      expect(loadAccount).toHaveBeenCalled();
+    });
+
+    it('does not load the hosting account for an anonymous visitor', () => {
+      const loadAccount = vi.fn().mockResolvedValue(null);
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          AgencyService,
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: HolochainClientService, useValue: mockHolochainClient },
+          { provide: AuthService, useValue: { isAuthenticated: vi.fn().mockReturnValue(false) } },
+          {
+            provide: HostingAccountService,
+            useValue: {
+              account: signal(null).asReadonly(),
+              isLoading: signal(false).asReadonly(),
+              loadAccount,
+            },
+          },
+        ],
+      });
+
+      TestBed.inject(AgencyService);
+      flushEffects();
+
+      expect(loadAccount).not.toHaveBeenCalled();
     });
   });
 });

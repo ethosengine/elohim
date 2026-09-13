@@ -12,7 +12,7 @@
  * - Migration options
  */
 
-import { Injectable, computed, inject } from '@angular/core';
+import { Injectable, computed, effect, inject } from '@angular/core';
 
 // @coverage: 88.6% (2026-02-24)
 
@@ -50,19 +50,31 @@ export class AgencyService {
   private readonly hostingAccountService = inject(HostingAccountService);
 
   /**
-   * Computed agency state based on current connections and session.
+   * Keep the hosting account fresh — an EFFECT, never a read side-effect.
    *
-   * Side-effect: triggers a hosting-account fetch on first read when the human
-   * is authenticated but `/auth/account` hasn't been loaded yet — this is what
-   * lets us discriminate `hosted-steward` from `hosted` without forcing every
-   * consumer to manually call `hostingAccountService.loadAccount()`.
+   * This used to be called from inside `agencyState`'s `computed()`. A computed
+   * body runs in a reactive context where signal WRITES are forbidden, and an
+   * async function body runs synchronously up to its first `await` — so
+   * `loadAccount()`'s opening `loadingSignal.set(true)` threw inside the
+   * computed, `void` discarded the rejected promise, and the fetch vanished
+   * without a request, without an error and without a trace. `/auth/account`
+   * was therefore NEVER loaded, `isSteward` was never seen, and a graduated
+   * steward's badge could only ever read "Hosted Visitor".
+   *
+   * An effect is the reactive context that is allowed to write: it re-runs on
+   * the same signals (`isAuthenticated`, `account`, `isLoading`) the guard
+   * reads, so the fetch still happens exactly once and exactly when the human
+   * becomes authenticated.
    */
+  private readonly hostingAccountSync = effect(() => {
+    this.ensureHostingAccountFresh();
+  });
+
+  /** Computed agency state based on current connections and session. */
   readonly agencyState = computed<AgencyState>(() => {
     const holochainConnection = this.holochainService.connection();
     const holochainState = holochainConnection.state;
     const displayInfo = this.holochainService.getDisplayInfo();
-
-    this.ensureHostingAccountFresh();
 
     const currentStage = this.determineStage(holochainState, displayInfo.hasStoredCredentials);
 
@@ -143,7 +155,15 @@ export class AgencyService {
     }
 
     if (holochainState === 'connecting' || holochainState === 'authenticating') {
-      return hasStoredCredentials ? this.hostedOrHostedSteward() : 'visitor';
+      // `visitor` means NO session — not "session present, socket still
+      // opening". `hasStoredCredentials` is Holochain signing credentials,
+      // which a fresh browser only has AFTER the first connection completes,
+      // so a signed-in human was called a Visitor for the whole connect
+      // window on every first page load. A doorway session is the same
+      // evidence the branch below already accepts; accept it here too.
+      return hasStoredCredentials || this.authService.isAuthenticated()
+        ? this.hostedOrHostedSteward()
+        : 'visitor';
     }
 
     if (this.authService.isAuthenticated()) {
