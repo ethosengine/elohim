@@ -132,6 +132,25 @@ use tracing::{debug, error, info, warn, Instrument};
 static HEAD_RECORD_REQUEST_SEQUENCE: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(1);
 
+fn exact_candidate_blob(
+    content_id: &str,
+    candidate_action: &str,
+    proven: &crate::services::conductor_writes::ContentHeadWire,
+) -> Option<String> {
+    if proven.head_action_hash.to_string() != candidate_action
+        || proven.content_id != content_id
+        || proven.content.id != content_id
+    {
+        return None;
+    }
+    proven
+        .content
+        .blob_cid
+        .as_deref()
+        .filter(|blob| !blob.is_empty())
+        .map(str::to_owned)
+}
+
 async fn trace_head_record_request<F>(
     content_id: &str,
     request: F,
@@ -8144,28 +8163,18 @@ impl HttpServer {
         else {
             return (None, None, StagingCandidateState::Unavailable);
         };
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
         let read =
             crate::services::conductor_writes::call_resolve_content_head_local(&hc, content_id);
-        match tokio::time::timeout(std::time::Duration::from_secs(2), read).await {
+        match tokio::time::timeout_at(deadline, read).await {
             Ok(Ok(Some(wire))) => {
                 let candidate = wire.staging_candidate.map(|h| h.to_string());
-                let blob = if let (Some(sync), Some(action)) =
-                    (self.sync_manager.as_ref(), candidate.as_deref())
-                {
-                    let doc_id = crate::sync::projector::content_doc_id(content_id);
-                    match sync
-                        .declared_head_blob(
-                            crate::sync::projector::PROJECTION_NAMESPACE,
-                            &doc_id,
-                            action,
-                        )
-                        .await
-                    {
-                        Some(blob) if self.blob_available_locally(&blob).await => Some(blob),
-                        _ => None,
+                let blob = match candidate.as_deref() {
+                    Some(action) => {
+                        self.resolve_exact_candidate_blob(&hc, content_id, action, deadline)
+                            .await
                     }
-                } else {
-                    None
+                    None => None,
                 };
                 let state = if candidate.is_some() {
                     StagingCandidateState::Staged
@@ -8189,6 +8198,101 @@ impl HttpServer {
                 );
                 (None, None, StagingCandidateState::Unavailable)
             }
+        }
+    }
+
+    /// Resolve the blob named by an already-elected subordinate candidate.
+    ///
+    /// The public [`crate::sync::SyncManager::declared_head_blob`] resolver is
+    /// intentionally not used here: its anti-laundering gate accepts only the
+    /// elected public head, while `candidate_action` is subordinate to that
+    /// head. Instead, this asks the same local conductor for the exact record
+    /// and hands those opaque bytes back to the coordinator's existing
+    /// cryptographic verifier. The verifier binds action hash, signature,
+    /// entry hash, and Content id; storage adds only the local-byte check.
+    async fn resolve_exact_candidate_blob(
+        &self,
+        hc: &Arc<crate::hc_client::HcClient>,
+        content_id: &str,
+        candidate_action: &str,
+        deadline: tokio::time::Instant,
+    ) -> Option<String> {
+        self.resolve_exact_candidate_blob_with(
+            content_id,
+            candidate_action,
+            deadline,
+            || crate::services::conductor_writes::call_get_record_for_action(hc, candidate_action),
+            |record| {
+                crate::services::conductor_writes::call_validate_carried_head_record(
+                    hc,
+                    content_id,
+                    candidate_action,
+                    Some(record),
+                )
+            },
+        )
+        .await
+    }
+
+    async fn resolve_exact_candidate_blob_with<Fetch, FetchFuture, Verify, VerifyFuture>(
+        &self,
+        content_id: &str,
+        candidate_action: &str,
+        deadline: tokio::time::Instant,
+        fetch: Fetch,
+        verify: Verify,
+    ) -> Option<String>
+    where
+        Fetch: FnOnce() -> FetchFuture,
+        FetchFuture: std::future::Future<
+            Output = Result<
+                Option<crate::services::conductor_writes::CarriedRecordWire>,
+                StorageError,
+            >,
+        >,
+        Verify: FnOnce(Vec<u8>) -> VerifyFuture,
+        VerifyFuture: std::future::Future<
+            Output = Result<
+                Option<crate::services::conductor_writes::ContentHeadWire>,
+                StorageError,
+            >,
+        >,
+    {
+        let carried = match tokio::time::timeout_at(deadline, fetch()).await {
+            Ok(Ok(Some(carried))) if carried.action_hash == candidate_action => carried,
+            Ok(Ok(Some(carried))) => {
+                debug!(
+                    content_id = %content_id,
+                    candidate_action = %candidate_action,
+                    served_action = %carried.action_hash,
+                    "head read: local candidate record named a different action"
+                );
+                return None;
+            }
+            Ok(Ok(None)) => return None,
+            Ok(Err(error)) => {
+                debug!(content_id = %content_id, error = %error,
+                    "head read: local candidate record ask failed");
+                return None;
+            }
+            Err(_) => return None,
+        };
+
+        let proven = match tokio::time::timeout_at(deadline, verify(carried.record)).await {
+            Ok(Ok(Some(proven))) => proven,
+            Ok(Ok(None)) => return None,
+            Ok(Err(error)) => {
+                debug!(content_id = %content_id, error = %error,
+                    "head read: local candidate record failed verification");
+                return None;
+            }
+            Err(_) => return None,
+        };
+
+        let blob = exact_candidate_blob(content_id, candidate_action, &proven)?;
+        match tokio::time::timeout_at(deadline, self.blob_available_locally(&blob)).await {
+            Ok(true) => Some(blob),
+            Ok(false) | Err(_) => None,
         }
     }
 
@@ -19075,6 +19179,44 @@ mod candidate_head_state_tests {
     use super::*;
     use elohim_views::lamad::StagingCandidateState;
 
+    const CONTENT_ID: &str = "landing";
+    const CANDIDATE: &str = "uhCkkp1ebd48niDLCWjV2aOoa2AWCtLSxjcjDFQRwZ9oMtjHS2q0w";
+
+    fn proven_candidate(
+        action: &str,
+        blob: &str,
+    ) -> crate::services::conductor_writes::ContentHeadWire {
+        serde_json::from_value(serde_json::json!({
+            "content_id": CONTENT_ID,
+            "head_action_hash": action,
+            "declared_at": 1,
+            "content": {
+                "id": CONTENT_ID,
+                "content_type": "app",
+                "title": "candidate",
+                "description": "",
+                "content_format": "html5-app",
+                "reach": "commons",
+                "blob_cid": blob
+            }
+        }))
+        .expect("candidate head wire")
+    }
+
+    fn carried(action: &str) -> crate::services::conductor_writes::CarriedRecordWire {
+        crate::services::conductor_writes::CarriedRecordWire {
+            action_hash: action.to_string(),
+            record: vec![1, 2, 3],
+        }
+    }
+
+    async fn candidate_server() -> (tempfile::TempDir, HttpServer) {
+        let root = tempfile::tempdir().unwrap();
+        let blob_store = Arc::new(BlobStore::new(root.path().to_path_buf()).await.unwrap());
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        (root, server)
+    }
+
     #[tokio::test]
     async fn missing_conductor_is_unavailable_not_authoritative_candidate_absence() {
         let blob_store = Arc::new(
@@ -19088,6 +19230,159 @@ mod candidate_head_state_tests {
         assert_eq!(candidate, None);
         assert_eq!(blob, None);
         assert_eq!(state, StagingCandidateState::Unavailable);
+    }
+
+    #[tokio::test]
+    async fn exact_verified_candidate_resolves_independently_of_the_public_head_scalar() {
+        let (_root, server) = candidate_server().await;
+        let stored = server.blob_store.store(b"candidate-b").await.unwrap();
+        let expected_blob = stored.hash.clone();
+        let blob = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                tokio::time::Instant::now() + std::time::Duration::from_secs(1),
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| {
+                    let expected_blob = expected_blob.clone();
+                    async move { Ok(Some(proven_candidate(CANDIDATE, &expected_blob))) }
+                },
+            )
+            .await;
+        assert_eq!(blob.as_deref(), Some(stored.hash.as_str()));
+    }
+
+    #[tokio::test]
+    async fn candidate_blob_refuses_mismatched_actions_and_empty_blob_claims() {
+        let (_root, server) = candidate_server().await;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+        let mismatched_carrier = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried("uhCkkDIFFERENT"))) },
+                |_| async { panic!("mismatched carrier must not reach verification") },
+            )
+            .await;
+        assert_eq!(mismatched_carrier, None);
+
+        let wrong_proven_action = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async {
+                    Ok(Some(proven_candidate(
+                        "uhCkko2IzF5WItm_q0nisrn80BFb0h39ChwvDYZbBGW-tjn-t3Mg9",
+                        "sha256-wrong-action",
+                    )))
+                },
+            )
+            .await;
+        assert_eq!(wrong_proven_action, None);
+
+        let empty_blob = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async { Ok(Some(proven_candidate(CANDIDATE, ""))) },
+            )
+            .await;
+        assert_eq!(empty_blob, None);
+    }
+
+    #[tokio::test]
+    async fn candidate_blob_refuses_wrong_ids_missing_records_and_verifier_errors() {
+        let (_root, server) = candidate_server().await;
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(1);
+
+        let wrong_outer_id = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async {
+                    let mut proven = proven_candidate(CANDIDATE, "sha256-present");
+                    proven.content_id = "other".to_string();
+                    Ok(Some(proven))
+                },
+            )
+            .await;
+        assert_eq!(wrong_outer_id, None);
+
+        let wrong_content_id = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async {
+                    let mut proven = proven_candidate(CANDIDATE, "sha256-present");
+                    proven.content.id = "other".to_string();
+                    Ok(Some(proven))
+                },
+            )
+            .await;
+        assert_eq!(wrong_content_id, None);
+
+        let missing = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(None) },
+                |_| async { panic!("missing record must not reach verification") },
+            )
+            .await;
+        assert_eq!(missing, None);
+
+        let invalid = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                deadline,
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async { Err(StorageError::InvalidInput("invalid proof".into())) },
+            )
+            .await;
+        assert_eq!(invalid, None);
+    }
+
+    #[tokio::test]
+    async fn verified_candidate_without_local_bytes_remains_unavailable() {
+        let (_root, server) = candidate_server().await;
+        let blob = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                tokio::time::Instant::now() + std::time::Duration::from_secs(1),
+                || async { Ok(Some(carried(CANDIDATE))) },
+                |_| async { Ok(Some(proven_candidate(CANDIDATE, "sha256-not-local"))) },
+            )
+            .await;
+        assert_eq!(blob, None);
+    }
+
+    #[tokio::test]
+    async fn candidate_record_resolution_obeys_the_shared_absolute_deadline() {
+        let (_root, server) = candidate_server().await;
+        let started = tokio::time::Instant::now();
+        let blob = server
+            .resolve_exact_candidate_blob_with(
+                CONTENT_ID,
+                CANDIDATE,
+                started + std::time::Duration::from_millis(10),
+                || std::future::pending(),
+                |_| async { panic!("timed-out fetch must not reach verification") },
+            )
+            .await;
+        assert_eq!(blob, None);
+        assert!(started.elapsed() < std::time::Duration::from_millis(250));
     }
 }
 

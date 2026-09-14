@@ -56,6 +56,50 @@ Caveat: the present condition is steady-state saturation of full-arc holders, no
 - The "immediate operator lever" is repo-declared after all: `edgenodeArcFactor` per human in `genesis/orchestrator/data/deployments.json`, rendered into `target_arc_factor` by `elohim/holochain/Jenkinsfile` (`TARGET_ARC_FACTOR_PLACEHOLDER`). Pulled: **susan 1 → 0 (leecher)** — shem-only, non-genesis, recycled-laptop class, the fleet's highest actionable divergence with zero heal outcomes, CFS-throttled 1.0 at her 3000m bump. Rationale beside the jessica/james precedents in her `$arcFactorComment`; reversible by setting `"1"`. 6 full holders remain (adam, matthew, jessica, james, gertrude, eve). Lands with the next edge deploy; measure = her throttle ratio and adam's publish-queue-Full rate afterwards, which the new `ConductorCfsThrottleSustained` rule now watches.
 - Sensing legs of the sibling atom landed the same night (alert rules + harvester hook), so the next week of saturation cannot go unwatched.
 
+## Evidence 2026-09-14 — restart endpoint churn blocks the FIFO
+
+The persistent Dowell household preserved its storage identities, keys and data, but restarting its
+conductors at about 07:08Z minted new ephemeral Iroh endpoint ids. These are separate lifecycles:
+persistent fixture identity does not make a conductor transport endpoint persistent. The merged
+conductor log (`genesis/local-dev/household-dowell/conductors/.sandbox_run_log`)
+contains `core_publish` failures against stale endpoint ids `3d9e0817…bbe2` and
+`6d45904d…46b6`. During the measured 07:53:20–08:01:28Z authored-to-first-heal interval, lines
+7387–7484 contain 22 `iroh connect timed out` failures, 11 for each stale id; diagnostics exposed
+three different current live endpoint ids. Each peer held 95 AgentInfo records (19 for each of five
+DNAs), full arcs, no tombstones and two direct connections. Stale-id failures continued after the
+record healed, so their presence establishes an overlapping transport failure mechanism, not the
+cause of this particular record's full delay or proof that the stale entries had expired.
+
+Commitment `project-epr-sus-032d6c3b9d994008` was authored around 07:53:20Z, first healed on Jessica
+at 08:01:28Z and James at 08:01:33Z, and coherent across storage and both doorways by 08:02:17Z.
+The 75-second standing oracle therefore failed although the same anchor ultimately converged after
+about 8m08s–8m57s. The transport failures overlap that interval, but the observation has no per-op
+correlation that attributes this commitment's latency to a particular dial. Receipts:
+`genesis/a2o/reports/recovery/doorway-overnight-20260914/heap-conductors-restart.log` plus the
+household conductor log above.
+
+The conductor lock resolves crates.io `kitsune2_core` 0.5.0 (checksum
+`3e1207d2f463f5e0b136ae918cc665f042abe78a21c63e7d5f6ed4faf10fc46e`); the sibling core patch in
+the conductor `Cargo.toml` is commented out. In that exact crate,
+`src/factories/core_publish.rs` lines 336–382 implement one outgoing receive loop, check only the
+peer-meta unresponsive marker, and then await `transport.send_module`. Its
+`src/factories/core_space.rs` lines 247–285 retain the marker only when the URL matches current
+peer-store AgentInfo. At conductor pin `25dd2d0be1443899965555af4b076c53ad014693`,
+`elohim/holochain-conductor/patches/kitsune2_transport_iroh/src/lib.rs` lines 282–286, 363–370 and
+994–1011 define a 60-second connect-timeout default and mark unresponsive after a failed attempt.
+The merged three-conductor log interleaves warnings about 22 seconds apart, while the same
+per-conductor sequence recurs about 66 seconds apart; the aggregate cadence is therefore consistent
+with, but does not itself measure, the configured timeout. A stale URL no longer matching current
+AgentInfo therefore gets no unresponsive marker, so `CorePublish` can dial it repeatedly. Together,
+the resolved source and logs locate a concrete stale-destination revalidation gap, while leaving its
+contribution to this one convergence delay unmeasured.
+
+No fix or graduation is claimed. The smallest fork regression is: restart one stable agent with a
+changed Iroh endpoint while publish work is queued; prove routing refreshes to the current endpoint,
+and the stale destination cannot head-of-line block subsequent work. This belongs with the sender
+back-off/warm-up design above;
+the red `dataplane-convergence` habit receives evidence only after that executable receipt exists.
+
 ## Done when
 
 - `rate(container_cpu_cfs_throttled_periods_total)/rate(container_cpu_cfs_periods_total)` < 0.9 on every alpha conductor for 24 h after a fleet roll; adam's publish-queue-Full lines drop to zero.
