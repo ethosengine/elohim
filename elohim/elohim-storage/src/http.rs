@@ -132,6 +132,20 @@ use tracing::{debug, error, info, warn, Instrument};
 static HEAD_RECORD_REQUEST_SEQUENCE: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(1);
 
+fn staging_candidate_for_projected_head(
+    projected_head_action: &str,
+    election: Option<crate::services::conductor_writes::CanonicalElectionWire>,
+) -> Result<Option<String>, String> {
+    let Some(election) = election else {
+        return Ok(None);
+    };
+    let actual_winner = election.winner_target.to_string();
+    if actual_winner != projected_head_action {
+        return Err(actual_winner);
+    }
+    Ok(election.staging_candidate.map(|hash| hash.to_string()))
+}
+
 fn exact_candidate_blob(
     content_id: &str,
     candidate_action: &str,
@@ -8141,14 +8155,17 @@ impl HttpServer {
     /// consumer retain its last candidate during a transient conductor outage
     /// while the rest of the projected head remains readable.
     ///
-    /// `resolve_content_head_local` is the same read the release-adoption
-    /// watcher performs — the conductor's LOCAL view, never a network resolve.
+    /// `resolve_canonical_election` reads the conductor's LOCAL declaration
+    /// links, never a network resolve. Unlike `resolve_content_head_local`, it
+    /// does not retrieve and decode the public winner's Content record merely
+    /// to discover the subordinate candidate.
     /// A network `get_links` on a peer whose storage arc has not reconverged
     /// since restart dies on the conductor's request timeout, and this is a
     /// read on the serving hot path.
     async fn resolve_staging_candidate(
         &self,
         content_id: &str,
+        projected_head_action: &str,
     ) -> (
         Option<String>,
         Option<String>,
@@ -8165,10 +8182,24 @@ impl HttpServer {
         };
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
         let read =
-            crate::services::conductor_writes::call_resolve_content_head_local(&hc, content_id);
+            crate::services::conductor_writes::call_resolve_canonical_election(&hc, content_id);
         match tokio::time::timeout_at(deadline, read).await {
-            Ok(Ok(Some(wire))) => {
-                let candidate = wire.staging_candidate.map(|h| h.to_string());
+            Ok(Ok(election)) => {
+                let candidate = match staging_candidate_for_projected_head(
+                    projected_head_action,
+                    election,
+                ) {
+                    Ok(candidate) => candidate,
+                    Err(actual_winner) => {
+                        tracing::debug!(
+                            content_id = %content_id,
+                            projected_head_action,
+                            actual_winner,
+                            "head read: local election winner differs from projected head — reporting unavailable"
+                        );
+                        return (None, None, StagingCandidateState::Unavailable);
+                    }
+                };
                 let blob = match candidate.as_deref() {
                     Some(action) => {
                         self.resolve_exact_candidate_blob(&hc, content_id, action, deadline)
@@ -8183,7 +8214,6 @@ impl HttpServer {
                 };
                 (candidate, blob, state)
             }
-            Ok(Ok(None)) => (None, None, StagingCandidateState::None),
             Ok(Err(e)) => {
                 tracing::debug!(
                     content_id = %content_id, error = %e,
@@ -8336,8 +8366,13 @@ impl HttpServer {
                             // the row — it is a pure function of the
                             // canonical-head link set — so only the conductor
                             // can answer it.
-                            let (candidate, candidate_blob, candidate_state) =
-                                self.resolve_staging_candidate(content_id).await;
+                            // The conductor call below does not use this SQL connection.
+                            // Release it before awaiting so concurrent `/head` readers do
+                            // not reserve the projection pool for their whole 2s budget.
+                            drop(conn);
+                            let (candidate, candidate_blob, candidate_state) = self
+                                .resolve_staging_candidate(content_id, &view.head_action_hash)
+                                .await;
                             Ok(response::ok(&crate::views::with_staging_candidate(
                                 view,
                                 candidate,
@@ -19180,7 +19215,22 @@ mod candidate_head_state_tests {
     use elohim_views::lamad::StagingCandidateState;
 
     const CONTENT_ID: &str = "landing";
+    const WINNER: &str = "uhCkkc4f18wPJTfxqSdzRUdXJjLD5DRRn7YbF_yHh0xyRENnbCK-A";
     const CANDIDATE: &str = "uhCkkp1ebd48niDLCWjV2aOoa2AWCtLSxjcjDFQRwZ9oMtjHS2q0w";
+
+    fn election(
+        winner: &str,
+        candidate: Option<&str>,
+    ) -> crate::services::conductor_writes::CanonicalElectionWire {
+        serde_json::from_value(serde_json::json!({
+            "winner_target": winner,
+            "canonical_declared_at": 10,
+            "canonical_earned": true,
+            "staging_candidate": candidate,
+            "staging_candidate_declared_at": candidate.map(|_| 11)
+        }))
+        .expect("canonical election wire")
+    }
 
     fn proven_candidate(
         action: &str,
@@ -19226,10 +19276,40 @@ mod candidate_head_state_tests {
         );
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
 
-        let (candidate, blob, state) = server.resolve_staging_candidate("landing").await;
+        let (candidate, blob, state) = server.resolve_staging_candidate("landing", WINNER).await;
         assert_eq!(candidate, None);
         assert_eq!(blob, None);
         assert_eq!(state, StagingCandidateState::Unavailable);
+    }
+
+    #[test]
+    fn candidate_election_must_belong_to_the_projected_winner() {
+        assert_eq!(
+            staging_candidate_for_projected_head(WINNER, Some(election(WINNER, Some(CANDIDATE))))
+                .unwrap()
+                .as_deref(),
+            Some(CANDIDATE)
+        );
+        assert_eq!(
+            staging_candidate_for_projected_head(WINNER, None).unwrap(),
+            None,
+            "no local canonical election preserves the no-candidate response"
+        );
+        assert_eq!(
+            staging_candidate_for_projected_head(WINNER, Some(election(WINNER, None))).unwrap(),
+            None,
+            "the matching winner has no subordinate candidate after promotion"
+        );
+
+        let other_winner = CANDIDATE;
+        assert_eq!(
+            staging_candidate_for_projected_head(
+                WINNER,
+                Some(election(other_winner, Some(WINNER)))
+            ),
+            Err(other_winner.to_string()),
+            "a candidate beneath another winner must not be attached to the projected head"
+        );
     }
 
     #[tokio::test]
