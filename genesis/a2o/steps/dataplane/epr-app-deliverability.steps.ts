@@ -1205,14 +1205,15 @@ When(
     );
     const storageUrl = loadHouseholdMeshFixture().storagePeers?.[peer]?.url;
     assert.ok(storageUrl);
-    const reachable = await pollUntil(async () => {
-      const response = await fetch(`${storageUrl}/health`, { signal: AbortSignal.timeout(2000) });
-      return response.ok;
-    }, 60_000);
-    app(this).recoveredAt = Date.now();
     const restartError = await restart;
     assert.equal(restartError, null, `peer restart failed: ${String(restartError)}`);
-    assert.notEqual(reachable, null, `${peer} did not become reachable`);
+    // The maintained arm owns its readiness horizon and returns only after the
+    // storage peer is ready. Check that completed state afresh: a concurrent
+    // shorter poll can expire while the arm is still making valid progress and
+    // leave a stale failure result even though the restart succeeds.
+    const health = await getRaw(`${storageUrl}/health`, { timeoutMs: 2000 });
+    assert.equal(health.status, 200, `${peer} did not become reachable`);
+    app(this).recoveredAt = Date.now();
     app(this).heldPeers!.delete(peer);
   }
 );
