@@ -474,7 +474,7 @@ const MAX_ROW_RETRIES: u32 = 2;
 /// returning partial results, and a caller timeout inside that window would
 /// discard them. Pinned by
 /// [`tests::the_extern_budget_outlasts_a_saturated_read_permit_acquire`].
-const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(25);
+pub(crate) const HEAL_ATTEMPT_TIMEOUT: Duration = Duration::from_secs(25);
 
 /// Stable marker embedded in the SYNTHETIC per-attempt timeout this module
 /// manufactures when `tokio::time::timeout` elapses on a heal call. Used both to
@@ -4741,7 +4741,7 @@ async fn heal_content(
                     );
                 }
                 seam_contracts::Answer::Present(head) => {
-                    match heal_content_one(&head, pool, &app_ctx) {
+                    match project_authenticated_content_head(&head, pool, &app_ctx) {
                         Ok(crate::db::content_diesel::StampOutcome::Stamped) => {
                             tracker.mark_completed(&id);
                             healed += 1;
@@ -5909,7 +5909,7 @@ fn election_resolve_for<'a>(
 /// [`ContentHeadWire`]; the field mapping mirrors the `ContentCommitted` signal
 /// arm (`rea_projection.rs`). Returns `stamp_declared_head`'s bool (false ⇒ no
 /// local row to stamp).
-fn heal_content_one(
+pub(crate) fn project_authenticated_content_head(
     head: &crate::services::conductor_writes::ContentHeadWire,
     pool: &DbPool,
     app_ctx: &crate::db::AppContext,
@@ -8185,7 +8185,8 @@ mod tests {
         // Incoming conductor answer carries a SCOPED reach over a
         // distribution-safe local row — the exact RC-4 trap.
         let head = content_head_wire("rc4-narrow", "uhCkk-rc4-narrow-head", "private");
-        let outcome = heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        let outcome = project_authenticated_content_head(&head, &pool, &ctx)
+            .expect("authenticated projection succeeds");
         assert!(
             matches!(outcome, crate::db::content_diesel::StampOutcome::Stamped),
             "the head still stamps despite the dropped reach field: {outcome:?}"
@@ -8221,7 +8222,8 @@ mod tests {
             .with_label_values(&["public", "trusted"])
             .get();
         let head = content_head_wire("rc4-counter", "uhCkk-rc4-counter-head", "trusted");
-        heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        project_authenticated_content_head(&head, &pool, &ctx)
+            .expect("authenticated projection succeeds");
         let after = crate::metrics::PROJECTION_RECONCILE_REACH_NARROWED
             .with_label_values(&["public", "trusted"])
             .get();
@@ -8246,7 +8248,8 @@ mod tests {
         // Both sides distribution-safe: the guard must not fire, and the
         // conductor-verified head still stamps.
         let head = content_head_wire("rc4-safe", "uhCkk-rc4-safe-head", "public");
-        let outcome = heal_content_one(&head, &pool, &ctx).expect("heal_content_one succeeds");
+        let outcome = project_authenticated_content_head(&head, &pool, &ctx)
+            .expect("authenticated projection succeeds");
         assert!(
             matches!(outcome, crate::db::content_diesel::StampOutcome::Stamped),
             "the head still stamps on a safe-to-safe pair: {outcome:?}"

@@ -603,6 +603,174 @@ pub fn project_commitment_from_wire(fields: &CommitmentWireFields<'_>) -> Create
 // Signal Handler
 // ============================================================================
 
+/// Ordered declarations must acquire their authenticated payload before they
+/// advance the SQL head. Legacy declarations retain the synchronous stamp path;
+/// a half-present ordering pair remains malformed and is refused there.
+pub fn requires_authenticated_head_projection(signal: &ReaProjectionSignal) -> bool {
+    matches!(
+        signal,
+        ReaProjectionSignal::ContentHeadDeclared {
+            canonical_declared_at: Some(_),
+            canonical_earned: Some(_),
+            ..
+        }
+    )
+}
+
+fn validate_ordered_content_head(
+    content_id: &str,
+    head_action_hash: &HoloHashB64,
+    ordering: content_diesel::CanonicalOrdering,
+    head: crate::services::conductor_writes::ContentHeadWire,
+) -> Result<crate::services::conductor_writes::ContentHeadWire, StorageError> {
+    if head.content_id != content_id
+        || head.content.id != content_id
+        || head.head_action_hash.as_str() != head_action_hash.as_str()
+        || !head.canonical
+        || head.canonical_ordering() != Some(ordering)
+    {
+        return Err(StorageError::InvalidInput(format!(
+            "ordered ContentHeadDeclared did not resolve its exact canonical payload: {content_id}"
+        )));
+    }
+    Ok(head)
+}
+
+fn apply_ordered_content_head(
+    content_id: &str,
+    head_action_hash: &HoloHashB64,
+    ordering: content_diesel::CanonicalOrdering,
+    head: crate::services::conductor_writes::ContentHeadWire,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<content_diesel::StampOutcome, StorageError> {
+    let head = validate_ordered_content_head(content_id, head_action_hash, ordering, head)?;
+    crate::p2p::projection_reconcile::project_authenticated_content_head(&head, pool, ctx)
+}
+
+fn ordered_head_from_batch(
+    content_id: &str,
+    output: crate::services::conductor_writes::BatchResolveOutput<
+        crate::services::conductor_writes::ContentHeadWire,
+    >,
+) -> Result<crate::services::conductor_writes::ContentHeadWire, StorageError> {
+    if output.schema_version != crate::services::conductor_writes::BATCH_RESOLVE_SCHEMA_VERSION {
+        return Err(StorageError::Serialization(format!(
+            "ordered head batch schema {} is unsupported",
+            output.schema_version
+        )));
+    }
+    if !output.unattempted.is_empty() || output.stop_reason.is_some() {
+        return Err(StorageError::Conductor(
+            "ordered head batch returned partial or stopped work".into(),
+        ));
+    }
+    let mut attempted = output.attempted.into_iter();
+    let Some(attempt) = attempted.next() else {
+        return Err(StorageError::NotFound(format!(
+            "ordered head payload unavailable for {content_id}"
+        )));
+    };
+    if attempt.id != content_id || attempted.next().is_some() {
+        return Err(StorageError::Serialization(
+            "ordered head batch returned an unexpected item set".into(),
+        ));
+    }
+    match attempt.outcome {
+        crate::services::conductor_writes::BatchOutcome::Resolved(Some(head)) => Ok(head),
+        crate::services::conductor_writes::BatchOutcome::Resolved(None) => Err(
+            StorageError::NotFound(format!("ordered head payload unavailable for {content_id}")),
+        ),
+        crate::services::conductor_writes::BatchOutcome::Failed(failure) => {
+            Err(StorageError::Conductor(format!(
+                "ordered head payload resolution failed: {:?}/{:?}",
+                failure.phase, failure.reason
+            )))
+        }
+    }
+}
+
+async fn bounded_ordered_head_call<F>(
+    call: F,
+) -> Result<
+    crate::services::conductor_writes::BatchCall<
+        crate::services::conductor_writes::ContentHeadWire,
+    >,
+    StorageError,
+>
+where
+    F: std::future::Future<
+        Output = Result<
+            crate::services::conductor_writes::BatchCall<
+                crate::services::conductor_writes::ContentHeadWire,
+            >,
+            StorageError,
+        >,
+    >,
+{
+    tokio::time::timeout(
+        crate::p2p::projection_reconcile::HEAL_ATTEMPT_TIMEOUT,
+        call,
+    )
+    .await
+    .map_err(|_| {
+        StorageError::Conductor(
+            "ordered head payload read exceeded the existing heal attempt timeout; already-running WASM work may continue"
+                .into(),
+        )
+    })?
+}
+
+/// Hydrate one complete ordered declaration from the own conductor before any
+/// SQL pointer moves. The one-id batch extern carries its existing in-WASM
+/// budget; an unavailable, unattempted, failed, stale, or malformed answer
+/// writes nothing. A fresh A→B signal therefore keeps its prior divergent
+/// anchor for normal reconciliation; an already-split row awaits another exact
+/// signal or authenticated projection rather than being mutated further.
+pub async fn handle_authenticated_content_head_signal(
+    signal: ReaProjectionSignal,
+    hc: &std::sync::Arc<crate::hc_client::HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Result<(), StorageError> {
+    let ReaProjectionSignal::ContentHeadDeclared {
+        content_id,
+        head_action_hash,
+        canonical_declared_at: Some(canonical_declared_at),
+        canonical_earned: Some(canonical_earned),
+        ..
+    } = signal
+    else {
+        return Err(StorageError::InvalidInput(
+            "authenticated head projection requires a complete ordered declaration".into(),
+        ));
+    };
+
+    let ids = [content_id.clone()];
+    let budget_ms =
+        u32::try_from(crate::services::head_batch_resolver::BATCH_EXTERN_BUDGET.as_millis())
+            .unwrap_or(u32::MAX);
+    let call = bounded_ordered_head_call(
+        crate::services::conductor_writes::call_resolve_content_heads_local(
+            hc,
+            &ids,
+            Some(budget_ms),
+        ),
+    )
+    .await?;
+    let head = ordered_head_from_batch(&content_id, call.out)?;
+    apply_ordered_content_head(
+        &content_id,
+        &head_action_hash,
+        (canonical_declared_at, canonical_earned),
+        head,
+        pool,
+        ctx,
+    )?;
+    notify_content_touched(&content_id);
+    Ok(())
+}
+
 /// Handle an incoming REA projection signal from the conductor.
 ///
 /// Main entry point — called from the signal dispatch loop. Acquires a DB
@@ -831,23 +999,19 @@ pub fn handle_rea_signal(
             // replay the canonical heal guard. Legacy/single-author signals
             // carry neither ordering field: they may fill, refresh, or move an
             // unordered legacy head, but may not move an ordered head. Modern
-            // cross-root declarations carry their election ordering here, so a
-            // legitimate direct-conductor winner still advances through the
-            // ordered arm. The independent projection-reconcile sweep also
-            // re-reads this node's authenticated conductor election; this
-            // projection signal never becomes the authority answer. A
-            // half-present pair is malformed and must not move the row.
+            // cross-root declarations are routed by the subscriber through the
+            // async authenticated-payload handler above; reaching this sync arm
+            // with a complete pair refuses before any pointer moves. The
+            // independent projection-reconcile sweep also re-reads this node's
+            // authenticated conductor election. A half-present pair is
+            // malformed and must not move the row.
             let stamped = match (canonical_declared_at, canonical_earned) {
-                (Some(at), Some(earned)) => content_diesel::stamp_declared_head_mode(
-                    &mut conn,
-                    ctx,
-                    &content_id,
-                    head_action_hash.as_str(),
-                    None,
-                    None,
-                    content_diesel::StampMode::HealCanonical,
-                    Some((at, earned)),
-                )?,
+                (Some(_), Some(_)) => {
+                    return Err(StorageError::InvalidInput(
+                        "ordered ContentHeadDeclared requires authenticated payload projection"
+                            .into(),
+                    ))
+                }
                 (None, None) => content_diesel::stamp_declared_head_mode(
                     &mut conn,
                     ctx,
@@ -958,6 +1122,227 @@ mod tests {
             .expect("pool");
         crate::db::run_migrations(&pool).expect("migrations");
         pool
+    }
+
+    fn ordered_head(
+        id: &str,
+        action_hash: &str,
+        blob: &str,
+        ordering: content_diesel::CanonicalOrdering,
+    ) -> crate::services::conductor_writes::ContentHeadWire {
+        serde_json::from_value(serde_json::json!({
+            "content_id": id,
+            "head_action_hash": action_hash,
+            "declared_at": 1_700_000_000_000_000i64,
+            "canonical": true,
+            "canonical_declared_at": ordering.0,
+            "canonical_earned": ordering.1,
+            "content": {
+                "id": id,
+                "content_type": "concept",
+                "title": format!("title-{blob}"),
+                "description": "d",
+                "content_format": "markdown",
+                "reach": "commons",
+                "metadata_json": format!(r#"{{"blob":"{blob}"}}"#),
+                "blob_cid": blob,
+            },
+        }))
+        .expect("ContentHeadWire fixture must deserialize")
+    }
+
+    fn seed_content(pool: &DbPool, id: &str, blob: &str) {
+        let mut conn = pool.get().expect("connection");
+        crate::db::content_diesel::create_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            crate::db::content_diesel::CreateContentInput {
+                id: id.into(),
+                title: format!("title-{blob}"),
+                description: Some("d".into()),
+                content_type: "concept".into(),
+                content_format: "markdown".into(),
+                blob_hash: Some(blob.into()),
+                blob_cid: Some(blob.into()),
+                content_size_bytes: None,
+                metadata_json: Some(format!(r#"{{"blob":"{blob}"}}"#)),
+                reach: "commons".into(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .expect("seed content");
+    }
+
+    #[test]
+    fn subscriber_routes_only_complete_ordered_heads_to_authenticated_hydration() {
+        let signal = |at, earned| ReaProjectionSignal::ContentHeadDeclared {
+            content_id: "route-head".into(),
+            head_action_hash: HoloHashB64("uhCkk-route-head".into()),
+            entry_hash: None,
+            author: None,
+            canonical_declared_at: at,
+            canonical_earned: earned,
+        };
+        assert!(requires_authenticated_head_projection(&signal(
+            Some(10),
+            Some(true)
+        )));
+        assert!(!requires_authenticated_head_projection(&signal(None, None)));
+        assert!(!requires_authenticated_head_projection(&signal(
+            Some(10),
+            None
+        )));
+    }
+
+    #[test]
+    fn exact_authenticated_payload_repairs_a_split_head_and_blob_atomically() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "split-head-payload";
+        seed_content(&pool, id, "blob-a");
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                id,
+                "uhCkk-head-b",
+                Some(20),
+                None,
+                content_diesel::StampMode::HealCanonical,
+                Some((20, true)),
+            )
+            .expect("reproduce split pointer stamp");
+        }
+
+        apply_ordered_content_head(
+            id,
+            &HoloHashB64("uhCkk-head-b".into()),
+            (20, true),
+            ordered_head(id, "uhCkk-head-b", "blob-b", (20, true)),
+            &pool,
+            &ctx,
+        )
+        .expect("hydrate exact ordered payload");
+
+        let mut conn = pool.get().expect("connection");
+        let row =
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .expect("read")
+                .expect("row");
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-head-b")
+        );
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-head-b"));
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-b"));
+        assert_eq!(row.blob_hash.as_deref(), Some("blob-b"));
+        assert_eq!(row.metadata_json.as_deref(), Some(r#"{"blob":"blob-b"}"#));
+    }
+
+    #[test]
+    fn stale_or_misbound_ordered_payload_cannot_advance_any_projection_field() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "refuse-misbound-payload";
+        seed_content(&pool, id, "blob-a");
+
+        let error = apply_ordered_content_head(
+            id,
+            &HoloHashB64("uhCkk-head-b".into()),
+            (20, true),
+            ordered_head(id, "uhCkk-head-a", "blob-stale", (10, true)),
+            &pool,
+            &ctx,
+        )
+        .expect_err("mismatched action and ordering must refuse");
+        assert!(error.to_string().contains("exact canonical payload"));
+
+        let mut conn = pool.get().expect("connection");
+        let row =
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .expect("read")
+                .expect("row");
+        assert_eq!(row.declared_head_action_hash, None);
+        assert_eq!(row.dht_anchor_hash, None);
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-a"));
+        assert_eq!(row.metadata_json.as_deref(), Some(r#"{"blob":"blob-a"}"#));
+    }
+
+    #[test]
+    fn absent_or_failed_bounded_head_read_is_a_deferral_not_a_pointer() {
+        use crate::services::conductor_writes::{
+            BatchAttempt, BatchFailureReason, BatchOutcome, BatchResolveFailure,
+            BatchResolveOutput, BatchResolvePhase, BATCH_RESOLVE_SCHEMA_VERSION,
+        };
+        let output = |outcome| BatchResolveOutput {
+            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+            attempted: vec![BatchAttempt {
+                id: "deferred-head".into(),
+                outcome,
+            }],
+            unattempted: Vec::new(),
+            stop_reason: None,
+            elapsed_ms: 1,
+        };
+        assert!(matches!(
+            ordered_head_from_batch("deferred-head", output(BatchOutcome::Resolved(None))),
+            Err(StorageError::NotFound(_))
+        ));
+        assert!(matches!(
+            ordered_head_from_batch(
+                "deferred-head",
+                output(BatchOutcome::Failed(BatchResolveFailure {
+                    reason: BatchFailureReason::PermitTimeout,
+                    phase: BatchResolvePhase::HeadResolve,
+                }))
+            ),
+            Err(StorageError::Conductor(_))
+        ));
+
+        let stopped = BatchResolveOutput {
+            schema_version: BATCH_RESOLVE_SCHEMA_VERSION,
+            attempted: Vec::new(),
+            unattempted: vec!["deferred-head".into()],
+            stop_reason: Some(crate::services::conductor_writes::BatchStopReason::BudgetExhausted),
+            elapsed_ms: 12_000,
+        };
+        assert!(matches!(
+            ordered_head_from_batch("deferred-head", stopped),
+            Err(StorageError::Conductor(_))
+        ));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn timed_out_ordered_head_read_leaves_the_projection_untouched() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let id = "timed-out-head";
+        seed_content(&pool, id, "blob-a");
+
+        let error = bounded_ordered_head_call(std::future::pending::<
+            Result<
+                crate::services::conductor_writes::BatchCall<
+                    crate::services::conductor_writes::ContentHeadWire,
+                >,
+                StorageError,
+            >,
+        >())
+        .await
+        .expect_err("the existing heal attempt timeout must bound the worker");
+        assert!(error.to_string().contains("heal attempt timeout"));
+
+        let mut conn = pool.get().expect("connection");
+        let row =
+            content_diesel::get_content(&mut conn, &ctx, id, content_diesel::MinTrust::Invisible)
+                .expect("read")
+                .expect("row");
+        assert_eq!(row.declared_head_action_hash, None);
+        assert_eq!(row.dht_anchor_hash, None);
+        assert_eq!(row.blob_cid.as_deref(), Some("blob-a"));
     }
 
     #[test]

@@ -1854,26 +1854,35 @@ async fn async_main(
                                 // Same bounded queue capacity as the imagodei signal stream.
                                 // One worker awaits exact authority reads; other signal families
                                 // keep their existing synchronous projection path.
-                                let (commitment_tx, mut commitment_rx) =
+                                let (authority_tx, mut authority_rx) =
                                     tokio::sync::mpsc::channel(256);
                                 let worker_hc = Arc::clone(&hc_sub);
                                 let worker_pool = pool.clone();
                                 let worker_ctx = ctx.clone();
                                 tokio::spawn(async move {
-                                    while let Some(signal) = commitment_rx.recv().await {
-                                        if let Err(e) = elohim_storage::rea_projection::handle_authenticated_commitment_signal(
-                                            signal, &worker_hc, &worker_pool, &worker_ctx,
-                                        ).await {
-                                            warn!(error = %e, "REA lifecycle signal deferred");
+                                    while let Some(signal) = authority_rx.recv().await {
+                                        let result = if elohim_storage::rea_projection::requires_authenticated_head_projection(&signal) {
+                                            elohim_storage::rea_projection::handle_authenticated_content_head_signal(
+                                                signal, &worker_hc, &worker_pool, &worker_ctx,
+                                            ).await
+                                        } else {
+                                            elohim_storage::rea_projection::handle_authenticated_commitment_signal(
+                                                signal, &worker_hc, &worker_pool, &worker_ctx,
+                                            ).await
+                                        };
+                                        if let Err(e) = result {
+                                            warn!(error = %e, "authenticated REA/content signal deferred");
                                         }
                                     }
                                 });
                                 let handle_id = hc_sub
                                 .subscribe_rea_projection_signals(
                                     move |signal: elohim_storage::rea_projection::ReaProjectionSignal| {
-                                        if matches!(signal, elohim_storage::rea_projection::ReaProjectionSignal::ReaCommitmentCommitted { .. }) {
-                                            if let Err(e) = commitment_tx.try_send(signal) {
-                                                warn!(error = %e, "REA lifecycle queue full or closed; deferred to reconciliation");
+                                        if matches!(signal, elohim_storage::rea_projection::ReaProjectionSignal::ReaCommitmentCommitted { .. })
+                                            || elohim_storage::rea_projection::requires_authenticated_head_projection(&signal)
+                                        {
+                                            if let Err(e) = authority_tx.try_send(signal) {
+                                                warn!(error = %e, "authenticated REA/content queue full or closed; deferred to reconciliation");
                                             }
                                             return;
                                         }

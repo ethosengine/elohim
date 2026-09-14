@@ -32,6 +32,41 @@ seamLocus: >
   (src/p2p/shard_protocol.rs).
 
 decisionPoints:
+  - name: authenticated_ordered_head_projection
+    kind: verdict-fn
+    sourceLocation:
+      file: src/rea_projection.rs
+      modulePath: rea_projection::handle_authenticated_content_head_signal
+    summary: >
+      A complete ordered ContentHeadDeclared hint advances SQL only after the own
+      conductor's bounded local batch read returns the exact canonical head,
+      ordering and Content payload. Missing, failed, stale or misbound answers
+      write nothing: a fresh divergent anchor remains retryable, while an
+      already-split row awaits another exact signal or authenticated projection.
+    concernIds:
+      - { id: C0, status: answered, justification: "The existing DHT Content and canonical declaration remain truth; SQL is only their authenticated projection." }
+      - { id: C1, status: n-a, justification: "This seam consumes the existing election and cannot nominate a winner." }
+      - { id: C2, status: answered, justification: "Exact head and ordering binding plus the shared atomic stamp prevent pointer/payload splits and stale moves." }
+      - { id: C3, status: answered, justification: "The bounded subscriber queue hydrates the signal; deferral preserves divergence for the existing reconcile retry." }
+      - { id: C4, status: answered, justification: "Absent, failed, malformed and half-ordered evidence cannot advance any projection field." }
+      - { id: C5, status: answered, justification: "The own coordinator validates the canonical election and Content record; the signal alone is never authority." }
+      - { id: C6a, status: answered, justification: "One id uses the existing 12-second in-WASM batch budget inside the existing 25-second heal attempt timeout and bounded queue; no scan or retry fan-out is added." }
+      - { id: C6b, status: answered, justification: "The existing atomic projection is idempotent for an unchanged exact head and payload." }
+      - { id: C7, status: answered, justification: "Head, anchor, blob and metadata are published from one authenticated ContentHeadWire through the shared projection function." }
+      - { id: C8, status: partial, justification: "Existing deferred-signal warnings expose failures; no new metric is claimed." }
+      - { id: C9, status: answered, justification: "Existing content id, action hash and canonical ordering bind identity continuity." }
+      - { id: C10, status: answered, justification: "Legacy unordered signals keep their old path; half pairs and unsupported batch schemas refuse." }
+      - { id: C11, status: answered, justification: "The existing 256-item signal queue and Background admission class remain the only admission surfaces." }
+      - { id: C12, status: n-a, justification: "No permission or consent boundary changes." }
+      - { id: C13, status: n-a, justification: "No social tier changes." }
+      - { id: C14, status: answered, justification: "Only an exact own-conductor answer is projected; deferred errors never impersonate a witnessed head." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/rea_projection.rs, testName: subscriber_routes_only_complete_ordered_heads_to_authenticated_hydration, kind: unit }
+      - { path: elohim/elohim-storage/src/rea_projection.rs, testName: exact_authenticated_payload_repairs_a_split_head_and_blob_atomically, kind: unit }
+      - { path: elohim/elohim-storage/src/rea_projection.rs, testName: stale_or_misbound_ordered_payload_cannot_advance_any_projection_field, kind: unit }
+      - { path: elohim/elohim-storage/src/rea_projection.rs, testName: absent_or_failed_bounded_head_read_is_a_deferral_not_a_pointer, kind: unit }
+      - { path: elohim/elohim-storage/src/rea_projection.rs, testName: timed_out_ordered_head_read_leaves_the_projection_untouched, kind: unit }
+
   - name: project_epr_current_terms_update
     kind: verdict-fn
     sourceLocation:
