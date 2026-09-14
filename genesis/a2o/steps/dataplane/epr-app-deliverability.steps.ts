@@ -551,23 +551,35 @@ When(
   }
 );
 
+async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Promise<void> {
+  const record = app(this);
+  const bundle = requireBundle(this);
+  const doorwayUrl = resolvePeerUrl(peerName);
+  const outcome = await stageBundle({ bundle, slug: record.slug, doorwayUrl, declare: true });
+  assert.strictEqual(
+    outcome.code,
+    0,
+    `declaring the head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
+  );
+  record.blobHash = outcome.blobHash;
+  record.browserDeclaredAt = Date.now();
+  record.declaredThrough.push(doorwayUrl);
+}
+
 When(
   "Matthew submits artifact A's byte-binding declaration through doorway {string}",
-  { timeout: 300_000 },
-  async function (this: E2EWorld, peerName: string) {
-    const record = app(this);
-    const bundle = requireBundle(this);
-    const doorwayUrl = resolvePeerUrl(peerName);
-    const outcome = await stageBundle({ bundle, slug: record.slug, doorwayUrl, declare: true });
-    assert.strictEqual(
-      outcome.code,
-      0,
-      `declaring the head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
-    );
-    record.blobHash = outcome.blobHash;
-    record.browserDeclaredAt = Date.now();
-    record.declaredThrough.push(doorwayUrl);
-  }
+  {
+    timeout: 300_000,
+  },
+  declareCurrentBrowserBundle
+);
+
+When(
+  'only doorway {string} is told this bundle is the new version',
+  {
+    timeout: 300_000,
+  },
+  declareCurrentBrowserBundle
 );
 
 When(
