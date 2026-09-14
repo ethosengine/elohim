@@ -3587,7 +3587,8 @@ async fn serve_admitted_projection(
     // `/apps/{address}` path; it never consults the moving slug or the converged
     // warm-shell cache. Thus absence or locally unavailable bytes cannot leak
     // the public version into the candidate name.
-    let candidate_address = if projection.channel == elohim_views::projection::Channel::Candidate {
+    let candidate_channel = projection.channel == elohim_views::projection::Channel::Candidate;
+    let candidate_address = if candidate_channel {
         match state.renderer_registry.bundle_heads().get_channel(
             &projection.epr_id,
             elohim_views::projection::Channel::Candidate,
@@ -3860,7 +3861,10 @@ async fn serve_admitted_projection(
                     // A non-2xx (a 404 for a hash storage has not extracted
                     // yet, say) stocks NOTHING — never invent a shell for a
                     // head we could not read.
-                    if status.is_success() && sub_path == projection.entry_file {
+                    if status.is_success()
+                        && sub_path == projection.entry_file
+                        && !candidate_channel
+                    {
                         let outcome = stock_warm_shell(
                             state,
                             &projection,
@@ -4809,7 +4813,24 @@ mod epr_dispatch_breaker_tests {
             .expect(1)
             .mount(&storage)
             .await;
-        let state = asset_binding_state(&storage.uri(), Arc::new(AssetBindingArchive::default()));
+        Mock::given(method("GET"))
+            .and(path("/apps/bafkreiCAND/index.html"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(b"candidate-B"))
+            .expect(1)
+            .mount(&storage)
+            .await;
+        let archive = Arc::new(AssetBindingArchive {
+            declared: Some("public-A".into()),
+            latest: Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: "public-A".into(),
+                content_type: "text/html".into(),
+                bytes: b"public-A".to_vec(),
+                head_bound: true,
+            }),
+            stored: Default::default(),
+        });
+        let state = asset_binding_state(&storage.uri(), archive);
+        hydrate_asset_binding_shell(&state).await;
         state.renderer_registry.bundle_heads().record(
             "elohim-host-landing",
             Channel::Candidate,
@@ -4834,6 +4855,38 @@ mod epr_dispatch_breaker_tests {
         assert_eq!(
             response.into_body().collect().await.unwrap().to_bytes(),
             Bytes::from_static(br#"{"commit":"candidate"}"#)
+        );
+
+        let candidate_root = dispatch_to_projected_epr(
+            &state,
+            "/",
+            projection.clone(),
+            "{}",
+            true,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(candidate_root.status(), StatusCode::OK);
+        assert_eq!(
+            candidate_root
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes(),
+            Bytes::from_static(b"candidate-B")
+        );
+        let public = crate::render::warm_shell::plan_shell_serve(
+            &state.warm_shell,
+            "elohim-host-landing",
+            "index.html",
+            false,
+        )
+        .await;
+        assert_eq!(public.declared.as_deref(), Some("public-A"));
+        assert_eq!(
+            public.warm.as_ref().map(|warm| warm.blob_hash.as_str()),
+            Some("public-A")
         );
 
         state.renderer_registry.bundle_heads().record(
@@ -6413,9 +6466,8 @@ struct RelayContext {
     /// The inbound request already crossed a doorway — the one-hop budget is
     /// spent and this doorway answers locally.
     hop_seen: bool,
-    /// The host the client asked for. Carried into the fold's `RouteKey` NOW
-    /// even though every contract is any-host today, so the next rung
-    /// (hostnames as head channels) needs no change here.
+    /// The host the client asked for. Carried into the fold's `RouteKey` and
+    /// forwarded unchanged so hostname-bound head channels stay end to end.
     host: Option<String>,
     authorization: Option<String>,
     cookie: Option<String>,
@@ -6423,25 +6475,52 @@ struct RelayContext {
 }
 
 impl RelayContext {
-    fn from_request(req: &Request<Incoming>) -> Self {
+    fn from_request<B>(req: &Request<B>) -> Result<Self, &'static str> {
         let header = |name: &str| {
             req.headers()
                 .get(name)
                 .and_then(|v| v.to_str().ok())
                 .map(|v| v.to_string())
         };
-        Self {
+        let host = match req.headers().get("host") {
+            Some(value) => Some(
+                value
+                    .to_str()
+                    .map_err(|_| "Host header is not visible text")?
+                    .to_string(),
+            ),
+            None => None,
+        };
+        Ok(Self {
             hop_seen: crate::services::name_routing::inbound_hop_seen(
                 req.headers()
                     .get(crate::services::name_routing::FEDERATION_HOP_HEADER)
                     .and_then(|v| v.to_str().ok()),
             ),
-            host: header("host"),
+            host,
             authorization: header("authorization"),
             cookie: header("cookie"),
             accept: header("accept"),
-        }
+        })
     }
+}
+
+/// Whether this doorway's current routing table makes `path` part of an
+/// explicit hostname namespace. Used when local dispatch found no matching
+/// host: a wholly hostname-scoped path must remain a 404 instead of widening
+/// through a sibling's legacy wildcard contract.
+fn local_path_requires_exact_host(router: &crate::projection::EprRouter, path: &str) -> bool {
+    let covering: Vec<_> = router
+        .projections()
+        .into_iter()
+        .filter(|projection| {
+            crate::services::name_routing::mount_covers(&projection.url_path, path)
+        })
+        .collect();
+    !covering.is_empty()
+        && covering
+            .iter()
+            .all(|projection| !projection.hostnames.is_empty())
 }
 
 /// Forward one request to one holder. Stamps the loop-prevention header so the
@@ -6462,6 +6541,12 @@ async fn fetch_from_holder(
     let mut request = client
         .get(&url)
         .header(crate::services::name_routing::FEDERATION_HOP_HEADER, "1");
+    if let Some(v) = &ctx.host {
+        // The selected holder must answer the same public name/channel the
+        // client asked for. The URL still selects the holder's transport and
+        // TLS identity; Host selects that holder's own serving contract.
+        request = request.header("host", v);
+    }
     if let Some(v) = &ctx.authorization {
         request = request.header("authorization", v);
     }
@@ -6513,6 +6598,134 @@ async fn fetch_from_holder(
     })
 }
 
+#[cfg(test)]
+mod name_relay_request_tests {
+    use super::{fetch_from_holder, local_path_requires_exact_host, RelayContext};
+    use crate::services::name_routing::{
+        HolderLiveness, NameHolder, RelayMode, FEDERATION_HOP_HEADER,
+    };
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    fn holder(origin: String) -> NameHolder {
+        NameHolder {
+            doorway_id: "holder".into(),
+            origin,
+            url_path: "/".into(),
+            host: None,
+            liveness: HolderLiveness::Serving,
+            relay_mode: RelayMode::Proxy,
+        }
+    }
+
+    #[tokio::test]
+    async fn relay_preserves_the_requested_host_channel_at_the_selected_holder() {
+        let selected = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/"))
+            .respond_with(|request: &wiremock::Request| {
+                let header = |name: &str| {
+                    request
+                        .headers
+                        .get(name)
+                        .and_then(|value| value.to_str().ok())
+                };
+                assert_eq!(header(FEDERATION_HOP_HEADER), Some("1"));
+                assert_eq!(header("authorization"), Some("Bearer named-human"));
+                assert_eq!(header("cookie"), Some("doorway_session=sibling"));
+                if header("host") == Some("candidate.example") {
+                    ResponseTemplate::new(200).set_body_string("candidate-B")
+                } else {
+                    ResponseTemplate::new(200).set_body_string("public-A")
+                }
+            })
+            .mount(&selected)
+            .await;
+
+        let ctx = RelayContext {
+            host: Some("candidate.example".into()),
+            authorization: Some("Bearer named-human".into()),
+            cookie: Some("doorway_session=sibling".into()),
+            ..Default::default()
+        };
+        let reply = fetch_from_holder(
+            &reqwest::Client::new(),
+            &holder(selected.uri()),
+            "/",
+            None,
+            &ctx,
+        )
+        .await
+        .expect("the selected holder answers");
+
+        assert_eq!(reply.status, 200);
+        assert_eq!(reply.body, b"candidate-B");
+    }
+
+    #[tokio::test]
+    async fn an_invalid_requested_host_never_downgrades_to_the_holders_default_channel() {
+        let selected = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("public-A"))
+            .mount(&selected)
+            .await;
+
+        let ctx = RelayContext {
+            host: Some("candidate.example\npublic.example".into()),
+            ..Default::default()
+        };
+        let result = fetch_from_holder(
+            &reqwest::Client::new(),
+            &holder(selected.uri()),
+            "/",
+            None,
+            &ctx,
+        )
+        .await;
+
+        assert!(result.is_err(), "an invalid Host must refuse the relay");
+        assert!(
+            selected.received_requests().await.unwrap().is_empty(),
+            "the holder's default public channel must not receive the request"
+        );
+    }
+
+    #[test]
+    fn a_present_non_text_host_is_not_collapsed_to_absence() {
+        let mut request = hyper::Request::builder().uri("/").body(()).unwrap();
+        request.headers_mut().insert(
+            hyper::header::HOST,
+            hyper::header::HeaderValue::from_bytes(&[0xff]).unwrap(),
+        );
+
+        assert!(RelayContext::from_request(&request).is_err());
+    }
+
+    #[test]
+    fn an_unknown_host_stays_outside_a_wholly_hostname_scoped_local_router() {
+        let router = crate::projection::EprRouter::new();
+        let mut scoped = crate::routes::coherence::sample_projection("/", "candidate-epr");
+        scoped.hostnames = vec!["candidate.example".into()];
+        router.replace_all(vec![scoped]);
+
+        assert!(local_path_requires_exact_host(&router, "/"));
+
+        let mut legacy = crate::routes::coherence::sample_projection("/", "public-epr");
+        legacy.hostnames.clear();
+        router.replace_all(vec![legacy.clone()]);
+        assert!(!local_path_requires_exact_host(&router, "/"));
+
+        let mut scoped = crate::routes::coherence::sample_projection("/candidate", "candidate-epr");
+        scoped.hostnames = vec!["candidate.example".into()];
+        router.replace_all(vec![legacy, scoped]);
+        assert!(
+            !local_path_requires_exact_host(&router, "/candidate"),
+            "a mixed router retains the explicit legacy wildcard contract"
+        );
+    }
+}
+
 /// **The wired forward.** Returns `Some(response)` only when a sibling doorway
 /// holding a live contract for this name actually served it; `None` means the
 /// caller keeps its OWN response byte-for-byte — a failed relay never masks a
@@ -6530,6 +6743,7 @@ async fn relay_by_name(
     query: Option<&str>,
     ctx: &RelayContext,
     trigger: crate::services::name_routing::RelayTrigger,
+    require_exact_host: bool,
     // The mount this doorway WOULD serve the request from, when it holds one
     // AND can serve it. `None` for a local 404 or shed — then every holder
     // qualifies, which is the original behaviour. `Some(mount)` filters the
@@ -6551,13 +6765,18 @@ async fn relay_by_name(
         .doorway_id
         .clone()
         .unwrap_or_else(|| state.args.node_id.to_string());
-    // Host-first, then path — the fold's key. Host never narrows today (every
-    // contract is any-host); it is threaded so the next rung does not re-key.
+    // Host-first, then path — the fold's key. An exact advertised or locally
+    // known hostname is a namespace boundary; legacy path-only apps remain
+    // any-host when no such binding exists.
     let key = crate::services::name_routing::RouteKey::new(ctx.host.as_deref(), path);
-    let holders = holders_more_specific_than(
-        local_mount,
-        state.name_routes.holders_for(&key, &self_doorway_id),
-    );
+    let holders = if require_exact_host {
+        state
+            .name_routes
+            .holders_for_exact_host(&key, &self_doorway_id)
+    } else {
+        state.name_routes.holders_for(&key, &self_doorway_id)
+    };
+    let holders = holders_more_specific_than(local_mount, holders);
     if holders.is_empty() {
         // Either nobody in the federation holds a contract covering this name
         // (our 404 is the whole truth) or nobody holds a MORE SPECIFIC one
@@ -6716,7 +6935,19 @@ async fn handle_request(
     // as-is. See `relay_by_name`.
     let is_get = method == Method::GET;
     let relay_query: Option<String> = req.uri().query().map(|q| q.to_string());
-    let relay_ctx = RelayContext::from_request(&req);
+    let relay_ctx = match RelayContext::from_request(&req) {
+        Ok(context) => context,
+        Err(reason) => {
+            return Ok(to_boxed(
+                Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .header("content-type", "application/json")
+                    .header("cache-control", "no-store")
+                    .body(Full::new(Bytes::from(format!(r#"{{"error":"{reason}"}}"#))))
+                    .expect("infallible invalid-host response"),
+            ));
+        }
+    };
     // The dispatch match below MOVES `state` into its arms; hold an Arc for the
     // post-match relay (cheap refcount bump, not a state copy).
     let relay_state = Arc::clone(&state);
@@ -6801,8 +7032,18 @@ async fn handle_request(
             // to local; a local 404/shed still relays below, as before.
             // Checked BEFORE the SSR diversion so no V8 render is spent on
             // content this doorway does not hold the contract for.
-            let local_mount =
-                crate::services::name_routing::LocalMount::path_only(&projection.url_path);
+            let exact_host = !projection.hostnames.is_empty();
+            let local_mount = crate::services::name_routing::LocalMount {
+                host: exact_host.then(|| {
+                    crate::services::name_routing::RouteKey::new(
+                        relay_ctx.host.as_deref(),
+                        &projection.url_path,
+                    )
+                    .host
+                    .expect("a hostname-bound projection matched a request host")
+                }),
+                url_path: projection.url_path.clone(),
+            };
             if let Some(relayed) = relay_by_name(
                 &state,
                 is_get,
@@ -6810,6 +7051,7 @@ async fn handle_request(
                 relay_query.as_deref(),
                 &relay_ctx,
                 crate::services::name_routing::RelayTrigger::LessSpecificThanHolder,
+                exact_host,
                 Some(&local_mount),
             )
             .await
@@ -6915,9 +7157,10 @@ async fn handle_request(
                     relay_query.as_deref(),
                     &relay_ctx,
                     crate::services::name_routing::RelayTrigger::LocalVerdict(local.status()),
+                    exact_host,
                     // No local mount filter: we hold a contract but cannot
-                    // serve it, so ANY holder of this name is better than a
-                    // shed — specificity is irrelevant when we answer nothing.
+                    // serve it. The exact-host boundary above still excludes
+                    // unrelated wildcard holders for a named channel.
                     None,
                 )
                 .await
@@ -8224,6 +8467,7 @@ async fn handle_request(
         relay_query.as_deref(),
         &relay_ctx,
         crate::services::name_routing::RelayTrigger::LocalVerdict(response.status()),
+        relay_ctx.host.is_some() && local_path_requires_exact_host(&relay_state.epr_router, &path),
         // We hold no mount for this request (404) or could not serve it (503),
         // so there is nothing to be more specific than.
         None,
@@ -11065,6 +11309,49 @@ mod root_projection_shadow_regression_tests {
         .await
         .unwrap_or_else(|_| panic!("GET {path} did not answer within 5s — likely shadowed into the projected-bundle dispatch path instead of its own service handler"))
         .unwrap_or_else(|e| panic!("GET {path} transport error: {e}"))
+    }
+
+    #[tokio::test]
+    async fn malformed_present_host_returns_400_before_wildcard_relay() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let wildcard = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("public-A"))
+            .mount(&wildcard)
+            .await;
+        let state = state_with_root_projection();
+        let mut scoped = root_projection();
+        scoped.hostnames = vec!["candidate.example".into()];
+        state.epr_router.replace_all(vec![scoped]);
+        state.name_routes.replace_all(
+            vec![crate::services::name_routing::HolderContract::any_host(
+                "wildcard",
+                &wildcard.uri(),
+                "/",
+            )],
+            std::collections::HashMap::new(),
+        );
+        let addr = spawn_test_doorway(state).await;
+
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"GET / HTTP/1.1\r\nHost: \xff\r\nConnection: close\r\n\r\n")
+            .await
+            .unwrap();
+        let mut response = Vec::new();
+        stream.read_to_end(&mut response).await.unwrap();
+
+        assert!(
+            response.starts_with(b"HTTP/1.1 400"),
+            "malformed Host must fail closed: {}",
+            String::from_utf8_lossy(&response)
+        );
+        assert!(
+            wildcard.received_requests().await.unwrap().is_empty(),
+            "the wildcard holder must not receive malformed-host traffic"
+        );
     }
 
     /// The incident scenario itself: `/status` must reach `routes::status_page`

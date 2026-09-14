@@ -49,10 +49,15 @@ static SELF_BUILD_COMMIT: LazyLock<String> =
 pub struct EprHeadFingerprint {
     pub url_path: String,
     pub epr_id: String,
+    /// Existing publication-channel claims for this projection. Empty is the
+    /// legacy any-host contract; absent decodes empty during a rolling deploy.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hostnames: Vec<String>,
 }
 
 /// This doorway's full routing-table fingerprint. `digest` is a content-stable
-/// **CIDv1 dag-cbor** (`bafyrei…`) over the sorted `(url_path, epr_id)` set, so
+/// **CIDv1 dag-cbor** (`bafyrei…`) over the sorted
+/// `(url_path, epr_id, hostnames)` set, so
 /// two edges agree iff their digests match. `build_id` is the deploy git SHA
 /// (the operator's "two EPR heads" symptom was actually build_id skew, not
 /// content divergence) — carried alongside so deploy-skew is reported, never
@@ -78,8 +83,25 @@ pub struct CoherenceManifest {
 /// never stay green while production minting drifts (the prior hand-copied
 /// formula was that drift hazard).
 pub fn mint_head_set_digest(heads: &mut [EprHeadFingerprint]) -> String {
-    heads.sort_by(|a, b| a.url_path.cmp(&b.url_path).then(a.epr_id.cmp(&b.epr_id)));
-    // dag-cbor of a Vec of `{String, String}` structs is infallible.
+    for head in heads.iter_mut() {
+        for hostname in &mut head.hostnames {
+            *hostname = crate::services::name_routing::RouteKey::new(Some(hostname), "/")
+                .host
+                // Preserve an invalid nonempty claim in the fingerprint. The
+                // route installer skips it; it must never collapse to the
+                // empty-list encoding that means wildcard authority.
+                .unwrap_or_else(|| hostname.trim().to_ascii_lowercase());
+        }
+        head.hostnames.sort();
+        head.hostnames.dedup();
+    }
+    heads.sort_by(|a, b| {
+        a.url_path
+            .cmp(&b.url_path)
+            .then(a.epr_id.cmp(&b.epr_id))
+            .then(a.hostnames.cmp(&b.hostnames))
+    });
+    // dag-cbor of this string-only fingerprint set is infallible.
     let preimage = serde_ipld_dagcbor::to_vec(&*heads)
         .expect("dag-cbor encode of EprHeadFingerprint set is infallible");
     let mh = Code::Sha2_256.digest(&preimage);
@@ -94,9 +116,13 @@ pub fn router_fingerprint(
     build_id: Option<&str>,
 ) -> CoherenceManifest {
     let mut heads: Vec<EprHeadFingerprint> = router
-        .head_fingerprints()
+        .projections()
         .into_iter()
-        .map(|(url_path, epr_id)| EprHeadFingerprint { url_path, epr_id })
+        .map(|projection| EprHeadFingerprint {
+            url_path: projection.url_path,
+            epr_id: projection.epr_id,
+            hostnames: projection.hostnames,
+        })
         .collect();
     // Single shared mint (sorts `heads` in place + returns the CIDv1 digest).
     let digest = mint_head_set_digest(&mut heads);
@@ -173,26 +199,33 @@ pub fn compare_to_peer(
             let agrees = p.digest == me.digest;
             let mut divergent: Vec<String> = Vec::new();
             if !agrees {
-                let mine: std::collections::HashMap<&str, &str> = me
+                let paths: std::collections::BTreeSet<&str> = me
                     .heads
                     .iter()
-                    .map(|h| (h.url_path.as_str(), h.epr_id.as_str()))
+                    .chain(p.heads.iter())
+                    .map(|head| head.url_path.as_str())
                     .collect();
-                // Pillars present on the peer with a different (or our-missing) head.
-                for h in &p.heads {
-                    match mine.get(h.url_path.as_str()) {
-                        Some(my_epr) if *my_epr == h.epr_id => {}
-                        _ => divergent.push(h.url_path.clone()),
+                let identities_at = |manifest: &CoherenceManifest, path: &str| {
+                    let mut identities: Vec<(String, Vec<String>)> = manifest
+                        .heads
+                        .iter()
+                        .filter(|head| head.url_path == path)
+                        .map(|head| {
+                            let mut hostnames = head.hostnames.clone();
+                            hostnames.sort();
+                            hostnames.dedup();
+                            (head.epr_id.clone(), hostnames)
+                        })
+                        .collect();
+                    identities.sort();
+                    identities.dedup();
+                    identities
+                };
+                for path in paths {
+                    if identities_at(me, path) != identities_at(p, path) {
+                        divergent.push(path.to_string());
                     }
                 }
-                // Pillars we have that the peer is missing entirely.
-                for path in mine.keys() {
-                    if !p.heads.iter().any(|h| h.url_path == *path) {
-                        divergent.push((*path).to_string());
-                    }
-                }
-                divergent.sort();
-                divergent.dedup();
             }
             PeerCoherence {
                 // Label from the manifest's authoritative self-report when present
@@ -438,6 +471,7 @@ mod tests {
             .map(|(url_path, epr_id)| EprHeadFingerprint {
                 url_path: (*url_path).to_string(),
                 epr_id: (*epr_id).to_string(),
+                hostnames: Vec::new(),
             })
             .collect();
         // Shared mint sorts `heads` in place and returns the CIDv1 digest.
@@ -460,6 +494,32 @@ mod tests {
         assert!(pc.reachable);
         assert!(!pc.agrees);
         assert_eq!(pc.divergent_paths, vec!["/qahal".to_string()]);
+    }
+
+    #[test]
+    fn hostname_binding_is_part_of_coherence_and_divergence_evidence() {
+        let mut me = sample_manifest("alpha", &[("/", "A")]);
+        me.heads[0].hostnames = vec!["candidate.example".into()];
+        me.digest = mint_head_set_digest(&mut me.heads);
+        let peer = sample_manifest("apex", &[("/", "A")]);
+
+        let comparison = compare_to_peer(&me, "apex", true, Some(&peer));
+        assert!(!comparison.agrees);
+        assert_eq!(comparison.divergent_paths, vec!["/".to_string()]);
+
+        let old_wire = r#"{"urlPath":"/","eprId":"A"}"#;
+        let decoded: EprHeadFingerprint = serde_json::from_str(old_wire).unwrap();
+        assert!(decoded.hostnames.is_empty());
+    }
+
+    #[test]
+    fn comparison_keeps_all_contract_identities_at_a_shared_path() {
+        let me = sample_manifest("alpha", &[("/", "A"), ("/", "B")]);
+        let peer = sample_manifest("apex", &[("/", "A"), ("/", "C")]);
+
+        let comparison = compare_to_peer(&me, "apex", true, Some(&peer));
+        assert!(!comparison.agrees);
+        assert_eq!(comparison.divergent_paths, vec!["/".to_string()]);
     }
 
     #[test]

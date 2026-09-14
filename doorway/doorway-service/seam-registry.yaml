@@ -3626,3 +3626,106 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/serve_eligibility.rs
         testName: malformed_membership_rows_are_unavailable_not_nonmembership
         kind: unit
+
+  - name: hostname_namespace_holders
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/name_routing.rs
+      modulePath: services::name_routing::fold_candidate_holders
+      line: 382
+    summary: >
+      Preserves an explicitly published hostname as a namespace boundary across one-hop
+      federation: exact host contracts exclude legacy wildcard contracts for the whole attempt
+      set, while a locally known binding can require exact advertisements and fail closed when a
+      peer manifest is missing or stale. Genuinely unnamed/path-only apps retain legacy wildcard
+      routing. The selected holder receives the original Host and independently re-applies its
+      standing and byte-serving authority.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          This is an Ephemeral (C) fold over in-memory projections rebuilt from existing
+          project-EPR declarations and coherence advertisements; it creates no persisted entity,
+          DHT entry, head, or recurring network walk.
+      - id: C1
+        status: answered
+        justification: The existing self_doorway_id exclusion remains before any holder can win.
+      - id: C2
+        status: answered
+        justification: >
+          Once an exact hostname binding is known locally or advertised, fallback can only stay
+          exact or preserve the local failure; it cannot widen monotonically into wildcard bytes.
+      - id: C3
+        status: answered
+        justification: >
+          Existing holder liveness still orders exact candidates; an unavailable exact holder is
+          exhausted without trying an unrelated wildcard holder.
+      - id: C4
+        status: answered
+        justification: >
+          Missing exact advertisement and an unknown name in a wholly hostname-scoped local table
+          produce no candidates, preserving the original 404/503 as honest absence.
+      - id: C5
+        status: answered
+        justification: >
+          Peer manifests nominate transport holders; the selected holder still dispatches the
+          forwarded Host and performs its own reach and byte-availability checks.
+      - id: C6a
+        status: answered
+        justification: The fold scans one finite in-memory contract snapshot and performs no I/O.
+      - id: C6b
+        status: n-a
+        justification: The predicate and relay are read-only and create no repeatable effect.
+      - id: C7
+        status: answered
+        justification: >
+          Existing projection hostnames now survive the coherence advertisement, holder fold, and
+          forwarded request; the tests pin advertised exact-name selection to actual Host serving.
+      - id: C8
+        status: partial
+        justification: >
+          Existing relay logs identify selected holder, trigger, status, and attempt count; there
+          is no new per-hostname metric in this bounded repair.
+      - id: C9
+        status: n-a
+        justification: No agent, doorway, or content identity is minted or rewritten.
+      - id: C10
+        status: answered
+        justification: >
+          The additive coherence hostnames field defaults missing peers to the legacy empty
+          any-host shape; canonical normalization makes equivalent bindings digest-identical.
+      - id: C11
+        status: n-a
+        justification: This predicate introduces no queue, retry, or externally imposed budget.
+      - id: C12
+        status: answered
+        justification: >
+          Authorization and cookie headers continue unchanged to the holder, whose existing
+          eligibility fold decides consent; hostname selection cannot bypass that fold.
+      - id: C13
+        status: n-a
+        justification: No authority stage or graduation is introduced or changed.
+      - id: C14
+        status: answered
+        justification: >
+          When exact evidence is unavailable, the witnessed residual is the caller's original
+          local 404/503; wildcard success is never substituted as false proof of the named channel.
+    contractTests:
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: exact_hostname_never_falls_through_to_a_wildcard_holder
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: locally_known_hostname_fails_closed_when_peers_only_advertise_wildcards
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: relay_preserves_the_requested_host_channel_at_the_selected_holder
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: an_unknown_host_stays_outside_a_wholly_hostname_scoped_local_router
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: a_present_non_text_host_is_not_collapsed_to_absence
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: malformed_present_host_returns_400_before_wildcard_relay
+        kind: integration

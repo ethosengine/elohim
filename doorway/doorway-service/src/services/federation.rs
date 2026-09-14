@@ -908,15 +908,30 @@ fn install_name_routes(
                 };
                 liveness.insert(doorway_id.clone(), HolderLiveness::Serving);
                 for head in &m.heads {
-                    // ANY-HOST: a coherence head set carries no host, so every
-                    // contract minted here answers for every host. The next
-                    // rung (hostnames as head channels) is what populates
-                    // `HolderContract::host`; the fold already matches on it.
-                    contracts.push(HolderContract::any_host(
-                        &doorway_id,
-                        peer_url,
-                        &head.url_path,
-                    ));
+                    if head.hostnames.is_empty() {
+                        contracts.push(HolderContract::any_host(
+                            &doorway_id,
+                            peer_url,
+                            &head.url_path,
+                        ));
+                    } else {
+                        for hostname in &head.hostnames {
+                            let Some(host) = crate::services::name_routing::RouteKey::new(
+                                Some(hostname),
+                                &head.url_path,
+                            )
+                            .host
+                            else {
+                                continue;
+                            };
+                            contracts.push(HolderContract {
+                                doorway_id: doorway_id.clone(),
+                                origin: peer_url.clone(),
+                                url_path: head.url_path.clone(),
+                                host: Some(host),
+                            });
+                        }
+                    }
                 }
             }
             None => {
@@ -1424,9 +1439,9 @@ mod tests {
     // ── F-COHERENCE: tri-state fetch + edge-trigger + empty-clear ─────────────
     mod coherence_probe {
         use super::super::{
-            fetch_peer_coherence, merge_discovery_seeds, new_peer_cache, new_peer_coherence_cache,
-            refresh_coherence, refresh_peer_cache, refresh_peer_cache_from_seeds,
-            DoorwayRegistration, PeerDoorway,
+            fetch_peer_coherence, install_name_routes, merge_discovery_seeds, new_peer_cache,
+            new_peer_coherence_cache, refresh_coherence, refresh_peer_cache,
+            refresh_peer_cache_from_seeds, DoorwayRegistration, PeerDoorway,
         };
         use crate::projection::EprRouter;
         use crate::routes::coherence::{router_fingerprint, CoherenceManifest, EprHeadFingerprint};
@@ -1451,6 +1466,7 @@ mod tests {
                 .map(|(p, e)| EprHeadFingerprint {
                     url_path: (*p).to_string(),
                     epr_id: (*e).to_string(),
+                    hostnames: Vec::new(),
                 })
                 .collect();
             let digest = crate::routes::coherence::mint_head_set_digest(&mut hv);
@@ -1469,6 +1485,45 @@ mod tests {
                 .respond_with(ResponseTemplate::new(200).set_body_json(body))
                 .mount(server)
                 .await;
+        }
+
+        #[test]
+        fn coherence_hostnames_install_exact_holder_contracts() {
+            let table = crate::services::name_routing::NameRouteTable::new();
+            let mut heads = vec![EprHeadFingerprint {
+                url_path: "/".into(),
+                epr_id: "candidate-epr".into(),
+                hostnames: vec!["Candidate.Example:443".into()],
+            }];
+            let manifest = CoherenceManifest {
+                doorway_id: "alpha".into(),
+                generation: 1,
+                digest: crate::routes::coherence::mint_head_set_digest(&mut heads),
+                heads,
+                build_id: None,
+            };
+            install_name_routes(
+                &table,
+                &[(
+                    "alpha".into(),
+                    "https://alpha.example".into(),
+                    true,
+                    Some(manifest),
+                )],
+            );
+
+            let exact = table.holders_for(
+                &crate::services::name_routing::RouteKey::new(Some("candidate.example"), "/"),
+                "local",
+            );
+            assert_eq!(exact.len(), 1);
+            assert_eq!(exact[0].host.as_deref(), Some("candidate.example"));
+            assert!(table
+                .holders_for(
+                    &crate::services::name_routing::RouteKey::new(Some("other.example"), "/"),
+                    "local",
+                )
+                .is_empty());
         }
 
         #[tokio::test]

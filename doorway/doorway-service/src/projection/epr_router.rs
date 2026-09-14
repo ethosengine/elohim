@@ -403,6 +403,13 @@ fn projection_reject_reason(view: &EprProjectionView) -> Option<&'static str> {
     if crate::server::http::is_reserved_url_path(path) {
         return Some("url_path collides with a reserved service prefix (§12.1)");
     }
+    if view
+        .hostnames
+        .iter()
+        .any(|hostname| RouteKey::new(Some(hostname), path).host.is_none())
+    {
+        return Some("explicit hostname does not normalize to a named host");
+    }
     None
 }
 
@@ -1161,6 +1168,22 @@ mod tests {
             router.dispatch_any_host("/lamadx").is_none(),
             "the non-absolute 'lamad' junk key must not be installed as a reachable mount"
         );
+    }
+
+    #[test]
+    fn malformed_explicit_hostname_is_rejected_instead_of_becoming_any_host() {
+        let router = EprRouter::new();
+        let mut malformed = make_projection("candidate", "/");
+        malformed.hostnames = vec!["   ".into()];
+
+        assert_eq!(
+            router.replace_all(vec![malformed]),
+            ReplaceOutcome {
+                installed: 0,
+                rejected: 1,
+            }
+        );
+        assert!(router.dispatch(Some("unrelated.example"), "/").is_none());
     }
 
     #[test]

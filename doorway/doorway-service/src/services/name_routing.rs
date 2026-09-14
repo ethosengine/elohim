@@ -111,12 +111,9 @@ pub enum HolderLiveness {
 
 /// The key the fold matches contracts against.
 ///
-/// **Routing dimensions.** Today only `path` discriminates: every contract is
-/// an any-host contract, so `host` is carried and matched but never narrows.
-/// It exists NOW so the next rung — hostnames as head channels (`elohim.host`
-/// = converged head at commons reach, `alpha.elohim.host` = candidate head at
-/// stewards reach, both served by every doorway) — adds host WITHOUT re-keying
-/// the fold, its table, or its callers.
+/// **Routing dimensions.** `host` selects an explicitly published head channel
+/// when one exists; legacy any-host contracts retain path-only routing when no
+/// exact binding is advertised. `path` then selects the longest mount.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RouteKey {
     /// The host the client asked for, lowercased and port-stripped. `None`
@@ -235,10 +232,7 @@ pub struct HolderContract {
     pub doorway_id: String,
     pub origin: String,
     pub url_path: String,
-    /// The host this contract is bound to. `None` = ANY host — which is every
-    /// contract today, because a coherence head set carries no host. The next
-    /// rung populates it (hostnames as head channels) and the fold already
-    /// matches on it.
+    /// The host this contract is bound to. `None` = a legacy ANY-host contract.
     pub host: Option<String>,
 }
 
@@ -391,6 +385,19 @@ pub fn fold_candidate_holders(
     liveness: &HashMap<String, HolderLiveness>,
     self_doorway_id: &str,
 ) -> Vec<NameHolder> {
+    // Once any doorway advertises an exact contract for the requested name,
+    // that name is a namespace boundary. A legacy any-host contract may keep
+    // serving genuinely unnamed apps, but it must never become fallback bytes
+    // for an explicitly published channel.
+    let exact_host_advertised = key.host.as_deref().is_some_and(|asked| {
+        contracts.iter().any(|contract| {
+            contract
+                .host
+                .as_deref()
+                .is_some_and(|bound| bound.eq_ignore_ascii_case(asked))
+                && mount_covers(&contract.url_path, &key.path)
+        })
+    });
     // `(holder, most-specific matching contract)`, in first-appearance (owner)
     // order — the index into this vec IS the OwnerOrder selector term.
     let mut holders: Vec<(NameHolder, (u8, usize))> = Vec::new();
@@ -404,6 +411,9 @@ pub fn fold_candidate_holders(
         }
         // Host first, then path — the match order the next rung needs.
         if !host_matches(contract.host.as_deref(), key.host.as_deref()) {
+            continue;
+        }
+        if exact_host_advertised && contract.host.is_none() {
             continue;
         }
         if !mount_covers(&contract.url_path, &key.path) {
@@ -566,6 +576,23 @@ impl NameRouteTable {
         let contracts = self.contracts.read().expect("name-route lock poisoned");
         let liveness = self.liveness.read().expect("name-route lock poisoned");
         fold_candidate_holders(key, &contracts, &liveness, self_doorway_id)
+    }
+
+    /// Candidate holders when this doorway's own router has already proven
+    /// that the request belongs to an explicit hostname namespace. Missing or
+    /// stale peer advertisements fail closed instead of widening to legacy
+    /// any-host contracts.
+    pub fn holders_for_exact_host(&self, key: &RouteKey, self_doorway_id: &str) -> Vec<NameHolder> {
+        self.holders_for(key, self_doorway_id)
+            .into_iter()
+            .filter(|holder| {
+                holder.host.as_deref().is_some_and(|bound| {
+                    key.host
+                        .as_deref()
+                        .is_some_and(|asked| bound.eq_ignore_ascii_case(asked))
+                })
+            })
+            .collect()
     }
 
     /// Every doorway this table holds a contract for (see
@@ -1082,6 +1109,57 @@ mod tests {
             Some("elohim.host"),
             "the more specific (host-bound) contract wins"
         );
+    }
+
+    #[tokio::test]
+    async fn exact_hostname_never_falls_through_to_a_wildcard_holder() {
+        let contracts = vec![
+            contract("canonical", "https://public.example", "/"),
+            host_contract(
+                "candidate",
+                "https://candidate.example",
+                "/",
+                "candidate.elohim.local",
+            ),
+        ];
+        let liveness = HashMap::from([
+            ("canonical".to_string(), HolderLiveness::Serving),
+            ("candidate".to_string(), HolderLiveness::Serving),
+        ]);
+        let holders = fold_candidate_holders(
+            &RouteKey::new(Some("candidate.elohim.local"), "/"),
+            &contracts,
+            &liveness,
+            "local",
+        );
+        assert_eq!(
+            holders
+                .iter()
+                .map(|holder| holder.doorway_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["candidate"]
+        );
+
+        let attempted = Mutex::new(Vec::new());
+        let outcome = relay_one_hop(&holders, |holder| {
+            attempted.lock().unwrap().push(holder.doorway_id);
+            async { Ok(reply(503, "candidate unavailable")) }
+        })
+        .await;
+        assert!(matches!(outcome.verdict, RelayVerdict::AllFailed { .. }));
+        assert_eq!(attempted.into_inner().unwrap(), vec!["candidate"]);
+    }
+
+    #[test]
+    fn locally_known_hostname_fails_closed_when_peers_only_advertise_wildcards() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("canonical", "https://public.example", "/")],
+            HashMap::new(),
+        );
+        let key = RouteKey::new(Some("candidate.elohim.local"), "/");
+        assert_eq!(table.holders_for(&key, "local").len(), 1);
+        assert!(table.holders_for_exact_host(&key, "local").is_empty());
     }
 
     #[test]
