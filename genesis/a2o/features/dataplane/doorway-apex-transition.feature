@@ -88,3 +88,27 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     When the household restores the shedding doorway
     Then it rejoins the serving set within the declared recovery bound
     And the same public name still serves the declared landing page
+
+  @requires:owned-substrate
+  Scenario: A current governed version crosses withdrawal and recovery
+    # Missing station between membership continuity and authority continuity.
+    # A static shell cannot pass: action A must move to an authored B, B's exact
+    # blob and addressed version must arrive through the survivor, and the
+    # recovered doorway must then answer the same B tuple.
+    Given a coherent EPR app bundle this run just built
+    And an EPR record this run owns for it
+    When each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    Then within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
+    And within 75 seconds doorway "elohim.host" serves a page naming that bundle's entry script
+    Given both owned doorways advertise eligibility for the same public name
+    And the doorway pair records this run's exact governed version as authority A
+    When the household makes one doorway report non-serving for three consecutive probes
+    Then only that doorway's owner records leave shared membership
+    When this run builds a next coherent browser version
+    And each doorway is handed the bundle's bytes
+    And only doorway "alpha-A" is told this bundle is the new version
+    Then the surviving doorway serves this run's exact governed authority B
+    When that doorway reports serving for two consecutive probes
+    Then its owner records rejoin shared membership without duplicating the sibling
+    And both recovered doorways serve the same exact governed authority B

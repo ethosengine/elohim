@@ -51,6 +51,7 @@ import { promisify } from 'node:util';
 
 import { After, Given, When, Then } from '@cucumber/cucumber';
 
+import { awaitOwnedProcessRecovery } from '../../src/framework/dataplane/owned-process-recovery.js';
 import {
   classifyDoorwayState,
   getRaw,
@@ -70,6 +71,12 @@ import { E2EWorld } from '../../src/framework/world.js';
 // Then steps read from here. This chapter's sibling-visit step below records
 // its real observation into the SAME slot so those steps see it, rather than
 // each chapter keeping a private, unsynchronized capture store.
+import { visitInBrowser } from './epr-app-deliverability.helpers.js';
+import {
+  chaosAuthorReceipt,
+  type ChaosAuthorReceipt,
+  type ChaosPublishedAuthority,
+} from './epr-app-deliverability.steps.js';
 import { rawCapture } from './resiliency-saga.steps.js';
 
 /**
@@ -85,6 +92,8 @@ const meshScript = fileURLToPath(
 
 /** One bounded GET; sized like every other single-fetch step in this suite. */
 const RAW_FETCH_TIMEOUT_MS = 30_000;
+/** Six server reads plus one browser boot in assertExactPublishedAuthority. */
+const EXACT_AUTHORITY_TIMEOUT_MS = 7 * RAW_FETCH_TIMEOUT_MS;
 /** Fallback bounds when the authority declares none (it always does today). */
 const DEFAULT_WITHDRAW_BOUND_MS = 30_000;
 const DEFAULT_REJOIN_BOUND_MS = 20_000;
@@ -239,10 +248,14 @@ interface ApexTransitionState {
   /** The owner whose doorway answered the first visit — then the one we fault. */
   observedOwner?: string;
   observedOrigin?: string;
+  /** Immutable origin of the process actually faulted; visitor routing may later move. */
+  faultedOrigin?: string;
   siblingOwner?: string;
   siblingOrigin?: string;
   declaredHeadAtVisit?: string;
   buildStampAtVisit?: string;
+  authorityA?: ChaosAuthorReceipt;
+  authorityB?: ChaosAuthorReceipt;
   /** The sibling's entry captured before the fault, for the unchanged assertion. */
   siblingEntryBeforeFault?: MembershipMember;
   pid?: number;
@@ -284,6 +297,61 @@ function stampOf(text: string): string {
   }
 }
 
+async function assertExactPublishedAuthority(
+  origin: string,
+  expected: ChaosPublishedAuthority
+): Promise<void> {
+  const nonce = `chaos-${Date.now().toString(36)}`;
+  const fresh = (path: string) => `${path}${path.includes('?') ? '&' : '?'}chaos=${nonce}`;
+  const headPath = `/db/content/${encodeURIComponent(expected.slug)}/head`;
+  const contentPath = `/db/content/${encodeURIComponent(expected.slug)}`;
+  const versionPath = `/apps/${encodeURIComponent(expected.blobHash)}/version.json`;
+  const head = await getRaw(`${origin}${fresh(headPath)}`, { timeoutMs: RAW_FETCH_TIMEOUT_MS });
+  assert.equal(head.status, 200, `${origin}: governed head answered ${head.status}`);
+  const headBody = JSON.parse(head.text) as { headActionHash?: string };
+  assert.equal(headBody.headActionHash, expected.actionHash, `${origin}: governed action diverged`);
+  const content = await getRaw(`${origin}${fresh(contentPath)}`, {
+    timeoutMs: RAW_FETCH_TIMEOUT_MS,
+  });
+  assert.equal(content.status, 200, `${origin}: governed content answered ${content.status}`);
+  const contentBody = JSON.parse(content.text) as { blobHash?: string };
+  assert.equal(contentBody.blobHash, expected.blobHash, `${origin}: governed blob diverged`);
+  const version = await getRaw(`${origin}${fresh(versionPath)}`, {
+    timeoutMs: RAW_FETCH_TIMEOUT_MS,
+  });
+  assert.equal(version.status, 200, `${origin}: addressed version answered ${version.status}`);
+  assert.equal(stampOf(version.text), expected.version, `${origin}: governed version diverged`);
+  const page = await getRaw(`${origin}${fresh(expected.mountPath)}`, {
+    timeoutMs: RAW_FETCH_TIMEOUT_MS,
+  });
+  assert.equal(page.status, 200, `${origin}: governed page answered ${page.status}`);
+  assert.ok(
+    page.text.includes(expected.entryScript),
+    `${origin}: page does not name current script`
+  );
+  for (const asset of [expected.entryScript, expected.styleSheet]) {
+    const assetPath = `${expected.mountPath.replace(/\/$/, '')}/${asset}`;
+    const response = await getRaw(`${origin}${fresh(assetPath)}`, {
+      timeoutMs: RAW_FETCH_TIMEOUT_MS,
+    });
+    assert.equal(
+      response.status,
+      200,
+      `${origin}: current asset ${asset} answered ${response.status}`
+    );
+  }
+  const browser = await visitInBrowser(`${origin}${fresh(expected.mountPath)}`);
+  assert.deepEqual(browser.pageErrors, [], `${origin}: browser page errors`);
+  assert.deepEqual(browser.failedRequests, [], `${origin}: browser request failures`);
+  assert.deepEqual(browser.httpErrors, [], `${origin}: browser HTTP errors`);
+  assert.ok(browser.rootPresent, `${origin}: browser saw no app-root`);
+  assert.ok(browser.bootstrapReady, `${origin}: current entry script did not bootstrap`);
+  assert.ok(
+    browser.rootText.includes(expected.version.replace(/^fixture-/, '')),
+    `${origin}: browser booted a root that does not identify the expected version`
+  );
+}
+
 /**
  * Shared-mesh coordination, identical in shape to
  * doorway-sibling-reader.steps.ts's `acquireLease` — every SIGSTOP/SIGCONT
@@ -308,6 +376,11 @@ async function acquireLease(world: E2EWorld): Promise<void> {
 async function processStartTicks(pid: number): Promise<string> {
   const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
   return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+}
+
+async function processState(pid: number): Promise<string> {
+  const stat = await readFile(`/proc/${pid}/stat`, 'utf8');
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0];
 }
 
 /**
@@ -361,6 +434,8 @@ async function signalOwnedDoorway(
 
 /** Stop the doorway serving `owner`, having first recorded its sibling. */
 async function faultOwnedDoorway(state: ApexTransitionState, owner: string): Promise<void> {
+  assert.ok(state.observedOrigin, `no captured origin for owned doorway "${owner}"`);
+  state.faultedOrigin = state.observedOrigin;
   const handle = await ownedDoorwayProcess(owner);
   state.pid = handle.pid;
   state.ticks = handle.ticks;
@@ -411,14 +486,24 @@ Given(
         `owner "${owner}" holds more than one entry in the advertised set`
       );
     }
-    // The fault in this scenario is the apex doorway's, exactly as the fleet
-    // apex is the name under study; its sibling is whatever else is advertised.
+    // Capture the ordinary public-name route before selecting the fault. The
+    // transition claim is valid only if this exact leg is the one later
+    // withdrawn; two snapshots that both happened to use the sibling prove no
+    // route change.
+    const baselineVisit = await resolvePublicName(state.authority, '/');
     const faulted = state.authority.owners['apex'] ?? owners.at(-1);
     assert.ok(faulted, 'the household declares no owner to fault');
+    assert.equal(
+      baselineVisit.owner,
+      faulted,
+      `ordinary public-name selection used "${baselineVisit.owner}", but the owned operation ` +
+        `withdraws "${faulted}"; reorder the declared membership fixture so the operation measures ` +
+        'an actual entrance transition'
+    );
     state.observedOwner = faulted;
     state.siblingOwner = owners.find(owner => owner !== faulted);
     assert.ok(state.siblingOwner, 'the advertised set names no sibling owner');
-    state.observedOrigin = memberFor(doc, faulted)?.origin;
+    state.observedOrigin = baselineVisit.origin;
     state.siblingOrigin = memberFor(doc, state.siblingOwner)?.origin;
     state.siblingEntryBeforeFault = memberFor(doc, state.siblingOwner);
   }
@@ -657,6 +742,13 @@ Then(
   { timeout: RAW_FETCH_TIMEOUT_MS + 5_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
+    const browser = await visitInBrowser(`${state.siblingOrigin}/`);
+    assert.deepEqual(browser.pageErrors, [], 'sibling browser page errors');
+    assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
+    assert.deepEqual(browser.httpErrors, [], 'sibling browser HTTP errors');
+    assert.ok(browser.rootPresent, 'sibling browser saw no app-root');
+    assert.ok(browser.bootstrapReady, 'sibling browser did not bootstrap its entry script');
+    assert.ok(browser.rootText.trim().length > 0, 'sibling browser booted an empty app root');
     const served = await getRaw(`${state.siblingOrigin}/version.json`, {
       timeoutMs: RAW_FETCH_TIMEOUT_MS,
     });
@@ -733,6 +825,68 @@ Then(
   }
 );
 
+Given(
+  "the doorway pair records this run's exact governed version as authority A",
+  { timeout: 2 * EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    state.authorityA = chaosAuthorReceipt(this);
+    this.attach(JSON.stringify(state.authorityA), 'application/json');
+    for (const member of (await readMembership(state.authority)).members) {
+      await assertExactPublishedAuthority(member.origin, state.authorityA.authority);
+    }
+  }
+);
+
+Then(
+  "the surviving doorway serves this run's exact governed authority B",
+  { timeout: EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    assert.ok(state.authorityA, 'authority A was not recorded before withdrawal');
+    const authorityB = chaosAuthorReceipt(this);
+    assert.notEqual(
+      authorityB.authority.actionHash,
+      state.authorityA.authority.actionHash,
+      'authority action did not move A→B'
+    );
+    assert.notEqual(
+      authorityB.authority.blobHash,
+      state.authorityA.authority.blobHash,
+      'authority blob did not move A→B'
+    );
+    state.authorityB = authorityB;
+    this.attach(JSON.stringify(authorityB), 'application/json');
+    assert.ok(state.siblingOrigin, 'the withdrawal named no surviving doorway');
+    const ordinaryVisit = await resolvePublicName(state.authority, authorityB.authority.mountPath);
+    assert.equal(
+      ordinaryVisit.owner,
+      state.siblingOwner,
+      `ordinary public-name selection used "${ordinaryVisit.owner}" during the fault; the surviving ` +
+        `doorway is "${state.siblingOwner}"`
+    );
+    await assertExactPublishedAuthority(ordinaryVisit.origin, authorityB.authority);
+  }
+);
+
+Then(
+  'both recovered doorways serve the same exact governed authority B',
+  { timeout: 2 * EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    assert.ok(state.authorityB, 'authority B was not observed during the withdrawal');
+    const doc = await readMembership(state.authority);
+    assert.equal(
+      doc.members.length,
+      Object.values(state.authority.owners).length,
+      'recovery did not restore exactly one membership entry per doorway'
+    );
+    for (const member of doc.members) {
+      await assertExactPublishedAuthority(member.origin, state.authorityB.authority);
+    }
+  }
+);
+
 // ---------------------------------------------------------------------------
 // Teardown: recovery has priority over everything else, exactly like
 // doorway-sibling-reader.steps.ts's own @concern:doorway-failover After hook.
@@ -744,8 +898,21 @@ Then(
 After({ tags: '@concern:doorway-failover', timeout: 20_000 }, async function (this: E2EWorld) {
   const state = states.get(this);
   try {
-    if (!state?.paused) return;
-    await signalOwnedDoorway(state, 'SIGCONT');
+    if (!state?.pid) return;
+    if (state.paused) await signalOwnedDoorway(state, 'SIGCONT');
+    assert.ok(state.faultedOrigin, 'fault handle exists without its immutable origin');
+    await awaitOwnedProcessRecovery(
+      {
+        identityMatches: async () =>
+          (await processStartTicks(state.pid as number)) === state.ticks &&
+          (await readlink(`/proc/${state.pid as number}/exe`)) === state.executable,
+        processRunning: async () => (await processState(state.pid as number)) !== 'T',
+        faultedPathHealthy: async () =>
+          (await getRaw(`${state.faultedOrigin}/health`, { timeoutMs: 2_000 })).status === 200,
+      },
+      15_000,
+      250
+    );
   } finally {
     leases.get(this)?.stdin.end();
     leases.delete(this);

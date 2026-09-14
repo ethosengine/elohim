@@ -78,6 +78,8 @@ interface PublishedApp {
   earnedHeadActionHash?: string;
   /** Exact Content action Matthew authored and declared as artifact B's candidate. */
   candidateActionHash?: string;
+  /** Exact currently declared browser action, read back after the write. */
+  latestHeadActionHash?: string;
   bundle?: FixtureBundle;
   /** The bundle deliberately built without its entry script (station 4). */
   brokenBundle?: FixtureBundle;
@@ -175,6 +177,59 @@ function requireBundle(world: E2EWorld): FixtureBundle {
   const bundle = app(world).bundle;
   assert.ok(bundle, 'this scenario built no coherent bundle');
   return bundle;
+}
+
+export interface ChaosPublishedAuthority {
+  slug: string;
+  mountPath: string;
+  actionHash: string;
+  blobHash: string;
+  version: string;
+  entryScript: string;
+  styleSheet: string;
+}
+
+export interface ChaosAuthorReceipt {
+  schema: 'doorway-chaos-author-receipt/v1';
+  source: 'fixture-author-operation';
+  receiptId: string;
+  authorId: string;
+  authoredAt: string;
+  contentId: string;
+  authority: ChaosPublishedAuthority;
+}
+
+/** Exact run-owned authority tuple used by the doorway withdrawal story. */
+export function chaosPublishedAuthority(world: E2EWorld): ChaosPublishedAuthority {
+  const record = app(world);
+  const bundle = requireBundle(world);
+  assert.ok(record.latestHeadActionHash, 'the run-owned app has no observed declared action');
+  assert.ok(record.blobHash, 'the run-owned app has no declared browser blob');
+  return {
+    slug: record.slug,
+    mountPath: record.mountPath,
+    actionHash: record.latestHeadActionHash,
+    blobHash: record.blobHash,
+    version: bundle.stamp,
+    entryScript: bundle.entryScript,
+    styleSheet: bundle.styleSheet,
+  };
+}
+
+/** Receipt emitted from the fixture author operation, before any serving-path observation. */
+export function chaosAuthorReceipt(world: E2EWorld): ChaosAuthorReceipt {
+  const record = app(world);
+  const authority = chaosPublishedAuthority(world);
+  assert.ok(record.browserDeclaredAt, 'the fixture author operation has no declaration timestamp');
+  return {
+    schema: 'doorway-chaos-author-receipt/v1',
+    source: 'fixture-author-operation',
+    receiptId: authority.actionHash,
+    authorId: ROOT_AUTHOR,
+    authoredAt: new Date(record.browserDeclaredAt).toISOString(),
+    contentId: authority.slug,
+    authority,
+  };
 }
 
 function visitMap(world: E2EWorld): Map<string, BrowserVisit> {
@@ -345,6 +400,10 @@ Given('Matthew has built coherent root app artifact A', function (this: E2EWorld
   buildNextFixture.call(this, true);
 });
 When('this run builds a next coherent browser and server version', function (this: E2EWorld) {
+  buildNextFixture.call(this);
+  app(this).upgradeIncarnations = doorwayIncarnations(this);
+});
+When('this run builds a next coherent browser version', function (this: E2EWorld) {
   buildNextFixture.call(this);
   app(this).upgradeIncarnations = doorwayIncarnations(this);
 });
@@ -618,6 +677,8 @@ async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Pr
     `declaring the head through ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
   );
   record.blobHash = outcome.blobHash;
+  assert.ok(outcome.authoredActionHash, `authoring through ${peerName} returned no exact action`);
+  record.latestHeadActionHash = outcome.authoredActionHash;
   record.browserDeclaredAt = Date.now();
   record.declaredThrough.push(doorwayUrl);
 }
