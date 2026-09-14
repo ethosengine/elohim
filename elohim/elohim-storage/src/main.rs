@@ -1847,6 +1847,7 @@ async fn async_main(
 
                         if let Some(subscriber_pool) = db_pool.clone() {
                             let hc_sub = hc.clone();
+                            let registry_sub = Arc::clone(&registry);
                             let ctx_sub = elohim_storage::db::AppContext::default_lamad();
                             tokio::spawn(async move {
                                 let pool = subscriber_pool;
@@ -1856,18 +1857,18 @@ async fn async_main(
                                 // keep their existing synchronous projection path.
                                 let (authority_tx, mut authority_rx) =
                                     tokio::sync::mpsc::channel(256);
-                                let worker_hc = Arc::clone(&hc_sub);
+                                let worker_registry = Arc::clone(&registry_sub);
                                 let worker_pool = pool.clone();
                                 let worker_ctx = ctx.clone();
                                 tokio::spawn(async move {
                                     while let Some(signal) = authority_rx.recv().await {
                                         let result = if elohim_storage::rea_projection::requires_authenticated_head_projection(&signal) {
                                             elohim_storage::rea_projection::handle_authenticated_content_head_signal(
-                                                signal, &worker_hc, &worker_pool, &worker_ctx,
+                                                signal, &worker_registry, &worker_pool, &worker_ctx,
                                             ).await
                                         } else {
                                             elohim_storage::rea_projection::handle_authenticated_commitment_signal(
-                                                signal, &worker_hc, &worker_pool, &worker_ctx,
+                                                signal, &worker_registry, &worker_pool, &worker_ctx,
                                             ).await
                                         };
                                         if let Err(e) = result {

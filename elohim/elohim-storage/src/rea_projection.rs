@@ -617,6 +617,16 @@ pub fn requires_authenticated_head_projection(signal: &ReaProjectionSignal) -> b
     )
 }
 
+fn current_lamad_client(
+    registry: &crate::hc_client_registry::HcClientRegistry,
+) -> Result<std::sync::Arc<crate::hc_client::HcClient>, StorageError> {
+    registry.lamad_client().ok_or_else(|| {
+        StorageError::Conductor(
+            "authenticated content_store read deferred: current lamad bridge unavailable".into(),
+        )
+    })
+}
+
 fn validate_ordered_content_head(
     content_id: &str,
     head_action_hash: &HoloHashB64,
@@ -729,7 +739,7 @@ where
 /// signal or authenticated projection rather than being mutated further.
 pub async fn handle_authenticated_content_head_signal(
     signal: ReaProjectionSignal,
-    hc: &std::sync::Arc<crate::hc_client::HcClient>,
+    registry: &crate::hc_client_registry::HcClientRegistry,
     pool: &DbPool,
     ctx: &AppContext,
 ) -> Result<(), StorageError> {
@@ -746,13 +756,20 @@ pub async fn handle_authenticated_content_head_signal(
         ));
     };
 
+    // This subscriber is registered through the infrastructure bridge because
+    // that app websocket carries every installed cell's signals. The content
+    // read itself belongs to lamad, though. Resolve its CURRENT supervised
+    // client for every job so a conductor restart swaps this path along with
+    // the rest of the registry instead of leaving a captured websocket behind.
+    let hc = current_lamad_client(registry)?;
+
     let ids = [content_id.clone()];
     let budget_ms =
         u32::try_from(crate::services::head_batch_resolver::BATCH_EXTERN_BUDGET.as_millis())
             .unwrap_or(u32::MAX);
     let call = bounded_ordered_head_call(
         crate::services::conductor_writes::call_resolve_content_heads_local(
-            hc,
+            &hc,
             &ids,
             Some(budget_ms),
         ),
@@ -1050,7 +1067,7 @@ pub fn handle_rea_signal(
 /// record; never project lifecycle or parties from the unverified signal payload.
 pub async fn handle_authenticated_commitment_signal(
     signal: ReaProjectionSignal,
-    hc: &std::sync::Arc<crate::hc_client::HcClient>,
+    registry: &crate::hc_client_registry::HcClientRegistry,
     pool: &DbPool,
     ctx: &AppContext,
 ) -> Result<(), StorageError> {
@@ -1064,8 +1081,9 @@ pub async fn handle_authenticated_commitment_signal(
             "expected Commitment signal".into(),
         ));
     };
+    let hc = current_lamad_client(registry)?;
     let outcome = crate::services::rea_commitment_projection::project(
-        hc,
+        &hc,
         pool,
         ctx,
         &commitment.id,
@@ -1195,6 +1213,45 @@ mod tests {
             Some(10),
             None
         )));
+    }
+
+    #[tokio::test]
+    async fn ordered_head_hydration_requires_the_current_lamad_registry_slot() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let registry = crate::hc_client_registry::HcClientRegistry::empty();
+        let result = handle_authenticated_content_head_signal(
+            ReaProjectionSignal::ContentHeadDeclared {
+                content_id: "role-bound-head".into(),
+                head_action_hash: HoloHashB64("uhCkk-role-bound-head".into()),
+                entry_hash: None,
+                author: None,
+                canonical_declared_at: Some(10),
+                canonical_earned: Some(true),
+            },
+            &registry,
+            &pool,
+            &ctx,
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(StorageError::Conductor(message))
+                if message.contains("current lamad bridge unavailable")
+        ));
+        let mut conn = pool.get().expect("connection");
+        assert!(
+            crate::db::content_diesel::get_content(
+                &mut conn,
+                &ctx,
+                "role-bound-head",
+                crate::db::content_diesel::MinTrust::Invisible,
+            )
+            .expect("read projection")
+            .is_none(),
+            "an absent lamad slot must not fall back to the infrastructure client or touch SQL"
+        );
     }
 
     #[test]
