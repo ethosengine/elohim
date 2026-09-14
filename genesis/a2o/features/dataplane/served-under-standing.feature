@@ -1,8 +1,8 @@
 @e2e @dataplane @concern:served-under-standing @act:i @requires:owned-substrate
 Feature: Doorway visitors can trace access decisions, contributions and response obligations
-  These are acceptance specifications for successful serves and reach-based HTTP 403
-  refusals. They have not yet run against the revised services. The first three retain the wip tag and the normal owned-mesh profile excludes them;
-  a run must explicitly include that tag before those scenarios can supply live evidence.
+  These acceptance specifications cover successful serves and reach-based HTTP 403
+  refusals through the household's owned mesh. Here, standing is the current identity
+  and relationship evidence considered under the resource's declared reach.
 
   The Dowell household is the governing collective in this story. It decides who may
   read the shared garden resource and owes an answer when James objects. The fixture
@@ -14,13 +14,16 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   declaration. It gives alpha permission to serve and names alpha's provider. Its reach
   field states the audience. Narrowing updates
   that field in place, under the same contract identifier; it does not create a new
-  contract. The hosting-agreement records computing and storage contribution,
+  contract. The full declaration means the complete returned contract record, including
+  its metadata; comparing it requires every returned field to remain unchanged.
+  The hosting-agreement records computing and storage contribution,
   operate-doorway records operation of beta, and a challenge record applies the
   contract's prior response promise to James's objection.
 
   Matthew, Susan, and James make named requests with hosted bearer credentials tied to
-  their canonical fixture humans. The steps separately read current peer membership
-  records. This proves only the hosted-identity path used here; direct device-to-doorway
+  their canonical fixture humans: the named people's existing Genesis identities.
+  The bearer credential and the separately read peer membership record must identify
+  the same person. This proves only the hosted-identity path used here; direct device-to-doorway
   credential handoff remains unproved.
 
   Alpha holds the scenario's uniquely marked bytes. Beta is a separate entrance that
@@ -45,7 +48,7 @@ Feature: Doorway visitors can trace access decisions, contributions and response
   The attribution-only receipt scenario remains at commons reach. Its introduction says that
   someone kept the resource ready and someone put it in front of Matthew; separate plain-language
   credit sentences name who kept it and who operated the entrance. Their records support that
-  audit but do not prove payment. A protocolForm URL returns the supporting records. The HTTP
+  audit but do not prove payment. A protocol-form URL returns the supporting records. The HTTP
   response frame is called chrome here; no browser presentation or rendered role label is asserted.
 
   The fixture declares a 60-second convergence window. The holder-side anonymous-refusal
@@ -65,23 +68,21 @@ Feature: Doorway visitors can trace access decisions, contributions and response
     And doorway "beta" holds no contract for "community-garden-club"
     And the household's declared reconcile window is read from its fixture manifest
 
-  @wip
   Scenario: Beta refuses anonymous access after the steward narrows the audience through alpha
     Given an anonymous probe at doorway "beta" observes public permission for "community-garden-club" before withdrawal
     When the Dowell household decision recorded through alpha says "the Dowell household" has narrowed "community-garden-club" to members of "the Dowell household"
-    And beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
+    And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
     Then an anonymous visitor at doorway "beta" is refused "community-garden-club"
     And the HTTP 403 refusal names reach as the failed term, not absence or a service error
     And the refusal names "the Dowell household" as the collective whose recorded decision narrowed it
     And the refusal gives the collective's challenge address for that decision
     And following the refusal's declaration reference at doorway "beta" returns that same contract identifier with the changed reach and deciding collective
 
-  @wip
   Scenario: A member and a nonmember receive different answers under one narrowed declaration
     Given Matthew's peer membership record states his membership in "the Dowell household"
     And Susan's peer membership record states no membership in "the Dowell household"
     When the Dowell household decision recorded through alpha says "community-garden-club" now admits only members of "the Dowell household"
-    And beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
+    And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
     And canonical Matthew presents his hosted bearer when asking doorway "beta" for "community-garden-club"
     Then Matthew is served the originally observed byte marker for "community-garden-club"
     And doorway "beta" names alpha as the live holder that supplied the bytes
@@ -94,7 +95,6 @@ Feature: Doorway visitors can trace access decisions, contributions and response
     And the HTTP 403 refusal names reach as the failed term, not absence or a service error
     And following the refusal's declaration reference at doorway "beta" returns that same contract identifier with the changed reach and deciding collective
 
-  @wip
   Scenario: Narrowing refuses an anonymous visitor while the holder can still serve a member
     Given Matthew's peer membership record states his membership in "the Dowell household"
     And doorway "alpha" has already served "community-garden-club" to an anonymous visitor
@@ -108,7 +108,7 @@ Feature: Doorway visitors can trace access decisions, contributions and response
 
   Scenario: Matthew sees alpha credited for holding while beta is credited only for operating the entrance
     Given Matthew's peer membership record states his membership in "the Dowell household"
-    And "community-garden-club" is at a reach that admits Matthew
+    And "community-garden-club" remains at its original commons reach
     And doorway "alpha" is the holder whose hosting agreement records computing time and storage
     When canonical Matthew presents his hosted bearer and is served "community-garden-club" through doorway "beta"
     Then doorway "beta" names alpha as the live holder that supplied the bytes
@@ -124,7 +124,7 @@ Feature: Doorway visitors can trace access decisions, contributions and response
     Given James's peer membership record states his membership in "the Dowell household"
     And the Dowell household decision recorded through alpha sets private reach for "community-garden-club"
     And the projection contract already names the collective and its 72-hour response promise
-    And beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
+    And within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract
     When canonical James presents his hosted bearer and membership evidence to doorway "beta" under private reach for "community-garden-club"
     Then the HTTP 403 refusal shows the current doorway cannot serve private reach without beneficiary verification
     And the private refusal points to "the Dowell household" and the contract that recorded its decision

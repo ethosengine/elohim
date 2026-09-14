@@ -1379,7 +1379,7 @@ When(
 );
 
 When(
-  'beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract',
+  'within 75 seconds beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract',
   { timeout: OWN_REFRESH_BUDGET_MS + 60_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
@@ -2036,7 +2036,7 @@ async function getJson(
 }
 
 Given(
-  '{string} is at a reach that admits Matthew',
+  '{string} remains at its original commons reach',
   { timeout: 30_000 },
   function (this: E2EWorld, eprLabel: string): void {
     const state = getState(this);
