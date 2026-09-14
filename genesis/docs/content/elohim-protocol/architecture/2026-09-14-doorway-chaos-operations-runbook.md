@@ -24,10 +24,10 @@ The maintained local operation is the existing a2o story and process controller.
 ```bash
 just mesh start
 just mesh prologue
-just test mesh features/dataplane/doorway-apex-transition.feature
+just test mesh features/dataplane/doorway-apex-transition.feature:93
 ```
 
-The scenario `A current governed version crosses withdrawal and recovery` authors a fresh fixture EPR through the existing fixture identity and registers required cleanup. It records exact authority A, pauses one household-owned doorway, waits for its owner record to leave shared membership, then the fixture author publishes B through the serving alpha-A gateway. It checks B from the author operation as four distinct values: the returned notarized action, its blob address, the `commit` in `/apps/{blob}/version.json`, and the generated entry-script name. Each serving assertion checks the HTTP page and assets and boots that page in a real browser. It resumes the paused doorway in the scenario and in the unconditional `After` hook; cleanup verifies the guarded process identity is running and its health path answers before releasing the lease. After readmission, both entrances must serve and boot B. Run evidence is written by the existing mesh report path under `genesis/a2o/reports/`.
+The scenario `A current governed version crosses withdrawal and recovery` authors a fresh fixture EPR through the existing fixture identity and registers required cleanup. It records exact authority A, pauses the alpha-A doorway, waits for its owner record to leave shared membership, then the fixture author publishes B through alpha-A's still-serving storage peer. It checks B through the surviving elohim.host entrance as four distinct values: the returned notarized action, its blob address, the `commit` in `/apps/{blob}/version.json`, and the generated entry-script name. Each serving assertion checks the HTTP page and assets and boots that page in a real browser. It resumes alpha-A in the scenario and in the unconditional `After` hook; cleanup verifies the guarded process identity is running and its health path answers before releasing the lease. After readmission, alpha-A and elohim.host must both serve and boot B. Run evidence is written by the existing mesh report path under `genesis/a2o/reports/`.
 
 Do not run this scenario against a public fleet. Its process control is valid only for the household fixture this workstation owns.
 
