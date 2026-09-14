@@ -29,6 +29,7 @@ import {
   declareEarnedCanonicalHead,
   meshConductorPorts,
 } from '../../src/framework/dataplane/carried-election.js';
+import { cancelOwnedCommitmentWithReadback } from '../../src/framework/dataplane/owned-commitment-cleanup.js';
 import {
   getRaw,
   getRawWithHeaders,
@@ -1829,14 +1830,24 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
   );
   const restores = await Promise.allSettled(
     record.rootCommitments.map(async id => {
-      const response = await postFixtureCommitment(`${authorStorageUrl}/api/v1/commitments/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'content-type': 'application/json',
-          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
-        },
-        body: JSON.stringify({ state: 'cancelled', finished: true }),
-      });
+      const response = await cancelOwnedCommitmentWithReadback(
+        id,
+        async () =>
+          await postFixtureCommitment(`${authorStorageUrl}/api/v1/commitments/${id}`, {
+            method: 'PATCH',
+            headers: {
+              'content-type': 'application/json',
+              'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+            },
+            body: JSON.stringify({ state: 'cancelled', finished: true }),
+          }),
+        async () => {
+          const readback = await fetch(`${authorStorageUrl}/api/v1/commitments/${id}`);
+          return readback.status === 200
+            ? ((await readback.json()) as { id?: string; state?: string; finished?: boolean })
+            : undefined;
+        }
+      );
       assert.ok(
         response.ok || response.status === 404,
         `alpha-A/matthew (root author): could not cancel owned root mount ${id}: ${response.status} ${response.text}`
