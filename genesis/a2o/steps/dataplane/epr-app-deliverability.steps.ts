@@ -683,6 +683,32 @@ async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Pr
   record.declaredThrough.push(doorwayUrl);
 }
 
+async function declareCurrentBrowserBundleThroughAuthorStorage(world: E2EWorld): Promise<void> {
+  const record = app(world);
+  const bundle = requireBundle(world);
+  const storageUrl = resolveStorageUrl('alpha-A');
+  assert.ok(storageUrl, 'canonical source-author storage URL is absent');
+  const outcome = await stageBundle({
+    bundle,
+    slug: record.slug,
+    doorwayUrl: storageUrl,
+    declare: true,
+  });
+  assert.strictEqual(
+    outcome.code,
+    0,
+    `declaring the head through the source author's storage peer failed (exit ${outcome.code}):\n${outcome.output}`
+  );
+  record.blobHash = outcome.blobHash;
+  assert.ok(
+    outcome.authoredActionHash,
+    'source-author storage publication returned no exact action'
+  );
+  record.latestHeadActionHash = outcome.authoredActionHash;
+  record.browserDeclaredAt = Date.now();
+  record.declaredThrough.push(storageUrl);
+}
+
 When(
   "Matthew submits artifact A's byte-binding declaration through doorway {string}",
   {
@@ -697,6 +723,14 @@ When(
     timeout: 300_000,
   },
   declareCurrentBrowserBundle
+);
+
+When(
+  'the canonical source author publishes authority B through its storage peer',
+  { timeout: 300_000 },
+  async function (this: E2EWorld): Promise<void> {
+    await declareCurrentBrowserBundleThroughAuthorStorage(this);
+  }
 );
 
 When(

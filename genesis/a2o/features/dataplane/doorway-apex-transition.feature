@@ -102,13 +102,13 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     Then within 75 seconds doorway "alpha-A" serves a page naming that bundle's entry script
     And within 75 seconds doorway "elohim.host" serves a page naming that bundle's entry script
     Given both owned doorways advertise eligibility for the same public name
-    And the doorway pair records this run's exact governed version as authority A
-    When the household makes one doorway report non-serving for three consecutive probes
-    Then only that doorway's owner records leave shared membership
+    And the doorway pair records authority A as the canonical author's exact action hash, blob address, entry script, and version
+    When the household makes doorway "alpha-A" report non-serving for three consecutive probes
+    Then only doorway "alpha-A"'s owner records leave shared membership while doorway "elohim.host" survives
     When this run builds a next coherent browser version
     And each doorway is handed the bundle's bytes
-    And only doorway "alpha-A" is told this bundle is the new version
-    Then the surviving doorway serves this run's exact governed authority B
-    When that doorway reports serving for two consecutive probes
-    Then its owner records rejoin shared membership without duplicating the sibling
-    And both recovered doorways serve the same exact governed authority B
+    And the canonical source author publishes authority B through its storage peer
+    Then doorway "elohim.host" serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap
+    When doorway "alpha-A" reports serving for two consecutive probes
+    Then doorway "alpha-A"'s owner records rejoin shared membership without duplicating doorway "elohim.host"
+    And recovered doorways "alpha-A" and "elohim.host" serve authority B's same exact head, blob, addressed version, HTML entry, and browser bootstrap

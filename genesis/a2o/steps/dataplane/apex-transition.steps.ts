@@ -491,7 +491,10 @@ Given(
     // withdrawn; two snapshots that both happened to use the sibling prove no
     // route change.
     const baselineVisit = await resolvePublicName(state.authority, '/');
-    const faulted = state.authority.owners['apex'] ?? owners.at(-1);
+    // The story names the controlled transition: alpha-A is withdrawn and
+    // elohim.host is the surviving entrance. Keep that name-to-owner binding
+    // explicit so a fixture ordering change cannot silently reverse the proof.
+    const faulted = state.authority.owners['alpha'];
     assert.ok(faulted, 'the household declares no owner to fault');
     assert.equal(
       baselineVisit.owner,
@@ -509,17 +512,33 @@ Given(
   }
 );
 
+async function induceSelectedDoorwayFault(world: E2EWorld): Promise<void> {
+  const state = getState(world);
+  assert.equal(
+    state.observedOwner,
+    state.authority.owners['alpha'],
+    'the selected fault must be alpha-A'
+  );
+  await acquireLease(world);
+  await faultOwnedDoorway(state, state.observedOwner);
+  // Wait out the declared withdraw bound rather than polling for success:
+  // the assertion belongs in the Then, where it can fail.
+  await delay(withdrawBound(state));
+}
+
 When(
   'the household makes one doorway report non-serving for three consecutive probes',
   { timeout: INDUCE_SHED_TIMEOUT_MS },
   async function (this: E2EWorld): Promise<void> {
-    const state = getState(this);
-    assert.ok(state.observedOwner, 'no owner selected to fault');
-    await acquireLease(this);
-    await faultOwnedDoorway(state, state.observedOwner);
-    // Wait out the declared withdraw bound rather than polling for success:
-    // the assertion belongs in the Then, where it can fail.
-    await delay(withdrawBound(state));
+    await induceSelectedDoorwayFault(this);
+  }
+);
+When(
+  'the household makes doorway {string} report non-serving for three consecutive probes',
+  { timeout: INDUCE_SHED_TIMEOUT_MS },
+  async function (this: E2EWorld, doorway: string): Promise<void> {
+    assert.equal(doorway, 'alpha-A', 'the controlled fault target must be alpha-A');
+    await induceSelectedDoorwayFault(this);
   }
 );
 
@@ -540,6 +559,18 @@ Then(
       `the sibling "${state.siblingOwner}" left the set too — a withdrawal must remove only the ` +
         `owner's OWN records; the set is now [${advertised(doc).join(', ')}]`
     );
+  }
+);
+
+Then(
+  "only doorway {string}'s owner records leave shared membership while doorway {string} survives",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, withdrawn: string, survivor: string): Promise<void> {
+    assert.deepEqual([withdrawn, survivor], ['alpha-A', 'elohim.host']);
+    const state = getState(this);
+    const doc = await readMembership(state.authority);
+    assert.equal(memberFor(doc, state.authority.owners['alpha']), undefined);
+    assert.ok(memberFor(doc, state.authority.owners['apex']));
   }
 );
 
@@ -568,7 +599,7 @@ Then(
     // that the membership authority left it alone — a withdrawal from the
     // shared set never retracts the doorway's own address.
     const fixture = loadHouseholdMeshFixture();
-    const diagnostic = requireFixtureDoorwayUrl(fixture, 'apex');
+    const diagnostic = requireFixtureDoorwayUrl(fixture, 'alpha-A');
     assert.equal(
       diagnostic,
       state.observedOrigin,
@@ -582,6 +613,17 @@ When(
   'that doorway reports serving for two consecutive probes',
   { timeout: DEFAULT_REJOIN_BOUND_MS + 30_000 },
   async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    if (state.paused) await signalOwnedDoorway(state, 'SIGCONT');
+    await delay(rejoinBound(state));
+  }
+);
+
+When(
+  'doorway {string} reports serving for two consecutive probes',
+  { timeout: DEFAULT_REJOIN_BOUND_MS + 30_000 },
+  async function (this: E2EWorld, doorway: string): Promise<void> {
+    assert.equal(doorway, 'alpha-A', 'the recovering doorway must be alpha-A');
     const state = getState(this);
     if (state.paused) await signalOwnedDoorway(state, 'SIGCONT');
     await delay(rejoinBound(state));
@@ -612,6 +654,19 @@ Then(
       Object.values(state.authority.owners).length,
       `the advertised set is [${advertised(doc).join(', ')}], not exactly one entry per declared owner`
     );
+  }
+);
+
+Then(
+  "doorway {string}'s owner records rejoin shared membership without duplicating doorway {string}",
+  { timeout: 30_000 },
+  async function (this: E2EWorld, recovered: string, sibling: string): Promise<void> {
+    assert.deepEqual([recovered, sibling], ['alpha-A', 'elohim.host']);
+    const state = getState(this);
+    const doc = await readMembership(state.authority);
+    for (const owner of Object.values(state.authority.owners)) {
+      assert.equal(doc.members.filter(member => member.owner === owner).length, 1);
+    }
   }
 );
 
@@ -826,7 +881,7 @@ Then(
 );
 
 Given(
-  "the doorway pair records this run's exact governed version as authority A",
+  "the doorway pair records authority A as the canonical author's exact action hash, blob address, entry script, and version",
   { timeout: 2 * EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
@@ -839,9 +894,9 @@ Given(
 );
 
 Then(
-  "the surviving doorway serves this run's exact governed authority B",
+  "doorway {string} serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap",
   { timeout: EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
-  async function (this: E2EWorld): Promise<void> {
+  async function (this: E2EWorld, survivingDoorway: string): Promise<void> {
     const state = getState(this);
     assert.ok(state.authorityA, 'authority A was not recorded before withdrawal');
     const authorityB = chaosAuthorReceipt(this);
@@ -858,6 +913,12 @@ Then(
     state.authorityB = authorityB;
     this.attach(JSON.stringify(authorityB), 'application/json');
     assert.ok(state.siblingOrigin, 'the withdrawal named no surviving doorway');
+    assert.equal(survivingDoorway, 'elohim.host', 'the governed survivor must be elohim.host');
+    assert.equal(
+      state.siblingOwner,
+      state.authority.owners['apex'],
+      'the surviving membership owner must be the elohim.host/apex leg'
+    );
     const ordinaryVisit = await resolvePublicName(state.authority, authorityB.authority.mountPath);
     assert.equal(
       ordinaryVisit.owner,
@@ -870,10 +931,15 @@ Then(
 );
 
 Then(
-  'both recovered doorways serve the same exact governed authority B',
+  "recovered doorways {string} and {string} serve authority B's same exact head, blob, addressed version, HTML entry, and browser bootstrap",
   { timeout: 2 * EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },
-  async function (this: E2EWorld): Promise<void> {
+  async function (this: E2EWorld, recoveredA: string, recoveredB: string): Promise<void> {
     const state = getState(this);
+    assert.deepEqual(
+      [recoveredA, recoveredB],
+      ['alpha-A', 'elohim.host'],
+      'the story must recover the named withdrawn and surviving entrances'
+    );
     assert.ok(state.authorityB, 'authority B was not observed during the withdrawal');
     const doc = await readMembership(state.authority);
     assert.equal(
