@@ -7,10 +7,34 @@ import {
   buildCustodyPairs,
   buildDeterministicZip,
   crc32,
+  drillCustodyPairsPath,
   fixtureBlob,
   DRILL_FIXTURES,
   type CustodySubject,
 } from '../seed-drill-fixtures.js';
+
+describe('drillCustodyPairsPath', () => {
+  it('defaults the reusable handoff to the canonical Genesis household', () => {
+    expect(drillCustodyPairsPath({})).toMatch(
+      /\/genesis\/local-dev\/household-dowell\/drill-custody-pairs\.json$/,
+    );
+  });
+
+  it('keeps an explicitly selected household root', () => {
+    expect(drillCustodyPairsPath({ MESH_DIR: '/fixtures/other-household' })).toBe(
+      '/fixtures/other-household/drill-custody-pairs.json',
+    );
+  });
+
+  it('keeps the declared output override used by the Prologue', () => {
+    expect(
+      drillCustodyPairsPath({
+        MESH_DIR: '/fixtures/household',
+        DRILL_CUSTODY_PAIRS_OUT: '/handoff/pairs.json',
+      }),
+    ).toBe('/handoff/pairs.json');
+  });
+});
 
 describe('crc32', () => {
   it('matches the known ZIP/PKZIP check value for "123456789"', () => {

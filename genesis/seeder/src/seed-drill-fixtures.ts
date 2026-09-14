@@ -60,9 +60,9 @@
  */
 
 import { createHash } from 'node:crypto';
-import { writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CommitmentClient } from './seed-commitments.js';
 import { computeContentAddresses } from './doorway-client.js';
 import { parseNamedCsv } from './peer-id.js';
@@ -85,6 +85,14 @@ export function crc32(buf: Buffer): number {
   let c = 0xffffffff;
   for (const byte of buf) c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
   return (c ^ 0xffffffff) >>> 0;
+}
+
+/** Resolve the durable handoff consumed by the next household Prologue leg. */
+export function drillCustodyPairsPath(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.DRILL_CUSTODY_PAIRS_OUT) return env.DRILL_CUSTODY_PAIRS_OUT;
+  const meshDir =
+    env.MESH_DIR || fileURLToPath(new URL('../../local-dev/household-dowell', import.meta.url));
+  return join(meshDir, 'drill-custody-pairs.json');
 }
 
 /**
@@ -634,9 +642,8 @@ if (isMain) {
     // A DECLARED output path (not a random temp dir) is what lets the Prologue
     // chain the next leg without scraping this one's stdout — the pair file is
     // an artifact handed to seed-commitments.ts, not a log line.
-    const path =
-      process.env.DRILL_CUSTODY_PAIRS_OUT ||
-      join(mkdtempSync(join(tmpdir(), 'drill-custody-')), 'custody-pairs.json');
+    const path = drillCustodyPairsPath();
+    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, JSON.stringify(pairs, null, 2));
     console.log('\n-- custody pairs --');
     console.log(`  [+] ${pairs.length} self-custody pair(s) across ${humanIds.length} peer(s)`);

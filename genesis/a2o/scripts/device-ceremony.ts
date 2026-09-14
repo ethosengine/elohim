@@ -13,7 +13,9 @@
  * The grant phase is the "primary device act": it runs against matthew's own conductor,
  * whose lair signs the delegation. The declare phase is the second device acting under it.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   AdminWebsocket,
@@ -23,7 +25,12 @@ import {
 } from '@holochain/client';
 
 const W = process.env.DEVICE_AGENT ?? 'uhCAkDRf5_8rAphi2xekEmRCrfw4dIUkKG0B01WiNSdp31LFIwZcX'; // override with DEVICE_AGENT after a conductor re-key
-const SCRATCH = '/tmp/claude-0/-projects-elohim/bd085a03-fcae-4c1c-b245-fda9ca07a257/scratchpad';
+const configuredCeremonyDir = process.env.DEVICE_CEREMONY_DIR;
+const CEREMONY_DIR =
+  configuredCeremonyDir !== undefined && configuredCeremonyDir !== ''
+    ? configuredCeremonyDir
+    : fileURLToPath(new URL('../../local-dev/device-ceremony', import.meta.url));
+const DELEGATION_PATH = join(CEREMONY_DIR, 'delegation.json');
 const APP_ID = 'elohim';
 
 function b64FromBytes(u8: Uint8Array): string {
@@ -95,8 +102,11 @@ async function grant() {
     validUntil: Number(delegation.payload.valid_until),
     signature: b64FromBytes(delegation.signature),
   };
-  writeFileSync(`${SCRATCH}/delegation.json`, JSON.stringify(json, null, 2));
-  console.log('delegation minted →', `${SCRATCH}/delegation.json`);
+  mkdirSync(CEREMONY_DIR, { recursive: true, mode: 0o700 });
+  chmodSync(CEREMONY_DIR, 0o700);
+  writeFileSync(DELEGATION_PATH, JSON.stringify(json, null, 2), { mode: 0o600 });
+  chmodSync(DELEGATION_PATH, 0o600);
+  console.log('delegation minted →', DELEGATION_PATH);
   console.log(JSON.stringify(json));
 
   if (mishpat) {
@@ -133,7 +143,7 @@ async function grant() {
 }
 
 async function declare() {
-  const delegation = JSON.parse(readFileSync(`${SCRATCH}/delegation.json`, 'utf8'));
+  const delegation = JSON.parse(readFileSync(DELEGATION_PATH, 'utf8'));
   const md = readFileSync(
     '/projects/elohim/genesis/docs/content/elohim-protocol/manifesto.md',
     'utf8'

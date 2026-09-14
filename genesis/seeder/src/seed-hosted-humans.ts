@@ -45,7 +45,7 @@
  * Environment variables:
  *   DOORWAY_URL   Doorway URL to register through (default: http://localhost:8888)
  *   MESH_DIR      Mesh data root the roster is written under
- *                 (default: /tmp/elohim-local-mesh)
+ *                 (default: genesis/local-dev/household-dowell)
  *
  * Exit codes (mirrors the Jenkinsfile runProbedSeeder contract used by the
  * other Act I Prologue seeders):
@@ -56,6 +56,7 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 // =============================================================================
 // Cast — verbatim identifiers/pools from the plan's Task 5 table
@@ -222,7 +223,9 @@ async function verifyExisting(
 
 async function main(): Promise<void> {
   const doorwayUrl = (process.env.DOORWAY_URL || 'http://localhost:8888').replace(/\/+$/, '');
-  const meshDir = process.env.MESH_DIR || '/tmp/elohim-local-mesh';
+  const meshDir =
+    process.env.MESH_DIR ||
+    fileURLToPath(new URL('../../local-dev/household-dowell', import.meta.url));
   const rosterPath = `${meshDir}/prologue-hosted-humans.json`;
 
   console.log('=== Seed Hosted Humans (Act I Prologue, D4) ===\n');

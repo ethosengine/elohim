@@ -4494,6 +4494,128 @@ mod epr_dispatch_breaker_tests {
         );
     }
 
+    /// A server renderer can adopt before the browser shell archive catches up.
+    /// Never splice that new render into the held old shell: its relative assets
+    /// are deliberately pinned to the held shell's address. Fall back coherently
+    /// until the declared browser head is readable, then compose and serve every
+    /// browser file from that same release.
+    #[tokio::test]
+    async fn ssr_waits_for_the_declared_browser_shell_before_exposing_a_new_render() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let old_shell = crate::render::warm_shell::ArchivedShell {
+            blob_hash: "head-old".into(),
+            content_type: "text/html".into(),
+            bytes: br#"<app-root></app-root><script src="main-OLD.js"></script>"#.to_vec(),
+            head_bound: true,
+        };
+        let rendered = "<app-root><p>server-new</p></app-root>";
+        let projection = shell_projection(true);
+
+        let unavailable = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-old/version.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(br#"{"commit":"old"}"#))
+            .expect(1)
+            .mount(&unavailable)
+            .await;
+        let stale_state = asset_binding_state(
+            &unavailable.uri(),
+            Arc::new(AssetBindingArchive {
+                declared: Some("head-new".into()),
+                latest: Some(old_shell.clone()),
+            }),
+        );
+        hydrate_asset_binding_shell(&stale_state).await;
+        let stale = compose_render_with_shell(
+            &stale_state,
+            &SsrFallback::ProjectedEpr(Box::new(projection.clone())),
+            rendered,
+        )
+        .await;
+        assert!(matches!(stale, Err(SsrFallbackReason::BrowserShellBehind)));
+        let fallback_root =
+            serve_admitted_projection(&stale_state, "/", projection.clone(), "{}", true).await;
+        let fallback_html = fallback_root
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes();
+        assert!(String::from_utf8_lossy(&fallback_html).contains("main-OLD.js"));
+        let fallback_version = serve_admitted_projection(
+            &stale_state,
+            "/version.json",
+            projection.clone(),
+            "{}",
+            false,
+        )
+        .await;
+        assert_eq!(fallback_version.status(), StatusCode::OK);
+        assert_eq!(
+            fallback_version
+                .into_body()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes(),
+            Bytes::from_static(br#"{"commit":"old"}"#)
+        );
+
+        let available = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-new/index.html"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .insert_header("content-type", "text/html")
+                    .set_body_string(r#"<app-root></app-root><script src="main-NEW.js"></script>"#),
+            )
+            .expect(1)
+            .mount(&available)
+            .await;
+        Mock::given(method("GET"))
+            .and(path("/apps/head-new/version.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(br#"{"commit":"new"}"#))
+            .expect(1)
+            .mount(&available)
+            .await;
+        let current_state = asset_binding_state(
+            &available.uri(),
+            Arc::new(AssetBindingArchive {
+                declared: Some("head-new".into()),
+                latest: Some(old_shell),
+            }),
+        );
+        hydrate_asset_binding_shell(&current_state).await;
+        let (composed, provenance) = compose_render_with_shell(
+            &current_state,
+            &SsrFallback::ProjectedEpr(Box::new(projection.clone())),
+            rendered,
+        )
+        .await
+        .expect("the declared browser head is now composable");
+        assert_eq!(provenance, ShellProvenance::DeclaredHead);
+        assert!(composed.contains("server-new"));
+        assert!(composed.contains("main-NEW.js"));
+        assert!(!composed.contains("main-OLD.js"));
+
+        let version = dispatch_to_projected_epr(
+            &current_state,
+            "/version.json",
+            projection,
+            "{}",
+            false,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(version.status(), StatusCode::OK);
+        assert_eq!(
+            version.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(br#"{"commit":"new"}"#)
+        );
+    }
+
     #[tokio::test]
     async fn asset_binding_prefers_bound_held_shell_and_never_labels_unbound_shell() {
         use wiremock::matchers::{method, path};
@@ -4990,6 +5112,11 @@ enum SsrFallbackReason {
     ShellBreakerOpen,
     /// The shell HTTP fetch failed (non-2xx, timeout, connect error).
     ShellFetchFailed,
+    /// The renderer is current, but the hydrating browser shell is still from
+    /// an older declared head. Composing the two would expose a mixed release:
+    /// new server markup with old scripts and version metadata. Keep serving
+    /// the coherent projected fallback until the browser head upgrades.
+    BrowserShellBehind,
     /// This doorway's own warmup pass has produced NOTHING (see
     /// `WarmupState::is_empty_warm`) — a cold shell cache with a closed
     /// breaker used to fall into `ShellPlan::Fetch` here regardless, paying
@@ -5020,6 +5147,7 @@ impl SsrFallbackReason {
             SsrFallbackReason::ShellNoProjection => "shell-no-projection",
             SsrFallbackReason::ShellBreakerOpen => "shell-breaker-open",
             SsrFallbackReason::ShellFetchFailed => "shell-fetch-failed",
+            SsrFallbackReason::BrowserShellBehind => "browser-shell-behind",
             SsrFallbackReason::WarmupEmpty => "warmup-empty",
             SsrFallbackReason::Compose(e) => e.reason_str(),
         }
@@ -5192,6 +5320,7 @@ async fn ssr_fallback_response(
             | SsrFallbackReason::ShellNoProjection
             | SsrFallbackReason::ShellBreakerOpen
             | SsrFallbackReason::ShellFetchFailed
+            | SsrFallbackReason::BrowserShellBehind
             | SsrFallbackReason::WarmupEmpty
             | SsrFallbackReason::Compose(_) => ssr_spa_shell_fallback_with_skip_reason(
                 Some(reason.as_skip_str()),
@@ -5299,6 +5428,9 @@ async fn compose_render_with_shell(
         .as_deref()
         .ok_or(SsrFallbackReason::ShellNoProjection)?;
     let (shell_html, provenance) = resolve_projected_shell(state, projection, storage_url).await?;
+    if matches!(provenance, ShellProvenance::Behind(_)) {
+        return Err(SsrFallbackReason::BrowserShellBehind);
+    }
     elohim_render::compose_ssr_with_shell(rendered_html, &shell_html)
         .map_err(SsrFallbackReason::Compose)
         .map(|composed| (composed, provenance))
@@ -9011,6 +9143,10 @@ mod ssr_session_tests {
         assert_eq!(
             SsrFallbackReason::ShellFetchFailed.as_skip_str(),
             "shell-fetch-failed"
+        );
+        assert_eq!(
+            SsrFallbackReason::BrowserShellBehind.as_skip_str(),
+            "browser-shell-behind"
         );
         // No served head — skip the upstream fetch entirely rather than
         // gambling the full EPR_DISPATCH_TIMEOUT_SECS wall. See the variant
