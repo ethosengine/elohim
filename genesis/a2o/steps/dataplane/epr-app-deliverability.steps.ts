@@ -526,7 +526,47 @@ Given(
     for (const doorway of DOORWAYS) {
       const storageUrl = storageUrlBehindDoorway(this, doorway);
       const head = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
-      assert.equal(head.status, 404, `${doorway}: fresh record unexpectedly had a release head`);
+      if (head.status === 404) continue;
+
+      assert.equal(head.status, 200, `${doorway}: fresh head read returned ${head.status}`);
+      const projected = (await head.json()) as {
+        headActionHash?: string;
+        declared?: boolean;
+        dhtAnchorHash?: string | null;
+        stagingCandidate?: string | null;
+        stagingCandidateBlobHash?: string | null;
+        stagingCandidateState?: string;
+      };
+      const contentResponse = await fetch(`${storageUrl}/db/content/${record.slug}`);
+      assert.equal(
+        contentResponse.status,
+        200,
+        `${doorway}: fresh content read returned ${contentResponse.status}`
+      );
+      const content = (await contentResponse.json()) as { dhtAnchorHash?: string | null };
+      assert.ok(content.dhtAnchorHash, `${doorway}: fresh content has no notarized anchor`);
+      assert.equal(
+        projected.headActionHash,
+        content.dhtAnchorHash,
+        `${doorway}: fresh head is neither absent nor the content's undeclared anchor fallback`
+      );
+      assert.equal(projected.declared, false, `${doorway}: fresh record has a declared release`);
+      assert.equal(
+        projected.dhtAnchorHash,
+        content.dhtAnchorHash,
+        `${doorway}: fresh head reports a different notarized anchor`
+      );
+      assert.equal(
+        projected.stagingCandidateState,
+        'none',
+        `${doorway}: fresh record does not have authoritative candidate absence`
+      );
+      assert.equal(projected.stagingCandidate, null, `${doorway}: fresh record has a candidate`);
+      assert.equal(
+        projected.stagingCandidateBlobHash,
+        null,
+        `${doorway}: fresh record has candidate bytes`
+      );
     }
   }
 );
