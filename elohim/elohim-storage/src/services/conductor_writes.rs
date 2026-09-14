@@ -41,6 +41,7 @@
 //! (Addendum 1 carries substrate-name corrections grounding this module.)
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::conductor_admission::AdmissionClass;
 use crate::error::StorageError;
@@ -341,8 +342,158 @@ pub async fn call_update_rea_commitment_state(
             "conductor_writes: encode UpdateReaCommitmentStateInput: {e}"
         ))
     })?;
-    hc.call_zome(ZOME_NAME, "update_rea_commitment_state", payload)
+    with_source_chain_head_moved_retry(&payload, |payload| {
+        hc.call_zome(ZOME_NAME, "update_rea_commitment_state", payload)
+    })
+    .await
+}
+
+/// Retry one authoritative commitment update after a strict source-chain
+/// compare-and-flush loses to another write on the same authored chain.
+///
+/// Holochain returns `HeadMoved` before committing the losing scratch, so the
+/// exact same encoded intent can safely restart and be signed again from the
+/// coordinator boundary. Four total attempts and 100/200/400 ms sleeps bound
+/// retry work and backoff; the existing admission behavior and upstream
+/// doorway deadline remain unchanged. Already-running WASM work remains
+/// uncancellable by the caller. Every other error returns immediately.
+async fn with_source_chain_head_moved_retry<F, Fut>(
+    payload: &[u8],
+    mut call: F,
+) -> Result<Vec<u8>, StorageError>
+where
+    F: FnMut(Vec<u8>) -> Fut,
+    Fut: std::future::Future<Output = Result<Vec<u8>, StorageError>>,
+{
+    const BACKOFFS: [Duration; 3] = [
+        Duration::from_millis(100),
+        Duration::from_millis(200),
+        Duration::from_millis(400),
+    ];
+
+    for (attempt, delay) in BACKOFFS.into_iter().enumerate() {
+        match call(payload.to_vec()).await {
+            Ok(output) => return Ok(output),
+            Err(error) if is_source_chain_head_moved(&error) => {
+                tracing::warn!(
+                    attempt = attempt + 1,
+                    max_attempts = BACKOFFS.len() + 1,
+                    delay_ms = delay.as_millis(),
+                    "update_rea_commitment_state source-chain conflict; retrying"
+                );
+                tokio::time::sleep(delay).await;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+
+    call(payload.to_vec()).await
+}
+
+fn is_source_chain_head_moved(error: &StorageError) -> bool {
+    let StorageError::Conductor(message) = error else {
+        return false;
+    };
+    message.contains("HeadMoved") || message.contains("source chain head has moved")
+}
+
+#[cfg(test)]
+mod source_chain_retry_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Mutex;
+
+    fn head_moved() -> StorageError {
+        StorageError::Conductor("Zome call failed: SourceChainError::HeadMoved".into())
+    }
+
+    #[test]
+    fn recognizes_both_conductor_head_moved_spellings() {
+        assert!(is_source_chain_head_moved(&head_moved()));
+        assert!(is_source_chain_head_moved(&StorageError::Conductor(
+            "source chain head has moved since the zome call began".into(),
+        )));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn head_moved_restarts_once_with_the_exact_same_input() {
+        let calls = AtomicUsize::new(0);
+        let payloads = Mutex::new(Vec::new());
+        let input = b"same-authoritative-update";
+
+        let output = with_source_chain_head_moved_retry(input, |payload| {
+            payloads.lock().unwrap().push(payload);
+            let attempt = calls.fetch_add(1, Ordering::SeqCst);
+            async move {
+                if attempt == 0 {
+                    Err(head_moved())
+                } else {
+                    Ok(b"signed-success".to_vec())
+                }
+            }
+        })
         .await
+        .unwrap();
+
+        assert_eq!(output, b"signed-success");
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert_eq!(
+            payloads.into_inner().unwrap(),
+            vec![input.to_vec(), input.to_vec()]
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_non_conflict_503_returns_after_one_call() {
+        let calls = AtomicUsize::new(0);
+        let error = with_source_chain_head_moved_retry(b"input", |_| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            async {
+                Err(StorageError::Conductor(
+                    "Zome call failed: HTTP 503 Service Unavailable".into(),
+                ))
+            }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(error.to_string().contains("503 Service Unavailable"));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn head_moved_text_outside_a_conductor_error_is_not_retried() {
+        let calls = AtomicUsize::new(0);
+        let error = with_source_chain_head_moved_retry(b"input", |_| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            async {
+                Err(StorageError::InvalidInput(
+                    "HeadMoved is not an input".into(),
+                ))
+            }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert!(matches!(error, StorageError::InvalidInput(_)));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn repeated_head_moves_exhaust_four_attempts_and_seven_hundred_milliseconds_backoff() {
+        let calls = AtomicUsize::new(0);
+        let started = tokio::time::Instant::now();
+        let error = with_source_chain_head_moved_retry(b"input", |_| {
+            calls.fetch_add(1, Ordering::SeqCst);
+            async { Err(head_moved()) }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(calls.load(Ordering::SeqCst), 4);
+        assert_eq!(started.elapsed(), Duration::from_millis(700));
+        assert!(error.to_string().contains("HeadMoved"));
+    }
 }
 
 /// Round-trip `create_content` through the local conductor (lamad role).

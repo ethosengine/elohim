@@ -1499,12 +1499,18 @@ pub fn stamp_declared_head(
 /// How a declared-head stamp may interact with an already-declared row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StampMode {
-    /// Deliberate canonical-channel stamp (declare route, canonical-head
-    /// propagation, own-conductor `ContentHeadDeclared` signal): always
-    /// writes. These channels are request-borne or own-authored — moving a
+    /// Deliberate canonical-channel stamp (declare route and canonical-head
+    /// propagation): always writes. These channels carry a deliberate
+    /// declaration or a verified authority answer — moving a
     /// declared head (including deliberately BACKWARDS: revert is a
     /// legitimate authority act on a version DAG) is exactly their job.
     Declare,
+    /// An asynchronous declaration signal carrying no election ordering.
+    /// Legacy rows with no stored ordering retain their historical behavior,
+    /// while a delayed signal cannot move a head already backed by an ordered
+    /// canonical election. The request path remains the deliberate `Declare`;
+    /// modern cross-root signals carry ordering and use `HealCanonical`.
+    LegacySignal,
     /// Heal stamp for a CANONICAL conductor answer (projection-reconcile with
     /// `ContentHeadWire.canonical == true`): fills an undeclared row,
     /// refreshes the same head, and may MOVE a declared row only when the
@@ -1693,6 +1699,31 @@ pub fn stamp_declared_head_mode(
     mode: StampMode,
     canonical_ordering: Option<CanonicalOrdering>,
 ) -> Result<StampOutcome, StorageError> {
+    conn.transaction(|conn| {
+        stamp_declared_head_mode_transaction(
+            conn,
+            ctx,
+            id,
+            head_action_hash,
+            declared_at,
+            patch,
+            mode,
+            canonical_ordering,
+        )
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stamp_declared_head_mode_transaction(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    declared_at: Option<i64>,
+    patch: Option<ContentProjectionPatch>,
+    mode: StampMode,
+    canonical_ordering: Option<CanonicalOrdering>,
+) -> Result<StampOutcome, StorageError> {
     use diesel::dsl::sql;
     use diesel::sql_types::Text;
 
@@ -1736,6 +1767,12 @@ pub fn stamp_declared_head_mode(
 
     match mode {
         StampMode::Declare => {}
+        StampMode::LegacySignal => {
+            if moving_declared_row && stored_ordering.is_some() {
+                crate::metrics::inc_projection_refused_stale(StaleReason::StoredNull.label());
+                return Ok(StampOutcome::SkippedStale);
+            }
+        }
         StampMode::GapFill => {
             if moving_declared_row {
                 return Ok(StampOutcome::SkippedDeclared);
@@ -5074,6 +5111,138 @@ mod tests {
         )
         .unwrap();
         assert_eq!(back, StampOutcome::SkippedStale);
+    }
+
+    #[test]
+    fn a_delayed_unordered_signal_cannot_roll_back_an_ordered_head() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-delayed-signal")).unwrap();
+
+        let declared = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-delayed-signal",
+            "uhCkk-browser-b",
+            Some(2_000),
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-browser-b".into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((2_000, true)),
+        )
+        .unwrap();
+        assert_eq!(declared, StampOutcome::Stamped);
+
+        let delayed = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-delayed-signal",
+            "uhCkk-browser-a",
+            None,
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-browser-a".into()),
+                ..Default::default()
+            }),
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(delayed, StampOutcome::SkippedStale);
+
+        let row = get_content(&mut conn, &ctx, "cid-delayed-signal", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-browser-b")
+        );
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser-b"));
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-b"));
+        assert_eq!(row.canonical_declared_at, Some(2_000));
+
+        // Backward compatibility: before a row has an election clock, its
+        // own legacy signal remains a deliberate declaration channel.
+        let mut legacy = mk_plain("cid-legacy-signal");
+        legacy.blob_hash = Some("sha256-browser-a".into());
+        create_content(&mut conn, &ctx, legacy).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-legacy-signal",
+            "uhCkk-browser-a",
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "cid-legacy-signal",
+                "uhCkk-browser-b",
+                None,
+                None,
+                StampMode::LegacySignal,
+                None,
+            )
+            .unwrap(),
+            StampOutcome::Stamped
+        );
+    }
+
+    #[test]
+    fn a_late_stamp_failure_rolls_back_the_head_and_pointer_together() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mut original = mk_plain("cid-atomic-stamp");
+        original.blob_hash = Some("sha256-browser-a".into());
+        create_content(&mut conn, &ctx, original).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-atomic-stamp",
+            "uhCkk-browser-a",
+            None,
+            None,
+        )
+        .unwrap();
+
+        // Fail after the head UPDATE but before election bookkeeping. Without
+        // the enclosing transaction this leaves a torn B head/pointer behind.
+        diesel::sql_query(
+            "CREATE TRIGGER reject_ordering_update \
+             BEFORE UPDATE OF canonical_declared_at ON content \
+             BEGIN SELECT RAISE(ABORT, 'test ordering failure'); END",
+        )
+        .execute(&mut conn)
+        .unwrap();
+        let result = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-atomic-stamp",
+            "uhCkk-browser-b",
+            Some(2_000),
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-browser-b".into()),
+                ..Default::default()
+            }),
+            StampMode::Declare,
+            Some((2_000, true)),
+        );
+        assert!(result.is_err(), "the injected late write must fail");
+
+        let row = get_content(&mut conn, &ctx, "cid-atomic-stamp", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-browser-a")
+        );
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-browser-a"));
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-a"));
+        assert!(row.canonical_declared_at.is_none());
     }
 
     /// The pure rule, exhaustively — every ordered pair of (election, no

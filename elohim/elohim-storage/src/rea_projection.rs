@@ -829,9 +829,14 @@ pub fn handle_rea_signal(
             // declaration carries only the action, not content fields.
             // Cross-root signals carry the exact winning link ordering and
             // replay the canonical heal guard. Legacy/single-author signals
-            // carry neither ordering field and retain the preexisting explicit
-            // declaration behavior. A half-present pair is malformed and must
-            // not move the row.
+            // carry neither ordering field: they may fill, refresh, or move an
+            // unordered legacy head, but may not move an ordered head. Modern
+            // cross-root declarations carry their election ordering here, so a
+            // legitimate direct-conductor winner still advances through the
+            // ordered arm. The independent projection-reconcile sweep also
+            // re-reads this node's authenticated conductor election; this
+            // projection signal never becomes the authority answer. A
+            // half-present pair is malformed and must not move the row.
             let stamped = match (canonical_declared_at, canonical_earned) {
                 (Some(at), Some(earned)) => content_diesel::stamp_declared_head_mode(
                     &mut conn,
@@ -843,20 +848,16 @@ pub fn handle_rea_signal(
                     content_diesel::StampMode::HealCanonical,
                     Some((at, earned)),
                 )?,
-                (None, None) => {
-                    if content_diesel::stamp_declared_head(
-                        &mut conn,
-                        ctx,
-                        &content_id,
-                        head_action_hash.as_str(),
-                        None,
-                        None,
-                    )? {
-                        content_diesel::StampOutcome::Refreshed
-                    } else {
-                        content_diesel::StampOutcome::NoRow
-                    }
-                }
+                (None, None) => content_diesel::stamp_declared_head_mode(
+                    &mut conn,
+                    ctx,
+                    &content_id,
+                    head_action_hash.as_str(),
+                    None,
+                    None,
+                    content_diesel::StampMode::LegacySignal,
+                    None,
+                )?,
                 _ => {
                     tracing::warn!(
                         id = %content_id,
@@ -942,6 +943,91 @@ pub fn try_handle_signal(
 mod tests {
     use super::*;
     use crate::signals::SignalDecodeMiss;
+
+    fn content_signal_test_pool() -> DbPool {
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::SqliteConnection;
+
+        let url = format!(
+            "file:content_signal_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(url))
+            .expect("pool");
+        crate::db::run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    #[test]
+    fn delayed_legacy_head_signal_cannot_roll_back_an_ordered_projection() {
+        let pool = content_signal_test_pool();
+        let ctx = AppContext::default_lamad();
+        let mut conn = pool.get().expect("connection");
+        crate::db::content_diesel::create_content(
+            &mut conn,
+            &ctx,
+            crate::db::content_diesel::CreateContentInput {
+                id: "signal-ordered-head".into(),
+                title: "signal-ordered-head".into(),
+                description: None,
+                content_type: "concept".into(),
+                content_format: "markdown".into(),
+                blob_hash: Some("sha256-browser-b".into()),
+                blob_cid: Some("sha256-browser-b".into()),
+                content_size_bytes: Some(10),
+                metadata_json: Some("{}".into()),
+                reach: "commons".into(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .expect("seed row");
+        crate::db::content_diesel::stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "signal-ordered-head",
+            "uhCkk-browser-b",
+            Some(2_000),
+            None,
+            crate::db::content_diesel::StampMode::HealCanonical,
+            Some((2_000, true)),
+        )
+        .expect("ordered stamp");
+        drop(conn);
+
+        handle_rea_signal(
+            ReaProjectionSignal::ContentHeadDeclared {
+                content_id: "signal-ordered-head".into(),
+                head_action_hash: HoloHashB64("uhCkk-browser-a".into()),
+                entry_hash: None,
+                author: None,
+                canonical_declared_at: None,
+                canonical_earned: None,
+            },
+            &pool,
+            &ctx,
+        )
+        .expect("legacy signal is handled");
+
+        let mut conn = pool.get().expect("connection");
+        let row = crate::db::content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "signal-ordered-head",
+            crate::db::content_diesel::MinTrust::Invisible,
+        )
+        .expect("read row")
+        .expect("row exists");
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-browser-b")
+        );
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-b"));
+    }
 
     /// THE 2026-06-13 root-cause regression test (REA arm): decode the signal
     /// from the REAL conductor wire — MessagePack (`ExternIO`), where
