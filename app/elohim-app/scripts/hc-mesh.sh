@@ -537,6 +537,38 @@ process_start_ticks() { # <pid> — guards a persisted pid against PID reuse
   sed 's/^[^)]*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'
 }
 
+conductor_pid_has_owned_config() { # <pid> [peer-name]
+  local pid="$1" only_name="${2:-}" cwd="" value="" canonical_value name
+  local -a argv=()
+  local i
+  [ -r "/proc/$pid/cmdline" ] || return 1
+  mapfile -d '' -t argv < "/proc/$pid/cmdline" 2>/dev/null || return 1
+  for ((i = 0; i < ${#argv[@]}; i++)); do
+    value=""
+    case "${argv[$i]}" in
+      --config-path|-c)
+        [ $((i + 1)) -lt ${#argv[@]} ] || continue
+        value="${argv[$((i + 1))]}"
+        ;;
+      --config-path=*)
+        value="${argv[$i]#--config-path=}"
+        ;;
+    esac
+    [ -n "$value" ] || continue
+    if [[ "$value" = /* ]]; then
+      canonical_value="$(readlink -m "$value")"
+    else
+      [ -n "$cwd" ] || cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)" || return 1
+      canonical_value="$(readlink -m "$cwd/$value")"
+    fi
+    for name in "${PEERS[@]}"; do
+      [ -z "$only_name" ] || [ "$name" = "$only_name" ] || continue
+      [ "$canonical_value" = "$(readlink -m "$LOCAL_DEV_DIR/$name/conductor-config.yaml")" ] && return 0
+    done
+  done
+  return 1
+}
+
 live_pids_in_registry() { # <pid-dir> — read-only, validates PID + start ticks
   local dir="$1" file pid started current
   [ -d "$dir" ] || return 0
@@ -1247,7 +1279,7 @@ refresh_mesh_pidfiles() {
 # process ownership; candidates still have to be the holochain executable and
 # carry this peer's exact config path.
 conductor_pid_for_index() { # <peer-name> <peer-index>
-  local name="$1" index="$2" pid raw
+  local name="$1" index="$2" pid
   pid="$(listener_pids_for_ports "$(admin_port "$index")" | head -1)"
   if [ -n "$pid" ]; then
     echo "$pid"
@@ -1255,8 +1287,7 @@ conductor_pid_for_index() { # <peer-name> <peer-index>
   fi
   while IFS= read -r pid; do
     [ -n "$pid" ] || continue
-    raw="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null)"
-    [[ "$raw" == *"$LOCAL_DEV_DIR/$name/conductor-config.yaml"* ]] || continue
+    conductor_pid_has_owned_config "$pid" "$name" || continue
     echo "$pid"
     return 0
   done < <(pgrep -x holochain 2>/dev/null)
@@ -2318,7 +2349,7 @@ fallback_pattern_pids() {
     cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null)"
     owned=0
     case "$exe" in
-      holochain) [[ "$args" == *"$LOCAL_DEV_DIR/"*"/conductor-config.yaml"* ]] && owned=1 ;;
+      holochain) conductor_pid_has_owned_config "$pid" && owned=1 ;;
       hc) [ "$cwd" = "$LOCAL_DEV_DIR" ] && [[ "$args" == *" sandbox "*" run"* ]] && owned=1 ;;
       elohim-storage)
         while IFS= read -r port; do
@@ -3059,13 +3090,48 @@ print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswi
 }
 
 conductor_restart_pids() {
-  # Reuse the shutdown ownership checks: /proc/exe plus this household's
-  # config path (holochain) or working directory (hc), never argv text alone.
-  local pid exe
+  # Prefer the listener pid recorded with its process start ticks. A retained
+  # conductor artifact may carry its source revision in the executable name,
+  # so basename `holochain` is not an ownership invariant. The exact peer config
+  # still binds that recorded process to this household rather than another
+  # workspace using the same binary.
+  local name pid exe selected_bin="" proc_exe
+  declare -A seen=()
+  for name in "${PEERS[@]}"; do
+    pid="$(live_recorded_pid conductor "$name" 2>/dev/null || true)"
+    [ -n "$pid" ] || continue
+    conductor_pid_has_owned_config "$pid" "$name" || continue
+    seen["$pid"]=1
+    echo "$pid"
+  done
+
+  # An explicitly selected retained artifact is equally strong executable
+  # evidence, including before a legacy mesh has refreshed its PID registry.
+  # Enumerate /proc so version-named binaries do not depend on pgrep's basename
+  # rules, then require a config beneath this exact household root.
+  if [ -n "${HOLOCHAIN_BIN:-}" ]; then
+    selected_bin="$(readlink -f "$HOLOCHAIN_BIN" 2>/dev/null || true)"
+  fi
+  if [ -n "$selected_bin" ]; then
+    for proc_exe in /proc/[0-9]*/exe; do
+      pid="${proc_exe#/proc/}"; pid="${pid%/exe}"
+      [ -z "${seen[$pid]:-}" ] || continue
+      exe="$(readlink "$proc_exe" 2>/dev/null)" || continue
+      exe="${exe% (deleted)}"
+      [ "$exe" = "$selected_bin" ] || continue
+      conductor_pid_has_owned_config "$pid" || continue
+      seen["$pid"]=1
+      echo "$pid"
+    done
+  fi
+
+  # Preserve the validated legacy fallback for stock-named conductors and hc
+  # supervisors, deduplicating anything already selected above.
   while IFS= read -r pid; do
+    [ -z "${seen[$pid]:-}" ] || continue
     exe="$(readlink "/proc/$pid/exe" 2>/dev/null)" || continue
     exe="${exe% (deleted)}"; exe="${exe##*/}"
-    case "$exe" in holochain|hc) echo "$pid" ;; esac
+    case "$exe" in holochain|hc) seen["$pid"]=1; echo "$pid" ;; esac
   done < <(fallback_pattern_pids)
 }
 

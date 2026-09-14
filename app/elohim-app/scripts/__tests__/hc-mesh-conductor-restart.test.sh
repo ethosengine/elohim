@@ -33,6 +33,8 @@ mkdir -p "$LOCAL_DEV_DIR/unit" "$foreign_dir/unit" "$bin_dir"
 : > "$LOCAL_DEV_DIR/unit/conductor-config.yaml"
 : > "$foreign_dir/unit/conductor-config.yaml"
 cp /bin/bash "$bin_dir/holochain"
+cp /bin/bash "$bin_dir/holochain-8591d6c20248"
+cp /bin/bash "$bin_dir/holochain-25dd0"
 cp /bin/bash "$bin_dir/hc"
 cp "$(command -v tail)" "$bin_dir/awk"
 
@@ -49,11 +51,17 @@ start_shell_fixture() { # <exe> <cwd> <argv...>
   pids+=("$started_pid")
 }
 
-# Two owned conductors: a direct holochain names this household's config, and
-# an hc supervisor runs from this household root with the expected argv shape.
-start_shell_fixture "$bin_dir/holochain" "$tmp" holochain \
-  --config-path "$LOCAL_DEV_DIR/unit/conductor-config.yaml"
-owned_holochain=$started_pid
+# Three owned conductors: a recorded retained artifact and an unrecorded one
+# both name this household's config, while an hc supervisor runs from the
+# household root with the expected argv shape.
+start_shell_fixture "$bin_dir/holochain-8591d6c20248" "$tmp" holochain \
+  -c "$LOCAL_DEV_DIR/unit/conductor-config.yaml"
+owned_recorded_holochain=$started_pid
+record_mesh_pid conductor unit "$owned_recorded_holochain"
+HOLOCHAIN_BIN="$bin_dir/holochain-25dd0"
+start_shell_fixture "$HOLOCHAIN_BIN" "$tmp" holochain \
+  --config-path="$LOCAL_DEV_DIR/unit/conductor-config.yaml"
+owned_explicit_holochain=$started_pid
 start_shell_fixture "$bin_dir/hc" "$LOCAL_DEV_DIR" hc sandbox fixture run
 owned_hc=$started_pid
 
@@ -64,6 +72,15 @@ start_shell_fixture "$bin_dir/holochain" "$tmp" holochain \
 foreign_holochain=$started_pid
 start_shell_fixture "$bin_dir/hc" "$foreign_dir" hc sandbox fixture run
 foreign_hc=$started_pid
+start_shell_fixture "$HOLOCHAIN_BIN" "$tmp" holochain \
+  --config-path "$foreign_dir/unit/conductor-config.yaml"
+foreign_versioned_holochain=$started_pid
+start_shell_fixture "$HOLOCHAIN_BIN" "$tmp" holochain \
+  --config-path "$LOCAL_DEV_DIR/unit/conductor-config.yaml.other"
+suffix_versioned_holochain=$started_pid
+start_shell_fixture "$HOLOCHAIN_BIN" "$tmp" holochain \
+  --diagnostic "$LOCAL_DEV_DIR/unit/conductor-config.yaml"
+argument_versioned_holochain=$started_pid
 
 # These argv strings nominate candidates for the old process-text search, but
 # /proc/exe proves neither process is a conductor executable.
@@ -90,12 +107,17 @@ set -o pipefail
 selected="$(conductor_restart_pids | sort -n)"; selected_rc=$?
 t "helper succeeds under inherited pipefail" '[ "$selected_rc" -eq 0 ]'
 t "no conductor candidates is a clean empty selection" \
-  '( fallback_pattern_pids() { return 0; }; empty="$(conductor_restart_pids)"; [ $? -eq 0 ] && [ -z "$empty" ]; )'
-t "owned holochain config is selected" 'grep -qx "$owned_holochain" <<<"$selected"'
+  '( PID_DIR="$tmp/empty-pids"; HOLOCHAIN_BIN=""; fallback_pattern_pids() { return 0; }; empty="$(conductor_restart_pids)"; [ $? -eq 0 ] && [ -z "$empty" ]; )'
+t "recorded version-named conductor using -c is selected" \
+  'grep -qx "$owned_recorded_holochain" <<<"$selected"'
+t "explicit version-named conductor is selected before registry refresh" \
+  'grep -qx "$owned_explicit_holochain" <<<"$selected"'
 t "owned hc supervisor cwd is selected" 'grep -qx "$owned_hc" <<<"$selected"'
-t "only the two owned conductor processes are selected" '[ "$(wc -w <<<"$selected")" -eq 2 ]'
+t "only the three owned conductor processes are selected" '[ "$(wc -w <<<"$selected")" -eq 3 ]'
 t "foreign-household conductor executables are excluded" \
-  '! grep -qx "$foreign_holochain" <<<"$selected" && ! grep -qx "$foreign_hc" <<<"$selected"'
+  '! grep -qx "$foreign_holochain" <<<"$selected" && ! grep -qx "$foreign_hc" <<<"$selected" && ! grep -qx "$foreign_versioned_holochain" <<<"$selected"'
+t "config suffix and unrelated-argument decoys are excluded" \
+  '! grep -qx "$suffix_versioned_holochain" <<<"$selected" && ! grep -qx "$argument_versioned_holochain" <<<"$selected"'
 t "argv-only sleep and awk decoys are excluded" \
   '! grep -qx "$sleep_decoy" <<<"$selected" && ! grep -qx "$awk_decoy" <<<"$selected"'
 t "selection does not stop any fixture process" \
