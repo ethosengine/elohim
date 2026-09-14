@@ -43,7 +43,13 @@
  * carries. {@link meshConductorPorts} is the one derivation both this module's
  * callers use, so a mesh-layout change lands in one place.
  */
-import { AdminWebsocket, AppWebsocket, encodeHashToBase64, type CellId } from '@holochain/client';
+import {
+  AdminWebsocket,
+  AppWebsocket,
+  encodeHashToBase64,
+  getSigningCredentials,
+  type CellId,
+} from '@holochain/client';
 
 /** The app id every household-mesh conductor installs. */
 export const MESH_APP_ID = 'elohim';
@@ -128,6 +134,42 @@ export interface CarriedElectionRail {
   close: () => Promise<void>;
 }
 
+const SIGNING_AUTH_BACKOFFS_MS = [100, 200, 400] as const;
+
+/**
+ * Mint signing credentials once for this exact, currently provisioned cell.
+ * The Holochain client keys its process-global cache by the complete CellId;
+ * the caller has just resolved that cell through a live admin connection.
+ */
+export async function authorizeSigningCredentialsWithRetry(
+  cell: CellId,
+  authorize: (cell: CellId) => Promise<void>,
+  cached: (cell: CellId) => unknown = getSigningCredentials,
+  sleep: (milliseconds: number) => Promise<void> = async milliseconds => {
+    await new Promise(resolve => setTimeout(resolve, milliseconds));
+  }
+): Promise<void> {
+  if (cached(cell)) return;
+  for (const delay of SIGNING_AUTH_BACKOFFS_MS) {
+    try {
+      await authorize(cell);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        !message.includes('source chain head has moved') &&
+        !/(?:^|[:(\s])HeadMoved(?:$|[:,)\s])/.test(message)
+      ) {
+        throw error;
+      }
+      await sleep(delay);
+      if (cached(cell)) return;
+    }
+  }
+  if (cached(cell)) return;
+  await authorize(cell);
+}
+
 /**
  * Connect to one household-mesh conductor and return its `content_store` rail.
  *
@@ -170,7 +212,9 @@ export async function connectConductor(
         `(roles seen: ${[...cells.keys()].join(', ') || 'none'})`
     );
   }
-  await admin.authorizeSigningCredentials(cell);
+  await authorizeSigningCredentialsWithRetry(cell, async candidate => {
+    await admin.authorizeSigningCredentials(candidate);
+  });
   const appWs = await AppWebsocket.connect({
     url: new URL(`ws://127.0.0.1:${appPort}`),
     token: (await admin.issueAppAuthenticationToken({ installed_app_id: app.installed_app_id }))
