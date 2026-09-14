@@ -744,37 +744,96 @@ When(
   }
 );
 
+interface BundleServeObservation {
+  doorway: string;
+  expected: { entryScript: string; commit: string };
+  root?: {
+    status: number;
+    entryScriptPresent: boolean;
+    bundle?: string;
+    reason?: string;
+    bodyPrefix?: string;
+  };
+  asset?: { status: number };
+  version?: { status: number; commit?: string; parseError?: string };
+  requestError?: string;
+}
+
 async function hostnameServesBundle(
   doorwayUrl: string,
   hostname: string,
-  bundle: FixtureBundle
+  bundle: FixtureBundle,
+  observe: (observation: BundleServeObservation) => void
 ): Promise<boolean> {
   const headers = { Host: hostname };
-  const root = await getRawWithHeaders(`${doorwayUrl}/`, { headers });
-  if (root.status < 200 || root.status >= 300 || !root.text.includes(bundle.entryScript))
-    return false;
-  const asset = await getRawWithHeaders(`${doorwayUrl}/${bundle.entryScript}`, { headers });
-  if (asset.status < 200 || asset.status >= 300) return false;
-  const version = await getRawWithHeaders(`${doorwayUrl}/version.json`, { headers });
-  if (version.status < 200 || version.status >= 300) return false;
-  return (JSON.parse(version.text) as { commit?: string }).commit === bundle.stamp;
+  const observation: BundleServeObservation = {
+    doorway: doorwayUrl,
+    expected: { entryScript: bundle.entryScript, commit: bundle.stamp },
+  };
+  try {
+    const root = await getRawWithHeaders(`${doorwayUrl}/`, { headers });
+    observation.root = {
+      status: root.status,
+      entryScriptPresent: root.text.includes(bundle.entryScript),
+      bundle: root.headers['x-elohim-bundle'],
+      reason: root.headers['x-deliverability-reason'],
+      ...(root.status < 200 || root.status >= 300 ? { bodyPrefix: root.text.slice(0, 160) } : {}),
+    };
+    observe(observation);
+    if (root.status < 200 || root.status >= 300 || !observation.root.entryScriptPresent) {
+      return false;
+    }
+
+    const asset = await getRawWithHeaders(`${doorwayUrl}/${bundle.entryScript}`, { headers });
+    observation.asset = { status: asset.status };
+    observe(observation);
+    if (asset.status < 200 || asset.status >= 300) return false;
+
+    const version = await getRawWithHeaders(`${doorwayUrl}/version.json`, { headers });
+    observation.version = { status: version.status };
+    observe(observation);
+    if (version.status < 200 || version.status >= 300) return false;
+    try {
+      observation.version.commit = (JSON.parse(version.text) as { commit?: string }).commit;
+    } catch (error) {
+      observation.version.parseError = error instanceof Error ? error.message : String(error);
+      observe(observation);
+      throw error;
+    }
+    observe(observation);
+    return observation.version.commit === bundle.stamp;
+  } catch (error) {
+    if (!observation.version?.parseError) {
+      observation.requestError = error instanceof Error ? error.message : String(error);
+      observe(observation);
+    }
+    throw error;
+  }
 }
 
 async function bothDoorwaysServe(
   hostname: string,
   bundle: FixtureBundle,
   timeoutMs = CONVERGENCE_BOUND_MS
-): Promise<boolean> {
+): Promise<{ ok: boolean; last: BundleServeObservation[] }> {
   const deadline = Date.now() + timeoutMs;
+  const last: BundleServeObservation[] = [];
   const results = await Promise.all(
-    DOORWAYS.map(async doorway =>
+    DOORWAYS.map(async (doorway, index) =>
       pollUntil(
-        async () => hostnameServesBundle(resolvePeerUrl(doorway), hostname, bundle),
+        async () =>
+          hostnameServesBundle(resolvePeerUrl(doorway), hostname, bundle, observation => {
+            last[index] = { ...observation };
+          }),
         Math.max(0, deadline - Date.now())
       )
     )
   );
-  return results.every(Boolean);
+  return { ok: results.every(Boolean), last };
+}
+
+function bundleServeFailure(message: string, result: { last: BundleServeObservation[] }): string {
+  return `${message}; last observations: ${JSON.stringify(result.last)}`;
 }
 
 Then(
@@ -783,10 +842,14 @@ Then(
   async function (this: E2EWorld) {
     const record = app(this);
     assert.ok(record.publicHostname, 'public hostname absent');
+    const result = await bothDoorwaysServe(record.publicHostname, requireBundle(this));
     assert.equal(
-      await bothDoorwaysServe(record.publicHostname, requireBundle(this)),
+      result.ok,
       true,
-      'public hostname did not serve the exact earned HTML, asset, and version stamp'
+      bundleServeFailure(
+        'public hostname did not serve the exact earned HTML, asset, and version stamp',
+        result
+      )
     );
   }
 );
@@ -797,10 +860,14 @@ Then(
   async function (this: E2EWorld) {
     const record = app(this);
     assert.ok(record.candidateHostname, 'candidate hostname absent');
+    const result = await bothDoorwaysServe(record.candidateHostname, requireBundle(this));
     assert.equal(
-      await bothDoorwaysServe(record.candidateHostname, requireBundle(this)),
+      result.ok,
       true,
-      'candidate hostname did not serve the exact staged HTML, asset, and version stamp'
+      bundleServeFailure(
+        'candidate hostname did not serve the exact staged HTML, asset, and version stamp',
+        result
+      )
     );
   }
 );
@@ -811,10 +878,11 @@ Then(
   async function (this: E2EWorld) {
     const record = app(this);
     assert.ok(record.publicHostname && record.earnedBundle, 'earned hostname/version absent');
+    const result = await bothDoorwaysServe(record.publicHostname, record.earnedBundle);
     assert.equal(
-      await bothDoorwaysServe(record.publicHostname, record.earnedBundle),
+      result.ok,
       true,
-      'candidate publication disturbed the exact earned public version'
+      bundleServeFailure('candidate publication disturbed the exact earned public version', result)
     );
   }
 );
@@ -916,10 +984,11 @@ Then(
   async function (this: E2EWorld) {
     const record = app(this);
     assert.ok(record.publicHostname, 'public hostname absent');
+    const result = await bothDoorwaysServe(record.publicHostname, requireBundle(this));
     assert.equal(
-      await bothDoorwaysServe(record.publicHostname, requireBundle(this)),
+      result.ok,
       true,
-      'public hostname did not follow the newly earned version'
+      bundleServeFailure('public hostname did not follow the newly earned version', result)
     );
   }
 );
