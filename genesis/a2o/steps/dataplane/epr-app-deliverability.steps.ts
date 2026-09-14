@@ -1104,7 +1104,7 @@ When(
     }
     const storageUrl = resolveStorageUrl('alpha-A');
     assert.ok(storageUrl, 'no direct storage URL for peer "alpha-A" — set E2E_STORAGE_URL');
-    const response = await fetch(`${storageUrl}/db/content/${record.slug}`, {
+    const response = await postFixtureCommitment(`${storageUrl}/db/content/${record.slug}`, {
       method: 'PATCH',
       headers: {
         'content-type': 'application/json',
@@ -1114,12 +1114,17 @@ When(
     });
     assert.ok(
       response.ok,
-      `could not force the incoherent head onto "${record.slug}": ${response.status} ${await response.text()}`
+      `could not force the incoherent head onto "${record.slug}": ${response.status} ${response.text}`
     );
     // Match the publisher's canonical declaration too. A projection-only PATCH
     // is correctly healed back to the prior canonical head and proves nothing.
     const rowResponse = await fetch(`${storageUrl}/db/content/${record.slug}`);
-    const row = (await rowResponse.json()) as { dhtAnchorHash?: string };
+    const row = (await rowResponse.json()) as { blobHash?: string; dhtAnchorHash?: string };
+    assert.equal(
+      row.blobHash,
+      record.brokenBlobHash,
+      `the forced head for "${record.slug}" did not resolve to the staged incoherent blob`
+    );
     assert.ok(row.dhtAnchorHash, 'the forced head has no notarized action to declare');
     const canonical = await fetch(`${storageUrl}/db/content/${record.slug}/canonical-head`, {
       method: 'POST',

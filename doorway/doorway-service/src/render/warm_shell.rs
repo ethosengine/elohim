@@ -396,6 +396,10 @@ impl ShellOutcome {
 pub struct WarmShellStore {
     hot: RwLock<HashMap<String, WarmShell>>,
     archive: Option<Arc<dyn ShellArchive>>,
+    /// The already-accepted converged browser head. When present this outranks
+    /// the asynchronously refreshed archive projection, which may briefly
+    /// replay an older row after the head reconciler has accepted a successor.
+    accepted_heads: Option<Arc<crate::render::bundle_heads::BundleHeadStore>>,
     /// Last upstream upgrade attempt per `{slug}:{file_path}` — the
     /// [`SHELL_UPGRADE_RETRY_SECS`] rate limit's only state.
     upgrade_attempts: RwLock<HashMap<String, std::time::Instant>>,
@@ -415,6 +419,7 @@ impl WarmShellStore {
         Self {
             hot: RwLock::new(HashMap::new()),
             archive,
+            accepted_heads: None,
             upgrade_attempts: RwLock::new(HashMap::new()),
             oracle: None,
             coherence: RwLock::new(HashMap::new()),
@@ -430,6 +435,30 @@ impl WarmShellStore {
             oracle,
             ..Self::new(archive)
         }
+    }
+
+    /// Production store: archive bytes classified against the converged head
+    /// already accepted by the bundle-head reconciler.
+    pub fn with_oracle_and_heads(
+        archive: Option<Arc<dyn ShellArchive>>,
+        oracle: Option<Arc<dyn CoherenceOracle>>,
+        accepted_heads: Arc<crate::render::bundle_heads::BundleHeadStore>,
+    ) -> Self {
+        Self {
+            accepted_heads: Some(accepted_heads),
+            ..Self::with_oracle(archive, oracle)
+        }
+    }
+
+    async fn declared_head(&self, slug: &str, archive: &Arc<dyn ShellArchive>) -> Option<String> {
+        if let Some(observed) = self
+            .accepted_heads
+            .as_ref()
+            .and_then(|heads| heads.get(slug))
+        {
+            return observed.browser;
+        }
+        archive.declared_blob_hash(slug).await
     }
 
     /// True when this store can judge deliverability, not merely provenance.
@@ -625,7 +654,7 @@ impl WarmShellStore {
         };
         let mut hydrated = 0usize;
         for (slug, entry_file) in targets {
-            let declared = archive.declared_blob_hash(slug).await;
+            let declared = self.declared_head(slug, archive).await;
             let found = match &declared {
                 Some(hash) => match archive.load(slug, entry_file, hash).await {
                     Some(a) => Some(a),
@@ -683,7 +712,7 @@ impl WarmShellStore {
             // Inert store: nothing warm, so the caller takes today's path.
             return (WarmClass::Cold, None, None);
         };
-        let declared = archive.declared_blob_hash(slug).await;
+        let declared = self.declared_head(slug, archive).await;
 
         if let Some(head) = declared.as_deref() {
             // `head_bound` is the load-bearing half of each test: bytes merely

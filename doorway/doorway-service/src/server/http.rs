@@ -1118,11 +1118,16 @@ impl AppState {
         // shell served from THIS archive — which outlives the pod — instead of a
         // per-request upstream fetch that a catching-up peer cannot answer.
         // Boot-hydrated in main.rs once the EPR router knows its mounts.
-        let warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(
-            app_file_cache
-                .clone()
-                .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
-        ));
+        let renderer_registry = crate::render::registry::RendererRegistry::from_env();
+        let warm_shell = Arc::new(
+            crate::render::warm_shell::WarmShellStore::with_oracle_and_heads(
+                app_file_cache
+                    .clone()
+                    .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
+                None,
+                renderer_registry.bundle_heads(),
+            ),
+        );
 
         Ok(Self {
             args,
@@ -1171,7 +1176,7 @@ impl AppState {
             app_file_cache,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
-            renderer_registry: crate::render::registry::RendererRegistry::from_env(),
+            renderer_registry,
             // Warm-boot shell cache over the Mongo archive that already holds
             // the last reconciled bundle. Hydrated at boot in main.rs.
             warm_shell,
@@ -1280,12 +1285,15 @@ impl AppState {
             .storage_url
             .as_ref()
             .map(|url| crate::render::coherence::StorageCoherenceProbe::shared(url.clone()));
-        self.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::with_oracle(
-            self.app_file_cache
-                .clone()
-                .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
-            oracle,
-        ));
+        self.warm_shell = Arc::new(
+            crate::render::warm_shell::WarmShellStore::with_oracle_and_heads(
+                self.app_file_cache
+                    .clone()
+                    .map(|c| c as Arc<dyn crate::render::warm_shell::ShellArchive>),
+                oracle,
+                self.renderer_registry.bundle_heads(),
+            ),
+        );
         info!(
             archive_backed = self.warm_shell.is_archive_backed(),
             coherence_judging = self.warm_shell.is_coherence_judging(),
@@ -4041,6 +4049,7 @@ mod epr_dispatch_breaker_tests {
     struct AssetBindingArchive {
         declared: Option<String>,
         latest: Option<crate::render::warm_shell::ArchivedShell>,
+        stored: std::sync::Mutex<Option<crate::render::warm_shell::ArchivedShell>>,
     }
 
     #[async_trait::async_trait]
@@ -4055,10 +4064,18 @@ mod epr_dispatch_breaker_tests {
             _file_path: &str,
             blob_hash: &str,
         ) -> Option<crate::render::warm_shell::ArchivedShell> {
-            self.latest
+            self.stored
+                .lock()
+                .unwrap()
                 .as_ref()
                 .filter(|shell| shell.blob_hash == blob_hash)
                 .cloned()
+                .or_else(|| {
+                    self.latest
+                        .as_ref()
+                        .filter(|shell| shell.blob_hash == blob_hash)
+                        .cloned()
+                })
         }
 
         async fn load_latest(
@@ -4066,7 +4083,7 @@ mod epr_dispatch_breaker_tests {
             _slug: &str,
             _file_path: &str,
         ) -> Option<crate::render::warm_shell::ArchivedShell> {
-            self.latest.clone()
+            self.stored.lock().unwrap().clone().or(self.latest.clone())
         }
 
         async fn store(
@@ -4077,6 +4094,12 @@ mod epr_dispatch_breaker_tests {
             _content_type: &str,
             _bytes: Vec<u8>,
         ) {
+            *self.stored.lock().unwrap() = Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: _blob_hash.to_string(),
+                content_type: _content_type.to_string(),
+                bytes: _bytes,
+                head_bound: true,
+            });
         }
     }
 
@@ -4087,10 +4110,27 @@ mod epr_dispatch_breaker_tests {
         let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
         args.storage_url = Some(storage_url.to_string());
         let mut state = AppState::new(args);
-        state.warm_shell = Arc::new(crate::render::warm_shell::WarmShellStore::new(Some(
-            archive,
-        )));
+        state.warm_shell = Arc::new(
+            crate::render::warm_shell::WarmShellStore::with_oracle_and_heads(
+                Some(archive),
+                None,
+                state.renderer_registry.bundle_heads(),
+            ),
+        );
         state
+    }
+
+    fn accept_browser_head(state: &AppState, browser: &str) {
+        use crate::render::bundle_heads::{ChannelHead, HeadDoc};
+        state.renderer_registry.bundle_heads().record(
+            "elohim-host-landing",
+            elohim_views::projection::Channel::Converged,
+            &ChannelHead::Resolved(HeadDoc {
+                browser: Some(browser.into()),
+                server: Some("server-new".into()),
+                staging_declaration: None,
+            }),
+        );
     }
 
     async fn hydrate_asset_binding_shell(state: &AppState) {
@@ -4138,6 +4178,7 @@ mod epr_dispatch_breaker_tests {
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
             }),
+            stored: Default::default(),
         });
         let state = asset_binding_state(&storage.uri(), archive);
         hydrate_asset_binding_shell(&state).await;
@@ -4248,6 +4289,7 @@ mod epr_dispatch_breaker_tests {
                 bytes: b"<app-root></app-root>".to_vec(),
                 head_bound: true,
             }),
+            stored: Default::default(),
         });
         let state = asset_binding_state(&storage.uri(), archive);
         hydrate_asset_binding_shell(&state).await;
@@ -4446,6 +4488,7 @@ mod epr_dispatch_breaker_tests {
         let archive = Arc::new(AssetBindingArchive {
             declared: Some("head-new".into()),
             latest: None,
+            stored: Default::default(),
         });
         let state = asset_binding_state(&storage.uri(), archive);
         let projection = shell_projection(true);
@@ -4523,10 +4566,12 @@ mod epr_dispatch_breaker_tests {
         let stale_state = asset_binding_state(
             &unavailable.uri(),
             Arc::new(AssetBindingArchive {
-                declared: Some("head-new".into()),
+                declared: Some("head-old".into()),
                 latest: Some(old_shell.clone()),
+                stored: Default::default(),
             }),
         );
+        accept_browser_head(&stale_state, "head-new");
         hydrate_asset_binding_shell(&stale_state).await;
         let stale = compose_render_with_shell(
             &stale_state,
@@ -4583,10 +4628,12 @@ mod epr_dispatch_breaker_tests {
         let current_state = asset_binding_state(
             &available.uri(),
             Arc::new(AssetBindingArchive {
-                declared: Some("head-new".into()),
+                declared: Some("head-old".into()),
                 latest: Some(old_shell),
+                stored: Default::default(),
             }),
         );
+        accept_browser_head(&current_state, "head-new");
         hydrate_asset_binding_shell(&current_state).await;
         let (composed, provenance) = compose_render_with_shell(
             &current_state,
@@ -4600,6 +4647,10 @@ mod epr_dispatch_breaker_tests {
         assert!(composed.contains("main-NEW.js"));
         assert!(!composed.contains("main-OLD.js"));
 
+        // A later projection invalidation may evict the hot shell while the
+        // asynchronously refreshed archive row still names A. Reload must use
+        // accepted head B and the B bytes just stocked by the successful fetch.
+        current_state.warm_shell.evict("elohim-host-landing");
         let version = dispatch_to_projected_epr(
             &current_state,
             "/version.json",
@@ -4614,6 +4665,84 @@ mod epr_dispatch_breaker_tests {
             version.into_body().collect().await.unwrap().to_bytes(),
             Bytes::from_static(br#"{"commit":"new"}"#)
         );
+    }
+
+    #[tokio::test]
+    async fn accepted_absent_browser_head_never_resurrects_the_archive_declaration() {
+        use crate::render::bundle_heads::{ChannelHead, HeadDoc};
+
+        let archive = Arc::new(AssetBindingArchive {
+            declared: Some("head-old".into()),
+            latest: Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: "head-old".into(),
+                content_type: "text/html".into(),
+                bytes: b"<app-root></app-root>".to_vec(),
+                head_bound: true,
+            }),
+            stored: Default::default(),
+        });
+        let state = asset_binding_state("http://127.0.0.1:9", archive);
+        state.renderer_registry.bundle_heads().record(
+            "elohim-host-landing",
+            elohim_views::projection::Channel::Converged,
+            &ChannelHead::Resolved(HeadDoc {
+                browser: None,
+                server: Some("server-new".into()),
+                staging_declaration: None,
+            }),
+        );
+        hydrate_asset_binding_shell(&state).await;
+
+        let decision = crate::render::warm_shell::plan_shell_serve(
+            &state.warm_shell,
+            "elohim-host-landing",
+            "index.html",
+            false,
+        )
+        .await;
+        assert!(decision.declared.is_none());
+        assert_eq!(
+            decision.plan,
+            crate::render::warm_shell::ShellPlan::ServeWarm
+        );
+        assert!(matches!(
+            decision.incoherence,
+            Some(crate::render::coherence::BehindReason::HeadUnknown)
+        ));
+
+        // A candidate observation is a separate channel and must not replace
+        // the converged declaration used by the public shell.
+        let candidate_archive = Arc::new(AssetBindingArchive {
+            declared: Some("head-public".into()),
+            latest: Some(crate::render::warm_shell::ArchivedShell {
+                blob_hash: "head-public".into(),
+                content_type: "text/html".into(),
+                bytes: b"<app-root></app-root>".to_vec(),
+                head_bound: true,
+            }),
+            stored: Default::default(),
+        });
+        let candidate_state = asset_binding_state("http://127.0.0.1:9", candidate_archive);
+        candidate_state.renderer_registry.bundle_heads().record(
+            "elohim-host-landing",
+            elohim_views::projection::Channel::Candidate,
+            &ChannelHead::Resolved(HeadDoc {
+                browser: Some("head-candidate".into()),
+                server: None,
+                staging_declaration: Some("declaration-candidate".into()),
+            }),
+        );
+        hydrate_asset_binding_shell(&candidate_state).await;
+        let public = crate::render::warm_shell::plan_shell_serve(
+            &candidate_state.warm_shell,
+            "elohim-host-landing",
+            "index.html",
+            false,
+        )
+        .await;
+        assert_eq!(public.declared.as_deref(), Some("head-public"));
+        assert_eq!(public.plan, crate::render::warm_shell::ShellPlan::ServeWarm);
+        assert!(public.incoherence.is_none());
     }
 
     #[tokio::test]
@@ -4637,6 +4766,7 @@ mod epr_dispatch_breaker_tests {
                     bytes: br#"<script src="main-OLD.js"></script>"#.to_vec(),
                     head_bound: latest_bound,
                 }),
+                stored: Default::default(),
             });
             let state = asset_binding_state(&storage.uri(), archive);
             hydrate_asset_binding_shell(&state).await;
