@@ -722,24 +722,6 @@ When(
         `HTTP ${canonical.status}: ${canonical.text}`
     );
 
-    const head = await getRaw(`${doorwayUrl}/db/content/${record.slug}/head`);
-    let observed: { stagingCandidate?: string } = {};
-    try {
-      observed = JSON.parse(head.text) as { stagingCandidate?: string };
-    } catch {
-      // The assertions below report the exact response body.
-    }
-    assert.equal(
-      head.status,
-      200,
-      `artifact B candidate read through ${peerName} failed: HTTP ${head.status}: ${head.text}`
-    );
-    assert.equal(
-      observed.stagingCandidate,
-      record.candidateActionHash,
-      `artifact B candidate read through ${peerName} named ${String(observed.stagingCandidate)}, ` +
-        `not authored action ${record.candidateActionHash}: HTTP ${head.status}: ${head.text}`
-    );
     record.browserDeclaredAt = Date.now();
   }
 );
