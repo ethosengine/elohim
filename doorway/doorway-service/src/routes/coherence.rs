@@ -49,6 +49,11 @@ static SELF_BUILD_COMMIT: LazyLock<String> =
 pub struct EprHeadFingerprint {
     pub url_path: String,
     pub epr_id: String,
+    /// Exact notarized project-epr undertaking backing this advertised route.
+    /// Absent on older peers; absence remains usable for ordinary name routing
+    /// but is ineligible for exact commitment-reference routing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub commitment_id: Option<String>,
     /// Existing publication-channel claims for this projection. Empty is the
     /// legacy any-host contract; absent decodes empty during a rolling deploy.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -57,7 +62,7 @@ pub struct EprHeadFingerprint {
 
 /// This doorway's full routing-table fingerprint. `digest` is a content-stable
 /// **CIDv1 dag-cbor** (`bafyrei…`) over the sorted
-/// `(url_path, epr_id, hostnames)` set, so
+/// `(url_path, epr_id, commitment_id, hostnames)` set, so
 /// two edges agree iff their digests match. `build_id` is the deploy git SHA
 /// (the operator's "two EPR heads" symptom was actually build_id skew, not
 /// content divergence) — carried alongside so deploy-skew is reported, never
@@ -99,6 +104,7 @@ pub fn mint_head_set_digest(heads: &mut [EprHeadFingerprint]) -> String {
         a.url_path
             .cmp(&b.url_path)
             .then(a.epr_id.cmp(&b.epr_id))
+            .then(a.commitment_id.cmp(&b.commitment_id))
             .then(a.hostnames.cmp(&b.hostnames))
     });
     // dag-cbor of this string-only fingerprint set is infallible.
@@ -121,6 +127,7 @@ pub fn router_fingerprint(
         .map(|projection| EprHeadFingerprint {
             url_path: projection.url_path,
             epr_id: projection.epr_id,
+            commitment_id: Some(projection.commitment_id),
             hostnames: projection.hostnames,
         })
         .collect();
@@ -206,7 +213,7 @@ pub fn compare_to_peer(
                     .map(|head| head.url_path.as_str())
                     .collect();
                 let identities_at = |manifest: &CoherenceManifest, path: &str| {
-                    let mut identities: Vec<(String, Vec<String>)> = manifest
+                    let mut identities: Vec<(String, Option<String>, Vec<String>)> = manifest
                         .heads
                         .iter()
                         .filter(|head| head.url_path == path)
@@ -214,7 +221,7 @@ pub fn compare_to_peer(
                             let mut hostnames = head.hostnames.clone();
                             hostnames.sort();
                             hostnames.dedup();
-                            (head.epr_id.clone(), hostnames)
+                            (head.epr_id.clone(), head.commitment_id.clone(), hostnames)
                         })
                         .collect();
                     identities.sort();
@@ -471,6 +478,7 @@ mod tests {
             .map(|(url_path, epr_id)| EprHeadFingerprint {
                 url_path: (*url_path).to_string(),
                 epr_id: (*epr_id).to_string(),
+                commitment_id: Some(format!("test-{epr_id}")),
                 hostnames: Vec::new(),
             })
             .collect();
@@ -510,6 +518,19 @@ mod tests {
         let old_wire = r#"{"urlPath":"/","eprId":"A"}"#;
         let decoded: EprHeadFingerprint = serde_json::from_str(old_wire).unwrap();
         assert!(decoded.hostnames.is_empty());
+        assert!(decoded.commitment_id.is_none());
+    }
+
+    #[test]
+    fn commitment_identity_is_part_of_coherence_and_divergence_evidence() {
+        let mut me = sample_manifest("alpha", &[("/", "A")]);
+        me.heads[0].commitment_id = Some("project-epr-a".into());
+        me.digest = mint_head_set_digest(&mut me.heads);
+        let peer = sample_manifest("apex", &[("/", "A")]);
+
+        let comparison = compare_to_peer(&me, "apex", true, Some(&peer));
+        assert!(!comparison.agrees);
+        assert_eq!(comparison.divergent_paths, vec!["/".to_string()]);
     }
 
     #[test]

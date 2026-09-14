@@ -909,11 +909,13 @@ fn install_name_routes(
                 liveness.insert(doorway_id.clone(), HolderLiveness::Serving);
                 for head in &m.heads {
                     if head.hostnames.is_empty() {
-                        contracts.push(HolderContract::any_host(
-                            &doorway_id,
-                            peer_url,
-                            &head.url_path,
-                        ));
+                        contracts.push(
+                            HolderContract::any_host(&doorway_id, peer_url, &head.url_path)
+                                .with_projection(
+                                    head.commitment_id.clone(),
+                                    Some(head.epr_id.clone()),
+                                ),
+                        );
                     } else {
                         for hostname in &head.hostnames {
                             let Some(host) = crate::services::name_routing::RouteKey::new(
@@ -929,6 +931,8 @@ fn install_name_routes(
                                 origin: peer_url.clone(),
                                 url_path: head.url_path.clone(),
                                 host: Some(host),
+                                commitment_id: head.commitment_id.clone(),
+                                epr_id: Some(head.epr_id.clone()),
                             });
                         }
                     }
@@ -1466,6 +1470,7 @@ mod tests {
                 .map(|(p, e)| EprHeadFingerprint {
                     url_path: (*p).to_string(),
                     epr_id: (*e).to_string(),
+                    commitment_id: Some(format!("test-{e}")),
                     hostnames: Vec::new(),
                 })
                 .collect();
@@ -1493,6 +1498,7 @@ mod tests {
             let mut heads = vec![EprHeadFingerprint {
                 url_path: "/".into(),
                 epr_id: "candidate-epr".into(),
+                commitment_id: Some("project-epr-candidate".into()),
                 hostnames: vec!["Candidate.Example:443".into()],
             }];
             let manifest = CoherenceManifest {
@@ -1518,6 +1524,11 @@ mod tests {
             );
             assert_eq!(exact.len(), 1);
             assert_eq!(exact[0].host.as_deref(), Some("candidate.example"));
+            assert_eq!(
+                exact[0].commitment_id.as_deref(),
+                Some("project-epr-candidate")
+            );
+            assert_eq!(exact[0].epr_id.as_deref(), Some("candidate-epr"));
             assert!(table
                 .holders_for(
                     &crate::services::name_routing::RouteKey::new(Some("other.example"), "/"),

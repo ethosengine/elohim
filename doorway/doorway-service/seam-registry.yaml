@@ -3639,7 +3639,10 @@ decisionPoints:
       set, while a locally known binding can require exact advertisements and fail closed when a
       peer manifest is missing or stale. Genuinely unnamed/path-only apps retain legacy wildcard
       routing. The selected holder receives the original Host and independently re-applies its
-      standing and byte-serving authority.
+      standing and byte-serving authority. Exact project-epr refusal references reuse the same
+      advertised holder table: a unique host+commitment claim is relayed once without visitor
+      credentials and structurally checked against its advertised doorway and EPR; conflicting
+      claims fail unavailable rather than being ranked.
     concernIds:
       - id: C0
         status: answered
@@ -3728,4 +3731,25 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/server/http.rs
         testName: malformed_present_host_returns_400_before_wildcard_relay
+        kind: integration
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: exact_commitment_reference_requires_one_coherent_current_holder
+        kind: unit
+      - path: doorway/doorway-service/src/routes/coherence.rs
+        testName: commitment_identity_is_part_of_coherence_and_divergence_evidence
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: public_commitment_reference_strips_credentials_and_binds_the_declared_scope
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: unknown_host_in_a_closed_namespace_never_reaches_generic_ssr_or_wildcard_relay
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: known_remote_host_in_a_closed_namespace_still_relays_exactly_once
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: named_http_request_resolves_an_any_host_exact_commitment_contract
+        kind: integration
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: exact_advertised_holder_precedes_a_stale_local_commitment_200
         kind: integration

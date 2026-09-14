@@ -6442,6 +6442,63 @@ mod path_segment_decoding_tests {
 /// verdict. Blob bytes are NOT this path's business (`doorway/CLAUDE.md`
 /// §"No Blob Fan-Out").
 const RELAY_MAX_BYTES: u64 = 8 * 1024 * 1024;
+// The shared transport can carry an app shell up to RELAY_MAX_BYTES. An exact
+// commitment record is accepted only under this narrower structural limit.
+const COMMITMENT_REFERENCE_MAX_BYTES: usize = 256 * 1024;
+const COMMITMENT_REFERENCE_RETRY_AFTER_SECS: u64 = 5;
+
+fn exact_commitment_reference(path: &str) -> Option<&str> {
+    let id = path.strip_prefix("/api/v1/commitments/")?;
+    (!id.is_empty()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_')))
+    .then_some(id)
+}
+
+fn commitment_reference_body_matches(
+    body: &[u8],
+    requested_id: &str,
+    holder: &crate::services::name_routing::NameHolder,
+) -> bool {
+    if body.len() > COMMITMENT_REFERENCE_MAX_BYTES {
+        return false;
+    }
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(body) else {
+        return false;
+    };
+    if value.get("id").and_then(|v| v.as_str()) != Some(requested_id)
+        || value.get("action").and_then(|v| v.as_str()) != Some("project-epr")
+    {
+        return false;
+    }
+    let Some(scope) = value.get("inScopeOf").and_then(|v| v.as_array()) else {
+        return false;
+    };
+    let doorway_scope = format!("doorway:{}", holder.doorway_id);
+    let Some(epr_id) = holder.epr_id.as_deref() else {
+        return false;
+    };
+    let epr_scope = format!("epr:{epr_id}");
+    scope.iter().any(|v| v.as_str() == Some(&doorway_scope))
+        && scope.iter().any(|v| v.as_str() == Some(&epr_scope))
+}
+
+fn commitment_reference_unavailable(reason: &'static str) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("content-type", "application/json")
+        .header(
+            "retry-after",
+            COMMITMENT_REFERENCE_RETRY_AFTER_SECS.to_string(),
+        )
+        .header("cache-control", "no-store")
+        .body(Full::new(Bytes::from(
+            serde_json::json!({ "error": "commitment reference unavailable", "reason": reason })
+                .to_string(),
+        )))
+        .expect("static commitment-reference response is infallible")
+}
 
 /// Dedicated client for cross-doorway relays. Deliberately NOT
 /// `storage_proxy_client`: a slow sibling must never consume a connection the
@@ -6502,6 +6559,16 @@ impl RelayContext {
             cookie: header("cookie"),
             accept: header("accept"),
         })
+    }
+
+    fn public_commitment_reference(&self) -> Self {
+        Self {
+            hop_seen: self.hop_seen,
+            host: self.host.clone(),
+            accept: self.accept.clone(),
+            authorization: None,
+            cookie: None,
+        }
     }
 }
 
@@ -6598,9 +6665,72 @@ async fn fetch_from_holder(
     })
 }
 
+async fn relay_exact_commitment_reference(
+    state: &Arc<AppState>,
+    path: &str,
+    requested_id: &str,
+    ctx: &RelayContext,
+) -> Option<Response<Full<Bytes>>> {
+    use crate::services::name_routing::ExactCommitmentHolder;
+
+    if ctx.hop_seen {
+        return None;
+    }
+    let holder = match state
+        .name_routes
+        .exact_commitment_holder(ctx.host.as_deref(), requested_id)
+    {
+        ExactCommitmentHolder::Absent => return None,
+        ExactCommitmentHolder::Conflict => {
+            warn!(host = ?ctx.host, commitment_id = %requested_id,
+                "exact commitment reference has conflicting advertised holders");
+            return Some(commitment_reference_unavailable("holder-conflict"));
+        }
+        ExactCommitmentHolder::Unique(holder) => holder,
+    };
+    let self_doorway_id = state
+        .args
+        .doorway_id
+        .clone()
+        .unwrap_or_else(|| state.args.node_id.to_string());
+    if self_doorway_id == holder.doorway_id {
+        return None;
+    }
+
+    let public_ctx = ctx.public_commitment_reference();
+    let reply = match fetch_from_holder(&RELAY_CLIENT, &holder, path, None, &public_ctx).await {
+        Ok(reply)
+            if reply.status == StatusCode::OK.as_u16()
+                && commitment_reference_body_matches(&reply.body, requested_id, &holder) =>
+        {
+            reply
+        }
+        Ok(reply) => {
+            warn!(host = ?ctx.host, commitment_id = %requested_id,
+                holder = %holder.doorway_id, status = reply.status,
+                "exact commitment holder returned an unavailable or inconsistent record");
+            return Some(commitment_reference_unavailable("holder-answer-invalid"));
+        }
+        Err(error) => {
+            warn!(host = ?ctx.host, commitment_id = %requested_id,
+                holder = %holder.doorway_id, %error,
+                "exact commitment holder could not be reached");
+            return Some(commitment_reference_unavailable("holder-unreachable"));
+        }
+    };
+    Some(crate::services::name_routing::build_relayed_response(
+        &holder.origin,
+        &holder.doorway_id,
+        reply,
+    ))
+}
+
 #[cfg(test)]
 mod name_relay_request_tests {
-    use super::{fetch_from_holder, local_path_requires_exact_host, RelayContext};
+    use super::{
+        commitment_reference_body_matches, exact_commitment_reference, fetch_from_holder,
+        local_path_requires_exact_host, RelayContext,
+    };
     use crate::services::name_routing::{
         HolderLiveness, NameHolder, RelayMode, FEDERATION_HOP_HEADER,
     };
@@ -6613,6 +6743,8 @@ mod name_relay_request_tests {
             origin,
             url_path: "/".into(),
             host: None,
+            commitment_id: None,
+            epr_id: None,
             liveness: HolderLiveness::Serving,
             relay_mode: RelayMode::Proxy,
         }
@@ -6689,6 +6821,87 @@ mod name_relay_request_tests {
             selected.received_requests().await.unwrap().is_empty(),
             "the holder's default public channel must not receive the request"
         );
+    }
+
+    #[tokio::test]
+    async fn public_commitment_reference_strips_credentials_and_binds_the_declared_scope() {
+        let selected = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/v1/commitments/project-epr-garden"))
+            .respond_with(|request: &wiremock::Request| {
+                assert!(request.headers.get("authorization").is_none());
+                assert!(request.headers.get("cookie").is_none());
+                assert_eq!(
+                    request
+                        .headers
+                        .get(FEDERATION_HOP_HEADER)
+                        .and_then(|v| v.to_str().ok()),
+                    Some("1")
+                );
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "id": "project-epr-garden",
+                    "action": "project-epr",
+                    "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+                }))
+            })
+            .mount(&selected)
+            .await;
+
+        let mut selected_holder = holder(selected.uri());
+        selected_holder.doorway_id = "alpha".into();
+        selected_holder.epr_id = Some("garden-epr".into());
+        selected_holder.commitment_id = Some("project-epr-garden".into());
+        let private_ctx = RelayContext {
+            host: Some("garden.example".into()),
+            authorization: Some("Bearer named-human".into()),
+            cookie: Some("doorway_session=sibling".into()),
+            ..Default::default()
+        };
+        let reply = fetch_from_holder(
+            &reqwest::Client::new(),
+            &selected_holder,
+            "/api/v1/commitments/project-epr-garden",
+            None,
+            &private_ctx.public_commitment_reference(),
+        )
+        .await
+        .expect("holder answers the public record read");
+        assert!(commitment_reference_body_matches(
+            &reply.body,
+            "project-epr-garden",
+            &selected_holder
+        ));
+
+        for body in [
+            serde_json::json!({"id":"wrong","action":"project-epr","inScopeOf":["doorway:alpha","epr:garden-epr"]}),
+            serde_json::json!({"id":"project-epr-garden","action":"hosting-agreement","inScopeOf":["doorway:alpha","epr:garden-epr"]}),
+            serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":"doorway:alpha|epr:garden-epr"}),
+            serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":["doorway:alpha"]}),
+        ] {
+            assert!(!commitment_reference_body_matches(
+                &serde_json::to_vec(&body).unwrap(),
+                "project-epr-garden",
+                &selected_holder
+            ));
+        }
+        assert_eq!(
+            exact_commitment_reference("/api/v1/commitments/project-epr-garden"),
+            Some("project-epr-garden")
+        );
+        assert_eq!(
+            exact_commitment_reference("/api/v1/commitments/contract_123"),
+            Some("contract_123"),
+            "the URL grammar must not impose a fixture-specific action prefix"
+        );
+        assert_eq!(exact_commitment_reference("/api/v1/commitments/x/y"), None);
+        for ambiguous in [
+            "/api/v1/commitments/project-epr-a%2Fb",
+            "/api/v1/commitments/project-epr-%2e%2e",
+            "/api/v1/commitments/.",
+            "/api/v1/commitments/..",
+        ] {
+            assert_eq!(exact_commitment_reference(ambiguous), None);
+        }
     }
 
     #[test]
@@ -6952,6 +7165,20 @@ async fn handle_request(
     // post-match relay (cheap refcount bump, not a state copy).
     let relay_state = Arc::clone(&state);
 
+    // A refusal's relative project-epr record belongs to the exact doorway
+    // whose current advertised contract named it. Resolve that one holder
+    // before the generic local storage proxy: an unrelated stale local row may
+    // answer 200 and still contradict the authoritative refusal.
+    if is_get {
+        if let Some(commitment_id) = exact_commitment_reference(&path) {
+            if let Some(response) =
+                relay_exact_commitment_reference(&state, &path, commitment_id, &relay_ctx).await
+            {
+                return Ok(to_boxed(response));
+            }
+        }
+    }
+
     // Check if this is a signal subdomain request (signal.*.elohim.host)
     let host = req
         .headers()
@@ -7169,6 +7396,29 @@ async fn handle_request(
                 }
             }
             return Ok(to_boxed(local));
+        }
+
+        // A path covered only by hostname-bound projections is a closed name
+        // namespace. If this Host has no local projection, try one exact
+        // advertised sibling and otherwise answer 404 here; falling through to
+        // the generic registry would let the root SSR/public fallback invent a
+        // 503 (or bytes) for a name nobody declared.
+        if relay_ctx.host.is_some() && local_path_requires_exact_host(&state.epr_router, &path) {
+            if let Some(relayed) = relay_by_name(
+                &state,
+                is_get,
+                &path,
+                relay_query.as_deref(),
+                &relay_ctx,
+                crate::services::name_routing::RelayTrigger::LocalVerdict(StatusCode::NOT_FOUND),
+                true,
+                None,
+            )
+            .await
+            {
+                return Ok(to_boxed(relayed));
+            }
+            return Ok(to_boxed(not_found_response(&path)));
         }
     }
 
@@ -11311,6 +11561,19 @@ mod root_projection_shadow_regression_tests {
         .unwrap_or_else(|e| panic!("GET {path} transport error: {e}"))
     }
 
+    async fn get_as_host(addr: SocketAddr, path: &str, host: &str) -> reqwest::Response {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            reqwest::Client::new()
+                .get(format!("http://{addr}{path}"))
+                .header("host", host)
+                .send(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("GET {path} as {host} did not answer within 5s"))
+        .unwrap_or_else(|e| panic!("GET {path} as {host} transport error: {e}"))
+    }
+
     #[tokio::test]
     async fn malformed_present_host_returns_400_before_wildcard_relay() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -11352,6 +11615,167 @@ mod root_projection_shadow_regression_tests {
             wildcard.received_requests().await.unwrap().is_empty(),
             "the wildcard holder must not receive malformed-host traffic"
         );
+    }
+
+    #[tokio::test]
+    async fn unknown_host_in_a_closed_namespace_never_reaches_generic_ssr_or_wildcard_relay() {
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let wildcard = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("wrong-public-root"))
+            .mount(&wildcard)
+            .await;
+        let state = state_with_root_projection();
+        let mut scoped = root_projection();
+        scoped.hostnames = vec!["candidate.example".into()];
+        state.epr_router.replace_all(vec![scoped]);
+        state.name_routes.replace_all(
+            vec![crate::services::name_routing::HolderContract::any_host(
+                "wildcard",
+                &wildcard.uri(),
+                "/",
+            )],
+            std::collections::HashMap::new(),
+        );
+        let addr = spawn_test_doorway(state).await;
+
+        let response = get_as_host(addr, "/", "unrelated.example").await;
+        assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+        assert!(
+            wildcard.received_requests().await.unwrap().is_empty(),
+            "closed hostname namespaces never widen to a wildcard holder"
+        );
+    }
+
+    #[tokio::test]
+    async fn known_remote_host_in_a_closed_namespace_still_relays_exactly_once() {
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let remote = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::header("host", "remote.example"))
+            .and(wiremock::matchers::header(
+                crate::services::name_routing::FEDERATION_HOP_HEADER,
+                "1",
+            ))
+            .respond_with(ResponseTemplate::new(200).set_body_string("remote-root"))
+            .expect(1)
+            .mount(&remote)
+            .await;
+        let state = state_with_root_projection();
+        let mut scoped = root_projection();
+        scoped.hostnames = vec!["candidate.example".into()];
+        state.epr_router.replace_all(vec![scoped]);
+        state.name_routes.replace_all(
+            vec![crate::services::name_routing::HolderContract {
+                host: Some("remote.example".into()),
+                ..crate::services::name_routing::HolderContract::any_host(
+                    "remote",
+                    &remote.uri(),
+                    "/",
+                )
+            }],
+            std::collections::HashMap::new(),
+        );
+        let addr = spawn_test_doorway(state).await;
+
+        let response = get_as_host(addr, "/", "remote.example").await;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(response.text().await.unwrap(), "remote-root");
+        remote.verify().await;
+    }
+
+    #[tokio::test]
+    async fn named_http_request_resolves_an_any_host_exact_commitment_contract() {
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let holder = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/api/v1/commitments/contract_123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "contract_123",
+                "action": "project-epr",
+                "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+            })))
+            .expect(1)
+            .mount(&holder)
+            .await;
+        let state = state_with_root_projection();
+        state.name_routes.replace_all(
+            vec![crate::services::name_routing::HolderContract::any_host(
+                "alpha",
+                &holder.uri(),
+                "/",
+            )
+            .with_projection(Some("contract_123".into()), Some("garden-epr".into()))],
+            std::collections::HashMap::new(),
+        );
+        let addr = spawn_test_doorway(state).await;
+
+        let response =
+            get_as_host(addr, "/api/v1/commitments/contract_123", "localhost:8889").await;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        let body: serde_json::Value = response.json().await.unwrap();
+        assert_eq!(body["id"], "contract_123");
+        holder.verify().await;
+    }
+
+    #[tokio::test]
+    async fn exact_advertised_holder_precedes_a_stale_local_commitment_200() {
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let local = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/api/v1/commitments/contract_123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "contract_123",
+                "action": "project-epr",
+                "inScopeOf": ["doorway:stale", "epr:stale-epr"]
+            })))
+            .expect(0)
+            .mount(&local)
+            .await;
+        let holder = MockServer::start().await;
+        Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/api/v1/commitments/contract_123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "id": "contract_123",
+                "action": "project-epr",
+                "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+            })))
+            .expect(1)
+            .mount(&holder)
+            .await;
+
+        let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        args.storage_url = Some(local.uri());
+        let state = Arc::new(AppState::new(args));
+        state.name_routes.replace_all(
+            vec![crate::services::name_routing::HolderContract::any_host(
+                "alpha",
+                &holder.uri(),
+                "/",
+            )
+            .with_projection(Some("contract_123".into()), Some("garden-epr".into()))],
+            std::collections::HashMap::new(),
+        );
+        let addr = spawn_test_doorway(state).await;
+
+        let response =
+            get_as_host(addr, "/api/v1/commitments/contract_123", "localhost:8889").await;
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get(crate::services::name_routing::NAME_ROUTE_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("relay:alpha")
+        );
+        let body: serde_json::Value = response.json().await.unwrap();
+        assert_eq!(body["inScopeOf"][0], "doorway:alpha");
+        local.verify().await;
+        holder.verify().await;
     }
 
     /// The incident scenario itself: `/status` must reach `routes::status_page`

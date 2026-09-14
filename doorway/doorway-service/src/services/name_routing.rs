@@ -234,6 +234,10 @@ pub struct HolderContract {
     pub url_path: String,
     /// The host this contract is bound to. `None` = a legacy ANY-host contract.
     pub host: Option<String>,
+    /// Exact project-epr undertaking this route advertises. `None` is a legacy
+    /// coherence peer: routable by name, never by commitment reference.
+    pub commitment_id: Option<String>,
+    pub epr_id: Option<String>,
 }
 
 impl HolderContract {
@@ -244,7 +248,19 @@ impl HolderContract {
             origin: origin.to_string(),
             url_path: url_path.to_string(),
             host: None,
+            commitment_id: None,
+            epr_id: None,
         }
+    }
+
+    pub fn with_projection(
+        mut self,
+        commitment_id: Option<String>,
+        epr_id: Option<String>,
+    ) -> Self {
+        self.commitment_id = commitment_id;
+        self.epr_id = epr_id;
+        self
     }
 }
 
@@ -259,6 +275,8 @@ pub struct NameHolder {
     /// contract. Carried so a relay can be reasoned about per channel once
     /// hosts become head channels.
     pub host: Option<String>,
+    pub commitment_id: Option<String>,
+    pub epr_id: Option<String>,
     pub liveness: HolderLiveness,
     /// How this holder is reached. [`RelayMode::Proxy`] for every holder today.
     pub relay_mode: RelayMode,
@@ -430,6 +448,8 @@ pub fn fold_candidate_holders(
                 if rank > *existing_rank {
                     existing.url_path = contract.url_path.clone();
                     existing.host = contract.host.clone();
+                    existing.commitment_id = contract.commitment_id.clone();
+                    existing.epr_id = contract.epr_id.clone();
                     *existing_rank = rank;
                 }
             }
@@ -439,6 +459,8 @@ pub fn fold_candidate_holders(
                     origin: contract.origin.trim_end_matches('/').to_string(),
                     url_path: contract.url_path.clone(),
                     host: contract.host.clone(),
+                    commitment_id: contract.commitment_id.clone(),
+                    epr_id: contract.epr_id.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -499,6 +521,8 @@ pub fn fold_all_holders(
                 if rank > *existing_rank {
                     existing.url_path = contract.url_path.clone();
                     existing.host = contract.host.clone();
+                    existing.commitment_id = contract.commitment_id.clone();
+                    existing.epr_id = contract.epr_id.clone();
                     *existing_rank = rank;
                 }
             }
@@ -508,6 +532,8 @@ pub fn fold_all_holders(
                     origin: contract.origin.trim_end_matches('/').to_string(),
                     url_path: contract.url_path.clone(),
                     host: contract.host.clone(),
+                    commitment_id: contract.commitment_id.clone(),
+                    epr_id: contract.epr_id.clone(),
                     liveness: liveness
                         .get(&contract.doorway_id)
                         .copied()
@@ -537,6 +563,16 @@ pub fn fold_all_holders(
 pub struct NameRouteTable {
     contracts: RwLock<Vec<HolderContract>>,
     liveness: RwLock<HashMap<String, HolderLiveness>>,
+}
+
+/// Exact project-epr reference resolution. Unlike the ordinary holder fold,
+/// conflicts are not ranked: two distinct current holders claiming one exact
+/// contract are an unavailable authority boundary, never a retry list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExactCommitmentHolder {
+    Absent,
+    Unique(NameHolder),
+    Conflict,
 }
 
 impl NameRouteTable {
@@ -602,6 +638,54 @@ impl NameRouteTable {
         let contracts = self.contracts.read().expect("name-route lock poisoned");
         let liveness = self.liveness.read().expect("name-route lock poisoned");
         fold_all_holders(&contracts, &liveness, self_doorway_id)
+    }
+
+    pub fn exact_commitment_holder(
+        &self,
+        host: Option<&str>,
+        commitment_id: &str,
+    ) -> ExactCommitmentHolder {
+        let asked_host = RouteKey::new(host, "/").host;
+        let contracts = self.contracts.read().expect("name-route lock poisoned");
+        let liveness = self.liveness.read().expect("name-route lock poisoned");
+        let exact_host_advertised = asked_host.as_deref().is_some_and(|asked| {
+            contracts.iter().any(|contract| {
+                contract.commitment_id.as_deref() == Some(commitment_id)
+                    && contract
+                        .host
+                        .as_deref()
+                        .is_some_and(|bound| bound.eq_ignore_ascii_case(asked))
+            })
+        });
+        let mut matches: Vec<NameHolder> = Vec::new();
+        for contract in contracts.iter().filter(|contract| {
+            contract.commitment_id.as_deref() == Some(commitment_id)
+                && host_matches(contract.host.as_deref(), asked_host.as_deref())
+                && (!exact_host_advertised || contract.host.is_some())
+                && contract.epr_id.as_deref().is_some_and(|id| !id.is_empty())
+        }) {
+            let holder = NameHolder {
+                doorway_id: contract.doorway_id.clone(),
+                origin: contract.origin.trim_end_matches('/').to_string(),
+                url_path: contract.url_path.clone(),
+                host: contract.host.clone(),
+                commitment_id: contract.commitment_id.clone(),
+                epr_id: contract.epr_id.clone(),
+                liveness: liveness
+                    .get(&contract.doorway_id)
+                    .copied()
+                    .unwrap_or_default(),
+                relay_mode: RelayMode::Proxy,
+            };
+            if !matches.contains(&holder) {
+                matches.push(holder);
+            }
+        }
+        match matches.len() {
+            0 => ExactCommitmentHolder::Absent,
+            1 => ExactCommitmentHolder::Unique(matches.remove(0)),
+            _ => ExactCommitmentHolder::Conflict,
+        }
     }
 
     /// Record that a holder SHED a relay (503). The discovery probe cannot tell
@@ -912,6 +996,21 @@ mod tests {
         HolderContract::any_host(id, origin, mount)
     }
 
+    fn exact_contract(
+        doorway: &str,
+        origin: &str,
+        host: &str,
+        commitment: &str,
+        epr: &str,
+    ) -> HolderContract {
+        HolderContract {
+            host: Some(host.to_string()),
+            commitment_id: Some(commitment.to_string()),
+            epr_id: Some(epr.to_string()),
+            ..HolderContract::any_host(doorway, origin, "/")
+        }
+    }
+
     fn host_contract(id: &str, origin: &str, mount: &str, host: &str) -> HolderContract {
         HolderContract {
             host: Some(host.to_string()),
@@ -925,6 +1024,8 @@ mod tests {
             origin: origin.to_string(),
             url_path: "/lamad".to_string(),
             host: None,
+            commitment_id: None,
+            epr_id: None,
             liveness,
             relay_mode: RelayMode::Proxy,
         }
@@ -940,6 +1041,96 @@ mod tests {
             cache_control: None,
             body: body.as_bytes().to_vec(),
         }
+    }
+
+    #[test]
+    fn exact_commitment_reference_requires_one_coherent_current_holder() {
+        let table = NameRouteTable::new();
+        let exact = exact_contract(
+            "alpha",
+            "https://alpha.example",
+            "Garden.Example",
+            "project-epr-garden",
+            "garden-epr",
+        );
+        table.replace_all(
+            vec![exact.clone(), exact],
+            HashMap::from([("alpha".into(), HolderLiveness::Serving)]),
+        );
+        let ExactCommitmentHolder::Unique(holder) =
+            table.exact_commitment_holder(Some("garden.example:443"), "project-epr-garden")
+        else {
+            panic!("identical advertisements must deduplicate");
+        };
+        assert_eq!(holder.doorway_id, "alpha");
+        assert_eq!(holder.epr_id.as_deref(), Some("garden-epr"));
+
+        table.replace_all(
+            vec![
+                HolderContract::any_host("alpha", "https://alpha.example", "/")
+                    .with_projection(Some("project-epr-garden".into()), Some("garden-epr".into())),
+            ],
+            HashMap::new(),
+        );
+        assert!(matches!(
+            table.exact_commitment_holder(Some("localhost:8889"), "project-epr-garden"),
+            ExactCommitmentHolder::Unique(_)
+        ));
+
+        table.replace_all(
+            vec![
+                exact_contract(
+                    "alpha",
+                    "https://alpha.example",
+                    "garden.example",
+                    "project-epr-garden",
+                    "garden-epr",
+                ),
+                HolderContract::any_host("gamma", "https://gamma.example", "/")
+                    .with_projection(Some("project-epr-garden".into()), Some("garden-epr".into())),
+            ],
+            HashMap::new(),
+        );
+        let ExactCommitmentHolder::Unique(holder) =
+            table.exact_commitment_holder(Some("garden.example"), "project-epr-garden")
+        else {
+            panic!("the exact hostname claim must exclude a wildcard claim");
+        };
+        assert_eq!(holder.doorway_id, "alpha");
+
+        table.replace_all(
+            vec![
+                exact_contract(
+                    "alpha",
+                    "https://alpha.example",
+                    "garden.example",
+                    "project-epr-garden",
+                    "garden-epr",
+                ),
+                exact_contract(
+                    "gamma",
+                    "https://gamma.example",
+                    "garden.example",
+                    "project-epr-garden",
+                    "garden-epr",
+                ),
+            ],
+            HashMap::new(),
+        );
+        assert_eq!(
+            table.exact_commitment_holder(Some("garden.example"), "project-epr-garden"),
+            ExactCommitmentHolder::Conflict
+        );
+
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/")],
+            HashMap::new(),
+        );
+        assert_eq!(
+            table.exact_commitment_holder(Some("garden.example"), "project-epr-garden"),
+            ExactCommitmentHolder::Absent,
+            "a legacy coherence row cannot route an exact reference"
+        );
     }
 
     /// A holder's authoritative refusal, shaped exactly as
