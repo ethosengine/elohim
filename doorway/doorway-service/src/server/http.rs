@@ -3354,8 +3354,9 @@ fn addressed_segment<'a>(path: &'a str, prefix: &str) -> Option<&'a str> {
 /// the address back to the CURRENT projection row and folding reach + standing
 /// before the bytes move.
 ///
-/// Returns `Some(refusal)` when the fold refuses, and `None` when it serves —
-/// OR when the address maps to no projection this doorway holds a contract for.
+/// Returns `Ok(Some(reach))` when the fold admits, `Ok(None)` when the address
+/// maps to no projection this doorway holds a contract for, and `Err(response)`
+/// when the fold refuses or cannot read the standing it needs.
 /// That second case is deliberate and is NOT a hole in the fold: an address
 /// with no contract row is not an EPR serve under a contract at all (a loose
 /// blob, an asset of something this doorway never mounted), so there is no
@@ -3370,10 +3371,10 @@ async fn fold_for_addressed_serve<B>(
     req: &Request<B>,
     path: &str,
     address: &str,
-) -> Option<Response<Full<Bytes>>> {
+) -> Result<Option<String>, Box<Response<Full<Bytes>>>> {
     // 1. The address IS the atom id (the ordinary bundle case — the shell URL
     //    `projected_shell_url` mints uses `projection.epr_id` verbatim).
-    let projection = match state.epr_router.projection_for_epr_id(address) {
+    let Some(projection) = (match state.epr_router.projection_for_epr_id(address) {
         Some(p) => Some(p),
         // 2. The address is a declared HEAD of a mounted atom. The slug index
         //    is in-memory, so an unknown hash costs a map walk, never a read.
@@ -3384,7 +3385,9 @@ async fn fold_for_addressed_serve<B>(
             },
             None => None,
         },
-    }?;
+    }) else {
+        return Ok(None);
+    };
 
     let standing = standing_from_request(state, req);
     match crate::services::serve_eligibility::fold_for_projection(
@@ -3395,10 +3398,24 @@ async fn fold_for_addressed_serve<B>(
     )
     .await
     {
-        crate::services::ServeEligibility::Serve => None,
-        crate::services::ServeEligibility::Refuse(refusal) => Some(
+        crate::services::ServeEligibility::Serve => Ok(Some(projection.reach.clone())),
+        crate::services::ServeEligibility::Refuse(refusal) => Err(Box::new(
             crate::services::serve_eligibility::refusal_response(&refusal),
-        ),
+        )),
+        crate::services::ServeEligibility::Unavailable(unavailable) => Err(Box::new(
+            crate::services::serve_eligibility::standing_unavailable_response(&unavailable),
+        )),
+    }
+}
+
+/// Carry the already-resolved admission onto an addressed byte response.
+///
+/// Keeping this tiny adapter shared by `/apps/{address}` and `/blob/{address}`
+/// pins the symmetry: either path states the reach that admitted it, while a
+/// loose address with no mounted contract remains unstamped.
+fn stamp_addressed_admission<B>(response: &mut Response<B>, admitted_reach: Option<&str>) {
+    if let Some(reach) = admitted_reach {
+        crate::services::stamp_admitted_standing(response, reach);
     }
 }
 
@@ -3447,22 +3464,45 @@ async fn dispatch_to_projected_epr(
     // function precisely so it cannot reach the request's standing at all: the
     // only two things that leave this function are a refusal that names its
     // term, or bytes that say which reach admitted them.
-    if let crate::services::ServeEligibility::Refuse(refusal) =
-        crate::services::serve_eligibility::fold_for_projection(
-            state,
-            request_path,
-            &projection,
-            standing,
-        )
-        .await
+    match crate::services::serve_eligibility::fold_for_projection(
+        state,
+        request_path,
+        &projection,
+        standing,
+    )
+    .await
     {
-        return crate::services::serve_eligibility::refusal_response(&refusal);
+        crate::services::ServeEligibility::Serve => {}
+        crate::services::ServeEligibility::Refuse(refusal) => {
+            return crate::services::serve_eligibility::refusal_response(&refusal);
+        }
+        crate::services::ServeEligibility::Unavailable(unavailable) => {
+            return crate::services::serve_eligibility::standing_unavailable_response(&unavailable);
+        }
     }
 
-    // Admitted. Serve the bytes, and say on the way out WHICH reach admitted
-    // them — the chrome's half of the fold being visible (the holder's name is
-    // the relay's `x-elohim-served-by`; the two together are what the person is
-    // shown about the place they walked into).
+    serve_admitted_projection_response(
+        state,
+        request_path,
+        projection,
+        chrome_context_json,
+        wants_html,
+    )
+    .await
+}
+
+/// Serve a projection after the fold has already admitted this request.
+///
+/// Shared with the SSR fallback so a failed render does not ask for the same
+/// membership a second time. This function takes no requester standing and
+/// therefore cannot accidentally re-evaluate or widen the prior decision.
+async fn serve_admitted_projection_response(
+    state: &AppState,
+    request_path: &str,
+    projection: elohim_views::projection::EprProjectionView,
+    chrome_context_json: &str,
+    wants_html: bool,
+) -> Response<Full<Bytes>> {
     let reach = projection.reach.clone();
     let epr_id = projection.epr_id.clone();
     let mut response = serve_admitted_projection(
@@ -3534,6 +3574,49 @@ async fn serve_admitted_projection(
         projection.spa_fallback,
     );
 
+    // A candidate-bound hostname serves only the staging declaration selected
+    // by the notary election. Its content address enters the existing
+    // `/apps/{address}` path; it never consults the moving slug or the converged
+    // warm-shell cache. Thus absence or locally unavailable bytes cannot leak
+    // the public version into the candidate name.
+    let candidate_address = if projection.channel == elohim_views::projection::Channel::Candidate {
+        match state.renderer_registry.bundle_heads().get_channel(
+            &projection.epr_id,
+            elohim_views::projection::Channel::Candidate,
+        ) {
+            Some(observed) if observed.no_candidate_staged => {
+                return Response::builder()
+                    .status(StatusCode::NOT_FOUND)
+                    .header("content-type", "application/json")
+                    .body(Full::new(Bytes::from(r#"{"error":"no-candidate-staged"}"#)))
+                    .expect("infallible candidate 404");
+            }
+            Some(observed) => match observed.browser {
+                Some(address) => Some(address),
+                None => {
+                    return Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header("content-type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"candidate-bytes-unavailable"}"#,
+                        )))
+                        .expect("infallible candidate 503");
+                }
+            },
+            None => {
+                return Response::builder()
+                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                    .header("content-type", "application/json")
+                    .body(Full::new(Bytes::from(
+                        r#"{"error":"candidate-head-unobserved"}"#,
+                    )))
+                    .expect("infallible candidate 503");
+            }
+        }
+    } else {
+        None
+    };
+
     // Warm-boot shell cache (Task 3.4), SHELL DOCUMENT ONLY. A browser
     // navigation resolves to the projection's entry file; that document is the
     // one thing a person cannot be served without, and it is exactly what the
@@ -3547,7 +3630,7 @@ async fn serve_admitted_projection(
     // the upstream read below and keys the stock — a slug is a moving pointer,
     // so the two must never be resolved separately.
     let mut shell_head: Option<String> = None;
-    if sub_path == projection.entry_file {
+    if sub_path == projection.entry_file && candidate_address.is_none() {
         use crate::render::warm_shell::{FetchBudget, ShellPlan};
         // `would_shed` is a READ. The obvious `is_open` is a gate: it consumes
         // the one half-open trial, and this planner has no guard to record an
@@ -3666,7 +3749,10 @@ async fn serve_admitted_projection(
     // later request; the shell cache's held-head behavior is the local continuity
     // guarantee available at this unversioned root URL.
     // Extension-less non-asset paths keep their existing semantics.
-    let asset_head = if sub_path != projection.entry_file && !is_spa_route_subpath(&sub_path) {
+    let asset_head = if candidate_address.is_none()
+        && sub_path != projection.entry_file
+        && !is_spa_route_subpath(&sub_path)
+    {
         let (_, warm, declared) = state
             .warm_shell
             .lookup_with_declared(&projection.epr_id, &projection.entry_file)
@@ -3683,9 +3769,8 @@ async fn serve_admitted_projection(
     } else {
         None
     };
-    let dispatch_address = shell_head
-        .clone()
-        .or(asset_head)
+    let dispatch_address = candidate_address
+        .or(shell_head.clone().or(asset_head))
         .unwrap_or_else(|| projection.epr_id.clone());
     let storage_apps_path = if projection.spa_fallback {
         format!("{}/apps/{}/{}", storage_url, dispatch_address, sub_path)
@@ -4245,6 +4330,7 @@ mod epr_dispatch_breaker_tests {
         assert!(
             fold_for_addressed_serve(&state, &req, "/blob/sha256-unknown", "sha256-unknown")
                 .await
+                .expect("an unmounted address is not blocked")
                 .is_none(),
             "no contract row ⇒ no reach declaration to enforce ⇒ pass through"
         );
@@ -4275,8 +4361,45 @@ mod epr_dispatch_breaker_tests {
             "elohim-host-landing",
         )
         .await
-        .expect("a narrowed EPR's cached assets stop answering anonymously too");
+        .expect_err("a narrowed EPR's cached assets stop answering anonymously too");
         assert_eq!(refusal.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn addressed_apps_and_blobs_carry_the_reach_that_admitted_them() {
+        use crate::config::Args;
+        use clap::Parser;
+
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let state = AppState::new(args);
+        state.epr_router.replace_all(vec![shell_projection(true)]);
+
+        for path in [
+            "/apps/elohim-host-landing/main.js",
+            "/blob/elohim-host-landing",
+        ] {
+            let req = Request::builder()
+                .uri(path)
+                .body(http_body_util::Empty::<Bytes>::new())
+                .unwrap();
+            let reach = fold_for_addressed_serve(&state, &req, path, "elohim-host-landing")
+                .await
+                .expect("commons reach is evaluable")
+                .expect("the address resolves to the mounted EPR");
+            let mut response = Response::builder()
+                .status(StatusCode::OK)
+                .body(Full::new(Bytes::new()))
+                .unwrap();
+            stamp_addressed_admission(&mut response, Some(&reach));
+            assert_eq!(
+                response
+                    .headers()
+                    .get(crate::services::STANDING_HEADER)
+                    .and_then(|value| value.to_str().ok()),
+                Some("admitted;reach=commons"),
+                "{path} must carry the same admission as the root EPR serve"
+            );
+        }
     }
 
     /// Regression for the live alpha split: `/` came from the new declared head,
@@ -4417,6 +4540,69 @@ mod epr_dispatch_breaker_tests {
         // Legacy/unbound warm bytes carry no address. The newer declaration must
         // not be attached to them; preserve the honest moving-slug fallback.
         exercise(false, "elohim-host-landing").await;
+    }
+
+    #[tokio::test]
+    async fn candidate_channel_uses_only_its_exact_cid_and_withdrawal_never_falls_back() {
+        use crate::render::bundle_heads::{ChannelHead, HeadDoc};
+        use elohim_views::projection::Channel;
+        use http_body_util::BodyExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let storage = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/apps/bafkreiCAND/version.json"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(br#"{"commit":"candidate"}"#))
+            .expect(1)
+            .mount(&storage)
+            .await;
+        let state = asset_binding_state(&storage.uri(), Arc::new(AssetBindingArchive::default()));
+        state.renderer_registry.bundle_heads().record(
+            "elohim-host-landing",
+            Channel::Candidate,
+            &ChannelHead::Resolved(HeadDoc {
+                browser: Some("bafkreiCAND".into()),
+                server: None,
+                staging_declaration: Some("uhCkkCAND".into()),
+            }),
+        );
+        let mut projection = shell_projection(true);
+        projection.channel = Channel::Candidate;
+        let response = dispatch_to_projected_epr(
+            &state,
+            "/version.json",
+            projection.clone(),
+            "{}",
+            false,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(br#"{"commit":"candidate"}"#)
+        );
+
+        state.renderer_registry.bundle_heads().record(
+            "elohim-host-landing",
+            Channel::Candidate,
+            &ChannelHead::NoCandidateStaged,
+        );
+        let withdrawn = dispatch_to_projected_epr(
+            &state,
+            "/version.json",
+            projection,
+            "{}",
+            false,
+            RequesterStanding::anonymous(),
+        )
+        .await;
+        assert_eq!(withdrawn.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            withdrawn.into_body().collect().await.unwrap().to_bytes(),
+            Bytes::from_static(br#"{"error":"no-candidate-staged"}"#)
+        );
     }
 
     #[test]
@@ -4892,8 +5078,14 @@ fn with_bundle_provenance_header(
 /// renderer-absent doorway, serves the projected bundle directly — the cheapest
 /// path and today's exact behavior. Pure, so the decision is unit-testable
 /// without a live storage or renderer.
-fn epr_should_serve_ssr(dispo: &Disposition, renderer_present: bool) -> bool {
-    matches!(dispo, Disposition::SsrRoute { .. }) && renderer_present
+fn epr_should_serve_ssr(
+    channel: elohim_views::projection::Channel,
+    dispo: &Disposition,
+    renderer_present: bool,
+) -> bool {
+    channel == elohim_views::projection::Channel::Converged
+        && matches!(dispo, Disposition::SsrRoute { .. })
+        && renderer_present
 }
 
 /// Detect a "successful but empty" Angular SSR render: the render returned HTML,
@@ -4990,9 +5182,6 @@ async fn ssr_fallback_response(
 ) -> Response<Full<Bytes>> {
     // Negotiated before `req` is consumed by the proxy/dispatch arms below.
     let wants_html = routes::catching_up::accepts_html(req.headers());
-    // Likewise the standing: the `ProjectedEpr` arm re-asks the serving fold,
-    // and `req` is moved by the sibling arms.
-    let standing = standing_from_request(state, &req);
     match fallback {
         SsrFallback::Registry => match reason {
             SsrFallbackReason::AuthModeUnsupported
@@ -5032,16 +5221,16 @@ async fn ssr_fallback_response(
         },
         SsrFallback::ProjectedEpr(projection) => {
             // EVERY fallback serves the projected bundle; the chrome island is
-            // spliced INSIDE dispatch_to_projected_epr (never double-spliced —
-            // the SSR-serve inject path is a disjoint branch that never runs on
-            // any request that reaches here). Tag for observability.
-            let resp = dispatch_to_projected_epr(
+            // spliced inside the admitted byte path (never double-spliced — the
+            // SSR-serve inject path is a disjoint branch that never runs on any
+            // request that reaches here). The EPR-router caller already folded
+            // before attempting SSR, so this fallback must not re-read standing.
+            let resp = serve_admitted_projection_response(
                 state,
                 path,
                 *projection,
                 chrome_context_json,
                 wants_html,
-                standing,
             )
             .await;
             with_ssr_skipped_header(resp, &reason)
@@ -6365,31 +6554,6 @@ async fn handle_request(
             {
                 return Ok(to_boxed(relayed));
             }
-            // ── THE FOLD, before any byte path ───────────────────────────────
-            // Checked AFTER the relay (a name a sibling holds the contract for
-            // is the HOLDER's reach to fold, never ours) and BEFORE the SSR
-            // diversion, because a successful SSR render serves the warm shell
-            // through `resolve_projected_shell` and returns without ever
-            // reaching `dispatch_to_projected_epr`. Without this the SSR path
-            // would be the one serve path a reach narrowing never reached.
-            //
-            // `projection` here is the row `EprRouter::dispatch` just returned
-            // from the table the reconcile rebuilds — the CURRENT reach, not a
-            // value that travelled with any cached bytes.
-            let standing = standing_from_request(&state, &req);
-            if let crate::services::ServeEligibility::Refuse(refusal) =
-                crate::services::serve_eligibility::fold_for_projection(
-                    &state,
-                    &path,
-                    &projection,
-                    standing.clone(),
-                )
-                .await
-            {
-                return Ok(to_boxed(
-                    crate::services::serve_eligibility::refusal_response(&refusal),
-                ));
-            }
             // The manifest `render` field is the agnostic SSR contract: a
             // projection whose path is ALSO declared render:"angular-ssr" must
             // serve through the V8 SSR engine (peer-capability-gated), not the
@@ -6399,8 +6563,40 @@ async fn handle_request(
             // only (the enclosing `method == Method::GET` guard), so a gated write
             // can never reach the SSR helper — the op-gate invariant holds.
             let dispo = classify_dispatch(&state.route_registry, &method, &path).await;
-            if epr_should_serve_ssr(&dispo, state.renderer_registry.any_loaded()) {
+            if epr_should_serve_ssr(
+                projection.channel,
+                &dispo,
+                state.renderer_registry.any_loaded(),
+            ) {
                 if let Disposition::SsrRoute { spec, endpoint } = dispo {
+                    // SSR is the one byte path that does not enter
+                    // `dispatch_to_projected_epr`, so it folds here. Ordinary
+                    // projected-bundle dispatch folds inside that function —
+                    // one membership read per request, never one before and
+                    // another inside dispatch.
+                    let standing = standing_from_request(&state, &req);
+                    match crate::services::serve_eligibility::fold_for_projection(
+                        &state,
+                        &path,
+                        &projection,
+                        standing,
+                    )
+                    .await
+                    {
+                        crate::services::ServeEligibility::Serve => {}
+                        crate::services::ServeEligibility::Refuse(refusal) => {
+                            return Ok(to_boxed(
+                                crate::services::serve_eligibility::refusal_response(&refusal),
+                            ));
+                        }
+                        crate::services::ServeEligibility::Unavailable(unavailable) => {
+                            return Ok(to_boxed(
+                                crate::services::serve_eligibility::standing_unavailable_response(
+                                    &unavailable,
+                                ),
+                            ));
+                        }
+                    }
                     // EVERY SSR shed/failure degrades to the projected bundle
                     // (chrome-carrying) — i.e. exactly today's EPR serving.
                     let reach = projection.reach.clone();
@@ -6434,6 +6630,7 @@ async fn handle_request(
             let chrome_context_json =
                 build_chrome_context_json_for(&path, &req, Some(&projection.epr_id));
             let wants_html = routes::catching_up::accepts_html(req.headers());
+            let standing = standing_from_request(&state, &req);
             let local = dispatch_to_projected_epr(
                 &state,
                 &path,
@@ -7196,15 +7393,18 @@ async fn handle_request(
             // app-file cache — bytes that outlive the pod and that no reach
             // check ever stood in front of. Re-ask the fold first, against the
             // CURRENT projection row for this address.
-            if let Some(address) = addressed_segment(p, "/apps/") {
-                if let Some(refusal) = fold_for_addressed_serve(&state, &req, p, address).await {
-                    return Ok(to_boxed(refusal));
+            let admitted_reach = if let Some(address) = addressed_segment(p, "/apps/") {
+                match fold_for_addressed_serve(&state, &req, p, address).await {
+                    Ok(reach) => reach,
+                    Err(blocked) => return Ok(to_boxed(*blocked)),
                 }
-            }
+            } else {
+                None
+            };
             debug!(path = %p, "Handling app request (projection cache)");
-            return Ok(to_boxed(
-                routes::handle_app_request(Arc::clone(&state), p).await,
-            ));
+            let mut response = routes::handle_app_request(Arc::clone(&state), p).await;
+            stamp_addressed_admission(&mut response, admitted_reach.as_deref());
+            return Ok(to_boxed(response));
         }
 
         // Sitemap (spec §7.5): a derived projection of the routing table —
@@ -7532,11 +7732,26 @@ async fn handle_request(
                         // doorway mounts, the fold governs it like any other
                         // serve of that EPR.
                         if let Some(address) = addressed_segment(p, "/blob/") {
-                            if let Some(refusal) =
-                                fold_for_addressed_serve(&state, &req, p, address).await
-                            {
-                                return Ok(to_boxed(refusal));
-                            }
+                            let admitted_reach =
+                                match fold_for_addressed_serve(&state, &req, p, address).await {
+                                    Ok(reach) => reach,
+                                    Err(blocked) => return Ok(to_boxed(*blocked)),
+                                };
+                            let mut response = routes::forward_blob_to_storage(
+                                req,
+                                &endpoint,
+                                p,
+                                Arc::clone(&state.cache),
+                                &state.storage_proxy_client,
+                                &state.upstream_breakers,
+                                ctx,
+                            )
+                            .await;
+                            stamp_addressed_admission(
+                                &mut response,
+                                admitted_reach.as_deref(),
+                            );
+                            return Ok(to_boxed(response));
                         }
                         return Ok(to_boxed(
                             routes::forward_blob_to_storage(
@@ -9565,6 +9780,7 @@ mod dispatch_classification_tests {
 
     #[test]
     fn epr_diverts_to_ssr_only_when_ssr_route_and_renderer_present() {
+        use elohim_views::projection::Channel;
         // The EPR-dispatch decision (pure, no HTTP): divert to the V8 SSR engine
         // iff the disposition is SsrRoute AND a renderer is loaded. Every other
         // combination serves the projected bundle (today's exact behavior).
@@ -9576,13 +9792,24 @@ mod dispatch_classification_tests {
             endpoint: "http://storage:8090".to_string(),
         };
         // SsrRoute + renderer → divert.
-        assert!(epr_should_serve_ssr(&ssr, true));
+        assert!(epr_should_serve_ssr(Channel::Converged, &ssr, true));
+        // A candidate projection always reaches its exact staged CID path,
+        // even when the same slug has an SSR route and a renderer is loaded.
+        assert!(!epr_should_serve_ssr(Channel::Candidate, &ssr, true));
         // SsrRoute but NO renderer → projected bundle (cheapest path, today's behavior).
-        assert!(!epr_should_serve_ssr(&ssr, false));
+        assert!(!epr_should_serve_ssr(Channel::Converged, &ssr, false));
         // Non-SSR dispositions never divert, renderer present or not.
-        assert!(!epr_should_serve_ssr(&proxy, true));
-        assert!(!epr_should_serve_ssr(&Disposition::RegistryUnhandled, true));
-        assert!(!epr_should_serve_ssr(&Disposition::NotFound, true));
+        assert!(!epr_should_serve_ssr(Channel::Converged, &proxy, true));
+        assert!(!epr_should_serve_ssr(
+            Channel::Converged,
+            &Disposition::RegistryUnhandled,
+            true
+        ));
+        assert!(!epr_should_serve_ssr(
+            Channel::Converged,
+            &Disposition::NotFound,
+            true
+        ));
     }
 
     #[test]

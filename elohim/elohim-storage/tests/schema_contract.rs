@@ -184,7 +184,7 @@ fn assert_source_of_truth_declared(schema_value: &Value, schema_name: &str) {
 
 #[test]
 fn content_head_view_matches_schema() {
-    use elohim_views::ContentHeadView;
+    use elohim_views::{ContentHeadView, StagingCandidateState};
 
     // Full variant: explicitly-declared head with an anchor + serving blob.
     let declared = ContentHeadView {
@@ -201,6 +201,8 @@ fn content_head_view_matches_schema() {
         staging_candidate: Some(
             "uhCkkCANDIDATE012345678901234567890123456789012345678901234".to_string(),
         ),
+        staging_candidate_blob_hash: Some("bafkrei-candidate".to_string()),
+        staging_candidate_state: Some(StagingCandidateState::Staged),
     };
     let json = serde_json::to_value(&declared).unwrap();
     validate_against_schema("views/content-head.schema.json", &json);
@@ -222,6 +224,8 @@ fn content_head_view_matches_schema() {
         blob_hash: None,
         updated_at: None,
         staging_candidate: None,
+        staging_candidate_blob_hash: None,
+        staging_candidate_state: Some(StagingCandidateState::None),
     };
     let json = serde_json::to_value(&anchor_only).unwrap();
     validate_against_schema("views/content-head.schema.json", &json);

@@ -16,6 +16,7 @@ import { readFile, readlink } from 'node:fs/promises';
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
 import {
+  householdMeshDir,
   loadHouseholdMeshFixture,
   requireFixtureDoorwayLogPath,
   requireFixturePeerPid,
@@ -160,14 +161,7 @@ async function acquireDoorwayLease(world: E2EWorld): Promise<void> {
   if (doorwayLeases.has(world)) return;
   const child = spawn(
     '/usr/bin/flock',
-    [
-      '-n',
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- The owned mesh's shared lock coordinates every fault run.
-      `${process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh'}/a2o.lock`,
-      '/bin/bash',
-      '-c',
-      'echo locked; read -r _',
-    ],
+    ['-n', `${householdMeshDir()}/a2o.lock`, '/bin/bash', '-c', 'echo locked; read -r _'],
     { stdio: 'pipe' }
   );
   doorwayLeases.set(world, child);

@@ -179,7 +179,7 @@ mkdir -p "$(readlink -m "$STORAGE_TARGET_DIR")" "$(readlink -m "$DOORWAY_TARGET_
 # DOORWAY_PORT always wins, and the isolated (no-mesh) default stays exactly
 # 8090/8888 as it always has.
 # ──────────────────────────────────────────────────────────────────────────────
-_t3_mesh_dir="${MESH_DIR:-/tmp/elohim-local-mesh}"
+_t3_mesh_dir="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
 mesh_peers_live() { # -> 0 when the mesh's pid dir names at least one live conductor
   local pid_dir="$_t3_mesh_dir/pids" f pid started current
   [ -d "$pid_dir" ] || return 1

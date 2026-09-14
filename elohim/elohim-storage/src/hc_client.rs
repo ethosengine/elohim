@@ -34,6 +34,14 @@ use crate::conductor_admission::AdmissionClass;
 use crate::conductor_bridge_health::{observe_role_zome_error, record_role_success};
 use crate::error::StorageError;
 
+fn is_correlated_head_record_call(zome_name: &str, fn_name: &str) -> bool {
+    zome_name == "content_store"
+        && fn_name == "get_record_for_action"
+        && tracing::Span::current()
+            .metadata()
+            .is_some_and(|metadata| metadata.name() == "head_record_http")
+}
+
 /// What the admission gate observed about one zome call.
 ///
 /// `admission_wait` is the queueing delay for LOCAL capacity; `rtt` is the
@@ -601,6 +609,7 @@ impl HcClient {
         payload: Vec<u8>,
         class: AdmissionClass,
     ) -> Result<(Vec<u8>, ZomeCallTiming), StorageError> {
+        let is_head_record = is_correlated_head_record_call(zome_name, fn_name);
         debug!(
             zome = %zome_name,
             fn_name = %fn_name,
@@ -619,9 +628,28 @@ impl HcClient {
         // conductor nothing. This is deliberately NOT a timeout on the call:
         // once admitted, the call runs unbounded on our side exactly as before,
         // bounded on the far side by the extern's own in-wasm deadline.
-        let permit = crate::conductor_admission::admission()
+        if is_head_record {
+            info!(phase = "admission_waiting", "head-record conductor phase");
+        }
+        let permit = match crate::conductor_admission::admission()
             .acquire(class, zome_name)
-            .await?;
+            .await
+        {
+            Ok(permit) => permit,
+            Err(error) => {
+                if is_head_record {
+                    info!(phase = "admission_error", error = %error, "head-record conductor phase");
+                }
+                return Err(error);
+            }
+        };
+        if is_head_record {
+            info!(
+                phase = "admission_acquired",
+                admission_wait_ms = permit.wait().as_millis(),
+                "head-record conductor phase"
+            );
+        }
 
         let dispatched_at = Instant::now();
         // The holochain_client handles signing automatically
@@ -634,13 +662,37 @@ impl HcClient {
                 fn_name.into(),
                 ExternIO::from(payload),
             )
-            .await
-            .map_err(|e| self.zome_call_failed(e))?;
+            .await;
+        let rtt = dispatched_at.elapsed();
+        let result = match result {
+            Ok(result) => {
+                if is_head_record {
+                    info!(
+                        phase = "zome_call_complete",
+                        rtt_ms = rtt.as_millis(),
+                        "head-record conductor phase"
+                    );
+                }
+                result
+            }
+            Err(error) => {
+                let error = self.zome_call_failed(error);
+                if is_head_record {
+                    info!(
+                        phase = "zome_call_error",
+                        rtt_ms = rtt.as_millis(),
+                        error = %error,
+                        "head-record conductor phase"
+                    );
+                }
+                return Err(error);
+            }
+        };
         record_role_success(self.role_key());
 
         let timing = ZomeCallTiming {
             admission_wait: permit.wait(),
-            rtt: dispatched_at.elapsed(),
+            rtt,
         };
         // Held across the whole call on purpose: the permit models capacity the
         // conductor is still spending, and releasing it early would understate
@@ -1156,6 +1208,38 @@ pub trait CellOwner: Send + Sync {
 impl CellOwner for HcClient {
     fn agent_key_hex(&self) -> String {
         hex::encode(self.cell_id.agent_pubkey().get_raw_39())
+    }
+}
+
+#[cfg(test)]
+mod head_record_trace_scope_tests {
+    use super::*;
+
+    #[test]
+    fn head_record_info_phases_require_the_http_correlation_span() {
+        let subscriber = tracing_subscriber::registry();
+        tracing::subscriber::with_default(subscriber, || {
+            assert!(!is_correlated_head_record_call(
+                "content_store",
+                "get_record_for_action"
+            ));
+
+            let span = tracing::info_span!("head_record_http", head_record_request_id = 7_u64);
+            span.in_scope(|| {
+                assert!(is_correlated_head_record_call(
+                    "content_store",
+                    "get_record_for_action"
+                ));
+                assert!(!is_correlated_head_record_call(
+                    "content_store",
+                    "resolve_content_head_local"
+                ));
+                assert!(!is_correlated_head_record_call(
+                    "mishpat",
+                    "get_record_for_action"
+                ));
+            });
+        });
     }
 }
 

@@ -87,7 +87,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-LOCAL_DEV_DIR="${LOCAL_DEV_DIR:-$REPO_ROOT/elohim/holochain/local-dev}"
+MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
+LOCAL_DEV_DIR="${LOCAL_DEV_DIR:-$MESH_DIR/conductors}"
 
 CYCLES=3
 WINDOW=20

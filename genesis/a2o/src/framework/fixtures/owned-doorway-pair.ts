@@ -4,9 +4,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createReadStream, readFileSync } from 'node:fs';
 import { chmod, copyFile, mkdir, mkdtemp, open, readFile, readlink, rm } from 'node:fs/promises';
 import { connect, createServer } from 'node:net';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { householdMeshDir } from './household-mesh.js';
 import {
   assertStillOwnedProcess,
   processStartTicks,
@@ -288,7 +288,9 @@ export class OwnedDoorwayPair {
     const urls = Object.fromEntries(names.map(name => [name, options.storagePeers[name]?.url]));
     for (const name of names)
       assert.ok(urls[name], `owned doorway pair needs storage peer ${name}`);
-    const root = await mkdtemp(join(tmpdir(), 'epr-deliverability-doorways-'));
+    const scenarioRoot = join(householdMeshDir(), 'scenarios');
+    await mkdir(scenarioRoot, { recursive: true });
+    const root = await mkdtemp(join(scenarioRoot, 'epr-deliverability-doorways-'));
     const acquired: StopTarget[] = [];
     try {
       const mongoDir = join(root, 'mongo');

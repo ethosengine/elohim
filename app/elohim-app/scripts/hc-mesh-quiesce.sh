@@ -37,7 +37,7 @@
 # no longer matches the fleet's actual reconcile cadence).
 #
 # Result record: one line per run appended to
-# ${MESH_DIR:-/tmp/elohim-local-mesh}/quiesce-log.txt AND printed —
+# ${MESH_DIR:-<repo>/genesis/local-dev/household-dowell}/quiesce-log.txt AND printed —
 # date, wall-clock, PASS/FAIL, knob values. This is the shift-visible
 # record the minutes-quiesce plan's baseline compares against
 # (baseline: 3,439 rows x 3 peers, ~90min, .claude/shifts/
@@ -49,7 +49,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 GATE_SCRIPT="$REPO_ROOT/scripts/ci/fleet-quiesce-gate.sh"
 
-MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
+MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
 mkdir -p "$MESH_DIR"
 # Durable home for the quiesce record (same defect + cure as recovery-timeline.jsonl — see
 # hc-mesh-recovery.sh): the log lives under the repo's gitignored reports tree; $MESH_DIR keeps a

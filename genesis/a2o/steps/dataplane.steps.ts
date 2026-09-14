@@ -72,6 +72,7 @@ import {
   CATCHUP_RIDE_STEP_TIMEOUT_MS,
   type ParsedMetrics,
 } from '../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -137,8 +138,7 @@ function recoveryScenario(record: RecoveryTimelineRecord, lineNumber: number): s
 }
 
 function loadRecoveryTimeline(pathExpression: string): RecoveryTimelineRecord[] {
-  // eslint-disable-next-line sonarjs/publicly-writable-directories -- the local mesh owns this exact task-scoped directory; MESH_DIR remains overridable for fixtures and isolated runs
-  const meshDir = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+  const meshDir = householdMeshDir();
   const timelinePath = pathExpression
     .replaceAll('${MESH_DIR}', meshDir)
     .replaceAll('$MESH_DIR', meshDir);

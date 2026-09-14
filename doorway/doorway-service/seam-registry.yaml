@@ -2729,7 +2729,11 @@ decisionPoints:
         justification: >
           tombstones_are_distinct_per_closing pins that distinct closings yield distinct
           handles, so the close update can never fail the unique index it is trying to free.
-      - { id: C13, status: n-a, justification: "Releases a name; it grants no authority and serves no lower social tier." }
+      - {
+          id: C13,
+          status: n-a,
+          justification: "Releases a name; it grants no authority and serves no lower social tier.",
+        }
     contractTests:
       - path: doorway/doorway-service/src/routes/auth_routes.rs
         testName: tombstones_are_distinct_per_closing
@@ -2762,7 +2766,11 @@ decisionPoints:
           (Angular DatePipe NG02100) and abandoned every template node below it, so the
           account page reported a missing hosted section when the data behind it was
           correct — a display absence standing in for a wire defect.
-      - { id: C14, status: partial, justification: "The format is now pinned by test; nothing yet reports a row whose stored instant is unrepresentable." }
+      - {
+          id: C14,
+          status: partial,
+          justification: "The format is now pinned by test; nothing yet reports a row whose stored instant is unrepresentable.",
+        }
     contractTests:
       - path: doorway/doorway-service/src/routes/auth_routes.rs
         testName: every_account_timestamp_is_rfc3339
@@ -3516,4 +3524,100 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/services/serve_eligibility.rs
         testName: a_refusal_with_no_declared_term_says_owed_null_rather_than_naming_anybody
+        kind: unit
+
+  - name: ServeEligibility
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/services/serve_eligibility.rs
+      modulePath: services::serve_eligibility::ServeEligibility
+      line: 439
+    summary: >
+      The serve-time reach and standing answer: Serve, Refuse with an attributable governance
+      verdict, or Unavailable when the membership evidence required to decide could not be read.
+    notes: >
+      This is a Category-C request decision over current notarized projections. It creates no
+      entry, link, cache row, or head. Unavailable is intentionally separate from Refuse: a
+      doorway with missing evidence may protect the bytes but may not tell a person that the
+      collective judged their standing.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The type is ephemeral and carries the result of reading existing projection and
+          membership records; it introduces no new authority or persisted identity.
+      - id: C4
+        status: answered
+        justification: >
+          Serve, Refuse, and Unavailable are distinct arms. The unavailable response test pins
+          that a failed read is neither an admission nor a non-membership verdict.
+      - id: C7
+        status: answered
+        justification: >
+          Both answers are visible on the wire: admitted responses carry an admitted standing
+          stamp, refusals carry 403, and unavailable evidence carries a non-cacheable 503.
+      - id: C12
+        status: answered
+        justification: >
+          The fold admits only verified request claims plus a successful current membership
+          projection; unknown or malformed evidence cannot become standing.
+      - id: C14
+        status: answered
+        justification: >
+          The exhaustive enum forces every serve path to handle unavailable evidence explicitly;
+          its wire form exposes neither challenge nor owed terms because no verdict was reached.
+    contractTests:
+      - path: doorway/doorway-service/src/services/serve_eligibility.rs
+        testName: an_unavailable_membership_read_is_a_nonchallengeable_503
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: addressed_apps_and_blobs_carry_the_reach_that_admitted_them
+        kind: unit
+
+  - name: MembershipReadFailure
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/services/serve_eligibility.rs
+      modulePath: services::serve_eligibility::MembershipReadFailure
+      line: 351
+    summary: >
+      Closed public-safe reasons why the current membership projection could not answer:
+      not-configured, upstream-status, transport, or invalid-body.
+    notes: >
+      Raw upstream bodies, transport errors, and membership lists remain private to bounded logs.
+      A successful empty list is deliberately outside this enum because it is evaluated evidence
+      of non-membership, while malformed rows are InvalidBody. Only consented, non-departed rows
+      establish standing; pending, withdrawn, and departed rows remain non-membership.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          Every non-success, transport failure, and malformed answer is a closed failure arm and
+          cannot fall through to permission.
+      - id: C4
+        status: answered
+        justification: >
+          The HTTP-boundary test independently pins successful empty and malformed answers to
+          different typed outcomes.
+      - id: C8
+        status: partial
+        justification: >
+          Logs carry the closed cause and bounded request identity, but no dedicated per-cause
+          counter has been introduced in this slice.
+      - id: C10
+        status: answered
+        justification: >
+          The public reason vocabulary is finite and excludes raw upstream payloads, errors, and
+          member lists; the 503 response test pins the exposed shape.
+      - id: C14
+        status: answered
+        justification: >
+          Unknown evidence cannot be represented as membership absence; callers must map a typed
+          failure to StandingUnavailable.
+    contractTests:
+      - path: doorway/doorway-service/src/services/serve_eligibility.rs
+        testName: membership_read_distinguishes_empty_from_malformed_at_the_http_boundary
+        kind: integration
+      - path: doorway/doorway-service/src/services/serve_eligibility.rs
+        testName: malformed_membership_rows_are_unavailable_not_nonmembership
         kind: unit

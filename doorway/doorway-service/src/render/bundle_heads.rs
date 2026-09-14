@@ -174,7 +174,7 @@ impl HeadSource for HttpHeadSource {
                 let body = self
                     .get_body(&format!("{}/db/content/{}/head", self.storage_base, slug))
                     .await?;
-                Ok(parse_candidate_head(&body))
+                parse_candidate_head(&body)
             }
         }
     }
@@ -182,27 +182,37 @@ impl HeadSource for HttpHeadSource {
 
 /// Parse a `/db/content/{slug}/head` body into this slug's candidate answer.
 ///
-/// Absent, null or empty `stagingCandidate` is [`ChannelHead::NoCandidateStaged`]
-/// — the NAMED absence, which the caller answers with and never falls back
-/// from. A malformed body is treated the same way rather than as a head: this
-/// function's contract is that it can only ever produce a candidate the peer
-/// actually declared.
-pub fn parse_candidate_head(body: &str) -> ChannelHead {
-    let declaration = serde_json::from_str::<serde_json::Value>(body)
-        .ok()
-        .and_then(|v| {
-            v.get("stagingCandidate")
-                .and_then(|c| c.as_str())
-                .map(str::to_string)
-        })
-        .filter(|c| !c.is_empty());
-    match declaration {
-        Some(d) => ChannelHead::Resolved(HeadDoc {
-            browser: None,
+/// Only an explicit `stagingCandidateState: "none"` is the authoritative
+/// named absence. Missing, unknown, malformed, unavailable, or inconsistent
+/// answers are read failures so reconciliation keeps its last observation.
+pub fn parse_candidate_head(body: &str) -> Result<ChannelHead, String> {
+    let parsed = serde_json::from_str::<serde_json::Value>(body)
+        .map_err(|e| format!("candidate head JSON: {e}"))?;
+    let state = parsed
+        .get("stagingCandidateState")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "candidate head lacks stagingCandidateState".to_string())?;
+    let declaration = parsed
+        .get("stagingCandidate")
+        .and_then(|c| c.as_str())
+        .filter(|c| !c.is_empty())
+        .map(str::to_string);
+    let blob = parsed
+        .get("stagingCandidateBlobHash")
+        .and_then(|c| c.as_str())
+        .filter(|c| !c.is_empty())
+        .map(str::to_string);
+    match (state, declaration, blob) {
+        ("staged", Some(d), blob) => Ok(ChannelHead::Resolved(HeadDoc {
+            browser: blob,
             server: None,
             staging_declaration: Some(d),
-        }),
-        None => ChannelHead::NoCandidateStaged,
+        })),
+        ("none", None, None) => Ok(ChannelHead::NoCandidateStaged),
+        ("unavailable", _, _) => Err("candidate head unavailable".to_string()),
+        ("staged", None, _) => Err("candidate state staged without a declaration".to_string()),
+        ("none", _, _) => Err("candidate state none carried candidate data".to_string()),
+        (unknown, _, _) => Err(format!("unknown candidate head state: {unknown}")),
     }
 }
 
@@ -1119,6 +1129,56 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn storage_candidate_state_keeps_last_on_unavailable_but_records_real_withdrawal() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn reconcile_from(body: &'static str) -> ObservedHeads {
+            let storage = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/db/content/landing/head"))
+                .respond_with(ResponseTemplate::new(200).set_body_string(body))
+                .expect(1)
+                .mount(&storage)
+                .await;
+            let heads = Arc::new(BundleHeadStore::new());
+            heads.record(
+                "landing",
+                Channel::Candidate,
+                &ChannelHead::Resolved(HeadDoc {
+                    browser: Some("bafkreiCAND".into()),
+                    server: None,
+                    staging_declaration: Some("uhCkkCAND".into()),
+                }),
+            );
+            let reconciler = BundleHeadsReconciler::new(
+                Arc::new(HttpHeadSource::new(storage.uri())),
+                None,
+                Arc::new(WarmShellStore::inert()),
+                heads.clone(),
+                Arc::new(Vec::new),
+            );
+            reconciler
+                .reconcile_slug("landing", Channel::Candidate, Some("index.html"))
+                .await;
+            heads
+                .get_channel("landing", Channel::Candidate)
+                .expect("prior candidate remains represented")
+        }
+
+        let retained =
+            reconcile_from(r#"{"stagingCandidate":null,"stagingCandidateState":"unavailable"}"#)
+                .await;
+        assert_eq!(retained.staging_declaration.as_deref(), Some("uhCkkCAND"));
+        assert!(!retained.no_candidate_staged);
+
+        let withdrawn =
+            reconcile_from(r#"{"stagingCandidate":null,"stagingCandidateState":"none"}"#).await;
+        assert_eq!(withdrawn.staging_declaration, None);
+        assert!(withdrawn.no_candidate_staged);
+    }
+
+    #[tokio::test]
     async fn a_content_event_reconciles_every_channel_that_slug_is_mounted_on() {
         let source = FakeSource::declaring(Some("sha256-production"), None);
         source.stage_candidate(Some("uhCkkCANDIDATE01"));
@@ -1138,17 +1198,25 @@ mod tests {
     }
 
     #[test]
-    fn a_head_read_with_no_staging_candidate_parses_as_the_named_absence() {
+    fn only_an_explicit_none_state_is_the_named_candidate_absence() {
+        assert_eq!(
+            parse_candidate_head(
+                r#"{"contentId":"landing","stagingCandidate":null,"stagingCandidateState":"none"}"#
+            ),
+            Ok(ChannelHead::NoCandidateStaged)
+        );
         for body in [
-            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","declared":true,"trust":"notarized"}"#,
             r#"{"contentId":"landing","stagingCandidate":null}"#,
-            r#"{"contentId":"landing","stagingCandidate":""}"#,
+            r#"{"stagingCandidate":null,"stagingCandidateState":"unavailable"}"#,
+            r#"{"stagingCandidate":null,"stagingCandidateState":"future"}"#,
+            r#"{"stagingCandidate":null,"stagingCandidateState":"staged"}"#,
+            r#"{"stagingCandidate":"uhCkkCAND","stagingCandidateState":"none"}"#,
+            r#"{"stagingCandidate":null,"stagingCandidateBlobHash":"bafkreiCAND","stagingCandidateState":"none"}"#,
             "not json at all",
         ] {
-            assert_eq!(
-                parse_candidate_head(body),
-                ChannelHead::NoCandidateStaged,
-                "body {body:?} must name absence, never a head"
+            assert!(
+                parse_candidate_head(body).is_err(),
+                "body {body:?} is not authoritative withdrawal"
             );
         }
     }
@@ -1156,17 +1224,30 @@ mod tests {
     #[test]
     fn a_head_read_carrying_a_staging_candidate_resolves_the_declaration() {
         let head = parse_candidate_head(
-            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","stagingCandidate":"uhCkkCAND"}"#,
-        );
+            r#"{"contentId":"landing","headActionHash":"uhCkkEARNED","stagingCandidate":"uhCkkCAND","stagingCandidateBlobHash":"bafkreiCAND","stagingCandidateState":"staged"}"#,
+        )
+        .unwrap();
         match head {
             ChannelHead::Resolved(doc) => {
                 assert_eq!(doc.staging_declaration.as_deref(), Some("uhCkkCAND"));
-                assert_eq!(
-                    doc.browser, None,
-                    "a candidate names a DECLARATION, not a blob head"
-                );
+                assert_eq!(doc.browser.as_deref(), Some("bafkreiCAND"));
             }
             ChannelHead::NoCandidateStaged => panic!("expected a resolved candidate"),
+        }
+    }
+
+    #[test]
+    fn candidate_declaration_without_local_blob_never_inherits_the_winner_blob() {
+        let head = parse_candidate_head(
+            r#"{"blobHash":"bafkreiPUBLIC","stagingCandidate":"uhCkkCAND","stagingCandidateBlobHash":null,"stagingCandidateState":"staged"}"#,
+        )
+        .unwrap();
+        match head {
+            ChannelHead::Resolved(doc) => {
+                assert_eq!(doc.staging_declaration.as_deref(), Some("uhCkkCAND"));
+                assert_eq!(doc.browser, None);
+            }
+            ChannelHead::NoCandidateStaged => panic!("candidate declaration was present"),
         }
     }
 }

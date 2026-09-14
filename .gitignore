@@ -77,7 +77,7 @@ target-pool/
 *.dna
 bindings/
 
-# Local holochain dev-stack scratch (cargo-pool / hc-dev-orchestrator)
+# Local Holochain dev-stack state (including genesis/local-dev/household-dowell)
 **/local-dev/
 research/matrix/pinecone
 

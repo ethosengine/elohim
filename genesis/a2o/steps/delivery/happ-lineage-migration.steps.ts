@@ -196,7 +196,7 @@
  * rather than re-deriving it.
  */
 
-/* eslint-disable sonarjs/no-os-command-from-path, sonarjs/publicly-writable-directories --
+/* eslint-disable sonarjs/no-os-command-from-path --
    this file deliberately shells out to `pnpm exec tsx` for the release-ceremony driver (the
    composition this task requires) and reads/writes the local household mesh's own /tmp work
    dir (runtime-config.toml), same posture as steps/delivery/runtime-upgrade-propagation.steps.ts
@@ -225,6 +225,7 @@ import { request } from 'undici';
 
 import { closeTransport } from '../../src/framework/dataplane/carried-election.js';
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 
 import {
   mintLineageCandidate,
@@ -365,7 +366,7 @@ function canaryManifestPath(): string {
   return path.join(REPORT_DIR, `a2o-happ-lineage-${worldStamp()}-canary.json`);
 }
 
-const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
+const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? householdMeshDir();
 
 /** The shell `hc-mesh.sh` is invoked through — absolute, never resolved off PATH. */
 const BASH_BIN = process.env['E2E_BASH_BIN'] ?? '/bin/bash';

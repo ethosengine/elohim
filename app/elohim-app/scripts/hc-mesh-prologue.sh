@@ -54,6 +54,8 @@ mesh_seed_env                     # CONDUCTOR_URLS, DOORWAY_URL(=A), STORAGE_URL
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
 DOORWAY_A_URL="$DOORWAY_URL"
 DOORWAY_B_URL="http://localhost:$DOORWAY_B_PORT"
+STORAGE_B_URL="http://localhost:$(http_port 1)"
+CONDUCTOR_B_ADMIN_URL="ws://localhost:$(admin_port 1)"
 STAGE_BLOB_SCRIPT="$REPO_ROOT/scripts/ci/stage-spa-blob.sh"
 SEEDER_DIR="$REPO_ROOT/genesis/seeder"
 FIXTURE_PATH="$MESH_DIR/household-fixture.json"
@@ -233,7 +235,7 @@ banner "1. seed.ts (base corpus) via A and B"
 run_seed_leg "seed-base-corpus-via-A" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
 run_seed_leg "seed-base-corpus-via-B" hard \
-  'DOORWAY_URL="$DOORWAY_B_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
+  'DOORWAY_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_B_URL" HOLOCHAIN_ADMIN_URL="$CONDUCTOR_B_ADMIN_URL" npx tsx src/seed.ts --ids="$BASE_CORPUS_IDS"'
 
 # ---------------------------------------------------------------------------
 # 2-3. Operator bindings + projections — explicit, ahead of the substrate
@@ -451,7 +453,7 @@ banner "5b. seed.ts (stewardship-affinity fixture corpus) via A and B"
 run_seed_leg "seed-stewardship-fixtures-via-A" hard \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed.ts --ids="$STEWARDSHIP_FIXTURE_IDS"'
 run_seed_leg "seed-stewardship-fixtures-via-B" hard \
-  'DOORWAY_URL="$DOORWAY_B_URL" npx tsx src/seed.ts --ids="$STEWARDSHIP_FIXTURE_IDS"'
+  'DOORWAY_URL="$DOORWAY_B_URL" STORAGE_URL="$STORAGE_B_URL" HOLOCHAIN_ADMIN_URL="$CONDUCTOR_B_ADMIN_URL" npx tsx src/seed.ts --ids="$STEWARDSHIP_FIXTURE_IDS"'
 
 run_seed_leg "seed-stewardship" soft \
   'DOORWAY_URL="$DOORWAY_A_URL" npx tsx src/seed-stewardship.ts'

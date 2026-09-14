@@ -1,4 +1,3 @@
-/* eslint-disable sonarjs/publicly-writable-directories -- this owned-substrate drill reads the local mesh's declared /tmp pid registry */
 /**
  * Stations 1 and 2 of the runtime death-witness story.
  *
@@ -22,6 +21,7 @@ import { request } from 'undici';
 
 import { getRaw } from '../../src/framework/dataplane/surfaces.js';
 import {
+  householdMeshDir,
   loadHouseholdMeshFixture,
   requireFixturePeerPid,
   requireFixtureStoragePeer,
@@ -31,7 +31,7 @@ import { E2EWorld } from '../../src/framework/world.js';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../../..');
 const LOCAL_DEV_DIR = resolve(REPO_ROOT, 'elohim/holochain/local-dev');
-const MESH_DIR = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+const MESH_DIR = householdMeshDir();
 const ARK_BIN =
   process.env['ARK_BIN'] ?? '/projects/.cargo-target-pool/family/dev/elohim/dev/debug/ark';
 const ARK_PRECONDITION = 'mesh is not ark-launched: start it with MESH_CONDUCTOR_LAUNCH=ark';

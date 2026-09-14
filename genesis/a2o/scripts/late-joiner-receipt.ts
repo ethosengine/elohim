@@ -13,10 +13,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 import { readFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
 import { discoverStoragePeerPid } from '../src/framework/fixtures/process-control.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -26,7 +26,7 @@ const DEFAULT_DOORWAY = 'http://localhost:8888';
 const DEFAULT_DEADLINE_MS = 95_000;
 const DEFAULT_POLL_MS = 2_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;
-const DEFAULT_MESH_DIR = process.env['MESH_DIR'] ?? path.join(tmpdir(), 'elohim-local-mesh');
+const DEFAULT_MESH_DIR = householdMeshDir();
 const DEFAULT_MESH_SCRIPT = path.join(REPO_ROOT, 'app/elohim-app/scripts/hc-mesh.sh');
 const BASH_BIN = '/bin/bash';
 const FLOCK_BIN = '/usr/bin/flock';

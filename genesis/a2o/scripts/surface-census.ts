@@ -40,6 +40,8 @@ import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
+
 const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
@@ -57,9 +59,8 @@ const HC_MESH_SCRIPT = join(A2O_ROOT, '..', '..', 'app/elohim-app/scripts/hc-mes
 
 const DOORWAY_URL = process.env['CENSUS_DOORWAY_URL'] ?? 'http://localhost:8888';
 const STORAGE_URL = process.env['CENSUS_STORAGE_URL'] ?? 'http://localhost:8090';
-// /tmp/elohim-local-mesh is the documented mesh-lane handoff location (hc-mesh-prologue.sh writes
-// the fixture there; `just mesh` writes reports there) — not an arbitrary publicly-writable path.
-const DEFAULT_FIXTURE_PATH = '/tmp/elohim-local-mesh/household-fixture.json'; // eslint-disable-line sonarjs/publicly-writable-directories
+// Resolve the same persistent household runtime used by hc-mesh-prologue.sh.
+const DEFAULT_FIXTURE_PATH = join(householdMeshDir(), 'household-fixture.json');
 const HOUSEHOLD_FIXTURE_PATH = process.env['E2E_HOUSEHOLD_FIXTURE_PATH'] ?? DEFAULT_FIXTURE_PATH;
 // Default candidate reports, newest/most-specific first — ALL non-empty ones
 // found are merged (not "first wins"), so a saga-lane report and a mesh-lane
@@ -71,14 +72,10 @@ const DEFAULT_REPORT_CANDIDATES = [
   // real re-measurement after the corpus repair + doorway restart. A void
   // report is also detected generically at load time (see loadLatestReport)
   // in case a future run repeats the mistake under a different name.
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave3c-saga.json',
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave3-synccontrol2.json',
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave3-p2pval.json',
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  '/tmp/elohim-local-mesh/reports/wave3-full.json',
+  join(householdMeshDir(), 'reports/wave3c-saga.json'),
+  join(householdMeshDir(), 'reports/wave3-synccontrol2.json'),
+  join(householdMeshDir(), 'reports/wave3-p2pval.json'),
+  join(householdMeshDir(), 'reports/wave3-full.json'),
 ];
 const CONCURRENCY = Number(process.env['CENSUS_CONCURRENCY'] ?? 4);
 const PROBE_TIMEOUT_MS = 3000;

@@ -31,18 +31,18 @@
 # Sourceable with RECOVERY_SOURCE_ONLY=1 (unit tests use the functions).
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 RECOVERY_DEADLINE_SECS="${RECOVERY_DEADLINE_SECS:-900}"
 RECOVERY_POLL_SECS="${RECOVERY_POLL_SECS:-5}"
 RECOVERY_DOORWAY_A="${RECOVERY_DOORWAY_A:-http://localhost:${DOORWAY_PORT:-8888}}"
 RECOVERY_DOORWAY_B="${RECOVERY_DOORWAY_B:-http://localhost:${DOORWAY_B_PORT:-8889}}"
 RECOVERY_LANDING_PATH="${RECOVERY_LANDING_PATH:-/db/content/elohim-host-landing}"
-MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
-# Durable evidence (backlog mesh-recovery-timeline-not-durable, 2026-08-25): $MESH_DIR is /tmp and
-# dies with the devspace container — the 13-row 2026-08-24 series vanished that way. The timeline
-# now lives under the repo (gitignored like the sprint reports, on the persistent volume) and
+MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
+# Durable evidence (backlog mesh-recovery-timeline-not-durable, 2026-08-25): the old $MESH_DIR
+# default lived in /tmp and died with the devspace container — the 13-row 2026-08-24 series
+# vanished that way. The timeline lives under the repo (gitignored like the sprint reports), and
 # $MESH_DIR/recovery-timeline.jsonl becomes a symlink so every reader that still uses that path
 # (recovery-timeline.py --table, the matrix's before/after line count) sees the same file.
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 RECOVERY_REPORTS_DIR="${RECOVERY_REPORTS_DIR:-$REPO_ROOT/genesis/a2o/reports/recovery}"
 RECOVERY_TIMELINE="${RECOVERY_TIMELINE:-$RECOVERY_REPORTS_DIR/recovery-timeline.jsonl}"
 
@@ -214,8 +214,8 @@ PY2
 # which yields 0 bytes on procfs) and readlink /proc/<pid>/exe (stripped of a
 # trailing " (deleted)") — BEFORE anything is killed or wiped. Without this,
 # restart_storage falls to its stale-capture branch once the pid is gone; after
-# a mesh reshape (`start` regenerates sandboxes and mints new agent keys) that
-# capture carries a STALE AGENT_PUBKEY, and with no capture at all the peer
+# an explicit household recast (`MESH_RESET=1 just mesh start`) that capture
+# carries a STALE AGENT_PUBKEY, and with no capture at all the peer
 # cannot come back. Refuses (rc 5) rather than inflict loss with no way home.
 recovery_capture_peer() { # <peer> <pid-or-empty> -> writes $MESH_DIR/storage-restart/<peer>.{environ,exe}
   local peer="$1" pid="${2:-}" workdir="$MESH_DIR/storage-restart" envfile exefile exe

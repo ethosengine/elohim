@@ -21,6 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { OwnedDoorwayPair } from '../../src/framework/fixtures/owned-doorway-pair.js';
 
 import type { HouseholdMeshFixture } from '../../src/framework/fixtures/household-mesh.js';
@@ -342,8 +343,8 @@ export async function stageInvalidFixture(
 export function doorwayIncarnations(world?: E2EWorld): string[] {
   const pair = world && ownedDoorwayPairs.get(world);
   if (pair) return pair.incarnations();
-  // eslint-disable-next-line sonarjs/publicly-writable-directories -- Read-only owned-mesh PID receipts; no temporary file creation.
-  const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+
+  const mesh = householdMeshDir();
   return ['a', 'b'].map(name => readFileSync(join(mesh, 'pids', `doorway-${name}`), 'utf8').trim());
 }
 
@@ -351,8 +352,8 @@ export function doorwayIncarnations(world?: E2EWorld): string[] {
 export function doorwayRestartLog(name: string, world?: E2EWorld): string {
   const pair = world && ownedDoorwayPairs.get(world);
   if (pair && (name === 'a' || name === 'b')) return pair.log(name);
-  // eslint-disable-next-line sonarjs/publicly-writable-directories -- read-only owned mesh receipt
-  const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+
+  const mesh = householdMeshDir();
   try {
     return readFileSync(join(mesh, 'logs', `doorway-restart-${name}.log`), 'utf8');
   } catch {

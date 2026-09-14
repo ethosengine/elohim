@@ -34,7 +34,15 @@ export interface ContentHeadView {
    */
   updatedAt?: string | null;
   /**
-   * The STAGING canonical-head declaration standing beneath the earned winner — the next version awaiting promotion, addressed by the ActionHash of its DECLARATION (not by a CID). Derived by content_store::select_staging_candidate as a pure function of the same link set every peer holds, so every peer names the same candidate. Present only when the winner is EARNED and a staging declaration postdates it. Absent/null means either no candidate stands beneath this head OR the serving node could not put the ask — and NEITHER is a licence to serve the converged head at a candidate name.
+   * The STAGING canonical-head declaration standing beneath the earned winner — the next version awaiting promotion, addressed by the ActionHash of its DECLARATION (not by a CID). Derived by content_store::select_staging_candidate as a pure function of the same link set every peer holds. Present only when the winner is EARNED and a staging declaration postdates it; stagingCandidateState distinguishes authoritative absence from an unavailable ask.
    */
   stagingCandidate?: string | null;
+  /**
+   * The blob content address named by stagingCandidate when this peer can resolve that exact declaration through its content projection and holds the bytes locally. Absent/null never authorizes fallback to the converged blobHash.
+   */
+  stagingCandidateBlobHash?: string | null;
+  /**
+   * Epistemic status of the staging-candidate read. staged names an authoritative declaration, none is an authoritative withdrawal/absence, and unavailable means the conductor ask could not be put. Missing is an older-peer response and is not authoritative absence.
+   */
+  stagingCandidateState?: 'staged' | 'none' | 'unavailable' | null;
 }

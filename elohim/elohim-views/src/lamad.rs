@@ -117,16 +117,30 @@ pub struct ContentHeadView {
     /// candidate. `Some` only when the winner is EARNED and a staging
     /// declaration postdates it.
     ///
-    /// `None` means one of two things and deliberately distinguishes neither:
-    /// no candidate stands beneath this head, or this node could not put the
-    /// ask. Both are honest absences to a caller, and NEITHER is a licence to
-    /// serve the converged head at a candidate name — a candidate channel with
-    /// no candidate answers a named absence, never production bytes.
-    ///
     /// Additive: absent on the wire from any serving node that predates this
     /// projection.
     #[ts(optional)]
     pub staging_candidate: Option<String>,
+    /// Blob content address named by `staging_candidate`, when this peer's projection can
+    /// resolve that exact declaration and the bytes are locally present.
+    /// Absence never falls back to `blob_hash`.
+    #[ts(optional)]
+    pub staging_candidate_blob_hash: Option<String>,
+    /// Whether the conductor authoritatively reported a staged declaration,
+    /// authoritatively reported none, or could not answer the ask. Consumers
+    /// must only interpret `None` as withdrawal when this says `none`.
+    /// Absent on older serving nodes and therefore not an authoritative answer.
+    #[ts(optional)]
+    pub staging_candidate_state: Option<StagingCandidateState>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "lowercase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum StagingCandidateState {
+    Staged,
+    None,
+    Unavailable,
 }
 
 /// One node in a content relationship graph.

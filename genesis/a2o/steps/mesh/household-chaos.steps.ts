@@ -60,6 +60,7 @@ import {
   probeP2PStatus,
 } from '../../src/framework/dataplane/surfaces.js';
 import {
+  householdMeshDir,
   HouseholdMeshFixture,
   loadHouseholdMeshFixture,
   normalizeHouseholdFootprint,
@@ -101,16 +102,8 @@ type HouseholdPeerName = (typeof HOUSEHOLD_PEERS)[number];
  */
 const CASCADE_KILL_ORDER: readonly HouseholdPeerName[] = ['james', 'jessica', 'matthew'];
 
-/**
- * hc-mesh.sh's own default (`MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"`),
- * honoured through the same env var so the two agree. Only used to place the
- * `storage-restart` environ capture where that script looks for it.
- */
-// Not a secret store: this is the local mesh's own working directory on a host this run
-// owns, and the literal must stay byte-identical to hc-mesh.sh's default or the restart
-// capture lands where that script will not look for it.
-// eslint-disable-next-line sonarjs/publicly-writable-directories -- see above
-const MESH_DIR = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+// Restart captures use the same persistent household root as hc-mesh.sh.
+const MESH_DIR = householdMeshDir();
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** genesis/a2o/steps/mesh → repo root → app/elohim-app/scripts/hc-mesh.sh */

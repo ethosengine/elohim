@@ -1,4 +1,4 @@
-/* eslint-disable sonarjs/no-os-command-from-path, sonarjs/publicly-writable-directories -- these steps deliberately spawn the two local-mesh host scripts and read the mesh's own /tmp work dir; the same posture as steps/compute-allocation.steps.ts and framework/testnet-manager.ts */
+/* eslint-disable sonarjs/no-os-command-from-path -- these steps deliberately spawn the two local-mesh host scripts and read the mesh's own /tmp work dir; the same posture as steps/compute-allocation.steps.ts and framework/testnet-manager.ts */
 /**
  * Conductor validation-spin step definitions.
  *
@@ -36,13 +36,16 @@ import { Given, When, Then } from '@cucumber/cucumber';
 
 import { request } from 'undici';
 
-import { loadHouseholdMeshFixture } from '../src/framework/fixtures/household-mesh.js';
+import {
+  householdMeshDir,
+  loadHouseholdMeshFixture,
+} from '../src/framework/fixtures/household-mesh.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '../../..');
 const DETECTOR = resolve(REPO_ROOT, 'app/elohim-app/scripts/hc-mesh-spin-detector.sh');
 const CHAOS = resolve(REPO_ROOT, 'app/elohim-app/scripts/hc-mesh-chaos-rekey.sh');
-const MESH_DIR = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+const MESH_DIR = householdMeshDir();
 
 /** The peer this story re-keys. James is the household's smallest node. */
 const TARGET_PEER = 'james';

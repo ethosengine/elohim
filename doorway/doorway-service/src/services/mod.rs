@@ -94,8 +94,9 @@ pub use route_registry::{
 pub use serve_eligibility::{
     admitted_standing_value, audience_from_projection, contract_from_projection,
     fold_for_projection, serve_eligibility, stamp_admitted_standing, standing_from_request,
-    AudienceTerm, CollectiveRef, ContractTerms, ReachClass, Refusal, RequesterStanding,
-    ServeEligibility, ServeRequest, STANDING_HEADER, WHERE_TO_BE_HEARD,
+    standing_unavailable_response, AudienceTerm, CollectiveRef, ContractTerms,
+    MembershipReadFailure, ReachClass, Refusal, RequesterStanding, ServeEligibility, ServeRequest,
+    StandingUnavailable, STANDING_HEADER, WHERE_TO_BE_HEARD,
 };
 pub use serve_receipt::{
     build_receipt, receipt_header_value, stamp_receipt, ChallengeOutcome, Credit, CreditRole,

@@ -40,7 +40,9 @@ DNA/WASM builds remain in-tree because `hc dna pack` requires `./target`.
 The alpha-shaped local topology is two doorways (A `:8888` alpha stand-in,
 bootstrap+signal owner; B `:8889` apex/elohim.host stand-in, jessica-primary)
 plus N conductor/storage peers (default matthew, jessica, james), all on
-loopback — fronted by a loopback `mongod` (`:27017`, dbpath `$MESH_DIR/mongo`)
+loopback. The canonical Dowell household fixture executes persistently under the workspace's gitignored
+`genesis/local-dev/household-dowell`; its `conductors/` subtree keeps each peer's conductor database and Lair keystore beside storage and archive state. `MESH_DIR` preserves an explicit alternative. A
+loopback `mongod` (`:27017`, dbpath `$MESH_DIR/mongo`) fronts the doorways
 so both doorways boot **archive-backed** (Mongo-side projection archive:
 `app_file_cache` / warm-shell `ShellArchive` / resolver store, one database per
 doorway: `doorway-a`, `doorway-b`). Without the binary (`MONGOD_BIN` unset and
@@ -57,7 +59,7 @@ populates from that — the surface the peer-conductor-resilience a2o reads. A
 read replica (`PROJECTION_WRITER=false`) never subscribes. The image ships
 `mongod` (che-devworkspaces udi-plus);
 a2o resolves `alpha-A`/`elohim.host` to `E2E_DOORWAY_ALPHA`/`E2E_DOORWAY_B`,
-so the failover feature runs against the local pair unchanged. **A cold start drops the doorway archive too (2026-09-11).** When peer 0's admin port is silent, `start_all` `rm -rf`s every conductor sandbox — but the doorways' Mongo archive holding account rows (identifier, password hash, `human_id`, `agent_pub_key`, `installed_app_id`) used to survive it, naming cells that no longer exist: `/auth/register` then answers 409, the stale login succeeds, and nothing re-provisions. The archive now goes with the sandboxes on every cold start; `MESH_KEEP_DOORWAY_DB=1` keeps it, for deliberately studying that skew:
+so the failover feature runs against the local pair unchanged. Ordinary `start` resumes a complete stopped household without changing conductor or storage keys. Partial conductor/storage/archive state refuses; dual/iroh peers require `iroh.key`, while captured libp2p-only peers do not. The archive posture is persisted so archive-backed state cannot restart with a missing DB/runtime and an intentionally archive-less household remains archive-less. `MESH_RESET=1 just mesh start` is the stopped-only full-recast arm. A stopped legacy `/tmp/elohim-local-mesh` moves to the persistent root only when the destination is absent, then remains as a compatibility symlink for captured absolute paths. A complete stopped Dowell conductor sandbox moves peer-by-peer from the historical shared `elohim/holochain/local-dev` root into `conductors/`, preserving unrelated single-peer state and leaving per-peer compatibility links; partial or competing state refuses:
 
 ```bash
 just mesh start                # mongod → doorway A → doorway B → conductors → storage peers
@@ -152,7 +154,7 @@ holds `conductor.db` open: `hc-mesh.sh blocks <peer>` -> `hc-mesh.sh stop` ->
 
 `mesh quiesce` measures an already-running mesh and records its bounded result
 (one line per run, including the wall-clock, verdict, knobs and an io_baseline
-write-throughput probe) under `${MESH_DIR:-/tmp/elohim-local-mesh}`. It never
+write-throughput probe) under `${MESH_DIR:-<repo>/genesis/local-dev/household-dowell}`. It never
 starts or stops peers. The underlying maintained interfaces are
 `hc-mesh.sh start|stop|status|probe` and `hc-mesh-quiesce.sh`; do not copy
 their pacing environment into new npm aliases.
@@ -451,11 +453,11 @@ the rung-1 coordinator hot-swap vehicle (`POST /admin/coordinators/sync` +
 `status`, `probe`, `start`, `join-peer`, `conductors-restart`, or that coordswap pass-through, the
 harness checks every live conductor sandbox exists and that no open handle into it is deleted. An
 `orphaned-data-root` result refuses mutation and names path/mode evidence plus the explicit
-`hc-mesh.sh stop && hc-mesh.sh start` kill-and-regenerate remediation. A peer restarted via `storage-restart`
+stop/restore remediation; only `MESH_RESET=1 just mesh start` deliberately recasts identities. A peer restarted via `storage-restart`
 re-execs the CAPTURED environ, so a mesh booted before that flag existed needs the overlay
 (`MESH_RESTART_ENV_OVERLAY="ALLOW_COORDINATOR_UPDATE=true"`) or a full mesh restart to accept swaps.
 The re-exec closes inherited fds ≥3 first — a caller holding a `flock` (the a2o
-mesh lock `/tmp/elohim-local-mesh/a2o.lock`, which serializes concurrent agents' mesh-touching
+mesh lock `$MESH_DIR/a2o.lock`, which serializes concurrent agents' mesh-touching
 commands) otherwise leaks the lock into the long-lived peer (2026-08-22: three peers owned the lock
 for 40 min). The restart re-resolves every peer's pid AND `agentPubKey` into the household fixture
 (`fixture-refresh` does only that): the a2o chaos drills kill and verify peers BY THAT PID, so a

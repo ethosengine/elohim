@@ -11,7 +11,10 @@ import { After, Given, When, Then } from '@cucumber/cucumber';
 import { chromium, type Browser, type Page, type Response } from 'playwright';
 
 import { resolvePeerUrl } from '../../src/framework/dataplane/surfaces.js';
-import { loadHouseholdMeshFixture } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  householdMeshDir,
+  loadHouseholdMeshFixture,
+} from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 const run = promisify(execFile);
@@ -45,14 +48,7 @@ const browsers = new WeakMap<E2EWorld, Browser>();
 async function acquireLease(world: E2EWorld): Promise<void> {
   const child = spawn(
     '/usr/bin/flock',
-    [
-      '-n',
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- The owned mesh's shared lock coordinates every fault and staging run.
-      `${process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh'}/a2o.lock`,
-      '/bin/bash',
-      '-c',
-      'echo locked; read -r _',
-    ],
+    ['-n', `${householdMeshDir()}/a2o.lock`, '/bin/bash', '-c', 'echo locked; read -r _'],
     { stdio: 'pipe' }
   );
   leases.set(world, child);

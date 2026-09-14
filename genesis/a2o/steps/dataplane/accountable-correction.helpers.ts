@@ -17,6 +17,7 @@ import {
   type CarriedElectionRail,
 } from '../../src/framework/dataplane/carried-election.js';
 import { resolvePeerUrl, probeDeclaredHead } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 export type Peer = 'matthew' | 'jessica' | 'james';
@@ -224,8 +225,8 @@ export function peerEnv(world: E2EWorld, peer: Peer): Record<string, string> {
   const s = ctx(world);
   if (s.env[peer]) return s.env[peer];
   // The household harness owns this directory; PID and env paths come from its live peer.
-  // eslint-disable-next-line sonarjs/publicly-writable-directories
-  const mesh = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+
+  const mesh = householdMeshDir();
   // hc-mesh.sh's `record_mesh_pid` writes "<pid> <start-ticks>", NOT a bare pid: the
   // second field is /proc/<pid>/stat's starttime, the harness's own PID-REUSE guard.
   // Reading the file as one number matched nothing and failed every scenario in the

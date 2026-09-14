@@ -59,6 +59,7 @@ import {
   CATCHUP_RIDE_STEP_TIMEOUT_MS,
 } from '../../src/framework/dataplane/surfaces.js';
 import {
+  householdMeshDir,
   loadHouseholdMeshFixture,
   requireFixtureDoorwayUrl,
   requireMembershipAuthority,
@@ -293,14 +294,7 @@ async function acquireLease(world: E2EWorld): Promise<void> {
   if (leases.has(world)) return;
   const child = spawn(
     '/usr/bin/flock',
-    [
-      '-n',
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- The owned mesh's shared lock coordinates every fault and staging run.
-      `${process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh'}/a2o.lock`,
-      '/bin/bash',
-      '-c',
-      'echo locked; read -r _',
-    ],
+    ['-n', `${householdMeshDir()}/a2o.lock`, '/bin/bash', '-c', 'echo locked; read -r _'],
     { stdio: 'pipe' }
   );
   leases.set(world, child);

@@ -28,6 +28,7 @@ import { stripVTControlCharacters } from 'node:util';
 import { After, Given, Then, When } from '@cucumber/cucumber';
 
 import {
+  householdMeshDir,
   loadHouseholdMeshFixture,
   requireFixtureStoragePeer,
   type HouseholdMeshFixture,
@@ -48,8 +49,8 @@ type HouseholdPeerName = (typeof HOUSEHOLD_PEERS)[number];
 const INGEST_PEER: HouseholdPeerName = 'matthew';
 const SURVIVORS: readonly HouseholdPeerName[] = ['jessica', 'james'];
 // The existing owned-mesh directory is shared intentionally for its exclusive fault lock.
-// eslint-disable-next-line sonarjs/publicly-writable-directories
-const MESH_LOCK = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+
+const MESH_LOCK = householdMeshDir();
 
 interface ManifestWire {
   blob_hash: string;

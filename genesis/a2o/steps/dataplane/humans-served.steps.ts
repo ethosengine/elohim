@@ -76,6 +76,7 @@ import {
   commitmentIsLive,
   readHostedCellCommitmentConverged,
 } from '../../src/framework/fixtures/hosted-cell.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { fixtureCredentials } from '../../src/framework/fixtures/humans.js';
 
 import type { AccountResponse, StatusResponse } from '../../src/framework/api/doorway-client.js';
@@ -121,8 +122,7 @@ interface HostedRosterEntry {
 const ROSTER_PASSWORD = 'Prologue2026!';
 
 function rosterPath(): string {
-  // eslint-disable-next-line sonarjs/publicly-writable-directories -- local dev mesh scratch dir
-  const meshDir = process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh';
+  const meshDir = householdMeshDir();
   return `${meshDir}/prologue-hosted-humans.json`;
 }
 
@@ -675,8 +675,8 @@ When('the household mesh casts that human again', function (this: E2EWorld) {
     env: {
       ...process.env,
       DOORWAY_URL: doorway.url,
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- local dev mesh scratch dir
-      MESH_DIR: process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh',
+
+      MESH_DIR: householdMeshDir(),
     },
   });
   const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;

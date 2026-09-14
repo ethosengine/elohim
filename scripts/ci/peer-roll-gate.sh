@@ -121,7 +121,7 @@ for cmd in curl python3 awk sed tail date sleep; do
   fi
 done
 
-PROM_URL="${ROLL_PROM_URL:-http://kube-prom-stack-kube-prometheus-prometheus.observability.svc.cluster.local:9090}"
+PROM_URL="${ROLL_PROM_URL:-http://kube-prom-stack-kube-prome-prometheus.observability.svc.cluster.local:9090}"
 PROM_URL="${PROM_URL%/}"
 PEER_DEADLINE="${ROLL_PEER_DEADLINE_SECS:-900}"
 MIN_DEADLINE="${ROLL_PEER_MIN_DEADLINE_SECS:-120}"

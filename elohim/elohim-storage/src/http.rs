@@ -127,7 +127,45 @@ use std::str::FromStr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::{RwLock, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, warn, Instrument};
+
+static HEAD_RECORD_REQUEST_SEQUENCE: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
+async fn trace_head_record_request<F>(
+    content_id: &str,
+    request: F,
+) -> Result<Response<Full<Bytes>>, StorageError>
+where
+    F: std::future::Future<Output = Result<Response<Full<Bytes>>, StorageError>>,
+{
+    let request_id =
+        HEAD_RECORD_REQUEST_SEQUENCE.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let span = tracing::info_span!(
+        "head_record_http",
+        head_record_request_id = request_id,
+        content_id = %content_id
+    );
+    async {
+        info!(phase = "route_enter", "head-record request phase");
+        let result = request.await;
+        match &result {
+            Ok(response) => info!(
+                phase = "route_complete",
+                status = response.status().as_u16(),
+                "head-record request phase"
+            ),
+            Err(error) => info!(
+                phase = "route_error",
+                error = %error,
+                "head-record request phase"
+            ),
+        }
+        result
+    }
+    .instrument(span)
+    .await
+}
 
 /// Maximum number of concurrent MUTATING (write) HTTP requests. Excess writes
 /// are SHED (per-request try_acquire → 503 + Retry-After), not queued — an
@@ -8016,49 +8054,77 @@ impl HttpServer {
         }
     }
 
-    /// The STAGING canonical-head declaration beneath the earned winner for
-    /// `content_id`, or `None`.
-    ///
-    /// BEST EFFORT, and deliberately so. Three things make `None` the only
-    /// safe failure:
-    ///
-    ///  - **No conductor configured** — nothing to ask.
-    ///  - **The ask failed or timed out** — an unreachable conductor is not
-    ///    evidence that no candidate exists, and it must not be reported as
-    ///    one; but it must also not stall a head read that is otherwise a
-    ///    single SQLite row.
-    ///  - **The election has no candidate** — the honest answer.
-    ///
-    /// All three collapse to absence, and the consumer's rule closes the gap:
-    /// a candidate channel with no candidate answers a NAMED ABSENCE, never the
-    /// converged head. So the worst an absent answer can cost is a candidate
-    /// name that says "nothing staged" for one read.
+    /// Resolve the STAGING declaration and preserve whether its absence was an
+    /// authoritative answer or an unavailable ask. The distinction lets a
+    /// consumer retain its last candidate during a transient conductor outage
+    /// while the rest of the projected head remains readable.
     ///
     /// `resolve_content_head_local` is the same read the release-adoption
     /// watcher performs — the conductor's LOCAL view, never a network resolve.
     /// A network `get_links` on a peer whose storage arc has not reconverged
     /// since restart dies on the conductor's request timeout, and this is a
     /// read on the serving hot path.
-    async fn resolve_staging_candidate(&self, content_id: &str) -> Option<String> {
-        let hc = self.hc_registry.as_ref()?.lamad_client()?;
+    async fn resolve_staging_candidate(
+        &self,
+        content_id: &str,
+    ) -> (
+        Option<String>,
+        Option<String>,
+        elohim_views::lamad::StagingCandidateState,
+    ) {
+        use elohim_views::lamad::StagingCandidateState;
+
+        let Some(hc) = self
+            .hc_registry
+            .as_ref()
+            .and_then(|registry| registry.lamad_client())
+        else {
+            return (None, None, StagingCandidateState::Unavailable);
+        };
         let read =
             crate::services::conductor_writes::call_resolve_content_head_local(&hc, content_id);
         match tokio::time::timeout(std::time::Duration::from_secs(2), read).await {
-            Ok(Ok(Some(wire))) => wire.staging_candidate.map(|h| h.to_string()),
-            Ok(Ok(None)) => None,
+            Ok(Ok(Some(wire))) => {
+                let candidate = wire.staging_candidate.map(|h| h.to_string());
+                let blob = if let (Some(sync), Some(action)) =
+                    (self.sync_manager.as_ref(), candidate.as_deref())
+                {
+                    let doc_id = crate::sync::projector::content_doc_id(content_id);
+                    match sync
+                        .declared_head_blob(
+                            crate::sync::projector::PROJECTION_NAMESPACE,
+                            &doc_id,
+                            action,
+                        )
+                        .await
+                    {
+                        Some(blob) if self.blob_available_locally(&blob).await => Some(blob),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                let state = if candidate.is_some() {
+                    StagingCandidateState::Staged
+                } else {
+                    StagingCandidateState::None
+                };
+                (candidate, blob, state)
+            }
+            Ok(Ok(None)) => (None, None, StagingCandidateState::None),
             Ok(Err(e)) => {
                 tracing::debug!(
                     content_id = %content_id, error = %e,
-                    "head read: staging-candidate ask failed — reporting absence, never a head"
+                    "head read: staging-candidate ask failed — reporting unavailable"
                 );
-                None
+                (None, None, StagingCandidateState::Unavailable)
             }
             Err(_) => {
                 tracing::debug!(
                     content_id = %content_id,
-                    "head read: staging-candidate ask timed out — reporting absence, never a head"
+                    "head read: staging-candidate ask timed out — reporting unavailable"
                 );
-                None
+                (None, None, StagingCandidateState::Unavailable)
             }
         }
     }
@@ -8103,9 +8169,13 @@ impl HttpServer {
                             // the row — it is a pure function of the
                             // canonical-head link set — so only the conductor
                             // can answer it.
-                            let candidate = self.resolve_staging_candidate(content_id).await;
+                            let (candidate, candidate_blob, candidate_state) =
+                                self.resolve_staging_candidate(content_id).await;
                             Ok(response::ok(&crate::views::with_staging_candidate(
-                                view, candidate,
+                                view,
+                                candidate,
+                                candidate_blob,
+                                candidate_state,
                             )))
                         }
                         // Honest: the row exists but the notary holds no HEAD for it.
@@ -8673,6 +8743,19 @@ impl HttpServer {
         content_id: &str,
         app_ctx: &db::AppContext,
     ) -> Result<Response<Full<Bytes>>, StorageError> {
+        trace_head_record_request(
+            content_id,
+            self.handle_content_head_record_inner(method, content_id, app_ctx),
+        )
+        .await
+    }
+
+    async fn handle_content_head_record_inner(
+        &self,
+        method: Method,
+        content_id: &str,
+        app_ctx: &db::AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
         if method != Method::GET {
             return Ok(response::method_not_allowed());
         }
@@ -8684,16 +8767,32 @@ impl HttpServer {
         let mut conn = pool
             .get()
             .map_err(|e| StorageError::Internal(format!("Failed to get connection: {}", e)))?;
+        info!(phase = "db_pool_acquired", "head-record request phase");
 
         // (a) Resolve the head action hash from the projection — the SAME
         // answer GET /db/content/{id}/head gives, so the carried record always
         // matches the hash the caller read from this peer a moment earlier.
-        let cwt = match db::content_diesel::get_content_with_tags(
+        let query = db::content_diesel::get_content_with_tags(
             &mut conn,
             app_ctx,
             content_id,
             db::content_diesel::MinTrust::Invisible,
-        )? {
+        );
+        let cwt = match query {
+            Ok(result) => {
+                info!(
+                    phase = "projection_query_complete",
+                    found = result.is_some(),
+                    "head-record request phase"
+                );
+                result
+            }
+            Err(error) => {
+                info!(phase = "projection_query_error", error = %error, "head-record request phase");
+                return Err(error);
+            }
+        };
+        let cwt = match cwt {
             None => {
                 return Ok(response::not_found(&format!(
                     "Content not found: {}",
@@ -8750,8 +8849,17 @@ impl HttpServer {
         )
         .await
         {
-            Ok(r) => r,
-            Err(e) => return Ok(response::conductor_write_error(&e)),
+            Ok(r) => {
+                info!(
+                    phase = "conductor_call_complete",
+                    "head-record request phase"
+                );
+                r
+            }
+            Err(e) => {
+                info!(phase = "conductor_call_error", error = %e, "head-record request phase");
+                return Ok(response::conductor_write_error(&e));
+            }
         };
 
         match served {
@@ -18835,6 +18943,142 @@ mod sync_mode_control_tests {
         let view = body_json(server2.handle_sync_mode_get().unwrap()).await;
         assert_eq!(view["mode"], "paused", "operator pause must be sticky");
         assert_eq!(view["effective"]["syncing"], false);
+    }
+}
+
+#[cfg(test)]
+mod candidate_head_state_tests {
+    use super::*;
+    use elohim_views::lamad::StagingCandidateState;
+
+    #[tokio::test]
+    async fn missing_conductor_is_unavailable_not_authoritative_candidate_absence() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+
+        let (candidate, blob, state) = server.resolve_staging_candidate("landing").await;
+        assert_eq!(candidate, None);
+        assert_eq!(blob, None);
+        assert_eq!(state, StagingCandidateState::Unavailable);
+    }
+}
+
+#[cfg(test)]
+mod head_record_trace_tests {
+    use super::*;
+    use std::collections::HashMap;
+    use std::io::{self, Write};
+    use std::sync::{Arc, Mutex};
+    use tracing::instrument::WithSubscriber as _;
+
+    #[derive(Clone)]
+    struct Capture(Arc<Mutex<Vec<u8>>>);
+
+    struct CaptureWriter(Arc<Mutex<Vec<u8>>>);
+
+    impl<'a> tracing_subscriber::fmt::MakeWriter<'a> for Capture {
+        type Writer = CaptureWriter;
+
+        fn make_writer(&'a self) -> Self::Writer {
+            CaptureWriter(Arc::clone(&self.0))
+        }
+    }
+
+    impl Write for CaptureWriter {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(bytes);
+            Ok(bytes.len())
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn concurrent_head_record_requests_keep_distinct_correlated_phase_histories() {
+        let bytes = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::fmt()
+            .json()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(Capture(Arc::clone(&bytes)))
+            .finish();
+        let rendezvous = Arc::new(tokio::sync::Barrier::new(2));
+        let first = Arc::clone(&rendezvous);
+        let second = Arc::clone(&rendezvous);
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        let ctx = AppContext::default_lamad();
+
+        let (missing_pool, method_refusal) = async {
+            tokio::join!(
+                trace_head_record_request("same-id", async {
+                    first.wait().await;
+                    tokio::task::yield_now().await;
+                    server
+                        .handle_content_head_record_inner(Method::GET, "same-id", &ctx)
+                        .await
+                }),
+                trace_head_record_request("same-id", async {
+                    second.wait().await;
+                    tokio::task::yield_now().await;
+                    server
+                        .handle_content_head_record_inner(Method::POST, "same-id", &ctx)
+                        .await
+                }),
+            )
+        }
+        .with_subscriber(subscriber)
+        .await;
+        assert!(missing_pool.is_err());
+        assert_eq!(
+            method_refusal.unwrap().status(),
+            StatusCode::METHOD_NOT_ALLOWED
+        );
+
+        let captured = String::from_utf8(bytes.lock().unwrap().clone()).unwrap();
+        let mut phases_by_request: HashMap<u64, Vec<String>> = HashMap::new();
+        for line in captured.lines() {
+            let row: serde_json::Value = serde_json::from_str(line).unwrap();
+            let Some(span) = row.get("span") else {
+                continue;
+            };
+            if span.get("name").and_then(|v| v.as_str()) != Some("head_record_http") {
+                continue;
+            }
+            assert_eq!(
+                span.get("content_id").and_then(|v| v.as_str()),
+                Some("same-id")
+            );
+            let request_id = span
+                .get("head_record_request_id")
+                .and_then(|v| v.as_u64())
+                .expect("head-record event carries its request correlation id");
+            let phase = row["fields"]["phase"]
+                .as_str()
+                .expect("head-record event carries a phase");
+            phases_by_request
+                .entry(request_id)
+                .or_default()
+                .push(phase.to_string());
+        }
+
+        assert_eq!(
+            phases_by_request.len(),
+            2,
+            "concurrent requests must not share an id"
+        );
+        let histories: Vec<Vec<String>> = phases_by_request.into_values().collect();
+        assert!(histories.contains(&vec!["route_enter".into(), "route_error".into()]));
+        assert!(histories.contains(&vec!["route_enter".into(), "route_complete".into()]));
     }
 }
 

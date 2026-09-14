@@ -52,12 +52,10 @@
  *
  * SCENARIO 5 NARROWS TO `private`, ON PURPOSE. `classify_reach('private')`
  * yields `BeneficiaryOnly`, which refuses an AUTHENTICATED requester too — so
- * James is genuinely refused naming reach without this file asserting the
- * false premise scenario 2 has to stay honest about (the real household triad
- * are all members of household-dowell, so no fixture human stands in for "a
- * household non-member"). The feature's own REACH paragraph licenses it: where
- * a narrowing lands is the collective's to say, and these scenarios never fix
- * it.
+ * James, a real Dowell member, is genuinely refused by this different ruling
+ * before he uses the challenge path. The feature's own REACH paragraph licenses
+ * it: where a narrowing lands is the collective's to say, and these scenarios
+ * never fix it.
  *
  * TEARDOWN LEAVES THE OWED RESPONSE STANDING. Withdrawing it would be the test
  * answering for the collective — the one thing scenario 5's last line says a
@@ -109,11 +107,10 @@
  * `HOUSEHOLD_SLUG`; `genesis/data/humans/humans.json` gives matthew/jessica/james
  * each `householdId: "household-dowell"`). All THREE household peers are
  * participants (`qahal-formation.steps.ts` `HOUSEHOLD_TRIAD` asserts exactly this
- * triad is affirmed) — there is NO non-member persona among alpha/beta's own
- * household. Scenario 2's James-refusal half is therefore checked LIVE against
- * `GET /db/participations/{humanId}` at the moment the scenario runs; if the real
- * mesh says James holds the membership (expected, given the above), that half
- * returns 'pending' naming this exact reason rather than asserting a false premise.
+ * triad is affirmed). Scenario 2 therefore uses Susan as its authenticated
+ * non-member control: her canonical fixture declares `household-susan`, she is
+ * already in the Act-I hosted cast, and the step still checks the asked doorway's
+ * LIVE `/db/participations/{humanId}` answer before relying on that premise.
  *
  * THE TWO CHROME CLAUSES, AND WHAT NOW ANSWERS THEM. Both were measured RED on
  * the household mesh 2026-09-13 and closed in the same pass — the assertions
@@ -146,21 +143,17 @@
  * 404'd "Unknown database endpoint" on every household peer, because
  * "participations" was missing from `extract_app_context`'s `legacy_prefixes`
  * (elohim-storage http.rs) and was eaten as an `h_app_id`. The fold read that
- * failure as "this requester presented no standing" — correctly, since a
- * membership read that cannot be completed is never permission — so a
- * household member was refused their own household's record and the refusal
- * blamed reach. Fixed storage-side in the same pass; regression test
- * `participations_namespace_survives_app_context_extraction`.
+ * failure as "this requester presented no standing", so a household member was
+ * refused their own household's record and the refusal blamed reach. The fold
+ * now answers `standing-unavailable` instead: still fail-closed, but without
+ * inventing a nonmembership verdict from missing evidence. The storage route is
+ * fixed and pinned by `participations_namespace_survives_app_context_extraction`.
  *
- * SCENARIO 3's "still holds the bytes warm" is checked by a SECOND, AUTHENTICATED
- * serve of the same root succeeding (200 + the archive's own marker) — never by
- * reading anything out of the anonymous refusal, which proves nothing about byte
- * custody one way or the other. `x-elohim-bundle: last-reconciled` (the doorway's
- * own warm-shell provenance marker, `server/http.rs::with_bundle_provenance_header`)
- * is logged as supporting evidence when present, but is NOT hard-asserted: which
- * branch of `warm_shell::plan_shell_serve` fires (ServeWarm vs a fresh Fetch that
- * confirms against a healthy upstream, which drops the header) is a live timing
- * detail this file cannot pin from source alone without running the mesh.
+ * SCENARIO 3 checks later authenticated availability using the staged resource's
+ * marker. This is not proof of uninterrupted cache retention: a successful fetch
+ * from upstream could produce the same result. The warm-shell provenance header
+ * remains supporting diagnostic output only; a retained-cache witness is still a
+ * missing station in served-under-standing.habit.md.
  *
  * Mesh facts (household-fixture.json, `just mesh prologue`): doorway "alpha"
  * http://localhost:8888 (primary storage matthew :8090), doorway "beta"
@@ -355,8 +348,12 @@ interface RawResponse {
   headers: Record<string, string | undefined>;
 }
 
-async function rawGet(url: string, headers?: Record<string, string>): Promise<RawResponse> {
-  return getRawWithHeaders(url, { timeoutMs: REQUEST_TIMEOUT_MS, headers });
+async function rawGet(
+  url: string,
+  headers?: Record<string, string>,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): Promise<RawResponse> {
+  return getRawWithHeaders(url, { timeoutMs, headers });
 }
 
 async function adminCallOnce(
@@ -452,13 +449,22 @@ async function loginBearer(
   const body = JSON.parse(text) as { token?: string; humanId?: string };
   assert.ok(body.token, `login as "${displayName}" via ${doorwayUrl} returned no token`);
   assert.ok(body.humanId, `login as "${displayName}" via ${doorwayUrl} returned no humanId`);
+  const canonicalHumanId = getFixture(displayName).id;
+  assert.equal(
+    body.humanId,
+    canonicalHumanId,
+    `login as "${displayName}" returned humanId "${body.humanId}", not canonical fixture ` +
+      `human "${canonicalHumanId}" — a bearer for another account cannot prove this persona's standing`
+  );
   return { token: body.token, humanId: body.humanId };
 }
 
 /** Whether `humanId` currently, live, holds a participation in `collectiveId` —
  * read from the SAME storage the asked doorway's own fold would consult
  * (`read_memberships`, serve_eligibility.rs: `GET {storage_url}/db/participations/{human_id}`,
- * a `departedAt` row dropped as past membership). */
+ * only a consented row with null `departedAt` establishes membership). The
+ * premise fails on an invalid response shape instead of turning it into an
+ * empty membership list. */
 async function isLiveMember(
   storageUrl: string,
   humanId: string,
@@ -472,10 +478,44 @@ async function isLiveMember(
     200,
     `GET ${storageUrl}/db/participations/${humanId} failed: HTTP ${res.status}`
   );
-  const body = (await res.json()) as {
-    items?: { collectiveId?: string; departedAt?: string | null }[];
-  };
-  return (body.items ?? []).some(item => item.collectiveId === collectiveId && !item.departedAt);
+  const body = (await res.json()) as unknown;
+  assert.ok(
+    body && typeof body === 'object' && !Array.isArray(body),
+    'participations body is not an object'
+  );
+  const items = (body as { items?: unknown }).items;
+  assert.ok(Array.isArray(items), 'participations body has no items array');
+
+  return items.some((item, index) => {
+    assert.ok(
+      item && typeof item === 'object' && !Array.isArray(item),
+      `participations item ${index} is not an object`
+    );
+    const row = item as {
+      collectiveId?: unknown;
+      consentState?: unknown;
+      departedAt?: unknown;
+    };
+    assert.ok(
+      typeof row.collectiveId === 'string' && row.collectiveId.trim().length > 0,
+      `participations item ${index} has no non-empty collectiveId`
+    );
+    assert.ok(
+      row.consentState === 'pending' ||
+        row.consentState === 'consented' ||
+        row.consentState === 'withdrawn',
+      `participations item ${index} has an unknown consentState`
+    );
+    assert.ok(
+      row.departedAt === null || typeof row.departedAt === 'string',
+      `participations item ${index} has an invalid departedAt`
+    );
+    return (
+      row.collectiveId === collectiveId &&
+      row.consentState === 'consented' &&
+      row.departedAt === null
+    );
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -619,7 +659,7 @@ function householdResponsiveReach(collectiveName: string): ResponsiveReach {
 /** The audience term a ruling by the household writes onto the contract.
  *
  * A ruling NAMES its collective — that is what makes "the refusal names the
- * collective whose ruling narrowed it" checkable from a record rather than
+ * collective whose recorded decision narrowed it" checkable from a record rather than
  * from a doorway-local string. It is also what the feature's own REACH
  * paragraph asks a narrowing to be: "the new reach admits the household's
  * members and no longer admits an anonymous stranger". A narrowing that
@@ -1055,6 +1095,9 @@ interface ScenarioState {
   holder?: StagedRoot;
   nonHolderId?: string;
   reconcileWindowMs: number;
+  originalContractId?: string;
+  originalMarker?: string;
+  memberComparisonVerified?: boolean;
   lastRefusal?: { status: number; headers: Record<string, string | undefined>; body?: Refusal };
   lastServed?: { status: number; text: string; headers: Record<string, string | undefined> };
   /** The receipt fetched for the last serve, and the raw bytes it arrived as
@@ -1070,7 +1113,7 @@ interface ScenarioState {
   challengerHumanId?: string;
   /** When the challenge was sent — the instant every "declared before" check
    * is made against. */
-  challengeSentAt?: number;
+  challengeSubmissionTimeMs?: number;
   challengeAnswer?: { status: number; body: ChallengeAnswer };
 }
 
@@ -1113,6 +1156,16 @@ function parseRefusalBody(text: string): Refusal | undefined {
   }
 }
 
+function remainingBefore(deadline: number, timeoutError: () => Error): number {
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= 0) throw timeoutError();
+  return remainingMs;
+}
+
+function observedResponse(response: RawResponse | undefined): string {
+  return response ? `HTTP ${response.status} ${response.text.slice(0, 200)}` : 'no response';
+}
+
 /** Poll `url` (with optional headers) until its status matches `wantStatus` —
  * used both for "wait for the doorway's own reconcile to refuse" (wantStatus
  * 403) and for "wait for the narrowed reach to admit standing" (wantStatus
@@ -1127,16 +1180,17 @@ async function pollUntilStatus(
 ): Promise<RawResponse> {
   const deadline = Date.now() + budgetMs;
   let last: RawResponse | undefined;
+  const timeoutError = (): Error =>
+    new Error(
+      `GET ${url} never reached HTTP ${wantStatus} within ${budgetMs}ms (last observed: ` +
+        `${observedResponse(last)})`
+    );
   for (;;) {
-    last = await rawGet(url, headers);
-    if (last.status === wantStatus) return last;
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `GET ${url} never reached HTTP ${wantStatus} within ${budgetMs}ms (last observed: ` +
-          `HTTP ${last.status} ${last.text.slice(0, 200)})`
-      );
-    }
-    await delay(intervalMs);
+    const requestBudgetMs = remainingBefore(deadline, timeoutError);
+    last = await rawGet(url, headers, Math.min(REQUEST_TIMEOUT_MS, requestBudgetMs));
+    const observedAt = Date.now();
+    if (last.status === wantStatus && observedAt <= deadline) return last;
+    await delay(Math.min(intervalMs, remainingBefore(deadline, timeoutError)));
   }
 }
 
@@ -1156,18 +1210,20 @@ async function pollUntilNarrowedWithStanding(
   const deadline = Date.now() + budgetMs;
   let lastAnon: RawResponse | undefined;
   let lastAuthed: RawResponse | undefined;
+  const timeoutError = (): Error =>
+    new Error(
+      `GET ${url} did not converge to "narrowed but standing admitted" within ${budgetMs}ms — ` +
+        `anonymous answered ${observedResponse(lastAnon)} (want 403), authenticated answered ` +
+        `${observedResponse(lastAuthed)} (want 200)`
+    );
   for (;;) {
-    lastAnon = await rawGet(url);
-    lastAuthed = await rawGet(url, bearerHeaders);
-    if (lastAnon.status === 403 && lastAuthed.status === 200) return;
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `GET ${url} did not converge to "narrowed but standing admitted" within ${budgetMs}ms — ` +
-          `anonymous answered HTTP ${lastAnon.status} (want 403, i.e. the narrowing landed), ` +
-          `authenticated answered HTTP ${lastAuthed.status} (want 200, i.e. standing still admits)`
-      );
-    }
-    await delay(intervalMs);
+    let requestBudgetMs = remainingBefore(deadline, timeoutError);
+    lastAnon = await rawGet(url, undefined, Math.min(REQUEST_TIMEOUT_MS, requestBudgetMs));
+    requestBudgetMs = remainingBefore(deadline, timeoutError);
+    lastAuthed = await rawGet(url, bearerHeaders, Math.min(REQUEST_TIMEOUT_MS, requestBudgetMs));
+    const observedAt = Date.now();
+    if (lastAnon.status === 403 && lastAuthed.status === 200 && observedAt <= deadline) return;
+    await delay(Math.min(intervalMs, remainingBefore(deadline, timeoutError)));
   }
 }
 
@@ -1210,6 +1266,29 @@ Given(
 );
 
 Given(
+  "alpha's original contract identifier and scenario-created byte marker are observed before any reach change",
+  { timeout: 30_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const holder = requireHolder(this);
+    const declaration = await getJson(
+      `${holder.doorwayUrl}/api/v1/commitments/${holder.commitmentId}`,
+      undefined,
+      'the original projection contract'
+    );
+    const contract = declaration.body as { id?: string; metadata?: { reach?: string } };
+    assert.equal(contract.id, holder.commitmentId);
+    assert.equal(contract.metadata?.reach, 'commons');
+    const marker = markerFor(state.label);
+    const served = await rawGet(`${holder.doorwayUrl}${holder.path}`);
+    assert.equal(served.status, 200);
+    assert.ok(served.text.includes(marker));
+    state.originalContractId = contract.id;
+    state.originalMarker = marker;
+  }
+);
+
+Given(
   'doorway {string} holds no contract for {string}',
   { timeout: 20_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
@@ -1238,6 +1317,10 @@ Given(
     const state = getState(this);
     const fixture = loadHouseholdMeshFixture();
     state.reconcileWindowMs = fixture.convergenceWindowMs ?? DEFAULT_RECONCILE_WINDOW_MS;
+    // eslint-disable-next-line no-console -- the declared test allowance is evidence
+    console.log(
+      `[served-under-standing] declared reconcile allowance: ${state.reconcileWindowMs / 1000}s`
+    );
   }
 );
 
@@ -1247,7 +1330,7 @@ Given(
 // =============================================================================
 
 Given(
-  'an anonymous visitor at doorway {string} can read {string} today',
+  'an anonymous probe at doorway {string} observes public permission for {string} before withdrawal',
   { timeout: 180_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
     const state = getState(this);
@@ -1279,28 +1362,46 @@ Given(
 );
 
 When(
-  'the collective {string} rules that {string} is no longer at commons reach',
+  'the Dowell household decision recorded through alpha says {string} has narrowed {string} to members of {string}',
   { timeout: 30_000 },
-  async function (this: E2EWorld, collectiveName: string, eprLabel: string): Promise<void> {
+  async function (
+    this: E2EWorld,
+    collectiveName: string,
+    eprLabel: string,
+    audienceName: string
+  ): Promise<void> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     assert.equal(collectiveName, state.collectiveName);
+    assert.equal(audienceName, collectiveName);
     await narrowReach(requireHolder(this), 'local', householdAudience(collectiveName));
   }
 );
 
 When(
-  'each doorway re-folds from the ledger on its own reconcile, unprompted',
+  'beta is polled without a refresh instruction until it enforces and references the changed reach on the same contract',
   { timeout: OWN_REFRESH_BUDGET_MS + 60_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
     const holder = requireHolder(this);
     const askUrl = `${this.getDoorway(state.nonHolderId ?? 'beta').url}${holder.path}`;
     const raw = await pollUntilStatus(askUrl, undefined, 403, OWN_REFRESH_BUDGET_MS + 30_000);
+    const refusal = parseRefusalBody(raw.text);
+    assert.ok(refusal, `beta's HTTP 403 carried no parseable refusal: ${raw.text.slice(0, 300)}`);
+    assert.equal(
+      refusal.reach,
+      holder.currentReach,
+      `beta refused at reach "${refusal.reach}", not the newly recorded "${holder.currentReach}"`
+    );
+    assert.equal(
+      refusal.contract,
+      state.originalContractId,
+      'beta did not reference the same contract observed before its reach changed'
+    );
     state.lastRefusal = {
       status: raw.status,
       headers: raw.headers,
-      body: parseRefusalBody(raw.text),
+      body: refusal,
     };
   }
 );
@@ -1327,7 +1428,7 @@ Then(
 );
 
 Then(
-  'the refusal names reach as the term that failed, not absence and not an error',
+  'the HTTP 403 refusal names reach as the failed term, not absence or a service error',
   function (this: E2EWorld): void {
     const state = getState(this);
     const refusal = state.lastRefusal?.body;
@@ -1343,7 +1444,7 @@ Then(
 );
 
 Then(
-  'the refusal names {string} as the collective whose ruling narrowed it',
+  'the refusal names {string} as the collective whose recorded decision narrowed it',
   function (this: E2EWorld, collectiveName: string): void {
     const state = getState(this);
     const refusal = state.lastRefusal?.body;
@@ -1382,7 +1483,28 @@ Then(
 );
 
 Then(
-  'the chrome of the refusal offers the visitor a way to be heard about that decision',
+  'the private refusal points to {string} and the contract that recorded its decision',
+  function (this: E2EWorld, collectiveName: string): void {
+    const state = getState(this);
+    const refusal = state.lastRefusal?.body;
+    assert.ok(refusal, 'no private refusal body captured to assert against');
+    assert.equal(collectiveName, state.collectiveName);
+    assert.equal(refusal.collective?.id, HOUSEHOLD_COLLECTIVE_ID);
+    assert.equal(
+      refusal.collective?.record,
+      `/db/collectives/${HOUSEHOLD_COLLECTIVE_ID}`,
+      'the private refusal must point to the collective record named by the declaration'
+    );
+    assert.equal(
+      refusal.declaredIn,
+      `/api/v1/commitments/${requireHolder(this).commitmentId}`,
+      'the private refusal must point to the contract whose private reach it enforced'
+    );
+  }
+);
+
+Then(
+  "the refusal gives the collective's challenge address for that decision",
   function (this: E2EWorld): void {
     const state = getState(this);
     const refusal = state.lastRefusal?.body;
@@ -1399,6 +1521,11 @@ Then(
     // refusal pointing at a door that does not open IS the suggestion box this
     // story exists to replace.
     assert.equal(
+      refusal.collective?.id,
+      HOUSEHOLD_COLLECTIVE_ID,
+      'the challenge address must accompany this collective decision, not an unnamed refusal'
+    );
+    assert.equal(
       refusal.hear,
       '/api/v1/challenge',
       `refusal "hear" route is "${refusal.hear}", not the route that witnesses a challenge ` +
@@ -1408,26 +1535,34 @@ Then(
 );
 
 Then(
-  'the refusal was decided by the fold, not by a doorway-local rule or list',
-  function (this: E2EWorld): void {
-    const state = getState(this);
-    const refusal = state.lastRefusal?.body;
+  "following the refusal's declaration reference at doorway {string} returns that same contract identifier with the changed reach and deciding collective",
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    const refusal = getState(this).lastRefusal?.body;
     const holder = requireHolder(this);
-    assert.ok(refusal, 'no refusal body captured to assert against');
-    // The traceability half of "decided by the fold": the reason must read
-    // back to REAL ledger records this scenario staged, never a made-up id a
-    // doorway-local allowlist could not have produced (serve_eligibility.rs
-    // module doc, "A doorway-local allowlist can name no such record").
-    assert.equal(
-      refusal.epr,
-      holder.contentId,
-      `refusal names epr "${refusal.epr}", not the staged content id "${holder.contentId}"`
-    );
+    assert.ok(refusal, 'no refusal body captured');
+    assert.equal(refusal.epr, holder.contentId);
     assert.equal(
       refusal.contract,
-      holder.commitmentId,
-      `refusal names contract "${refusal.contract}", not the staged commitment id "${holder.commitmentId}"`
+      getState(this).originalContractId,
+      'the refusal must name the contract observed before its reach changed'
     );
+    assert.equal(refusal.contract, holder.commitmentId);
+    assert.equal(refusal.declaredIn, `/api/v1/commitments/${holder.commitmentId}`);
+    const { body } = await getJson(
+      `${this.getDoorway(doorwayId).url}${refusal.declaredIn}`,
+      undefined,
+      'the refusal declaration'
+    );
+    const declaration = body as {
+      id?: string;
+      metadata?: { reach?: string; gateHints?: GateHint[] };
+    };
+    assert.equal(declaration.id, holder.commitmentId);
+    assert.equal(declaration.metadata?.reach, holder.currentReach);
+    assert.ok(
+      declaration.metadata?.gateHints?.some(hint => hint.eprRef === HOUSEHOLD_COLLECTIVE_ID)
+    );
+    assert.equal(refusal.reach, holder.currentReach);
   }
 );
 
@@ -1483,8 +1618,8 @@ Then(
 //     since it is a real product gap (Task A4), not a step-glue defect.
 // =============================================================================
 
-/** Matthew's and James's hosted-shaped account resolves on ALPHA (his own
- * pool/primary-storage doorway) — see the ATTACHMENT above. Mint there always,
+/** The household lane's hosted-shaped fixture accounts resolve on ALPHA (their
+ * provisioning doorway) — see the ATTACHMENT above. Mint there always,
  * regardless of which doorway the Gherkin later asks; the bearer travels via
  * the shared dev JWT secret (or JWKS federation on a real deployment). */
 async function loginDevicePersonaBearer(
@@ -1500,7 +1635,7 @@ async function loginDevicePersonaBearer(
 
 const NO_DEVICE_STANDING_PATH_REASON = (name: string): string =>
   `no implemented path exists for device persona "${name}" to present verifiable standing to a ` +
-  'doorway\'s serve_eligibility fold: minting a bearer via doorway "alpha" (his own pool/primary-' +
+  'doorway\'s serve_eligibility fold: minting a bearer via doorway "alpha" (the lane\'s provisioning-' +
   "storage doorway — see this file's ATTACHMENT comment above scenario 2) failed live. Doorway-side " +
   'peer-conductor delegation is deferred (doorway/doorway-service/src/routes/auth_routes.rs ' +
   'MeResponse doc: "MVP: always doorway-host. Mode B detection is deferred to Task A4"), and ' +
@@ -1513,7 +1648,7 @@ const NO_DEVICE_STANDING_PATH_REASON = (name: string): string =>
 // =============================================================================
 
 Given(
-  '{string} has been narrowed to a reach that admits members of {string}',
+  'the Dowell household decision recorded through alpha says {string} now admits only members of {string}',
   { timeout: 150_000 },
   async function (
     this: E2EWorld,
@@ -1533,8 +1668,8 @@ Given(
     // started being refused (the narrowing landed) at the SAME time a
     // bearer any household member holds (matthew, minted via alpha — see
     // the ATTACHMENT above) is still admitted (the standing the reach
-    // names survives it) — both within the household's declared reconcile
-    // window.
+    // names survives it) — both within the declared window plus the explicit
+    // request/poll observation allowance.
     const bearer = await loginDevicePersonaBearer(this, 'Matthew');
     if (!bearer) return 'pending';
     await pollUntilNarrowedWithStanding(
@@ -1545,66 +1680,68 @@ Given(
   }
 );
 
+async function assertCurrentHouseholdMembership(
+  world: E2EWorld,
+  persona: 'Matthew' | 'James',
+  collectiveName: string
+): Promise<void> {
+  const state = getState(world);
+  assert.equal(collectiveName, state.collectiveName);
+  const fixture = loadHouseholdMeshFixture();
+  // No login needed: this is a live substrate read keyed by the persona's
+  // canonical fixture human id, never a doorway session artifact.
+  const humanId = getFixture(persona).id;
+  const storageUrl = requireFixturePrimaryStorageUrl(fixture, 'beta');
+  const isMember = await isLiveMember(storageUrl, humanId, HOUSEHOLD_COLLECTIVE_ID);
+  assert.ok(
+    isMember,
+    `${persona} ("${humanId}") carries no live participation in "${HOUSEHOLD_COLLECTIVE_ID}" ` +
+      `per ${storageUrl}/db/participations/${humanId} — the household-formation ceremony ` +
+      'has not (or no longer) affirmed this on this mesh'
+  );
+}
+
 Given(
-  "Matthew's conductor states his membership in {string}",
+  "Matthew's peer membership record states his membership in {string}",
+  { timeout: 20_000 },
+  async function (this: E2EWorld, collectiveName: string): Promise<void> {
+    await assertCurrentHouseholdMembership(this, 'Matthew', collectiveName);
+  }
+);
+
+Given(
+  "James's peer membership record states his membership in {string}",
+  { timeout: 20_000 },
+  async function (this: E2EWorld, collectiveName: string): Promise<void> {
+    await assertCurrentHouseholdMembership(this, 'James', collectiveName);
+  }
+);
+
+Given(
+  "Susan's peer membership record states no membership in {string}",
   { timeout: 20_000 },
   async function (this: E2EWorld, collectiveName: string): Promise<void> {
     const state = getState(this);
     assert.equal(collectiveName, state.collectiveName);
     const fixture = loadHouseholdMeshFixture();
-    // No login needed: this is a live substrate read keyed by Matthew's
-    // CANONICAL fixture human id, never a session artifact (see ATTACHMENT
-    // above — the earlier version of this step wrongly logged in via beta,
-    // where his hosted-shaped account does not resolve, and 401'd for no
-    // reason this assertion actually needed).
-    const humanId = getFixture('Matthew').id;
+    // No login needed — see the sibling Matthew step's comment above.
+    const humanId = getFixture('Susan').id;
     const storageUrl = requireFixturePrimaryStorageUrl(fixture, 'beta');
     const isMember = await isLiveMember(storageUrl, humanId, HOUSEHOLD_COLLECTIVE_ID);
-    assert.ok(
+    assert.equal(
       isMember,
-      `Matthew ("${humanId}") carries no live participation in "${HOUSEHOLD_COLLECTIVE_ID}" ` +
-        `per ${storageUrl}/db/participations/${humanId} — the household-formation ceremony ` +
-        'has not (or no longer) affirmed this on this mesh'
+      false,
+      `Susan ("${humanId}") unexpectedly carries a live participation in ` +
+        `"${HOUSEHOLD_COLLECTIVE_ID}" per ${storageUrl}/db/participations/${humanId}; ` +
+        'the non-member control must be true in the substrate, not inferred from fixture prose'
     );
   }
 );
 
-Given(
-  "James's conductor states no membership in {string}",
-  { timeout: 20_000 },
-  async function (this: E2EWorld, collectiveName: string): Promise<void | 'pending'> {
-    const state = getState(this);
-    assert.equal(collectiveName, state.collectiveName);
-    const fixture = loadHouseholdMeshFixture();
-    // No login needed — see the sibling Matthew step's comment above.
-    const humanId = getFixture('James').id;
-    const storageUrl = requireFixturePrimaryStorageUrl(fixture, 'beta');
-    const isMember = await isLiveMember(storageUrl, humanId, HOUSEHOLD_COLLECTIVE_ID);
-    if (isMember) {
-      // The real Dowell household triad (matthew/jessica/james) are ALL
-      // affirmed participants of household-dowell (genesis/seeder/src/
-      // seed-household-formation.ts; genesis/data/humans/humans.json gives
-      // James householdId: "household-dowell" directly) — there is no
-      // non-member persona among this mesh's own household. Rather than
-      // assert a premise the live mesh contradicts, this half of the
-      // scenario is honestly pending: the feature names James specifically,
-      // and no other fixture human stands in for "a household non-member"
-      // without changing what the story is about.
-      return 'pending';
-    }
-  }
-);
-
 When(
-  'Matthew asks doorway {string} for {string} as {string}',
+  'canonical Matthew presents his hosted bearer when asking doorway {string} for {string}',
   { timeout: 20_000 },
-  async function (
-    this: E2EWorld,
-    doorwayId: string,
-    eprLabel: string,
-    asName: string
-  ): Promise<void | 'pending'> {
-    assert.equal(asName, 'Matthew');
+  async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void | 'pending'> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     const doorway = this.getDoorway(doorwayId);
@@ -1628,39 +1765,29 @@ When(
   }
 );
 
-Then('Matthew is served {string}', function (this: E2EWorld, eprLabel: string): void {
-  const state = getState(this);
-  assert.equal(eprLabel, state.label);
-  assert.ok(state.lastServed, 'no served response captured for Matthew');
-  assert.equal(
-    state.lastServed.status,
-    200,
-    `Matthew was answered HTTP ${state.lastServed.status}, not served: ${state.lastServed.text.slice(0, 300)}`
-  );
-  const marker = markerFor(eprLabel);
-  assert.ok(
-    state.lastServed.text.includes(marker),
-    `Matthew's 200 response does not carry the staged archive's own marker — it may be a doorway ` +
-      'landing-page fallback rather than the actual root'
-  );
-});
-
 Then(
-  'the standing that admitted him was read from his own conductor',
-  function (this: E2EWorld): void {
-    // True by construction, not by inference from any response field:
-    // `standing_from_request` (serve_eligibility.rs) derives standing SOLELY
-    // from the verified JWT of THIS request — never a doorway-side lookup —
-    // and this scenario's only credential for Matthew is the bearer his own
-    // `/auth/login` minted. Re-asserting the prior serve is what is checkable
-    // here; there is no separate "source" field on the wire to inspect.
+  'Matthew is served the originally observed byte marker for {string}',
+  function (this: E2EWorld, eprLabel: string): void {
     const state = getState(this);
-    assert.ok(state.lastServed?.status === 200, 'Matthew must already be served');
+    assert.equal(eprLabel, state.label);
+    assert.ok(state.lastServed, 'no served response captured for Matthew');
+    assert.equal(
+      state.lastServed.status,
+      200,
+      `Matthew was answered HTTP ${state.lastServed.status}, not served: ${state.lastServed.text.slice(0, 300)}`
+    );
+    const marker = state.originalMarker;
+    assert.ok(marker, 'the original byte marker was not observed in the Background');
+    assert.ok(
+      state.lastServed.text.includes(marker),
+      `Matthew's 200 response does not carry the staged archive's own marker — it may be a doorway ` +
+        'landing-page fallback rather than the actual root'
+    );
   }
 );
 
 Then(
-  'doorway {string} served it through the nearest live holder of the contract',
+  'doorway {string} names alpha as the live holder that supplied the bytes',
   function (this: E2EWorld, doorwayId: string): void {
     const state = getState(this);
     const holder = requireHolder(this);
@@ -1714,32 +1841,46 @@ Then(
 );
 
 When(
-  'James asks doorway {string} for {string} as {string}',
-  { timeout: 20_000 },
-  async function (
-    this: E2EWorld,
-    doorwayId: string,
-    eprLabel: string,
-    asName: string
-  ): Promise<void | 'pending'> {
-    assert.equal(asName, 'James');
+  'canonical Susan presents her hosted bearer at doorway {string} between two further Matthew requests for {string}',
+  { timeout: 60_000 },
+  async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     const doorway = this.getDoorway(doorwayId);
-    // Bearer minted via alpha, presented to whichever doorway the Gherkin
-    // names — see the ATTACHMENT above scenario 2. In practice this step is
-    // never reached today: James's own "no membership" Given (above) already
-    // returns 'pending' first, since the real household triad are all
-    // members. Fixed for correctness regardless.
-    const bearer = await loginDevicePersonaBearer(this, 'James');
-    if (!bearer) {
-      console.warn(`  ⏭️  PENDING: ${NO_DEVICE_STANDING_PATH_REASON('James')}`);
-      return 'pending';
-    }
+    // Susan is already an Act-I hosted-cast persona. Mint her bearer via the
+    // lane's provisioning doorway, then present it to the doorway under test.
+    const bearer = await loginBearer(this.getDoorway('alpha').url, 'Susan');
     const holder = requireHolder(this);
+    const member = await loginBearer(this.getDoorway('alpha').url, 'Matthew');
+    const declarationUrl = `${doorway.url}/api/v1/commitments/${holder.commitmentId}`;
+    const before = await getJson(declarationUrl, undefined, 'audience before the paired requests');
+    const memberControl = async (): Promise<void> => {
+      const response = await rawGet(`${doorway.url}${holder.path}`, {
+        Authorization: `Bearer ${member.token}`,
+      });
+      assert.equal(response.status, 200, 'Matthew must remain admitted around Susan’s request');
+      assert.ok(state.originalMarker, 'the Background did not capture the original marker');
+      assert.ok(response.text.includes(state.originalMarker));
+      assert.equal(response.headers['x-elohim-standing'], `admitted;reach=${holder.currentReach}`);
+    };
+    await memberControl();
     const raw = await rawGet(`${doorway.url}${holder.path}`, {
       Authorization: `Bearer ${bearer.token}`,
     });
+    await memberControl();
+    const after = await getJson(declarationUrl, undefined, 'audience after the paired requests');
+    const beforeContract = before.body as { id?: string; metadata?: { reach?: string } };
+    const afterContract = after.body as { id?: string; metadata?: { reach?: string } };
+    assert.equal(beforeContract.id, state.originalContractId);
+    assert.equal(afterContract.id, state.originalContractId);
+    assert.equal(beforeContract.metadata?.reach, holder.currentReach);
+    assert.equal(afterContract.metadata?.reach, holder.currentReach);
+    assert.deepEqual(
+      after.body,
+      before.body,
+      'the declaration changed during the standing comparison'
+    );
+    state.memberComparisonVerified = true;
     state.lastServed = raw;
     state.lastRefusal =
       raw.status === 403
@@ -1748,15 +1889,26 @@ When(
   }
 );
 
-Then('James is refused {string}', function (this: E2EWorld, eprLabel: string): void {
+Then(
+  'the surrounding Matthew controls return the original marker while before-and-after reads keep the same contract identifier, reach and full declaration',
+  function (this: E2EWorld): void {
+    assert.equal(
+      getState(this).memberComparisonVerified,
+      true,
+      'both member controls and declaration readbacks must have passed'
+    );
+  }
+);
+
+Then('Susan is refused {string}', function (this: E2EWorld, eprLabel: string): void {
   const state = getState(this);
   assert.equal(eprLabel, state.label);
-  assert.ok(state.lastRefusal, `James was not refused: ${JSON.stringify(state.lastServed)}`);
+  assert.ok(state.lastRefusal, `Susan was not refused: ${JSON.stringify(state.lastServed)}`);
   assert.equal(state.lastRefusal.status, 403);
 });
 
 // (the shared "the refusal names reach as the term that failed..." Then step
-// above is reused verbatim for James's refusal and for scenario 3's.)
+// above is reused verbatim for Susan's refusal and for scenario 3's.)
 
 // =============================================================================
 // Scenario 3 — the holder's warm copy stops answering anonymously inside the
@@ -1764,7 +1916,7 @@ Then('James is refused {string}', function (this: E2EWorld, eprLabel: string): v
 // =============================================================================
 
 Given(
-  'doorway {string} has served {string} to an anonymous visitor and holds it warm',
+  'doorway {string} has already served {string} to an anonymous visitor',
   { timeout: 30_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
     const state = getState(this);
@@ -1795,7 +1947,7 @@ Given(
 // step from scenario 1 is reused verbatim here — same holder, same narrowing.)
 
 Then(
-  "within the household's declared reconcile window an anonymous visitor at doorway {string} is refused {string}",
+  'within the fixture window plus 15 seconds of observation allowance an anonymous visitor at doorway {string} is refused {string}',
   { timeout: 180_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void> {
     const state = getState(this);
@@ -1803,14 +1955,7 @@ Then(
     const holder = requireHolder(this);
     const doorway = this.getDoorway(doorwayId);
     const budgetMs = state.reconcileWindowMs + 15_000; // + request/poll-interval slack
-    const start = Date.now();
     const raw = await pollUntilStatus(`${doorway.url}${holder.path}`, undefined, 403, budgetMs);
-    const elapsedMs = Date.now() - start;
-    assert.ok(
-      elapsedMs <= state.reconcileWindowMs + RECONCILE_POLL_INTERVAL_MS,
-      `doorway "${doorwayId}" refused only after ${elapsedMs}ms, past the declared reconcile window ` +
-        `of ${state.reconcileWindowMs}ms`
-    );
     state.lastRefusal = {
       status: raw.status,
       headers: raw.headers,
@@ -1820,7 +1965,7 @@ Then(
 );
 
 Then(
-  'doorway {string} still holds the bytes warm',
+  'doorway {string} serves Matthew the scenario-created resource bytes because the narrowed reach admits his current membership',
   { timeout: 20_000 },
   async function (this: E2EWorld, doorwayId: string): Promise<void> {
     const state = getState(this);
@@ -1829,9 +1974,9 @@ Then(
     // Proven by a SECOND, AUTHENTICATED serve succeeding — never by anything
     // read out of the anonymous refusal, which is a permission decision and
     // proves nothing about byte custody either way (file header). The
-    // narrowed reach ("local", no gate hints) admits ANY authenticated
-    // standing, so Matthew's bearer is enough to observe custody without
-    // needing his household membership at all.
+    // narrowed reach admits Matthew through his household membership. This
+    // proves that the resource is still available to him, not which cache
+    // branch supplied the response.
     const bearer = await loginBearer(doorway.url, 'Matthew');
     const raw = await rawGet(`${doorway.url}${holder.path}`, {
       Authorization: `Bearer ${bearer.token}`,
@@ -1840,12 +1985,18 @@ Then(
       raw.status,
       200,
       `authenticated re-serve of "${state.label}" from doorway "${doorwayId}" answered HTTP ${raw.status} ` +
-        '— if the bytes were evicted this would 404/503 rather than serve'
+        '— the resource is no longer available to the admitted member'
     );
-    const marker = markerFor(state.label);
+    const marker = state.originalMarker;
+    assert.ok(marker, 'the original byte marker was not observed before the reach change');
     assert.ok(
       raw.text.includes(marker),
-      `authenticated re-serve does not carry the staged archive's marker`
+      `authenticated re-serve does not carry the scenario-created archive's marker`
+    );
+    assert.equal(
+      raw.headers['x-elohim-standing'],
+      `admitted;reach=${holder.currentReach}`,
+      `Matthew's serve was not admitted by the narrowed reach "${holder.currentReach}"`
     );
     // Supporting evidence only, never hard-asserted: which warm_shell::plan_shell_serve
     // branch fires (ServeWarm vs a fresh Fetch that confirms against upstream
@@ -1857,15 +2008,6 @@ Then(
     }
   }
 );
-
-Then('no eviction of those bytes was required for the refusal', function (this: E2EWorld): void {
-  // This scenario never calls any admin cache/eviction route between the
-  // warm serve and the refusal — the refusal above was produced purely by
-  // the fold re-reading the narrowed reach, with the bytes untouched. Nothing
-  // to probe: the absence of any eviction call in this file's own steps IS
-  // the evidence, and "doorway {string} still holds the bytes warm" (above)
-  // is what proves the bytes are, in fact, still there.
-});
 
 // =============================================================================
 // Scenario 4 — the fair-trade receipt names what was exchanged for this serve
@@ -1918,9 +2060,9 @@ Given(
 );
 
 When(
-  'Matthew is served {string} through doorway {string}',
+  'canonical Matthew presents his hosted bearer and is served {string} through doorway {string}',
   { timeout: 180_000 },
-  async function (this: E2EWorld, eprLabel: string, doorwayId: string): Promise<void> {
+  async function (this: E2EWorld, eprLabel: string, doorwayId: string): Promise<void | 'pending'> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
     const holder = requireHolder(this);
@@ -1928,13 +2070,14 @@ When(
     state.askedDoorwayId = await resolveDoorwayId(this, doorwayId, doorway.url);
     state.askedDoorwayUrl = doorway.url;
 
-    // Matthew's own bearer when one can be minted — a serve to a NAMED person,
-    // which is what the Gherkin says. When it cannot be (the device-persona
-    // standing path is a separate, named red), the commons reach admits him
-    // anyway and the receipt is the same receipt: it accounts for who was
-    // CREDITED, never for who was served.
+    // This is a serve to a named person, so absence of Matthew's bearer cannot
+    // fall back to anonymous commons access and still count as this scenario.
     const bearer = await loginDevicePersonaBearer(this, 'Matthew');
-    const headers = bearer ? { Authorization: `Bearer ${bearer.token}` } : undefined;
+    if (!bearer) {
+      console.warn(`  ⏭️  PENDING: ${NO_DEVICE_STANDING_PATH_REASON('Matthew')}`);
+      return 'pending';
+    }
+    const headers = { Authorization: `Bearer ${bearer.token}` };
 
     const marker = markerFor(eprLabel);
     const deadline = Date.now() + 150_000;
@@ -1956,7 +2099,7 @@ When(
 );
 
 Then(
-  'the chrome carries a fair-trade receipt for this serve',
+  'the chrome carries a contribution receipt for this serve',
   { timeout: 30_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
@@ -1986,33 +2129,72 @@ Then(
   }
 );
 
-Then('the receipt names what was given in exchange for the serve', function (this: E2EWorld): void {
-  const receipt = getState(this).receipt?.body;
-  assert.ok(receipt, 'no receipt captured — the preceding step must run first');
-  assert.ok(
-    receipt.exchanged,
-    'the receipt names no exchange: ' +
-      `unrecorded=${JSON.stringify(receipt.unrecorded)}. A null here is the doorway being ` +
-      'HONEST that it holds no hosting agreement for this record — so if this fails, the ' +
-      "staging (stageRoot's hosting-agreement) did not land, not the receipt."
-  );
-  assert.ok(
-    receipt.exchanged.what.trim().length > 0,
-    'the exchange must say WHAT was given, in words'
-  );
-  assert.ok(
-    receipt.exchanged.sentence.includes(receipt.exchanged.what),
-    `the clause must SAY what was given, not only carry it in a field: "${receipt.exchanged.sentence}"`
-  );
-  assert.ok(
-    !receipt.unrecorded.includes('exchanged'),
-    'a named exchange and an "exchanged" entry in unrecorded cannot both be true'
-  );
-});
+Given(
+  'doorway {string} is the holder whose hosting agreement records computing time and storage',
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    const holder = requireHolder(this);
+    assert.equal(doorwayId, 'alpha', 'this scenario names alpha as the holder');
+    assert.ok(
+      holder.doorwayId === doorwayId ||
+        originsEqual(this.getDoorway(doorwayId).url, holder.doorwayUrl),
+      `doorway "${doorwayId}" is not the holder that owns the hosting agreement`
+    );
+    const { body } = await getJson(
+      `${holder.doorwayUrl}/api/v1/commitments/${holder.hostingAgreementId}`,
+      undefined,
+      'the hosting contribution'
+    );
+    const agreement = body as { action?: string; resourceClassifiedAs?: string[] };
+    assert.equal(agreement.action, 'hosting-agreement');
+    assert.ok(agreement.resourceClassifiedAs?.includes('compute'));
+  }
+);
+
+Given(
+  'the projection contract already names the collective and its 72-hour response promise',
+  async function (this: E2EWorld): Promise<void> {
+    const holder = requireHolder(this);
+    const { body } = await getJson(
+      `${holder.doorwayUrl}/api/v1/commitments/${holder.commitmentId}`,
+      undefined,
+      'the previously declared response window'
+    );
+    const declaration = body as { metadata?: { responsiveReach?: ResponsiveReach } };
+    assert.equal(declaration.metadata?.responsiveReach?.party, HOUSEHOLD_COLLECTIVE_ID);
+    assert.equal(declaration.metadata?.responsiveReach?.withinHours, 72);
+  }
+);
 
 Then(
-  'the receipt credits the holder peer that provided the bytes',
+  'the receipt names computing time and storage as the hosting contribution',
   function (this: E2EWorld): void {
+    const receipt = getState(this).receipt?.body;
+    assert.ok(receipt, 'no receipt captured — the preceding step must run first');
+    assert.ok(
+      receipt.exchanged,
+      'the receipt names no exchange: ' +
+        `unrecorded=${JSON.stringify(receipt.unrecorded)}. A null here is the doorway being ` +
+        'HONEST that it holds no hosting agreement for this record — so if this fails, the ' +
+        "staging (stageRoot's hosting-agreement) did not land, not the receipt."
+    );
+    assert.ok(
+      receipt.exchanged.what === 'computing time and storage',
+      'the exchange must name the hosting contribution declared by this fixture'
+    );
+    assert.ok(
+      receipt.exchanged.sentence.includes(receipt.exchanged.what),
+      `the clause must SAY what was given, not only carry it in a field: "${receipt.exchanged.sentence}"`
+    );
+    assert.ok(
+      !receipt.unrecorded.includes('exchanged'),
+      'a named exchange and an "exchanged" entry in unrecorded cannot both be true'
+    );
+  }
+);
+
+Then(
+  "the receipt's held credit resolves to alpha's exact project-EPR record and provider",
+  async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
     const receipt = state.receipt?.body;
     const holder = requireHolder(this);
@@ -2029,12 +2211,22 @@ Then(
       'the held credit must read back to the projection contract this scenario staged, not to ' +
         'some other record the doorway happened to hold'
     );
+    const { body } = await getJson(
+      `${holder.doorwayUrl}${held.record}`,
+      undefined,
+      "alpha's held-credit record"
+    );
+    const record = body as { id?: string; action?: string; provider?: string };
+    assert.equal(record.id, held.commitment);
+    assert.equal(record.action, 'project-epr');
+    assert.equal(record.provider, testStewardPeerId());
   }
 );
 
 Then(
-  'the receipt credits doorway {string} for the projection, separately from the holder',
-  function (this: E2EWorld, doorwayId: string): void {
+  "the receipt's projected credit resolves to beta's exact operate-doorway record, separately from the holder",
+  async function (this: E2EWorld): Promise<void> {
+    const doorwayId = 'beta';
     const state = getState(this);
     const receipt = state.receipt?.body;
     const holder = requireHolder(this);
@@ -2061,6 +2253,26 @@ Then(
       projected.commitment,
       holder.commitmentId,
       "the projection credit must not be the holder's own projection contract"
+    );
+    assert.equal(
+      state.askedDoorwayId,
+      await resolveDoorwayId(this, doorwayId, this.getDoorway(doorwayId).url)
+    );
+    const askedUrl = state.askedDoorwayUrl;
+    assert.ok(askedUrl, 'the serving step must record the asked doorway URL');
+    const { body } = await getJson(
+      `${askedUrl}${projected.record}`,
+      undefined,
+      `doorway "${doorwayId}" projection-credit record`
+    );
+    const record = body as { id?: string; action?: string; inScopeOf?: string[] };
+    assert.equal(record.id, projected.commitment);
+    assert.equal(record.action, 'operate-doorway');
+    assert.ok(
+      record.inScopeOf
+        ?.flatMap(scope => scope.split('|'))
+        .includes(`doorway:${state.askedDoorwayId}`),
+      `projection record scope does not name resolved doorway "${state.askedDoorwayId}": ${JSON.stringify(record.inScopeOf)}`
     );
   }
 );
@@ -2097,7 +2309,31 @@ function safeParseId(text: string): string | undefined {
 }
 
 Then(
-  'every credit on the receipt reads back to a record on the shared ledger',
+  'the receipt explains in plain sentences who kept the resource ready and who operated the entrance',
+  function (this: E2EWorld): void {
+    const receipt = getState(this).receipt?.body;
+    assert.ok(receipt, 'the receipt must be captured before its explanation is checked');
+    const held = receipt.credits.find(c => c.role === 'held');
+    const projected = receipt.credits.find(c => c.role === 'projected');
+    assert.ok(held, 'the receipt has no held credit to explain');
+    assert.ok(projected, 'the receipt has no projected credit to explain');
+    const heldLabel = held.partyLabel?.trim();
+    const projectedLabel = projected.partyLabel?.trim();
+    const heldName = heldLabel && heldLabel.length > 0 ? heldLabel : held.party.trim();
+    const projectedName =
+      projectedLabel && projectedLabel.length > 0 ? projectedLabel : projected.party.trim();
+    assert.ok(heldName, 'the held credit names no party in either partyLabel or party');
+    assert.ok(projectedName, 'the projected credit names no party in either partyLabel or party');
+    assert.equal(held.sentence, `${heldName} keeps this and handed over the copy you are reading.`);
+    assert.equal(
+      projected.sentence,
+      `${projectedName} runs the doorway that put it in front of you.`
+    );
+  }
+);
+
+Then(
+  'each receipt record link returns the exact credited record identifier',
   { timeout: 60_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
@@ -2116,7 +2352,7 @@ Then(
     }
     assert.ok(clauses.length > 0, 'a receipt with no clause at all proves nothing');
 
-    // The ledger is SHARED, so either doorway may answer for a record. Ask the
+    // Either doorway may answer the record route. Ask the
     // doorway that gave the receipt first; fall back to the holder it named,
     // because whether a holder's commitment row has replicated to the courier's
     // own storage peer yet is dataplane-convergence's subject, not this
@@ -2140,7 +2376,7 @@ Then(
 );
 
 Then(
-  'the receipt is written in the words a friend would use, with the protocol form one request away',
+  'the receipt begins with its plain introduction and offers one protocol-form link',
   { timeout: 30_000 },
   async function (this: E2EWorld): Promise<void> {
     const state = getState(this);
@@ -2156,6 +2392,10 @@ Then(
     assert.ok(
       captured.raw.trimStart().startsWith('{"sentence":"'),
       `the first thing the receipt says is not its sentence: ${captured.raw.slice(0, 120)}`
+    );
+    assert.equal(
+      receipt.sentence,
+      'Someone kept this ready and someone put it in front of you. Here is who was credited for that, and what they were given in return.'
     );
     for (const identifier of [
       holder.contentId,
@@ -2205,29 +2445,27 @@ Then(
  * the same challenge rather than a second one — the doorway's ensure-not-create
  * is what makes that safe, and exercising it here is free. */
 const JAMES_CHALLENGE_WORDS =
-  'I live in this household and I think this should still be readable by people like me. ' +
-  'Please look at it again.';
+  'I ask the Dowell household to reconsider keeping this resource at private reach, whether or ' +
+  'not my own record makes me its beneficiary. Please look at the audience decision again.';
 
 Given(
-  'the collective {string} has ruled that {string} is no longer at commons reach',
+  'the Dowell household decision recorded through alpha sets private reach for {string}',
   { timeout: 60_000 },
-  async function (this: E2EWorld, collectiveName: string, eprLabel: string): Promise<void> {
+  async function (this: E2EWorld, eprLabel: string): Promise<void> {
     const state = getState(this);
     assert.equal(eprLabel, state.label);
-    assert.equal(collectiveName, state.collectiveName);
+    const collectiveName = state.collectiveName;
     // `private` on purpose. `classify_reach('private')` is BeneficiaryOnly,
-    // which refuses an AUTHENTICATED requester too — so James is genuinely
-    // refused naming reach without this file asserting the false premise
-    // scenario 2 has to stay honest about (the real household triad are all
-    // members of household-dowell, so no fixture human stands in for "a
-    // household non-member"). The feature's REACH paragraph licenses it: where
-    // a narrowing lands is the collective's to say.
+    // which refuses an AUTHENTICATED requester too — so James, a real Dowell
+    // member, is genuinely refused by this different ruling before he uses the
+    // challenge path. The feature's REACH paragraph licenses it: where a
+    // narrowing lands is the collective's to say.
     await narrowReach(requireHolder(this), 'private', householdAudience(collectiveName));
   }
 );
 
 Given(
-  'James asked doorway {string} for {string} and was refused naming reach',
+  'canonical James presents his hosted bearer and membership evidence to doorway {string} under private reach for {string}',
   { timeout: 180_000 },
   async function (this: E2EWorld, doorwayId: string, eprLabel: string): Promise<void | 'pending'> {
     const state = getState(this);
@@ -2267,10 +2505,23 @@ Given(
   }
 );
 
+Then(
+  'the HTTP 403 refusal shows the current doorway cannot serve private reach without beneficiary verification',
+  function (this: E2EWorld): void {
+    const state = getState(this);
+    const refusal = state.lastRefusal?.body;
+    assert.equal(state.lastRefusal?.status, 403);
+    assert.ok(refusal, 'James received no parseable private-reach refusal');
+    assert.equal(refusal.refused, 'reach');
+    assert.equal(refusal.reach, 'private');
+  }
+);
+
 When(
-  "James uses the way to be heard in that refusal's chrome to challenge the standing",
+  "James submits {string} through the refusal's challenge address",
   { timeout: 60_000 },
-  async function (this: E2EWorld): Promise<void | 'pending'> {
+  async function (this: E2EWorld, objection: string): Promise<void | 'pending'> {
+    assert.equal(objection, JAMES_CHALLENGE_WORDS);
     const state = getState(this);
     const holder = requireHolder(this);
     const refusal = state.lastRefusal?.body;
@@ -2284,7 +2535,7 @@ When(
     // a refusal advertises has to be the route that works.
     assert.ok(refusal.hear, 'the refusal offered no way to be heard');
 
-    state.challengeSentAt = Date.now();
+    state.challengeSubmissionTimeMs = Date.now();
     const res = await fetch(`${askedUrl}${refusal.hear}`, {
       method: 'POST',
       headers: {
@@ -2307,28 +2558,29 @@ When(
   }
 );
 
-Then('his challenge is witnessed on the shared ledger as a commitment', function (this: E2EWorld):
-  | void
-  | 'pending' {
-  const state = getState(this);
-  if (!state.challengeAnswer) return 'pending';
-  const { status, body } = state.challengeAnswer;
-  assert.ok(
-    status === 201 || status === 200,
-    `the challenge answered HTTP ${status}: ${JSON.stringify(body).slice(0, 400)}`
-  );
-  assert.ok(
-    body.outcome === 'witnessed' || body.outcome === 'replay',
-    `the challenge outcome was "${body.outcome}" (${body.reason}) — only "witnessed" and ` +
-      '"replay" mean a commitment stands on the ledger. "nothingOwed" means the staged ' +
-      'contract carried no responsiveReach term, which is a staging gap, not a doorway defect.'
-  );
-  assert.ok(body.challenge, 'the answer names no commitment');
-  assert.ok(body.record, 'the answer offers no route to read that commitment back');
-});
+Then(
+  "James receives a challenge record identifier carrying the collective's existing response promise",
+  function (this: E2EWorld): void | 'pending' {
+    const state = getState(this);
+    if (!state.challengeAnswer) return 'pending';
+    const { status, body } = state.challengeAnswer;
+    assert.ok(
+      status === 201 || status === 200,
+      `the challenge answered HTTP ${status}: ${JSON.stringify(body).slice(0, 400)}`
+    );
+    assert.ok(
+      body.outcome === 'witnessed' || body.outcome === 'replay',
+      `the challenge outcome was "${body.outcome}" (${body.reason}) — only "witnessed" and ` +
+        '"replay" mean a commitment stands on the ledger. "nothingOwed" means the staged ' +
+        'contract carried no responsiveReach term, which is a staging gap, not a doorway defect.'
+    );
+    assert.ok(body.challenge, 'the answer names no challenge record identifier');
+    assert.ok(body.record, 'the answer offers no route to read the challenge record back');
+  }
+);
 
 Then(
-  'the commitment names {string} as the party that owes the response',
+  'the challenge record names {string} as the party that owes the response',
   function (this: E2EWorld, collectiveName: string): void | 'pending' {
     const state = getState(this);
     if (!state.challengeAnswer) return 'pending';
@@ -2356,14 +2608,14 @@ Then(
 );
 
 Then(
-  'the commitment carries a due date that was declared before James sent it',
+  'the challenge deadline is between submission plus 72 hours minus five minutes and submission plus 72 hours plus five minutes',
   function (this: E2EWorld): void | 'pending' {
     const state = getState(this);
     if (!state.challengeAnswer) return 'pending';
     const { body } = state.challengeAnswer;
     const owed = body.owed;
     assert.ok(owed, 'no owed term to check a due window against');
-    assert.ok(body.due, 'the commitment carries no due date');
+    assert.ok(body.due, 'the challenge record carries no due date');
     const due = Date.parse(body.due);
     assert.ok(Number.isFinite(due), `the due date "${body.due}" is not a date`);
 
@@ -2376,20 +2628,25 @@ Then(
       Number.isFinite(declaredAt),
       `the owed term names no readable declaration time: ${JSON.stringify(owed.declaredAt)}`
     );
-    const sentAt = state.challengeSentAt ?? Date.now();
+    const sentAt = state.challengeSubmissionTimeMs ?? Date.now();
     assert.ok(
       declaredAt < sentAt,
       `the redress term was declared at ${owed.declaredAt}, which is NOT before James sent his ` +
         `challenge at ${new Date(sentAt).toISOString()} — a window agreed after the fact is not a ` +
         'window that was fixed before he sent anything'
     );
-    assert.ok(owed.withinHours > 0, 'a window of no time at all is not a window');
+    assert.equal(
+      owed.withinHours,
+      72,
+      "the challenge record must use the projection contract's declared 72-hour window"
+    );
     assert.ok(
       owed.declaredBy.startsWith('/api/v1/commitments/'),
       `the window must read back to the record that declared it (got: "${owed.declaredBy}")`
     );
     // The arithmetic a reader can redo: the due date is the declared window
-    // counted from receipt, never a number the doorway chose.
+    // counted from the client-observed submission instant. The five-minute tolerance
+    // covers request transit and the difference between client and server clocks.
     const drift = Math.abs(due - (sentAt + owed.withinHours * 3_600_000));
     assert.ok(
       drift < 5 * 60_000,
@@ -2400,7 +2657,7 @@ Then(
 );
 
 Then(
-  'James can read the owed response and its due date from the same chrome',
+  'James retrieves the challenge record with his written objection, the collective that owes a response and its due date through beta using that identifier',
   { timeout: 30_000 },
   async function (this: E2EWorld): Promise<void | 'pending'> {
     const state = getState(this);
@@ -2409,8 +2666,8 @@ Then(
     assert.ok(askedUrl, 'no doorway recorded');
     const answer = state.challengeAnswer.body;
 
-    // THE SAME CHROME: the same doorway James was refused at and challenged
-    // through, read back live. Not the holder, not an admin surface.
+    // Read the returned challenge identifier through the same public doorway
+    // API. This is not proof that a rendered frame exposes a status link.
     const { body } = await getJson(
       `${askedUrl}/api/v1/challenge/${encodeURIComponent(answer.challenge!)}`,
       { Authorization: `Bearer ${state.challengerToken ?? ''}` },

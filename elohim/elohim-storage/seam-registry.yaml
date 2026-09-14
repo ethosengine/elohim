@@ -4445,6 +4445,41 @@ decisionPoints:
       and first seen by a non-authoring peer through this path projects as unrevoked until
       a reconcile reads the links.
 
+  - name: resolve_staging_candidate
+    kind: resolver
+    sourceLocation:
+      file: src/http.rs
+      modulePath: http::HttpServer::resolve_staging_candidate
+    summary: >
+      Projects the conductor-selected staging declaration into the content-head read and maps
+      that exact declaration to locally present blob bytes. The additive state distinguishes
+      authoritative staged/none answers from an unavailable ask, so a consumer can retain its
+      last observation during an outage and never infer withdrawal or fall back to public bytes.
+    concernIds:
+      - { id: C0, status: answered, justification: "Reads existing canonical-head declarations and content projection hints; authors no entity or head." }
+      - { id: C1, status: answered, justification: "The existing content-store election selects the candidate; storage does not rank or promote it." }
+      - { id: C2, status: answered, justification: "The selected ActionHash must match the existing declaration-to-blob projection before bytes are named." }
+      - { id: C3, status: answered, justification: "Each HTTP read samples current local conductor and projection state; promotion removes the candidate on the next successful read." }
+      - { id: C4, status: answered, justification: "staged, none and unavailable remain distinct; only authoritative none means withdrawal and absent local bytes never select the public blob." }
+      - { id: C5, status: partial, justification: "The conductor re-derives the selected declaration from notarized links; this node's local view is not a claim of global convergence." }
+      - { id: C6a, status: answered, justification: "One local conductor ask with a two-second ceiling and one local projection lookup; no peer fan-out or retry loop." }
+      - { id: C6b, status: answered, justification: "Repeated reads are pure over current conductor/projection state and converge to the same state tuple." }
+      - { id: C7, status: answered, justification: "The response advertises only the exact locally available candidate blob that the candidate serving path addresses." }
+      - { id: C8, status: partial, justification: "Debug logs distinguish timeout/failure; the wire state exposes availability but no new aggregate metric is added." }
+      - { id: C9, status: n-a, justification: "No identity key or custody rotation is introduced." }
+      - { id: C10, status: answered, justification: "Older responses omit the optional state and consumers fail closed by retaining prior observation; unknown states are refused." }
+      - { id: C11, status: n-a, justification: "No external admission queue or backpressure surface is introduced." }
+      - { id: C12, status: n-a, justification: "No identity, person, device or cross-namespace correlation is performed." }
+      - { id: C13, status: n-a, justification: "No custody right or resource allocation changes." }
+      - { id: C14, status: partial, justification: "Source tests cover unavailable state and declaration-to-blob mapping; the hostname scenario supplies deployed-runtime evidence." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/http.rs, testName: missing_conductor_is_unavailable_not_authoritative_candidate_absence, kind: unit }
+      - { path: elohim/elohim-storage/src/sync/projector.rs, testName: declared_head_blob_returns_head_when_hint_matches, kind: unit }
+      - { path: elohim/elohim-storage/tests/schema_contract.rs, testName: content_head_view_matches_schema, kind: integration }
+    gapNote: >
+      Candidate SSR rendering is not implemented. A candidate declaration whose exact bytes are
+      absent remains staged-but-unavailable; this resolver neither fetches it nor serves another CID.
+
   - name: count_household_peers
     kind: verdict-fn
     sourceLocation:

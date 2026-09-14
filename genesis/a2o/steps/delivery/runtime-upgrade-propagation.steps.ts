@@ -85,7 +85,7 @@
  * `steps/delivery/acquisition-pins.steps.ts`'s self-verifying Givens).
  */
 
-/* eslint-disable sonarjs/no-os-command-from-path, sonarjs/publicly-writable-directories --
+/* eslint-disable sonarjs/no-os-command-from-path --
    this file deliberately shells out to `pnpm exec tsx` for the two ceremony drivers (the
    composition this task requires) and reads/writes the local household mesh's own /tmp work
    dir (runtime-config.toml, conductor pid files) — same posture as
@@ -103,6 +103,7 @@ import { Given, When, Then, Before, AfterAll } from '@cucumber/cucumber';
 import { request } from 'undici';
 
 import { getRaw, postRaw } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 
 import { mintCoordinatorCandidate } from './coordinator-candidate.js';
 
@@ -334,7 +335,7 @@ const LAMAD_ROLE = 'lamad';
  */
 const ALL_BASELINE_ROLES = ['lamad', 'infrastructure', 'imagodei', 'mishpat', 'node_registry'];
 
-const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
+const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? householdMeshDir();
 
 // ---------------------------------------------------------------------------
 // Typed wire shapes (no `any` — this file's lint gate is 0 errors)

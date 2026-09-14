@@ -25,6 +25,11 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Given, When, Then, After, Before } from '@cucumber/cucumber';
 
 import {
+  connectConductor,
+  declareEarnedCanonicalHead,
+  meshConductorPorts,
+} from '../../src/framework/dataplane/carried-election.js';
+import {
   getRaw,
   getRawWithHeaders,
   resolvePeerUrl,
@@ -63,6 +68,11 @@ interface PublishedApp {
   slug: string;
   mountPath: string;
   rootCommitments?: string[];
+  publicHostname?: string;
+  candidateHostname?: string;
+  unrelatedHostname?: string;
+  earnedBundle?: FixtureBundle;
+  earnedBlobHash?: string;
   bundle?: FixtureBundle;
   /** The bundle deliberately built without its entry script (station 4). */
   brokenBundle?: FixtureBundle;
@@ -96,6 +106,7 @@ interface HouseholdTopology {
 }
 
 const DOORWAYS = ['alpha-A', 'elohim.host'];
+const ROOT_AUTHOR = 'human-matthew-manager';
 const COMMITMENT_PAGE_SIZE = 100;
 const MAX_COMMITMENT_PAGES = 10;
 
@@ -104,9 +115,11 @@ const publishedApps = new WeakMap<E2EWorld, PublishedApp>();
 const browserVisits = new WeakMap<E2EWorld, Map<string, BrowserVisit>>();
 
 function isDeliverabilityFeature(uri?: string): boolean {
-  return Boolean(
-    uri?.replaceAll('\\', '/').endsWith('features/dataplane/epr-app-deliverability.feature')
-  );
+  const normalized = uri?.replaceAll('\\', '/');
+  return [
+    'features/dataplane/epr-app-deliverability.feature',
+    'features/dataplane/epr-app-channel-isolation.feature',
+  ].some(feature => normalized?.endsWith(feature));
 }
 
 Before(async function (this: E2EWorld, scenario) {
@@ -312,7 +325,14 @@ Given(
     buildNextFixture.call(this, true);
   }
 );
+Given('Matthew has built coherent root app artifact A', function (this: E2EWorld) {
+  buildNextFixture.call(this, true);
+});
 When('this run builds a next coherent browser and server version', function (this: E2EWorld) {
+  buildNextFixture.call(this);
+  app(this).upgradeIncarnations = doorwayIncarnations(this);
+});
+When('Matthew builds coherent successor artifact B', function (this: E2EWorld) {
   buildNextFixture.call(this);
   app(this).upgradeIncarnations = doorwayIncarnations(this);
 });
@@ -325,8 +345,8 @@ When('this run builds a next coherent browser and server version', function (thi
  * declaration guard would refuse the write anyway (measured 2026-09-05 —
  * declare_earned_canonical_head is restricted to a page's root author).
  */
-Given('an EPR record this run owns for it', { timeout: 180_000 }, async function (this: E2EWorld) {
-  const record = app(this);
+async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
+  const record = app(world);
   const storageUrl = resolveStorageUrl('alpha-A');
   assert.ok(
     storageUrl,
@@ -377,6 +397,10 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
       mode: 'cached',
       reach: 'commons',
       entryFile: 'index.html',
+      ...(record.publicHostname && {
+        hostnames: [record.publicHostname],
+        channel: 'converged',
+      }),
     };
     const mounted = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
       method: 'POST',
@@ -387,8 +411,8 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
       body: JSON.stringify({
         id: `${record.slug}-${coherence.doorwayId}`,
         action: 'project-epr',
-        provider: 'human-matthew-manager',
-        receiver: 'human-matthew-manager',
+        provider: ROOT_AUTHOR,
+        receiver: ROOT_AUTHOR,
         inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
         metadataJson: JSON.stringify(metadata),
         metadata,
@@ -422,8 +446,8 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
         {
           id,
           action: 'project-epr',
-          provider: 'human-matthew-manager',
-          receiver: 'human-matthew-manager',
+          provider: ROOT_AUTHOR,
+          receiver: ROOT_AUTHOR,
           inScopeOf: [`doorway:${coherence.doorwayId}|epr:${record.slug}`],
           metadata,
         }
@@ -432,9 +456,35 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
     } else {
       assert.ok(mounted.ok, `mount ${peerName}: ${mounted.status} ${mountResult}`);
     }
+    if (record.candidateHostname) {
+      const candidateMetadata = {
+        ...metadata,
+        hostnames: [record.candidateHostname],
+        channel: 'candidate',
+      };
+      const candidateId = `${record.slug}-${coherence.doorwayId}-candidate`;
+      record.rootCommitments?.push(candidateId);
+      const candidate = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
+        },
+        body: JSON.stringify({
+          id: candidateId,
+          action: 'project-epr',
+          provider: ROOT_AUTHOR,
+          receiver: ROOT_AUTHOR,
+          inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
+          metadataJson: JSON.stringify(candidateMetadata),
+          metadata: candidateMetadata,
+        }),
+      });
+      assert.ok(candidate.ok, `candidate mount ${peerName}: ${candidate.status} ${candidate.text}`);
+    }
   }
   // Head reconciliation targets configured apps, including CSR fallbacks.
-  for (const doorway of ['a', 'b']) await restartStoryDoorway(this, doorway, record.slug);
+  for (const doorway of ['a', 'b']) await restartStoryDoorway(world, doorway, record.slug);
   for (const doorway of DOORWAYS) {
     const ready = await pollUntil(
       async () =>
@@ -443,34 +493,66 @@ Given('an EPR record this run owns for it', { timeout: 180_000 }, async function
     );
     assert.notEqual(ready, null, `${doorway}: configured fixture doorway did not become ready`);
   }
+}
+
+Given('an EPR record this run owns for it', { timeout: 180_000 }, async function (this: E2EWorld) {
+  await authorOwnedEprRecord(this);
 });
+
+Given(
+  'Matthew has registered PUBLIC_NAME for published releases and CANDIDATE_NAME for staged releases of a fresh empty app',
+  { timeout: 180_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    record.publicHostname = `public-${record.slug}.elohim.local`;
+    record.candidateHostname = `candidate-${record.slug}.elohim.local`;
+    record.unrelatedHostname = `unrelated-${record.slug}.elohim.local`;
+    await authorOwnedEprRecord(this);
+    for (const doorway of DOORWAYS) {
+      const storageUrl = resolveStorageUrl(doorway);
+      const head = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
+      assert.equal(head.status, 404, `${doorway}: fresh record unexpectedly had a release head`);
+    }
+  }
+);
+
+async function handCurrentBundleBytesToEachDoorway(world: E2EWorld): Promise<void> {
+  const record = app(world);
+  const bundle = requireBundle(world);
+  for (const peerName of DOORWAYS) {
+    const outcome = await stageBundle({
+      bundle,
+      slug: record.slug,
+      doorwayUrl: resolvePeerUrl(peerName),
+      declare: false,
+    });
+    assert.strictEqual(
+      outcome.code,
+      0,
+      `handing the bundle's bytes to ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
+    );
+    record.blobHash = outcome.blobHash;
+  }
+  assert.ok(record.blobHash, 'stage-spa-blob.sh reported no blob hash for the staged bundle');
+}
 
 When(
   "each doorway is handed the bundle's bytes",
   { timeout: 300_000 },
   async function (this: E2EWorld) {
-    const record = app(this);
-    const bundle = requireBundle(this);
-    for (const peerName of DOORWAYS) {
-      const outcome = await stageBundle({
-        bundle,
-        slug: record.slug,
-        doorwayUrl: resolvePeerUrl(peerName),
-        declare: false,
-      });
-      assert.strictEqual(
-        outcome.code,
-        0,
-        `handing the bundle's bytes to ${peerName} failed (exit ${outcome.code}):\n${outcome.output}`
-      );
-      record.blobHash = outcome.blobHash;
-    }
-    assert.ok(record.blobHash, 'stage-spa-blob.sh reported no blob hash for the staged bundle');
+    await handCurrentBundleBytesToEachDoorway(this);
+  }
+);
+When(
+  /^each doorway receives artifact [AB]'s exact bytes$/,
+  { timeout: 300_000 },
+  async function (this: E2EWorld) {
+    await handCurrentBundleBytesToEachDoorway(this);
   }
 );
 
 When(
-  'only doorway {string} is told this bundle is the new version',
+  "Matthew submits artifact A's byte-binding declaration through doorway {string}",
   { timeout: 300_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
@@ -485,6 +567,209 @@ When(
     record.blobHash = outcome.blobHash;
     record.browserDeclaredAt = Date.now();
     record.declaredThrough.push(doorwayUrl);
+  }
+);
+
+When(
+  'Matthew submits his authorized publication claim for artifact A',
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    const storageUrl = resolveStorageUrl('alpha-A');
+    assert.ok(storageUrl, 'root-author storage URL is absent');
+    const head = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
+    assert.equal(head.status, 200, `root-author head read: ${head.status}`);
+    const { headActionHash } = (await head.json()) as { headActionHash?: string };
+    assert.ok(headActionHash, 'root-author head read names no action hash');
+    const { adminPort, appPort } = meshConductorPorts(0);
+    const rail = await connectConductor(adminPort, appPort);
+    try {
+      const earned = await declareEarnedCanonicalHead(rail, record.slug, headActionHash);
+      assert.equal(earned?.canonical, true, 'root-author promotion did not mint an earned head');
+    } finally {
+      await rail.close();
+    }
+    record.earnedBundle = requireBundle(this);
+    record.earnedBlobHash = record.blobHash;
+  }
+);
+
+When(
+  "Matthew submits artifact B's byte-binding staging declaration through doorway {string}",
+  { timeout: 300_000 },
+  async function (this: E2EWorld, peerName: string) {
+    const record = app(this);
+    const bundle = requireBundle(this);
+    const outcome = await stageBundle({
+      bundle,
+      slug: record.slug,
+      doorwayUrl: resolvePeerUrl(peerName),
+      declare: true,
+    });
+    assert.equal(outcome.code, 0, `candidate declaration failed:\n${outcome.output}`);
+    record.blobHash = outcome.blobHash;
+    record.browserDeclaredAt = Date.now();
+  }
+);
+
+async function hostnameServesBundle(
+  doorwayUrl: string,
+  hostname: string,
+  bundle: FixtureBundle
+): Promise<boolean> {
+  const headers = { Host: hostname };
+  const root = await fetch(`${doorwayUrl}/`, { headers });
+  if (!root.ok || !(await root.text()).includes(bundle.entryScript)) return false;
+  const asset = await fetch(`${doorwayUrl}/${bundle.entryScript}`, { headers });
+  if (!asset.ok) return false;
+  const version = await fetch(`${doorwayUrl}/version.json`, { headers });
+  if (!version.ok) return false;
+  return ((await version.json()) as { commit?: string }).commit === bundle.stamp;
+}
+
+async function bothDoorwaysServe(
+  hostname: string,
+  bundle: FixtureBundle,
+  timeoutMs = CONVERGENCE_BOUND_MS
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  const results = await Promise.all(
+    DOORWAYS.map(async doorway =>
+      pollUntil(
+        async () => hostnameServesBundle(resolvePeerUrl(doorway), hostname, bundle),
+        Math.max(0, deadline - Date.now())
+      )
+    )
+  );
+  return results.every(Boolean);
+}
+
+Then(
+  'within 75 seconds both doorways serve PUBLIC_NAME with artifact A',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    assert.ok(record.publicHostname, 'public hostname absent');
+    assert.equal(
+      await bothDoorwaysServe(record.publicHostname, requireBundle(this)),
+      true,
+      'public hostname did not serve the exact earned HTML, asset, and version stamp'
+    );
+  }
+);
+
+Then(
+  'within 75 seconds both doorways serve CANDIDATE_NAME with artifact B',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    assert.ok(record.candidateHostname, 'candidate hostname absent');
+    assert.equal(
+      await bothDoorwaysServe(record.candidateHostname, requireBundle(this)),
+      true,
+      'candidate hostname did not serve the exact staged HTML, asset, and version stamp'
+    );
+  }
+);
+
+Then(
+  'both doorways still serve PUBLIC_NAME with artifact A',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    assert.ok(record.publicHostname && record.earnedBundle, 'earned hostname/version absent');
+    assert.equal(
+      await bothDoorwaysServe(record.publicHostname, record.earnedBundle),
+      true,
+      'candidate publication disturbed the exact earned public version'
+    );
+  }
+);
+
+Then(
+  "both doorways answer 404 for UNRELATED_NAME without artifact B's asset or build stamp",
+  async function (this: E2EWorld) {
+    const record = app(this);
+    const candidate = requireBundle(this);
+    assert.ok(record.unrelatedHostname, 'UNRELATED_NAME is absent');
+    const unrelatedHostname = record.unrelatedHostname;
+    for (const doorway of DOORWAYS) {
+      const requestHeaders: Record<string, string> = { Host: unrelatedHostname };
+      for (const subpath of ['', candidate.entryScript, 'version.json']) {
+        const response = await fetch(`${resolvePeerUrl(doorway)}/${subpath}`, {
+          headers: requestHeaders,
+        });
+        const body = await response.text();
+        assert.equal(response.status, 404, `${doorway}: UNRELATED_NAME /${subpath} was not 404`);
+        assert.ok(
+          !body.includes(candidate.entryScript),
+          `${doorway}: response named version B asset`
+        );
+        assert.ok(!body.includes(candidate.stamp), `${doorway}: response named version B stamp`);
+      }
+    }
+  }
+);
+
+When(
+  'Matthew submits his authorized publication claim for artifact B',
+  { timeout: 120_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    const storageUrl = resolveStorageUrl('alpha-A');
+    assert.ok(storageUrl, 'root-author storage URL is absent');
+    const response = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
+    assert.equal(response.status, 200, `candidate head read: ${response.status}`);
+    const { stagingCandidate } = (await response.json()) as { stagingCandidate?: string };
+    assert.ok(stagingCandidate, 'the notary election reports no staged candidate to promote');
+    const { adminPort, appPort } = meshConductorPorts(0);
+    const rail = await connectConductor(adminPort, appPort);
+    try {
+      const promoted = await declareEarnedCanonicalHead(rail, record.slug, stagingCandidate);
+      assert.equal(promoted?.canonical, true, 'candidate promotion did not mint an earned head');
+    } finally {
+      await rail.close();
+    }
+  }
+);
+
+Then(
+  'within 75 seconds CANDIDATE_NAME answers 404 with "no-candidate-staged" through both doorways',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    assert.ok(record.candidateHostname, 'candidate hostname absent');
+    const deadline = Date.now() + CONVERGENCE_BOUND_MS;
+    const results = await Promise.all(
+      DOORWAYS.map(async doorway =>
+        pollUntil(
+          async () => {
+            const response = await fetch(`${resolvePeerUrl(doorway)}/`, {
+              headers: { Host: record.candidateHostname as string },
+            });
+            return (
+              response.status === 404 && (await response.text()).includes('no-candidate-staged')
+            );
+          },
+          Math.max(0, deadline - Date.now())
+        )
+      )
+    );
+    assert.ok(results.every(Boolean), 'candidate hostname retained the promoted candidate CID');
+  }
+);
+
+Then(
+  'both doorways serve PUBLIC_NAME with artifact B',
+  { timeout: 90_000 },
+  async function (this: E2EWorld) {
+    const record = app(this);
+    assert.ok(record.publicHostname, 'public hostname absent');
+    assert.equal(
+      await bothDoorwaysServe(record.publicHostname, requireBundle(this)),
+      true,
+      'public hostname did not follow the newly earned version'
+    );
   }
 );
 

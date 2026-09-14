@@ -1,8 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
   fixtureDoorwayUrl,
+  householdMeshDir,
   mergeHouseholdMeshEnvironment,
   resolveDoorwayUrl,
   normalizeHouseholdFootprint,
@@ -272,6 +274,23 @@ void describe('household mesh fixture', () => {
           COMMONS_EPR_ID
         ),
       /not commitment-backed/
+    );
+  });
+});
+
+void describe('household runtime location', () => {
+  void it('resolves durable state inside the workspace without depending on the launch directory', () => {
+    const expected = fileURLToPath(
+      new URL('../../../../../local-dev/household-dowell', import.meta.url)
+    );
+    assert.equal(householdMeshDir({}), expected);
+    assert.equal(householdMeshDir({ MESH_DIR: '' }), expected);
+  });
+
+  void it('preserves an explicit mesh directory for independently owned runs', () => {
+    assert.equal(
+      householdMeshDir({ MESH_DIR: '/isolated/workspace/household' }),
+      '/isolated/workspace/household'
     );
   });
 });

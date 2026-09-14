@@ -18,10 +18,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { once } from 'node:events';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
 import {
   processAlive,
   readProcEnvironment,
@@ -35,7 +35,7 @@ import {
 } from '../src/framework/fixtures/substrate-scope.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
-const DEFAULT_MESH_DIR = process.env['MESH_DIR'] ?? path.join(tmpdir(), 'elohim-local-mesh');
+const DEFAULT_MESH_DIR = householdMeshDir();
 const DEFAULT_MINIMUM_EXCHANGES = 200;
 const DEFAULT_BURST_TIMEOUT_MS = 6 * 60_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 5_000;

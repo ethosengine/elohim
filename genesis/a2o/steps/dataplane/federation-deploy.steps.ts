@@ -64,13 +64,6 @@
  * `just test mesh genesis/a2o/features/dataplane/federation-deploy.feature`.
  */
 
-/* eslint-disable sonarjs/publicly-writable-directories --
- * MESH_ROOT defaults to /tmp/elohim-local-mesh because that is where
- * `app/elohim-app/scripts/hc-mesh.sh` actually puts the household mesh's per-peer
- * directories; this fixture reads and restores a file the mesh itself owns there.
- * `steps/delivery/happ-lineage-migration.steps.ts` carries the same disable for the
- * same constant and the same reason. */
-
 import { strict as assert } from 'node:assert';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -99,6 +92,7 @@ import {
   probeDeclaredHead,
   resolvePeerUrl,
 } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -116,7 +110,7 @@ const OBEY_FLAG = 'ELOHIM_OBEY_CARRIED_ELECTION';
 const RUNTIME_CONFIG_RELOAD_PATH = '/admin/runtime-config/reload';
 
 /** Same default as `steps/delivery/happ-lineage-migration.steps.ts`. */
-const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? '/tmp/elohim-local-mesh';
+const MESH_ROOT = process.env['E2E_MESH_ROOT'] ?? householdMeshDir();
 
 /**
  * How long the WHEN step waits for the ORGANIC sweep.

@@ -121,6 +121,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { After, Before, Given, Then, When } from '@cucumber/cucumber';
 
 import { getRawWithHeaders } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import {
   assertStillOwnedProcess,
   resolveOwnedMeshProcess,
@@ -1154,14 +1155,7 @@ async function acquireLease(world: E2EWorld): Promise<void> {
   if (leases.has(world)) return;
   const child = spawn(
     '/usr/bin/flock',
-    [
-      '-n',
-      // eslint-disable-next-line sonarjs/publicly-writable-directories -- shared household-mesh lock, matches apex-transition.steps.ts.
-      `${process.env['MESH_DIR'] ?? '/tmp/elohim-local-mesh'}/a2o.lock`,
-      '/bin/bash',
-      '-c',
-      'echo locked; read -r _',
-    ],
+    ['-n', `${householdMeshDir()}/a2o.lock`, '/bin/bash', '-c', 'echo locked; read -r _'],
     { stdio: 'pipe' }
   );
   leases.set(world, child);

@@ -58,7 +58,13 @@
 #
 # ENVIRONMENT:
 #   MESH_PEERS      Peer names, comma-separated (default: matthew,jessica,james)
-#   MESH_DIR        Data root (default: /tmp/elohim-local-mesh)
+#   MESH_DIR        Data root (default: <repo>/genesis/local-dev/household-dowell,
+#                   the gitignored persistent execution of the canonical
+#                   Dowell household fixture)
+#   MESH_RESET      1 explicitly discards a stopped household's conductor,
+#                   storage, and doorway-account state before a fresh start.
+#                   Without it, complete stopped state resumes in place and
+#                   partial state refuses rather than silently re-keying.
 #   MESH_TRANSPORT_BACKEND
 #                   elohim-storage Track-2 backend: libp2p (default), dual, or
 #                   iroh. This does NOT change the conductor's Holochain 0.7
@@ -221,8 +227,25 @@
 #
 set -u
 
-MESH_PEERS="${MESH_PEERS:-matthew,jessica,james}"
-MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+DEFAULT_HOUSEHOLD_PEERS="matthew,jessica,james"
+MESH_PEERS="${MESH_PEERS:-$DEFAULT_HOUSEHOLD_PEERS}"
+MESH_DIR_WAS_EXPLICIT=0
+[ -n "${MESH_DIR:-}" ] && MESH_DIR_WAS_EXPLICIT=1
+MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
+export MESH_DIR
+LEGACY_MESH_DIR="${LEGACY_MESH_DIR:-/tmp/elohim-local-mesh}"
+INTERIM_MESH_DIR="$REPO_ROOT/genesis/local-dev/household"
+CANONICAL_HUMANS_PATH="$REPO_ROOT/genesis/data/humans/humans.json"
+MESH_RESET="${MESH_RESET:-0}"
+case "$MESH_RESET" in
+  0|1) ;;
+  *)
+    echo "invalid MESH_RESET='$MESH_RESET' (expected 0 or 1)" >&2
+    if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 2; else exit 2; fi ;;
+esac
 # Default flipped libp2p -> dual 2026-08-23: alpha has run dual since Wave-2 E3
 # (campaign decision 2026-08-04); localdev now boots at fleet parity. Rollback: libp2p.
 MESH_TRANSPORT_BACKEND="${MESH_TRANSPORT_BACKEND:-dual}"
@@ -289,9 +312,11 @@ MESH_MEMBERSHIP_NAME="${MESH_MEMBERSHIP_NAME:-elohim.local}"
 MESH_MEMBERSHIP_CANDIDATE_NAME="${MESH_MEMBERSHIP_CANDIDATE_NAME:-alpha.elohim.local}"
 MESH_MEMBERSHIP_PROBE_SECS="${MESH_MEMBERSHIP_PROBE_SECS:-3}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-LOCAL_DEV_DIR="$REPO_ROOT/elohim/holochain/local-dev"
+LEGACY_CONDUCTOR_DIR="$REPO_ROOT/elohim/holochain/local-dev"
+# The reusable household fixture is one persisted unit. Conductor keys and DHT
+# state live beside its storage, archive, logs, and receipts instead of in the
+# single-peer developer stack's shared local-dev directory.
+LOCAL_DEV_DIR="$MESH_DIR/conductors"
 HAPP_WORKDIR="$REPO_ROOT/elohim/holochain/dna/elohim/workdir"
 # MESH_HAPP_PATH overrides the bundle the sandboxes install. Default = the locally packed
 # workdir bundle. Point it at elohim/holochain/local-dev/deployed-bundles/elohim.happ
@@ -392,12 +417,114 @@ MESH_DOORWAY_GATEWAY_SCOPING="${MESH_DOORWAY_GATEWAY_SCOPING:-1}"
 MONGOD_BIN="${MONGOD_BIN-$(command -v mongod 2>/dev/null || { [ -x "$HOME/bin/mongod" ] && echo "$HOME/bin/mongod"; })}"
 MONGO_PORT="${MONGO_PORT:-27017}"
 MONGO_DIR="$MESH_DIR/mongo"
+ARCHIVE_MODE_FILE="$MESH_DIR/doorway-archive-mode"
 LOGDIR="$MESH_DIR/logs"
 PID_DIR="$MESH_DIR/pids"
 
 # Port scheme per peer index i (0-based): admin 4444+10i, app 4445+10i,
 # storage http 8090+i, libp2p 9701+i.
 IFS=',' read -ra PEERS <<< "$MESH_PEERS"
+
+# The default mesh is an execution of the canonical household fixture, not a
+# second household definition. Resolve its human and household identities from
+# humans.json (the generated projection of genesis/data/humans/*.md) and refuse
+# before migration or launch if the three named peers no longer describe that
+# exact household. Explicit alternative rosters retain the existing generic
+# local-mesh behavior.
+declare -A CANONICAL_HUMAN_IDS=()
+CANONICAL_HOUSEHOLD_ID=""
+
+load_canonical_household_binding() {
+  [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ] || return 0
+  local bindings kind name value
+  bindings="$(python3 - "$CANONICAL_HUMANS_PATH" "$MESH_PEERS" 2>&1 <<'PY'
+import json, sys
+
+path, peers_csv = sys.argv[1:]
+peers = peers_csv.split(',')
+try:
+    with open(path, encoding='utf-8') as handle:
+        document = json.load(handle)
+except Exception as error:
+    raise SystemExit(f"cannot read canonical human fixture {path}: {error}")
+
+humans = document.get('humans')
+if not isinstance(humans, list):
+    raise SystemExit(f"canonical human fixture {path} has no humans array")
+
+by_name = {}
+for human in humans:
+    if not isinstance(human, dict):
+        continue
+    display_name = human.get('displayName')
+    if isinstance(display_name, str) and display_name:
+        by_name.setdefault(display_name.casefold(), []).append(human)
+
+selected = []
+for peer in peers:
+    matches = by_name.get(peer.casefold(), [])
+    if len(matches) != 1:
+        raise SystemExit(
+            f"canonical household peer {peer!r} resolved to {len(matches)} human fixture rows"
+        )
+    human = matches[0]
+    human_id = human.get('id')
+    household_id = human.get('householdId')
+    if not isinstance(human_id, str) or not human_id:
+        raise SystemExit(f"canonical household peer {peer!r} has no human id")
+    if not isinstance(household_id, str) or not household_id:
+        raise SystemExit(f"canonical household peer {peer!r} has no householdId")
+    selected.append((peer, human_id, household_id))
+
+households = {household_id for _, _, household_id in selected}
+if households != {'household-dowell'}:
+    raise SystemExit(
+        "default household peers do not share canonical household-dowell: "
+        + ','.join(sorted(households))
+    )
+if len({human_id for _, human_id, _ in selected}) != len(selected):
+    raise SystemExit("default household peers do not resolve to distinct human ids")
+
+member_names = {
+    human.get('displayName', '').casefold()
+    for human in humans
+    if isinstance(human, dict) and human.get('householdId') == 'household-dowell'
+}
+if member_names != {peer.casefold() for peer in peers}:
+    raise SystemExit(
+        "default mesh roster differs from canonical household-dowell members: "
+        + ','.join(sorted(member_names))
+    )
+
+print('household\thousehold-dowell')
+for peer, human_id, _ in selected:
+    print(f'human\t{peer}\t{human_id}')
+PY
+)" || {
+    echo "REFUSED canonical household binding: $bindings" >&2
+    return 1
+  }
+
+  CANONICAL_HUMAN_IDS=()
+  CANONICAL_HOUSEHOLD_ID=""
+  while IFS=$'\t' read -r kind name value; do
+    case "$kind" in
+      household) CANONICAL_HOUSEHOLD_ID="$name" ;;
+      human) CANONICAL_HUMAN_IDS["$name"]="$value" ;;
+    esac
+  done <<< "$bindings"
+
+  [ "$CANONICAL_HOUSEHOLD_ID" = "household-dowell" ] || {
+    echo "REFUSED canonical household binding: household identity was not resolved" >&2
+    return 1
+  }
+  for name in "${PEERS[@]}"; do
+    [ -n "${CANONICAL_HUMAN_IDS[$name]:-}" ] || {
+      echo "REFUSED canonical household binding: no human identity resolved for $name" >&2
+      return 1
+    }
+  done
+}
 
 admin_port() { echo $((4444 + 10 * $1)); }
 app_port()   { echo $((4445 + 10 * $1)); }
@@ -408,6 +535,392 @@ process_start_ticks() { # <pid> — guards a persisted pid against PID reuse
   # stat field 2 (`comm`) may contain spaces; strip pid+comm through the final
   # ')' first. starttime is field 20 of the remaining field-3.. sequence.
   sed 's/^[^)]*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $20}'
+}
+
+live_pids_in_registry() { # <pid-dir> — read-only, validates PID + start ticks
+  local dir="$1" file pid started current
+  [ -d "$dir" ] || return 0
+  while IFS= read -r file; do
+    pid=""; started=""
+    read -r pid started < "$file" || true
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    [ -n "${started:-}" ] || continue
+    current="$(process_start_ticks "$pid")"
+    [ -n "$current" ] && [ "$current" = "$started" ] && echo "$pid"
+  done < <(find "$dir" -maxdepth 1 -type f -print 2>/dev/null)
+}
+
+legacy_mesh_state_pending() {
+  [ "$MESH_DIR_WAS_EXPLICIT" = "0" ] || return 1
+  local candidate target
+  for candidate in "$INTERIM_MESH_DIR" "$LEGACY_MESH_DIR"; do
+    [ "$candidate" != "$MESH_DIR" ] || continue
+    if [ -L "$candidate" ]; then
+      target="$(readlink "$candidate" 2>/dev/null || true)"
+      case "$target" in /*) ;; *) target="$(dirname "$candidate")/$target" ;; esac
+      target="$(readlink -m "$target")"
+      [ "$target" = "$(readlink -m "$MESH_DIR")" ] && continue
+      [ -e "$target" ] && return 0
+    elif [ -e "$candidate" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# The old /tmp root, or the briefly-used generic workspace root, may contain a
+# household from before this canonical fixture path. Move one source only while
+# stopped and only into an absent destination. Compatibility symlinks keep
+# absolute paths in captured process environments usable. An explicit MESH_DIR
+# is always left alone.
+ensure_legacy_conductor_links() {
+  [ "$MESH_DIR_WAS_EXPLICIT" = "0" ] || return 0
+  local name target log_link
+  mkdir -p "$LEGACY_CONDUCTOR_DIR"
+  for name in "${PEERS[@]}"; do
+    [ -e "$LOCAL_DEV_DIR/$name" ] || continue
+    if [ -L "$LEGACY_CONDUCTOR_DIR/$name" ]; then
+      target="$(readlink -m "$LEGACY_CONDUCTOR_DIR/$name")"
+      [ "$target" = "$(readlink -m "$LOCAL_DEV_DIR/$name")" ] || {
+        echo "REFUSED conductor compatibility link: $LEGACY_CONDUCTOR_DIR/$name targets $target" >&2
+        return 1
+      }
+    elif [ -e "$LEGACY_CONDUCTOR_DIR/$name" ]; then
+      echo "REFUSED conductor compatibility link: $LEGACY_CONDUCTOR_DIR/$name already exists" >&2
+      return 1
+    else
+      ln -s "$LOCAL_DEV_DIR/$name" "$LEGACY_CONDUCTOR_DIR/$name" || return 1
+    fi
+    log_link="$LEGACY_CONDUCTOR_DIR/.sandbox_run_log.$name"
+    if [ -L "$log_link" ]; then
+      target="$(readlink -m "$log_link")"
+      [ "$target" = "$(readlink -m "$LOCAL_DEV_DIR/.sandbox_run_log.$name")" ] || {
+        echo "REFUSED conductor compatibility link: $log_link targets $target" >&2
+        return 1
+      }
+    elif [ ! -e "$log_link" ]; then
+      ln -s "$LOCAL_DEV_DIR/.sandbox_run_log.$name" "$log_link" || return 1
+    fi
+  done
+}
+
+maybe_migrate_legacy_mesh_dir() {
+  [ "$MESH_DIR_WAS_EXPLICIT" = "0" ] || return 0
+  local candidate target source="" live relink=""
+  for candidate in "$INTERIM_MESH_DIR" "$LEGACY_MESH_DIR"; do
+    [ "$candidate" != "$MESH_DIR" ] || continue
+    if [ -L "$candidate" ]; then
+      target="$(readlink "$candidate" 2>/dev/null || true)"
+      case "$target" in /*) ;; *) target="$(dirname "$candidate")/$target" ;; esac
+      target="$(readlink -m "$target")"
+      [ "$target" = "$(readlink -m "$MESH_DIR")" ] && continue
+      if [ "$target" = "$(readlink -m "$INTERIM_MESH_DIR")" ] || \
+         [ "$target" = "$(readlink -m "$LEGACY_MESH_DIR")" ]; then
+        relink+=" $candidate"
+        continue
+      fi
+      echo "REFUSED mesh-state migration: compatibility path is a symlink to another target: $candidate" >&2
+      return 1
+    fi
+    [ -e "$candidate" ] || continue
+    if [ -n "$source" ]; then
+      echo "REFUSED mesh-state migration: multiple prior roots exist; refusing to choose" >&2
+      echo "  prior roots: $source $candidate" >&2
+      return 1
+    fi
+    source="$candidate"
+  done
+
+  if [ -n "$source" ] && [ -e "$MESH_DIR" ]; then
+    echo "REFUSED mesh-state migration: both legacy and persistent roots exist; refusing to overwrite either" >&2
+    echo "  legacy: $source" >&2
+    echo "  persistent: $MESH_DIR" >&2
+    return 1
+  fi
+
+  if [ -d "$source" ]; then
+    live="$(live_pids_in_registry "$source/pids")"
+    if [ -n "$live" ] || mesh_ports_busy; then
+      echo "REFUSED mesh-state migration: the prior household may still be running" >&2
+      [ -n "$live" ] && echo "  live recorded pids: $(tr '\n' ' ' <<<"$live")" >&2
+      echo "  stop it with MESH_DIR='$source' ./hc-mesh.sh stop, then start again" >&2
+      return 1
+    fi
+    mkdir -p "$(dirname "$MESH_DIR")"
+    mv -T "$source" "$MESH_DIR" || return 1
+    relink+=" $source"
+    echo "mesh-state migrated: $source -> $MESH_DIR"
+  fi
+
+  if [ -e "$MESH_DIR" ]; then
+    for candidate in "$INTERIM_MESH_DIR" "$LEGACY_MESH_DIR"; do
+      [ "$candidate" != "$MESH_DIR" ] || continue
+      if [ -L "$candidate" ]; then
+        target="$(readlink "$candidate" 2>/dev/null || true)"
+        case "$target" in /*) ;; *) target="$(dirname "$candidate")/$target" ;; esac
+        target="$(readlink -m "$target")"
+        [ "$target" = "$(readlink -m "$MESH_DIR")" ] && continue
+        case " $relink " in *" $candidate "*) rm "$candidate" ;; *) continue ;; esac
+      fi
+      [ -e "$candidate" ] && continue
+      mkdir -p "$(dirname "$candidate")"
+      ln -s "$MESH_DIR" "$candidate" || return 1
+    done
+  fi
+}
+
+# Move only this household's named conductor sandboxes out of the historical
+# shared local-dev root. Other single-peer developer sandboxes in that root are
+# unrelated state and must remain byte-for-byte in place. A stopped, complete
+# household moves once; partial or competing state refuses rather than being
+# regenerated or overwritten. Per-peer links preserve old absolute readers.
+maybe_migrate_legacy_conductors() {
+  [ "$MESH_DIR_WAS_EXPLICIT" = "0" ] || return 0
+  [ "$(readlink -m "$LOCAL_DEV_DIR")" != "$(readlink -m "$LEGACY_CONDUCTOR_DIR")" ] || return 0
+
+  local name legacy_seen=0 legacy_complete=1 destination_seen=0 live proc raw target
+  [ -s "$LEGACY_CONDUCTOR_DIR/.hc" ] || legacy_complete=0
+  for name in "${PEERS[@]}"; do
+    if [ -L "$LEGACY_CONDUCTOR_DIR/$name" ]; then
+      target="$(readlink -m "$LEGACY_CONDUCTOR_DIR/$name")"
+      if [ "$target" = "$(readlink -m "$LOCAL_DEV_DIR/$name")" ]; then
+        [ -e "$LOCAL_DEV_DIR/$name" ] && destination_seen=1
+        continue
+      fi
+      echo "REFUSED conductor-state migration: compatibility path targets another sandbox: $LEGACY_CONDUCTOR_DIR/$name -> $target" >&2
+      return 1
+    fi
+    [ -e "$LEGACY_CONDUCTOR_DIR/$name" ] && legacy_seen=1
+    [ -s "$LEGACY_CONDUCTOR_DIR/$name/conductor-config.yaml" ] || legacy_complete=0
+    [ -s "$LEGACY_CONDUCTOR_DIR/$name/ks/store_file" ] || legacy_complete=0
+    [ -s "$LEGACY_CONDUCTOR_DIR/$name/databases/conductor.db" ] || legacy_complete=0
+    grep -Fxq "$LEGACY_CONDUCTOR_DIR/$name" "$LEGACY_CONDUCTOR_DIR/.hc" 2>/dev/null \
+      || legacy_complete=0
+    [ -e "$LOCAL_DEV_DIR/$name" ] && destination_seen=1
+  done
+  [ "$legacy_seen" = 1 ] || { ensure_legacy_conductor_links; return; }
+  if [ "$legacy_complete" != 1 ]; then
+    echo "REFUSED conductor-state migration: prior household state is partial at $LEGACY_CONDUCTOR_DIR" >&2
+    return 1
+  fi
+  if [ "$destination_seen" = 1 ] || [ -e "$LOCAL_DEV_DIR/.hc" ]; then
+    echo "REFUSED conductor-state migration: prior and persistent conductor state both exist" >&2
+    echo "  prior: $LEGACY_CONDUCTOR_DIR" >&2
+    echo "  persistent: $LOCAL_DEV_DIR" >&2
+    return 1
+  fi
+  live="$(live_pids_in_registry "$PID_DIR")"
+  for proc in /proc/[0-9]*; do
+    raw="$(tr '\0' ' ' < "$proc/cmdline" 2>/dev/null || true)"
+    for name in "${PEERS[@]}"; do
+      [[ "$raw" == *"$LEGACY_CONDUCTOR_DIR/$name/"* ]] \
+        && live+=" ${proc##*/}"
+    done
+  done
+  if [ -n "$live" ] || mesh_ports_busy || ! assert_no_live_peer_processes migration; then
+    echo "REFUSED conductor-state migration: the prior household may still be running" >&2
+    return 1
+  fi
+
+  mkdir -p "$LOCAL_DEV_DIR"
+  for name in "${PEERS[@]}"; do
+    mv "$LEGACY_CONDUCTOR_DIR/$name" "$LOCAL_DEV_DIR/$name" || return 1
+  done
+  # Re-root only entries belonging to this household; a shared roster may
+  # also name a single-peer dev sandbox and therefore remains untouched.
+  : > "$LOCAL_DEV_DIR/.hc"
+  for name in "${PEERS[@]}"; do printf '%s\n' "$LOCAL_DEV_DIR/$name" >> "$LOCAL_DEV_DIR/.hc"; done
+  echo "conductor-state migrated: $LEGACY_CONDUCTOR_DIR/{${MESH_PEERS}} -> $LOCAL_DEV_DIR"
+  ensure_legacy_conductor_links
+}
+
+conductor_state_kind() { # complete | absent | partial
+  local seen=0 complete=1 name
+  [ -e "$LOCAL_DEV_DIR/.hc" ] && seen=1
+  [ -s "$LOCAL_DEV_DIR/.hc" ] || complete=0
+  for name in "${PEERS[@]}"; do
+    [ -e "$LOCAL_DEV_DIR/$name" ] && seen=1
+    [ -s "$LOCAL_DEV_DIR/$name/conductor-config.yaml" ] || complete=0
+    [ -s "$LOCAL_DEV_DIR/$name/ks/store_file" ] || complete=0
+    [ -s "$LOCAL_DEV_DIR/$name/databases/conductor.db" ] || complete=0
+  done
+  [ "$seen" = 0 ] && { echo absent; return; }
+  [ "$complete" = 1 ] && echo complete || echo partial
+}
+
+state_transport_for_peer() { # <root> <peer-name> <peer-index>
+  local root="$1" name="$2" index="$3" pid mode=""
+  pid="$(storage_pid_for_port "$(http_port "$index")")"
+  if [ -n "$pid" ] && [ -r "/proc/$pid/environ" ]; then
+    mode="$(transport_from_environ "/proc/$pid/environ")"
+  fi
+  if [ -z "$mode" ]; then
+    mode="$(transport_from_environ "$root/storage-restart/$name.environ")"
+  fi
+  case "$mode" in
+    libp2p|dual|iroh) echo "$mode" ;;
+    *) peer_transport "$name" ;;
+  esac
+}
+
+storage_state_kind_at() { # <root> -> complete | absent | partial
+  local root="$1" seen=0 complete=1 name transport i=0
+  for name in "${PEERS[@]}"; do
+    [ -e "$root/$name" ] && seen=1
+    [ -s "$root/$name/content.db" ] || complete=0
+    [ -s "$root/$name/identity.key" ] || complete=0
+    transport="$(state_transport_for_peer "$root" "$name" "$i")"
+    case "$transport" in
+      dual|iroh) [ -s "$root/$name/iroh.key" ] || complete=0 ;;
+    esac
+    i=$((i + 1))
+  done
+  [ "$seen" = 0 ] && { echo absent; return; }
+  [ "$complete" = 1 ] && echo complete || echo partial
+}
+
+storage_state_kind() { storage_state_kind_at "$MESH_DIR"; }
+
+archive_mode_at() { # <root> -> archive | archive-less | unknown
+  local root="$1" marker="$1/doorway-archive-mode" mode=""
+  if [ -s "$marker" ]; then
+    mode="$(head -1 "$marker")"
+    case "$mode" in archive|archive-less) echo "$mode"; return 0 ;; esac
+    echo unknown
+    return 0
+  fi
+  # Backward compatibility for households created before the mode marker:
+  # Mongo's storage-engine marker proves an archive existed. When mongod is
+  # unavailable, the old script could only have run archive-less. If mongod is
+  # now available but no DB or marker survived, intent is unknowable and the
+  # caller must refuse rather than creating an empty account archive.
+  if [ -s "$root/mongo/WiredTiger" ]; then
+    echo archive
+  elif [ -z "$MONGOD_BIN" ] || [ ! -x "$MONGOD_BIN" ]; then
+    echo archive-less
+  else
+    echo unknown
+  fi
+}
+
+archive_state_kind_at() { # <root> -> complete | partial
+  [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] || { echo complete; return; }
+  local root="$1" mode
+  mode="$(archive_mode_at "$root")"
+  case "$mode" in
+    archive)
+      [ -s "$root/mongo/WiredTiger" ] && [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ] \
+        && echo complete || echo partial ;;
+    archive-less) echo complete ;;
+    *) echo partial ;;
+  esac
+}
+
+record_archive_mode() { # archive | archive-less
+  mkdir -p "$MESH_DIR"
+  printf '%s\n' "$1" > "$ARCHIVE_MODE_FILE"
+}
+
+print_household_state_gaps() {
+  local name path transport i=0
+  [ -s "$LOCAL_DEV_DIR/.hc" ] || echo "  missing conductor roster: $LOCAL_DEV_DIR/.hc" >&2
+  for name in "${PEERS[@]}"; do
+    for path in conductor-config.yaml ks/store_file databases/conductor.db; do
+      [ -s "$LOCAL_DEV_DIR/$name/$path" ] || echo "  missing conductor state: $LOCAL_DEV_DIR/$name/$path" >&2
+    done
+    for path in content.db identity.key; do
+      [ -s "$MESH_DIR/$name/$path" ] || echo "  missing storage state: $MESH_DIR/$name/$path" >&2
+    done
+    transport="$(state_transport_for_peer "$MESH_DIR" "$name" "$i")"
+    case "$transport" in
+      dual|iroh)
+        [ -s "$MESH_DIR/$name/iroh.key" ] \
+          || echo "  missing storage state: $MESH_DIR/$name/iroh.key (transport=$transport)" >&2 ;;
+    esac
+    i=$((i + 1))
+  done
+  if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
+    local archive_mode
+    archive_mode="$(archive_mode_at "$MESH_DIR")"
+    case "$archive_mode" in
+      archive)
+        [ -s "$MONGO_DIR/WiredTiger" ] \
+          || echo "  missing doorway archive state: $MONGO_DIR/WiredTiger" >&2
+        [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ] \
+          || echo "  missing doorway archive runtime: executable MONGOD_BIN" >&2 ;;
+      unknown)
+        echo "  missing doorway archive declaration: $ARCHIVE_MODE_FILE" >&2
+        echo "    restore the archive, or set MONGOD_BIN='' once to affirm an intentionally archive-less household" >&2 ;;
+    esac
+  fi
+}
+
+household_start_mode() { # running | fresh | resume | reset; refuses incoherent state
+  if [ "$MESH_RESET" = "1" ]; then
+    echo reset
+    return 0
+  fi
+  local conductor storage archive i=0 name all_conductors_up=1
+  conductor="$(conductor_state_kind)"
+  storage="$(storage_state_kind)"
+  archive="$(archive_state_kind_at "$MESH_DIR")"
+  for name in "${PEERS[@]}"; do
+    ss -H -ltn "sport = :$(admin_port "$i")" 2>/dev/null | grep -q . \
+      || all_conductors_up=0
+    i=$((i + 1))
+  done
+  if legacy_mesh_state_pending; then
+    echo "REFUSED mesh preflight: prior default mesh state awaits ordinary-start migration" >&2
+    echo "  run just mesh start to migrate it while stopped; competing roots refuse without overwrite" >&2
+    return 1
+  fi
+  if [ "$conductor" = absent ] && [ "$storage" = absent ]; then
+    local live
+    live="$(live_pids_in_registry "$PID_DIR")"
+    if [ -n "$live" ] || mesh_ports_busy || ! assert_no_live_peer_processes fresh-start; then
+      echo "REFUSED mesh start: a household process or port is live but persisted conductor/storage state is absent" >&2
+      [ -n "$live" ] && echo "  live recorded pids: $(tr '\n' ' ' <<<"$live")" >&2
+      return 1
+    fi
+    echo fresh
+    return 0
+  fi
+  if [ "$conductor" = complete ] && [ "$storage" = complete ] && [ "$archive" = complete ]; then
+    [ "$all_conductors_up" = 1 ] && echo running || echo resume
+    return 0
+  fi
+  echo "REFUSED mesh start: household state is incomplete (conductor=$conductor storage=$storage archive=$archive)" >&2
+  print_household_state_gaps
+  if [ "$MESH_DIR_WAS_EXPLICIT" = "0" ] && [ -d "$LEGACY_MESH_DIR" ]; then
+    echo "  legacy state also exists at $LEGACY_MESH_DIR; ordinary start migrates it only when the persistent destination is absent" >&2
+  fi
+  echo "  restore the missing state, or deliberately recast the stopped household with MESH_RESET=1 just mesh start" >&2
+  return 1
+}
+
+assert_mesh_stopped_for_reset() {
+  local live
+  live="$(live_pids_in_registry "$PID_DIR")"
+  if [ -n "$live" ] || mesh_ports_busy; then
+    echo "REFUSED MESH_RESET=1: a process still owns a household mesh port or recorded state" >&2
+    [ -n "$live" ] && echo "  live recorded pids: $(tr '\n' ' ' <<<"$live")" >&2
+    echo "  run just mesh stop, verify just mesh status is down, then retry the explicit reset" >&2
+    return 1
+  fi
+  assert_no_live_peer_processes reset
+}
+
+reset_household_state() {
+  assert_mesh_stopped_for_reset || return 1
+  local name
+  for name in "${PEERS[@]}"; do
+    rm -rf "$MESH_DIR/$name" "$LOCAL_DEV_DIR/$name"
+  done
+  rm -rf "$LOCAL_DEV_DIR/.hc" "$LOCAL_DEV_DIR/.sandbox_log" "$LOCAL_DEV_DIR/.sandbox_run_log"
+  rm -rf "$MONGO_DIR" "$MESH_DIR/membership" "$MESH_DIR/state" "$MESH_DIR/storage-restart"
+  rm -f "$ARCHIVE_MODE_FILE"
+  rm -f "$MESH_DIR/household-fixture.json" "$MESH_DIR/prologue-hosted-humans.json"
+  echo "mesh reset authorized: conductor, storage, and doorway-account state will be recast together"
 }
 
 record_mesh_pid() { # <role> <name> <pid>
@@ -812,20 +1325,16 @@ guard_conductor_data_roots() { # <verb>
   done
   [ "$failed" -eq 0 ] && return 0
   echo "REFUSING $verb: state=orphaned-data-root" >&2
-  echo "  remediation: ./hc-mesh.sh stop && ./hc-mesh.sh start" >&2
-  echo "  stop kills the surviving conductor; start then regenerates its sandbox." >&2
+  echo "  remediation: stop the orphaned process, restore the data root, then run ./hc-mesh.sh start" >&2
+  echo "  use MESH_RESET=1 only when deliberately recasting the stopped household." >&2
   return 1
 }
 
-# Is ANY peer's data root still held by a live process? `start` decides whether
-# to regenerate from ONE observation — peer 0's admin port being silent — and
-# then removes every peer directory. That port is silent while an ark is
-# between incarnations, and it says nothing at all about peers 1..n, so the
-# regenerate branch can reach a `rm -rf` of a data root that a running ark or a
-# running conductor is writing to (deleted-inode sandbox, orphaned ark, lost
-# spool). Ask every peer directly instead, with the two pid facts this script
-# already trusts: the recorded ark pid (validated against its start ticks) and
-# the conductor pid that owns the peer's admin port.
+# Is ANY peer's data root still held by a live process? An explicit reset may
+# remove every peer directory, and a conductor port can be silent while an ark
+# is between incarnations. Ask every peer directly before a reset, using the two
+# pid facts this script already trusts: the recorded ark pid (validated against
+# its start ticks) and the conductor pid that owns the peer's admin port.
 assert_no_live_peer_processes() { # <verb> — 0 only when every peer is idle
   local verb="$1" i=0 name pid survivors=""
   for name in "${PEERS[@]}"; do
@@ -1120,12 +1629,32 @@ MESH_RUST_LOG="${MESH_RUST_LOG:-warn,holochain_sqlite::db::access=info,holochain
 # own human's agent_pub_key from its conductor cell key, NULL-only. Without
 # this env the saga ch02 finish line (non-null agentPubKey) can never light.
 human_id() {
+  if [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ]; then
+    [ -n "${CANONICAL_HUMAN_IDS[$1]:-}" ] || {
+      echo "canonical household binding has not resolved peer '$1'" >&2
+      return 1
+    }
+    echo "${CANONICAL_HUMAN_IDS[$1]}"
+    return 0
+  fi
   case "$1" in
     matthew) echo human-matthew-manager ;;
     jessica) echo human-jessica-spouse ;;
     james)   echo human-james-son ;;
     *)       echo "human-$1" ;;
   esac
+}
+
+household_id() {
+  if [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ]; then
+    [ -n "$CANONICAL_HOUSEHOLD_ID" ] || {
+      echo "canonical household identity has not been resolved" >&2
+      return 1
+    }
+    echo "$CANONICAL_HOUSEHOLD_ID"
+  else
+    echo household-dowell
+  fi
 }
 
 peer_csv() { # name=host:port CSV for substrate-verify / PEER_STORAGE_URLS
@@ -2543,10 +3072,10 @@ conductor_restart_pids() {
 restart_conductors() {
   # Restart the conductors IN PLACE, against the sandboxes that already exist.
   #
-  # Why this is a separate action and not "stop && start": `start` regenerates
-  # sandboxes when the admin ports are free (rm -rf + `hc sandbox generate`),
-  # which mints NEW agent keys for every peer and throws away their chains. That
-  # is a re-key of the whole household, not a restart. It is also load-sensitive
+  # Ordinary `start` now resumes complete stopped household state through this
+  # same path. Only MESH_RESET=1 may regenerate sandboxes, mint new agent keys,
+  # and throw away chains; that is a re-key of the whole household. Generation
+  # is also load-sensitive
   # — the cold wasm install inside generate races the conductor's 60s admin
   # request timeout, measured 65s and failing at load average 79 on 2026-08-21.
   #
@@ -2826,8 +3355,10 @@ start_storage_peer() { # <peer-name> <peer-index>
   fi
   mapfile -t ark_env < <(storage_ark_env "$name")
   if ! curl -s -m 2 "http://localhost:$(http_port "$i")/health" >/dev/null; then
-    local agent
+    local agent self_human_id self_household_id
     agent="$(sandbox_agent_key "$(admin_port "$i")")"
+    self_human_id="$(human_id "$name")" || return 1
+    self_household_id="$(household_id)" || return 1
     # An EMPTY AGENT_PUBKEY is worse than none: the storage reads Some("") and
     # never falls back to its own admin-derived key, so the release-adoption soak
     # attestor has no deviceId ("soak_context_incomplete", station 3, 2026-09-03).
@@ -2846,8 +3377,8 @@ start_storage_peer() { # <peer-name> <peer-index>
     ENABLE_P2P=true P2P_PORT="$(p2p_port "$i")" \
     ELOHIM_TRANSPORT_BACKEND="$(peer_transport "$name")" \
     "${agent_env[@]}" RELAY_MODE=server \
-    GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$(human_id "$name")" \
-    HOUSEHOLD_ID=household-dowell \
+    GENESIS_SELF_HEAL_IDENTITY=1 SELF_HUMAN_ID="$self_human_id" \
+    HOUSEHOLD_ID="$self_household_id" \
     DEVICE_ARCHETYPE=device-family-node-base \
     ELOHIM_STORAGE_PEER_POLICY_PATH="$MESH_DIR/peer-policy.toml" \
     ELOHIM_RUNTIME_CONFIG_PATH="$(runtime_config_path_for "$name")" \
@@ -3095,7 +3626,31 @@ join_peer() { # <fresh-peer-name>
 # as one of this mesh's own processes is a genuine collision.
 # ---------------------------------------------------------------------------
 preflight() {
-  local fail=0 name port pid tmp
+  local fail=0 name port pid tmp start_mode
+
+  if load_canonical_household_binding; then
+    if [ "$MESH_PEERS" = "$DEFAULT_HOUSEHOLD_PEERS" ]; then
+      echo "ok canonical household binding: $CANONICAL_HOUSEHOLD_ID ($MESH_PEERS)"
+    else
+      echo "ok canonical household binding: skipped (explicit alternative roster $MESH_PEERS)"
+    fi
+  else
+    fail=1
+  fi
+
+  if start_mode="$(household_start_mode)"; then
+    if [ "$start_mode" = reset ]; then
+      if assert_mesh_stopped_for_reset; then
+        echo "ok household state: explicit stopped reset"
+      else
+        fail=1
+      fi
+    else
+      echo "ok household state: $start_mode ($MESH_DIR)"
+    fi
+  else
+    fail=1
+  fi
 
   # 1. conductor binary: the fork pair (auto-detected as today), or an
   #    operator's explicit HOLOCHAIN_BIN (deliberate override — same
@@ -3303,6 +3858,9 @@ preflight() {
 # behavior, for callers that already manage their own backgrounding/timeout.
 # ---------------------------------------------------------------------------
 start_detached() {
+  load_canonical_household_binding || return 1
+  maybe_migrate_legacy_mesh_dir || return 1
+  maybe_migrate_legacy_conductors || return 1
   if [ "${MESH_FOREGROUND:-0}" = "1" ]; then
     start_all
     return $?
@@ -3311,7 +3869,14 @@ start_detached() {
   mkdir -p "$MESH_DIR" "$LOGDIR"
   local logfile="$LOGDIR/start.log"
   : > "$logfile"
-  setsid nohup bash "$0" __start_all_inner >> "$logfile" 2>&1 < /dev/null &
+  local -a launch=(bash "$0" __start_all_inner)
+  # MESH_DIR is exported for scenario consumers. Preserve the default-selection
+  # semantics across this internal re-exec so fresh conductor compatibility
+  # links are still created; a caller's explicit root remains explicit.
+  if [ "$MESH_DIR_WAS_EXPLICIT" = "0" ]; then
+    launch=(env -u MESH_DIR "${launch[@]}")
+  fi
+  setsid nohup "${launch[@]}" >> "$logfile" 2>&1 < /dev/null &
   disown "$!" 2>/dev/null || true
   echo "mesh starting detached (own session) — log: $logfile"
   echo "next: just mesh wait"
@@ -3394,17 +3959,25 @@ wait_all() { # [--timeout N]
 }
 
 start_all() {
+  local start_mode archive_mode
+  load_canonical_household_binding || return 1
+  maybe_migrate_legacy_mesh_dir || return 1
+  maybe_migrate_legacy_conductors || return 1
   guard_conductor_data_roots start || return 1
   # The CLI writes the config the conductor must parse — refuse a mismatched
   # pair before anything is generated, not after three conductors panic. Under
   # `ark` the refusal that matters is a different one (the ark binary and jq),
   # and it is made in the same place, for the same reason.
   assert_launch_prerequisites || return 1
+  start_mode="$(household_start_mode)" || return 1
+  if [ "$start_mode" = reset ]; then
+    reset_household_state || return 1
+  fi
   mkdir -p "$MESH_DIR" "$LOGDIR" "$LOCAL_DEV_DIR" "$PID_DIR"
 
-  # COLD START: peer 0's admin port is silent, so step 2 below will `rm -rf` every
-  # peer's data root and regenerate the sandboxes. Decide that HERE, before anything
-  # is launched, because one more store has to go with them.
+  # FRESH/EXPLICIT RESET: step 2 below will generate every sandbox. Decide that
+  # here, before anything is launched, because one more store has to agree with
+  # the new identities.
   #
   # The doorways' Mongo archive holds the ACCOUNT rows: identifier, password hash,
   # human_id, agent_pub_key, installed_app_id. Those name cells on the conductors
@@ -3418,8 +3991,14 @@ start_all() {
   #
   # MESH_KEEP_DOORWAY_DB=1 keeps it (for deliberately studying that skew).
   MESH_COLD_START=0
-  if [ "$(ss -tln | grep -cE "127.0.0.1:$(admin_port 0) ")" -eq 0 ]; then
+  MESH_RESUME=0
+  if [ "$start_mode" = fresh ] || [ "$start_mode" = reset ]; then
     MESH_COLD_START=1
+    if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ] && [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+      archive_mode=archive
+    else
+      archive_mode=archive-less
+    fi
     if [ "${MESH_KEEP_DOORWAY_DB:-0}" != "1" ] && [ -d "$MONGO_DIR" ]; then
       if (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
         echo "WARN: cold start, but mongod is already live on :$MONGO_PORT — leaving the doorway archive in place (stop the mesh fully to get a clean recast)" >&2
@@ -3434,6 +4013,11 @@ start_all() {
         rm -f "$MESH_DIR/prologue-hosted-humans.json"
       fi
     fi
+  elif [ "$start_mode" = resume ]; then
+    MESH_RESUME=1
+    archive_mode="$(archive_mode_at "$MESH_DIR")"
+  else
+    archive_mode="$(archive_mode_at "$MESH_DIR")"
   fi
 
   # Peer policy: the storage binary loads ./config/peer-policy.toml relative to
@@ -3487,23 +4071,29 @@ EOF
   #    (bind_warm_shell_to_archive), and a doorway that boots archive-less
   #    stays inert for its whole life. Optional: no binary => skip, and the
   #    doorways degrade to today's memory-only shape (status says so).
-  if [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
+  if [ "$archive_mode" = archive ]; then
     if ! (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null; then
       mkdir -p "$MONGO_DIR"
       "$MONGOD_BIN" --dbpath "$MONGO_DIR" --bind_ip 127.0.0.1 --port "$MONGO_PORT" \
         --fork --logpath "$LOGDIR/mongod.log" >/dev/null 2>&1 \
-        || echo "WARN: mongod failed to start (see $LOGDIR/mongod.log) — doorways will run archive-less" >&2
+        || { echo "REFUSED mesh start: the declared doorway archive failed to start (see $LOGDIR/mongod.log)" >&2; return 1; }
       for _ in $(seq 1 20); do
         (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null && break; sleep 1
       done
+      (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null || {
+        echo "REFUSED mesh start: the declared doorway archive did not become ready on :$MONGO_PORT" >&2
+        return 1
+      }
       record_listener_pid mongod mesh "$MONGO_PORT" || true
       echo "mongod up on :$MONGO_PORT (dbpath $MONGO_DIR)"
     else
       record_listener_pid mongod mesh "$MONGO_PORT" || true
       echo "mongod already up on :$MONGO_PORT"
     fi
+    record_archive_mode archive
   else
-    echo "mongod not found (MONGOD_BIN unset/absent) — doorways will run archive-less (inert warm shell)"
+    record_archive_mode archive-less
+    echo "doorway archive mode is archive-less (inert warm shell)"
   fi
 
   # 0. Relay first: every 0.7 conductor homes to it at boot (see
@@ -3686,7 +4276,10 @@ EOF
   #    `generate -r=$rports`) creates the window the pacing profile needs:
   #    the conductor must not boot until the patch has landed, or its first
   #    kitsune2 gossip round starts at prod cadence.
-  if [ "$MESH_COLD_START" = "1" ]; then
+  if [ "$MESH_RESUME" = "1" ]; then
+    echo "resuming ${#PEERS[@]} conductors from complete persisted household state"
+    restart_conductors || return 1
+  elif [ "$MESH_COLD_START" = "1" ]; then
     # Peer 0's silent admin port is not evidence that peers 1..n are idle, nor
     # that an ark is not alive between incarnations — and the next line removes
     # every peer's data root. Ask each peer before destroying anything.
@@ -3710,6 +4303,7 @@ EOF
       echo "conductor generate failed (exit=$gen_status) — see $LOCAL_DEV_DIR/.sandbox_log"
       exit 1
     fi
+    ensure_legacy_conductor_links || return 1
 
     # -------------------------------------------------------------------
     # dev-tier gossip acceleration (declared preproduction stakes — see

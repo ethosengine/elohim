@@ -9,6 +9,15 @@
 
 import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+/** Persistent execution of the canonical Dowell household fixture. */
+export function householdMeshDir(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env['MESH_DIR'];
+  // Match Bash ${MESH_DIR:-default}: an empty value selects the default too.
+  if (override !== undefined && override !== '') return override;
+  return fileURLToPath(new URL('../../../../local-dev/household-dowell', import.meta.url));
+}
 
 export interface DoorwayFixture {
   url?: string;

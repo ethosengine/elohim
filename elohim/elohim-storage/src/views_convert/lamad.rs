@@ -198,6 +198,8 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
         // its conductor answers. A projector that fabricated one here would be
         // synthesising election evidence from a projection (C5).
         staging_candidate: None,
+        staging_candidate_blob_hash: None,
+        staging_candidate_state: None,
     })
 }
 
@@ -211,10 +213,12 @@ pub fn content_head_view_from_content(c: &Content) -> Option<ContentHeadView> {
 pub fn with_staging_candidate(
     mut view: ContentHeadView,
     staging_candidate: Option<String>,
+    staging_candidate_blob_hash: Option<String>,
+    staging_candidate_state: elohim_views::lamad::StagingCandidateState,
 ) -> ContentHeadView {
-    if staging_candidate.is_some() {
-        view.staging_candidate = staging_candidate;
-    }
+    view.staging_candidate = staging_candidate;
+    view.staging_candidate_blob_hash = staging_candidate_blob_hash;
+    view.staging_candidate_state = Some(staging_candidate_state);
     view
 }
 

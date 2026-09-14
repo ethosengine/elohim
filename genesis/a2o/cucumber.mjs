@@ -77,10 +77,10 @@ export default function () {
     //   E2E_DOORWAY_ALPHA / E2E_DOORWAY_B / E2E_DOORWAY_BETA
     //   E2E_STORAGE_URL / E2E_STORAGE_B / E2E_STORAGE_<PEER>   (MATTHEW, JESSICA, JAMES)
     //   E2E_DOORWAY_POOL_STORAGE_URLS
-    //   E2E_HOUSEHOLD_FIXTURE_PATH=/tmp/elohim-local-mesh/household-fixture.json  (processControl)
+    //   E2E_HOUSEHOLD_FIXTURE_PATH=genesis/local-dev/household-dowell/household-fixture.json  (processControl)
     //   ELOHIM_CLUSTER_STATE_PATH_OVERRIDE=genesis/manifests/cluster-state.act1-household.yaml
     //   ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
-    // plus CUCUMBER_JSON_REPORT=/tmp/elohim-local-mesh/reports/mesh.json so exactly one JSON report
+    // plus CUCUMBER_JSON_REPORT=genesis/local-dev/household-dowell/reports/mesh.json so exactly one JSON report
     // is written per run (see the jsonReportPath note above).
     mesh: {
       ...base,

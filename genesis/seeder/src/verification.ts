@@ -292,12 +292,13 @@ export class SeedingVerification {
         fn_name: 'get_content_stats',
         payload: null,
       }) as ContentStats;
+      const contentCount = stats.total_count - (stats.by_type.path ?? 0);
 
       return {
         name: 'content_stats',
         status: 'pass',
-        message: `Found ${stats.total_count} existing content entries`,
-        details: JSON.stringify(stats),
+        message: `Found ${contentCount} existing locally authored content entries`,
+        details: JSON.stringify({ ...stats, total_count: contentCount }),
       };
     } catch (error) {
       return {
@@ -310,18 +311,19 @@ export class SeedingVerification {
 
   private async checkPaths(): Promise<PreflightCheck> {
     try {
-      const index = await this.appWs.callZome({
+      const stats = await this.appWs.callZome({
         cell_id: this.cellId,
         zome_name: this.zomeName,
-        fn_name: 'get_all_paths',
+        fn_name: 'get_content_stats',
         payload: null,
-      }) as PathIndex;
+      }) as ContentStats;
+      const pathCount = stats.by_type.path ?? 0;
 
       return {
         name: 'paths',
         status: 'pass',
-        message: `Found ${index.total_count} existing paths`,
-        details: JSON.stringify(index),
+        message: `Found ${pathCount} existing locally authored paths`,
+        details: JSON.stringify({ total_count: pathCount }),
       };
     } catch (error) {
       return {
@@ -410,7 +412,8 @@ export class SeedingVerification {
 
   async runPostflightVerification(
     expected: ExpectedCounts,
-    sampleContentIds?: string[]
+    sampleContentIds?: string[],
+    pathIds: string[] = []
   ): Promise<PostflightResult> {
     const checks: PostflightCheck[] = [];
     const errors: string[] = [];
@@ -420,8 +423,41 @@ export class SeedingVerification {
     console.log('🔍 POST-FLIGHT VERIFICATION');
     console.log('═'.repeat(70));
 
-    // Get final counts
-    console.log('\n1. Querying final content count...');
+    // Exact-ID reads carry the bounded wait for the asynchronous storage
+    // projection sweep. Run them before aggregate counts so the checks measure
+    // the settled projection rather than the instant after the HTTP bulk insert.
+    let contentIdsVerified = false;
+    if (sampleContentIds && sampleContentIds.length > 0) {
+      console.log(`\n1. Verifying ${sampleContentIds.length} sample content entries...`);
+      const sampleCheck = await this.verifySampleContent(sampleContentIds);
+      checks.push(sampleCheck);
+      this.logCheck(sampleCheck);
+      const completeContentSet = sampleContentIds.length >= expected.content;
+      contentIdsVerified = sampleCheck.status === 'pass' && completeContentSet;
+      if (sampleCheck.status === 'fail' || (completeContentSet && sampleCheck.status !== 'pass')) {
+        errors.push(sampleCheck.message);
+      }
+      else if (sampleCheck.status === 'warn') warnings.push(sampleCheck.message);
+    }
+
+    let pathIdsVerified = false;
+    if (pathIds.length > 0) {
+      console.log(`\n2. Verifying ${pathIds.length} path content entries...`);
+      const pathCheck = await this.verifySampleContent(pathIds);
+      pathCheck.name = 'path_verification';
+      checks.push(pathCheck);
+      this.logCheck(pathCheck);
+      const completePathSet = pathIds.length >= expected.paths;
+      pathIdsVerified = pathCheck.status === 'pass' && completePathSet;
+      if (pathCheck.status === 'fail' || (completePathSet && pathCheck.status !== 'pass')) {
+        errors.push(pathCheck.message);
+      }
+      else if (pathCheck.status === 'warn') warnings.push(pathCheck.message);
+    }
+
+    // get_content_stats is author-chain-local telemetry. Exact ID reads above
+    // are the shared-substrate proof when the caller supplies the complete set.
+    console.log('\n3. Querying final content count...');
     let finalContent = 0;
     let finalPaths = 0;
 
@@ -432,25 +468,13 @@ export class SeedingVerification {
         fn_name: 'get_content_stats',
         payload: null,
       }) as ContentStats;
-      finalContent = stats.total_count;
+      finalPaths = stats.by_type.path ?? 0;
+      finalContent = stats.total_count - finalPaths;
       console.log(`   Found ${finalContent} content entries`);
     } catch (error) {
       errors.push(`Failed to get final content stats: ${error}`);
     }
-
-    console.log('\n2. Querying final path count...');
-    try {
-      const index = await this.appWs.callZome({
-        cell_id: this.cellId,
-        zome_name: this.zomeName,
-        fn_name: 'get_all_paths',
-        payload: null,
-      }) as PathIndex;
-      finalPaths = index.total_count;
-      console.log(`   Found ${finalPaths} paths`);
-    } catch (error) {
-      errors.push(`Failed to get final paths: ${error}`);
-    }
+    console.log(`   Found ${finalPaths} locally authored paths`);
 
     // Calculate deltas
     const preContent = this.preflightCounts?.content ?? 0;
@@ -471,7 +495,7 @@ export class SeedingVerification {
       existing > 0 ? ` (${existing} already existed and count as success)` : '';
 
     // Check content delta
-    console.log('\n3. Verifying content was written...');
+    console.log('\n4. Verifying content was written...');
     const contentCheck: PostflightCheck = {
       name: 'content_count',
       status: 'pass',
@@ -480,7 +504,10 @@ export class SeedingVerification {
       actual: deltaContent,
     };
 
-    if (deltaContent === 0 && expectedNewContent > 0) {
+    if (contentIdsVerified) {
+      contentCheck.status = 'pass';
+      contentCheck.message = `All ${expected.content} requested content IDs are readable`;
+    } else if (deltaContent === 0 && expectedNewContent > 0) {
       contentCheck.status = 'fail';
       contentCheck.message = `No content was written! Expected ${expectedNewContent} new entries, got 0${existingNote(contentExisting)}`;
       errors.push(contentCheck.message);
@@ -500,7 +527,7 @@ export class SeedingVerification {
     this.logCheck(contentCheck);
 
     // Check paths delta
-    console.log('\n4. Verifying paths were written...');
+    console.log('\n5. Verifying paths were written...');
     const pathsCheck: PostflightCheck = {
       name: 'paths_count',
       status: 'pass',
@@ -509,7 +536,10 @@ export class SeedingVerification {
       actual: deltaPaths,
     };
 
-    if (deltaPaths === 0 && expectedNewPaths > 0) {
+    if (pathIdsVerified) {
+      pathsCheck.status = 'pass';
+      pathsCheck.message = `All ${expected.paths} requested path IDs are readable`;
+    } else if (deltaPaths === 0 && expectedNewPaths > 0) {
       pathsCheck.status = 'fail';
       pathsCheck.message = `No paths were written! Expected ${expectedNewPaths} new paths, got 0${existingNote(pathsExisting)}`;
       errors.push(pathsCheck.message);
@@ -523,20 +553,6 @@ export class SeedingVerification {
     }
     checks.push(pathsCheck);
     this.logCheck(pathsCheck);
-
-    // Sample verification
-    if (sampleContentIds && sampleContentIds.length > 0) {
-      console.log(`\n5. Verifying ${sampleContentIds.length} sample content entries...`);
-      const sampleCheck = await this.verifySampleContent(sampleContentIds);
-      checks.push(sampleCheck);
-      this.logCheck(sampleCheck);
-
-      if (sampleCheck.status === 'fail') {
-        errors.push(sampleCheck.message);
-      } else if (sampleCheck.status === 'warn') {
-        warnings.push(sampleCheck.message);
-      }
-    }
 
     // Summary
     const success = errors.length === 0;
@@ -577,7 +593,7 @@ export class SeedingVerification {
   private async verifySampleContent(ids: string[]): Promise<PostflightCheck> {
     let found = 0;
     let missing: string[] = [];
-    const checked = Math.min(ids.length, 10);
+    const checked = ids.length;
 
     // Anchoring is ASYNCHRONOUS by contract: `/db/content/bulk` inserts the storage rows and the
     // storage reconcile sweep notarizes them onto the conductor a few seconds later (measured
@@ -592,8 +608,7 @@ export class SeedingVerification {
     for (;;) {
       found = 0;
       missing = [];
-      for (const id of ids.slice(0, 10)) {
-        // Check up to 10 samples
+      for (const id of ids) {
         try {
           const result = await this.appWs.callZome({
             cell_id: this.cellId,

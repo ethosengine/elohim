@@ -146,7 +146,7 @@ function poolStorageUrls(id = 'alpha'): string[] {
 
 // ---------------------------------------------------------------------------
 // JSON-lines log tailing — doorway logs one JSON object per line (verified
-// live against /tmp/elohim-local-mesh/logs/doorway.log): {"timestamp",
+// live against genesis/local-dev/household-dowell/logs/doorway.log): {"timestamp",
 // "level","fields":{"message",...},"target"}. Offset-based tail mirrors
 // federation-failover.steps.ts's captureLogStart/newLogText pattern (a
 // sibling file, not reused directly — no such helper is exported there).

@@ -381,6 +381,11 @@ COPY elohim/sdk /sdk
 # compile without them (couldn't read … No such file → the E0282 that followed was downstream).
 COPY elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs /holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs
 COPY elohim/holochain/dna/mishpat/dna.yaml /holochain/dna/mishpat/dna.yaml
+# content_store integrity source: rea_commitment_record_tests.rs pins
+# COMMITMENT_ENTRY to the Commitment variant's EntryTypes index with a
+# cfg(test) include_str! at the same container-absolute /holochain path. Keep
+# this test input out of the release builder; only check compiles that module.
+COPY elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs /holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs
 # rakia/schemas: the T1 release-manifest schema the release_adoption::verify mirror test reads at
 # runtime ("../rakia/schemas/v1/…" from /app → /rakia/schemas). The Checkout stage initialises
 # the submodule under ee-bot-pat (scripts/ci/init-rakia-submodule.sh) and, on a fetch failure,

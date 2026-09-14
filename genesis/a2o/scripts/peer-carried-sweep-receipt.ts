@@ -15,11 +15,11 @@
  */
 import { execFileSync } from 'node:child_process';
 import { readFileSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// eslint-disable-next-line import/no-extraneous-dependencies -- local mesh probe dependency
 import { AdminWebsocket, AppWebsocket, encodeHashToBase64, type CellId } from '@holochain/client';
+
+import { householdMeshDir } from '../src/framework/fixtures/household-mesh.js';
 
 const APP_ID = 'elohim';
 const SUPPLIER = process.env.PEER_CARRIED_SUPPLIER ?? 'http://localhost:8090';
@@ -32,7 +32,7 @@ const ADOPTER_CONFIG =
   process.env.PEER_CARRIED_ADOPTER_CONFIG ??
   '/projects/elohim/elohim/holochain/local-dev/jessica/conductor-config.yaml';
 const ADOPTER_LOG =
-  process.env.PEER_CARRIED_ADOPTER_LOG ?? join(tmpdir(), 'elohim-local-mesh/logs/jessica.log');
+  process.env.PEER_CARRIED_ADOPTER_LOG ?? join(householdMeshDir(), 'logs/jessica.log');
 const CONTROL_WAIT_MS = Number(process.env.PEER_CARRIED_CONTROL_WAIT_MS ?? 90_000);
 const RECEIPT_WAIT_MS = Number(process.env.PEER_CARRIED_RECEIPT_WAIT_MS ?? 110_000);
 const POLL_MS = Number(process.env.PEER_CARRIED_POLL_MS ?? 5_000);

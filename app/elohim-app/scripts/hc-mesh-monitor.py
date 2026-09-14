@@ -28,9 +28,11 @@ import re
 import socket
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 PORT = int(os.environ.get("MESH_MONITOR_PORT", "4210"))
-MESH_DIR = os.environ.get("MESH_DIR", "/tmp/elohim-local-mesh")
+REPO_ROOT = Path(__file__).resolve().parents[3]
+MESH_DIR = os.environ.get("MESH_DIR") or str(REPO_ROOT / "genesis/local-dev/household-dowell")
 CONTENT_ID = os.environ.get("MESH_QUIESCE_CONTENT_ID", "elohim-host-landing")
 ACTIONABLE_TOL = int(os.environ.get("QUIESCE_ACTIONABLE_TOLERANCE", "2"))
 PROBE_TIMEOUT = float(os.environ.get("MESH_MONITOR_PROBE_TIMEOUT", "1.5"))

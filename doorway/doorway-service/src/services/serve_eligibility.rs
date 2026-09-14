@@ -108,6 +108,8 @@ pub const REACH_UNDECLARED: &str = "undeclared";
 /// minted here; contract and liveness refusals are minted by dispatch and the
 /// shed path respectively, and keep their own shapes.
 const TERM_REACH: &str = "reach";
+const TERM_STANDING: &str = "standing";
+const STANDING_UNAVAILABLE_STATUS: &str = "standing-unavailable";
 
 /// How a declared reach behaves under the fold.
 ///
@@ -340,6 +342,86 @@ pub struct Refusal {
     pub owed: Option<crate::services::owed_response::OwedResponse>,
 }
 
+/// Why the doorway could not read the requester's current memberships.
+///
+/// This vocabulary is intentionally closed and carries no upstream body,
+/// transport error or membership value. Those details remain in the doorway's
+/// own logs; the public answer says only which bounded leg prevented a verdict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MembershipReadFailure {
+    NotConfigured,
+    UpstreamStatus,
+    Transport,
+    InvalidBody,
+}
+
+impl MembershipReadFailure {
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::NotConfigured => "not-configured",
+            Self::UpstreamStatus => "upstream-status",
+            Self::Transport => "transport",
+            Self::InvalidBody => "invalid-body",
+        }
+    }
+
+    #[must_use]
+    const fn reason(self) -> &'static str {
+        match self {
+            Self::NotConfigured => {
+                "This doorway has no storage projection configured from which to read current membership standing."
+            }
+            Self::UpstreamStatus => {
+                "The membership record did not answer successfully, so this doorway cannot decide whether the named reach admits this requester."
+            }
+            Self::Transport => {
+                "The membership record could not be reached, so this doorway cannot decide whether the named reach admits this requester."
+            }
+            Self::InvalidBody => {
+                "The membership record returned an answer this doorway could not interpret, so it cannot decide whether the named reach admits this requester."
+            }
+        }
+    }
+}
+
+/// The fold could not evaluate the requester's standing.
+///
+/// This is neither a reach refusal nor an assertion that the requester holds no
+/// membership. It is a fail-closed, non-cacheable 503 and offers no challenge:
+/// without a standing answer there is no governance verdict to challenge.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StandingUnavailable {
+    pub status: &'static str,
+    pub term: &'static str,
+    pub cause: &'static str,
+    pub reach: String,
+    pub epr: String,
+    pub contract: String,
+    pub reason: &'static str,
+}
+
+impl StandingUnavailable {
+    #[must_use]
+    fn new(failure: MembershipReadFailure, reach: &str, contract: &ContractTerms) -> Self {
+        Self {
+            status: STANDING_UNAVAILABLE_STATUS,
+            term: TERM_STANDING,
+            cause: failure.label(),
+            reach: sanitize_reach_label(reach),
+            epr: contract.epr_id.clone(),
+            contract: contract.commitment_id.clone(),
+            reason: failure.reason(),
+        }
+    }
+
+    #[must_use]
+    pub fn standing_header_value(&self) -> String {
+        format!("unavailable;reach={}", self.reach)
+    }
+}
+
 impl Refusal {
     /// The `x-elohim-standing` header value for this refusal.
     ///
@@ -363,6 +445,9 @@ pub enum ServeEligibility {
     /// records it reads back to, and the serve arm carries nothing at all — so
     /// the common answer (serve) should not pay for the rare one's payload.
     Refuse(Box<Refusal>),
+    /// Membership evidence needed by this fold could not be read. Fail closed,
+    /// but do not misreport the requester as a known non-member.
+    Unavailable(Box<StandingUnavailable>),
 }
 
 impl ServeEligibility {
@@ -372,6 +457,15 @@ impl ServeEligibility {
         match self {
             Self::Serve => None,
             Self::Refuse(r) => Some(r.as_ref()),
+            Self::Unavailable(_) => None,
+        }
+    }
+
+    #[must_use]
+    pub fn unavailable(&self) -> Option<&StandingUnavailable> {
+        match self {
+            Self::Unavailable(unavailable) => Some(unavailable.as_ref()),
+            Self::Serve | Self::Refuse(_) => None,
         }
     }
 }
@@ -589,6 +683,20 @@ pub fn refusal_response(refusal: &Refusal) -> Response<Full<Bytes>> {
         .expect("infallible refusal response")
 }
 
+/// Render an unavailable standing read without pretending the fold decided
+/// that the requester lacked membership.
+#[must_use]
+pub fn standing_unavailable_response(unavailable: &StandingUnavailable) -> Response<Full<Bytes>> {
+    let body = serde_json::to_vec(unavailable).unwrap_or_else(|_| b"{}".to_vec());
+    Response::builder()
+        .status(StatusCode::SERVICE_UNAVAILABLE)
+        .header("content-type", "application/json")
+        .header(STANDING_HEADER, unavailable.standing_header_value())
+        .header("cache-control", "no-store")
+        .body(Full::new(Bytes::from(body)))
+        .expect("infallible standing-unavailable response")
+}
+
 /// The `x-elohim-standing` value for a serve the fold ADMITTED.
 ///
 /// The counterpart of [`Refusal::standing_header_value`], and deliberately the
@@ -646,8 +754,8 @@ use hyper::Request;
 /// How long the membership read may take before the fold gives up on it.
 ///
 /// Short on purpose: this sits on the browser hot path for the narrow-reach
-/// case. A read that does not answer in time yields NO memberships, which
-/// refuses — never serves. A slow substrate must not become an open door.
+/// case. A read that does not answer in time yields an unavailable-standing
+/// response and never becomes either permission or a false non-membership.
 const MEMBERSHIP_READ_TIMEOUT_SECS: u64 = 3;
 
 /// The audience the declared reach names, read from the CURRENT projection row.
@@ -706,22 +814,27 @@ pub fn standing_from_request<B>(state: &AppState, req: &Request<B>) -> Requester
 /// request, from the substrate projection — never from a doorway-local list.
 ///
 /// `GET {storage}/db/participations/{human_id}` is the canonical read (storage
-/// `handle_participations_by_human`). A participation with a `departedAt` is
-/// past membership and is dropped. Both the collective id and, when present,
-/// its name are returned, because the id/name seam between the collective row
-/// and a gate hint is still drifting (see [`AudienceTerm::satisfied_by`]).
+/// `handle_participations_by_human`). Only a `consented` participation with no
+/// `departedAt` is current membership; pending, withdrawn, and departed rows do
+/// not establish standing. Both the collective id and, when present, its name
+/// are returned, because the id/name seam between the collective row and a gate
+/// hint is still drifting (see [`AudienceTerm::satisfied_by`]).
 ///
-/// Any failure — no storage configured, a non-success status, a timeout, an
-/// unparseable body — yields an EMPTY list, which REFUSES. A membership read
-/// that cannot be completed is never read as permission.
-pub async fn read_memberships(state: &AppState, human_id: &str) -> Vec<String> {
+/// A successful empty list means a known non-member. Any failure — no storage
+/// configured, a non-success status, a timeout, or an invalid body — is a
+/// distinct unavailable answer. Both fail closed, but only the former may be
+/// described as the requester's standing not satisfying the declared reach.
+pub async fn read_memberships(
+    state: &AppState,
+    human_id: &str,
+) -> Result<Vec<String>, MembershipReadFailure> {
     let Some(storage_url) = state.args.storage_url.as_deref() else {
         tracing::warn!(
             human_id = %human_id,
             "serve eligibility: no storage URL configured — the membership read \
              cannot be made, so no standing is presented"
         );
-        return Vec::new();
+        return Err(MembershipReadFailure::NotConfigured);
     };
     let url = format!(
         "{}/db/participations/{}",
@@ -738,40 +851,77 @@ pub async fn read_memberships(state: &AppState, human_id: &str) -> Vec<String> {
         Ok(r) if r.status().is_success() => r,
         Ok(r) => {
             tracing::warn!(human_id = %human_id, status = %r.status(),
-                "serve eligibility: membership read non-success — presenting no standing");
-            return Vec::new();
+                "serve eligibility: membership read non-success — standing unavailable");
+            return Err(MembershipReadFailure::UpstreamStatus);
         }
         Err(e) => {
             tracing::warn!(human_id = %human_id, error = %e,
-                "serve eligibility: membership read failed — presenting no standing");
-            return Vec::new();
+                "serve eligibility: membership read failed — standing unavailable");
+            return Err(MembershipReadFailure::Transport);
         }
     };
-    let Ok(body) = resp.json::<serde_json::Value>().await else {
-        return Vec::new();
+    let body = match resp.json::<serde_json::Value>().await {
+        Ok(body) => body,
+        Err(error) => {
+            tracing::warn!(human_id = %human_id, %error,
+                "serve eligibility: membership read body was not JSON — standing unavailable");
+            return Err(MembershipReadFailure::InvalidBody);
+        }
     };
+    parse_memberships(body)
+}
+
+fn parse_memberships(body: serde_json::Value) -> Result<Vec<String>, MembershipReadFailure> {
     let items = body
         .get("items")
         .and_then(|i| i.as_array())
         .or_else(|| body.as_array());
     let Some(items) = items else {
-        return Vec::new();
+        return Err(MembershipReadFailure::InvalidBody);
     };
     let mut memberships = Vec::new();
     for item in items {
-        // Past membership is not membership.
-        if item.get("departedAt").is_some_and(|d| !d.is_null()) {
-            continue;
-        }
+        let Some(item) = item.as_object() else {
+            return Err(MembershipReadFailure::InvalidBody);
+        };
+        let mut row_memberships = Vec::new();
         for key in ["collectiveId", "collectiveName", "collective_id"] {
-            if let Some(v) = item.get(key).and_then(|v| v.as_str()) {
-                if !v.is_empty() && !memberships.iter().any(|m| m == v) {
-                    memberships.push(v.to_string());
+            if let Some(value) = item.get(key) {
+                let Some(value) = value.as_str() else {
+                    return Err(MembershipReadFailure::InvalidBody);
+                };
+                let value = value.trim();
+                if !value.is_empty()
+                    && !row_memberships.iter().any(|membership| membership == value)
+                {
+                    row_memberships.push(value.to_string());
                 }
             }
         }
+        if row_memberships.is_empty() {
+            return Err(MembershipReadFailure::InvalidBody);
+        }
+        let Some(consent_state) = item.get("consentState").and_then(|value| value.as_str()) else {
+            return Err(MembershipReadFailure::InvalidBody);
+        };
+        if !matches!(consent_state, "consented" | "pending" | "withdrawn") {
+            return Err(MembershipReadFailure::InvalidBody);
+        }
+        let departed = match item.get("departedAt") {
+            Some(serde_json::Value::Null) => false,
+            Some(serde_json::Value::String(_)) => true,
+            _ => return Err(MembershipReadFailure::InvalidBody),
+        };
+        if consent_state != "consented" || departed {
+            continue;
+        }
+        for membership in row_memberships {
+            if !memberships.contains(&membership) {
+                memberships.push(membership);
+            }
+        }
     }
-    memberships
+    Ok(memberships)
 }
 
 /// Fold reach + standing for one serve of one projection — the single entry
@@ -798,8 +948,21 @@ pub async fn fold_for_projection(
     // changes the verdict.
     let standing = if needs_memberships(head_reach, &contract.audience, &standing) {
         let human_id = standing.human_id.clone().unwrap_or_default();
-        let memberships = read_memberships(state, &human_id).await;
-        standing.with_memberships(memberships)
+        match read_memberships(state, &human_id).await {
+            Ok(memberships) => standing.with_memberships(memberships),
+            Err(failure) => {
+                let unavailable =
+                    StandingUnavailable::new(failure, projection.reach.as_str(), &contract);
+                tracing::warn!(
+                    path = %path,
+                    epr_id = %projection.epr_id,
+                    reach = %unavailable.reach,
+                    cause = unavailable.cause,
+                    "serve eligibility: standing unavailable — fold cannot decide"
+                );
+                return ServeEligibility::Unavailable(Box::new(unavailable));
+            }
+        }
     } else {
         standing
     };
@@ -1193,6 +1356,194 @@ mod tests {
         assert!(needs_memberships(Some("local"), &audience, &member(&[])));
     }
 
+    #[test]
+    fn an_empty_membership_answer_is_known_nonmembership() {
+        assert_eq!(
+            parse_memberships(serde_json::json!({"items": [], "count": 0})),
+            Ok(Vec::new())
+        );
+        assert_eq!(
+            parse_memberships(serde_json::json!({
+                "items": [{
+                    "collectiveId": "household-dowell",
+                    "consentState": "consented",
+                    "departedAt": "2026-09-13T00:00:00Z"
+                }]
+            })),
+            Ok(Vec::new()),
+            "a valid departed row is evaluated history, not an unavailable read"
+        );
+        assert_eq!(
+            parse_memberships(serde_json::json!({
+                "items": [{
+                    "collectiveId": "household-dowell",
+                    "consentState": "pending",
+                    "departedAt": null
+                }]
+            })),
+            Ok(Vec::new()),
+            "a pending participation is not affirmed membership standing"
+        );
+    }
+
+    #[test]
+    fn malformed_membership_rows_are_unavailable_not_nonmembership() {
+        for malformed in [
+            serde_json::json!({}),
+            serde_json::json!({"items": "not-an-array"}),
+            serde_json::json!({"items": [null]}),
+            serde_json::json!({"items": [{}]}),
+            serde_json::json!({"items": [{
+                "collectiveId": 42,
+                "consentState": "consented",
+                "departedAt": null
+            }]}),
+            serde_json::json!({"items": [{
+                "collectiveId": "household-dowell",
+                "consentState": "consented",
+                "departedAt": false
+            }]}),
+            serde_json::json!({"items": [{
+                "collectiveId": "household-dowell",
+                "consentState": "unknown",
+                "departedAt": null
+            }]}),
+        ] {
+            assert_eq!(
+                parse_memberships(malformed),
+                Err(MembershipReadFailure::InvalidBody)
+            );
+        }
+    }
+
+    #[test]
+    fn valid_membership_rows_keep_ids_and_names_without_duplicates() {
+        assert_eq!(
+            parse_memberships(serde_json::json!({
+                "items": [
+                    {
+                        "collectiveId": "household-dowell",
+                        "collectiveName": "the Dowell household",
+                        "consentState": "consented",
+                        "departedAt": null
+                    },
+                    {
+                        "collective_id": "household-dowell",
+                        "consentState": "consented",
+                        "departedAt": null
+                    }
+                ]
+            })),
+            Ok(vec![
+                "household-dowell".to_string(),
+                "the Dowell household".to_string()
+            ])
+        );
+    }
+
+    #[tokio::test]
+    async fn membership_read_distinguishes_empty_from_malformed_at_the_http_boundary() {
+        use crate::config::Args;
+        use clap::Parser;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn read(body: serde_json::Value) -> Result<Vec<String>, MembershipReadFailure> {
+            let storage = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/db/participations/human-susan-household"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .expect(1)
+                .mount(&storage)
+                .await;
+            let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+            args.storage_url = Some(storage.uri());
+            let state = AppState::new(args);
+            read_memberships(&state, "human-susan-household").await
+        }
+
+        assert_eq!(
+            read(serde_json::json!({"items": [], "count": 0})).await,
+            Ok(Vec::new()),
+            "a completed empty read is authoritative non-membership"
+        );
+        assert_eq!(
+            read(serde_json::json!({"items": [{
+                "collectiveId": "household-dowell",
+                "consentState": "consented"
+            }]}))
+            .await,
+            Err(MembershipReadFailure::InvalidBody),
+            "a malformed row is unavailable evidence, never non-membership"
+        );
+    }
+
+    #[tokio::test]
+    async fn membership_read_outcomes_reach_the_fold_without_collapsing() {
+        use crate::config::Args;
+        use clap::Parser;
+        use http_body_util::BodyExt;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        async fn fold_body(status: u16, body: serde_json::Value) -> ServeEligibility {
+            let storage = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path("/db/participations/human-matthew"))
+                .respond_with(ResponseTemplate::new(status).set_body_json(body))
+                .expect(1)
+                .mount(&storage)
+                .await;
+            let mut args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+            args.storage_url = Some(storage.uri());
+            let state = AppState::new(args);
+            let projection = projection(
+                "local",
+                vec![hint(
+                    "collective-dowell-household",
+                    Some("the Dowell household"),
+                    GateHintRelation::MembershipPrerequisite,
+                )],
+            );
+            fold_for_projection(&state, "/community-garden-club", &projection, member(&[])).await
+        }
+
+        let unavailable = fold_body(200, serde_json::json!({"items": [{}]})).await;
+        let response = standing_unavailable_response(
+            unavailable
+                .unavailable()
+                .expect("malformed membership evidence must stay unavailable"),
+        );
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let json: serde_json::Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(json["cause"], "invalid-body");
+        assert!(json.get("hear").is_none());
+        assert!(json.get("owed").is_none());
+
+        assert!(matches!(
+            fold_body(200, serde_json::json!({"items": [], "count": 0})).await,
+            ServeEligibility::Refuse(_)
+        ));
+        assert_eq!(
+            fold_body(
+                200,
+                serde_json::json!({"items": [{
+                    "collectiveId": "collective-dowell-household",
+                    "consentState": "consented",
+                    "departedAt": null
+                }]})
+            )
+            .await,
+            ServeEligibility::Serve
+        );
+        assert!(matches!(
+            fold_body(500, serde_json::json!({"error": "internal"})).await,
+            ServeEligibility::Unavailable(_)
+        ));
+    }
+
     // ── the wire contract ───────────────────────────────────────────────────
 
     #[test]
@@ -1241,6 +1592,42 @@ mod tests {
             "/db/collectives/collective-dowell-household"
         );
         assert_eq!(json["declaredIn"], "/api/v1/commitments/commitment-abc");
+    }
+
+    #[tokio::test]
+    async fn an_unavailable_membership_read_is_a_nonchallengeable_503() {
+        use http_body_util::BodyExt;
+
+        let unavailable = StandingUnavailable::new(
+            MembershipReadFailure::InvalidBody,
+            "local",
+            &contract(vec![household()]),
+        );
+        let response = standing_unavailable_response(&unavailable);
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            response
+                .headers()
+                .get(STANDING_HEADER)
+                .and_then(|value| value.to_str().ok()),
+            Some("unavailable;reach=local")
+        );
+        assert_eq!(
+            response
+                .headers()
+                .get("cache-control")
+                .and_then(|value| value.to_str().ok()),
+            Some("no-store")
+        );
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["status"], "standing-unavailable");
+        assert_eq!(json["term"], "standing");
+        assert_eq!(json["cause"], "invalid-body");
+        assert_eq!(json["reach"], "local");
+        assert!(json.get("hear").is_none());
+        assert!(json.get("owed").is_none());
+        assert!(json.get("memberships").is_none());
     }
 
     /// A projection row is not a place to trust bytes from: a reach carrying

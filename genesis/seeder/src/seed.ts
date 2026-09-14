@@ -871,6 +871,7 @@ interface SeedResult {
   /** Path rows the bulk import reported as already existing — idempotent re-run skips, not failures. */
   pathsSkipped: number;
   sampleIds: string[];
+  pathIds: string[];
 }
 
 /**
@@ -1032,6 +1033,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
     pathsSucceeded: 0,
     pathsSkipped: 0,
     sampleIds: [],
+    pathIds: [],
   };
   timer.startPhase('Doorway Import');
 
@@ -1921,6 +1923,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
     );
 
     result.pathsAttempted = pathContentItems.length;
+    result.pathIds = pathContentItems.map(path => path.id);
 
     // Bulk create path ContentNodes
     console.log(`   📤 Bulk creating ${pathContentItems.length} path content nodes...`);
@@ -2178,7 +2181,8 @@ export async function seed() {
         contentExisting: seedResult.contentSkipped,
         pathsExisting: seedResult.pathsSkipped,
       },
-      seedResult.sampleIds.slice(0, 5)  // Verify first 5 sample IDs
+      seedResult.sampleIds.slice(0, 5), // Verify first 5 content IDs
+      seedResult.pathIds,               // The canonical corpus has eight paths; verify every one
     );
 
     // Display results

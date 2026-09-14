@@ -74,8 +74,8 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-LOCAL_DEV_DIR="${LOCAL_DEV_DIR:-$REPO_ROOT/elohim/holochain/local-dev}"
-MESH_DIR="${MESH_DIR:-/tmp/elohim-local-mesh}"
+MESH_DIR="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}"
+LOCAL_DEV_DIR="${LOCAL_DEV_DIR:-$MESH_DIR/conductors}"
 HAPP_PATH="${HAPP_PATH:-$REPO_ROOT/elohim/holochain/dna/elohim/workdir/elohim.happ}"
 DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 API_KEY="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}"

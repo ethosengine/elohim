@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # hc-mesh-perf-watch.sh — continuous mesh timing watch (15 s cadence).
-# Writes ${MESH_DIR:-/tmp/elohim-local-mesh}/perf/watch.jsonl (one JSON object per tick) and appends
+# Writes ${MESH_DIR:-<repo>/genesis/local-dev/household-dowell}/perf/watch.jsonl (one JSON object per tick) and appends
 # `SPIKE` lines to perf/watch.spikes when: a probe exceeds 1.0 s or answers >=500/0, a service exceeds
 # 1.5 cores over the tick, doorway A's breaker is not closed, or a storage zome path reads dead.
 # Probes are read-only. Born 2026-08-21 when the "storage stall" that opened the doorway breaker turned
 # out to be the doorway's own first SSR render parking its runtime (12.00 s via doorway, 1.6 ms direct).
-OUT="${MESH_DIR:-/tmp/elohim-local-mesh}/perf"; mkdir -p "$OUT"; HZ=$(getconf CLK_TCK); INTERVAL="${PERF_WATCH_INTERVAL:-15}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+OUT="${MESH_DIR:-$REPO_ROOT/genesis/local-dev/household-dowell}/perf"; mkdir -p "$OUT"; HZ=$(getconf CLK_TCK); INTERVAL="${PERF_WATCH_INTERVAL:-15}"
 declare -A prev
 # cpu_of sets $CPU (cores over the last tick) — a function, not a $(…) substitution, because the
 # prev[] ticks must persist across iterations (a subshell would lose them and read 0.0 forever).
