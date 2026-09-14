@@ -53,6 +53,10 @@ import { After, Given, When, Then } from '@cucumber/cucumber';
 
 import { awaitOwnedProcessRecovery } from '../../src/framework/dataplane/owned-process-recovery.js';
 import {
+  completeOnceWithinDeadline,
+  waitForStrictAuthorityConvergence,
+} from '../../src/framework/dataplane/strict-authority-convergence.js';
+import {
   classifyDoorwayState,
   getRaw,
   probeDeclaredHead,
@@ -94,6 +98,7 @@ const meshScript = fileURLToPath(
 const RAW_FETCH_TIMEOUT_MS = 30_000;
 /** Six server reads plus one browser boot in assertExactPublishedAuthority. */
 const EXACT_AUTHORITY_TIMEOUT_MS = 7 * RAW_FETCH_TIMEOUT_MS;
+const AUTHORITY_PUBLICATION_BOUND_MS = 75_000;
 /** Fallback bounds when the authority declares none (it always does today). */
 const DEFAULT_WITHDRAW_BOUND_MS = 30_000;
 const DEFAULT_REJOIN_BOUND_MS = 20_000;
@@ -341,6 +346,87 @@ async function assertExactPublishedAuthority(
     );
   }
   const browser = await visitInBrowser(`${origin}${fresh(expected.mountPath)}`);
+  assert.deepEqual(browser.pageErrors, [], `${origin}: browser page errors`);
+  assert.deepEqual(browser.failedRequests, [], `${origin}: browser request failures`);
+  assert.deepEqual(browser.httpErrors, [], `${origin}: browser HTTP errors`);
+  assert.ok(browser.rootPresent, `${origin}: browser saw no app-root`);
+  assert.ok(browser.bootstrapReady, `${origin}: current entry script did not bootstrap`);
+  assert.ok(
+    browser.rootText.includes(expected.version.replace(/^fixture-/, '')),
+    `${origin}: browser booted a root that does not identify the expected version`
+  );
+}
+
+async function lightweightAuthorityMismatch(
+  origin: string,
+  expected: ChaosPublishedAuthority,
+  remainingMs: number
+): Promise<string | undefined> {
+  const timeoutMs = Math.max(1, Math.min(10_000, remainingMs));
+  const nonce = `authority-${Date.now().toString(36)}`;
+  const fresh = (path: string) => `${path}${path.includes('?') ? '&' : '?'}chaos=${nonce}`;
+  const encodedSlug = encodeURIComponent(expected.slug);
+  const encodedBlobHash = encodeURIComponent(expected.blobHash);
+  const headUrl = origin + fresh(`/db/content/${encodedSlug}/head`);
+  const contentUrl = origin + fresh(`/db/content/${encodedSlug}`);
+  const versionUrl = origin + fresh(`/apps/${encodedBlobHash}/version.json`);
+  const [head, content, version] = await Promise.all([
+    getRaw(headUrl, { timeoutMs }),
+    getRaw(contentUrl, { timeoutMs }),
+    getRaw(versionUrl, { timeoutMs }),
+  ]);
+  if (head.status !== 200) return `head status ${head.status}`;
+  if (content.status !== 200) return `content status ${content.status}`;
+  if (version.status !== 200) return `version status ${version.status}`;
+  const headBody = JSON.parse(head.text) as { headActionHash?: string; blobHash?: string };
+  const contentBody = JSON.parse(content.text) as { blobHash?: string };
+  if (headBody.headActionHash !== expected.actionHash)
+    return `action expected ${expected.actionHash}, observed ${headBody.headActionHash ?? 'absent'}`;
+  if (headBody.blobHash !== expected.blobHash)
+    return `head blob expected ${expected.blobHash}, observed ${headBody.blobHash ?? 'absent'}`;
+  if (contentBody.blobHash !== expected.blobHash)
+    return `content blob expected ${expected.blobHash}, observed ${contentBody.blobHash ?? 'absent'}`;
+  const versionStamp = stampOf(version.text);
+  return versionStamp === expected.version
+    ? undefined
+    : `version expected ${expected.version}, observed ${versionStamp || 'absent'}`;
+}
+
+async function assertExactPublishedSurface(
+  origin: string,
+  expected: ChaosPublishedAuthority,
+  deadlineAt: number
+): Promise<void> {
+  const nonce = `chaos-surface-${Date.now().toString(36)}`;
+  const fresh = (path: string) => `${path}${path.includes('?') ? '&' : '?'}chaos=${nonce}`;
+  const remaining = () => Math.max(1, deadlineAt - Date.now());
+  const page = await getRaw(`${origin}${fresh(expected.mountPath)}`, {
+    timeoutMs: Math.min(RAW_FETCH_TIMEOUT_MS, remaining()),
+  });
+  assert.equal(page.status, 200, `${origin}: governed page answered ${page.status}`);
+  assert.ok(
+    page.text.includes(expected.entryScript),
+    `${origin}: page does not name current script`
+  );
+  for (const asset of [expected.entryScript, expected.styleSheet]) {
+    const assetPath = `${expected.mountPath.replace(/\/$/, '')}/${asset}`;
+    const response = await getRaw(`${origin}${fresh(assetPath)}`, {
+      timeoutMs: Math.min(RAW_FETCH_TIMEOUT_MS, remaining()),
+    });
+    assert.equal(
+      response.status,
+      200,
+      `${origin}: current asset ${asset} answered ${response.status}`
+    );
+  }
+  const browser = await completeOnceWithinDeadline(
+    deadlineAt,
+    async remainingMs =>
+      await visitInBrowser(
+        `${origin}${fresh(expected.mountPath)}`,
+        Math.min(RAW_FETCH_TIMEOUT_MS, remainingMs)
+      )
+  );
   assert.deepEqual(browser.pageErrors, [], `${origin}: browser page errors`);
   assert.deepEqual(browser.failedRequests, [], `${origin}: browser request failures`);
   assert.deepEqual(browser.httpErrors, [], `${origin}: browser HTTP errors`);
@@ -887,8 +973,20 @@ Given(
     const state = getState(this);
     state.authorityA = chaosAuthorReceipt(this);
     this.attach(JSON.stringify(state.authorityA), 'application/json');
-    for (const member of (await readMembership(state.authority)).members) {
-      await assertExactPublishedAuthority(member.origin, state.authorityA.authority);
+    const members = (await readMembership(state.authority)).members;
+    const deadlineAt = Date.parse(state.authorityA.authoredAt) + AUTHORITY_PUBLICATION_BOUND_MS;
+    const convergence = await waitForStrictAuthorityConvergence(
+      members.map(member => member.origin),
+      deadlineAt,
+      async (origin, remainingMs) =>
+        await lightweightAuthorityMismatch(origin, state.authorityA!.authority, remainingMs)
+    );
+    assert.ok(
+      convergence.converged,
+      `authority A did not converge to the author's exact receipt within the shared 75s publication deadline: ${JSON.stringify(convergence.lastMismatches)}`
+    );
+    for (const member of members) {
+      await assertExactPublishedSurface(member.origin, state.authorityA.authority, deadlineAt);
     }
   }
 );
