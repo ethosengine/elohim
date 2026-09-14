@@ -102,6 +102,7 @@ test target="changed" scope="":
             exit 2
           fi
         fi
+        wait_for_lamad_call_readiness 75
         export ELOHIM_CLUSTER_STATE_PATH_OVERRIDE="{{ root }}/genesis/manifests/cluster-state.act1-household.yaml"
         export ELOHIM_REMOTE_COMPUTE_STATUS=unavailable
         # DURABLE TRACE. Reports live under the REPO (genesis/a2o/reports/, gitignored),

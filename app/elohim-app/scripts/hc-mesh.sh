@@ -3089,6 +3089,62 @@ print(next((i["id"] for i in items if str(i.get("dhtAnchorHash") or "").startswi
   return 0
 }
 
+# Refuse an a2o household lane until every configured storage peer can make a
+# read-only call through its own lamad/content_store conductor rail. This uses
+# the fixed Prologue anchor rather than an arbitrary local row, so it is only
+# called after the lane's roster-freshness check. The deadline is shared across
+# peers; this proves call readiness, not write admission or peer convergence.
+wait_for_lamad_call_readiness() { # [shared timeout seconds]
+  if [ "${MESH_ALLOW_NO_PROLOGUE:-0}" = 1 ]; then
+    echo "lamad-call readiness: skipped (MESH_ALLOW_NO_PROLOGUE=1)"
+    return 0
+  fi
+  if [ "${#PEERS[@]}" -eq 0 ]; then
+    echo "REFUSED: lamad zome-call readiness has no configured storage peers." >&2
+    return 1
+  fi
+  local budget="${1:-75}" deadline=$((SECONDS + ${1:-75}))
+  local admin="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}"
+  local body_file status remaining request_timeout name port i all_ready last
+  body_file="$(mktemp "${TMPDIR:-/tmp}/mesh-lamad-ready.XXXXXX")" || return 1
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    all_ready=1; i=0; last=""
+    for name in "${PEERS[@]}"; do
+      port="$(http_port "$i")"; remaining=$((deadline - SECONDS))
+      [ "$remaining" -gt 0 ] || { all_ready=0; break; }
+      request_timeout=5; [ "$remaining" -lt 5 ] && request_timeout="$remaining"
+      status="$(curl -sS -m "$request_timeout" -H "Authorization: Bearer $admin" \
+        -H 'Cache-Control: no-cache' -o "$body_file" -w '%{http_code}' \
+        "http://localhost:$port/db/content/elohim-host-landing/head-record" 2>/dev/null || true)"
+      if [ "$status" = 200 ] && python3 - "$body_file" <<'PY'
+import base64, json, sys
+try:
+    value = json.load(open(sys.argv[1]))
+    head = value.get("headActionHash")
+    record = value.get("record")
+    ok = isinstance(head, str) and head.startswith("uhCkk") and isinstance(record, str) and bool(base64.b64decode(record, validate=True))
+except Exception:
+    ok = False
+raise SystemExit(0 if ok else 1)
+PY
+      then
+        printf 'lamad-call ready: %s :%s head=%s…\n' "$name" "$port" \
+          "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["headActionHash"][:12])' "$body_file")"
+      else
+        all_ready=0
+        last="$name:$port status=${status:-transport-error} shape=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print(sorted(d) if isinstance(d,dict) else type(d).__name__)' "$body_file" 2>/dev/null || echo invalid-json)"
+      fi
+      i=$((i+1))
+    done
+    [ "$all_ready" = 1 ] && { rm -f "$body_file"; return 0; }
+    sleep 2
+  done
+  rm -f "$body_file"
+  echo "REFUSED: lamad zome-call readiness did not hold within shared ${budget}s (${last:-no configured storage peer answered})." >&2
+  echo "  Check storage/conductor readiness; if the Prologue anchor is absent, run \`just mesh prologue\`." >&2
+  return 1
+}
+
 conductor_restart_pids() {
   # Prefer the listener pid recorded with its process start ticks. A retained
   # conductor artifact may carry its source revision in the executable name,

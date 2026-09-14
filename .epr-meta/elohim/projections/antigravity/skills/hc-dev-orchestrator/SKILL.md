@@ -510,7 +510,7 @@ just test mesh '@act:i and @dataplane'
 
 `just test mesh` sources `hc-mesh.sh`'s `mesh_seed_env` and exports the Prologue's a2o env block; a
 scope argument makes it write a paths-less config so the run is actually scoped (cucumber merges a
-profile's `paths` with positionals otherwise). `@act:<i|ii|iii|host>` resolves to the act's baseline caps;
+profile's `paths` with positionals otherwise). A roster-backed lane then gives every configured storage peer one shared 75-second window to return the Prologue anchor through its authenticated `lamad/content_store` read rail; malformed, error, or incomplete responses refuse before scenario setup. `MESH_ALLOW_NO_PROLOGUE=1` explicitly bypasses this seeded-anchor check. This establishes lamad zome-call readiness only; scenario assertions still prove write admission. `@act:<i|ii|iii|host>` resolves to the act's baseline caps;
 an undeclared `@requires:` cap warns loudly once per run. Spec: `genesis/a2o/LAYERS.md`.
 
 Destructive steps (kill/restart/pin/delete) ride ONE gate — `substrate-scope.ts destructiveAllowed()`:
