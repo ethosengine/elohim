@@ -6469,19 +6469,19 @@ fn commitment_reference_body_matches(
     };
     if value.get("id").and_then(|v| v.as_str()) != Some(requested_id)
         || value.get("action").and_then(|v| v.as_str()) != Some("project-epr")
+        || !matches!(value.get("inScopeOf"), Some(serde_json::Value::Array(_)))
     {
         return false;
     }
-    let Some(scope) = value.get("inScopeOf").and_then(|v| v.as_array()) else {
-        return false;
-    };
     let doorway_scope = format!("doorway:{}", holder.doorway_id);
     let Some(epr_id) = holder.epr_id.as_deref() else {
         return false;
     };
     let epr_scope = format!("epr:{epr_id}");
-    scope.iter().any(|v| v.as_str() == Some(&doorway_scope))
-        && scope.iter().any(|v| v.as_str() == Some(&epr_scope))
+    crate::routes::receipt::scope_binding_names(
+        &value,
+        &[doorway_scope.as_str(), epr_scope.as_str()],
+    )
 }
 
 fn commitment_reference_unavailable(reason: &'static str) -> Response<Full<Bytes>> {
@@ -6841,7 +6841,7 @@ mod name_relay_request_tests {
                 ResponseTemplate::new(200).set_body_json(serde_json::json!({
                     "id": "project-epr-garden",
                     "action": "project-epr",
-                    "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+                    "inScopeOf": ["doorway:alpha|epr:garden-epr"]
                 }))
             })
             .mount(&selected)
@@ -6876,7 +6876,9 @@ mod name_relay_request_tests {
             serde_json::json!({"id":"wrong","action":"project-epr","inScopeOf":["doorway:alpha","epr:garden-epr"]}),
             serde_json::json!({"id":"project-epr-garden","action":"hosting-agreement","inScopeOf":["doorway:alpha","epr:garden-epr"]}),
             serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":"doorway:alpha|epr:garden-epr"}),
+            serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":["doorway:alpha","epr:garden-epr"]}),
             serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":["doorway:alpha"]}),
+            serde_json::json!({"id":"project-epr-garden","action":"project-epr","inScopeOf":["doorway:alpha|epr:other","doorway:other|epr:garden-epr"]}),
         ] {
             assert!(!commitment_reference_body_matches(
                 &serde_json::to_vec(&body).unwrap(),
@@ -7418,7 +7420,7 @@ async fn handle_request(
             {
                 return Ok(to_boxed(relayed));
             }
-            return Ok(to_boxed(not_found_response(&path)));
+            return Ok(to_boxed(closed_namespace_not_found_response()));
         }
     }
 
@@ -9115,6 +9117,19 @@ fn not_found_response(path: &str) -> Response<Full<Bytes>> {
         "path": path,
         "hint": "Use WebSocket connection to /admin or /app/:port"
     });
+
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header("Content-Type", "application/json")
+        .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+/// An undeclared Host in a closed projection namespace must not reflect the
+/// requested path. A staged bundle's unique asset name is itself release
+/// information, even when the response correctly refuses it with 404.
+fn closed_namespace_not_found_response() -> Response<Full<Bytes>> {
+    let body = serde_json::json!({ "error": "Not Found" });
 
     Response::builder()
         .status(StatusCode::NOT_FOUND)
@@ -11640,8 +11655,14 @@ mod root_projection_shadow_regression_tests {
         );
         let addr = spawn_test_doorway(state).await;
 
-        let response = get_as_host(addr, "/", "unrelated.example").await;
+        let staged_asset = "/main.candidate-b-secret.js";
+        let response = get_as_host(addr, staged_asset, "unrelated.example").await;
         assert_eq!(response.status(), reqwest::StatusCode::NOT_FOUND);
+        let body = response.text().await.unwrap();
+        assert!(
+            !body.contains(staged_asset),
+            "closed-name refusal must not reflect staged asset identity: {body}"
+        );
         assert!(
             wildcard.received_requests().await.unwrap().is_empty(),
             "closed hostname namespaces never widen to a wildcard holder"
@@ -11696,7 +11717,7 @@ mod root_projection_shadow_regression_tests {
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "contract_123",
                 "action": "project-epr",
-                "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+                "inScopeOf": ["doorway:alpha|epr:garden-epr"]
             })))
             .expect(1)
             .mount(&holder)
@@ -11742,7 +11763,7 @@ mod root_projection_shadow_regression_tests {
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
                 "id": "contract_123",
                 "action": "project-epr",
-                "inScopeOf": ["doorway:alpha", "epr:garden-epr"]
+                "inScopeOf": ["doorway:alpha|epr:garden-epr"]
             })))
             .expect(1)
             .mount(&holder)
@@ -11773,7 +11794,7 @@ mod root_projection_shadow_regression_tests {
             Some("relay:alpha")
         );
         let body: serde_json::Value = response.json().await.unwrap();
-        assert_eq!(body["inScopeOf"][0], "doorway:alpha");
+        assert_eq!(body["inScopeOf"][0], "doorway:alpha|epr:garden-epr");
         local.verify().await;
         holder.verify().await;
     }

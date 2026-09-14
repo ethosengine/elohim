@@ -464,14 +464,28 @@ pub(crate) fn is_operative(row: &serde_json::Value) -> bool {
 /// satisfied by `epr_root:garden-archive`, or a receipt would credit the wrong
 /// agreement while looking entirely correct.
 pub(crate) fn scope_names(row: &serde_json::Value, needle: &str) -> bool {
+    scope_binding_names(row, &[needle])
+}
+
+/// Whether one canonical scope binding contains every requested name.
+///
+/// A JSON array contains binding records, while `|` joins the names in one
+/// binding. Keeping the needles within one element prevents a doorway from
+/// one contract and an EPR from another from being combined into false proof.
+pub(crate) fn scope_binding_names(row: &serde_json::Value, needles: &[&str]) -> bool {
+    let binding_names = |binding: &str| {
+        needles.iter().all(|needle| {
+            binding
+                .split('|')
+                .map(str::trim)
+                .any(|part| part == *needle)
+        })
+    };
     match row.get("inScopeOf") {
-        Some(serde_json::Value::Array(items)) => items
-            .iter()
-            .filter_map(|v| v.as_str())
-            .any(|s| s.trim() == needle),
-        Some(serde_json::Value::String(s)) => {
-            s.split('|').map(str::trim).any(|part| part == needle)
+        Some(serde_json::Value::Array(items)) => {
+            items.iter().filter_map(|v| v.as_str()).any(binding_names)
         }
+        Some(serde_json::Value::String(s)) => binding_names(s),
         _ => false,
     }
 }
@@ -582,6 +596,22 @@ mod tests {
         assert!(scope_names(&row, "doorway:alpha-elohim-host"));
         assert!(scope_names(&row, "epr:garden"));
         assert!(!scope_names(&row, "doorway:alpha"));
+    }
+
+    #[test]
+    fn an_array_wrapped_binding_keeps_its_names_together() {
+        let row = json!({
+            "inScopeOf": [
+                "doorway:alpha|epr:garden",
+                "doorway:beta|epr:orchard"
+            ]
+        });
+        assert!(scope_binding_names(&row, &["doorway:alpha", "epr:garden"]));
+        assert!(scope_names(&row, "epr:garden"));
+        assert!(
+            !scope_binding_names(&row, &["doorway:alpha", "epr:orchard"]),
+            "names from distinct contract bindings must not compose"
+        );
     }
 
     #[test]
