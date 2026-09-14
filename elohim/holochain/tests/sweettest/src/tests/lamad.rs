@@ -1395,9 +1395,18 @@ async fn long_lived_channel_takes_a_second_candidate_beneath_its_earned_head() -
         )
         .await;
     assert_eq!(
-        admitted.head_action_hash, s1_action,
-        "a staging declaration whose manifest names the EARNED head as its \
-         lineage parent is ADMITTED over that earned head"
+        admitted.head_action_hash, e_action,
+        "admitting a staging candidate must report the actual EARNED winner"
+    );
+    assert_eq!(
+        admitted.canonical_earned,
+        Some(true),
+        "the declaration receipt must retain the winner's earned provenance"
+    );
+    assert_eq!(
+        admitted.staging_candidate.as_deref(),
+        Some(s1_cid.as_str()),
+        "the declaration receipt must report the admitted release as the candidate beneath E"
     );
 
     // --- (c) The election: E still WINS, S1 stands beneath it as the candidate.

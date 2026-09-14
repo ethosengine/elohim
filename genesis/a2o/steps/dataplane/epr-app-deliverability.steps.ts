@@ -73,6 +73,10 @@ interface PublishedApp {
   unrelatedHostname?: string;
   earnedBundle?: FixtureBundle;
   earnedBlobHash?: string;
+  /** Exact Content action Matthew promoted as artifact A's earned head. */
+  earnedHeadActionHash?: string;
+  /** Exact Content action Matthew authored and declared as artifact B's candidate. */
+  candidateActionHash?: string;
   bundle?: FixtureBundle;
   /** The bundle deliberately built without its entry script (station 4). */
   brokenBundle?: FixtureBundle;
@@ -193,6 +197,17 @@ function requireVisit(world: E2EWorld, peerName: string): BrowserVisit {
 /** The address the app this run published answers at on one doorway. */
 function appUrl(world: E2EWorld, peerName: string): string {
   return `${resolvePeerUrl(peerName)}${app(world).mountPath}`;
+}
+
+/** Resolve a symbolic doorway to the storage peer declared by this scenario. */
+function storageUrlBehindDoorway(world: E2EWorld, doorway: string): string {
+  const topology = householdPeers.get(world);
+  assert.ok(topology, 'the household storage topology has not been declared');
+  const peer = topology.behind[doorway];
+  assert.ok(peer, `the household topology names no storage peer behind doorway "${doorway}"`);
+  const storageUrl = loadHouseholdMeshFixture().storagePeers?.[peer]?.url;
+  assert.ok(storageUrl, `the household fixture has no storage URL for peer "${peer}"`);
+  return storageUrl;
 }
 
 /** The `commit` field of a version.json body, or '' when it carries none. */
@@ -509,7 +524,7 @@ Given(
     record.unrelatedHostname = `unrelated-${record.slug}.elohim.local`;
     await authorOwnedEprRecord(this);
     for (const doorway of DOORWAYS) {
-      const storageUrl = resolveStorageUrl(doorway);
+      const storageUrl = storageUrlBehindDoorway(this, doorway);
       const head = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
       assert.equal(head.status, 404, `${doorway}: fresh record unexpectedly had a release head`);
     }
@@ -603,6 +618,7 @@ When(
     }
     record.earnedBundle = requireBundle(this);
     record.earnedBlobHash = record.blobHash;
+    record.earnedHeadActionHash = headActionHash;
   }
 );
 
@@ -611,15 +627,79 @@ When(
   { timeout: 300_000 },
   async function (this: E2EWorld, peerName: string) {
     const record = app(this);
-    const bundle = requireBundle(this);
-    const outcome = await stageBundle({
-      bundle,
-      slug: record.slug,
-      doorwayUrl: resolvePeerUrl(peerName),
-      declare: true,
+    assert.ok(record.blobHash, 'artifact B bytes have no content address to declare');
+    assert.ok(
+      record.earnedHeadActionHash,
+      'artifact A has no exact earned action for artifact B to name as its lineage parent'
+    );
+    const doorwayUrl = resolvePeerUrl(peerName);
+    const patch = await postFixtureCommitment(`${doorwayUrl}/db/content/${record.slug}`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json',
+        'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
+      },
+      body: JSON.stringify({
+        blobHash: record.blobHash,
+        metadata: {
+          kind: 'release-manifest',
+          publishedAt: new Date().toISOString(),
+          manifest: { envelope: { lineageParentCid: record.earnedHeadActionHash } },
+        },
+      }),
     });
-    assert.equal(outcome.code, 0, `candidate declaration failed:\n${outcome.output}`);
-    record.blobHash = outcome.blobHash;
+    assert.ok(
+      patch.ok,
+      `artifact B authoring PATCH through ${peerName} failed: HTTP ${patch.status}: ${patch.text}`
+    );
+    let patched: { dhtAnchorHash?: string } = {};
+    try {
+      patched = JSON.parse(patch.text) as { dhtAnchorHash?: string };
+    } catch {
+      // The assertion below reports the exact response body.
+    }
+    assert.ok(
+      patched.dhtAnchorHash,
+      `artifact B authoring PATCH through ${peerName} returned no dhtAnchorHash: ` +
+        `HTTP ${patch.status}: ${patch.text}`
+    );
+    record.candidateActionHash = patched.dhtAnchorHash;
+
+    const canonical = await postFixtureCommitment(
+      `${doorwayUrl}/db/content/${record.slug}/canonical-head`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? '',
+        },
+        body: JSON.stringify({ headActionHash: record.candidateActionHash }),
+      }
+    );
+    assert.ok(
+      canonical.ok,
+      `artifact B canonical declaration through ${peerName} failed: ` +
+        `HTTP ${canonical.status}: ${canonical.text}`
+    );
+
+    const head = await getRaw(`${doorwayUrl}/db/content/${record.slug}/head`);
+    let observed: { stagingCandidate?: string } = {};
+    try {
+      observed = JSON.parse(head.text) as { stagingCandidate?: string };
+    } catch {
+      // The assertions below report the exact response body.
+    }
+    assert.equal(
+      head.status,
+      200,
+      `artifact B candidate read through ${peerName} failed: HTTP ${head.status}: ${head.text}`
+    );
+    assert.equal(
+      observed.stagingCandidate,
+      record.candidateActionHash,
+      `artifact B candidate read through ${peerName} named ${String(observed.stagingCandidate)}, ` +
+        `not authored action ${record.candidateActionHash}: HTTP ${head.status}: ${head.text}`
+    );
     record.browserDeclaredAt = Date.now();
   }
 );
@@ -630,13 +710,14 @@ async function hostnameServesBundle(
   bundle: FixtureBundle
 ): Promise<boolean> {
   const headers = { Host: hostname };
-  const root = await fetch(`${doorwayUrl}/`, { headers });
-  if (!root.ok || !(await root.text()).includes(bundle.entryScript)) return false;
-  const asset = await fetch(`${doorwayUrl}/${bundle.entryScript}`, { headers });
-  if (!asset.ok) return false;
-  const version = await fetch(`${doorwayUrl}/version.json`, { headers });
-  if (!version.ok) return false;
-  return ((await version.json()) as { commit?: string }).commit === bundle.stamp;
+  const root = await getRawWithHeaders(`${doorwayUrl}/`, { headers });
+  if (root.status < 200 || root.status >= 300 || !root.text.includes(bundle.entryScript))
+    return false;
+  const asset = await getRawWithHeaders(`${doorwayUrl}/${bundle.entryScript}`, { headers });
+  if (asset.status < 200 || asset.status >= 300) return false;
+  const version = await getRawWithHeaders(`${doorwayUrl}/version.json`, { headers });
+  if (version.status < 200 || version.status >= 300) return false;
+  return (JSON.parse(version.text) as { commit?: string }).commit === bundle.stamp;
 }
 
 async function bothDoorwaysServe(
@@ -708,10 +789,10 @@ Then(
     for (const doorway of DOORWAYS) {
       const requestHeaders: Record<string, string> = { Host: unrelatedHostname };
       for (const subpath of ['', candidate.entryScript, 'version.json']) {
-        const response = await fetch(`${resolvePeerUrl(doorway)}/${subpath}`, {
+        const response = await getRawWithHeaders(`${resolvePeerUrl(doorway)}/${subpath}`, {
           headers: requestHeaders,
         });
-        const body = await response.text();
+        const body = response.text;
         assert.equal(response.status, 404, `${doorway}: UNRELATED_NAME /${subpath} was not 404`);
         assert.ok(
           !body.includes(candidate.entryScript),
@@ -731,13 +812,33 @@ When(
     const storageUrl = resolveStorageUrl('alpha-A');
     assert.ok(storageUrl, 'root-author storage URL is absent');
     const response = await fetch(`${storageUrl}/db/content/${record.slug}/head`);
-    assert.equal(response.status, 200, `candidate head read: ${response.status}`);
-    const { stagingCandidate } = (await response.json()) as { stagingCandidate?: string };
-    assert.ok(stagingCandidate, 'the notary election reports no staged candidate to promote');
+    const responseText = await response.text();
+    let head: { stagingCandidate?: string } = {};
+    try {
+      head = JSON.parse(responseText) as { stagingCandidate?: string };
+    } catch {
+      // The assertions below report the exact response body.
+    }
+    assert.equal(
+      response.status,
+      200,
+      `candidate head read: HTTP ${response.status}: ${responseText}`
+    );
+    assert.ok(record.candidateActionHash, 'artifact B has no exact authored action to promote');
+    assert.equal(
+      head.stagingCandidate,
+      record.candidateActionHash,
+      `the notary election named candidate ${String(head.stagingCandidate)}, not artifact B action ` +
+        `${record.candidateActionHash}: HTTP ${response.status}: ${responseText}`
+    );
     const { adminPort, appPort } = meshConductorPorts(0);
     const rail = await connectConductor(adminPort, appPort);
     try {
-      const promoted = await declareEarnedCanonicalHead(rail, record.slug, stagingCandidate);
+      const promoted = await declareEarnedCanonicalHead(
+        rail,
+        record.slug,
+        record.candidateActionHash
+      );
       assert.equal(promoted?.canonical, true, 'candidate promotion did not mint an earned head');
     } finally {
       await rail.close();
@@ -756,12 +857,10 @@ Then(
       DOORWAYS.map(async doorway =>
         pollUntil(
           async () => {
-            const response = await fetch(`${resolvePeerUrl(doorway)}/`, {
+            const response = await getRawWithHeaders(`${resolvePeerUrl(doorway)}/`, {
               headers: { Host: record.candidateHostname as string },
             });
-            return (
-              response.status === 404 && (await response.text()).includes('no-candidate-staged')
-            );
+            return response.status === 404 && response.text.includes('no-candidate-staged');
           },
           Math.max(0, deadline - Date.now())
         )

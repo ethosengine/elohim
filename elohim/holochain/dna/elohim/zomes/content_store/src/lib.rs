@@ -3116,7 +3116,10 @@ struct ElectionOutcome {
 ///
 /// Staging declarations OLDER than the standing earned head are its own
 /// superseded history — the releases this channel already promoted past. Only a
-/// declaration made AFTER the earned head can be a candidate to succeed it.
+/// declaration made AFTER the earned head can be a candidate to succeed it,
+/// provided it names a DIFFERENT action. A later staging declaration that
+/// names the earned action is convergence evidence for the standing winner,
+/// not a successor candidate.
 /// The comparison is strict (`>`): a staging link sharing the earned winner's
 /// exact timestamp is not newer, and is excluded.
 ///
@@ -3133,7 +3136,7 @@ fn select_staging_candidate(
     select_canonical_winner(
         candidates
             .iter()
-            .filter(|c| !c.is_earned && c.timestamp > winner.timestamp)
+            .filter(|c| !c.is_earned && c.timestamp > winner.timestamp && c.target != winner.target)
             .cloned()
             .collect(),
     )
@@ -3682,6 +3685,44 @@ mod canonical_head_selector_tests {
             c2.expect("candidate").target,
             "the candidate must not depend on get_links arrival order"
         );
+    }
+
+    /// A peer may re-declare the already-earned action as staging after it
+    /// learns the channel. Those convergence declarations cannot displace a
+    /// real successor candidate, regardless of link arrival order; without a
+    /// distinct successor they leave the candidate slot empty.
+    #[test]
+    fn staging_refreshes_of_the_earned_target_are_not_successor_candidates() {
+        let mk = || {
+            vec![
+                cand(true, 100, 1, 10),
+                cand(false, 200, 2, 20), // real successor B
+                cand(false, 300, 3, 10), // later refresh of earned A
+                cand(false, 400, 4, 10), // newest link still names A
+            ]
+        };
+        let forward = run_election(mk()).expect("outcome");
+        assert_eq!(forward.winner.target, ah(10));
+        assert!(forward.winner.is_earned);
+        let c1 = forward.staging_candidate.expect("distinct successor");
+        let mut reversed = mk();
+        reversed.reverse();
+        let reverse = run_election(reversed).expect("outcome");
+        assert_eq!(reverse.winner.target, ah(10));
+        assert!(reverse.winner.is_earned);
+        let c2 = reverse.staging_candidate.expect("distinct successor");
+        assert_eq!(c1.target, ah(20));
+        assert_eq!(c2.target, ah(20));
+
+        let refresh_only = run_election(vec![
+            cand(true, 100, 1, 10),
+            cand(false, 300, 3, 10),
+            cand(false, 400, 4, 10),
+        ])
+        .expect("outcome");
+        assert_eq!(refresh_only.winner.target, ah(10));
+        assert!(refresh_only.winner.is_earned);
+        assert!(refresh_only.staging_candidate.is_none());
     }
 
     /// Equal timestamps among candidates break on the create-link hash — the
@@ -16241,7 +16282,7 @@ fn authored_commitment_head_links(
     Ok(links)
 }
 
-/// Update an REA Commitment's state field (e.g., transition to "cancelled").
+/// Update an REA Commitment's lifecycle or its project-epr current audience.
 ///
 /// Substrate-correct PATCH path for /api/v1/commitments/{id} per
 /// 2026-05-26-substrate-rea-replication-fix.md (Task 6). The update_entry
@@ -16266,6 +16307,11 @@ pub fn update_rea_commitment_state(
     let root_action_hash = commitment_observation::root_action_hash(&observed)?;
     let prev_action_hash = observed.record.action_address().clone();
     let mut commitment = observed.commitment;
+
+    commitment_observation::apply_current_terms(
+        &mut commitment,
+        input.project_epr_current_terms_json.as_deref(),
+    )?;
 
     // 3. Mutate state + finished + updated_at.
     commitment.state = input.state;

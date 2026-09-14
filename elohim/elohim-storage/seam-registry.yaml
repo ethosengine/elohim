@@ -32,6 +32,41 @@ seamLocus: >
   (src/p2p/shard_protocol.rs).
 
 decisionPoints:
+  - name: project_epr_current_terms_update
+    kind: verdict-fn
+    sourceLocation:
+      file: src/services/rea_commitment_service.rs
+      modulePath: services::rea_commitment_service::ReaCommitmentService::project_epr_requires_conductor
+    summary: >
+      A current reach and gateHints declaration revises the existing notarized
+      project-epr Commitment. Anchored changes use the conductor and project only
+      its authenticated returned record; unanchored, malformed, immutable-field,
+      ignored-coordinator and stale-response shapes fail without a local metadata write.
+    concernIds:
+      - { id: C0, status: answered, justification: "The DHT Commitment revision is truth; SQLite remains an authenticated projection." }
+      - { id: C1, status: n-a, justification: "No role or winner is elected; the existing root-author coordinator guard remains." }
+      - { id: C2, status: answered, justification: "Existing signed root/action sequence and projection CAS refuse stale rollback." }
+      - { id: C3, status: answered, justification: "The existing update and post-commit signal path provides progress without a new poller." }
+      - { id: C4, status: answered, justification: "Absent terms preserve metadata; malformed, unanchored, or ignored terms fail explicitly." }
+      - { id: C5, status: partial, justification: "The signed revision proves root authorship and shape, not collective ruling or beneficiary authority." }
+      - { id: C6a, status: answered, justification: "One bounded 256 KiB metadata comparison and the existing bounded exact-record lineage read; no scan." }
+      - { id: C6b, status: answered, justification: "Semantically unchanged terms avoid an extra conductor action; retries retain existing revision semantics." }
+      - { id: C7, status: answered, justification: "Storage and coordinator share same_commitment_metadata and storage verifies the authenticated output equals requested terms." }
+      - { id: C8, status: partial, justification: "Typed errors distinguish invalid, unavailable and ignored terms; no new metric is claimed." }
+      - { id: C9, status: answered, justification: "The deterministic commitment id and signed root-author lineage remain unchanged." }
+      - { id: C10, status: answered, justification: "The optional input field preserves old callers; old coordinators are detected from returned terms." }
+      - { id: C11, status: n-a, justification: "No new queue or external admission surface; existing conductor admission remains." }
+      - { id: C12, status: partial, justification: "Existing root-author authorization remains; broader collective consent is outside this repair." }
+      - { id: C13, status: n-a, justification: "No stage or social authority tier changes." }
+      - { id: C14, status: answered, justification: "Only the authenticated returned revision is projected; local metadata cannot impersonate its witness." }
+    contractTests:
+      - { path: elohim/elohim-storage/src/services/rea_commitment_service.rs, testName: same_state_project_epr_current_terms_change_requires_notarization, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_service.rs, testName: unanchored_project_epr_terms_change_refuses_without_mutating_the_row, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_service.rs, testName: project_epr_current_terms_cannot_change_the_undertaking, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_service.rs, testName: project_epr_update_refuses_a_coordinator_that_ignored_current_terms, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs, testName: signed_project_epr_terms_advance_and_stale_delivery_cannot_roll_them_back, kind: unit }
+      - { path: elohim/elohim-storage/src/services/rea_commitment_record_tests.rs, testName: signed_project_epr_update_cannot_replace_immutable_terms, kind: unit }
+
   - name: recover_before_mint
     kind: verdict-fn
     sourceLocation:

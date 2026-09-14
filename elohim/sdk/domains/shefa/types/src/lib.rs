@@ -14,6 +14,9 @@
 use holo_hash::{ActionHash, EntryHash};
 use serde::{Deserialize, Serialize};
 
+mod commitment_terms;
+pub use commitment_terms::{same_commitment_metadata, validate_project_epr_current_terms};
+
 // =============================================================================
 // REA Agreement Types
 // =============================================================================
@@ -163,6 +166,10 @@ pub struct UpdateReaCommitmentStateInput {
     pub state: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub finished: Option<bool>,
+    /// Current reach/audience terms on a project-epr commitment. Other terms
+    /// remain bound to the original undertaking and require supersession.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_epr_current_terms_json: Option<String>,
 }
 
 // =============================================================================
@@ -947,7 +954,6 @@ mod tests {
         assert_eq!(decoded.limit, Some(10));
     }
 }
-
 
 #[cfg(test)]
 #[cfg(feature = "ts")]

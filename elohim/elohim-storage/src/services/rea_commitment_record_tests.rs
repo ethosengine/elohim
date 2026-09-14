@@ -22,6 +22,24 @@ fn commitment(state: &str) -> Commitment {
     .unwrap()
 }
 
+fn project_epr_commitment(reach: &str) -> Commitment {
+    let mut value = commitment("active");
+    value.action = "project-epr".into();
+    value.in_scope_of_json = r#"["doorway:alpha-elohim-host|epr:own-provide"]"#.into();
+    value.metadata_json = serde_json::json!({
+        "urlPath": "/garden",
+        "mode": "cached",
+        "reach": reach,
+        "gateHints": if reach == "commons" {
+            serde_json::json!([])
+        } else {
+            serde_json::json!([{"eprRef":"collective:dowell", "relation":"membershipPrerequisite"}])
+        }
+    })
+    .to_string();
+    value
+}
+
 fn record(c: Commitment, seq: u32, parent: Option<&Record>, seed: u8) -> Record {
     let key = SigningKey::from_bytes(&[seed; 32]);
     let entry = Entry::App(
@@ -164,6 +182,55 @@ async fn delayed_cancellation_does_not_reverse_newer_active_observation() {
             .unwrap();
     assert_eq!(row.state, "active");
     assert_eq!(row.finished, 0);
+}
+
+#[tokio::test]
+async fn signed_project_epr_terms_advance_and_stale_delivery_cannot_roll_them_back() {
+    let created = record(project_epr_commitment("commons"), 1, None, 1);
+    let narrowed = record(project_epr_commitment("local"), 2, Some(&created), 1);
+    let map = records(&[&created, &narrowed]);
+    let mut conn = database();
+    assert_eq!(
+        apply(&mut conn, &map, &created).await.unwrap(),
+        lifecycle::ApplyOutcome::Advanced
+    );
+    assert_eq!(
+        apply(&mut conn, &map, &narrowed).await.unwrap(),
+        lifecycle::ApplyOutcome::Advanced
+    );
+    assert_eq!(
+        apply(&mut conn, &map, &created).await.unwrap(),
+        lifecycle::ApplyOutcome::Unchanged
+    );
+    let row =
+        rea_commitments::get_commitment(&mut conn, &AppContext::default_lamad(), "own-provide")
+            .unwrap()
+            .unwrap();
+    let metadata: serde_json::Value =
+        serde_json::from_str(row.metadata_json.as_deref().unwrap()).unwrap();
+    assert_eq!(metadata["reach"], "local");
+}
+
+#[tokio::test]
+async fn signed_project_epr_update_cannot_replace_immutable_terms() {
+    let created = record(project_epr_commitment("commons"), 1, None, 1);
+    let mut changed = project_epr_commitment("local");
+    let mut metadata: serde_json::Value = serde_json::from_str(&changed.metadata_json).unwrap();
+    metadata["urlPath"] = serde_json::json!("/other");
+    changed.metadata_json = metadata.to_string();
+    let changed = record(changed, 2, Some(&created), 1);
+    let map = records(&[&created, &changed]);
+    let mut conn = database();
+    apply(&mut conn, &map, &created).await.unwrap();
+    assert!(apply(&mut conn, &map, &changed).await.is_err());
+    let row =
+        rea_commitments::get_commitment(&mut conn, &AppContext::default_lamad(), "own-provide")
+            .unwrap()
+            .unwrap();
+    let metadata: serde_json::Value =
+        serde_json::from_str(row.metadata_json.as_deref().unwrap()).unwrap();
+    assert_eq!(metadata["urlPath"], "/garden");
+    assert_eq!(metadata["reach"], "commons");
 }
 
 #[tokio::test]

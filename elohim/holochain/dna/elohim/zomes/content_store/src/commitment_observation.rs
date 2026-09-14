@@ -62,11 +62,39 @@ fn read_observation(hash: &ActionHash) -> ExternResult<Observation> {
 }
 
 fn same_undertaking(a: &Commitment, b: &Commitment) -> bool {
+    if !shefa_types::same_commitment_metadata(&a.action, &a.metadata_json, &b.metadata_json)
+        .unwrap_or(false)
+    {
+        return false;
+    }
     let mut normalized = b.clone();
     normalized.state.clone_from(&a.state);
     normalized.finished = a.finished;
     normalized.updated_at.clone_from(&a.updated_at);
+    normalized.metadata_json.clone_from(&a.metadata_json);
     a == &normalized
+}
+
+/// Called only after the coordinator has established the existing root author.
+/// The current ruling cannot rewrite routing, ownership or redress promises.
+pub(crate) fn apply_current_terms(
+    commitment: &mut Commitment,
+    terms: Option<&str>,
+) -> ExternResult<()> {
+    let Some(terms) = terms else { return Ok(()) };
+    if commitment.action != "project-epr" {
+        return Err(unavailable("current audience terms require project-epr"));
+    }
+    shefa_types::validate_project_epr_current_terms(terms).map_err(|e| unavailable(&e))?;
+    if !shefa_types::same_commitment_metadata(&commitment.action, &commitment.metadata_json, terms)
+        .map_err(|e| unavailable(&e))?
+    {
+        return Err(unavailable(
+            "changed undertaking terms require supersession",
+        ));
+    }
+    commitment.metadata_json = terms.to_string();
+    Ok(())
 }
 
 fn load<F>(
@@ -334,6 +362,37 @@ pub(crate) fn root_action_hash(observed: &Observation) -> ExternResult<ActionHas
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn current_terms_keep_root_undertaking_and_preserve_absence() {
+        let mut root = node(1, None, 1, "active", &[]).commitment;
+        root.action = "project-epr".into();
+        root.metadata_json = r#"{"urlPath":"/garden","reach":"commons","gateHints":[]}"#.into();
+        let mut child = root.clone();
+        apply_current_terms(&mut child, None).unwrap();
+        assert_eq!(child, root);
+        apply_current_terms(&mut child, Some(r#"{"urlPath":"/garden","reach":"private","gateHints":[{"eprRef":"dowell","relation":"membershipPrerequisite"}]}"#)).unwrap();
+        assert!(same_undertaking(&root, &child));
+        child.provider = "another-provider".into();
+        assert!(!same_undertaking(&root, &child));
+    }
+
+    #[test]
+    fn current_terms_refuse_other_actions_malformed_and_rewritten_routing() {
+        let mut c = node(1, None, 1, "active", &[]).commitment;
+        assert!(apply_current_terms(&mut c, Some("{}")).is_err());
+        c.action = "project-epr".into();
+        c.metadata_json = r#"{"urlPath":"/garden","reach":"commons"}"#.into();
+        for bad in [
+            "null",
+            r#"{"urlPath":"/elsewhere","reach":"private"}"#,
+            r#"{"urlPath":"/garden","reach":false}"#,
+        ] {
+            let before = c.clone();
+            assert!(apply_current_terms(&mut c, Some(bad)).is_err());
+            assert_eq!(c, before);
+        }
+    }
 
     fn ah(n: u8) -> ActionHash {
         ActionHash::from_raw_32(vec![n; 32])

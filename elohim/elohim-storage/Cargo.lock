@@ -8904,6 +8904,7 @@ version = "0.1.0"
 dependencies = [
  "holo_hash",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

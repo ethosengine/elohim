@@ -1,0 +1,186 @@
+seamRegistryVersion: 1
+crate: shefa-types
+crateRoot: elohim/sdk/domains/shefa/types
+seamLocus: >
+  Shared wire types and pure compatibility predicates for REA commitments used by both the
+  content-store coordinator and native storage projection.
+
+decisionPoints:
+  - name: same_commitment_metadata
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/commitment_terms.rs
+      modulePath: shefa_types::same_commitment_metadata
+    summary: >
+      Decides whether two commitment metadata values describe the same undertaking, permitting
+      only project-epr reach and gateHints to move through the existing notarized revision path.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The predicate keeps canonical terms in the existing notarized Commitment revision; it
+          creates no competing SQL, HTTP, or cache authority plane.
+      - id: C1
+        status: n-a
+        justification: >
+          This predicate grants no role and elects no actor; the coordinator's root-author guard
+          is an external prerequisite.
+      - id: C2
+        status: n-a
+        justification: >
+          The predicate neither orders revisions nor selects a winner; existing root-scoped head
+          ordering remains responsible for monotonic authority.
+      - id: C3
+        status: n-a
+        justification: >
+          The pure comparison performs no polling, retry, or network progress decision.
+      - id: C4
+        status: answered
+        justification: >
+          Identical values and absent optional wire input remain distinct from malformed present
+          terms, which return an error rather than being treated as absence.
+      - id: C5
+        status: answered
+        justification: >
+          Accepted shape equivalence is evidence about terms only and never confers provider,
+          collective, beneficiary, or ruling authority.
+      - id: C6a
+        status: answered
+        justification: >
+          Both inputs are capped by the new 256 KiB metadata bound aligned with the existing
+          record-verification ceiling; comparison adds no scan or recurring head.
+      - id: C6b
+        status: answered
+        justification: >
+          Byte-identical values are accepted without normalization, and the predicate itself is
+          pure under repeated evaluation.
+      - id: C7
+        status: answered
+        justification: >
+          Coordinator validation and storage observation consume this same predicate, preventing
+          the two boundaries from assigning different meanings to a metadata revision.
+      - id: C8
+        status: answered
+        justification: >
+          Result distinguishes malformed input from legitimate non-equivalence so callers can
+          report the actual decision instead of collapsing both to false.
+      - id: C9
+        status: answered
+        justification: >
+          The decision changes neither the deterministic commitment id nor its root ActionHash
+          lineage.
+      - id: C10
+        status: answered
+        justification: >
+          Identical strings are accepted before parsing for legacy compatibility, while the new
+          current-terms wire field is optional and integrity bytes remain unchanged.
+      - id: C11
+        status: n-a
+        justification: >
+          No external queue, allocator, or capacity source participates in this pure bounded
+          comparison.
+      - id: C12
+        status: partial
+        justification: >
+          The predicate narrows allowable changes but does not authorize their author; the
+          coordinator's existing root-author check remains the only authorization floor.
+      - id: C13
+        status: partial
+        justification: >
+          The predicate does not establish graduated collective or provider authority. All
+          stages retain the existing root-author surrogate and its named limitation.
+      - id: C14
+        status: answered
+        justification: >
+          Malformed changed metadata cannot become a witnessed residual: it fails closed, while
+          callers project only the authenticated returned revision.
+    contractTests:
+      - path: elohim/sdk/domains/shefa/types/src/commitment_terms.rs
+        testName: current_audience_changes_preserve_other_terms
+        kind: unit
+      - path: elohim/sdk/domains/shefa/types/src/commitment_terms.rs
+        testName: routing_redress_and_unknown_terms_require_supersession
+        kind: unit
+      - path: elohim/sdk/domains/shefa/types/src/commitment_terms.rs
+        testName: explicit_malformed_terms_refuse_but_unchanged_legacy_is_readable
+        kind: unit
+
+  - name: validate_project_epr_current_terms
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/commitment_terms.rs
+      modulePath: shefa_types::validate_project_epr_current_terms
+    summary: >
+      Validates an explicit project-epr current-terms declaration before the coordinator writes,
+      including declarations whose bytes repeat the observed metadata.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Validation applies to the existing notarized Commitment metadata rather than creating
+          a second authority plane.
+      - id: C1
+        status: n-a
+        justification: >
+          The validator grants no role; coordinator root-author authorization precedes it.
+      - id: C2
+        status: n-a
+        justification: >
+          It does not order revisions or choose a winner.
+      - id: C3
+        status: n-a
+        justification: >
+          It performs no retry, polling, or network liveness decision.
+      - id: C4
+        status: answered
+        justification: >
+          Explicit malformed input is refused and cannot be interpreted as absent current terms.
+      - id: C5
+        status: answered
+        justification: >
+          Structural validity is not treated as evidence of ruling authority.
+      - id: C6a
+        status: answered
+        justification: >
+          Parsing refuses above the 256 KiB metadata bound aligned with record verification.
+      - id: C6b
+        status: answered
+        justification: >
+          Repeated validation is pure and has no effect to duplicate.
+      - id: C7
+        status: answered
+        justification: >
+          The same structural validator is used before writing and by metadata equivalence.
+      - id: C8
+        status: answered
+        justification: >
+          Distinct error text identifies size, JSON, object, reach, and gate-hint shape refusal.
+      - id: C9
+        status: n-a
+        justification: >
+          Validation neither creates nor changes commitment identity or lineage.
+      - id: C10
+        status: answered
+        justification: >
+          It validates only the optional new declaration and leaves absent legacy callers alone.
+      - id: C11
+        status: n-a
+        justification: >
+          No external allocator or queue controls this bounded pure check.
+      - id: C12
+        status: partial
+        justification: >
+          Shape validation is not authorization; the coordinator's root-author guard remains the
+          current authorization floor.
+      - id: C13
+        status: partial
+        justification: >
+          No collective or provider ruling tier is proven by this validator.
+      - id: C14
+        status: answered
+        justification: >
+          Invalid explicit terms are refused before they can become a witnessed revision.
+    contractTests:
+      - path: elohim/sdk/domains/shefa/types/src/commitment_terms.rs
+        testName: explicit_malformed_terms_refuse_but_unchanged_legacy_is_readable
+        kind: unit

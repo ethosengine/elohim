@@ -511,6 +511,7 @@ dependencies = [
  "holo_hash",
  "rmp-serde",
  "serde",
+ "serde_json",
  "ts-rs",
 ]
 

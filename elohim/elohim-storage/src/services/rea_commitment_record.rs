@@ -32,6 +32,11 @@ fn invalid(reason: &str) -> StorageError {
 
 fn same_undertaking(a: &Commitment, b: &Commitment) -> Result<bool, StorageError> {
     let mut normalized = b.clone();
+    if shefa_types::same_commitment_metadata(&a.action, &a.metadata_json, &b.metadata_json)
+        .map_err(|reason| invalid(&reason))?
+    {
+        normalized.metadata_json.clone_from(&a.metadata_json);
+    }
     normalized.state.clone_from(&a.state);
     normalized.finished = a.finished;
     normalized.updated_at.clone_from(&a.updated_at);

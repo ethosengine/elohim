@@ -37,6 +37,78 @@ use elohim_views::projection::ProjectionMode;
 
 pub struct ReaCommitmentService;
 
+fn validate_project_epr_current_terms(metadata_json: &str) -> Result<(), StorageError> {
+    shefa_types::validate_project_epr_current_terms(metadata_json)
+        .map_err(StorageError::Validation)?;
+    let meta: serde_json::Value = serde_json::from_str(metadata_json)
+        .map_err(|e| StorageError::Validation(format!("metadataJson parse: {e}")))?;
+    crate::db::rea_commitments::validate_project_epr_commitment(
+        &crate::db::rea_commitments::ProjectEprValidationInput {
+            url_path: meta
+                .get("urlPath")
+                .and_then(|v| v.as_str())
+                .unwrap_or("/")
+                .to_string(),
+            mode: meta
+                .get("mode")
+                .cloned()
+                .and_then(|v| serde_json::from_value(v).ok())
+                .unwrap_or(ProjectionMode::Cached),
+            reach: meta
+                .get("reach")
+                .and_then(|v| v.as_str())
+                .unwrap_or("commons")
+                .to_string(),
+            preview_epr_ref: meta
+                .get("previewEprRef")
+                .and_then(|v| v.as_str())
+                .map(String::from),
+            gate_hints: meta
+                .get("gateHints")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default(),
+            dead_end: meta
+                .get("deadEnd")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
+            steward_direct_endpoint: meta.get("stewardDirectEndpoint").and_then(|v| {
+                (!v.is_null())
+                    .then(|| serde_json::from_value(v.clone()).ok())
+                    .flatten()
+            }),
+            redirects_from: meta
+                .get("redirectsFrom")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default(),
+            redirect_templates: meta
+                .get("redirectTemplates")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default(),
+            route_claims: meta.get("routeClaims").and_then(|v| {
+                (!v.is_null())
+                    .then(|| serde_json::from_value(v.clone()).ok())
+                    .flatten()
+            }),
+        },
+    )
+}
+
+fn require_project_epr_terms_applied(requested: &str, observed: &str) -> Result<(), StorageError> {
+    let requested: serde_json::Value = serde_json::from_str(requested)
+        .map_err(|e| StorageError::Validation(format!("metadataJson parse: {e}")))?;
+    let observed: serde_json::Value = serde_json::from_str(observed).map_err(|e| {
+        StorageError::InvalidInput(format!(
+            "conductor returned malformed project-epr terms: {e}"
+        ))
+    })?;
+    if requested != observed {
+        return Err(StorageError::InvalidInput(
+            "conductor did not apply the requested project-epr current terms; coordinator version unsupported or a newer observation won".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// Build the HTTP view through the commitment classification accessor so both
 /// conductor-projected bare values and seeded JSON-list values retain their
 /// classifications.
@@ -561,14 +633,64 @@ impl ReaCommitmentService {
     /// as 503 {"status":"catching-up"} — the genesis "Seed Custody Commitments"
     /// stage went Unstable on exactly this, a reseed re-activating already-active
     /// rows. When this returns `false` the update skips the conductor round-trip
-    /// and takes the cheap diesel-direct path, which still applies any
-    /// `metadata_json` reconcile and returns the row (idempotent success).
+    /// and takes the cheap diesel-direct path. An anchored project-epr terms
+    /// change is independently detected and notarized even at the same state.
     fn state_transition_changes(
         existing_state: &str,
         existing_finished: bool,
         update: &UpdateReaCommitmentState,
     ) -> bool {
         existing_state != update.state || update.finished.is_some_and(|f| f != existing_finished)
+    }
+
+    fn project_epr_terms_change(
+        existing_metadata: Option<&str>,
+        update: &UpdateReaCommitmentState,
+    ) -> Result<bool, StorageError> {
+        let Some(next_metadata) = update.metadata_json.as_deref() else {
+            return Ok(false);
+        };
+        let existing_metadata = existing_metadata.ok_or_else(|| {
+            StorageError::InvalidInput(
+                "project-epr current terms require existing notarized metadata".into(),
+            )
+        })?;
+        if !shefa_types::same_commitment_metadata(
+            PROJECT_EPR_ACTION,
+            existing_metadata,
+            next_metadata,
+        )
+        .map_err(StorageError::Validation)?
+        {
+            return Err(StorageError::Validation(
+                "project-epr PATCH may change only reach and gateHints".into(),
+            ));
+        }
+        validate_project_epr_current_terms(next_metadata)?;
+        let old: serde_json::Value = serde_json::from_str(existing_metadata)
+            .map_err(|e| StorageError::Validation(format!("stored metadataJson parse: {e}")))?;
+        let next: serde_json::Value = serde_json::from_str(next_metadata)
+            .map_err(|e| StorageError::Validation(format!("metadataJson parse: {e}")))?;
+        Ok(old != next)
+    }
+
+    fn project_epr_requires_conductor(
+        existing_state: &str,
+        existing_finished: bool,
+        existing_metadata: Option<&str>,
+        anchored: bool,
+        update: &UpdateReaCommitmentState,
+    ) -> Result<bool, StorageError> {
+        let terms_change = Self::project_epr_terms_change(existing_metadata, update)?;
+        if terms_change && !anchored {
+            return Err(StorageError::InvalidInput(
+                "project-epr current terms require an existing notarized commitment".into(),
+            ));
+        }
+        Ok(
+            Self::state_transition_changes(existing_state, existing_finished, update)
+                || terms_change,
+        )
     }
 
     /// Update commitment state.
@@ -578,8 +700,8 @@ impl ReaCommitmentService {
     /// content_store::update_rea_commitment_state coordinator (Task 6 of
     /// the substrate-rea-replication-fix plan); other actions take the
     /// legacy diesel-direct path. A no-op transition (same state, finished
-    /// unchanged) always takes the diesel-direct path — see
-    /// `state_transition_changes`.
+    /// unchanged) takes the diesel-direct path unless an anchored project-epr
+    /// update also carries a permitted current-terms change.
     pub async fn update_state(
         conn: &mut SqliteConnection,
         ctx: &AppContext,
@@ -592,16 +714,30 @@ impl ReaCommitmentService {
         let existing = rea_commitments::get_commitment(conn, ctx, id)?
             .ok_or_else(|| StorageError::NotFound(format!("commitment {} not found", id)))?;
 
-        // Idempotency: only round-trip the conductor when the state genuinely
-        // changes. A PATCH to the state the row already holds falls through to
-        // the diesel-direct path below — cheap, non-sheddable, and still applies
-        // any metadata_json reconcile. This is the server-side root fix for the
-        // 503 catching-up shed on redundant re-activation.
+        // Idempotency: round-trip the conductor for a lifecycle transition or
+        // an anchored project-epr current-terms change. Immutable undertaking
+        // changes fail before either persistence path.
         let state_changes =
             Self::state_transition_changes(&existing.state, existing.finished == 1, update);
-
-        if existing.action == PROJECT_EPR_ACTION && state_changes {
-            return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
+        if existing.action == PROJECT_EPR_ACTION
+            && Self::project_epr_requires_conductor(
+                &existing.state,
+                existing.finished == 1,
+                existing.metadata_json.as_deref(),
+                existing.dht_anchor_hash.is_some(),
+                update,
+            )?
+        {
+            return Self::update_state_via_conductor(
+                conn,
+                ctx,
+                id,
+                &existing.action,
+                update,
+                events,
+                hc_lamad,
+            )
+            .await;
         }
         // Soft gate mirrors the create path: custody-blob round-trips the conductor
         // when one is connected (so state transitions are notarized on the DHT),
@@ -620,7 +756,16 @@ impl ReaCommitmentService {
             && hc_lamad.is_some()
             && state_changes
         {
-            return Self::update_state_via_conductor(conn, ctx, id, update, events, hc_lamad).await;
+            return Self::update_state_via_conductor(
+                conn,
+                ctx,
+                id,
+                &existing.action,
+                update,
+                events,
+                hc_lamad,
+            )
+            .await;
         }
 
         // Legacy diesel-direct path (also the idempotent no-op path).
@@ -666,6 +811,7 @@ impl ReaCommitmentService {
         conn: &mut SqliteConnection,
         ctx: &AppContext,
         id: &str,
+        action: &str,
         update: &UpdateReaCommitmentState,
         events: Option<&EventBus>,
         hc_lamad: Option<&Arc<HcClient>>,
@@ -680,6 +826,9 @@ impl ReaCommitmentService {
             id: id.to_string(),
             state: update.state.clone(),
             finished: update.finished,
+            project_epr_current_terms_json: (action == PROJECT_EPR_ACTION)
+                .then(|| update.metadata_json.clone())
+                .flatten(),
         };
 
         let output_bytes =
@@ -694,22 +843,20 @@ impl ReaCommitmentService {
                      output could not be decoded as ReaCommitmentOutput: {e}"
                 ))
             })?;
+        // The returned signed record is the only projection source. Never
+        // overwrite metadata locally after this authority read: a delayed HTTP
+        // response must not roll current terms back over a newer signal.
         let commitment = Self::project_conductor_observation(conn, ctx, hc, &output).await?;
-
-        // THE NEWER DECLARATION WINS (2026-09-12), restated for the authenticated
-        // path. The projection above is built EXCLUSIVELY from the notarized
-        // record, and that record cannot carry `metadata_json`: the zome's
-        // `UpdateReaCommitmentStateInput` is `{id, state, finished}`, so after a
-        // state update the entry still holds its CREATE-TIME metadata. A caller
-        // that re-declared metadata alongside the transition would otherwise have
-        // its declaration silently dropped — the steward's reach-narrowing that
-        // both doorways kept serving at `commons` (household run
-        // 20260912T225331Z). This field is projection-authored; the caller is its
-        // authority, and this is the one write that states it.
-        let commitment = match update.metadata_json.as_deref() {
-            Some(declared) => rea_commitments::set_metadata_json(conn, ctx, id, declared)?,
-            None => commitment,
-        };
+        if action == PROJECT_EPR_ACTION {
+            if let Some(requested) = update.metadata_json.as_deref() {
+                let observed = commitment.metadata_json.as_deref().ok_or_else(|| {
+                    StorageError::InvalidInput(
+                        "conductor returned project-epr without current terms".into(),
+                    )
+                })?;
+                require_project_epr_terms_applied(requested, observed)?;
+            }
+        }
 
         if let Some(bus) = events {
             if commitment.action == PROJECT_EPR_ACTION && commitment.state == "cancelled" {
@@ -1125,6 +1272,43 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn unanchored_project_epr_terms_change_refuses_without_mutating_the_row() {
+        let mut conn = setup_conn();
+        let ctx = crate::db::context::AppContext::default_lamad();
+        let input = project_epr_input("unanchored-terms", false, None);
+        rea_commitments::create_commitment(&mut conn, &ctx, input).unwrap();
+        let before = rea_commitments::get_commitment(&mut conn, &ctx, "unanchored-terms")
+            .unwrap()
+            .unwrap();
+        let mut metadata: serde_json::Value =
+            serde_json::from_str(before.metadata_json.as_deref().unwrap()).unwrap();
+        metadata["reach"] = serde_json::json!("local");
+        metadata["gateHints"] = serde_json::json!([
+            {"eprRef":"collective:dowell", "relation":"membershipPrerequisite"}
+        ]);
+        let update = UpdateReaCommitmentState {
+            state: before.state.clone(),
+            finished: None,
+            metadata_json: Some(metadata.to_string()),
+        };
+        assert!(ReaCommitmentService::update_state(
+            &mut conn,
+            &ctx,
+            "unanchored-terms",
+            &update,
+            None,
+            None,
+        )
+        .await
+        .is_err());
+        let after = rea_commitments::get_commitment(&mut conn, &ctx, "unanchored-terms")
+            .unwrap()
+            .unwrap();
+        assert_eq!(after.metadata_json, before.metadata_json);
+        assert_eq!(after.dht_anchor_hash, None);
+    }
+
     /// Service re-grant path (no conductor): a project-epr create carrying
     /// `supersedes` routes through the diesel-direct supersession path, marks
     /// the grant-less predecessor superseded, and the active set returns only
@@ -1430,6 +1614,66 @@ mod tests {
             false,
             &upd("active", Some(false))
         ));
+    }
+
+    #[test]
+    fn same_state_project_epr_current_terms_change_requires_notarization() {
+        let old = serde_json::json!({
+            "urlPath": "/garden", "mode": "cached", "reach": "commons", "gateHints": []
+        })
+        .to_string();
+        let update = UpdateReaCommitmentState {
+            state: "active".into(),
+            finished: None,
+            metadata_json: Some(
+                serde_json::json!({
+                    "urlPath": "/garden", "mode": "cached", "reach": "local",
+                    "gateHints": [{"eprRef":"collective:dowell", "relation":"membershipPrerequisite"}]
+                })
+                .to_string(),
+            ),
+        };
+        assert!(ReaCommitmentService::project_epr_requires_conductor(
+            "active",
+            false,
+            Some(&old),
+            true,
+            &update
+        )
+        .unwrap());
+        assert!(ReaCommitmentService::project_epr_requires_conductor(
+            "active",
+            false,
+            Some(&old),
+            false,
+            &update
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn project_epr_current_terms_cannot_change_the_undertaking() {
+        let old = r#"{"urlPath":"/garden","mode":"cached","reach":"commons"}"#;
+        let update = UpdateReaCommitmentState {
+            state: "active".into(),
+            finished: None,
+            metadata_json: Some(
+                r#"{"urlPath":"/other","mode":"cached","reach":"local","gateHints":[{"eprRef":"collective:dowell","relation":"membershipPrerequisite"}]}"#.into(),
+            ),
+        };
+        assert!(ReaCommitmentService::project_epr_terms_change(Some(old), &update).is_err());
+    }
+
+    #[test]
+    fn project_epr_update_refuses_a_coordinator_that_ignored_current_terms() {
+        let requested = r#"{"reach":"local","gateHints":[{"relation":"membershipPrerequisite","eprRef":"collective:dowell"}]}"#;
+        let same_semantics = r#"{"gateHints":[{"eprRef":"collective:dowell","relation":"membershipPrerequisite"}],"reach":"local"}"#;
+        assert!(require_project_epr_terms_applied(requested, same_semantics).is_ok());
+        assert!(require_project_epr_terms_applied(
+            requested,
+            r#"{"reach":"commons","gateHints":[]}"#
+        )
+        .is_err());
     }
 
     #[test]
