@@ -167,6 +167,50 @@ where
     .await
 }
 
+#[cfg(test)]
+mod head_declare_stamp_policy_tests {
+    use super::{head_declare_stamp_policy, HeadDeclareStampPolicy};
+
+    fn declared() -> crate::services::conductor_writes::ContentHeadWire {
+        serde_json::from_value(serde_json::json!({
+            "content_id": "ordered",
+            "head_action_hash": "uhCkk-ordered",
+            "declared_at": 1,
+            "content": {
+                "id": "ordered",
+                "content_type": "concept",
+                "title": "ordered",
+                "description": "",
+                "content_format": "markdown",
+                "reach": "commons"
+            }
+        }))
+        .expect("wire fixture")
+    }
+
+    #[test]
+    fn author_is_legacy_but_delegate_requires_complete_canonical_ordering() {
+        let mut head = declared();
+        assert_eq!(
+            head_declare_stamp_policy(false, &head),
+            Ok(HeadDeclareStampPolicy::LegacyAuthor)
+        );
+        assert!(head_declare_stamp_policy(true, &head).is_err());
+
+        head.canonical_declared_at = Some(42);
+        assert!(head_declare_stamp_policy(true, &head).is_err());
+        head.canonical_declared_at = None;
+        head.canonical_earned = Some(true);
+        assert!(head_declare_stamp_policy(true, &head).is_err());
+
+        head.canonical_declared_at = Some(42);
+        assert_eq!(
+            head_declare_stamp_policy(true, &head),
+            Ok(HeadDeclareStampPolicy::Canonical((42, true)))
+        );
+    }
+}
+
 /// Maximum number of concurrent MUTATING (write) HTTP requests. Excess writes
 /// are SHED (per-request try_acquire → 503 + Retry-After), not queued — an
 /// unbounded wait is just a slower wedge and gates /health too. Shedding a write
@@ -1055,6 +1099,25 @@ fn project_agent_info(signed_json: &str) -> serde_json::Value {
         "isTombstone": inner.get("isTombstone").cloned().unwrap_or(serde_json::Value::Null),
         "storageArc": inner.get("storageArc").cloned().unwrap_or(serde_json::Value::Null),
     })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HeadDeclareStampPolicy {
+    LegacyAuthor,
+    Canonical(db::content_diesel::CanonicalOrdering),
+}
+
+fn head_declare_stamp_policy(
+    is_delegated: bool,
+    declared: &crate::services::conductor_writes::ContentHeadWire,
+) -> Result<HeadDeclareStampPolicy, &'static str> {
+    if !is_delegated {
+        return Ok(HeadDeclareStampPolicy::LegacyAuthor);
+    }
+    declared
+        .canonical_ordering()
+        .map(HeadDeclareStampPolicy::Canonical)
+        .ok_or("Conductor returned no complete canonical election ordering; refusing an unordered delegated stamp")
 }
 
 impl HttpServer {
@@ -8393,6 +8456,7 @@ impl HttpServer {
                 }
             }
         };
+        let is_delegated = delegate_wire.is_some();
 
         // (d2) NOW apply write-admission backpressure — reached only by a caller
         // whose authorship has already been confirmed. This route is carved out
@@ -8474,6 +8538,10 @@ impl HttpServer {
         // (not only once the async projection signal lands) — mirrors
         // update_via_conductor. Field mapping mirrors the ContentCommitted
         // projection arm (rea_projection.rs).
+        let stamp_policy = match head_declare_stamp_policy(is_delegated, &declared) {
+            Ok(policy) => policy,
+            Err(message) => return Ok(response::service_unavailable(message)),
+        };
         let content = declared.content;
         let size_i32 = content
             .content_size_bytes
@@ -8488,14 +8556,47 @@ impl HttpServer {
             reach: Some(content.reach),
             metadata_json: Some(content.metadata_json),
         };
-        db::content_diesel::stamp_declared_head(
-            &mut conn,
-            app_ctx,
-            content_id,
-            declared.head_action_hash.as_str(),
-            Some(declared.declared_at),
-            Some(patch),
-        )?;
+        let stamp = match stamp_policy {
+            HeadDeclareStampPolicy::Canonical(ordering) => {
+                db::content_diesel::stamp_declared_head_mode(
+                    &mut conn,
+                    app_ctx,
+                    content_id,
+                    declared.head_action_hash.as_str(),
+                    Some(declared.declared_at),
+                    Some(patch),
+                    db::content_diesel::StampMode::HealCanonical,
+                    Some(ordering),
+                )?
+            }
+            HeadDeclareStampPolicy::LegacyAuthor => {
+                if db::content_diesel::stamp_declared_head(
+                    &mut conn,
+                    app_ctx,
+                    content_id,
+                    declared.head_action_hash.as_str(),
+                    Some(declared.declared_at),
+                    Some(patch),
+                )? {
+                    db::content_diesel::StampOutcome::Refreshed
+                } else {
+                    db::content_diesel::StampOutcome::NoRow
+                }
+            }
+        };
+        match stamp {
+            db::content_diesel::StampOutcome::Stamped
+            | db::content_diesel::StampOutcome::Refreshed => {}
+            db::content_diesel::StampOutcome::SkippedStale
+            | db::content_diesel::StampOutcome::SkippedDeclared => {
+                return Ok(response::conflict(
+                    "Conductor election did not supersede the canonical head already projected on this peer",
+                ));
+            }
+            db::content_diesel::StampOutcome::NoRow => {
+                return Ok(response::not_found("Content not found"));
+            }
+        }
         // The declared head is a projected doc field (`headActionHash`); a stamp
         // that never announced left ~300 docs per peer missing it until the next
         // cold-start back-fill (measured 2026-08-29: `filled=headActionHash=318`).
@@ -8658,6 +8759,14 @@ impl HttpServer {
         // (not only once the async projection signal lands) — mirrors
         // handle_content_head's declare arm / update_via_conductor. Field
         // mapping mirrors the ContentCommitted projection arm (rea_projection.rs).
+        let canonical_ordering = match declared.canonical_ordering() {
+            Some(ordering) => Some(ordering),
+            None => {
+                return Ok(response::service_unavailable(
+                    "Conductor returned no complete canonical election ordering; refusing an unordered eager stamp",
+                ));
+            }
+        };
         let content = declared.content;
         let size_i32 = content
             .content_size_bytes
@@ -8672,14 +8781,29 @@ impl HttpServer {
             reach: Some(content.reach),
             metadata_json: Some(content.metadata_json),
         };
-        db::content_diesel::stamp_declared_head(
+        let stamp = db::content_diesel::stamp_declared_head_mode(
             &mut conn,
             app_ctx,
             content_id,
             declared.head_action_hash.as_str(),
             Some(declared.declared_at),
             Some(patch),
+            db::content_diesel::StampMode::HealCanonical,
+            canonical_ordering,
         )?;
+        match stamp {
+            db::content_diesel::StampOutcome::Stamped
+            | db::content_diesel::StampOutcome::Refreshed => {}
+            db::content_diesel::StampOutcome::SkippedStale
+            | db::content_diesel::StampOutcome::SkippedDeclared => {
+                return Ok(response::conflict(
+                    "Conductor election did not supersede the canonical head already projected on this peer",
+                ));
+            }
+            db::content_diesel::StampOutcome::NoRow => {
+                return Ok(response::not_found("Content not found"));
+            }
+        }
         // The declared head is a projected doc field (`headActionHash`); a stamp
         // that never announced left ~300 docs per peer missing it until the next
         // cold-start back-fill (measured 2026-08-29: `filled=headActionHash=318`).

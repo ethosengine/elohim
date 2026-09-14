@@ -1779,7 +1779,20 @@ fn adopt_local(
     // admits is a row the stamp will treat as `Refreshed` rather than as a move.
     // See condition 2 on `pointer_heal_patch`, which repeats the test for the
     // same reason.
-    let mut pointer_patch: Option<content_diesel::ContentProjectionPatch> = None;
+    // The canonical answer comes from this node's own conductor and carries
+    // the complete notarized Content entry. Its metadata is therefore the
+    // authority for reserved serving fields such as `serverBlobHash`, including
+    // an explicit `{}` that removes obsolete server code. Keep this patch on
+    // the SAME guarded stamp: a stale canonical answer that cannot move the
+    // head also cannot mutate metadata, while a fill or same-head refresh can
+    // project the verified entry. A fallback (canonical=false) never gets this
+    // authority; CRDT metadata remains unauthenticated and unused here.
+    let mut verified_patch = head
+        .canonical
+        .then(|| content_diesel::ContentProjectionPatch {
+            metadata_json: Some(head.content.metadata_json.clone()),
+            ..Default::default()
+        });
     if local_declared == Some(head.head_action_hash.as_str()) {
         let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
             Ok(v) => v,
@@ -1812,11 +1825,9 @@ fn adopt_local(
                  ALREADY declares names a different blob — refreshing the pointer and \
                  its length together; the declared head and dht_anchor_hash do not move"
             );
-            pointer_patch = Some(content_diesel::ContentProjectionPatch {
-                blob_cid: Some(healed),
-                content_size_bytes: Some(size_bytes),
-                ..Default::default()
-            });
+            let patch = verified_patch.get_or_insert_with(Default::default);
+            patch.blob_cid = Some(healed);
+            patch.content_size_bytes = Some(size_bytes);
         }
     }
 
@@ -1826,7 +1837,7 @@ fn adopt_local(
         id,
         head.head_action_hash.as_str(),
         Some(head.declared_at),
-        pointer_patch,
+        verified_patch,
         StampMode::HealCanonical,
         // The DHT election behind this answer — what the guard actually compares.
         head.canonical_ordering(),
@@ -2679,11 +2690,11 @@ async fn contest_peer(
     )
     .await
     {
-        Ok(declared) => {
+        Ok(_declared) => {
             return contested(
                 ContestShape::PeerHead,
                 id,
-                &declared.head_action_hash,
+                &peer_head,
                 local_declared,
                 hint,
                 carried_present,
@@ -2841,10 +2852,10 @@ async fn contest_peer(
     )
     .await
     {
-        Ok(declared) => contested(
+        Ok(_declared) => contested(
             ContestShape::SelfHead,
             id,
-            &declared.head_action_hash,
+            own_head,
             local_declared,
             hint,
             carried_present,
@@ -2986,14 +2997,14 @@ async fn contest_divergent(
     )
     .await
     {
-        Ok(declared) => {
+        Ok(_declared) => {
             crate::metrics::inc_content_canonical_link_minted(
                 crate::metrics::MINTED_SOURCE_CONTEST_DIVERGENT_SELF,
             );
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
                 content_id = %id,
-                contested_head = %declared.head_action_hash,
+                contested_head = %target,
                 divergent_peer = %divergent_peer,
                 "spin-discharge: CONTESTED an undeclared two-way root divergence by nominating \
                  THIS node's own head — the peer advertises a different root and holds no \
@@ -3113,14 +3124,14 @@ async fn try_adopt_before_author(
     )
     .await
     {
-        Ok(declared) => {
+        Ok(_declared) => {
             crate::metrics::inc_content_canonical_link_minted(
                 crate::metrics::MINTED_SOURCE_ADOPT_BEFORE_AUTHOR,
             );
             tracing::warn!(
                 target: "elohim_storage::head_adoption",
                 content_id = %id,
-                contested_head = %declared.head_action_hash,
+                contested_head = %peer_head,
                 from_peer = %hint.peer_id,
                 carried = carried_present,
                 fetcher = fetcher_present,
@@ -3177,7 +3188,7 @@ async fn try_adopt_before_author(
 fn contested(
     shape: ContestShape,
     id: &str,
-    minted_head: &crate::signals::HoloHashB64,
+    minted_head: &str,
     local_declared: Option<&str>,
     hint: &PeerHeadHint,
     carried: bool,
@@ -3404,10 +3415,36 @@ async fn declare_peer_head(
     match attempted {
         Ok(declared) => {
             crate::metrics::inc_content_canonical_link_minted(minted_source);
-            // This declaration is a DELIBERATE own-conductor canonical act that
-            // this process just caused — the same class as the declare route's
-            // eager stamp — so `Declare` is the correct mode here (unlike the
-            // local-resolve arm above, which is a heal-class read).
+            // The coordinator returns the ACTUAL winner after incorporating
+            // the link just authored. It may therefore name an incumbent earned
+            // head rather than the nominated staging candidate. Replay that
+            // winner's exact election ordering under the same monotonic guard
+            // as every other canonical heal; never crown the nominated target
+            // merely because this process caused its subordinate link.
+            let canonical_ordering = match declared.canonical_ordering() {
+                Some(ordering) => Some(ordering),
+                None => {
+                    tracing::warn!(
+                        content_id = %id,
+                        "adopt-before-author: conductor declared but returned no complete \
+                         canonical election ordering; holding for a later heal"
+                    );
+                    return AdoptOutcome::Held;
+                }
+            };
+            let c = &declared.content;
+            let patch = content_diesel::ContentProjectionPatch {
+                blob_cid: c.blob_cid.clone(),
+                content_size_bytes: c
+                    .content_size_bytes
+                    .map(|n| i32::try_from(n).unwrap_or(i32::MAX)),
+                title: Some(c.title.clone()),
+                description: Some(c.description.clone()),
+                content_type: Some(c.content_type.clone()),
+                content_format: Some(c.content_format.clone()),
+                reach: Some(c.reach.clone()),
+                metadata_json: Some(c.metadata_json.clone()),
+            };
             let stamped = pool.get().map_err(|e| e.to_string()).and_then(|mut conn| {
                 content_diesel::stamp_declared_head_mode(
                     &mut conn,
@@ -3415,13 +3452,9 @@ async fn declare_peer_head(
                     id,
                     declared.head_action_hash.as_str(),
                     Some(declared.declared_at),
-                    None,
-                    StampMode::Declare,
-                    // The declare has written a link but not read back its
-                    // notarized timestamp, so it carries no election to record.
-                    // The row's ordering backfills on the next canonical heal
-                    // resolve — which answers with the election just created.
-                    None,
+                    Some(patch),
+                    StampMode::HealCanonical,
+                    canonical_ordering,
                 )
                 .map_err(|e| e.to_string())
             });
@@ -3517,6 +3550,47 @@ async fn declare_peer_head(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn adoption_test_pool() -> DbPool {
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use diesel::SqliteConnection;
+
+        let url = format!(
+            "file:head_adoption_metadata_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        crate::db::run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    fn seed_adoption_content(pool: &DbPool, id: &str, metadata: &str) {
+        let mut conn = pool.get().expect("connection");
+        content_diesel::create_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            content_diesel::CreateContentInput {
+                id: id.to_string(),
+                title: id.to_string(),
+                description: None,
+                content_type: "concept".to_string(),
+                content_format: "markdown".to_string(),
+                blob_hash: Some("sha256-browser".to_string()),
+                blob_cid: Some("sha256-browser".to_string()),
+                content_size_bytes: Some(10),
+                metadata_json: Some(metadata.to_string()),
+                reach: "commons".to_string(),
+                created_by: None,
+                tags: Vec::new(),
+                content_body: None,
+                dht_anchor_hash: None,
+            },
+        )
+        .expect("seed content");
+    }
 
     /// Contest ON — the rollout default. Keeps the older tests reading as
     /// situations rather than argument lists. `peer_divergent_anchor` OFF: the
@@ -3642,6 +3716,112 @@ mod tests {
             },
         }))
         .expect("ContentHeadWire fixture must deserialize")
+    }
+
+    fn server_hash(pool: &DbPool, id: &str) -> Option<String> {
+        let mut conn = pool.get().expect("connection");
+        content_diesel::get_content(
+            &mut conn,
+            &AppContext::default_lamad(),
+            id,
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read content")
+        .expect("content exists")
+        .server_blob_hash
+    }
+
+    #[test]
+    fn canonical_head_adoption_projects_and_removes_server_metadata_without_stale_mutation() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        let mut head = wire(true);
+        head.content.id = "refresh".to_string();
+        head.content.metadata_json = r#"{"serverBlobHash":"sha256-server-new"}"#.to_string();
+        let head_hash = head.head_action_hash.to_string();
+
+        seed_adoption_content(
+            &pool,
+            "refresh",
+            r#"{"serverBlobHash":"sha256-server-old"}"#,
+        );
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "refresh",
+                &head_hash,
+                Some(1),
+                None,
+                StampMode::Declare,
+                Some((1, false)),
+            )
+            .expect("seed declaration");
+        }
+        assert_eq!(
+            adopt_local(&pool, &ctx, "refresh", &head, Some(&head_hash)),
+            AdoptOutcome::Held,
+            "same-head adoption is a refresh, not a head move"
+        );
+        assert_eq!(
+            server_hash(&pool, "refresh").as_deref(),
+            Some("sha256-server-new")
+        );
+
+        let accepted_head = head.head_action_hash.clone();
+        head.head_action_hash = crate::signals::HoloHashB64("uhCkkOlderCanonicalHead".to_string());
+        head.canonical_declared_at = Some(0);
+        head.canonical_earned = Some(false);
+        head.content.metadata_json = "{}".to_string();
+        assert_eq!(
+            adopt_local(&pool, &ctx, "refresh", &head, Some(&head_hash)),
+            AdoptOutcome::Held
+        );
+        assert_eq!(
+            server_hash(&pool, "refresh").as_deref(),
+            Some("sha256-server-new"),
+            "an older canonical answer cannot mutate accepted metadata"
+        );
+
+        head.head_action_hash = accepted_head;
+        head.canonical_declared_at = Some(1);
+
+        head.content.metadata_json = "{}".to_string();
+        assert_eq!(
+            adopt_local(&pool, &ctx, "refresh", &head, Some(&head_hash)),
+            AdoptOutcome::Held
+        );
+        assert_eq!(
+            server_hash(&pool, "refresh"),
+            None,
+            "authoritative canonical metadata absence removes obsolete server code"
+        );
+
+        head.canonical = false;
+        head.content.metadata_json = r#"{"serverBlobHash":"sha256-unverified"}"#.to_string();
+        assert_eq!(
+            adopt_local(&pool, &ctx, "refresh", &head, Some(&head_hash)),
+            AdoptOutcome::Held
+        );
+        assert_eq!(
+            server_hash(&pool, "refresh"),
+            None,
+            "fallback metadata has no authority"
+        );
+
+        seed_adoption_content(&pool, "fill", "{}");
+        head.canonical = true;
+        head.content.id = "fill".to_string();
+        head.content.metadata_json = r#"{"serverBlobHash":"sha256-server-fill"}"#.to_string();
+        assert_eq!(
+            adopt_local(&pool, &ctx, "fill", &head, None),
+            AdoptOutcome::Adopted
+        );
+        assert_eq!(
+            server_hash(&pool, "fill").as_deref(),
+            Some("sha256-server-fill")
+        );
     }
 
     /// The wave-4 split, asserted at the type level: an OBSERVED absence and an

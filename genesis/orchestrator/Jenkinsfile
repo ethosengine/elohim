@@ -15,9 +15,9 @@
  * Dependency Graph:
  *   elohim-holochain (DNA/hApp, WASM) [cascades: true]
  *       ├──► elohim-edge (auto-triggered when DNA changes, ensures new hApp is deployed)
- *       │                                    ├──► elohim-genesis (seed + test)
+ *       │                                    ├──► elohim (Angular app)
+ *       │                                    │        └──► elohim-genesis (seed + test)
  *       └──► elohim-steward (manual only)    │
- *   elohim (Angular app) ───────────────────┘
  */
 
 // =============================================================================
@@ -26,16 +26,17 @@
 
 import groovy.transform.Field
 
-// longRunning flag: pipelines that take 15min+ to complete. Orchestrator
-// dispatches these with `wait: false` (fire-and-forget) so the orchestrator
-// itself stays short (~5min). This prevents the abortPrevious cascade
-// documented as bug #5 in 2026-05-24 sweettest sprint result — when a new
-// orchestrator dispatch arrived (cron or push), the prior orchestrator was
-// aborted, which propagated to its in-flight `build(wait:true)` call and
-// killed the long downstream mid-run (cost: 55-90min lost per cascade).
-// Tradeoff: baseline advances optimistically at dispatch (not at completion);
-// if a long pipeline fails silently and no follow-up push lands, baseline
-// stays stale. Visible in the downstream pipeline's own Jenkins view.
+// longRunning flag: pipelines that take 15min+ to complete. A standalone
+// long-running pipeline is dispatched with `wait: false` (fire-and-forget),
+// keeping the orchestrator short and advancing its baseline optimistically.
+// When a selected pipeline depends on a selected long-running producer, the
+// producer still starts detached, but the orchestrator waits for its actual
+// completion before dispatching that dependent. The detached wait preserves
+// the abortPrevious protection documented as bug #5 in the 2026-05-24
+// sweettest sprint result: aborting a superseded orchestrator must not kill an
+// already-running downstream build (formerly costing 55-90min per cascade).
+// A standalone long-running failure remains visible in that downstream
+// pipeline's Jenkins view and may leave its optimistic baseline stale.
 // Environment-specific endpoints for version checking.
 // `doorway-alpha-b` is the federation peer of doorway-alpha on apex hostname
 // elohim.host; both back the shared alpha conductor pool — see
@@ -684,6 +685,44 @@ def submoduleSha(String path) {
 }
 
 /**
+ * A selected long-running producer must finish before a selected consumer that
+ * declares it in dependsOn can start. Standalone long-running pipelines remain
+ * fire-and-forget. The completion wait itself is detached in triggerPipeline:
+ * aborting this orchestrator must never abort the producer it already started.
+ */
+def needsDetachedDependencyBarrier(String producer, List selectedPipelines) {
+    def producerConfig = getPipelineMetadata(producer)
+    if (!(producerConfig.longRunning == true)) return false
+    return selectedPipelines.any { consumer ->
+        def dependencies = getPipelineMetadata(consumer).dependsOn ?: []
+        dependencies.contains(producer)
+    }
+}
+
+/**
+ * Start a downstream only until Jenkins assigns its durable run ID, then wait
+ * without propagating an abort of this orchestrator into that already-started
+ * run. The installed Pipeline Build Step exposes waitForStart,
+ * RunWrapper.externalizableId, and waitForBuild(propagateAbort:false).
+ */
+def awaitDetachedBuild(String jobName, String jobBranch, List buildParams) {
+    def started = build(
+        job: "${jobName}/${jobBranch}",
+        waitForStart: true,
+        propagate: false,
+        parameters: buildParams
+    )
+    if (!started?.externalizableId) {
+        error "Detached dependency '${jobName}/${jobBranch}' started without a durable run ID"
+    }
+    return waitForBuild(
+        runId: started.externalizableId,
+        propagate: false,
+        propagateAbort: false
+    )
+}
+
+/**
  * Trigger a pipeline. Long-running pipelines (config.longRunning) are
  * dispatched fire-and-forget (wait:false) so the orchestrator stays short
  * and the abortPrevious cascade (bug #5 of 2026-05-24 sweettest sprint)
@@ -692,16 +731,21 @@ def submoduleSha(String path) {
  *
  * The wait param remains as a manual override for callers that need it
  * (e.g. genesis dispatched as a barrier). Default is "auto" — derived
- * from config.longRunning.
+ * from config.longRunning. dependencyBarrier starts a long-running producer
+ * with waitForStart, then waits by run ID with propagateAbort:false. This
+ * preserves abortPrevious isolation while enforcing a selected dependency.
  */
-def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = []) {
+def triggerPipeline(String name, String branch, Object wait = null, List changedFiles = [], boolean dependencyBarrier = false) {
     def config = getPipelineMetadata(name)
     if (!config.jenkinsPath) {
         error "Cannot dispatch pipeline '${name}': no jenkinsPath in its build-manifest.json"
     }
     // Auto-derive wait from longRunning flag unless caller forced it.
     boolean shouldWait = (wait == null) ? !(config.longRunning) : (wait as boolean)
-    String waitMode = shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)'
+    boolean detachedBarrier = dependencyBarrier && config.longRunning == true
+    String waitMode = detachedBarrier
+        ? 'detached dependency barrier'
+        : (shouldWait ? 'wait-for-result' : 'fire-and-forget (longRunning)')
     // A cross-repo pipeline pins its own job name and branch (see getPipelineMetadata).
     String jobName = config.jenkinsJob ?: name
     String jobBranch = config.jenkinsBranch ?: branch
@@ -722,13 +766,18 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // of them produces undefined-parameter warnings and no behaviour. They get
         // their own dedicated list instead.
         if (config.jenkinsBranch) {
-            def result = build(
-                job: "${jobName}/${jobBranch}",
-                wait: shouldWait,
-                propagate: false,
-                parameters: crossRepoParams(name)
-            )
-            return dispatchResult(result, shouldWait)
+            def result
+            if (detachedBarrier) {
+                result = awaitDetachedBuild(jobName, jobBranch, crossRepoParams(name))
+            } else {
+                result = build(
+                    job: "${jobName}/${jobBranch}",
+                    wait: shouldWait,
+                    propagate: false,
+                    parameters: crossRepoParams(name)
+                )
+            }
+            return dispatchResult(result, shouldWait || detachedBarrier)
         }
         def buildParams = [booleanParam(name: 'FORCE_BUILD', value: !validateOnlyDownstream)]
         if (config.deploymentCheck) {
@@ -761,14 +810,19 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
             buildParams.add(booleanParam(name: 'RESET_STORAGE', value: resetStorage))
         }
 
-        def result = build(
-            job: "${jobName}/${jobBranch}",
-            wait: shouldWait,
-            propagate: false,
-            parameters: buildParams
-        )
+        def result
+        if (detachedBarrier) {
+            result = awaitDetachedBuild(jobName, jobBranch, buildParams)
+        } else {
+            result = build(
+                job: "${jobName}/${jobBranch}",
+                wait: shouldWait,
+                propagate: false,
+                parameters: buildParams
+            )
+        }
 
-        return dispatchResult(result, shouldWait)
+        return dispatchResult(result, shouldWait || detachedBarrier)
     } catch (Exception e) {
         // Distinguish "Jenkins job not provisioned" from a real build failure.
         // When a pipeline is registered in build-manifest.json
@@ -1956,7 +2010,11 @@ spec:
                                 echo "🔨 Building: ${name}"
                                 // wait=null → triggerPipeline auto-derives from
                                 // build-manifest.json longRunning flag (bug #5 fix).
-                                def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
+                                // A selected consumer turns an async producer into a
+                                // detached completion barrier without restoring abort
+                                // propagation from this orchestrator.
+                                def dependencyBarrier = needsDetachedDependencyBarrier(name, pipelines)
+                                def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier)
                                 results[name] = result
                                 recordPipelineResult(name, result, pipelineBaselines)
                             } else {
@@ -1965,7 +2023,8 @@ spec:
                                     parallelBuilds[name] = {
                                         echo "🔨 Building: ${name}"
                                         // wait=null → auto-derive per longRunning
-                                        def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles)
+                                        def dependencyBarrier = needsDetachedDependencyBarrier(name, pipelines)
+                                        def result = triggerPipeline(name, env.BRANCH_NAME, null, changedFiles, dependencyBarrier)
                                         results[name] = result
                                         recordPipelineResult(name, result, pipelineBaselines)
                                     }

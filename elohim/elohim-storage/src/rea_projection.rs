@@ -185,8 +185,9 @@ pub enum ReaProjectionSignal {
     /// emits this ONLY for locally-authored HEAD declarations, so local
     /// authorship is implied. Field names/types mirror the DNA signal exactly:
     /// `ProjectionSignal::ContentHeadDeclared { content_id, head_action_hash,
-    /// entry_hash, author }` — the wire field is `head_action_hash` (a raw
-    /// 39-byte `ActionHash` array on the msgpack wire, hence `HoloHashB64`).
+    /// entry_hash, author, canonical_declared_at, canonical_earned }` — the
+    /// wire field is `head_action_hash` (a raw 39-byte `ActionHash` array on the
+    /// msgpack wire, hence `HoloHashB64`).
     ContentHeadDeclared {
         content_id: String,
         head_action_hash: HoloHashB64,
@@ -194,6 +195,13 @@ pub enum ReaProjectionSignal {
         entry_hash: Option<HoloHashB64>,
         #[serde(default)]
         author: Option<HoloHashB64>,
+        /// Present together on cross-root declarations whose coordinator has
+        /// already run the canonical election including the link it authored.
+        /// Both absent is the legacy/single-author signal shape.
+        #[serde(default)]
+        canonical_declared_at: Option<i64>,
+        #[serde(default)]
+        canonical_earned: Option<bool>,
     },
 }
 
@@ -806,6 +814,8 @@ pub fn handle_rea_signal(
         ReaProjectionSignal::ContentHeadDeclared {
             content_id,
             head_action_hash,
+            canonical_declared_at,
+            canonical_earned,
             ..
         } => {
             info!(
@@ -816,20 +826,46 @@ pub fn handle_rea_signal(
             // Own-conductor-witnessed HEAD declaration → verified stamp on the
             // EXISTING row only (no insert: a HEAD declaration for a row this
             // node never seeded is a no-op here). No value patch — the HEAD
-            // declaration carries only the action, not content fields. The DNA
-            // signal carries no declaration Timestamp: `declared_at = None`
-            // NULLs the stored ordering when this moves the head, so a later
-            // heal cannot misorder against a timestamp left over from a prior
-            // declaration (the next declare/propagation stamp restores it).
-            let stamped = content_diesel::stamp_declared_head(
-                &mut conn,
-                ctx,
-                &content_id,
-                head_action_hash.as_str(),
-                None,
-                None,
-            )?;
-            if !stamped {
+            // declaration carries only the action, not content fields.
+            // Cross-root signals carry the exact winning link ordering and
+            // replay the canonical heal guard. Legacy/single-author signals
+            // carry neither ordering field and retain the preexisting explicit
+            // declaration behavior. A half-present pair is malformed and must
+            // not move the row.
+            let stamped = match (canonical_declared_at, canonical_earned) {
+                (Some(at), Some(earned)) => content_diesel::stamp_declared_head_mode(
+                    &mut conn,
+                    ctx,
+                    &content_id,
+                    head_action_hash.as_str(),
+                    None,
+                    None,
+                    content_diesel::StampMode::HealCanonical,
+                    Some((at, earned)),
+                )?,
+                (None, None) => {
+                    if content_diesel::stamp_declared_head(
+                        &mut conn,
+                        ctx,
+                        &content_id,
+                        head_action_hash.as_str(),
+                        None,
+                        None,
+                    )? {
+                        content_diesel::StampOutcome::Refreshed
+                    } else {
+                        content_diesel::StampOutcome::NoRow
+                    }
+                }
+                _ => {
+                    tracing::warn!(
+                        id = %content_id,
+                        "ContentHeadDeclared: incomplete canonical ordering — refusing stamp"
+                    );
+                    content_diesel::StampOutcome::SkippedStale
+                }
+            };
+            if stamped == content_diesel::StampOutcome::NoRow {
                 debug!(
                     id = %content_id,
                     "ContentHeadDeclared: no local row to stamp — declared-head projection skipped"
@@ -1274,6 +1310,8 @@ mod tests {
                 head_action_hash: ActionHash,
                 entry_hash: EntryHash,
                 author: AgentPubKey,
+                canonical_declared_at: Option<i64>,
+                canonical_earned: Option<bool>,
             },
         }
 
@@ -1285,6 +1323,8 @@ mod tests {
             head_action_hash: head_action_hash.clone(),
             entry_hash,
             author,
+            canonical_declared_at: Some(1_700_000_000_000_001),
+            canonical_earned: Some(false),
         };
 
         // emit_signal encodes via ExternIO == rmp_serde::to_vec_named.
@@ -1297,11 +1337,15 @@ mod tests {
             ReaProjectionSignal::ContentHeadDeclared {
                 content_id,
                 head_action_hash: got_head,
+                canonical_declared_at,
+                canonical_earned,
                 ..
             } => {
                 assert_eq!(content_id, "elohim-host-landing");
                 // Normalized form must match holochain's canonical base64.
                 assert_eq!(got_head.0, format!("{head_action_hash}"));
+                assert_eq!(canonical_declared_at, Some(1_700_000_000_000_001));
+                assert_eq!(canonical_earned, Some(false));
             }
             other => panic!("unexpected variant: {other:?}"),
         }

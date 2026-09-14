@@ -134,6 +134,75 @@ test('dead change-detection helpers are retired from the Jenkinsfile', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// Selected dependency completion barrier
+// ══════════════════════════════════════════════════════════════════
+
+describe('long-running dependency completion barrier', () => {
+  const jenkinsfile = readFileSync(
+    resolve(__dirname, 'Jenkinsfile'),
+    'utf8'
+  );
+  const helper = jenkinsfile.slice(
+    jenkinsfile.indexOf('def needsDetachedDependencyBarrier('),
+    jenkinsfile.indexOf('/**\n * Trigger a pipeline.')
+  );
+  const trigger = jenkinsfile.slice(
+    jenkinsfile.indexOf('def triggerPipeline('),
+    jenkinsfile.indexOf('def autoModeAnalyze()')
+  );
+
+  test('only a selected long-running producer with a selected dependent gets a barrier', () => {
+    assert.match(helper, /producerConfig\.longRunning == true/);
+    assert.match(helper, /selectedPipelines\.any/);
+    assert.match(helper, /dependencies\.contains\(producer\)/);
+    assert.match(
+      jenkinsfile,
+      /needsDetachedDependencyBarrier\(name, pipelines\)/,
+      'the selected execution plan must decide the barrier at both dispatch call sites'
+    );
+    assert.equal(
+      [...jenkinsfile.matchAll(/needsDetachedDependencyBarrier\(name, pipelines\)/g)].length,
+      2,
+      'single and parallel dependency levels must both enforce the barrier'
+    );
+  });
+
+  test('barrier starts detached and parent abort cannot cancel the producer', () => {
+    assert.match(helper, /waitForStart:\s*true/);
+    assert.match(helper, /started\?\.externalizableId/);
+    assert.match(helper, /runId:\s*started\.externalizableId/);
+    assert.match(helper, /propagateAbort:\s*false/);
+    assert.equal(
+      [...trigger.matchAll(/awaitDetachedBuild\(jobName, jobBranch,/g)].length,
+      2,
+      'monorepo and cross-repository dispatches must share the safe wait path'
+    );
+    assert.match(trigger, /dispatchResult\(result, shouldWait \|\| detachedBarrier\)/);
+  });
+
+  test('standalone long-running pipelines retain the existing asynchronous default', () => {
+    assert.match(trigger, /dependencyBarrier && config\.longRunning == true/);
+    assert.match(trigger, /wait:\s*shouldWait/);
+    assert.match(trigger, /fire-and-forget \(longRunning\)/);
+  });
+
+  test('app dependency orders coupled delivery without selecting edge for app-only work', () => {
+    const registry = loadPipelineRegistry(ROOT);
+    const appDependencies = registry.get('elohim').dependsOn;
+    const edgeDependencies = registry.get('elohim-edge').dependsOn;
+    assert.deepEqual(appDependencies, ['elohim-sophia', 'elohim-edge']);
+    assert.ok(edgeDependencies.includes('elohim-holochain'));
+    assert.ok(!edgeDependencies.includes('elohim'));
+    assert.match(
+      jenkinsfile,
+      /deps\.every \{ dep -> !nonGenesis\.contains\(dep\) \|\| placed\.contains\(dep\) \}/,
+      'an absent dependency must not be selected by pipeline ordering'
+    );
+    assert.match(jenkinsfile, /if \(hasGenesis\) levelDesc \+= ' → genesis'/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
 // pre-push guard: no references to deleted orchestrator-strategy module
 // ══════════════════════════════════════════════════════════════════
 

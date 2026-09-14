@@ -526,11 +526,10 @@ pub struct ContentHeadWire {
 impl ContentHeadWire {
     /// The DHT election behind this answer, in the shape the stamp guard takes.
     /// `None` when the answer carries no election — which is the only thing a
-    /// pre-cure coordinator, a fallback resolve, or a declare path can honestly
-    /// report.
+    /// pre-cure coordinator, a fallback resolve, or a legacy/single-author
+    /// declare path can honestly report.
     pub fn canonical_ordering(&self) -> Option<crate::db::content_diesel::CanonicalOrdering> {
-        self.canonical_declared_at
-            .map(|ts| (ts, self.canonical_earned.unwrap_or(false)))
+        self.canonical_declared_at.zip(self.canonical_earned)
     }
 
     /// Election tier label for `elohim_content_canonical_answers_total`.
@@ -1919,6 +1918,30 @@ mod tests {
             super::DECLARE_DEFAULT_CLASS,
             crate::conductor_admission::AdmissionClass::Interactive
         );
+    }
+
+    #[test]
+    fn canonical_ordering_requires_a_complete_timestamp_and_tier_pair() {
+        let mut head: super::ContentHeadWire = serde_json::from_value(serde_json::json!({
+            "content_id": "ordered",
+            "head_action_hash": "uhCkk-ordered",
+            "declared_at": 1,
+            "content": {
+                "id": "ordered",
+                "content_type": "concept",
+                "title": "ordered",
+                "description": "",
+                "content_format": "markdown",
+                "reach": "commons"
+            }
+        }))
+        .expect("wire fixture");
+
+        assert_eq!(head.canonical_ordering(), None);
+        head.canonical_declared_at = Some(2);
+        assert_eq!(head.canonical_ordering(), None);
+        head.canonical_earned = Some(false);
+        assert_eq!(head.canonical_ordering(), Some((2, false)));
     }
 }
 

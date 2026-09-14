@@ -2636,11 +2636,13 @@ pub struct ContentHeadOutput {
     /// The WINNING canonical-head declaration's DHT LINK timestamp — the exact
     /// ordering [`select_canonical_winner`] arbitrated on.
     ///
-    /// `Some` ONLY on the canonical branch of [`resolve_content_head_inner`];
-    /// `None` on the root-author fallback, on the declare paths (which have not
-    /// yet read back the link they just wrote), and — via `serde(default)` — from
-    /// any pre-cure coordinator. `None` therefore reads as "no election stands
-    /// behind this answer", which is the safe reading everywhere.
+    /// `Some` on the canonical branch of [`resolve_content_head_inner`] and on a
+    /// cross-root declaration receipt after the coordinator has incorporated
+    /// the exact CreateLink action it just authored into the same election.
+    /// `None` on the root-author fallback, on the single-author declare path,
+    /// and — via `serde(default)` — from any pre-cure coordinator. `None`
+    /// therefore reads as "no election stands behind this answer", which is the
+    /// safe reading everywhere.
     ///
     /// ## Why this is NOT `declared_at`
     ///
@@ -2937,16 +2939,41 @@ const CANONICAL_TAG_EARNED: &[u8] = b"canonical-head:earned";
 /// hot-swappable via `update_coordinators`. The link gossips to every peer; its
 /// DHT timestamp gives newest-declaration-wins semantics in
 /// `gather_canonical_head_record`.
-fn create_canonical_head_link(id: &str, target: &ActionHash, tag: &[u8]) -> ExternResult<()> {
+fn create_canonical_head_link(
+    id: &str,
+    target: &ActionHash,
+    tag: &[u8],
+) -> ExternResult<CanonicalCandidate> {
     let anchor = StringAnchor::new(CANONICAL_HEAD_ANCHOR, id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
+    let link_hash = create_link(
         anchor_hash,
         target.clone(),
         LinkTypes::IdToContent,
         LinkTag::new(tag.to_vec()),
     )?;
-    Ok(())
+    // `agent_info().chain_head` includes writes in this zome call's scratch.
+    // No write occurs between `create_link` and this read, so this is the exact
+    // signed CreateLink action's notarized clock — never `sys_time`, the target
+    // Content action's clock, or a later get_links arrival time.
+    let (chain_head, _, timestamp) = agent_info()?.chain_head;
+    if chain_head != link_hash {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "create_canonical_head_link: newly created link {link_hash:?} was not the source-chain \
+             head {chain_head:?}; refusing an inexact declaration receipt"
+        ))));
+    }
+    let is_earned = canonical_tag_tier(tag).ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "create_canonical_head_link: declaration tag carries no canonical tier".to_string()
+        ))
+    })?;
+    Ok(CanonicalCandidate {
+        is_earned,
+        timestamp,
+        link_hash,
+        target: target.clone(),
+    })
 }
 
 // RETIRED (long-lived-channel candidate): `newest_canonical_link`, the
@@ -3123,6 +3150,18 @@ fn run_election(candidates: Vec<CanonicalCandidate>) -> Option<ElectionOutcome> 
         winner,
         staging_candidate,
     })
+}
+
+/// Incorporate one freshly-authored declaration into the link set read before
+/// opening the source-chain scratch, then run the same election every reader
+/// uses. The exact created action is appended directly; correctness never asks
+/// get_links to expose an uncommitted write.
+fn election_after_declaration(
+    mut visible: Vec<CanonicalCandidate>,
+    declared: CanonicalCandidate,
+) -> Option<ElectionOutcome> {
+    visible.push(declared);
+    run_election(visible)
 }
 
 /// The winning canonical-head declaration, resolved: the target `Record` PLUS
@@ -3543,6 +3582,43 @@ mod canonical_head_selector_tests {
             outcome.staging_candidate.is_none(),
             "nothing stands beneath a staging winner"
         );
+    }
+
+    /// A declaration receipt is the exact CreateLink action just authored,
+    /// folded into the previously visible set. Its exact source-chain timestamp
+    /// must be the ordering the receipt reports.
+    #[test]
+    fn declaration_receipt_uses_the_exact_new_link_action() {
+        let declared = cand(false, 300, 3, 30);
+        let outcome = election_after_declaration(
+            vec![cand(false, 100, 1, 10)],
+            declared.clone(),
+        )
+        .expect("declaration makes the election non-empty");
+        assert_eq!(outcome.winner.link_hash, declared.link_hash);
+        assert_eq!(outcome.winner.target, declared.target);
+        assert_eq!(outcome.winner.timestamp, Timestamp::from_micros(300));
+        assert!(!outcome.winner.is_earned);
+    }
+
+    /// Writing a newer staging link while an earned head stands returns the
+    /// actual earned winner and reports the new declaration only as its
+    /// subordinate candidate. A declaration receipt must never let the storage
+    /// projection crown the target merely because this conductor authored it.
+    #[test]
+    fn declaration_receipt_keeps_earned_winner_over_newer_staging_candidate() {
+        let earned = cand(true, 100, 1, 10);
+        let declared = cand(false, 300, 3, 30);
+        let outcome = election_after_declaration(vec![earned.clone()], declared.clone())
+            .expect("declaration makes the election non-empty");
+
+        assert_eq!(outcome.winner.target, earned.target);
+        assert_eq!(outcome.winner.timestamp, earned.timestamp);
+        assert!(outcome.winner.is_earned);
+        let candidate = outcome.staging_candidate.expect("new staging candidate");
+        assert_eq!(candidate.target, declared.target);
+        assert_eq!(candidate.timestamp, declared.timestamp);
+        assert!(!candidate.is_earned);
     }
 
     /// An earned head with no staging declaration after it: no candidate. The
@@ -5372,6 +5448,8 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
                 head_action_hash: out.head_action_hash.clone(),
                 entry_hash: out.entry_hash.clone(),
                 author: out.author.clone(),
+                canonical_declared_at: None,
+                canonical_earned: None,
             })?;
             return Ok(out);
         }
@@ -5398,6 +5476,8 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
             head_action_hash: out.head_action_hash.clone(),
             entry_hash: out.entry_hash.clone(),
             author: out.author.clone(),
+            canonical_declared_at: None,
+            canonical_earned: None,
         })?;
         return Ok(out);
     }
@@ -5440,6 +5520,8 @@ pub fn declare_content_head(input: DeclareContentHeadInput) -> ExternResult<Cont
         head_action_hash: out.head_action_hash.clone(),
         entry_hash: out.entry_hash.clone(),
         author: out.author.clone(),
+        canonical_declared_at: None,
+        canonical_earned: None,
     })?;
     Ok(out)
 }
@@ -5577,7 +5659,10 @@ pub fn classify_chain_gate(
 
 /// Shared body for both canonical-head declaration tiers: validate the id +
 /// cross-root target, write the canonical-head link with the given provenance
-/// `tag`, emit the reused `ContentHeadDeclared` signal, and build the output.
+/// `tag`, incorporate the exact newly-authored link into the canonical election,
+/// emit the reused `ContentHeadDeclared` signal for the ACTUAL winner, and build
+/// that winner's output. A staging declaration beneath an earned winner appears
+/// only as `staging_candidate`; it is never mislabeled as the head.
 /// Callers own the AUTHORITY decision (which tier / who may declare) and the
 /// earned-head guard BEFORE calling this.
 ///
@@ -5680,10 +5765,41 @@ fn declare_canonical_head_inner(
         ))));
     }
 
-    // Record the canonical-head link (coordinator-only, gossips to all peers).
-    create_canonical_head_link(id, &target, tag)?;
+    // Record the canonical-head link (coordinator-only, gossips to all peers),
+    // then fold that exact scratch-authored action into the same election every
+    // reader runs. A staging declaration beneath an earned winner is a
+    // CANDIDATE, not the head; returning the nominated target unconditionally
+    // made the storage projection crown a loser until a later heal corrected it.
+    // Complete every fallible read before opening the source-chain scratch
+    // write. The exact new link is merged below, so correctness does not depend
+    // on get_links exposing an uncommitted action.
+    let visible = gather_election_candidates(id, GetStrategy::Local)?;
+    let declared_candidate = create_canonical_head_link(id, &target, tag)?;
+    let election = election_after_declaration(visible, declared_candidate).ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "declare_canonical_head: newly authored declaration produced no election".to_string()
+        ))
+    })?;
+    let winner_target = election.winner.target.clone();
+    let winner_record = if winner_target == target {
+        target_record
+    } else {
+        get(winner_target.clone(), GetOptions::local())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "declare_canonical_head: locally elected winner {winner_target:?} is not \
+                 retrievable locally after declaration; refusing to report the nominated target \
+                 as canonical"
+            )))
+        })?
+    };
 
-    let mut out = build_content_head_output(id, &target_record, true)?;
+    let mut out = build_content_head_output(id, &winner_record, true)?;
+    out.canonical_declared_at = Some(election.winner.timestamp);
+    out.canonical_earned = Some(election.winner.is_earned);
+    if let Some(candidate) = election.staging_candidate {
+        out.staging_candidate = Some(holo_hash::ActionHashB64::from(candidate.target));
+        out.staging_candidate_declared_at = Some(candidate.timestamp);
+    }
     // DECLARE-CARRIES-RECORD hardening: on the CARRIED branch the target
     // action's OWN timestamp is attacker-influenced — a carried action stamped
     // at i64::MAX would flow verbatim into `declared_at` and permanently lock
@@ -5693,7 +5809,7 @@ fn declare_canonical_head_inner(
     // was declared — so stamp `declared_at` with THIS conductor's local
     // `sys_time`, the moment the declaration is witnessed here. The local-`get`
     // branch (`from_carried == false`) keeps the real conductor timestamp.
-    if from_carried {
+    if from_carried && winner_target == target {
         out.declared_at = sys_time()?;
     }
     // Reuse the existing declared-head projection signal — storage's
@@ -5703,6 +5819,8 @@ fn declare_canonical_head_inner(
         head_action_hash: out.head_action_hash.clone(),
         entry_hash: out.entry_hash.clone(),
         author: out.author.clone(),
+        canonical_declared_at: out.canonical_declared_at,
+        canonical_earned: out.canonical_earned,
     })?;
     Ok(out)
 }
@@ -14356,16 +14474,27 @@ pub enum ProjectionSignal {
         content: Content,
         author: AgentPubKey,
     },
-    /// Content HEAD was declared by the author (notary-authority Leg 1).
-    /// Emitted from `declare_content_head` — the version DAG's head moved
-    /// (republish) or was re-affirmed (idempotent). Coordinator-local
-    /// emission: the republish path also fires `ContentCommitted` from
-    /// post_commit, but only `declare_content_head` knows the declare intent.
+    /// Content HEAD declaration result (notary-authority Leg 1). The
+    /// single-author path emits the declared version-DAG head with no canonical
+    /// ordering. A cross-root path emits the ACTUAL post-declaration election
+    /// winner with its exact canonical ordering; a subordinate staging
+    /// declaration is reported on the returned output's candidate fields and
+    /// never emitted here as though it won. Coordinator-local emission: a
+    /// republish also fires `ContentCommitted` from post_commit, but only the
+    /// declare function knows the declaration intent.
     ContentHeadDeclared {
         content_id: String,
         head_action_hash: ActionHash,
         entry_hash: EntryHash,
         author: AgentPubKey,
+        /// Exact ordering of the winning canonical declaration link when this
+        /// signal came from a cross-root declare. `None` on the single-author
+        /// path and for older coordinators.
+        #[serde(default)]
+        canonical_declared_at: Option<Timestamp>,
+        /// Tier paired with `canonical_declared_at`; both are Some or both None.
+        #[serde(default)]
+        canonical_earned: Option<bool>,
     },
     /// Manifest entry was created or updated (Phase 3 P3.2).
     ManifestCommitted {

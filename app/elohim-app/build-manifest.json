@@ -4,7 +4,7 @@
   "jenkinsPath": "Jenkinsfile",
   "manualOnly": false,
   "triggersGenesis": true,
-  "dependsOn": ["elohim-sophia"],
+  "dependsOn": ["elohim-sophia", "elohim-edge"],
   "description": "Elohim Angular app \u2014 build, service worker, site image",
   "steps": {
     "build-angular": {

@@ -1,6 +1,22 @@
 # Elohim Orchestrator
 
-The **central controller** for all Elohim CI/CD pipelines. This is the ONLY pipeline that receives GitHub webhooks - all other pipelines are triggered by the orchestrator.
+This guide is for contributors adding, previewing, or diagnosing a CI pipeline.
+The orchestrator is the central controller for Elohim CI/CD: it alone receives
+GitHub webhooks and dispatches the other Jenkins pipelines.
+
+Start from the repository root with Node, pnpm, and `just` available. A local
+preview needs a Git checkout and manifests; observing a pushed build also needs
+read access to the Jenkins orchestrator job. The safe first check is read-only:
+
+```bash
+node genesis/orchestrator/preview.mjs origin/dev
+```
+
+A healthy preview exits zero, prints `ORCHESTRATOR DECISION (preview)`, and
+marks each non-manual manifest pipeline `BUILD` or `SKIP` for committed plus
+uncommitted paths. Use **Pipeline Configuration** to add a pipeline, **Commit-message
+tags** to request a deliberate dispatch, and **Troubleshooting** when the preview
+and Jenkins result disagree.
 
 ## Architecture
 
@@ -12,17 +28,40 @@ GitHub Webhook → Orchestrator → Analyze Changesets → Trigger Pipelines →
 
 ## How It Works
 
-1. **Receive webhook** - GitHub pushes trigger the orchestrator
-2. **Analyze changesets** - Determine which files changed
-3. **Map to pipelines** - Match changed files to pipeline patterns
-4. **Trigger in order** - Respect dependency graph (holochain → edge/app → genesis)
-5. **Report status** - Update build description with results
+1. **Select** — changed paths and build-process hashes mark manifest steps stale;
+   commit tags can force-include pipelines, and baseline debt can widen the
+   changeset.
+2. **Order** — `dependsOn` ranks only the selected pipelines. It never selects
+   an absent prerequisite.
+3. **Dispatch** — each dependency level runs in parallel. A failed level stops
+   later levels. A selected long-running producer is awaited through a detached
+   completion barrier when a selected consumer depends on it; otherwise it stays
+   fire-and-forget.
+4. **Run Genesis** — on eligible dev branches, a selected pipeline with
+   `triggersGenesis: true` adds Genesis unless `SKIP_GENESIS` is set. Genesis runs
+   after every selected non-Genesis level returns a successful dispatch result.
+   For a dependency-barrier producer that reflects completion; a standalone
+   long-running producer retains its optimistic dispatch result.
+5. **Record and reconcile** — predicted and actual graph artifacts retain the
+   plan, downstream results, timings, and stage annotations.
+
+For example, an app-only selection runs only `elohim`; its absent edge and
+Sophia prerequisites are not added. A change that selects DNA, edge, and app is
+ordered DNA → edge → app → Genesis. Step dependencies can make downstream steps
+stale in Jenkins; the pipeline-level `cascades` field is retained as registry
+metadata and does not itself expand the selected set.
 
 ## Pipeline Configuration
 
-Each pipeline declares its metadata in a `build-manifest.json` file. The orchestrator uses `graph-walker.mjs` to walk these manifests and build a dependency graph.
+Each project declares steps and pipeline metadata in `build-manifest.json`.
+`elohim/rakia/schemas/v1/build-manifest.schema.json` is authoritative: the
+required top-level fields are `manifestVersion`, `pipeline`, `description`, and
+`steps`; dispatchable pipelines also provide `jenkinsPath` (or the explicit
+cross-repository job fields). Fields such as `dependsOn`, `manualOnly`,
+`triggersGenesis`, `cascades`, `longRunning`, `gate`, and `deployment` are
+optional and default in the registry when omitted.
 
-### Example: `elohim/holochain/build-manifest.json`
+### Abbreviated manifest shape
 
 ```json
 {
@@ -33,47 +72,73 @@ Each pipeline declares its metadata in a `build-manifest.json` file. The orchest
   "triggersGenesis": true,
   "cascades": true,
   "dependsOn": [],
-  "changePatterns": [
-    "holochain/dna/",
-    "holochain/holochain-cache-core/"
-  ],
   "steps": {
-    "build": { "stage": "Build", "step": "cargo build" },
-    "test": { "stage": "Test", "step": "cargo test" }
-  },
-  "gate": {
-    "metric": "testCoverage",
-    "minimum": 75
-  },
-  "deployment": {
-    "environments": ["alpha", "staging", "prod"]
+    "build": {
+      "inputs": { "sources": ["project/src/**"] },
+      "outputs": { "artifacts": ["project-image"], "verify": null },
+      "depends": [],
+      "executor": { "stage": "Build", "function": null }
+    }
   }
 }
 ```
 
 ### How to Add a New Pipeline
 
-1. Create `<project>/build-manifest.json` with `pipeline`, `jenkinsPath`, `changePatterns`, `dependsOn`, and other metadata
-2. Ensure the Jenkinsfile at `jenkinsPath` exists and validates `UpstreamCause` or `UserIdCause`
-3. Run `node genesis/orchestrator/scripts/generate-pipeline-list.mjs` to update the Bash-consumable artifact
-4. Commit both files
+1. Create `<project>/build-manifest.json` from the schema and an existing peer
+   manifest. Declare source inputs, step dependencies, outputs, and the pipeline
+   metadata that actually applies.
+2. Add the Jenkinsfile named by `jenkinsPath`; it must accept only
+   `UpstreamCause` or `UserIdCause`. Keep the Groovy mirror in
+   `build-graph.groovy` aligned when changing graph algorithms; ordinary manifest
+   additions need no hand-maintained registry entry.
+3. From the repository root, regenerate and validate:
+
+   ```bash
+   node genesis/orchestrator/scripts/generate-pipeline-list.mjs
+   just _gate-rakia-validate
+   just _gate-pipeline-list-fresh
+   just gate orchestrator
+   node genesis/orchestrator/preview.mjs origin/dev
+   ```
+
+   The schema validator must accept every manifest, the generated list must have
+   no diff after regeneration, the orchestrator gate must pass, and the preview
+   must show the new pipeline only for its declared inputs (or `MANUAL`).
+4. Commit the manifest, Jenkinsfile, generated `pipeline-list.json`, and any
+   necessary graph/test updates together. After pushing, confirm the orchestrator
+   build for that commit dispatched the same pipelines the preview predicted.
 
 The orchestrator automatically discovers all manifests at startup.
 
 ## Dependency Graph
 
-| Pipeline | Builds | `dependsOn` |
-|---|---|---|
-| `elohim-holochain` | the DNA / hApp bundle | — |
-| `elohim-conductor` | the custom holochain conductor image | — |
-| `elohim-edge` | doorway + storage + edge node image; deploys them | `elohim-holochain`, `elohim-conductor` |
-| `elohim` | the Angular app | — |
-| `elohim-steward` | the desktop/device build (`manualOnly`) | — |
-| `elohim-genesis` | content seeding + validation; runs last, after all builds succeed | (outside the levels loop) |
+This table covers every dispatchable pipeline in the generated
+`pipeline-list.json`; manifests without a Jenkins target remain local gate
+metadata.
+
+| Pipeline | Builds | `dependsOn` | Dispatch behavior |
+|---|---|---|---|
+| `elohim-holochain` | DNA / hApp bundles | — | long-running; triggers Genesis |
+| `elohim-conductor` | custom conductor image | — | cross-repository |
+| `elohim-edge` | doorway, storage, conductor, edge image | DNA, conductor | triggers Genesis |
+| `elohim` | Angular app | edge, Sophia | triggers Genesis |
+| `elohim-sophia` | Sophia bundle | — | selected by Sophia inputs |
+| `elohim-storybook` | component Storybook | — | independent |
+| `elohim-epr` | EPR tooling | — | independent |
+| `elohim-eprfs` | EPR filesystem tooling | — | independent |
+| `elohim-orchestrator` | this controller's checks | — | self-dispatch is suppressed |
+| `elohim-steward` | desktop/device build | — | manual-only |
+| `elohim-genesis` | seed and acceptance validation | edge, app | dispatched after selected levels |
 
 Pipelines are dispatched in dependency **levels** — topological ranks, run in
 order, with everything in a level running in parallel and a failed level
 aborting the next.
+
+Dependencies order pipelines only when both are selected; they do not select a
+prerequisite by themselves. An app-only change therefore remains app-only,
+while a coupled DNA + edge + app change deploys the repaired backend before the
+app publishes against it.
 
 `elohim-conductor` is the one pipeline whose Jenkins job tracks a **different
 repository**: the `elohim-edgenode` job on che-devworkspaces (itself a submodule
@@ -107,7 +172,14 @@ Individual pipelines check if they were triggered by the orchestrator. If trigge
 Each pipeline carries a per-pipeline baseline (the last build the orchestrator considers known-good). **Watch-out — baseline-rollback over-build:** a `FAILURE`/`ABORTED` result can invalidate the per-pipeline baseline and roll back to the *global* baseline, which then fans out into a full cascade rebuild; `lastSuccessful()` can pin an ancient green build that no longer reflects HEAD. The baseline should advance only on a *confirmed-downstream-success*, never on a dispatch that merely started. (Backlog: convert the baseline into an explicit state machine + a `build-manifest ⊆ orchestrator changePatterns` drift test — see the recurring-anti-patterns museum record below.)
 
 ### Genesis Triggering
-Genesis is triggered automatically after ALL dependent pipelines succeed. It auto-detects the target environment from the branch.
+
+Genesis is selected by its own changed inputs or force tag, or automatically on
+an eligible dev branch when another selected pipeline declares
+`triggersGenesis: true`. It runs outside the dependency-level loop, after all
+selected non-Genesis levels report success. For dispatch control,
+`SUCCESS` and `UNSTABLE` are successful; `FAILURE`, `ERROR`, `ABORTED`, and a
+missing/`NOT_BUILT` result prevent progression. Genesis detects its target
+environment from the branch.
 
 ### Manual-Only Pipelines
 `elohim-steward` is marked `manualOnly: true` - the orchestrator never triggers it automatically.
@@ -183,27 +255,36 @@ Read it before debugging a "regression" or proposing a measure/baseline change �
 ## Before Editing Orchestrator Dispatch Logic
 
 Read the substrate pieces before touching Execute Builds, dispatch ordering, or trigger logic:
-- `graph-walker.mjs` (`walkGraph`) — JS change-detection for local pre-push; reads `build-manifest.json` source-globs to compute which pipelines are affected
-- `build-graph.groovy` (`walkBuildGraph`) — the server-side Groovy mirror of the same manifest-walk; runs in Jenkins
-- `preview.mjs` — `just ci-preview`, imports `pipeline-registry.mjs` + `graph-walker.mjs` to print predicted dispatch locally pre-push
-- `Jenkinsfile` `groupByDependencyLevel` and `triggerPipeline` (Groovy dispatch loop)
 
-Key invariants that naive edits break: `levelFailed` guard must abort downstream; baselines advance only after confirmed success; `cascades: false` pipelines (sophia, epr) opt out of downstream auto-include; Genesis is intentionally outside the levels loop. Any edit to `orderByDependencies`, `groupByDependencyLevel`, `propagateDependencies`, or pipeline metadata in `build-manifest.json` files must be reflected in `build-graph.groovy`.
+- `graph-walker.mjs` (`walkGraph`) performs local changed-path detection for
+  pre-push gates and `preview.mjs`; it reports affected pipelines but deliberately
+  does not propagate staleness.
+- `build-graph.groovy` (`walkBuildGraph`) is Jenkins's server-side manifest walk;
+  it propagates stale manifest steps through step dependencies and returns the
+  selected pipeline/step map.
+- `preview.mjs` combines the local walker with registry metadata and commit tags
+  to print the pre-push prediction.
+- Jenkinsfile `groupByDependencyLevel` owns pipeline-level ordering of the final
+  selected set; `triggerPipeline` owns dispatch and result classification.
+
+Key invariants that naive edits break: `levelFailed` must stop later levels;
+waited baselines advance only after confirmed success; standalone long-running
+pipelines retain their deliberate optimistic baseline; and Genesis stays outside
+the levels loop. Algorithm changes must keep the Groovy walker, local preview,
+and their tests aligned. Manifest metadata changes need matching ordering tests,
+not a second hard-coded registry.
 
 Note: `graph-walker.mjs` is per-pipeline manifest-step gating (change detection + lint/test); `groupByDependencyLevel` is orchestrator-level dispatch ordering. Different layers, different concerns.
 
-## Predictive Build-Graph Vision
+## Build-Graph Evidence
 
-The long-term target: predict what will run before you push, reconcile against what actually ran, and treat every disconnect as an investigation. Three-hour build runs hide cascading failures inside a single opaque "Execute Builds" stage; visible structure surfaces drift before it becomes a mystery.
-
-The substrate already exists — don't rebuild it:
-- `preview.mjs` (`walkGraph` via `graph-walker.mjs`) computes the predicted dispatch graph locally pre-push
-- `pipeline-registry.mjs` is the single source of pipeline metadata (loaded from `build-manifest.json` files)
-
-Planned iterations (each safe to land independently):
-1. **Visibility** — nest stages inside Execute Builds so Blue Ocean shows level structure with per-pipeline timing. Presentation only, no behavior change.
-2. **Reconciliation artifact** — emit `predicted-build-graph.json` (from `walkGraph`) and `actual-build-graph.json` (from Execute Builds results), then diff in a Reconcile stage.
-3. **Drift escalation** — any predicted-vs-actual disconnect marks UNSTABLE with an investigation pointer.
+The current pipeline writes and archives `predicted-build-graph.json` before
+dispatch, then `actual-build-graph.json` after dispatch. The actual artifact
+records downstream results, durations, dependency levels, and hydrated stage
+annotations. `reconcile-build-graph.mjs` compares them; a disconnect marks the
+orchestrator UNSTABLE and supplies investigation pointers. `pipeline-registry.mjs`
+loads pipeline metadata directly from manifests, so do not build a second
+registry or result classifier.
 
 ## Seed Stage — Per-Peer, Not All-or-Nothing
 
@@ -212,7 +293,9 @@ When one peer's conductor admin WebSocket is down, the seeder continues against 
 Rules:
 - Readiness probes belong at the per-peer level; gate nothing globally on one pod's health.
 - Record a per-peer readiness snapshot at start; seed ready peers; surface unready peers in the report.
-- `actual-build-graph.json` `results` map carries per-peer status; downstream advisories decide whether partial-seed warrants UNSTABLE or informational.
+- `actual-build-graph.json` carries Genesis's per-peer readiness and seed details
+  under its result's `stageAnnotations`; downstream advisories decide whether a
+  partial seed warrants UNSTABLE or is informational.
 - E2E tests targeting a specific peer should skip-with-reason if that peer was unready, not fail-cascade.
 
 ## Troubleshooting
@@ -221,8 +304,9 @@ Rules:
 - Expected! The orchestrator didn't trigger it because no relevant files changed.
 
 **Q: Genesis not running?**
-- Check if all dependencies (holochain, edge, app) succeeded.
-- Genesis only runs after successful builds.
+- Check that Genesis was selected and that every earlier selected level returned
+  `SUCCESS` or `UNSTABLE`. `ABORTED`, `NOT_BUILT`, `ERROR`, and `FAILURE` do not
+  permit progression.
 
 **Q: Wrong environment targeted?**
 - Check the branch. Orchestrator passes branch info to pipelines.

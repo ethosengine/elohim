@@ -1568,6 +1568,15 @@ pub enum StampOutcome {
 /// verbatim to the projection. `None` = the answer carries no election.
 pub type CanonicalOrdering = (i64, bool);
 
+fn canonical_ordering_from_columns(
+    declared_at: Option<i64>,
+    earned: Option<i32>,
+) -> Option<CanonicalOrdering> {
+    declared_at
+        .zip(earned)
+        .map(|(timestamp, tier)| (timestamp, tier != 0))
+}
+
 /// Why a [`StampMode::HealCanonical`] stamp declined to move an already-declared
 /// row. Label values for `elohim_projection_heal_refused_stale_total{reason}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1661,8 +1670,8 @@ pub fn canonical_move_verdict(
 
 /// `canonical_ordering` is the DHT election behind a CANONICAL answer (see
 /// [`CanonicalOrdering`]). `None` means the caller's answer carries no election:
-/// every non-canonical channel, and the declare paths (which have written a link
-/// but not read back its notarized timestamp). It is consulted ONLY by
+/// every non-canonical channel and legacy declaration paths that did not read
+/// back their notarized link timestamp. It is consulted ONLY by
 /// [`StampMode::HealCanonical`]; the other modes ignore it for the move decision
 /// but still PERSIST it when present, so the column backfills.
 ///
@@ -1709,8 +1718,8 @@ pub fn stamp_declared_head_mode(
 
     // The stored election, reassembled. Both columns are written together, so a
     // half-populated pair cannot occur; a defensive `zip` treats one as none.
-    let stored_ordering: Option<CanonicalOrdering> =
-        stored_canonical_at.map(|ts| (ts, stored_canonical_earned.unwrap_or(0) != 0));
+    let stored_ordering =
+        canonical_ordering_from_columns(stored_canonical_at, stored_canonical_earned);
 
     let moving_declared_row = matches!(
         declared.as_deref(),
@@ -1744,6 +1753,21 @@ pub fn stamp_declared_head_mode(
                 if let Err(reason) = canonical_move_verdict(canonical_ordering, stored_ordering) {
                     crate::metrics::inc_projection_refused_stale(reason.label());
                     return Ok(StampOutcome::SkippedStale);
+                }
+            } else if same_declared_head {
+                // A delayed signal for this SAME head must not downgrade the
+                // row's stronger/newer election clock and thereby reopen a
+                // rollback window. Equal ordering is an idempotent refresh;
+                // a genuinely newer/tier-stronger election may advance the
+                // bookkeeping. An unordered same-head legacy refresh keeps
+                // the ordering already known.
+                if let (Some(incoming), Some(stored)) = (canonical_ordering, stored_ordering) {
+                    if incoming != stored {
+                        if let Err(reason) = canonical_move_verdict(Some(incoming), Some(stored)) {
+                            crate::metrics::inc_projection_refused_stale(reason.label());
+                            return Ok(StampOutcome::SkippedStale);
+                        }
+                    }
                 }
             }
         }
@@ -4898,6 +4922,76 @@ mod tests {
         );
     }
 
+    /// The declaration response carries the exact election that includes the
+    /// link it just authored. Persisting both in the eager stamp closes the
+    /// publish-before-integrate window: an older canonical answer may arrive
+    /// from the same conductor before its new link reaches the read store, but
+    /// it cannot roll the declared executable metadata back.
+    #[test]
+    fn eager_ordered_declaration_rejects_an_older_head_and_its_metadata() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("ordered-declare")).unwrap();
+
+        let declared = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "ordered-declare",
+            "uhCkk-server-head",
+            Some(2_000),
+            Some(ContentProjectionPatch {
+                metadata_json: Some(r#"{"serverBlobHash":"sha256-server"}"#.into()),
+                ..Default::default()
+            }),
+            StampMode::Declare,
+            Some((2_000, false)),
+        )
+        .unwrap();
+        assert_eq!(declared, StampOutcome::Stamped);
+
+        let stale = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "ordered-declare",
+            "uhCkk-browser-head",
+            Some(1_000),
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((1_000, false)),
+        )
+        .unwrap();
+        assert_eq!(stale, StampOutcome::SkippedStale);
+
+        let delayed_same_head = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "ordered-declare",
+            "uhCkk-server-head",
+            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((1_000, false)),
+        )
+        .unwrap();
+        assert_eq!(delayed_same_head, StampOutcome::SkippedStale);
+
+        let row = get_content(&mut conn, &ctx, "ordered-declare", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-server-head")
+        );
+        assert_eq!(row.server_blob_hash.as_deref(), Some("sha256-server"));
+        assert_eq!(row.canonical_declared_at, Some(2_000));
+    }
+
     /// THE CURE (2026-08-02) — the two-way-declared class. A row declared by a
     /// channel that records NO election (the deploy PATCH's
     /// `HeadElection::Declare`, or a timestamp-less `ContentHeadDeclared`
@@ -5018,6 +5112,20 @@ mod tests {
                 assert!(!(ab && ba), "flap: {a:?} and {b:?} each displace the other");
             }
         }
+    }
+
+    #[test]
+    fn half_stored_canonical_ordering_has_no_election_authority() {
+        assert_eq!(canonical_ordering_from_columns(Some(42), None), None);
+        assert_eq!(canonical_ordering_from_columns(None, Some(1)), None);
+        assert_eq!(
+            canonical_ordering_from_columns(Some(42), Some(0)),
+            Some((42, false))
+        );
+        assert_eq!(
+            canonical_ordering_from_columns(Some(42), Some(1)),
+            Some((42, true))
+        );
     }
 
     /// Refusal reasons are distinct and stable — they are metric label values,
