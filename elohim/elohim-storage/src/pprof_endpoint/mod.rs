@@ -315,17 +315,34 @@ mod tests {
     /// The `pprof` guard itself is process-wide for the same reason.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn captures_a_gzip_framed_profile_and_releases_the_guard() {
-        // Give the sampler something to see.
-        std::thread::spawn(|| {
-            let deadline = std::time::Instant::now() + Duration::from_millis(1200);
+        // Give the sampler Rust work for the ENTIRE capture. The former loop
+        // called `Instant::now()` on every arithmetic operation, so clock checks
+        // could dominate in the explicitly-blocklisted vDSO; its fixed lifetime
+        // also began before profiler initialization. Batching the arithmetic
+        // keeps observable work in application code; the stop flag + join prove
+        // the producer overlaps the full profiler lifetime.
+        let stop = std::sync::Arc::new(AtomicBool::new(false));
+        let started = std::sync::Arc::new(std::sync::Barrier::new(2));
+        let producer_stop = stop.clone();
+        let producer_started = started.clone();
+        let producer = std::thread::spawn(move || {
             let mut acc: u64 = 0;
-            while std::time::Instant::now() < deadline {
-                acc = acc.wrapping_mul(31).wrapping_add(7);
+            producer_started.wait();
+            while !producer_stop.load(Ordering::Relaxed) {
+                for _ in 0..1_000_000 {
+                    acc = std::hint::black_box(acc).wrapping_mul(31).wrapping_add(7);
+                }
+                std::hint::black_box(acc);
             }
             std::hint::black_box(acc);
         });
+        started.wait();
 
-        match capture_profile(1).await {
+        let outcome = capture_profile(1).await;
+        stop.store(true, Ordering::Relaxed);
+        producer.join().expect("CPU sample producer");
+
+        match outcome {
             ProfileOutcome::Profile(body) => {
                 assert!(!body.is_empty(), "profile body must not be empty");
                 assert_eq!(&body[..2], &[0x1f, 0x8b], "expected gzip magic bytes");
