@@ -32,8 +32,8 @@
 //! whose conductor subscription is dead, or that booted while storage was down —
 //! converges within one tick after storage answers.
 
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
 
 use elohim_views::projection::Channel;
@@ -403,6 +403,12 @@ pub struct BundleHeadsReconciler {
     heads: Arc<BundleHeadStore>,
     targets: TargetSource,
     reconcile_lock: tokio::sync::Mutex<()>,
+    /// Ephemeral (C) refresh intent. It is reconstructable from the current
+    /// target set and the periodic full tick, so restart may safely discard it.
+    /// Set membership, rather than notification count, is the work record:
+    /// bursts for one slug therefore occupy one bounded slot.
+    pending_slugs: Mutex<HashSet<String>>,
+    pending_notify: tokio::sync::Notify,
 }
 
 impl BundleHeadsReconciler {
@@ -424,6 +430,8 @@ impl BundleHeadsReconciler {
             heads,
             targets,
             reconcile_lock: tokio::sync::Mutex::new(()),
+            pending_slugs: Mutex::new(HashSet::new()),
+            pending_notify: tokio::sync::Notify::new(),
         }
     }
 
@@ -434,7 +442,71 @@ impl BundleHeadsReconciler {
 
     /// The apps this pass will walk.
     pub fn targets(&self) -> Vec<BundleTarget> {
-        (self.targets)()
+        let mut unique: Vec<BundleTarget> = Vec::new();
+        for target in (self.targets)() {
+            if let Some(existing) = unique
+                .iter_mut()
+                .find(|existing| existing.slug == target.slug && existing.channel == target.channel)
+            {
+                // `entry_file` is ancillary eviction/log context; eviction is
+                // slug-scoped. Preserve a useful path when duplicate contracts
+                // differ only because one source did not carry it.
+                if existing.entry_file.is_none() {
+                    existing.entry_file = target.entry_file;
+                }
+            } else {
+                unique.push(target);
+            }
+        }
+        unique
+    }
+
+    /// Queue one current target slug for the existing serial reconciler task.
+    ///
+    /// This never reads storage and never waits for an in-flight reconciliation.
+    /// An update arriving while its slug is being fetched inserts the slug after
+    /// the worker's take, leaving exactly one pending rerun with the latest
+    /// authority answer. Removed and unknown targets cannot accumulate work.
+    pub fn request_content_refresh(&self, id: &str) -> bool {
+        let targets = self.targets();
+        let current: HashSet<&str> = targets.iter().map(|target| target.slug.as_str()).collect();
+        let mut pending = self.pending_slugs.lock().unwrap_or_else(|e| e.into_inner());
+        pending.retain(|slug| current.contains(slug.as_str()));
+        if !current.contains(id) {
+            return false;
+        }
+        let inserted = pending.insert(id.to_string());
+        drop(pending);
+        if inserted {
+            self.pending_notify.notify_one();
+        }
+        true
+    }
+
+    /// Take one bounded dirty snapshot. Taking happens BEFORE any fetch so an
+    /// update during an in-flight read is retained for the next worker turn.
+    fn take_pending_slugs(&self) -> Vec<String> {
+        let pending = {
+            let mut guard = self.pending_slugs.lock().unwrap_or_else(|e| e.into_inner());
+            std::mem::take(&mut *guard)
+        };
+        let current: HashSet<String> = self
+            .targets()
+            .into_iter()
+            .map(|target| target.slug)
+            .collect();
+        let mut slugs: Vec<String> = pending
+            .into_iter()
+            .filter(|slug| current.contains(slug))
+            .collect();
+        slugs.sort();
+        slugs
+    }
+
+    async fn reconcile_pending_snapshot(&self) {
+        for slug in self.take_pending_slugs() {
+            self.on_content_event(&slug).await;
+        }
     }
 
     /// Reconcile ONE slug. Returns the move when a head actually changed.
@@ -589,16 +661,28 @@ pub fn spawn_bundle_heads_task(
             tick_secs = period.as_secs(),
             "bundle-heads reconcile tick started"
         );
+        let mut tick_sleep = Box::pin(tokio::time::sleep(period));
         loop {
-            tokio::time::sleep(period).await;
-            let moves = reconciler.tick().await;
-            if !moves.is_empty() {
-                tracing::info!(
-                    target: "doorway::ssr",
-                    moved = moves.len(),
-                    "bundle heads: {} declaration(s) advanced this tick",
-                    moves.len()
-                );
+            tokio::select! {
+                // A ready full tick wins over a sustained dirty-event stream.
+                biased;
+                _ = &mut tick_sleep => {
+                    let moves = reconciler.tick().await;
+                    if !moves.is_empty() {
+                        tracing::info!(
+                            target: "doorway::ssr",
+                            moved = moves.len(),
+                            "bundle heads: {} declaration(s) advanced this tick",
+                            moves.len()
+                        );
+                    }
+                    tick_sleep.as_mut().reset(tokio::time::Instant::now() + period);
+                }
+                _ = reconciler.pending_notify.notified() => {
+                    // One captured batch per turn. Notifications arriving while
+                    // it runs retain their set membership for a later turn.
+                    reconciler.reconcile_pending_snapshot().await;
+                }
             }
         }
     })
@@ -608,7 +692,6 @@ pub fn spawn_bundle_heads_task(
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Mutex;
 
     /// In-memory stand-in for the storage peer. Answers per channel: the
     /// converged doc, and the candidate's staging declaration (absent by
@@ -671,6 +754,67 @@ mod tests {
                     None => ChannelHead::NoCandidateStaged,
                 }),
             }
+        }
+    }
+
+    struct BlockingCandidateSource {
+        candidate: Mutex<Option<String>>,
+        reads: AtomicUsize,
+        first_started: tokio::sync::Notify,
+        release_first: tokio::sync::Notify,
+    }
+
+    impl BlockingCandidateSource {
+        fn new() -> Arc<Self> {
+            Arc::new(Self {
+                candidate: Mutex::new(None),
+                reads: AtomicUsize::new(0),
+                first_started: tokio::sync::Notify::new(),
+                release_first: tokio::sync::Notify::new(),
+            })
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl HeadSource for BlockingCandidateSource {
+        async fn fetch(&self, _slug: &str, channel: Channel) -> Result<ChannelHead, String> {
+            assert_eq!(channel, Channel::Candidate);
+            let answer = self.candidate.lock().unwrap().clone();
+            if self.reads.fetch_add(1, Ordering::SeqCst) == 0 {
+                self.first_started.notify_one();
+                self.release_first.notified().await;
+            }
+            Ok(match answer {
+                Some(declaration) => ChannelHead::Resolved(HeadDoc {
+                    browser: Some("sha256-candidate-b".into()),
+                    server: None,
+                    staging_declaration: Some(declaration),
+                }),
+                None => ChannelHead::NoCandidateStaged,
+            })
+        }
+    }
+
+    #[derive(Default)]
+    struct OrderedBlockingSource {
+        slugs: Mutex<Vec<String>>,
+        first_started: tokio::sync::Notify,
+        release_first: tokio::sync::Notify,
+    }
+
+    #[async_trait::async_trait]
+    impl HeadSource for OrderedBlockingSource {
+        async fn fetch(&self, slug: &str, _channel: Channel) -> Result<ChannelHead, String> {
+            let first = {
+                let mut slugs = self.slugs.lock().unwrap();
+                slugs.push(slug.to_string());
+                slugs.len() == 1
+            };
+            if first {
+                self.first_started.notify_one();
+                self.release_first.notified().await;
+            }
+            Ok(ChannelHead::NoCandidateStaged)
         }
     }
 
@@ -1195,6 +1339,160 @@ mod tests {
             .heads()
             .get_channel("landing", Channel::Candidate)
             .is_some());
+    }
+
+    #[tokio::test]
+    async fn a_burst_during_an_inflight_refresh_leaves_one_latest_rerun() {
+        let source = BlockingCandidateSource::new();
+        let heads = Arc::new(BundleHeadStore::new());
+        let reconciler = Arc::new(BundleHeadsReconciler::new(
+            source.clone(),
+            None,
+            Arc::new(WarmShellStore::inert()),
+            heads.clone(),
+            Arc::new(|| {
+                vec![BundleTarget {
+                    slug: "landing".into(),
+                    entry_file: Some("index.html".into()),
+                    channel: Channel::Candidate,
+                }]
+            }),
+        ));
+        let worker = spawn_bundle_heads_task(reconciler.clone(), Duration::from_secs(3_600));
+
+        assert!(reconciler.request_content_refresh("landing"));
+        source.first_started.notified().await;
+        for _ in 0..9 {
+            assert!(reconciler.request_content_refresh("landing"));
+        }
+        *source.candidate.lock().unwrap() = Some("uhCkkB".into());
+        source.release_first.notify_one();
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while source.reads.load(Ordering::SeqCst) < 2 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("one rerun consumes the latest answer");
+        tokio::task::yield_now().await;
+        assert_eq!(source.reads.load(Ordering::SeqCst), 2);
+        let observed = heads
+            .get_channel("landing", Channel::Candidate)
+            .expect("latest candidate observed");
+        assert_eq!(observed.staging_declaration.as_deref(), Some("uhCkkB"));
+        worker.abort();
+    }
+
+    #[tokio::test]
+    async fn exact_target_pairs_are_deduplicated_but_channels_stay_distinct() {
+        let source = FakeSource::declaring(Some("sha256-a"), None);
+        source.stage_candidate(Some("uhCkkB"));
+        let reconciler = BundleHeadsReconciler::new(
+            source.clone(),
+            None,
+            Arc::new(WarmShellStore::inert()),
+            Arc::new(BundleHeadStore::new()),
+            Arc::new(|| {
+                vec![
+                    BundleTarget {
+                        slug: "landing".into(),
+                        entry_file: None,
+                        channel: Channel::Candidate,
+                    },
+                    BundleTarget {
+                        slug: "landing".into(),
+                        entry_file: Some("index.html".into()),
+                        channel: Channel::Candidate,
+                    },
+                    BundleTarget {
+                        slug: "landing".into(),
+                        entry_file: Some("index.html".into()),
+                        channel: Channel::Converged,
+                    },
+                ]
+            }),
+        );
+        assert_eq!(reconciler.targets().len(), 2);
+        reconciler.tick().await;
+        assert_eq!(source.reads.load(Ordering::SeqCst), 2);
+        assert!(reconciler.heads().get("landing").is_some());
+        assert!(reconciler
+            .heads()
+            .get_channel("landing", Channel::Candidate)
+            .is_some());
+    }
+
+    #[tokio::test]
+    async fn removed_and_unknown_targets_do_not_leave_pending_work() {
+        let targets = Arc::new(Mutex::new(vec![BundleTarget {
+            slug: "landing".into(),
+            entry_file: None,
+            channel: Channel::Candidate,
+        }]));
+        let target_source: TargetSource = {
+            let targets = targets.clone();
+            Arc::new(move || targets.lock().unwrap().clone())
+        };
+        let source = FakeSource::default();
+        let reconciler = BundleHeadsReconciler::new(
+            Arc::new(source),
+            None,
+            Arc::new(WarmShellStore::inert()),
+            Arc::new(BundleHeadStore::new()),
+            target_source,
+        );
+        assert!(!reconciler.request_content_refresh("unknown"));
+        assert!(reconciler.request_content_refresh("landing"));
+        targets.lock().unwrap().clear();
+        assert!(reconciler.take_pending_slugs().is_empty());
+        assert!(reconciler.pending_slugs.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_due_full_tick_precedes_sustained_dirty_reruns() {
+        let source = Arc::new(OrderedBlockingSource::default());
+        let reconciler = Arc::new(BundleHeadsReconciler::new(
+            source.clone(),
+            None,
+            Arc::new(WarmShellStore::inert()),
+            Arc::new(BundleHeadStore::new()),
+            Arc::new(|| {
+                vec![
+                    BundleTarget {
+                        slug: "a".into(),
+                        entry_file: None,
+                        channel: Channel::Candidate,
+                    },
+                    BundleTarget {
+                        slug: "b".into(),
+                        entry_file: None,
+                        channel: Channel::Candidate,
+                    },
+                ]
+            }),
+        ));
+        let worker = spawn_bundle_heads_task(reconciler.clone(), Duration::from_secs(10));
+        assert!(reconciler.request_content_refresh("a"));
+        source.first_started.notified().await;
+
+        tokio::time::advance(Duration::from_secs(10)).await;
+        for _ in 0..9 {
+            assert!(reconciler.request_content_refresh("a"));
+        }
+        source.release_first.notify_one();
+        for _ in 0..100 {
+            if source.slugs.lock().unwrap().len() >= 3 {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            &source.slugs.lock().unwrap()[..3],
+            &["a".to_string(), "a".to_string(), "b".to_string()],
+            "the due full tick wins after the in-flight dirty read; another dirty a would be third"
+        );
+        worker.abort();
     }
 
     #[test]

@@ -379,10 +379,10 @@ async fn handle_event(
             // BUNDLE_HEADS_TICK_SECS. A no-op for any other content row.
             if event_type != "content.deleted" {
                 if let Some(reconciler) = bundle_heads {
-                    if let Some(mv) = reconciler.on_content_event(&id).await {
-                        info!(
-                            slug = %mv.slug,
-                            "storage_events_subscriber: bundle head reconciled from a content event"
+                    if reconciler.request_content_refresh(&id) {
+                        debug!(
+                            slug = %id,
+                            "storage_events_subscriber: queued bundle-head refresh"
                         );
                     }
                 }
