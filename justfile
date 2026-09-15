@@ -115,8 +115,7 @@ test target="changed" scope="":
         mkdir -p "$reports_dir"
         # Default, not a force: a caller-supplied CUCUMBER_JSON_REPORT survives, so a
         # scoped run's report isn't clobbered by a later full-lane run.
-        export CUCUMBER_JSON_REPORT="${CUCUMBER_JSON_REPORT:-$reports_dir/cucumber-mesh.json}"
-        mkdir -p "$(dirname "$CUCUMBER_JSON_REPORT")"
+        cucumber_json_report_supplied="${CUCUMBER_JSON_REPORT:+1}"
         # Law II env input: the peer count this run addressed. The household fixture also
         # carries it, but the fixture is written by `just mesh prologue` and can be absent,
         # while the mesh roster is always in scope here. Nothing else is forced from this
@@ -130,12 +129,12 @@ test target="changed" scope="":
         # Run id: sortable UTC stamp + the commit measured. Lexicographic order IS
         # chronological order, and a mesh run takes minutes, so one second is collision-free.
         run_id="${A2O_RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$(git -C "{{ root }}" rev-parse --short=8 HEAD 2>/dev/null || echo nogit)}"
+        export A2O_RUN_ID="$run_id"
         a2o_profile=mesh
         if [[ "{{ target }}" == "mesh-browser" ]]; then
           a2o_profile=mesh-browser
           export E2E_DEVICE_MODE=playwright
           export E2E_APP_URL="${E2E_APP_URL:-$DOORWAY_URL}"
-          export CUCUMBER_JSON_REPORT="${CUCUMBER_JSON_REPORT:-$reports_dir/cucumber-mesh-browser.json}"
           # PORTAL PREFLIGHT — refuse before launch, the same contract `just mesh preflight`
           # holds for the mesh itself. The portal is a bare `ng serve` with no supervisor;
           # the workspace RAM guard sheds it and the only symptom the lane produced was a
@@ -160,6 +159,10 @@ test target="changed" scope="":
           fi
           echo "portal preflight ok: $portal_url -> 200"
         fi
+        if [[ -z "$cucumber_json_report_supplied" ]]; then
+          export CUCUMBER_JSON_REPORT="$reports_dir/cucumber-$a2o_profile-$run_id.json"
+        fi
+        mkdir -p "$(dirname "$CUCUMBER_JSON_REPORT")"
         cd "{{ a2o_dir }}"
         # NO `exec`: exec replaces the shell, so nothing after cucumber ever ran and a run
         # left no report. Capture the verdict instead and propagate it at the end.

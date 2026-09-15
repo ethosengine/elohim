@@ -30,6 +30,7 @@ import {
   meshConductorPorts,
 } from '../../src/framework/dataplane/carried-election.js';
 import { cancelOwnedCommitmentWithReadback } from '../../src/framework/dataplane/owned-commitment-cleanup.js';
+import { resolveOwnedCommitmentCreate } from '../../src/framework/dataplane/owned-commitment-create.js';
 import {
   getRaw,
   getRawWithHeaders,
@@ -477,60 +478,36 @@ async function authorOwnedEprRecord(world: E2EWorld): Promise<void> {
         channel: 'converged',
       }),
     };
+    const commitmentInput = {
+      id: `${record.slug}-${coherence.doorwayId}`,
+      action: 'project-epr',
+      provider: ROOT_AUTHOR,
+      receiver: ROOT_AUTHOR,
+      inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
+      metadataJson: JSON.stringify(metadata),
+      metadata,
+    };
+    const setupDeadline = Date.now() + 60_000;
     const mounted = await postFixtureCommitment(`${storageUrl}/api/v1/commitments`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         'X-API-Key': process.env['STORAGE_API_KEY_ADMIN'] ?? 'mesh-admin-dev-key',
       },
-      body: JSON.stringify({
-        id: `${record.slug}-${coherence.doorwayId}`,
-        action: 'project-epr',
-        provider: ROOT_AUTHOR,
-        receiver: ROOT_AUTHOR,
-        inScopeOf: `doorway:${coherence.doorwayId}|epr:${record.slug}`,
-        metadataJson: JSON.stringify(metadata),
-        metadata,
-      }),
+      body: JSON.stringify(commitmentInput),
     });
-    const mountResult = mounted.text;
-    if (!mounted.ok && mountResult.includes('UNIQUE constraint failed: rea_commitments.id')) {
-      // The canonical signal can project this very creation before the eager
-      // HTTP projection inserts it. Only exact anchored readback satisfies setup.
-      const id = `${record.slug}-${coherence.doorwayId}`;
-      const readback: Response = await fetch(`${storageUrl}/api/v1/commitments/${id}`);
-      assert.equal(readback.status, 200, `mount race readback ${id}`);
-      const existing = (await readback.json()) as {
-        id: string;
-        action: string;
-        provider: string;
-        receiver: string;
-        inScopeOf: string[];
-        metadata: unknown;
-        dhtAnchorHash?: string;
-      };
-      assert.deepEqual(
-        {
-          id: existing.id,
-          action: existing.action,
-          provider: existing.provider,
-          receiver: existing.receiver,
-          inScopeOf: existing.inScopeOf,
-          metadata: existing.metadata,
-        },
-        {
-          id,
-          action: 'project-epr',
-          provider: ROOT_AUTHOR,
-          receiver: ROOT_AUTHOR,
-          inScopeOf: [`doorway:${coherence.doorwayId}|epr:${record.slug}`],
-          metadata,
-        }
-      );
-      assert.ok(existing.dhtAnchorHash, 'mount race readback is not anchored');
-    } else {
-      assert.ok(mounted.ok, `mount ${peerName}: ${mounted.status} ${mountResult}`);
-    }
+    await resolveOwnedCommitmentCreate(
+      mounted,
+      commitmentInput,
+      async () => {
+        const readback = await fetch(
+          `${storageUrl}/api/v1/commitments/${encodeURIComponent(commitmentInput.id)}`,
+          { signal: AbortSignal.timeout(Math.max(1, setupDeadline - Date.now())) }
+        );
+        return { ok: readback.ok, status: readback.status, text: await readback.text() };
+      },
+      setupDeadline
+    );
     if (record.candidateHostname) {
       const candidateMetadata = {
         ...metadata,

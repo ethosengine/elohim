@@ -150,6 +150,8 @@ export interface StageOutcome {
   output: string;
   /** `sha256-…`, parsed off the script's own "blob hash:" line. */
   blobHash: string;
+  /** Exact action returned by the authoring PATCH; absent for byte-only staging. */
+  authoredActionHash?: string;
 }
 
 /**
@@ -188,7 +190,13 @@ export async function stageBundle(opts: {
     output = `${failure.stdout ?? ''}\n${failure.stderr ?? ''}\n${failure.message ?? ''}`;
   }
   const match = /blob hash:\s*(sha256-[0-9a-f]+)/i.exec(output);
-  return { code, output, blobHash: match?.[1] ?? '' };
+  const action = /authored action:\s*([^\s]+)/i.exec(output);
+  return {
+    code,
+    output,
+    blobHash: match?.[1] ?? '',
+    authoredActionHash: action?.[1],
+  };
 }
 
 export interface BrowserVisit {

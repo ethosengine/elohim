@@ -51,7 +51,18 @@ import { promisify } from 'node:util';
 
 import { After, Given, When, Then } from '@cucumber/cucumber';
 
+import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
+
 import { awaitOwnedProcessRecovery } from '../../src/framework/dataplane/owned-process-recovery.js';
+import {
+  awaitCanonicalManifestoCandidate,
+  classifyFirstPartyHttpError,
+  isOptionalNavigationCancellation,
+  persistRealAppPhaseArtifacts,
+  publicDoorwayUrl,
+  requiredRequestRoutingFailure,
+  unexpectedOptionalNegatives,
+} from '../../src/framework/dataplane/real-app-network.js';
 import {
   completeOnceWithinDeadline,
   waitForStrictAuthorityConvergence,
@@ -245,9 +256,14 @@ async function resolvePublicName(
  * fixture doorway ids, by construction in `start_membership_beacons`.
  */
 const PID_LEDGER_LETTER: Readonly<Record<string, string>> = { alpha: 'a', apex: 'b' };
+const ALPHA_DOORWAY_ID = 'alpha-A';
+const APEX_DOORWAY_ID = 'elohim.host';
+const OWNED_DOORWAY_IDS = [ALPHA_DOORWAY_ID, APEX_DOORWAY_ID] as const;
 
 interface ApexTransitionState {
   authority: MembershipAuthority;
+  /** Both owned socket legs, frozen before any membership withdrawal. */
+  ownedPorts: string[];
   commonsId: string;
   recoveryBoundMs: number;
   /** The owner whose doorway answered the first visit — then the one we fault. */
@@ -267,6 +283,10 @@ interface ApexTransitionState {
   ticks?: string;
   executable?: string;
   paused: boolean;
+  /** Exact contract-approved negative reads observed before the fault, by serving owner. */
+  realAppBaselineOptionalNegatives?: Map<string, Set<string>>;
+  /** Browser console errors observed before the fault, by serving owner. */
+  realAppBaselineConsoleErrors?: Map<string, Set<string>>;
 }
 
 const states = new WeakMap<E2EWorld, ApexTransitionState>();
@@ -284,6 +304,9 @@ function beginScenario(world: E2EWorld): ApexTransitionState {
   const authority = requireMembershipAuthority(fixture);
   const state: ApexTransitionState = {
     authority,
+    ownedPorts: OWNED_DOORWAY_IDS.map(
+      doorway => new URL(requireFixtureDoorwayUrl(fixture, doorway)).port
+    ),
     commonsId: fixture.commonsEprId ?? 'elohim-host-landing',
     recoveryBoundMs: fixture.convergenceWindowMs ?? DEFAULT_RECOVERY_BOUND_MS,
     paused: false,
@@ -437,6 +460,217 @@ async function assertExactPublishedSurface(
     `${origin}: browser booted a root that does not identify the expected version`
   );
 }
+
+async function selectJourneyDoorway(
+  state: ApexTransitionState,
+  phase: string
+): Promise<{ owner: string; origin: string }> {
+  const expectedOwner =
+    phase === 'survivor' || phase === 'baseline-apex'
+      ? state.authority.owners['apex']
+      : state.authority.owners['alpha'];
+  const selected =
+    phase === 'survivor'
+      ? await resolvePublicName(state.authority, '/')
+      : memberFor(await readMembership(state.authority), expectedOwner);
+  assert.ok(selected, `${phase}: recovered alpha-A is absent from membership`);
+  assert.equal(selected.owner, expectedOwner);
+  return selected;
+}
+
+async function completeRealAppJourney(world: E2EWorld, phase: string): Promise<void> {
+  const state = getState(world);
+  const selected = await selectJourneyDoorway(state, phase);
+  const publicOrigin = publicDoorwayUrl(selected.origin, state.authority.publicName);
+  let browser: Browser | undefined;
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  const allFirstPartyFailures: string[] = [];
+  const requiredFirstPartyFailures: string[] = [];
+  const httpErrors: string[] = [];
+  const requiredHttpErrors: string[] = [];
+  const optionalNegatives = new Set<string>();
+  const activeFirstParty = new Map<Request, { rendered: string; optionalDiscovery: boolean }>();
+  const activeFirstPartyAtBoundary: string[] = [];
+  let manifestoText = '';
+  let screenshot: Buffer | undefined;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [`--host-resolver-rules=MAP ${state.authority.publicName} 127.0.0.1`],
+    });
+    context = await browser.newContext();
+    page = await context.newPage();
+    page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('console', message => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    page.on('request', request => {
+      const url = new URL(request.url());
+      const routingFailure = requiredRequestRoutingFailure({
+        requestUrl: request.url(),
+        selectedOrigin: publicOrigin,
+        publicHostname: state.authority.publicName,
+        ownedPorts: state.ownedPorts,
+      });
+      if (routingFailure)
+        requiredFirstPartyFailures.push(`${request.method()} ${request.url()}: ${routingFailure}`);
+      if (url.origin !== publicOrigin) return;
+      activeFirstParty.set(request, {
+        rendered: `${request.method()} ${request.url()}`,
+        optionalDiscovery:
+          request.method() === 'GET' && url.pathname === '/api/v1/federation/doorways',
+      });
+    });
+    page.on('requestfinished', request => activeFirstParty.delete(request));
+    page.on('requestfailed', request => {
+      activeFirstParty.delete(request);
+      if (new URL(request.url()).origin !== publicOrigin) return;
+      const failure = `${request.method()} ${request.url()}: ${request.failure()?.errorText}`;
+      allFirstPartyFailures.push(failure);
+      const path = new URL(request.url()).pathname;
+      const navigationCancelledDiscovery = isOptionalNavigationCancellation({
+        path,
+        errorText: request.failure()?.errorText,
+      });
+      if (!navigationCancelledDiscovery) requiredFirstPartyFailures.push(failure);
+    });
+    page.on('response', response => {
+      const url = new URL(response.url());
+      if (url.origin !== publicOrigin || response.status() < 400) return;
+      const rendered = `${response.status()} ${response.url()}`;
+      const identity = `${response.status()} ${url.pathname}`;
+      httpErrors.push(rendered);
+      if (
+        classifyFirstPartyHttpError({ path: url.pathname, status: response.status() }) ===
+        'expected-optional-negative'
+      )
+        optionalNegatives.add(identity);
+      else requiredHttpErrors.push(rendered);
+    });
+    await page.goto(publicOrigin, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+    await page.getByTestId('footer-lamad-link').click();
+    await page.waitForURL(/\/lamad\/?$/, { timeout: 30_000 });
+    await page.getByTestId('home-featured-begin').click();
+    await page.waitForURL(/\/lamad\/path\/elohim-protocol\/step\/0/, { timeout: 30_000 });
+    const manifestoCandidates = page.locator('.markdown-content');
+    const settledManifesto = await awaitCanonicalManifestoCandidate(
+      async () => await manifestoCandidates.allInnerTexts(),
+      Date.now() + 30_000
+    );
+    const manifesto = manifestoCandidates.nth(settledManifesto.index);
+    await manifesto.waitFor({ state: 'visible', timeout: 30_000 });
+    manifestoText = settledManifesto.text.trim();
+    assert.ok(
+      page.url().endsWith('/lamad/path/elohim-protocol/step/0') &&
+        manifestoText.includes('Executive Summary') &&
+        manifestoText.includes('Love as Technology'),
+      `${phase}: step 0 is not the public manifesto`
+    );
+    assert.ok(manifestoText.length > 1000, `${phase}: manifesto rendered no substantive content`);
+    await page.getByTestId('lamad-footer-home-link').click();
+    await page.waitForURL(url => url.pathname === '/', { timeout: 30_000 });
+    await page.getByTestId('landing-hero').waitFor({ state: 'visible', timeout: 30_000 });
+    screenshot = await page.screenshot({ fullPage: true });
+    const settleDeadline = Date.now() + 5_000;
+    while (activeFirstParty.size > 0 && Date.now() < settleDeadline) await delay(50);
+    for (const request of activeFirstParty.values()) {
+      activeFirstPartyAtBoundary.push(request.rendered);
+      if (!request.optionalDiscovery)
+        requiredFirstPartyFailures.push(`${request.rendered}: still active at journey boundary`);
+    }
+    page.removeAllListeners('request');
+    page.removeAllListeners('requestfinished');
+    page.removeAllListeners('requestfailed');
+    page.removeAllListeners('response');
+    page.removeAllListeners('pageerror');
+    page.removeAllListeners('console');
+    assert.deepEqual(pageErrors, [], `${phase}: uncaught browser page errors`);
+    assert.deepEqual(
+      requiredFirstPartyFailures,
+      [],
+      `${phase}: failed required first-party requests`
+    );
+    assert.deepEqual(requiredHttpErrors, [], `${phase}: required first-party HTTP errors`);
+    if (phase.startsWith('baseline-')) {
+      state.realAppBaselineOptionalNegatives ??= new Map();
+      state.realAppBaselineOptionalNegatives.set(selected.owner, optionalNegatives);
+      state.realAppBaselineConsoleErrors ??= new Map();
+      state.realAppBaselineConsoleErrors.set(selected.owner, new Set(consoleErrors));
+    } else {
+      const baselineOptionalNegatives = state.realAppBaselineOptionalNegatives?.get(selected.owner);
+      const baselineConsoleErrors = state.realAppBaselineConsoleErrors?.get(selected.owner);
+      assert.ok(
+        baselineOptionalNegatives,
+        `${phase}: no optional-negative baseline for ${selected.owner}`
+      );
+      assert.ok(baselineConsoleErrors, `${phase}: no console-error baseline for ${selected.owner}`);
+      assert.deepEqual(
+        unexpectedOptionalNegatives(baselineOptionalNegatives, optionalNegatives),
+        [],
+        `${phase}: introduced new optional first-party negatives`
+      );
+      assert.deepEqual(
+        unexpectedOptionalNegatives(baselineConsoleErrors, new Set(consoleErrors)),
+        [],
+        `${phase}: introduced new browser console errors`
+      );
+    }
+  } finally {
+    if (!screenshot && page)
+      screenshot = await page.screenshot({ fullPage: true }).catch(() => undefined);
+    const receipt = {
+      phase,
+      owner: selected.owner,
+      origin: selected.origin,
+      publicOrigin,
+      manifestoText,
+      pageErrors,
+      consoleErrors,
+      allFirstPartyFailures,
+      requiredFirstPartyFailures,
+      httpErrors,
+      requiredHttpErrors,
+      optionalNegatives: [...optionalNegatives].sort((left, right) => left.localeCompare(right)),
+      activeFirstPartyAtBoundary,
+    };
+    const runId = process.env['A2O_RUN_ID'] ?? `${process.pid}-${Date.now().toString(36)}`;
+    const artifactPaths = screenshot
+      ? persistRealAppPhaseArtifacts({ runId, phase, screenshot, receipt })
+      : undefined;
+    if (screenshot) world.attach(screenshot, 'image/png');
+    world.attach(JSON.stringify({ ...receipt, artifactPaths }), 'application/json');
+    await context?.close().catch(() => undefined);
+    await browser?.close().catch(() => undefined);
+  }
+}
+
+Given(
+  'a fresh visitor completes the real landing to Lamad to manifesto and home journey at both doorway baselines',
+  { timeout: 300_000 },
+  async function (this: E2EWorld): Promise<void> {
+    await completeRealAppJourney(this, 'baseline-alpha');
+    await completeRealAppJourney(this, 'baseline-apex');
+  }
+);
+
+Then(
+  'a fresh visitor completes the real landing to Lamad to manifesto and home journey through the survivor',
+  { timeout: 150_000 },
+  async function (this: E2EWorld): Promise<void> {
+    await completeRealAppJourney(this, 'survivor');
+  }
+);
+
+Then(
+  'a fresh visitor completes the real landing to Lamad to manifesto and home journey after recovery',
+  { timeout: 150_000 },
+  async function (this: E2EWorld): Promise<void> {
+    await completeRealAppJourney(this, 'recovery');
+  }
+);
 
 /**
  * Shared-mesh coordination, identical in shape to
@@ -623,7 +857,7 @@ When(
   'the household makes doorway {string} report non-serving for three consecutive probes',
   { timeout: INDUCE_SHED_TIMEOUT_MS },
   async function (this: E2EWorld, doorway: string): Promise<void> {
-    assert.equal(doorway, 'alpha-A', 'the controlled fault target must be alpha-A');
+    assert.equal(doorway, ALPHA_DOORWAY_ID, 'the controlled fault target must be alpha-A');
     await induceSelectedDoorwayFault(this);
   }
 );
@@ -652,7 +886,7 @@ Then(
   "only doorway {string}'s owner records leave shared membership while doorway {string} survives",
   { timeout: 30_000 },
   async function (this: E2EWorld, withdrawn: string, survivor: string): Promise<void> {
-    assert.deepEqual([withdrawn, survivor], ['alpha-A', 'elohim.host']);
+    assert.deepEqual([withdrawn, survivor], OWNED_DOORWAY_IDS);
     const state = getState(this);
     const doc = await readMembership(state.authority);
     assert.equal(memberFor(doc, state.authority.owners['alpha']), undefined);
@@ -685,7 +919,7 @@ Then(
     // that the membership authority left it alone — a withdrawal from the
     // shared set never retracts the doorway's own address.
     const fixture = loadHouseholdMeshFixture();
-    const diagnostic = requireFixtureDoorwayUrl(fixture, 'alpha-A');
+    const diagnostic = requireFixtureDoorwayUrl(fixture, ALPHA_DOORWAY_ID);
     assert.equal(
       diagnostic,
       state.observedOrigin,
@@ -709,7 +943,7 @@ When(
   'doorway {string} reports serving for two consecutive probes',
   { timeout: DEFAULT_REJOIN_BOUND_MS + 30_000 },
   async function (this: E2EWorld, doorway: string): Promise<void> {
-    assert.equal(doorway, 'alpha-A', 'the recovering doorway must be alpha-A');
+    assert.equal(doorway, ALPHA_DOORWAY_ID, 'the recovering doorway must be alpha-A');
     const state = getState(this);
     if (state.paused) await signalOwnedDoorway(state, 'SIGCONT');
     await delay(rejoinBound(state));
@@ -747,7 +981,7 @@ Then(
   "doorway {string}'s owner records rejoin shared membership without duplicating doorway {string}",
   { timeout: 30_000 },
   async function (this: E2EWorld, recovered: string, sibling: string): Promise<void> {
-    assert.deepEqual([recovered, sibling], ['alpha-A', 'elohim.host']);
+    assert.deepEqual([recovered, sibling], OWNED_DOORWAY_IDS);
     const state = getState(this);
     const doc = await readMembership(state.authority);
     for (const owner of Object.values(state.authority.owners)) {
@@ -1035,7 +1269,7 @@ Then(
     const state = getState(this);
     assert.deepEqual(
       [recoveredA, recoveredB],
-      ['alpha-A', 'elohim.host'],
+      OWNED_DOORWAY_IDS,
       'the story must recover the named withdrawn and surviving entrances'
     );
     assert.ok(state.authorityB, 'authority B was not observed during the withdrawal');

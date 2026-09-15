@@ -106,9 +106,19 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     When the household makes doorway "alpha-A" report non-serving for three consecutive probes
     Then only doorway "alpha-A"'s owner records leave shared membership while doorway "elohim.host" survives
     When this run builds a next coherent browser version
-    And each doorway is handed the bundle's bytes
     And the canonical source author publishes authority B through its storage peer
     Then doorway "elohim.host" serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap
     When doorway "alpha-A" reports serving for two consecutive probes
     Then doorway "alpha-A"'s owner records rejoin shared membership without duplicating doorway "elohim.host"
     And recovered doorways "alpha-A" and "elohim.host" serve authority B's same exact head, blob, addressed version, HTML entry, and browser bootstrap
+
+  @requires:owned-substrate @browser
+  Scenario: A visitor can still navigate the real learning app across withdrawal and recovery
+    Given both owned doorways advertise eligibility for the same public name
+    And a fresh visitor completes the real landing to Lamad to manifesto and home journey at both doorway baselines
+    When the household makes doorway "alpha-A" report non-serving for three consecutive probes
+    Then only doorway "alpha-A"'s owner records leave shared membership while doorway "elohim.host" survives
+    And a fresh visitor completes the real landing to Lamad to manifesto and home journey through the survivor
+    When doorway "alpha-A" reports serving for two consecutive probes
+    Then doorway "alpha-A"'s owner records rejoin shared membership without duplicating doorway "elohim.host"
+    And a fresh visitor completes the real landing to Lamad to manifesto and home journey after recovery

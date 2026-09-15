@@ -439,6 +439,14 @@ stage_once() {
             esac
         fi
         echo "  ✓ patched ${SLUG} (${HASH_FIELD})"
+        local authored_action
+        authored_action=$(printf '%s' "${patch_body}" \
+            | sed -n 's/.*"dhtAnchorHash"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+        if [ -z "${authored_action}" ]; then
+            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH returned no dhtAnchorHash: ${patch_body}" >&2
+            return 3
+        fi
+        echo "[${SLUG}] authored action: ${authored_action}"
 
         local actual
         actual=$(curl -fSs "${DOORWAY_EPR_URL}/db/content/${SLUG}" \
