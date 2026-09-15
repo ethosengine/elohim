@@ -55,6 +55,7 @@ import {
   removeFixtureBundle,
   sameOrigin,
   stageBundle,
+  stageBundleThroughStorage,
   stageInvalidFixture,
   visitInBrowser,
   type BrowserVisit,
@@ -665,11 +666,10 @@ async function declareCurrentBrowserBundleThroughAuthorStorage(world: E2EWorld):
   const bundle = requireBundle(world);
   const storageUrl = resolveStorageUrl('alpha-A');
   assert.ok(storageUrl, 'canonical source-author storage URL is absent');
-  const outcome = await stageBundle({
+  const outcome = await stageBundleThroughStorage({
     bundle,
     slug: record.slug,
-    doorwayUrl: storageUrl,
-    declare: true,
+    storageUrl,
   });
   assert.strictEqual(
     outcome.code,

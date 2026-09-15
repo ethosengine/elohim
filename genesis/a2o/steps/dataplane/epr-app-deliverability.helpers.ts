@@ -21,6 +21,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
+import { StorageClient } from '@elohim/storage-client';
+
 import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
 import { OwnedDoorwayPair } from '../../src/framework/fixtures/owned-doorway-pair.js';
 
@@ -197,6 +199,42 @@ export async function stageBundle(opts: {
     blobHash: match?.[1] ?? '',
     authoredActionHash: action?.[1],
   };
+}
+
+/** Upload and author through one storage peer, without touching a survivor doorway. */
+export async function stageBundleThroughStorage(opts: {
+  bundle: FixtureBundle;
+  slug: string;
+  storageUrl: string;
+}): Promise<StageOutcome> {
+  const archiveDir = mkdtempSync(join(fixtureRoot(), 'source-author-package-'));
+  try {
+    const archive = join(archiveDir, 'browser.zip');
+    await execFileAsync('zip', ['-X', '-qr', archive, '.'], { cwd: opts.bundle.dir });
+    const bytes = readFileSync(archive);
+    const expectedHash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
+    const apiKey = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
+    const client = new StorageClient({ baseUrl: opts.storageUrl, apiKey, timeout: 30_000 });
+    const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
+    const uploadedHash = manifest.blob_hash.startsWith('sha256-')
+      ? manifest.blob_hash
+      : `sha256-${manifest.blob_hash}`;
+    assert.equal(uploadedHash, expectedHash, 'source storage returned a different blob hash');
+
+    const response = await fetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+      body: JSON.stringify({ blobHash: expectedHash }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    const body = await response.text();
+    assert.ok(response.ok, `source storage publication failed: ${response.status} ${body}`);
+    const action = (JSON.parse(body) as { dhtAnchorHash?: string }).dhtAnchorHash;
+    assert.ok(action, 'source storage publication returned no exact action');
+    return { code: 0, output: body, blobHash: expectedHash, authoredActionHash: action };
+  } finally {
+    rmSync(archiveDir, { recursive: true, force: true });
+  }
 }
 
 export interface BrowserVisit {
