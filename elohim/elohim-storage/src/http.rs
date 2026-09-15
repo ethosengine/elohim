@@ -131,6 +131,14 @@ use tracing::{debug, error, info, warn, Instrument};
 
 static HEAD_RECORD_REQUEST_SEQUENCE: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(1);
+static CANDIDATE_HEAD_REQUEST_SEQUENCE: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(1);
+
+fn candidate_head_remaining_ms(deadline: tokio::time::Instant) -> u128 {
+    deadline
+        .saturating_duration_since(tokio::time::Instant::now())
+        .as_millis()
+}
 
 fn staging_candidate_for_projected_head(
     projected_head_action: &str,
@@ -8173,28 +8181,48 @@ impl HttpServer {
     ) {
         use elohim_views::lamad::StagingCandidateState;
 
+        let client_started = tokio::time::Instant::now();
         let Some(hc) = self
             .hc_registry
             .as_ref()
             .and_then(|registry| registry.lamad_client())
         else {
+            warn!(
+                phase = "client",
+                outcome = "unavailable",
+                elapsed_ms = client_started.elapsed().as_millis(),
+                "head read: candidate role client is unavailable"
+            );
             return (None, None, StagingCandidateState::Unavailable);
         };
-        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(2);
+        let started = tokio::time::Instant::now();
+        let deadline = started + std::time::Duration::from_secs(2);
         let read =
             crate::services::conductor_writes::call_resolve_canonical_election(&hc, content_id);
         match tokio::time::timeout_at(deadline, read).await {
             Ok(Ok(election)) => {
+                debug!(
+                    phase = "election",
+                    outcome = if election.is_some() {
+                        "ok_some"
+                    } else {
+                        "ok_none"
+                    },
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
                 let candidate = match staging_candidate_for_projected_head(
                     projected_head_action,
                     election,
                 ) {
                     Ok(candidate) => candidate,
-                    Err(actual_winner) => {
-                        tracing::debug!(
-                            content_id = %content_id,
-                            projected_head_action,
-                            actual_winner,
+                    Err(_actual_winner) => {
+                        warn!(
+                            phase = "election_binding",
+                            outcome = "winner_mismatch",
+                            elapsed_ms = started.elapsed().as_millis(),
+                            remaining_ms = candidate_head_remaining_ms(deadline),
                             "head read: local election winner differs from projected head — reporting unavailable"
                         );
                         return (None, None, StagingCandidateState::Unavailable);
@@ -8214,16 +8242,22 @@ impl HttpServer {
                 };
                 (candidate, blob, state)
             }
-            Ok(Err(e)) => {
-                tracing::debug!(
-                    content_id = %content_id, error = %e,
+            Ok(Err(_error)) => {
+                warn!(
+                    phase = "election",
+                    outcome = "error",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
                     "head read: staging-candidate ask failed — reporting unavailable"
                 );
                 (None, None, StagingCandidateState::Unavailable)
             }
             Err(_) => {
-                tracing::debug!(
-                    content_id = %content_id,
+                warn!(
+                    phase = "election",
+                    outcome = "deadline",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
                     "head read: staging-candidate ask timed out — reporting unavailable"
                 );
                 (None, None, StagingCandidateState::Unavailable)
@@ -8288,41 +8322,154 @@ impl HttpServer {
             >,
         >,
     {
+        let fetch_started = tokio::time::Instant::now();
         let carried = match tokio::time::timeout_at(deadline, fetch()).await {
-            Ok(Ok(Some(carried))) if carried.action_hash == candidate_action => carried,
-            Ok(Ok(Some(carried))) => {
+            Ok(Ok(Some(carried))) if carried.action_hash == candidate_action => {
                 debug!(
-                    content_id = %content_id,
-                    candidate_action = %candidate_action,
-                    served_action = %carried.action_hash,
+                    phase = "record_fetch",
+                    outcome = "ok_some",
+                    elapsed_ms = fetch_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
+                carried
+            }
+            Ok(Ok(Some(_carried))) => {
+                warn!(
+                    phase = "record_fetch",
+                    outcome = "wrong_action",
+                    elapsed_ms = fetch_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
                     "head read: local candidate record named a different action"
                 );
                 return None;
             }
-            Ok(Ok(None)) => return None,
-            Ok(Err(error)) => {
-                debug!(content_id = %content_id, error = %error,
-                    "head read: local candidate record ask failed");
+            Ok(Ok(None)) => {
+                warn!(
+                    phase = "record_fetch",
+                    outcome = "ok_none",
+                    elapsed_ms = fetch_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record is absent"
+                );
                 return None;
             }
-            Err(_) => return None,
+            Ok(Err(_error)) => {
+                warn!(
+                    phase = "record_fetch",
+                    outcome = "error",
+                    elapsed_ms = fetch_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record ask failed"
+                );
+                return None;
+            }
+            Err(_) => {
+                warn!(
+                    phase = "record_fetch",
+                    outcome = "deadline",
+                    elapsed_ms = fetch_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record ask timed out"
+                );
+                return None;
+            }
         };
 
+        let verify_started = tokio::time::Instant::now();
         let proven = match tokio::time::timeout_at(deadline, verify(carried.record)).await {
-            Ok(Ok(Some(proven))) => proven,
-            Ok(Ok(None)) => return None,
-            Ok(Err(error)) => {
-                debug!(content_id = %content_id, error = %error,
-                    "head read: local candidate record failed verification");
+            Ok(Ok(Some(proven))) => {
+                debug!(
+                    phase = "record_verify",
+                    outcome = "ok_some",
+                    elapsed_ms = verify_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
+                proven
+            }
+            Ok(Ok(None)) => {
+                warn!(
+                    phase = "record_verify",
+                    outcome = "ok_none",
+                    elapsed_ms = verify_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record was not verified"
+                );
                 return None;
             }
-            Err(_) => return None,
+            Ok(Err(_error)) => {
+                warn!(
+                    phase = "record_verify",
+                    outcome = "error",
+                    elapsed_ms = verify_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record failed verification"
+                );
+                return None;
+            }
+            Err(_) => {
+                warn!(
+                    phase = "record_verify",
+                    outcome = "deadline",
+                    elapsed_ms = verify_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate record verification timed out"
+                );
+                return None;
+            }
         };
 
-        let blob = exact_candidate_blob(content_id, candidate_action, &proven)?;
+        let claim_started = tokio::time::Instant::now();
+        let Some(blob) = exact_candidate_blob(content_id, candidate_action, &proven) else {
+            warn!(
+                phase = "record_claim",
+                outcome = "invalid",
+                elapsed_ms = claim_started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: verified candidate record carried an invalid content claim"
+            );
+            return None;
+        };
+        debug!(
+            phase = "record_claim",
+            outcome = "valid",
+            elapsed_ms = claim_started.elapsed().as_millis(),
+            remaining_ms = candidate_head_remaining_ms(deadline),
+            "candidate-head resolution phase"
+        );
+        let blob_started = tokio::time::Instant::now();
         match tokio::time::timeout_at(deadline, self.blob_available_locally(&blob)).await {
-            Ok(true) => Some(blob),
-            Ok(false) | Err(_) => None,
+            Ok(true) => {
+                debug!(
+                    phase = "local_blob",
+                    outcome = "available",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
+                Some(blob)
+            }
+            Ok(false) => {
+                warn!(
+                    phase = "local_blob",
+                    outcome = "absent",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: verified candidate blob is absent locally"
+                );
+                None
+            }
+            Err(_) => {
+                warn!(
+                    phase = "local_blob",
+                    outcome = "deadline",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate blob check timed out"
+                );
+                None
+            }
         }
     }
 
@@ -8370,8 +8517,15 @@ impl HttpServer {
                             // Release it before awaiting so concurrent `/head` readers do
                             // not reserve the projection pool for their whole 2s budget.
                             drop(conn);
+                            let request_id = CANDIDATE_HEAD_REQUEST_SEQUENCE
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let span = tracing::info_span!(
+                                "candidate_head_http",
+                                candidate_head_request_id = request_id
+                            );
                             let (candidate, candidate_blob, candidate_state) = self
                                 .resolve_staging_candidate(content_id, &view.head_action_hash)
+                                .instrument(span)
                                 .await;
                             Ok(response::ok(&crate::views::with_staging_candidate(
                                 view,
