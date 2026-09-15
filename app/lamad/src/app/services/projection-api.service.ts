@@ -13,7 +13,7 @@ import { Injectable, inject } from '@angular/core';
 
 // @coverage: 88.4% (2026-02-24)
 
-import { map, catchError, timeout, shareReplay } from 'rxjs/operators';
+import { map, catchError, timeout, shareReplay, switchMap } from 'rxjs/operators';
 
 import { Observable, of } from 'rxjs';
 
@@ -272,8 +272,8 @@ export class ProjectionAPIService {
 
     return this.http.get<Record<string, unknown>>(url).pipe(
       timeout(this.defaultTimeout),
-      map(data => {
-        const node = this.contentService.transformRawContent(data);
+      switchMap(data => this.contentService.hydrateRawContent(data)),
+      map(node => {
         this.recordSuccess();
         return node;
       }),

@@ -343,35 +343,9 @@ export class ContentBackendService {
 
     const obs = from(this.client.get<RawContentData>('content', id)).pipe(
       pendingUntilEvent(this.injector),
-      switchMap(data => {
-        if (!data) return of(null);
-
-        // Check if we need to fetch blob content
-        // contentBody may be a blob reference (sha256:... or sha256-...) instead of actual content
-        const contentBody = data.contentBody ?? '';
-
-        const isBlobReference =
-          contentBody.startsWith('sha256:') ||
-          contentBody.startsWith('sha256-') ||
-          contentBody.startsWith('bafk');
-        const blobCid = isBlobReference ? contentBody : (data.blobCid ?? undefined);
-        const needsBlobFetch = isBlobReference || (!contentBody && data.blobCid);
-
-        if (needsBlobFetch && blobCid) {
-          return this.fetchBlobContent(blobCid).pipe(
-            map(blobContent => {
-              // Inject blob content as contentBody
-              return this.transformContent({ ...data, contentBody: blobContent });
-            }),
-            catchError(_err => {
-              // Fall back to transforming without blob content
-              return of(this.transformContent(data));
-            })
-          );
-        }
-
-        return of(this.transformContent(data));
-      }),
+      switchMap(data =>
+        data ? this.hydrateRawContent(data as unknown as Record<string, unknown>) : of(null)
+      ),
       catchError(_err => {
         return of(null);
       }),
@@ -718,6 +692,25 @@ export class ContentBackendService {
     // Intentionally untyped cast: projection data has the same fields as RawContentData
     // but arrives as Record<string, unknown> from the HTTP cache layer.
     return this.transformContent(data as unknown as RawContentData);
+  }
+
+  /** Resolve a projected content record through the same blob-hydration path as direct reads. */
+  hydrateRawContent(data: Record<string, unknown>): Observable<ContentNode> {
+    const raw = data as unknown as RawContentData;
+    const contentBody = raw.contentBody ?? '';
+    const isBlobReference =
+      contentBody.startsWith('sha256:') ||
+      contentBody.startsWith('sha256-') ||
+      contentBody.startsWith('bafk');
+    const blobCid = isBlobReference ? contentBody : (raw.blobCid ?? undefined);
+    const needsBlobFetch = isBlobReference || (!contentBody && raw.blobCid);
+
+    if (!needsBlobFetch || !blobCid) return of(this.transformContent(raw));
+
+    return this.fetchBlobContent(blobCid).pipe(
+      map(blobContent => this.transformContent({ ...raw, contentBody: blobContent })),
+      catchError(() => of(this.transformContent(raw)))
+    );
   }
 
   /**
