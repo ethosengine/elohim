@@ -1,12 +1,19 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { requireFixtureDoorwayUrl, type HouseholdMeshFixture } from '../fixtures/household-mesh.js';
+
 const MANIFESTO_MARKERS = ['Executive Summary', 'Love as Technology'] as const;
 
 export function publicDoorwayUrl(origin: string, publicHostname: string): string {
   const url = new URL(origin);
   url.hostname = publicHostname;
   return url.origin;
+}
+
+/** The immutable socket legs use fixture topology keys, not story-facing actor labels. */
+export function publicDoorwayPorts(fixture: HouseholdMeshFixture): string[] {
+  return ['alpha', 'apex'].map(id => new URL(requireFixtureDoorwayUrl(fixture, id)).port);
 }
 
 export function requiredRequestRoutingFailure(input: {

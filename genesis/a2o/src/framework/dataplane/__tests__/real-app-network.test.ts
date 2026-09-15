@@ -11,6 +11,7 @@ import {
   isOptionalNavigationCancellation,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
+  publicDoorwayPorts,
   requiredRequestRoutingFailure,
   selectCanonicalManifestoCandidate,
   unexpectedOptionalNegatives,
@@ -21,6 +22,18 @@ void describe('public doorway browser routing', () => {
     assert.equal(
       publicDoorwayUrl('http://localhost:8889', 'elohim.local'),
       'http://elohim.local:8889'
+    );
+  });
+
+  void it('derives immutable ports from canonical fixture topology keys', () => {
+    assert.deepEqual(
+      publicDoorwayPorts({
+        doorways: {
+          alpha: { url: 'http://localhost:8888' },
+          apex: { url: 'http://localhost:8889' },
+        },
+      }),
+      ['8888', '8889']
     );
   });
 

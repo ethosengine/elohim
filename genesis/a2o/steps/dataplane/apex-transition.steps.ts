@@ -60,6 +60,7 @@ import {
   isOptionalNavigationCancellation,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
+  publicDoorwayPorts,
   requiredRequestRoutingFailure,
   unexpectedOptionalNegatives,
 } from '../../src/framework/dataplane/real-app-network.js';
@@ -304,9 +305,7 @@ function beginScenario(world: E2EWorld): ApexTransitionState {
   const authority = requireMembershipAuthority(fixture);
   const state: ApexTransitionState = {
     authority,
-    ownedPorts: OWNED_DOORWAY_IDS.map(
-      doorway => new URL(requireFixtureDoorwayUrl(fixture, doorway)).port
-    ),
+    ownedPorts: publicDoorwayPorts(fixture),
     commonsId: fixture.commonsEprId ?? 'elohim-host-landing',
     recoveryBoundMs: fixture.convergenceWindowMs ?? DEFAULT_RECOVERY_BOUND_MS,
     paused: false,
@@ -919,7 +918,7 @@ Then(
     // that the membership authority left it alone — a withdrawal from the
     // shared set never retracts the doorway's own address.
     const fixture = loadHouseholdMeshFixture();
-    const diagnostic = requireFixtureDoorwayUrl(fixture, ALPHA_DOORWAY_ID);
+    const diagnostic = requireFixtureDoorwayUrl(fixture, 'alpha');
     assert.equal(
       diagnostic,
       state.observedOrigin,
