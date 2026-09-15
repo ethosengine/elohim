@@ -35,11 +35,16 @@ use crate::conductor_bridge_health::{observe_role_zome_error, record_role_succes
 use crate::error::StorageError;
 
 fn is_correlated_head_record_call(zome_name: &str, fn_name: &str) -> bool {
-    zome_name == "content_store"
-        && fn_name == "get_record_for_action"
-        && tracing::Span::current()
-            .metadata()
-            .is_some_and(|metadata| metadata.name() == "head_record_http")
+    if zome_name != "content_store" {
+        return false;
+    }
+    tracing::Span::current().metadata().is_some_and(|metadata| {
+        matches!(
+            (fn_name, metadata.name()),
+            ("get_record_for_action", "head_record_http")
+                | ("resolve_canonical_election", "candidate_head_http")
+        )
+    })
 }
 
 /// What the admission gate observed about one zome call.
@@ -1223,6 +1228,10 @@ mod head_record_trace_scope_tests {
                 "content_store",
                 "get_record_for_action"
             ));
+            assert!(!is_correlated_head_record_call(
+                "content_store",
+                "resolve_canonical_election"
+            ));
 
             let span = tracing::info_span!("head_record_http", head_record_request_id = 7_u64);
             span.in_scope(|| {
@@ -1237,6 +1246,27 @@ mod head_record_trace_scope_tests {
                 assert!(!is_correlated_head_record_call(
                     "mishpat",
                     "get_record_for_action"
+                ));
+            });
+
+            let span =
+                tracing::info_span!("candidate_head_http", candidate_head_request_id = 11_u64);
+            span.in_scope(|| {
+                assert!(is_correlated_head_record_call(
+                    "content_store",
+                    "resolve_canonical_election"
+                ));
+                assert!(!is_correlated_head_record_call(
+                    "content_store",
+                    "get_record_for_action"
+                ));
+                assert!(!is_correlated_head_record_call(
+                    "content_store",
+                    "resolve_canonical_elections"
+                ));
+                assert!(!is_correlated_head_record_call(
+                    "mishpat",
+                    "resolve_canonical_election"
                 ));
             });
         });
