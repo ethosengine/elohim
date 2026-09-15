@@ -44,6 +44,27 @@ void describe('public doorway browser routing', () => {
       }) ?? '',
       /bypassed selected doorway/
     );
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://doorway-alpha.elohim.host/db/content/elohim-host-landing',
+      }) ?? '',
+      /bypassed selected doorway/
+    );
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://doorway-alpha.elohim.host/epr-head/elohim-protocol',
+      }) ?? '',
+      /bypassed selected doorway/
+    );
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://doorway-alpha.elohim.host/api/v1/federation/doorways',
+      }) ?? '',
+      /bypassed selected doorway/
+    );
     assert.equal(
       requiredRequestRoutingFailure({
         ...common,
@@ -55,6 +76,27 @@ void describe('public doorway browser routing', () => {
       requiredRequestRoutingFailure({
         ...common,
         requestUrl: 'https://www.youtube.com/embed/demo',
+      }),
+      undefined
+    );
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://cdn.example.org/player.js',
+      }),
+      undefined
+    );
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://cdn.example.org/player.css',
+      }),
+      undefined
+    );
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://api.example.org/api/player',
       }),
       undefined
     );

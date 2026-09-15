@@ -21,8 +21,14 @@ export function requiredRequestRoutingFailure(input: {
     request.hostname === input.publicHostname ||
     ((request.hostname === 'localhost' || request.hostname === '127.0.0.1') &&
       input.ownedPorts.includes(request.port));
-  if (!targetsOwnedDoorway) return undefined;
-  return request.hostname === input.publicHostname && request.port === selected.port
+  const targetsProductionDoorway =
+    request.hostname === 'elohim.host' || request.hostname.endsWith('.elohim.host');
+  const requiresSelectedOrigin =
+    request.pathname.startsWith('/db/') ||
+    request.pathname.startsWith('/epr-head/') ||
+    (request.pathname.startsWith('/api/') && targetsProductionDoorway);
+  if (!targetsOwnedDoorway && !requiresSelectedOrigin) return undefined;
+  return request.origin === selected.origin
     ? undefined
     : `${request.origin} bypassed selected doorway ${selected.origin}`;
 }
