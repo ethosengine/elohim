@@ -1,0 +1,226 @@
+/* eslint-disable @typescript-eslint/no-floating-promises -- node:test describe/it
+   return promises that the test runner itself consumes; awaiting them is wrong. */
+/**
+ * Covers the shed-aware staging ladder restored after b344f533a dropped it
+ * (genesis/a2o/steps/dataplane/epr-app-deliverability.helpers.ts,
+ * `stageBundleThroughStorage`). Exercises the SAME retry/seatbelt contract
+ * stage-spa-blob.sh's `stage_once` carries (scripts/ci/stage-spa-blob.sh
+ * ~376-458), against a mocked `fetch` — no real storage peer needed.
+ */
+import { strict as assert } from 'node:assert';
+import { createHash } from 'node:crypto';
+import { describe, it } from 'node:test';
+
+import {
+  buildFixtureBundle,
+  classifyStorageResponse,
+  NonRetryableStageError,
+  removeFixtureBundle,
+  RetryableStageShed,
+  stageBundleThroughStorage,
+  type FixtureBundle,
+} from '../epr-app-deliverability.helpers.js';
+
+const STORAGE_URL = 'http://storage.test.invalid:9999';
+const SLUG = 'staging-ladder-fixture';
+
+class MockResponse {
+  constructor(
+    private readonly opts: { status: number; body: string; headers?: Record<string, string> }
+  ) {}
+  get ok(): boolean {
+    return this.opts.status >= 200 && this.opts.status < 300;
+  }
+  get status(): number {
+    return this.opts.status;
+  }
+  headers = { get: (name: string) => this.opts.headers?.[name.toLowerCase()] ?? null };
+  async text(): Promise<string> {
+    return this.opts.body;
+  }
+  async json(): Promise<unknown> {
+    return JSON.parse(this.opts.body);
+  }
+}
+
+/** A tiny fetch double: PUT/blob computes a real hash, PATCH plays a scripted
+ * response queue, GET (the seatbelt) answers with the last uploaded hash
+ * unless `seatbeltHash` overrides it (to simulate drift). */
+function makeFetchMock(opts: {
+  patchResponses: MockResponse[];
+  seatbeltHash?: string;
+}): { fetchFn: typeof fetch; patchCallCount: () => number } {
+  let patchCalls = 0;
+  let uploadedHash: string | undefined;
+  const fetchFn = (async (url: string | URL, init?: RequestInit) => {
+    const target = url.toString();
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (target === `${STORAGE_URL}/blob/` && method === 'PUT') {
+      const bytes = init?.body as Uint8Array;
+      uploadedHash = `sha256-${createHash('sha256').update(Buffer.from(bytes)).digest('hex')}`;
+      return new MockResponse({
+        status: 200,
+        body: JSON.stringify({ blob_hash: uploadedHash, cid: 'cid-fixture' }),
+      });
+    }
+    if (target === `${STORAGE_URL}/db/content/${SLUG}` && method === 'PATCH') {
+      const response = opts.patchResponses[patchCalls] ?? opts.patchResponses.at(-1);
+      patchCalls += 1;
+      assert.ok(response, 'test scripted no PATCH response for this attempt');
+      return response;
+    }
+    if (target === `${STORAGE_URL}/db/content/${SLUG}` && method === 'GET') {
+      return new MockResponse({
+        status: 200,
+        body: JSON.stringify({ blobHash: opts.seatbeltHash ?? uploadedHash }),
+      });
+    }
+    throw new Error(`unexpected fetch in test: ${method} ${target}`);
+  }) as unknown as typeof fetch;
+  return { fetchFn, patchCallCount: () => patchCalls };
+}
+
+function withFixtureBundle<T>(run: (bundle: FixtureBundle) => Promise<T>): Promise<T> {
+  const bundle = buildFixtureBundle({ coherent: true });
+  return run(bundle).finally(() => removeFixtureBundle(bundle));
+}
+
+/**
+ * `StorageClient.putBlob` calls the module-global `fetch` directly (no
+ * injection point on the client) — the mock has to stand in for that too, so
+ * every case installs it globally for the call's duration, restoring the
+ * real `fetch` afterward regardless of outcome.
+ */
+async function withGlobalFetchMock<T>(fetchFn: typeof fetch, run: () => Promise<T>): Promise<T> {
+  const original = globalThis.fetch;
+  globalThis.fetch = fetchFn;
+  try {
+    return await run();
+  } finally {
+    globalThis.fetch = original;
+  }
+}
+
+void describe('classifyStorageResponse', () => {
+  void it('treats 2xx as ok', () => {
+    assert.deepEqual(classifyStorageResponse(200, '{}', null), { ok: true });
+  });
+
+  void it('reads retryAfter off the header first, then the JSON body field', () => {
+    const fromHeader = classifyStorageResponse(
+      503,
+      JSON.stringify({ status: 'catching-up' }),
+      '12'
+    );
+    assert.ok(fromHeader instanceof RetryableStageShed);
+    assert.equal(fromHeader.retryAfterSecs, 12);
+
+    const fromBody = classifyStorageResponse(
+      429,
+      JSON.stringify({ status: 'catching-up', retryAfter: 7 }),
+      null
+    );
+    assert.ok(fromBody instanceof RetryableStageShed);
+    assert.equal(fromBody.retryAfterSecs, 7);
+  });
+
+  void it('keeps a "not retrievable" 4xx retryable with no hint', () => {
+    const verdict = classifyStorageResponse(404, 'target not retrievable yet', null);
+    assert.ok(verdict instanceof RetryableStageShed);
+    assert.equal(verdict.retryAfterSecs, undefined);
+  });
+
+  void it('treats any OTHER 4xx as structural and non-retryable', () => {
+    const verdict = classifyStorageResponse(409, JSON.stringify({ error: 'slug locked' }), null);
+    assert.ok(verdict instanceof NonRetryableStageError);
+  });
+});
+
+void describe('stageBundleThroughStorage', () => {
+  void it('retries a 503 catching-up shed within budget and then succeeds', async () => {
+    const sleepCalls: number[] = [];
+    const { fetchFn, patchCallCount } = makeFetchMock({
+      patchResponses: [
+        new MockResponse({
+          status: 503,
+          body: JSON.stringify({ status: 'catching-up', retryAfter: 1 }),
+        }),
+        new MockResponse({ status: 200, body: JSON.stringify({ dhtAnchorHash: 'action-1' }) }),
+      ],
+    });
+
+    const outcome = await withGlobalFetchMock(fetchFn, () =>
+      withFixtureBundle(bundle =>
+        stageBundleThroughStorage({
+          bundle,
+          slug: SLUG,
+          storageUrl: STORAGE_URL,
+          fetchFn,
+          sleep: async seconds => {
+            sleepCalls.push(seconds);
+          },
+          budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
+        })
+      )
+    );
+
+    assert.equal(outcome.code, 0);
+    assert.equal(outcome.authoredActionHash, 'action-1');
+    assert.equal(patchCallCount(), 2);
+    assert.deepEqual(sleepCalls, [1]);
+  });
+
+  void it('fails immediately on a non-retryable 4xx (no backoff, no retry)', async () => {
+    let sleepCalled = false;
+    const { fetchFn, patchCallCount } = makeFetchMock({
+      patchResponses: [
+        new MockResponse({ status: 409, body: JSON.stringify({ error: 'slug locked' }) }),
+      ],
+    });
+
+    await assert.rejects(
+      withGlobalFetchMock(fetchFn, () =>
+        withFixtureBundle(bundle =>
+          stageBundleThroughStorage({
+            bundle,
+            slug: SLUG,
+            storageUrl: STORAGE_URL,
+            fetchFn,
+            sleep: async () => {
+              sleepCalled = true;
+            },
+            budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
+          })
+        )
+      ),
+      /structural failure \(HTTP 409\)/
+    );
+    assert.equal(patchCallCount(), 1);
+    assert.equal(sleepCalled, false);
+  });
+
+  void it('fails when the post-PATCH seatbelt GET finds a different hash', async () => {
+    const { fetchFn } = makeFetchMock({
+      patchResponses: [
+        new MockResponse({ status: 200, body: JSON.stringify({ dhtAnchorHash: 'action-1' }) }),
+      ],
+      seatbeltHash: 'sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    });
+
+    await assert.rejects(
+      withGlobalFetchMock(fetchFn, () =>
+        withFixtureBundle(bundle =>
+          stageBundleThroughStorage({
+            bundle,
+            slug: SLUG,
+            storageUrl: STORAGE_URL,
+            fetchFn,
+            sleep: async () => {},
+            budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
+          })
+        )
+      ),
+      /blobHash drift after PATCH/
+    );
+  });
+});

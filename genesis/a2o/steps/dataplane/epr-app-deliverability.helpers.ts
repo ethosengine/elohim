@@ -201,13 +201,158 @@ export async function stageBundle(opts: {
   };
 }
 
-/** Upload and author through one storage peer, without touching a survivor doorway. */
+/**
+ * Retry budget mirroring stage-spa-blob.sh's STAGE_BLOB_BUDGET_SECS /
+ * STAGE_BLOB_ATTEMPTS / MAX_WAIT_SECS (scripts/ci/stage-spa-blob.sh ~13-26,
+ * ~554-574,607-619) — read from the same env vars so an operator tuning the
+ * shell ladder tunes this direct-to-storage path identically.
+ */
+export interface StorageRetryBudget {
+  /** Total wall-clock retry budget in seconds (default 360). */
+  budgetSecs: number;
+  /** Safety-net ceiling on attempt count on top of the budget (default 60). */
+  attempts: number;
+  /** Cap on any single backoff wait, including an advertised retryAfter (default 60). */
+  maxWaitSecs: number;
+}
+
+export function defaultStorageRetryBudget(): StorageRetryBudget {
+  return {
+    budgetSecs: Number(process.env['STAGE_BLOB_BUDGET_SECS'] ?? 360),
+    attempts: Number(process.env['STAGE_BLOB_ATTEMPTS'] ?? 60),
+    maxWaitSecs: 60,
+  };
+}
+
+/** A backpressure/lag answer the ladder should re-offer within budget. */
+export class RetryableStageShed extends Error {
+  constructor(
+    message: string,
+    public readonly retryAfterSecs?: number
+  ) {
+    super(message);
+    this.name = 'RetryableStageShed';
+  }
+}
+
+/** A structural answer the peer has already given — retrying just burns budget. */
+export class NonRetryableStageError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NonRetryableStageError';
+  }
+}
+
+/**
+ * Classify one storage HTTP response exactly the way stage-spa-blob.sh's
+ * stage_once PATCH leg does (scripts/ci/stage-spa-blob.sh ~419-439):
+ * 503/429 is backpressure (retryable, honoring an advertised Retry-After);
+ * a "not retrievable" 4xx is the pre-existing DHT-publish-lag class (also
+ * retryable, no hint); any OTHER 4xx is a structural, non-retryable answer;
+ * anything else non-2xx (5xx, transport-adjacent) is a generic retryable
+ * failure, matching the shell's bare `*)` arm.
+ */
+export function classifyStorageResponse(
+  status: number,
+  body: string,
+  retryAfterHeader: string | null | undefined
+): { ok: true } | RetryableStageShed | NonRetryableStageError {
+  if (status >= 200 && status < 300) return { ok: true };
+  const headerSecs = retryAfterHeader != null ? Number(retryAfterHeader) : NaN;
+  const bodyMatch = /"retryAfter"\s*:\s*(\d+)/.exec(body)?.[1];
+  const bodySecs = bodyMatch != null ? Number(bodyMatch) : NaN;
+  const retryAfterSecs = Number.isFinite(headerSecs)
+    ? headerSecs
+    : Number.isFinite(bodySecs)
+      ? bodySecs
+      : undefined;
+  if (status === 503 || status === 429) {
+    return new RetryableStageShed(`peer shed (HTTP ${status}): ${body}`, retryAfterSecs);
+  }
+  if (status >= 400 && status < 500) {
+    if (body.includes('not retrievable')) {
+      return new RetryableStageShed(`target not retrievable yet (HTTP ${status}): ${body}`);
+    }
+    return new NonRetryableStageError(`structural failure (HTTP ${status}): ${body}`);
+  }
+  return new RetryableStageShed(`peer failed (HTTP ${status}): ${body}`);
+}
+
+/**
+ * Bounded-budget retry loop mirroring stage-spa-blob.sh's outer while-loop
+ * (scripts/ci/stage-spa-blob.sh ~577-623): a `NonRetryableStageError` from
+ * `attempt` aborts immediately (never retried); a `RetryableStageShed` backs
+ * off by its own `retryAfterSecs` hint (capped at `maxWaitSecs`) or, absent a
+ * hint, by `attempt * 5` seconds (also capped) — until either the attempt
+ * count or the wall-clock budget is exhausted, at which point the last error
+ * is thrown.
+ */
+export async function withStorageRetryBudget<T>(
+  attempt: (attemptNumber: number) => Promise<T>,
+  opts: {
+    budget?: StorageRetryBudget;
+    sleep?: (seconds: number) => Promise<void>;
+    now?: () => number;
+  } = {}
+): Promise<T> {
+  const budget = opts.budget ?? defaultStorageRetryBudget();
+  const sleep =
+    opts.sleep ??
+    (async (seconds: number) => {
+      await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+    });
+  const now = opts.now ?? Date.now;
+  const startedAt = now();
+  let attemptNumber = 0;
+  for (;;) {
+    attemptNumber += 1;
+    try {
+      return await attempt(attemptNumber);
+    } catch (error) {
+      if (error instanceof NonRetryableStageError) throw error;
+      const shed =
+        error instanceof RetryableStageShed
+          ? error
+          : new RetryableStageShed((error as Error).message ?? String(error));
+      const elapsedSecs = (now() - startedAt) / 1000;
+      const remainingSecs = budget.budgetSecs - elapsedSecs;
+      if (attemptNumber >= budget.attempts || remainingSecs <= 0) throw shed;
+      const waitSecs = Math.min(
+        shed.retryAfterSecs ?? attemptNumber * 5,
+        budget.maxWaitSecs
+      );
+      await sleep(waitSecs);
+    }
+  }
+}
+
+/**
+ * Upload and author through one storage peer, without touching a survivor
+ * doorway — the intent b344f533a fixed (elohim/dev, publish authority
+ * through source storage: the PATCH must reach the AUTHOR/source storage
+ * peer directly, never via a doorway). That commit dropped the shed-aware
+ * retry ladder AND the post-PATCH seatbelt GET that stage-spa-blob.sh's
+ * stage_once carries (~376-458); both are restored here, ported rather than
+ * re-invoked because stage-spa-blob.sh's byte-upload leg is hard-wired to
+ * the doorway-only `/admin/seed/blob` route (doorway/doorway-service/src/
+ * routes/seed.rs) and has no source-storage target override.
+ *
+ * The whole attempt (re-upload + PATCH + seatbelt) is retried as a unit on a
+ * shed: re-uploading identical content-addressed bytes is idempotent-safe
+ * (stage-spa-blob.sh's own re-PUT-short-circuit comment, ~313-320), so this
+ * matches the shell ladder's behavior of retrying `stage_once` wholesale.
+ */
 export async function stageBundleThroughStorage(opts: {
   bundle: FixtureBundle;
   slug: string;
   storageUrl: string;
+  budget?: StorageRetryBudget;
+  fetchFn?: typeof fetch;
+  sleep?: (seconds: number) => Promise<void>;
+  now?: () => number;
 }): Promise<StageOutcome> {
   const archiveDir = mkdtempSync(join(fixtureRoot(), 'source-author-package-'));
+  const doFetch = opts.fetchFn ?? fetch;
   try {
     const archive = join(archiveDir, 'browser.zip');
     await execFileAsync('zip', ['-X', '-qr', archive, '.'], { cwd: opts.bundle.dir });
@@ -215,23 +360,68 @@ export async function stageBundleThroughStorage(opts: {
     const expectedHash = `sha256-${createHash('sha256').update(bytes).digest('hex')}`;
     const apiKey = process.env['STORAGE_API_KEY_ADMIN'] ?? '';
     const client = new StorageClient({ baseUrl: opts.storageUrl, apiKey, timeout: 30_000 });
-    const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
-    const uploadedHash = manifest.blob_hash.startsWith('sha256-')
-      ? manifest.blob_hash
-      : `sha256-${manifest.blob_hash}`;
-    assert.equal(uploadedHash, expectedHash, 'source storage returned a different blob hash');
 
-    const response = await fetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body: JSON.stringify({ blobHash: expectedHash }),
-      signal: AbortSignal.timeout(30_000),
-    });
-    const body = await response.text();
-    assert.ok(response.ok, `source storage publication failed: ${response.status} ${body}`);
-    const action = (JSON.parse(body) as { dhtAnchorHash?: string }).dhtAnchorHash;
-    assert.ok(action, 'source storage publication returned no exact action');
-    return { code: 0, output: body, blobHash: expectedHash, authoredActionHash: action };
+    return await withStorageRetryBudget(
+      async () => {
+        const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
+        const uploadedHash = manifest.blob_hash.startsWith('sha256-')
+          ? manifest.blob_hash
+          : `sha256-${manifest.blob_hash}`;
+        if (uploadedHash !== expectedHash) {
+          throw new NonRetryableStageError(
+            `source storage returned a different blob hash: expected ${expectedHash}, got ${uploadedHash}`
+          );
+        }
+
+        const response = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+          body: JSON.stringify({ blobHash: expectedHash }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        const body = await response.text();
+        const verdict = classifyStorageResponse(
+          response.status,
+          body,
+          response.headers.get('retry-after')
+        );
+        if (verdict instanceof Error) throw verdict;
+
+        const action = (JSON.parse(body) as { dhtAnchorHash?: string }).dhtAnchorHash;
+        if (!action) {
+          throw new NonRetryableStageError(
+            `source storage publication returned no exact action: ${body}`
+          );
+        }
+
+        // Seatbelt (stage-spa-blob.sh ~450-458): re-GET the row and confirm the
+        // hash field actually landed before calling this staged.
+        const verifyResponse = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
+          signal: AbortSignal.timeout(30_000),
+        });
+        const verifyText = await verifyResponse.text();
+        if (!verifyResponse.ok) {
+          throw new NonRetryableStageError(
+            `seatbelt GET failed (HTTP ${verifyResponse.status}): ${verifyText}`
+          );
+        }
+        const actual = (JSON.parse(verifyText) as { blobHash?: string }).blobHash;
+        if (actual !== expectedHash) {
+          throw new NonRetryableStageError(
+            `blobHash drift after PATCH: expected ${expectedHash}, got ${actual ?? '<empty>'}`
+          );
+        }
+
+        const outcome: StageOutcome = {
+          code: 0,
+          output: body,
+          blobHash: expectedHash,
+          authoredActionHash: action,
+        };
+        return outcome;
+      },
+      { budget: opts.budget, sleep: opts.sleep, now: opts.now }
+    );
   } finally {
     rmSync(archiveDir, { recursive: true, force: true });
   }
