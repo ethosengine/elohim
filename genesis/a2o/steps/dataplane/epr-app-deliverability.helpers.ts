@@ -208,7 +208,7 @@ export async function stageBundle(opts: {
  * shell ladder tunes this direct-to-storage path identically.
  */
 export interface StorageRetryBudget {
-  /** Total wall-clock retry budget in seconds (default 360). */
+  /** Total wall-clock retry budget in seconds (default 360, clamped to the caller's step). */
   budgetSecs: number;
   /** Safety-net ceiling on attempt count on top of the budget (default 60). */
   attempts: number;
@@ -216,9 +216,30 @@ export interface StorageRetryBudget {
   maxWaitSecs: number;
 }
 
-export function defaultStorageRetryBudget(): StorageRetryBudget {
+/**
+ * Deadline-aware default: when a caller hands us its own cucumber step
+ * timeout, the budget is clamped strictly inside it (minus `marginMs`, which
+ * has to leave room for the seatbelt verify fetch and the exhaustion error's
+ * own formatting after the ladder gives up). A 360s budget inside a 300s step
+ * is exactly the defect this guards — cucumber's generic `function timed out`
+ * kills the step first and every diagnostic the ladder would have thrown is
+ * lost. `STAGE_BLOB_BUDGET_SECS` is still honored, but only up to that same
+ * ceiling — an operator cannot configure a budget that outlives its step.
+ * With no `stepTimeoutMs` (no step context), behavior matches the historical
+ * unbounded default.
+ */
+export function defaultStorageRetryBudget(
+  opts: { stepTimeoutMs?: number; marginMs?: number } = {}
+): StorageRetryBudget {
+  const marginMs = opts.marginMs ?? 20_000;
+  const envSecs = Number(process.env['STAGE_BLOB_BUDGET_SECS'] ?? 360);
+  const rawBudgetSecs = Number.isFinite(envSecs) && envSecs > 0 ? envSecs : 360;
+  const ceilingSecs =
+    opts.stepTimeoutMs === undefined
+      ? Number.POSITIVE_INFINITY
+      : Math.max(5, (opts.stepTimeoutMs - marginMs) / 1000);
   return {
-    budgetSecs: Number(process.env['STAGE_BLOB_BUDGET_SECS'] ?? 360),
+    budgetSecs: Math.min(rawBudgetSecs, ceilingSecs),
     attempts: Number(process.env['STAGE_BLOB_ATTEMPTS'] ?? 60),
     maxWaitSecs: 60,
   };
@@ -226,12 +247,20 @@ export function defaultStorageRetryBudget(): StorageRetryBudget {
 
 /** A backpressure/lag answer the ladder should re-offer within budget. */
 export class RetryableStageShed extends Error {
+  /** HTTP body of the last answer that produced this shed, trimmed to ~300 chars. */
+  public readonly bodySnippet?: string;
+
   constructor(
     message: string,
-    public readonly retryAfterSecs?: number
+    public readonly retryAfterSecs?: number,
+    /** Which leg of the publish produced this shed — 'blob upload' | 'PATCH' | 'seatbelt verify'. */
+    public readonly leg?: string,
+    public readonly httpStatus?: number,
+    bodySnippet?: string
   ) {
     super(message);
     this.name = 'RetryableStageShed';
+    this.bodySnippet = bodySnippet?.slice(0, 300);
   }
 }
 
@@ -255,7 +284,8 @@ export class NonRetryableStageError extends Error {
 export function classifyStorageResponse(
   status: number,
   body: string,
-  retryAfterHeader: string | null | undefined
+  retryAfterHeader: string | null | undefined,
+  leg = 'PATCH'
 ): { ok: true } | RetryableStageShed | NonRetryableStageError {
   if (status >= 200 && status < 300) return { ok: true };
   const headerSecs =
@@ -268,15 +298,58 @@ export function classifyStorageResponse(
   if (Number.isFinite(headerSecs)) retryAfterSecs = headerSecs;
   else if (Number.isFinite(bodySecs)) retryAfterSecs = bodySecs;
   if (status === 503 || status === 429) {
-    return new RetryableStageShed(`peer shed (HTTP ${status}): ${body}`, retryAfterSecs);
+    return new RetryableStageShed(
+      `peer shed (HTTP ${status}): ${body}`,
+      retryAfterSecs,
+      leg,
+      status,
+      body
+    );
   }
   if (status >= 400 && status < 500) {
     if (body.includes('not retrievable')) {
-      return new RetryableStageShed(`target not retrievable yet (HTTP ${status}): ${body}`);
+      return new RetryableStageShed(
+        `target not retrievable yet (HTTP ${status}): ${body}`,
+        undefined,
+        leg,
+        status,
+        body
+      );
     }
     return new NonRetryableStageError(`structural failure (HTTP ${status}): ${body}`);
   }
-  return new RetryableStageShed(`peer failed (HTTP ${status}): ${body}`);
+  return new RetryableStageShed(
+    `peer failed (HTTP ${status}): ${body}`,
+    undefined,
+    leg,
+    status,
+    body
+  );
+}
+
+/** Minimum remaining budget a new attempt is allowed to start with. */
+const MIN_REMAINING_SECS_FOR_ANOTHER_ATTEMPT = 5;
+
+/**
+ * Build the terminal, non-retryable error thrown when the ladder exhausts its
+ * budget or attempt count — names the leg, attempt count, elapsed time, and
+ * the last answer seen, since that is exactly the diagnostic evidence a
+ * generic cucumber `function timed out` would otherwise erase.
+ */
+function storageLadderExhaustedError(
+  shed: RetryableStageShed,
+  attemptNumber: number,
+  elapsedSecs: number
+): Error {
+  const leg = shed.leg ?? 'unknown leg';
+  const lastStatus = shed.httpStatus === undefined ? 'n/a' : String(shed.httpStatus);
+  const lastBody = shed.bodySnippet ?? shed.message.slice(0, 300);
+  const lastRetryAfter = shed.retryAfterSecs === undefined ? 'n/a' : `${shed.retryAfterSecs}s`;
+  return new Error(
+    `staging ladder exhausted at leg "${leg}" after ${attemptNumber} attempt(s) / ` +
+      `${elapsedSecs.toFixed(1)}s elapsed — last HTTP status: ${lastStatus}, ` +
+      `last body: ${JSON.stringify(lastBody)}, last Retry-After: ${lastRetryAfter}`
+  );
 }
 
 /**
@@ -285,8 +358,14 @@ export function classifyStorageResponse(
  * `attempt` aborts immediately (never retried); a `RetryableStageShed` backs
  * off by its own `retryAfterSecs` hint (capped at `maxWaitSecs`) or, absent a
  * hint, by `attempt * 5` seconds (also capped) — until either the attempt
- * count or the wall-clock budget is exhausted, at which point the last error
- * is thrown.
+ * count or the wall-clock budget is exhausted, at which point a terminal,
+ * diagnostic-bearing error is thrown (`storageLadderExhaustedError`).
+ *
+ * Every backoff is clamped to the remaining wall-clock budget so the ladder
+ * never sleeps past its own deadline, and a new attempt never starts with
+ * less than `MIN_REMAINING_SECS_FOR_ANOTHER_ATTEMPT` left — at that point the
+ * ladder exhausts immediately instead of gambling one more round-trip it
+ * cannot afford to finish and report on.
  */
 export async function withStorageRetryBudget<T>(
   attempt: (attemptNumber: number) => Promise<T>,
@@ -294,6 +373,8 @@ export async function withStorageRetryBudget<T>(
     budget?: StorageRetryBudget;
     sleep?: (seconds: number) => Promise<void>;
     now?: () => number;
+    /** Log-line prefix identifying which caller is retrying. */
+    label?: string;
   } = {}
 ): Promise<T> {
   const budget = opts.budget ?? defaultStorageRetryBudget();
@@ -303,6 +384,7 @@ export async function withStorageRetryBudget<T>(
       await new Promise(resolve => setTimeout(resolve, seconds * 1000));
     });
   const now = opts.now ?? Date.now;
+  const label = opts.label ?? 'storage-retry-budget';
   const startedAt = now();
   let attemptNumber = 0;
   for (;;) {
@@ -317,8 +399,25 @@ export async function withStorageRetryBudget<T>(
           : new RetryableStageShed((error as Error).message ?? String(error));
       const elapsedSecs = (now() - startedAt) / 1000;
       const remainingSecs = budget.budgetSecs - elapsedSecs;
-      if (attemptNumber >= budget.attempts || remainingSecs <= 0) throw shed;
-      const waitSecs = Math.min(shed.retryAfterSecs ?? attemptNumber * 5, budget.maxWaitSecs);
+      if (
+        attemptNumber >= budget.attempts ||
+        remainingSecs <= MIN_REMAINING_SECS_FOR_ANOTHER_ATTEMPT
+      ) {
+        throw storageLadderExhaustedError(shed, attemptNumber, elapsedSecs);
+      }
+      const waitSecs = Math.max(
+        0,
+        Math.min(
+          shed.retryAfterSecs ?? attemptNumber * 5,
+          budget.maxWaitSecs,
+          remainingSecs - MIN_REMAINING_SECS_FOR_ANOTHER_ATTEMPT
+        )
+      );
+      console.warn(
+        `[${label}] attempt ${attemptNumber} shed at leg "${shed.leg ?? 'unknown'}": ` +
+          `${shed.message} — retrying in ${waitSecs.toFixed(1)}s ` +
+          `(elapsed ${elapsedSecs.toFixed(1)}s / budget ${budget.budgetSecs.toFixed(1)}s)`
+      );
       await sleep(waitSecs);
     }
   }
@@ -345,6 +444,13 @@ export async function stageBundleThroughStorage(opts: {
   slug: string;
   storageUrl: string;
   budget?: StorageRetryBudget;
+  /**
+   * The calling cucumber step's own `{ timeout }`. Used (when `budget` is not
+   * given explicitly) to derive a budget that is strictly inside the step's
+   * deadline — see `defaultStorageRetryBudget`.
+   */
+  stepTimeoutMs?: number;
+  marginMs?: number;
   fetchFn?: typeof fetch;
   sleep?: (seconds: number) => Promise<void>;
   now?: () => number;
@@ -361,27 +467,51 @@ export async function stageBundleThroughStorage(opts: {
 
     return await withStorageRetryBudget(
       async () => {
-        const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
-        const uploadedHash = manifest.blob_hash.startsWith('sha256-')
-          ? manifest.blob_hash
-          : `sha256-${manifest.blob_hash}`;
+        let uploadedHash: string;
+        try {
+          const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
+          uploadedHash = manifest.blob_hash.startsWith('sha256-')
+            ? manifest.blob_hash
+            : `sha256-${manifest.blob_hash}`;
+        } catch (error) {
+          if (error instanceof NonRetryableStageError || error instanceof RetryableStageShed)
+            throw error;
+          throw new RetryableStageShed(
+            `blob upload failed: ${(error as Error).message ?? String(error)}`,
+            undefined,
+            'blob upload'
+          );
+        }
         if (uploadedHash !== expectedHash) {
           throw new NonRetryableStageError(
             `source storage returned a different blob hash: expected ${expectedHash}, got ${uploadedHash}`
           );
         }
 
-        const response = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-          body: JSON.stringify({ blobHash: expectedHash }),
-          signal: AbortSignal.timeout(30_000),
-        });
-        const body = await response.text();
+        let response: Response;
+        let body: string;
+        try {
+          response = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+            body: JSON.stringify({ blobHash: expectedHash }),
+            signal: AbortSignal.timeout(30_000),
+          });
+          body = await response.text();
+        } catch (error) {
+          if (error instanceof NonRetryableStageError || error instanceof RetryableStageShed)
+            throw error;
+          throw new RetryableStageShed(
+            `PATCH request failed: ${(error as Error).message ?? String(error)}`,
+            undefined,
+            'PATCH'
+          );
+        }
         const verdict = classifyStorageResponse(
           response.status,
           body,
-          response.headers.get('retry-after')
+          response.headers.get('retry-after'),
+          'PATCH'
         );
         if (verdict instanceof Error) throw verdict;
 
@@ -394,10 +524,22 @@ export async function stageBundleThroughStorage(opts: {
 
         // Seatbelt (stage-spa-blob.sh ~450-458): re-GET the row and confirm the
         // hash field actually landed before calling this staged.
-        const verifyResponse = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
-          signal: AbortSignal.timeout(30_000),
-        });
-        const verifyText = await verifyResponse.text();
+        let verifyResponse: Response;
+        let verifyText: string;
+        try {
+          verifyResponse = await doFetch(`${opts.storageUrl}/db/content/${opts.slug}`, {
+            signal: AbortSignal.timeout(30_000),
+          });
+          verifyText = await verifyResponse.text();
+        } catch (error) {
+          if (error instanceof NonRetryableStageError || error instanceof RetryableStageShed)
+            throw error;
+          throw new RetryableStageShed(
+            `seatbelt verify failed: ${(error as Error).message ?? String(error)}`,
+            undefined,
+            'seatbelt verify'
+          );
+        }
         if (!verifyResponse.ok) {
           throw new NonRetryableStageError(
             `seatbelt GET failed (HTTP ${verifyResponse.status}): ${verifyText}`
@@ -418,7 +560,17 @@ export async function stageBundleThroughStorage(opts: {
         };
         return outcome;
       },
-      { budget: opts.budget, sleep: opts.sleep, now: opts.now }
+      {
+        budget:
+          opts.budget ??
+          defaultStorageRetryBudget({
+            stepTimeoutMs: opts.stepTimeoutMs,
+            marginMs: opts.marginMs,
+          }),
+        sleep: opts.sleep,
+        now: opts.now,
+        label: 'stage-through-storage',
+      }
     );
   } finally {
     rmSync(archiveDir, { recursive: true, force: true });

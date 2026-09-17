@@ -13,6 +13,7 @@ import { describe, it } from 'node:test';
 import {
   buildFixtureBundle,
   classifyStorageResponse,
+  defaultStorageRetryBudget,
   NonRetryableStageError,
   removeFixtureBundle,
   RetryableStageShed,
@@ -104,6 +105,43 @@ async function withGlobalFetchMock<T>(fetchFn: typeof fetch, run: () => Promise<
     globalThis.fetch = original;
   }
 }
+
+void describe('defaultStorageRetryBudget', () => {
+  void it('clamps the budget strictly inside a supplied step timeout', () => {
+    // marginMs default 20_000 -> ceiling = (300_000 - 20_000) / 1000 = 280s,
+    // strictly inside the 300s step (the defect: a 360s budget in a 300s step).
+    const budget = defaultStorageRetryBudget({ stepTimeoutMs: 300_000 });
+    assert.equal(budget.budgetSecs, 280);
+    assert.ok(budget.budgetSecs * 1000 < 300_000);
+  });
+
+  void it('honors a custom margin', () => {
+    const budget = defaultStorageRetryBudget({ stepTimeoutMs: 60_000, marginMs: 10_000 });
+    assert.equal(budget.budgetSecs, 50);
+  });
+
+  void it('clamps STAGE_BLOB_BUDGET_SECS to the same step ceiling', () => {
+    const original = process.env['STAGE_BLOB_BUDGET_SECS'];
+    process.env['STAGE_BLOB_BUDGET_SECS'] = '360';
+    try {
+      const budget = defaultStorageRetryBudget({ stepTimeoutMs: 300_000 });
+      assert.equal(budget.budgetSecs, 280);
+    } finally {
+      if (original === undefined) delete process.env['STAGE_BLOB_BUDGET_SECS'];
+      else process.env['STAGE_BLOB_BUDGET_SECS'] = original;
+    }
+  });
+
+  void it('stays unbounded (legacy default) with no step timeout supplied', () => {
+    const original = process.env['STAGE_BLOB_BUDGET_SECS'];
+    delete process.env['STAGE_BLOB_BUDGET_SECS'];
+    try {
+      assert.equal(defaultStorageRetryBudget().budgetSecs, 360);
+    } finally {
+      if (original !== undefined) process.env['STAGE_BLOB_BUDGET_SECS'] = original;
+    }
+  });
+});
 
 void describe('classifyStorageResponse', () => {
   void it('treats 2xx as ok', () => {
@@ -203,6 +241,101 @@ void describe('stageBundleThroughStorage', () => {
     );
     assert.equal(patchCallCount(), 1);
     assert.equal(sleepCalled, false);
+  });
+
+  void it(
+    'throws a terminal error naming the leg, attempts, elapsed time, last status, ' +
+      'last body, and last Retry-After when the budget exhausts',
+    async () => {
+      const { fetchFn } = makeFetchMock({
+        patchResponses: [
+          new MockResponse({
+            status: 503,
+            body: JSON.stringify({ status: 'catching-up' }),
+          }),
+        ],
+      });
+      let now = 0;
+      const sleepCalls: number[] = [];
+
+      await assert.rejects(
+        withGlobalFetchMock(fetchFn, async () =>
+          withFixtureBundle(async bundle =>
+            stageBundleThroughStorage({
+              bundle,
+              slug: SLUG,
+              storageUrl: STORAGE_URL,
+              fetchFn,
+              now: () => now,
+              sleep: async seconds => {
+                sleepCalls.push(seconds);
+                now += seconds * 1000;
+                return Promise.resolve();
+              },
+              // Budget exhausts on attempt 2 (see the "never sleeps past the
+              // deadline" test below for the arithmetic).
+              budget: { budgetSecs: 8, attempts: 60, maxWaitSecs: 60 },
+            })
+          )
+        ),
+        (error: Error) => {
+          assert.match(error.message, /staging ladder exhausted at leg "PATCH"/);
+          assert.match(error.message, /after 2 attempt\(s\)/);
+          assert.match(error.message, /elapsed/);
+          assert.match(error.message, /last HTTP status: 503/);
+          assert.match(error.message, /last body: .*catching-up/);
+          assert.match(error.message, /last Retry-After: n\/a/);
+          return true;
+        }
+      );
+      assert.deepEqual(sleepCalls, [3]);
+    }
+  );
+
+  void it('never sleeps past the remaining budget deadline, even with a large Retry-After hint', async () => {
+    const { fetchFn } = makeFetchMock({
+      patchResponses: [
+        new MockResponse({
+          status: 503,
+          body: '{}',
+          headers: { 'retry-after': '50' },
+        }),
+      ],
+    });
+    let now = 0;
+    const sleepCalls: number[] = [];
+
+    await assert.rejects(
+      withGlobalFetchMock(fetchFn, async () =>
+        withFixtureBundle(async bundle =>
+          stageBundleThroughStorage({
+            bundle,
+            slug: SLUG,
+            storageUrl: STORAGE_URL,
+            fetchFn,
+            now: () => now,
+            sleep: async seconds => {
+              sleepCalls.push(seconds);
+              now += seconds * 1000;
+              return Promise.resolve();
+            },
+            budget: { budgetSecs: 10, attempts: 60, maxWaitSecs: 60 },
+          })
+        )
+      ),
+      (error: Error) => {
+        // The hint is preserved in the terminal error even though it was
+        // clamped down for the actual sleep.
+        assert.match(error.message, /last Retry-After: 50s/);
+        return true;
+      }
+    );
+
+    // The 50s Retry-After hint was clamped to the ~5s actually left in the
+    // 10s budget — never slept past the deadline.
+    assert.deepEqual(sleepCalls, [5]);
+    const totalSlept = sleepCalls.reduce((sum, s) => sum + s, 0);
+    assert.ok(totalSlept < 10, `slept ${totalSlept}s, past the 10s budget`);
   });
 
   void it('fails when the post-PATCH seatbelt GET finds a different hash', async () => {

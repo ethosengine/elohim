@@ -661,6 +661,16 @@ async function declareCurrentBrowserBundle(this: E2EWorld, peerName: string): Pr
   record.declaredThrough.push(doorwayUrl);
 }
 
+/**
+ * The step below's own `{ timeout }` — shared with the call into
+ * `stageBundleThroughStorage` so the ladder's budget can never outlive the
+ * cucumber step that runs it (a 360s ladder inside a 300s step is exactly the
+ * defect this constant prevents: cucumber's generic `function timed out`
+ * kills the step first and every diagnostic the ladder would have thrown is
+ * lost).
+ */
+const DECLARE_THROUGH_AUTHOR_STORAGE_STEP_TIMEOUT_MS = 300_000;
+
 async function declareCurrentBrowserBundleThroughAuthorStorage(world: E2EWorld): Promise<void> {
   const record = app(world);
   const bundle = requireBundle(world);
@@ -670,6 +680,7 @@ async function declareCurrentBrowserBundleThroughAuthorStorage(world: E2EWorld):
     bundle,
     slug: record.slug,
     storageUrl,
+    stepTimeoutMs: DECLARE_THROUGH_AUTHOR_STORAGE_STEP_TIMEOUT_MS,
   });
   assert.strictEqual(
     outcome.code,
@@ -704,7 +715,7 @@ When(
 
 When(
   'the canonical source author publishes authority B through its storage peer',
-  { timeout: 300_000 },
+  { timeout: DECLARE_THROUGH_AUTHOR_STORAGE_STEP_TIMEOUT_MS },
   async function (this: E2EWorld): Promise<void> {
     await declareCurrentBrowserBundleThroughAuthorStorage(this);
   }
