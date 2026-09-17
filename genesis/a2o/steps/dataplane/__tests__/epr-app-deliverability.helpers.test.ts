@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-floating-promises -- node:test describe/it
-   return promises that the test runner itself consumes; awaiting them is wrong. */
+/* eslint-disable sonarjs/no-clear-text-protocols -- fixture-only invalid.test host, never dialed */
 /**
  * Covers the shed-aware staging ladder restored after b344f533a dropped it
  * (genesis/a2o/steps/dataplane/epr-app-deliverability.helpers.ts,
@@ -36,51 +35,56 @@ class MockResponse {
   }
   headers = { get: (name: string) => this.opts.headers?.[name.toLowerCase()] ?? null };
   async text(): Promise<string> {
-    return this.opts.body;
+    return Promise.resolve(this.opts.body);
   }
   async json(): Promise<unknown> {
-    return JSON.parse(this.opts.body);
+    return Promise.resolve(JSON.parse(this.opts.body));
   }
 }
 
 /** A tiny fetch double: PUT/blob computes a real hash, PATCH plays a scripted
  * response queue, GET (the seatbelt) answers with the last uploaded hash
- * unless `seatbeltHash` overrides it (to simulate drift). */
-function makeFetchMock(opts: {
-  patchResponses: MockResponse[];
-  seatbeltHash?: string;
-}): { fetchFn: typeof fetch; patchCallCount: () => number } {
+ * unless `seatbeltHash` overrides it (to simulate drift). No `async`: every
+ * branch resolves synchronously, so the function itself never awaits. */
+function makeFetchMock(opts: { patchResponses: MockResponse[]; seatbeltHash?: string }): {
+  fetchFn: typeof fetch;
+  patchCallCount: () => number;
+} {
   let patchCalls = 0;
   let uploadedHash: string | undefined;
-  const fetchFn = (async (url: string | URL, init?: RequestInit) => {
+  const fetchFn = (async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const target = url.toString();
     const method = (init?.method ?? 'GET').toUpperCase();
     if (target === `${STORAGE_URL}/blob/` && method === 'PUT') {
       const bytes = init?.body as Uint8Array;
       uploadedHash = `sha256-${createHash('sha256').update(Buffer.from(bytes)).digest('hex')}`;
-      return new MockResponse({
-        status: 200,
-        body: JSON.stringify({ blob_hash: uploadedHash, cid: 'cid-fixture' }),
-      });
+      return Promise.resolve(
+        new MockResponse({
+          status: 200,
+          body: JSON.stringify({ blob_hash: uploadedHash, cid: 'cid-fixture' }),
+        }) as unknown as Response
+      );
     }
     if (target === `${STORAGE_URL}/db/content/${SLUG}` && method === 'PATCH') {
       const response = opts.patchResponses[patchCalls] ?? opts.patchResponses.at(-1);
       patchCalls += 1;
       assert.ok(response, 'test scripted no PATCH response for this attempt');
-      return response;
+      return Promise.resolve(response as unknown as Response);
     }
     if (target === `${STORAGE_URL}/db/content/${SLUG}` && method === 'GET') {
-      return new MockResponse({
-        status: 200,
-        body: JSON.stringify({ blobHash: opts.seatbeltHash ?? uploadedHash }),
-      });
+      return Promise.resolve(
+        new MockResponse({
+          status: 200,
+          body: JSON.stringify({ blobHash: opts.seatbeltHash ?? uploadedHash }),
+        }) as unknown as Response
+      );
     }
-    throw new Error(`unexpected fetch in test: ${method} ${target}`);
+    return Promise.reject(new Error(`unexpected fetch in test: ${method} ${target}`));
   }) as unknown as typeof fetch;
   return { fetchFn, patchCallCount: () => patchCalls };
 }
 
-function withFixtureBundle<T>(run: (bundle: FixtureBundle) => Promise<T>): Promise<T> {
+async function withFixtureBundle<T>(run: (bundle: FixtureBundle) => Promise<T>): Promise<T> {
   const bundle = buildFixtureBundle({ coherent: true });
   return run(bundle).finally(() => removeFixtureBundle(bundle));
 }
@@ -149,8 +153,8 @@ void describe('stageBundleThroughStorage', () => {
       ],
     });
 
-    const outcome = await withGlobalFetchMock(fetchFn, () =>
-      withFixtureBundle(bundle =>
+    const outcome = await withGlobalFetchMock(fetchFn, async () =>
+      withFixtureBundle(async bundle =>
         stageBundleThroughStorage({
           bundle,
           slug: SLUG,
@@ -158,6 +162,7 @@ void describe('stageBundleThroughStorage', () => {
           fetchFn,
           sleep: async seconds => {
             sleepCalls.push(seconds);
+            return Promise.resolve();
           },
           budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
         })
@@ -179,8 +184,8 @@ void describe('stageBundleThroughStorage', () => {
     });
 
     await assert.rejects(
-      withGlobalFetchMock(fetchFn, () =>
-        withFixtureBundle(bundle =>
+      withGlobalFetchMock(fetchFn, async () =>
+        withFixtureBundle(async bundle =>
           stageBundleThroughStorage({
             bundle,
             slug: SLUG,
@@ -188,6 +193,7 @@ void describe('stageBundleThroughStorage', () => {
             fetchFn,
             sleep: async () => {
               sleepCalled = true;
+              return Promise.resolve();
             },
             budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
           })
@@ -208,14 +214,14 @@ void describe('stageBundleThroughStorage', () => {
     });
 
     await assert.rejects(
-      withGlobalFetchMock(fetchFn, () =>
-        withFixtureBundle(bundle =>
+      withGlobalFetchMock(fetchFn, async () =>
+        withFixtureBundle(async bundle =>
           stageBundleThroughStorage({
             bundle,
             slug: SLUG,
             storageUrl: STORAGE_URL,
             fetchFn,
-            sleep: async () => {},
+            sleep: async () => Promise.resolve(),
             budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
           })
         )

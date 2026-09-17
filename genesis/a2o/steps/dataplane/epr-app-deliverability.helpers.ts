@@ -258,14 +258,15 @@ export function classifyStorageResponse(
   retryAfterHeader: string | null | undefined
 ): { ok: true } | RetryableStageShed | NonRetryableStageError {
   if (status >= 200 && status < 300) return { ok: true };
-  const headerSecs = retryAfterHeader != null ? Number(retryAfterHeader) : NaN;
+  const headerSecs =
+    retryAfterHeader === null || retryAfterHeader === undefined
+      ? Number.NaN
+      : Number(retryAfterHeader);
   const bodyMatch = /"retryAfter"\s*:\s*(\d+)/.exec(body)?.[1];
-  const bodySecs = bodyMatch != null ? Number(bodyMatch) : NaN;
-  const retryAfterSecs = Number.isFinite(headerSecs)
-    ? headerSecs
-    : Number.isFinite(bodySecs)
-      ? bodySecs
-      : undefined;
+  const bodySecs = bodyMatch === undefined ? Number.NaN : Number(bodyMatch);
+  let retryAfterSecs: number | undefined;
+  if (Number.isFinite(headerSecs)) retryAfterSecs = headerSecs;
+  else if (Number.isFinite(bodySecs)) retryAfterSecs = bodySecs;
   if (status === 503 || status === 429) {
     return new RetryableStageShed(`peer shed (HTTP ${status}): ${body}`, retryAfterSecs);
   }
@@ -317,10 +318,7 @@ export async function withStorageRetryBudget<T>(
       const elapsedSecs = (now() - startedAt) / 1000;
       const remainingSecs = budget.budgetSecs - elapsedSecs;
       if (attemptNumber >= budget.attempts || remainingSecs <= 0) throw shed;
-      const waitSecs = Math.min(
-        shed.retryAfterSecs ?? attemptNumber * 5,
-        budget.maxWaitSecs
-      );
+      const waitSecs = Math.min(shed.retryAfterSecs ?? attemptNumber * 5, budget.maxWaitSecs);
       await sleep(waitSecs);
     }
   }
