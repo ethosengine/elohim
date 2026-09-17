@@ -21,7 +21,26 @@ DEGEN_MIN_EVENTS = 3    # ... and >= N NEW degenerate renders (a rate needs a ba
 WINDOW = 8              # ring-buffer length per node (>= max predicate window)
 CLASS = "self-heal-exhaustion"
 
-CLOSE_STREAK = 3        # fp absent for >= N consecutive polls => closed (deleted)
+CLOSE_STREAK = 5        # fp absent for >= N consecutive polls => closed (deleted).
+                        #   MUST stay STRICTLY GREATER than the widest predicate window
+                        #   (max(OPEN_POLLS, SHED_POLLS, LAG_POLLS, DEGEN_POLLS) == 3).
+                        #   WHY (measured 2026-09-17, fp 79f357281ca5, third flap of the
+                        #   same unchanged condition): a predicate that ANDs over a
+                        #   sliding window of W samples goes silent for exactly W polls
+                        #   after ONE aberrant sample — the bad sample sits in the last
+                        #   W windows. With CLOSE_STREAK == W == 3 a SINGLE junk sample
+                        #   is therefore sufficient to DELETE a live, correctly-blocked
+                        #   ledger line, which re-files on the next poll as NEW and burns
+                        #   a full triage dispatch on a condition that never moved.
+                        #   The stored alpha-b window shows it exactly: _heals_nothing
+                        #   True,True,True,True,FALSE,True,True,True — the lone False is
+                        #   a `divergentAnchor: 0` reading from a DIFFERENT storage
+                        #   process behind the doorway's upstream pool (see the
+                        #   multi-process-counter lesson in _projector_lag). 5 absorbs
+                        #   one aberrant sample (needs 4) and two ADJACENT ones (needs 5)
+                        #   while still closing a genuinely self-resolved finding
+                        #   promptly. Closure-by-disappearance must be slower to believe
+                        #   a condition ended than a predicate is to stop asserting it.
 MAX_NEW_FINDINGS = 12   # ledger appends per run (storm guard, mirror ci-harvest)
 
 

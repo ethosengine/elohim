@@ -6,8 +6,8 @@ contentFormat: "markdown"
 title: "adam (B / elohim.host) projection catch-up stalls after a deploy restart — cells are NOT authorities until their storage arc reconverges, so every heal get_links leaves the box and dies on the 60s conductor request timeout"
 slug: "self-heal-adam-projection-catchup-exhaustion-full-arc"
 written: "2026-07-27"
-updated: "2026-09-13"
-author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence)"
+updated: "2026-09-17"
+author: "claude (resiliency-saga sprint-3 delivery — ch06 runtime blocker RCA); mechanism corrected 2026-07-29 (rust-architect, probe-confirmed); ledger-bound 2026-09-12 (runtime-triage); mechanism corrected AGAIN 2026-09-13 (runtime-triage, Prometheus-confirmed — admission ceiling, not arc convergence); re-triaged 2026-09-17 (runtime-triage — node condition unchanged and flat; third flap traced to CLOSE_STREAK == predicate window, fixed)"
 status: "wip"
 priority: "high"
 self_heal_status: blocked
@@ -16,7 +16,7 @@ ci_status: blocked
 jobs: [elohim-edge]
 fingerprints: [79f357281ca5]
 nodes: [alpha-b, elohim-adam-alpha]
-tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter]
+tags: [self-heal-exhaustion, projection-reconcile, catch-up, storage-arc, arc-convergence, kitsune2-gossip, get-strategy-local, adam, shem, restart-churn, heal-timeout, ch06, declare, chronic-flap, elevate-arm, conductor-admission, admission-shed, sensing-gap, multi-process-counter, closure-hysteresis, re-dispatch-amplifier]
 cites:
   - resiliency-saga-sprint3-objective | Resiliency Saga Sprint 3 Objective | path: genesis/docs/superpowers/plans/2026-07-26-resiliency-saga-sprint3-objective.md
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
@@ -31,6 +31,10 @@ cites:
   - elohim/elohim-storage/src/conductor_admission.rs
   - elohim/elohim-storage/src/metrics.rs
   - .claude/scripts/_lib/__tests__/runtime_harvest_test.py
+  - .claude/data/runtime-findings.jsonl
+  - .claude/data/runtime-cursor.json
+  - genesis/data/timeline/backlog/dataplane-reanchor-dead-remaining-rekeyed-peer.md
+  - genesis/data/timeline/backlog/runtime-sensing-gap-poller-unscheduled-no-throttle-alert-2026-09-11.md
 ---
 
 # adam's post-restart catch-up cannot complete — corrected mechanism
@@ -568,3 +572,202 @@ a storage change plus a fleet roll — deliberately NOT taken here, and NOT a th
   showing a nonzero `healed`/`refreshed` bucket is this concern clearing. `divergent_actionable`
   climbing past the fleet's upper range (~55) while `healed` stays 0, or the interactive shed
   rate exceeding its 24h peak of ~117/h, is it deepening.
+
+---
+
+# 2026-09-17 — third flap, re-triaged: the condition did not move, the SENSING did
+
+## What is exhausted
+
+Ledger line as re-filed (`.claude/data/runtime-findings.jsonl`), and note `seen: 1` /
+`first_poll: 91` — this fp was filed as **NEW**, i.e. the previous, correctly-`blocked`
+line for the SAME fingerprint had been deleted by closure-by-disappearance:
+
+```json
+{"fp": "79f357281ca5", "class": "self-heal-exhaustion", "node": "alpha-b",
+ "provenance": "projector:reconcile",
+ "line": "projector healed NOTHING (healedTotal 0 over 73-144 sweeps, divergentAnchor 58, converged=false) sustained >= 3 polls",
+ "status": "open", "seen": 1, "first_poll": 91, "last_poll": 91,
+ "clean_poll_streak": 0, "ts": "2026-09-17T12:25:48+00:00"}
+```
+
+Re-fetched live at triage (2026-09-17, `https://elohim.host/p2p/status`, HTTP 200) —
+condition **LIVE**, not a transient:
+
+```json
+"projectionReconcile": {"pending": 22, "completed": 0, "failed": 2, "caughtUp": false,
+  "peersAsked": 5, "divergentAnchor": 58, "healedTotal": 0, "sweeps": 144,
+  "exhausted": 0, "converged": false}
+```
+
+`https://elohim.host/admin/self-healing` in the same pass: `admission {maxInflight: 256,
+available: 256, shedTotal: 0}` (the doorway gate is idle — still the wrong gate, per the
+2026-09-13 sensing-gap section), upstream circuit `closed`, `conductor {connected: true,
+connectedWorkers: 4, totalWorkers: 4}`, `warmup {completed: true, attempts: 1}`,
+`render {total: 164, degenerateRate: 0.0366}`, and **all seven conductor peers
+`"status": "Degraded", "lastSeen": null`**.
+
+**The domain reading: the ceiling is STABLE, not deepening.** Against 2026-09-13
+(`healedTotal 0` over 21–23 sweeps, `divergentAnchor 59`), four days later the projector
+has run ~120 MORE sweeps, healed **zero**, and divergence sits at **58** — flat, one
+below. It is not converging and it is not degrading; `divergent_actionable` has not
+climbed past the ~55 fleet range and the regression signature named on 2026-09-13
+(`elohim_projection_heal_outcomes_total` showing a nonzero `healed` bucket) has not
+fired. Adam's `/p2p/status` is otherwise healthy — 6 connected peers, `drain` 3445/3445
+published, `pull` caught up, iroh paths at ~8ms RTT and `successRate: 1.0`. The blocked
+verdict below is unchanged and correctly blocked.
+
+## Root-cause inventory — of the RE-DISPATCH (the node's own root cause is unchanged)
+
+The 2026-09-13 rewrite fixed the cross-poll-delta defect and predicted the finding would
+now "file ONE ledger line that stays present — which is what stops the re-dispatch." It
+did not. Replaying `evaluate()` over the persisted window in `.claude/data/runtime-cursor.json`
+(read-only, `_heals_nothing` per sample) shows why:
+
+| sample | healedTotal | sweeps | divergentAnchor | converged | `_heals_nothing` |
+|---|---|---|---|---|---|
+| 0 | 0 | 88 | 9 | false | True |
+| 1 | 0 | 109 | 9 | false | True |
+| 2 | 0 | 21 | 59 | false | True |
+| 3 | 0 | 20 | 51 | false | True |
+| 4 | 0 | 52 | **0** | false | **False** |
+| 5 | 0 | 73 | 51 | false | True |
+| 6 | 0 | 144 | 58 | false | True |
+| 7 | 0 | 144 | 58 | false | True |
+
+`healedTotal` is **0 in every single sample of the window** — the condition never lapsed
+for one poll. The lone `False` is sample 4's `divergentAnchor: 0`, which is the SAME
+multi-process artifact `_projector_lag`'s own docstring names for `sweeps`: consecutive
+polls are answered by different storage processes behind doorway-B's upstream pool, and a
+young process reports `divergentAnchor: 0` because it has not yet discovered divergence.
+The 2026-09-13 fix removed cross-poll *arithmetic*, but each per-sample term is still drawn
+from a possibly-different process, and the predicate requires **every** sampled process to
+agree (`all(_heals_nothing(r) for r in reports)`).
+
+**The structural amplifier — the actual defect, and it is not in the predicate.** A
+predicate that ANDs over a sliding window of `W` samples goes silent for exactly `W` polls
+after one aberrant sample (the bad sample sits in the last `W` windows). With
+`LAG_POLLS == CLOSE_STREAK == 3`, **one junk sample is exactly sufficient** to delete a
+live ledger line:
+
+- window `[2,3,4]` → contains sample 4 → silent (clean_poll_streak 1)
+- window `[3,4,5]` → contains sample 4 → silent (clean_poll_streak 2)
+- window `[4,5,6]` → contains sample 4 → silent (clean_poll_streak 3 → **DELETE**)
+- window `[5,6,7]` → all True → re-files as **NEW** → full Opus triage dispatch
+
+That is this dispatch, and it is the third flap of fp `79f357281ca5` on a condition that
+has not changed since 2026-07-27.
+
+- `.claude/scripts/_lib/runtime_harvest.py:24` — `CLOSE_STREAK` (the amplifier)
+- `.claude/scripts/_lib/runtime_harvest.py:~203` — `_projector_lag`, the `all(...)` quorum
+- `.claude/scripts/_lib/runtime_harvest.py:~190` — `_heals_nothing`, the per-sample terms
+
+**Committed-ledger proof that the line was deleted, not merely re-worded.** `git diff` of
+`.claude/data/runtime-findings.jsonl` against HEAD shows the fp's previous incarnation was
+already terminal-state and already cited this file:
+
+```json
+{"fp": "79f357281ca5", ..., "line": "projector caughtUp=false sustained >= 3 polls",
+ "status": "blocked", "seen": 2, "first_poll": 81, "last_poll": 82,
+ "backlog": "genesis/data/timeline/backlog/self-heal-adam-projection-catchup-exhaustion-full-arc.md"}
+```
+
+The fingerprint is byte-identical to the one re-filed at poll 91 (fp is computed from
+node+class+**provenance**, not the line text — so the 2026-09-13 line rewrite correctly did
+NOT move it). Between poll 82 and poll 91 the line was removed by
+closure-by-disappearance and then re-filed at `seen: 1`, losing both `status: blocked` and
+the backlog citation — i.e. **losing the entire suppression state this concern exists to
+hold.** Blocked is supposed to be terminal for automation; closure-by-disappearance
+silently un-terminals it.
+
+**And it is not confined to this fingerprint.** The same diff shows fp `2b4761b2eaf6`
+(`provide-loop-dead-remaining-stuck` on alpha-b, `status: blocked`, cited to
+`genesis/data/timeline/backlog/dataplane-reanchor-dead-remaining-rekeyed-peer.md`) was
+closed over the same interval — while the live 2026-09-17 `/p2p/status` still reports
+`reanchorDeadRemaining: 9` **unchanged** and `reanchorCaughtUp: false`. Only
+`stuckSweeps` moved (3 → 1), which is a per-PROCESS counter resetting under the same pool
+churn. Two independently-triaged `blocked` lines were therefore retired by sampling noise
+rather than by resolution, which makes this a defect of the closure rule itself, not of any
+one predicate.
+
+## Fix path
+
+**Applied (bounded, monotone-safe): `CLOSE_STREAK` 3 → 5**, with the arithmetic written
+into the constant. Closure hysteresis must be STRICTLY GREATER than the widest predicate
+window (`max(OPEN_POLLS, SHED_POLLS, LAG_POLLS, DEGEN_POLLS) == 3`); 4 absorbs one aberrant
+sample, 5 absorbs two adjacent ones. This change can only make a line persist LONGER before
+closure — it cannot make any predicate go silent, so it adds no blind spot, which is the
+failure mode the previous two rewrites of this predicate family each introduced. A
+genuinely self-resolved finding still closes promptly. **Standing invariant:
+closure-by-disappearance must be slower to believe a condition ended than a predicate is to
+stop asserting it.**
+
+**Proposed, deliberately NOT applied (needs a daylight pass, not a background agent):**
+`_heals_nothing` currently treats an *abstaining* sample as a *refutation*. A sample with
+`healedTotal == 0` and `divergentAnchor == 0` is a process with nothing to say, not
+evidence that the projector is healthy. The honest quorum is: a window affirms exhaustion
+when at least one sample affirms it and **no** sample REFUTES it, where refutation is
+`healedTotal > 0` or `converged is True` — the two readings that actually mean "some
+process healed something / adjudicated the divergence". This is a semantic change to a
+predicate that has been rewritten twice in five days, and the standing lesson from both
+rewrites is that a hasty tightening goes silent on the very condition it was written for.
+It wants the full stored-window replay plus a fresh fixture, in daylight.
+
+**Second proposal, also NOT taken — a design question for the deterministic-layer owner,
+not a background agent.** `CLOSE_STREAK = 5` raises the noise floor but does not change the
+rule that a `blocked` line is deletable at all. Design note D5 in `reconcile()` says
+closure applies to "ANY status — runtime exhaustions self-resolve without triage", and for
+an `open` line that is exactly right. For a `blocked` line it is questionable: `blocked` is
+documented as **terminal for automation** — a human decided this needs an operator lever —
+and closure-by-disappearance silently discards that decision along with its backlog
+citation, so the next flap pays a fresh Opus dispatch to re-derive a verdict that was
+already written down. The candidate rule is that `open` closes on `CLOSE_STREAK` as today,
+while `triaged`/`blocked` require either a much longer streak or an explicit re-check
+(which is what the stasis sweep already exists to do). That is a change to the ledger's
+state machine and to the role boundary between the poller and the stasis sweep; it should
+be decided deliberately, not inside a triage pass.
+
+**Also still open from 2026-09-13, unchanged:** storage publishes neither its admission
+capacity nor its shed count on any admin JSON the poller reads, which is why a conductor-
+admission ceiling keeps reaching the ledger wearing a projector costume. Closing that is a
+storage change plus a fleet roll; `elohim/elohim-storage/src/p2p/projection_reconcile.rs`
+remains under operator WIP and out of this pass's write-set by rule.
+
+## Current decision
+
+**BLOCKED — node condition unchanged and correctly blocked; the re-dispatch amplifier is
+fixed.** The operator/cluster levers named in the 2026-09-13 "Current decision" are still
+the only things that move adam's projector, and all of them remain outside a background
+triage agent's remit (cluster action, hosted-agent sharding, conductor CPU, or the
+demand-driven reconcile ramp — the last being an **actuation** loop this agent's remit
+explicitly excludes). Nothing about the 2026-09-17 re-fetch argues for reopening that
+verdict: divergence is flat at 58 and no regression signature fired.
+
+What the poller should cite on re-encounter: this file. With `CLOSE_STREAK = 5` the
+`blocked` ledger line now survives the multi-process sampling noise that deleted it, so the
+fingerprint stays present and dispatch stays suppressed. The stasis sweep owns the re-check.
+
+## Verification
+
+- 2026-09-17 — `https://elohim.host/admin/self-healing` and `https://elohim.host/p2p/status`
+  re-fetched (HTTP 200, both quoted verbatim above). Condition confirmed **LIVE**:
+  `healedTotal: 0` over `sweeps: 144`, `divergentAnchor: 58`, `converged: false`,
+  `caughtUp: false`.
+- Predicate replayed read-only over the persisted `.claude/data/runtime-cursor.json` window
+  (table above): `healedTotal == 0` in 8 of 8 samples; exactly one sample refutes, on
+  `divergentAnchor: 0`.
+- `python3 .claude/scripts/_lib/__tests__/runtime_harvest_test.py` → **60 assertions
+  passed**, exit 0, after the `CLOSE_STREAK` change. The closure test is written against
+  `rh.CLOSE_STREAK` rather than a literal, so it follows the constant.
+- `.claude/data/runtime-findings.jsonl` and `.claude/data/runtime-cursor.json` verified
+  byte-identical (sha256) before and after the suite run — the ledger-pollution leak fixed
+  on 2026-09-13 has not regressed.
+- No cargo, no mesh, no cluster action, no push taken in this pass; the two in-flight
+  worktrees were not touched.
+- **Regression signature to watch (unchanged from 2026-09-13)**:
+  `elohim_projection_heal_outcomes_total` on adam showing a nonzero `healed`/`refreshed`
+  bucket is this concern clearing. `divergent_actionable` climbing past ~55 while `healed`
+  stays 0, or interactive shed exceeding its 24h peak of ~117/h, is it deepening.
+- **New signature for the sensing fix**: fp `79f357281ca5` should now hold `status:
+  blocked` with `seen` advancing monotonically. Another `seen: 1` re-file on this fp means
+  `CLOSE_STREAK` was insufficient and the `_heals_nothing` quorum change above is required.
