@@ -1456,6 +1456,13 @@ lazy_static! {
     /// - `adopted` — a canonical head landed FROM a sync apply rather than from
     ///   the heal leg's period. This is the series that says the 2026-09-17
     ///   130–450 s adoption lag is actually closed;
+    /// - `not_yet_walkable` — the own conductor cannot yet resolve the head the
+    ///   doc names (the DHT record has not reached it). The stale-head guard
+    ///   refused to declare, and a re-probe was considered;
+    /// - `retry_scheduled` / `retry_exhausted` / `retry_dropped_cap` /
+    ///   `retry_dropped_full` — the bounded re-probe ladder's rungs. Sustained
+    ///   `retry_exhausted` means 60 s of re-probing did not get the record here,
+    ///   which is a gossip-delivery question, not a trigger question;
     /// - `held` — nothing to adopt (row held or contested);
     /// - `author_deferred` — the adopt pre-flight returned an author verdict,
     ///   which this path deliberately does NOT act on;

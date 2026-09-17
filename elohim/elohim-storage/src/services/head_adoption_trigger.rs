@@ -49,6 +49,31 @@
 //! path; this one does not, and never mints a root. A sync apply is not evidence
 //! that anything should be authored.
 //!
+//! # The stale-head guard, and why the trigger must re-probe
+//!
+//! Adoption here is `AdoptLocal`: it needs THIS peer's conductor to already
+//! resolve the new head. The doc crosses in under a second; the DHT record does
+//! not necessarily. So the first probe often arrives before the record — and two
+//! things follow.
+//!
+//! **First, a guard.** `adopt_local` runs `StampMode::HealCanonical`, whose
+//! refusals key on `moving_declared_row` and `same_declared_head`. A row
+//! declaring NOTHING satisfies neither, so the stamp falls through and writes
+//! whatever head it is handed. If the conductor answered with the PREVIOUS head
+//! while the doc already names a newer one, that fill pins a head we know is
+//! superseded — and the later old→new move must then clear
+//! `canonical_move_verdict`, which can refuse it as `SkippedStale`. So the
+//! worker takes the conductor read ITSELF and declares only when the answer IS
+//! the head the doc names. A disagreement is not-yet-walkable, never a declare.
+//!
+//! **Second, a ladder.** Without a re-probe the id would sit inside its claim
+//! with nothing to re-fire it, and adoption would fall back to the sweep — the
+//! exact failure this module exists to remove. [`RETRY_DELAYS`] re-probes at
+//! 1/2/4/8/15/30 s (60 s total = the claim window), bounded by
+//! [`RETRY_PENDING_CAP`] sleeping timers, and only for ids a doc hint PROVES
+//! carry a head we lack ([`retry_warranted`]). Each rung re-reads the row first,
+//! so a sweep adoption in the meantime ends the schedule for free.
+//!
 //! # REQ-N5 and the `headActionHash` doc hint — the line this module holds
 //!
 //! The content doc carries a `headActionHash` scalar
@@ -126,6 +151,7 @@ use tokio::sync::mpsc;
 
 use crate::db::{content_diesel, AppContext, DbPool};
 use crate::hc_client::HcClient;
+use crate::services::conductor_writes;
 use crate::services::head_adoption::{
     self, AdoptContext, AdoptOutcome, ElectionResolve, LocalResolve,
 };
@@ -152,6 +178,70 @@ pub const DEFAULT_TRIGGER_COOLDOWN: Duration = Duration::from_secs(60);
 /// large corpus; expired entries carry no meaning, so dropping them is free.
 const CLAIM_MAP_PRUNE_AT: usize = 8_192;
 
+/// Back-off ladder for re-probing an id whose head is proven to exist but is
+/// not yet walkable by the local conductor.
+///
+/// # The race this closes
+///
+/// The trigger fires under a second after the author commits, but adoption is
+/// `AdoptLocal` — it needs THIS peer's conductor to already resolve the new
+/// head, which needs DHT gossip to have delivered the record. A single probe at
+/// t≈0 therefore loses a foot-race it was never going to win, and without a
+/// re-probe the id sits inside its claim with nothing to re-fire it: back to the
+/// 130–450 s sweep, and the 75 s bound still fails. (The same not-yet-walkable
+/// race is the likeliest cause of the 0-for-176 `ContentHeadDeclared` deferral.)
+///
+/// Sums to exactly 60 s — the claim window — so the ladder is spent while the
+/// claim still stands and cannot collide with a fresh claim for the same id.
+/// Front-loaded because the record usually lands in the first seconds; the long
+/// tail is there so a slow gossip round is still caught before the sweep.
+///
+/// bounded-work: 6 re-probes per id per claim window, ≤60 s total wall-clock,
+/// ≤`RETRY_PENDING_CAP` sleeping timers process-wide, 1 single-id conductor read
+/// per probe on a SERIAL worker. Every dimension is a constant in this file.
+const RETRY_DELAYS: [Duration; 6] = [
+    Duration::from_secs(1),
+    Duration::from_secs(2),
+    Duration::from_secs(4),
+    Duration::from_secs(8),
+    Duration::from_secs(15),
+    Duration::from_secs(30),
+];
+
+/// Ceiling on ids holding a pending re-probe timer at once.
+///
+/// The retry set is naturally small — only ids a peer has PROVEN carry a head we
+/// do not hold (see [`retry_warranted`]) — but a bound is not optional: a seed
+/// storm must not be able to convert itself into unbounded timer tasks.
+pub const RETRY_PENDING_CAP: usize = 256;
+
+/// The delay before attempt `attempt + 1`, or `None` when the ladder is spent.
+///
+/// Pure and total, so the schedule's shape and its termination are readable
+/// (and testable) without a clock, a conductor, or a task.
+pub fn retry_delay(attempt: u32) -> Option<Duration> {
+    RETRY_DELAYS.get(attempt as usize).copied()
+}
+
+/// Is a re-probe warranted for this id?
+///
+/// **Only when a doc hint is PRESENT and the local row does not already declare
+/// it.** The hint is the evidence that a head exists at all; with no hint there
+/// is nothing to wait for, and re-probing would be speculation charged to the
+/// conductor. That asymmetry is what keeps a 3,500-doc seed of undeclared
+/// content at exactly one probe per id — the storm case — while the measured
+/// race (a peer declared, we have not caught up) gets the full ladder.
+///
+/// It is also self-terminating for free: if the sweep adopts in the meantime,
+/// the local row comes to equal the hint and the next retry ends the schedule
+/// without a conductor call.
+pub fn retry_warranted(doc_hint: Option<&str>, local_declared: Option<&str>) -> bool {
+    match doc_hint {
+        None => false,
+        Some(hint) => local_declared != Some(hint),
+    }
+}
+
 /// One scheduled adoption probe.
 #[derive(Debug, Clone)]
 pub struct HeadAdoptionTrigger {
@@ -162,8 +252,36 @@ pub struct HeadAdoptionTrigger {
     /// from peer … node:<slug>` and the ADOPT line) is readable from the log
     /// alone. It is never consulted for authority.
     pub peer: String,
-    /// When the hot path raised it — the trigger→adopt elapsed measurement.
+    /// When the hot path raised it. PRESERVED across re-probes on purpose, so
+    /// `trigger_to_adopt_ms` always measures from the sync apply — the number
+    /// the lag analysis asks for — rather than from the attempt that happened
+    /// to land.
     pub raised_at: Instant,
+    /// 0 for the probe the sync apply raised; N for the Nth re-probe.
+    pub attempt: u32,
+}
+
+/// What [`TriggerGate::plan_retry`] decided.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetryPlan {
+    /// Sleep this long, then re-probe.
+    After(Duration),
+    /// The ladder is spent — leave the id to the sweep.
+    Exhausted,
+    /// Too many pending timers already. Drop-new: the sweep remains the
+    /// backstop, and the id's claim is left alone (it expires on its own).
+    DroppedCap,
+}
+
+impl RetryPlan {
+    /// Closed metric-label vocabulary.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::After(_) => "retry_scheduled",
+            Self::Exhausted => "retry_exhausted",
+            Self::DroppedCap => "retry_dropped_cap",
+        }
+    }
 }
 
 /// What [`TriggerGate::claim`] decided. Exhaustive on purpose: each arm is a
@@ -249,6 +367,10 @@ pub struct TriggerGate {
     tx: mpsc::Sender<HeadAdoptionTrigger>,
     claims: Mutex<HashMap<String, Instant>>,
     cooldown: Duration,
+    /// Ids holding a pending re-probe timer. An `AtomicUsize` rather than a set:
+    /// the claim ledger already guarantees at most one live schedule per id, so
+    /// all this needs to bound is the COUNT of sleeping tasks.
+    pending_retries: std::sync::atomic::AtomicUsize,
 }
 
 impl TriggerGate {
@@ -260,9 +382,82 @@ impl TriggerGate {
                 tx,
                 claims: Mutex::new(HashMap::new()),
                 cooldown,
+                pending_retries: std::sync::atomic::AtomicUsize::new(0),
             }),
             rx,
         )
+    }
+
+    /// Decide the next rung of the re-probe ladder, reserving budget if one is
+    /// granted. Separated from the spawn so the schedule's shape, its
+    /// termination and its cap are testable without a runtime.
+    pub fn plan_retry(&self, attempt: u32) -> RetryPlan {
+        use std::sync::atomic::Ordering;
+        let Some(delay) = retry_delay(attempt) else {
+            return RetryPlan::Exhausted;
+        };
+        // Reserve-then-verify: bump, and give the slot straight back if the bump
+        // crossed the cap. Cheaper than a CAS loop and the transient overshoot
+        // is invisible (the only reader is this check).
+        if self.pending_retries.fetch_add(1, Ordering::AcqRel) >= RETRY_PENDING_CAP {
+            self.pending_retries.fetch_sub(1, Ordering::AcqRel);
+            return RetryPlan::DroppedCap;
+        }
+        RetryPlan::After(delay)
+    }
+
+    /// Release a reserved re-probe slot.
+    fn release_retry(&self) {
+        self.pending_retries
+            .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+
+    /// Pending re-probe timers — test/observability only.
+    pub fn pending_retries(&self) -> usize {
+        self.pending_retries
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// Schedule the next re-probe, if the ladder and the budget allow one.
+    ///
+    /// The timer is a detached task that sleeps and then re-sends, so the SERIAL
+    /// worker never blocks on a delay — it keeps draining other ids throughout.
+    /// The re-send deliberately BYPASSES the claim gate ([`Self::resend_retry`]):
+    /// the claim for this id is already held, and is precisely what the ladder is
+    /// spending.
+    pub fn schedule_retry(self: &Arc<Self>, trigger: HeadAdoptionTrigger) -> RetryPlan {
+        let plan = self.plan_retry(trigger.attempt);
+        if let RetryPlan::After(delay) = plan {
+            let gate = Arc::clone(self);
+            let next = HeadAdoptionTrigger {
+                attempt: trigger.attempt + 1,
+                ..trigger
+            };
+            tokio::spawn(async move {
+                tokio::time::sleep(delay).await;
+                // Release BEFORE the send: the slot bounds sleeping timers, not
+                // queued work, and the queue has its own bound.
+                gate.release_retry();
+                gate.resend_retry(next);
+            });
+        }
+        plan
+    }
+
+    /// Re-enqueue a trigger for another attempt, bypassing the claim gate.
+    ///
+    /// A full queue drops it — the id keeps its claim and the sweep remains the
+    /// backstop, exactly as on the initial-enqueue path.
+    fn resend_retry(&self, trigger: HeadAdoptionTrigger) {
+        let content_id = trigger.content_id.clone();
+        if self.tx.try_send(trigger).is_err() {
+            crate::metrics::inc_head_adoption_trigger("retry_dropped_full");
+            tracing::debug!(
+                target: "elohim_storage::head_adoption_trigger",
+                content_id = %content_id,
+                "head-adoption trigger: re-probe dropped — queue full; the sweep still covers it"
+            );
+        }
     }
 
     /// Offer a just-applied doc to the trigger. NEVER blocks, never awaits,
@@ -299,6 +494,7 @@ impl TriggerGate {
             content_id: content_id.to_string(),
             peer: peer.to_string(),
             raised_at: now,
+            attempt: 0,
         };
         match self.tx.try_send(trigger) {
             Ok(()) => EnqueueDecision::Enqueued,
@@ -385,7 +581,6 @@ pub async fn run_head_adoption_trigger_worker(
     sync: Arc<SyncManager>,
     mut shutdown: tokio::sync::broadcast::Receiver<()>,
 ) {
-    let _ = &gate; // held so the gate outlives the worker; see `offer`'s release path
     let ctx = AppContext::default_lamad();
     tracing::info!(
         target: "elohim_storage::head_adoption_trigger",
@@ -413,7 +608,7 @@ pub async fn run_head_adoption_trigger_worker(
                 return;
             }
         };
-        process_trigger(&trigger, conductor.as_ref(), &pool, &sync, &ctx).await;
+        process_trigger(&trigger, conductor.as_ref(), &pool, &sync, &ctx, &gate).await;
     }
 }
 
@@ -425,6 +620,7 @@ async fn process_trigger(
     pool: &DbPool,
     sync: &SyncManager,
     ctx: &AppContext,
+    gate: &Arc<TriggerGate>,
 ) {
     let id = trigger.content_id.as_str();
     let Some(hc) = conductor.hc() else {
@@ -473,22 +669,83 @@ async fn process_trigger(
     };
 
     if !should_probe(local_declared.as_deref(), doc_hint.as_deref()) {
+        // Includes the case a concurrent sweep adoption already landed: the row
+        // now equals the hint, so a pending ladder ends here for free.
         crate::metrics::inc_head_adoption_trigger("skipped_current");
         return;
     }
 
-    // THE one adoption implementation. `Probe`/`Probe` because this path has
-    // paid for neither read (the same honest posture `reanchor_backfill` takes),
-    // `AdoptContext::none()` because no CRDT-derived hint may sit in the seat
-    // that selects a head, and `inert()` because with no peer hints there is no
-    // provenance to price.
+    // THE conductor read — made HERE rather than inside the adoption path, which
+    // is what `LocalResolve::Probe` would otherwise have done. Same call, same
+    // cost; taking it ourselves is what lets the stale-head guard below exist.
+    let resolved = match conductor_writes::call_resolve_content_head(&hc, id).await {
+        Ok(head) => head,
+        Err(e) => {
+            tracing::debug!(
+                target: "elohim_storage::head_adoption_trigger",
+                content_id = %id, attempt = trigger.attempt, error = %e,
+                "head-adoption trigger: own-conductor resolve failed — treating as not-yet-walkable"
+            );
+            None
+        }
+    };
+
+    // THE STALE-HEAD GUARD.
+    //
+    // `adopt_local` runs `StampMode::HealCanonical`, whose guards fire on
+    // `moving_declared_row` (row declares a DIFFERENT head) and on
+    // `same_declared_head`. A row that declares NOTHING satisfies neither, so the
+    // stamp falls straight through and writes whatever head it was handed into
+    // BOTH `declared_head_action_hash` and `dht_anchor_hash`, returning
+    // `Adopted`. That is a fill, not a move — but if the conductor answered with
+    // the PREVIOUS head while the doc already proves a newer one exists, the fill
+    // pins a head we know is superseded, and the later old→new move then has to
+    // clear `canonical_move_verdict`, which can refuse it as `SkippedStale`.
+    //
+    // So: when the doc names a head, the conductor's answer must BE that head.
+    // Anything else is "not yet walkable" — the record has not reached this
+    // conductor — and is retried, never declared. With no doc hint there is
+    // nothing to disagree with and any canonical answer is adoptable.
+    let adoptable = resolved.as_ref().filter(|h| h.canonical).filter(|h| {
+        doc_hint
+            .as_deref()
+            .is_none_or(|hint| h.head_action_hash.as_str() == hint)
+    });
+
+    let Some(head) = adoptable else {
+        crate::metrics::inc_head_adoption_trigger("not_yet_walkable");
+        tracing::debug!(
+            target: "elohim_storage::head_adoption_trigger",
+            content_id = %id,
+            attempt = trigger.attempt,
+            resolved_head = ?resolved.as_ref().map(|h| h.head_action_hash.as_str()),
+            canonical = resolved.as_ref().map(|h| h.canonical),
+            doc_hint = ?doc_hint,
+            "head-adoption trigger: the own conductor cannot yet walk the head this doc \
+             names — NOT declaring a stale head; re-probing"
+        );
+        schedule_reprobe(
+            gate,
+            trigger,
+            doc_hint.as_deref(),
+            local_declared.as_deref(),
+        );
+        return;
+    };
+
+    // THE one adoption implementation. `observed(Some(head))` hands it the read
+    // just made, so it does not pay for a second one — and `should_probe_election`
+    // is false for an answered head, so the election probe is skipped too.
+    // `AdoptContext::none()` because no CRDT-derived hint may sit in the seat that
+    // selects a head; `inert()` because with no peer hints there is no provenance
+    // to price.
     let outcome = head_adoption::try_adopt_canonical_head(
         &hc,
         pool,
         ctx,
         id,
-        LocalResolve::Probe,
-        ElectionResolve::Probe,
+        LocalResolve::observed(Some(head)),
+        ElectionResolve::unresolved(),
         &AdoptContext::none(),
         PricedVerification::inert(),
     )
@@ -507,6 +764,7 @@ async fn process_trigger(
                 content_id = %id,
                 source_peer = %trigger.peer,
                 trigger_to_adopt_ms = elapsed_ms,
+                attempt = trigger.attempt,
                 "head-adoption trigger: ADOPTED a canonical head raised by a content-sync \
                  apply — adoption no longer waits on the heal leg's period"
             );
@@ -516,7 +774,17 @@ async fn process_trigger(
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id, outcome = ?outcome, trigger_to_adopt_ms = elapsed_ms,
+                attempt = trigger.attempt,
                 "head-adoption trigger: nothing to adopt — the row is held or contested"
+            );
+            // A stamp refusal (`SkippedStale`) leaves the row still not naming
+            // the doc's head, so the ladder continues — the next rung re-reads
+            // the row first and stops for free if anything settles it.
+            schedule_reprobe(
+                gate,
+                trigger,
+                doc_hint.as_deref(),
+                local_declared.as_deref(),
             );
         }
         // NOT OURS TO ACT ON. A sync apply is not evidence that a root should be
@@ -527,10 +795,45 @@ async fn process_trigger(
             tracing::debug!(
                 target: "elohim_storage::head_adoption_trigger",
                 content_id = %id, trigger_to_adopt_ms = elapsed_ms,
+                attempt = trigger.attempt,
                 "head-adoption trigger: nothing canonical to adopt — leaving the author \
                  path to the sweeps that own one"
             );
+            schedule_reprobe(
+                gate,
+                trigger,
+                doc_hint.as_deref(),
+                local_declared.as_deref(),
+            );
         }
+    }
+}
+
+/// Book the next rung of the ladder, when one is warranted.
+///
+/// Separate from the outcome arms so every non-adopting path books it the same
+/// way, and so the WARRANT check ([`retry_warranted`]) is applied exactly once.
+/// Exhaustion releases NOTHING early: the id keeps its claim until the cooldown
+/// expires on its own, which is what stops an exhausted id from immediately
+/// re-entering on the next change batch.
+fn schedule_reprobe(
+    gate: &Arc<TriggerGate>,
+    trigger: &HeadAdoptionTrigger,
+    doc_hint: Option<&str>,
+    local_declared: Option<&str>,
+) {
+    if !retry_warranted(doc_hint, local_declared) {
+        return;
+    }
+    let plan = gate.schedule_retry(trigger.clone());
+    crate::metrics::inc_head_adoption_trigger(plan.label());
+    if plan == RetryPlan::Exhausted {
+        tracing::debug!(
+            target: "elohim_storage::head_adoption_trigger",
+            content_id = %trigger.content_id,
+            attempts = trigger.attempt + 1,
+            "head-adoption trigger: re-probe ladder spent — leaving this id to the sweep"
+        );
     }
 }
 
@@ -700,6 +1003,149 @@ mod tests {
         // coalescing already happened at the claim gate, so no queued entry is
         // ever superseded by a newer one for the same id.
         assert_eq!(rx.try_recv().unwrap().content_id, "id-1");
+    }
+
+    // ── the bounded re-probe ladder ─────────────────────────────────────────
+
+    #[test]
+    fn the_retry_ladder_is_bounded_and_fits_inside_the_claim_window() {
+        let total: Duration = RETRY_DELAYS.iter().sum();
+        assert_eq!(total, DEFAULT_TRIGGER_COOLDOWN, "ladder must fit the claim");
+        // Spends, and then stops. No rung beyond the table exists.
+        assert_eq!(retry_delay(0), Some(Duration::from_secs(1)));
+        assert_eq!(retry_delay(5), Some(Duration::from_secs(30)));
+        assert_eq!(retry_delay(6), None);
+        assert_eq!(retry_delay(u32::MAX), None);
+    }
+
+    #[test]
+    fn the_ladder_ends_on_adopt() {
+        // Adoption stamps the head, so the row comes to name the hint — and the
+        // warrant is exactly that disagreement. No warrant, no next rung.
+        let hint = Some("uhCkk-new");
+        assert!(retry_warranted(hint, None), "absent row: keep probing");
+        assert!(
+            retry_warranted(hint, Some("uhCkk-old")),
+            "stale row: keep probing"
+        );
+        assert!(
+            !retry_warranted(hint, Some("uhCkk-new")),
+            "adopted row: the ladder ends"
+        );
+    }
+
+    #[test]
+    fn the_ladder_ends_early_when_a_sweep_adoption_lands_first() {
+        // A rung that wakes to find the sweep already settled the row spends no
+        // conductor call: `should_probe` short-circuits, and the warrant is gone.
+        let hint = "uhCkk-new";
+        assert!(!should_probe(Some(hint), Some(hint)));
+        assert!(!retry_warranted(Some(hint), Some(hint)));
+    }
+
+    #[test]
+    fn a_doc_with_no_head_hint_never_enters_the_ladder() {
+        // The storm case: undeclared content probes ONCE and stops. Retrying with
+        // no hint would be speculation charged to the conductor.
+        assert!(!retry_warranted(None, None));
+        assert!(!retry_warranted(None, Some("uhCkk-local")));
+    }
+
+    #[test]
+    fn the_retry_cap_drops_new_without_leaking_claims_or_slots() {
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        let t0 = Instant::now();
+        // Reserve the whole budget.
+        for _ in 0..RETRY_PENDING_CAP {
+            assert!(matches!(gate.plan_retry(0), RetryPlan::After(_)));
+        }
+        assert_eq!(gate.pending_retries(), RETRY_PENDING_CAP);
+        // One more is refused — and the refusal does NOT consume budget.
+        assert_eq!(gate.plan_retry(0), RetryPlan::DroppedCap);
+        assert_eq!(
+            gate.pending_retries(),
+            RETRY_PENDING_CAP,
+            "a refused reservation must give its slot back"
+        );
+        // An exhausted ladder never reserves at all.
+        assert_eq!(gate.plan_retry(6), RetryPlan::Exhausted);
+        assert_eq!(gate.pending_retries(), RETRY_PENDING_CAP);
+        // And none of that touched the claim ledger: a fresh id still enqueues.
+        assert_eq!(gate.claim_count(), 0, "planning a retry must not claim");
+        assert_eq!(
+            gate.claim_and_send("unrelated", "peerA", t0),
+            EnqueueDecision::Enqueued
+        );
+        assert_eq!(rx.try_recv().unwrap().content_id, "unrelated");
+    }
+
+    #[test]
+    fn exhaustion_releases_nothing_early_and_the_claim_stands_until_cooldown() {
+        let cooldown = DEFAULT_TRIGGER_COOLDOWN;
+        let (gate, mut rx) = gate_with(cooldown);
+        let t0 = Instant::now();
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0),
+            EnqueueDecision::Enqueued
+        );
+        let trigger = rx.try_recv().unwrap();
+        assert_eq!(trigger.attempt, 0);
+        // Ladder spent.
+        assert_eq!(gate.plan_retry(6), RetryPlan::Exhausted);
+        // The claim is NOT released — the id stays barred for the rest of the
+        // window, so an exhausted id cannot immediately re-enter on the next
+        // change batch and start the ladder over.
+        assert_eq!(gate.claim_count(), 1);
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0 + Duration::from_secs(59)),
+            EnqueueDecision::Deduped
+        );
+        // It re-admits only when the cooldown genuinely expires.
+        assert_eq!(
+            gate.claim_and_send("alpha", "peerA", t0 + cooldown),
+            EnqueueDecision::Enqueued
+        );
+    }
+
+    #[tokio::test]
+    async fn a_scheduled_reprobe_re_enqueues_with_an_incremented_attempt() {
+        // End-to-end on the real timer: the ladder's first rung is 1 s, so pause
+        // time and let the runtime auto-advance rather than sleeping for real.
+        tokio::time::pause();
+        let (gate, mut rx) = gate_with(DEFAULT_TRIGGER_COOLDOWN);
+        let raised = Instant::now();
+        let plan = gate.schedule_retry(HeadAdoptionTrigger {
+            content_id: "alpha".into(),
+            peer: "peerA".into(),
+            raised_at: raised,
+            attempt: 0,
+        });
+        assert_eq!(plan, RetryPlan::After(Duration::from_secs(1)));
+        assert_eq!(gate.pending_retries(), 1, "the timer holds its slot");
+        // Paused time auto-advances while the runtime is idle, so awaiting the
+        // receiver fires the 1 s rung without sleeping for real.
+        let again = tokio::time::timeout(Duration::from_secs(30), rx.recv())
+            .await
+            .expect("the re-probe timer fired")
+            .expect("the re-probe was re-enqueued");
+        assert_eq!(again.content_id, "alpha");
+        assert_eq!(again.attempt, 1, "attempt advances along the ladder");
+        assert_eq!(
+            again.raised_at, raised,
+            "raised_at is preserved so trigger_to_adopt_ms measures from the sync apply"
+        );
+        assert_eq!(gate.pending_retries(), 0, "the slot is released on fire");
+    }
+
+    #[test]
+    fn retry_plan_labels_are_a_closed_vocabulary() {
+        for (p, l) in [
+            (RetryPlan::After(Duration::from_secs(1)), "retry_scheduled"),
+            (RetryPlan::Exhausted, "retry_exhausted"),
+            (RetryPlan::DroppedCap, "retry_dropped_cap"),
+        ] {
+            assert_eq!(p.label(), l);
+        }
     }
 
     #[test]
