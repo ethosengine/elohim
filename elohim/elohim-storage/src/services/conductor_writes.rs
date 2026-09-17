@@ -1090,13 +1090,31 @@ pub async fn call_resolve_content_head(
     hc: &Arc<HcClient>,
     id: &str,
 ) -> Result<Option<ContentHeadWire>, StorageError> {
+    // `call_zome` is `call_zome_timed(.., Interactive)`. Preserved verbatim for
+    // the HTTP and sweep callers that already depend on this lane.
+    call_resolve_content_head_classed(hc, id, AdmissionClass::Interactive).await
+}
+
+/// [`call_resolve_content_head`] with the caller's admission class.
+///
+/// Same reason [`call_declare_content_head_classed`] exists: a resolve nobody is
+/// waiting on must not queue on the interactive bound. A background arm that
+/// borrows the interactive lane is how a person's read gets starved — and a
+/// resolve driven by REMOTE input (the head-adoption trigger, whose rate a peer
+/// influences) is the sharpest instance of that, because the offered load is not
+/// this node's to shape.
+pub async fn call_resolve_content_head_classed(
+    hc: &Arc<HcClient>,
+    id: &str,
+    class: AdmissionClass,
+) -> Result<Option<ContentHeadWire>, StorageError> {
     let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
         StorageError::Internal(format!(
             "conductor_writes: encode resolve_content_head id: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "resolve_content_head", payload)
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "resolve_content_head", payload, class)
         .await?;
     let out: Option<ContentHeadWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(

@@ -8605,29 +8605,40 @@ impl P2PNode {
         {
             return;
         }
-        // HEAD-ADOPTION TRIGGER, raised FIRST and unconditionally for a content
-        // doc — before the `db_pool` guard and before the reverse projection's
-        // own `Ok(false)` early-outs, because none of those conditions bear on
-        // whether a HEAD moved. The doc's arrival is the evidence; the amber
-        // blob heal below is a different concern that happens to share a
-        // trigger point.
-        //
-        // This is the repair for the measured 130–450 s head-adoption lag
-        // (2026-09-17 `head-adoption-lag-analysis.md`): the doc body crosses in
-        // under a second while adoption waited on a single-flight heal leg whose
-        // period is backlog-driven. `offer` never awaits, never blocks and
-        // never fails — a saturated trigger degrades to exactly the pre-trigger
-        // world, in which the sweep is the only carrier.
-        if let Some(gate) = self.head_adoption_trigger.as_ref() {
-            let decision = gate.offer(h_app_id, doc_id, peer);
-            crate::metrics::inc_head_adoption_trigger(decision.label());
-        }
         let Some(pool) = self.db_pool.as_ref() else {
             return;
         };
-        match crate::sync::projector::reverse_project_content_doc(&self.sync_manager, pool, doc_id)
-            .await
-        {
+        let projected =
+            crate::sync::projector::reverse_project_content_doc(&self.sync_manager, pool, doc_id)
+                .await;
+
+        // HEAD-ADOPTION TRIGGER, raised only AFTER the `db_pool` guard and only
+        // when the reverse projection completed without error — i.e. for a doc
+        // this node actually has a projection home for.
+        //
+        // The ORDER is load-bearing and was wrong in `d599b8587`. Raised before
+        // the guard, a peer could turn one CRDT change into a conductor probe
+        // plus a 6-rung ladder for an id this node has never held: ~7 DHT
+        // resolves per fabricated `node:<uuid>`, at a rate the peer chooses.
+        // The sweep cannot do that — it iterates LOCAL rows. This ordering
+        // restores that property at the offer, and the worker enforces it again
+        // on the authoritative side by treating "no local row" as terminal.
+        //
+        // `Ok(false)` still offers: the reverse projection returns it for an
+        // unchanged blob pointer, which says nothing about whether the HEAD
+        // moved. `Err` does not — a doc we could not read is not evidence.
+        //
+        // `offer` never awaits, never blocks and never fails; a saturated
+        // trigger degrades to exactly the pre-trigger world, where the sweep is
+        // the only carrier.
+        if projected.is_ok() {
+            if let Some(gate) = self.head_adoption_trigger.as_ref() {
+                let decision = gate.offer(h_app_id, doc_id, peer);
+                crate::metrics::inc_head_adoption_trigger(decision.label());
+            }
+        }
+
+        match projected {
             Ok(true) => {
                 debug!("content heal: reverse-projected {doc_id}");
                 // Pointer-heal implies bytes-heal: the reverse projection just

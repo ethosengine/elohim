@@ -1456,13 +1456,24 @@ lazy_static! {
     /// - `adopted` — a canonical head landed FROM a sync apply rather than from
     ///   the heal leg's period. This is the series that says the 2026-09-17
     ///   130–450 s adoption lag is actually closed;
-    /// - `not_yet_walkable` — the own conductor cannot yet resolve the head the
-    ///   doc names (the DHT record has not reached it). The stale-head guard
-    ///   refused to declare, and a re-probe was considered;
-    /// - `retry_scheduled` / `retry_exhausted` / `retry_dropped_cap` /
-    ///   `retry_dropped_full` — the bounded re-probe ladder's rungs. Sustained
-    ///   `retry_exhausted` means 60 s of re-probing did not get the record here,
-    ///   which is a gossip-delivery question, not a trigger question;
+    /// - `claims_full` — the claim ledger hit its hard cap with nothing expired;
+    /// - `no_local_row` — a peer named an id this node holds no row for.
+    ///   TERMINAL, before any conductor call. A rising series here is a peer
+    ///   pushing docs for ids we do not hold — worth looking at, never costly;
+    /// - `no_hint_left_to_sweep` — the doc carries no head claim, so there is
+    ///   nothing for the trigger to confirm; the sweep owns that id;
+    /// - `not_yet_walkable` — the own conductor answered, but not (yet) with the
+    ///   head the doc names. The stale-head guard refused to declare;
+    /// - `conductor_unavailable` — the probe FAULTED (cell disabled, refused,
+    ///   shed). Distinct from `not_yet_walkable` on purpose: a fault gets ONE
+    ///   slow re-probe, never the fast ladder;
+    /// - `retry_scheduled` / `retry_scheduled_slow` / `retry_exhausted` /
+    ///   `retry_dropped_cap` / `retry_dropped_full` — the bounded re-probe
+    ///   ladder's rungs. Sustained `retry_exhausted` means 60 s of re-probing did
+    ///   not get the record here, which is a gossip-delivery question, not a
+    ///   trigger question;
+    /// - `worker_restarted` — the worker panicked and was restarted. Should be
+    ///   zero; anything else is a bug worth a look, and is no longer silent;
     /// - `held` — nothing to adopt (row held or contested);
     /// - `author_deferred` — the adopt pre-flight returned an author verdict,
     ///   which this path deliberately does NOT act on;

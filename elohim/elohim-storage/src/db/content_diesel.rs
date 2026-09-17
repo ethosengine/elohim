@@ -1385,6 +1385,39 @@ pub fn reach_for(
 /// Splitting them into two queries would let the pair go inconsistent under a
 /// concurrent stamp — the row could gain an election between the reads and be
 /// contested anyway, re-minting a link against an already-settled question.
+/// [`declared_head_with_election`] that also reports whether the ROW EXISTS.
+///
+/// The distinction the collapsed form cannot make: `declared_head_with_election`
+/// answers `(None, false)` both for "this node holds the row and it declares
+/// nothing" and for "this node has never heard of this id". Those are the same
+/// answer to a sweep — which only ever iterates rows it already holds — and
+/// wildly different answers to anything driven by REMOTE input, where "never
+/// heard of it" means a peer just named an id out of thin air.
+///
+/// Returns `None` when no row exists; otherwise the same pair.
+pub fn declared_head_for_existing_row(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+) -> Result<Option<(Option<String>, bool)>, StorageError> {
+    let found: Option<(Option<String>, Option<i64>)> = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::id.eq(id))
+        .select((
+            content::declared_head_action_hash,
+            content::canonical_declared_at,
+        ))
+        .first::<(Option<String>, Option<i64>)>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("declared head lookup failed: {e}")))?;
+    Ok(found.map(|(declared, election)| {
+        (
+            declared.filter(|h| !h.trim().is_empty()),
+            election.is_some(),
+        )
+    }))
+}
+
 pub fn declared_head_with_election(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
