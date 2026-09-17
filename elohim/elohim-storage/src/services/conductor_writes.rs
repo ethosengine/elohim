@@ -890,6 +890,64 @@ pub async fn call_validate_carried_head_record(
     Ok(out)
 }
 
+/// Mirror of `content_store::StagingCandidateHeadOutput` — the election PLUS
+/// the elected STAGING candidate's already-PROVEN head record, in ONE answer.
+///
+/// This exists so the serving path pays ONE conductor-admission acquisition and
+/// ONE app-websocket crossing where it used to pay three (election, record
+/// fetch, record verify) inside a single bounded read budget. The zome runs the
+/// identical proof chain it ran before — nothing moved to storage, and storage
+/// keeps its own winner-binding and content-claim checks on this payload.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct StagingCandidateHeadWire {
+    pub election: CanonicalElectionWire,
+    /// `None` when the election names no candidate, or when the conductor
+    /// cannot retrieve the candidate action locally — honest absence, never an
+    /// error. Additive + `serde(default)`: a pre-single-call coordinator that
+    /// somehow answered would omit the key and it would read as "no candidate".
+    #[serde(default)]
+    pub candidate_head: Option<ContentHeadWire>,
+}
+
+/// Ask the conductor for the election for `id` AND the PROVEN head record of
+/// the STAGING candidate beneath it, in one call
+/// (`content_store::resolve_staging_candidate_head`).
+///
+/// `Ok(None)` = no election in this conductor's LOCAL view yet — never
+/// authoritative absence, exactly as [`call_resolve_canonical_election`].
+///
+/// BOUNDED IN WASM, not by a caller timeout: the extern does one link-set
+/// gather on one anchor plus at most ONE `GetOptions::local()` retrieval and a
+/// signature verification — no network await, no chain walk (the same C6a floor
+/// [`call_resolve_canonical_election`] and [`call_get_record_for_action`] each
+/// carry, now paid once instead of three times). A caller-side deadline here
+/// only stops the caller waiting; it is not what bounds the work.
+///
+/// An `unknown function` conductor error propagates VERBATIM: it is the
+/// hot-swap probe signal telling the caller this peer still runs a coordinator
+/// without this extern, and [`is_unknown_function_error`] is the only licence
+/// to fall back to the three-call path. A saturated-pool or transport error is
+/// NOT that signal and must be reported as an error.
+pub async fn call_resolve_staging_candidate_head(
+    hc: &Arc<HcClient>,
+    id: &str,
+) -> Result<Option<StagingCandidateHeadWire>, StorageError> {
+    let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
+        StorageError::Internal(format!(
+            "conductor_writes: encode resolve_staging_candidate_head id: {e}"
+        ))
+    })?;
+    let bytes = hc
+        .call_zome(ZOME_NAME, "resolve_staging_candidate_head", payload)
+        .await?;
+    let out: Option<StagingCandidateHeadWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Serialization(format!(
+            "conductor_writes: decode StagingCandidateHeadWire: {e}"
+        ))
+    })?;
+    Ok(out)
+}
+
 /// Caller-input wire shape for the `content_store::declare_canonical_content_head`
 /// coordinator: the CROSS-ROOT canonical-head selector (notary-authority
 /// convergence, Model B / Tier-1 STAGING tier). Unlike [`DeclareContentHeadInput`],
@@ -2369,6 +2427,103 @@ mod batch_wire_contract_tests {
 
         let ws = StorageError::Internal("Zome call failed: Websocket error: Timeout".to_string());
         assert!(!is_unknown_function_error(&ws));
+    }
+
+    /// Keys transcribed from `content_store::StagingCandidateHeadOutput` /
+    /// `ContentHeadOutput` / `CanonicalElectionOutput`. A rename on either side
+    /// fails the decode below — the same SECOND-declaration discipline the
+    /// module doc describes, expressed as an explicit key set because the
+    /// coordinator's output nests three of its own structs.
+    fn staging_candidate_head_msgpack(with_candidate_head: bool) -> Vec<u8> {
+        let mut value = serde_json::json!({
+            "election": {
+                "winner_target": "uhCkkwinner",
+                "canonical_declared_at": 1_700_000_000_000_000i64,
+                "canonical_earned": true,
+                "staging_candidate": "uhCkkcandidate",
+                "staging_candidate_declared_at": 1_700_000_001_000_000i64,
+            },
+        });
+        if with_candidate_head {
+            value["candidate_head"] = serde_json::json!({
+                "content_id": "runtime:coordinators:elohim:commons",
+                "head_action_hash": "uhCkkcandidate",
+                "declared_at": 1_700_000_001_000_000i64,
+                "canonical": true,
+                "content": {
+                    "id": "runtime:coordinators:elohim:commons",
+                    "content_type": "concept",
+                    "title": "t",
+                    "description": "d",
+                    "content_format": "markdown",
+                    "reach": "commons",
+                    "blob_cid": "sha256-deadbeef",
+                },
+            });
+        }
+        // `to_vec_named` is the map-keyed encoding every Holochain boundary
+        // uses, and the one the additive-field contract depends on.
+        rmp_serde::to_vec_named(&Some(value)).expect("encode replica")
+    }
+
+    /// The whole point of the single call: ONE decode yields the election AND
+    /// the candidate's proven head, so the serving path never pays a second
+    /// admission acquisition to learn the candidate's blob.
+    #[test]
+    fn staging_candidate_head_wire_carries_election_and_proven_candidate() {
+        let bytes = staging_candidate_head_msgpack(true);
+        let out: Option<super::StagingCandidateHeadWire> =
+            rmp_serde::from_slice(&bytes).expect("decode StagingCandidateHeadWire");
+        let out = out.expect("an election was encoded");
+        assert_eq!(out.election.winner_target.to_string(), "uhCkkwinner");
+        assert!(out.election.canonical_earned);
+        assert_eq!(
+            out.election
+                .staging_candidate
+                .as_ref()
+                .map(ToString::to_string)
+                .as_deref(),
+            Some("uhCkkcandidate")
+        );
+        let head = out.candidate_head.expect("candidate head must decode");
+        assert_eq!(head.head_action_hash.to_string(), "uhCkkcandidate");
+        assert_eq!(head.content_id, "runtime:coordinators:elohim:commons");
+        assert_eq!(head.content.blob_cid.as_deref(), Some("sha256-deadbeef"));
+    }
+
+    /// ADDITIVE: an answer with no `candidate_head` key (no candidate elected,
+    /// or the conductor cannot retrieve the candidate action locally) decodes
+    /// as honest absence, never a decode failure.
+    #[test]
+    fn staging_candidate_head_wire_without_a_candidate_head_reads_as_absent() {
+        let bytes = staging_candidate_head_msgpack(false);
+        let out: Option<super::StagingCandidateHeadWire> =
+            rmp_serde::from_slice(&bytes).expect("decode StagingCandidateHeadWire");
+        let out = out.expect("an election was encoded");
+        assert!(
+            out.candidate_head.is_none(),
+            "a missing candidate_head key must read as absent, not fail the decode"
+        );
+    }
+
+    /// The single-call path may fall back to the three-call path ONLY on an
+    /// unknown-function error (a conductor whose coordinator has not
+    /// hot-swapped). Backpressure must NOT fall back: retrying the slow way
+    /// inside the same budget would triple the load on a conductor that is
+    /// already refusing work — the exact overrun this change removes.
+    #[test]
+    fn only_unknown_function_licenses_the_candidate_single_call_fallback() {
+        let unknown = StorageError::Internal(
+            "Zome call failed: RibosomeError: Wasm error ... Zome function \
+             resolve_staging_candidate_head does not exist"
+                .to_string(),
+        );
+        assert!(is_unknown_function_error(&unknown));
+
+        let saturated = StorageError::Internal(
+            "Zome call failed: WasmError { error: Host(\"deadline has elapsed\") }".to_string(),
+        );
+        assert!(!is_unknown_function_error(&saturated));
     }
 }
 

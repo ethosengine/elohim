@@ -6636,7 +6636,27 @@ pub fn validate_carried_head_record(
         return Ok(None);
     };
     let target = ActionHash::from(input.expected_action_hash);
-    let record = validate_carried_record(&target, &bytes)?;
+    Ok(Some(validated_carried_head_record(
+        &input.id, &target, &bytes,
+    )?))
+}
+
+/// The PROOF BODY of [`validate_carried_head_record`], extracted verbatim so a
+/// second caller can run it without a second zome-call boundary.
+///
+/// Extracted 2026-09-17 for [`resolve_staging_candidate_head`]: collapsing the
+/// election/fetch/verify trio into one extern must not weaken any clause, and
+/// the only way to guarantee that is for both callers to execute the SAME
+/// bytes-in proof chain — action-hash self-binding, author signature, and the
+/// entry↔action binding via [`validate_carried_record`], then the TARGET-ID
+/// GATE, then [`build_content_head_output`]. Nothing here is new; the `?`
+/// arms, the error text and the `canonical = true` decision are unchanged.
+fn validated_carried_head_record(
+    id: &str,
+    target: &ActionHash,
+    bytes: &[u8],
+) -> ExternResult<ContentHeadOutput> {
+    let record = validate_carried_record(target, bytes)?;
 
     // TARGET-ID GATE — same rule as `declare_canonical_head_inner`, restated
     // here because this path does not go through that function.
@@ -6649,11 +6669,11 @@ pub fn validate_carried_head_record(
                 "validate_carried_head_record: carried record for {target:?} carries no Content entry"
             )))
         })?;
-    if content.id != input.id {
+    if content.id != id {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "validate_carried_head_record: carried record {target:?} carries Content id '{}', \
              which does not match the requested id '{}'",
-            content.id, input.id
+            content.id, id
         ))));
     }
 
@@ -6661,7 +6681,99 @@ pub fn validate_carried_head_record(
     // election ordering is NOT attached here — the caller already holds it from
     // `resolve_canonical_election`, and inventing it from the action timestamp
     // is exactly the clock confusion the election fields exist to end.
-    Ok(Some(build_content_head_output(&input.id, &record, true)?))
+    build_content_head_output(id, &record, true)
+}
+
+/// Output of [`resolve_staging_candidate_head`] — the election PLUS the elected
+/// STAGING candidate's already-PROVEN head record, in one answer.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StagingCandidateHeadOutput {
+    /// The election exactly as [`resolve_canonical_election`] reports it —
+    /// same [`CanonicalElectionOutput::from_outcome`] projection, so the two
+    /// externs cannot drift.
+    pub election: CanonicalElectionOutput,
+    /// The candidate's head, PROVEN by the same chain
+    /// [`validate_carried_head_record`] runs. `None` — never an error — when
+    /// the election names no candidate, or when this conductor cannot retrieve
+    /// the candidate action locally (the same honest-absence narrowing
+    /// [`get_record_for_action`] carries). `serde(default)` keeps the field
+    /// additive on the wire.
+    #[serde(default)]
+    pub candidate_head: Option<ContentHeadOutput>,
+}
+
+/// Answer the election for `id` AND, in the same call, the PROVEN head record
+/// of the STAGING candidate standing beneath its earned winner.
+///
+/// ## Why one extern instead of three calls
+///
+/// A serving peer resolving a candidate channel used to spend three separate
+/// zome calls — [`resolve_canonical_election`], [`get_record_for_action`],
+/// [`validate_carried_head_record`] — inside ONE bounded read budget on the
+/// caller's side. Each acquires the caller's conductor-admission gate
+/// independently and crosses the app websocket, so a single queued acquisition
+/// could consume the whole budget and the remaining phases never ran. The work
+/// itself is unchanged and still bounded: one link-set gather on the
+/// `canonical_head` anchor plus at most ONE local `get` of the candidate
+/// action.
+///
+/// ## Every proof is retained
+///
+/// The candidate record is serialized with the same encoding
+/// [`get_record_for_action`] serves and then handed to
+/// [`validated_carried_head_record`] — the extracted body of
+/// [`validate_carried_head_record`]. The round trip is deliberate: the bytes
+/// face the identical self-binding, author-signature, entry↔action and
+/// TARGET-ID clauses they would face if a peer had carried them. This extern
+/// asserts NOTHING the three-call path did not already assert, and the caller
+/// keeps its own winner-binding and content-claim checks on the answer.
+///
+/// `GetStrategy::Local` / `GetOptions::local()` throughout — this is a read on
+/// the serving hot path and must never await the network (same rationale as
+/// [`resolve_canonical_election`] and [`get_record_for_action`]). `Ok(None)`
+/// means "no election in my local view YET", never authoritative absence.
+///
+/// Coordinator-only and read-only: no entries, no links, no commits — so it
+/// ships on the `update_coordinators` hot-swap path with no DNA-hash move.
+#[hdk_extern]
+pub fn resolve_staging_candidate_head(
+    id: String,
+) -> ExternResult<Option<StagingCandidateHeadOutput>> {
+    let outcome = match select_election(&id, GetStrategy::Local)? {
+        Some(o) => o,
+        None => return Ok(None),
+    };
+    let election = CanonicalElectionOutput::from_outcome(&outcome);
+    let Some(candidate) = outcome.staging_candidate.as_ref() else {
+        return Ok(Some(StagingCandidateHeadOutput {
+            election,
+            candidate_head: None,
+        }));
+    };
+    let target = candidate.target.clone();
+    // LOCAL get, deliberately — see `get_record_for_action`'s semantic
+    // narrowing. A candidate whose bytes have not gossiped in yet is honest
+    // absence on THIS conductor, never fleet-wide absence, and the caller
+    // degrades exactly as it does when `get_record_for_action` answers `None`.
+    let Some(record) = get(target.clone(), GetOptions::local())? else {
+        return Ok(Some(StagingCandidateHeadOutput {
+            election,
+            candidate_head: None,
+        }));
+    };
+    // Same encoding `validate_carried_record` decodes — HSB (MessagePack with
+    // struct-map), matching `get_record_for_action` byte for byte.
+    let bytes = holochain_serialized_bytes::encode(&record).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "resolve_staging_candidate_head: could not serialize candidate record for \
+             {target:?}: {e}"
+        )))
+    })?;
+    let candidate_head = validated_carried_head_record(&id, &target, &bytes)?;
+    Ok(Some(StagingCandidateHeadOutput {
+        election,
+        candidate_head: Some(candidate_head),
+    }))
 }
 
 /// Bulk create content entries (for import operations)

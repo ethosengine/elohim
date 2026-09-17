@@ -140,6 +140,25 @@ fn candidate_head_remaining_ms(deadline: tokio::time::Instant) -> u128 {
         .as_millis()
 }
 
+/// What the ONE-CALL candidate read produced.
+///
+/// `Unsupported` is NOT a failure and NOT an answer — it is the hot-swap probe
+/// result for a conductor whose coordinator predates
+/// `content_store::resolve_staging_candidate_head`, and the only state that
+/// licenses the three-call fallback. Every real outcome, including every
+/// failure, arrives as `Answered` so the fallback can never be reached by a
+/// saturated pool or a transport error.
+enum SingleCallCandidate {
+    Answered(
+        (
+            Option<String>,
+            Option<String>,
+            elohim_views::lamad::StagingCandidateState,
+        ),
+    ),
+    Unsupported,
+}
+
 fn staging_candidate_for_projected_head(
     projected_head_action: &str,
     election: Option<crate::services::conductor_writes::CanonicalElectionWire>,
@@ -8197,6 +8216,22 @@ impl HttpServer {
         };
         let started = tokio::time::Instant::now();
         let deadline = started + std::time::Duration::from_secs(2);
+
+        // ONE call first: election + the candidate's already-proven head record.
+        // The three-call path below (election → record fetch → record verify)
+        // acquires the conductor-admission gate three times and crosses the app
+        // websocket three times inside this one budget, so a single queued
+        // acquisition could consume it whole. `Unsupported` is the ONLY arm that
+        // falls through, and it costs exactly one cheap refusal on a peer whose
+        // coordinator has not hot-swapped yet.
+        match self
+            .resolve_staging_candidate_single_call(&hc, content_id, projected_head_action, deadline)
+            .await
+        {
+            SingleCallCandidate::Answered(answer) => return answer,
+            SingleCallCandidate::Unsupported => {}
+        }
+
         let read =
             crate::services::conductor_writes::call_resolve_canonical_election(&hc, content_id);
         match tokio::time::timeout_at(deadline, read).await {
@@ -8261,6 +8296,202 @@ impl HttpServer {
                     "head read: staging-candidate ask timed out — reporting unavailable"
                 );
                 (None, None, StagingCandidateState::Unavailable)
+            }
+        }
+    }
+
+    /// The ONE-CALL candidate read: election + the candidate's already-proven
+    /// head record from a single `content_store::resolve_staging_candidate_head`.
+    ///
+    /// Pays ONE conductor-admission acquisition and ONE app-websocket crossing
+    /// where the three-call path pays three, all inside the SAME unchanged
+    /// budget. The budget is not widened and the work is not relaxed: the zome
+    /// runs the identical proof chain (self-binding, author signature,
+    /// entry↔action, TARGET-ID gate), and the two checks that were always
+    /// storage's stay storage's — the winner binding
+    /// ([`staging_candidate_for_projected_head`]) and the public-scalar
+    /// anti-laundering claim check ([`exact_candidate_blob`]) — plus the
+    /// local-byte gate.
+    ///
+    /// Returns [`SingleCallCandidate::Unsupported`] ONLY on an `unknown
+    /// function` conductor error, which is the hot-swap probe signal for a peer
+    /// still running a coordinator without this extern. Every other error
+    /// (saturated read pool, transport) is an answer — `Unavailable` — exactly
+    /// as the three-call path reports it, never a licence to retry the slow way
+    /// inside the same budget.
+    async fn resolve_staging_candidate_single_call(
+        &self,
+        hc: &Arc<crate::hc_client::HcClient>,
+        content_id: &str,
+        projected_head_action: &str,
+        deadline: tokio::time::Instant,
+    ) -> SingleCallCandidate {
+        use crate::services::conductor_writes::{
+            call_resolve_staging_candidate_head, is_unknown_function_error,
+        };
+        use elohim_views::lamad::StagingCandidateState;
+
+        let started = tokio::time::Instant::now();
+        let read = call_resolve_staging_candidate_head(hc, content_id);
+        let answer = match tokio::time::timeout_at(deadline, read).await {
+            Ok(Ok(answer)) => {
+                debug!(
+                    phase = "candidate_single",
+                    outcome = if answer.is_some() {
+                        "ok_some"
+                    } else {
+                        "ok_none"
+                    },
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
+                answer
+            }
+            Ok(Err(error)) if is_unknown_function_error(&error) => {
+                info!(
+                    phase = "candidate_single",
+                    outcome = "unsupported",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: this conductor has no single-call candidate extern — falling back"
+                );
+                return SingleCallCandidate::Unsupported;
+            }
+            Ok(Err(_error)) => {
+                warn!(
+                    phase = "candidate_single",
+                    outcome = "error",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: single-call candidate ask failed — reporting unavailable"
+                );
+                return SingleCallCandidate::Answered((
+                    None,
+                    None,
+                    StagingCandidateState::Unavailable,
+                ));
+            }
+            Err(_) => {
+                warn!(
+                    phase = "candidate_single",
+                    outcome = "deadline",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: single-call candidate ask timed out — reporting unavailable"
+                );
+                return SingleCallCandidate::Answered((
+                    None,
+                    None,
+                    StagingCandidateState::Unavailable,
+                ));
+            }
+        };
+
+        let (election, proven) = match answer {
+            Some(answer) => (Some(answer.election), answer.candidate_head),
+            None => (None, None),
+        };
+        let candidate = match staging_candidate_for_projected_head(projected_head_action, election) {
+            Ok(candidate) => candidate,
+            Err(_actual_winner) => {
+                warn!(
+                    phase = "election_binding",
+                    outcome = "winner_mismatch",
+                    elapsed_ms = started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local election winner differs from projected head — reporting unavailable"
+                );
+                return SingleCallCandidate::Answered((
+                    None,
+                    None,
+                    StagingCandidateState::Unavailable,
+                ));
+            }
+        };
+        let Some(candidate_action) = candidate else {
+            return SingleCallCandidate::Answered((None, None, StagingCandidateState::None));
+        };
+        let blob = self
+            .candidate_blob_from_proven(content_id, &candidate_action, proven, deadline)
+            .await;
+        SingleCallCandidate::Answered((
+            Some(candidate_action),
+            blob,
+            StagingCandidateState::Staged,
+        ))
+    }
+
+    /// The claim + local-byte tail shared by the single-call and three-call
+    /// paths: the public-scalar anti-laundering guard on an ALREADY-proven
+    /// record, then the local-presence gate. Split out so both paths cannot
+    /// drift on what "staged with a servable blob" means.
+    async fn candidate_blob_from_proven(
+        &self,
+        content_id: &str,
+        candidate_action: &str,
+        proven: Option<crate::services::conductor_writes::ContentHeadWire>,
+        deadline: tokio::time::Instant,
+    ) -> Option<String> {
+        let claim_started = tokio::time::Instant::now();
+        let Some(proven) = proven else {
+            info!(
+                phase = "record_fetch",
+                outcome = "ok_none",
+                elapsed_ms = claim_started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: local candidate record is absent"
+            );
+            return None;
+        };
+        let Some(blob) = exact_candidate_blob(content_id, candidate_action, &proven) else {
+            warn!(
+                phase = "record_claim",
+                outcome = "invalid",
+                elapsed_ms = claim_started.elapsed().as_millis(),
+                remaining_ms = candidate_head_remaining_ms(deadline),
+                "head read: verified candidate record carried an invalid content claim"
+            );
+            return None;
+        };
+        debug!(
+            phase = "record_claim",
+            outcome = "valid",
+            elapsed_ms = claim_started.elapsed().as_millis(),
+            remaining_ms = candidate_head_remaining_ms(deadline),
+            "candidate-head resolution phase"
+        );
+        let blob_started = tokio::time::Instant::now();
+        match tokio::time::timeout_at(deadline, self.blob_available_locally(&blob)).await {
+            Ok(true) => {
+                debug!(
+                    phase = "local_blob",
+                    outcome = "available",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "candidate-head resolution phase"
+                );
+                Some(blob)
+            }
+            Ok(false) => {
+                info!(
+                    phase = "local_blob",
+                    outcome = "absent",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: verified candidate blob is absent locally"
+                );
+                None
+            }
+            Err(_) => {
+                warn!(
+                    phase = "local_blob",
+                    outcome = "deadline",
+                    elapsed_ms = blob_started.elapsed().as_millis(),
+                    remaining_ms = candidate_head_remaining_ms(deadline),
+                    "head read: local candidate blob check timed out"
+                );
+                None
             }
         }
     }
@@ -8420,57 +8651,10 @@ impl HttpServer {
             }
         };
 
-        let claim_started = tokio::time::Instant::now();
-        let Some(blob) = exact_candidate_blob(content_id, candidate_action, &proven) else {
-            warn!(
-                phase = "record_claim",
-                outcome = "invalid",
-                elapsed_ms = claim_started.elapsed().as_millis(),
-                remaining_ms = candidate_head_remaining_ms(deadline),
-                "head read: verified candidate record carried an invalid content claim"
-            );
-            return None;
-        };
-        debug!(
-            phase = "record_claim",
-            outcome = "valid",
-            elapsed_ms = claim_started.elapsed().as_millis(),
-            remaining_ms = candidate_head_remaining_ms(deadline),
-            "candidate-head resolution phase"
-        );
-        let blob_started = tokio::time::Instant::now();
-        match tokio::time::timeout_at(deadline, self.blob_available_locally(&blob)).await {
-            Ok(true) => {
-                debug!(
-                    phase = "local_blob",
-                    outcome = "available",
-                    elapsed_ms = blob_started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "candidate-head resolution phase"
-                );
-                Some(blob)
-            }
-            Ok(false) => {
-                info!(
-                    phase = "local_blob",
-                    outcome = "absent",
-                    elapsed_ms = blob_started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: verified candidate blob is absent locally"
-                );
-                None
-            }
-            Err(_) => {
-                warn!(
-                    phase = "local_blob",
-                    outcome = "deadline",
-                    elapsed_ms = blob_started.elapsed().as_millis(),
-                    remaining_ms = candidate_head_remaining_ms(deadline),
-                    "head read: local candidate blob check timed out"
-                );
-                None
-            }
-        }
+        // The claim + local-byte tail is shared with the single-call path, so
+        // "staged with a servable blob" cannot come to mean two things.
+        self.candidate_blob_from_proven(content_id, candidate_action, Some(proven), deadline)
+            .await
     }
 
     async fn handle_content_head(
