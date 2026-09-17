@@ -1532,6 +1532,25 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Staged candidates observed OFF the serving read path, by outcome
+    /// (`rea_projection`). label: outcome = "observed" (enqueued for a
+    /// candidate-byte prefetch) | "dropped" (channel full — the next
+    /// election sweep re-observes) | "no_sink" (before the prefetcher is
+    /// installed) | "already_local" | "fetched" | "unfetched". Pre-touched.
+    ///
+    /// Reads as the byte-mobility half of the candidate channel: a peer that
+    /// elects a candidate it cannot serve is the `unfetched` series, and it is
+    /// the series that used to be invisible because candidate bytes were only
+    /// ever fetched lazily by a `/blob` read.
+    pub static ref CANDIDATE_BLOB_PREFETCH: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_candidate_blob_prefetch_total",
+            "Staged-candidate observations and candidate-byte acquisitions, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Inventory refresh pages on the PUBLISH side, by outcome: "sent" |
     /// "deferred" (publisher backpressure — retried next pacer tick) |
     /// "superseded" (a newer refresh replaced pages still in the backlog) |
@@ -2672,6 +2691,10 @@ pub fn register_all() {
         for outcome in ["sent", "dropped", "no_sink"] {
             CONTENT_TOUCHES.with_label_values(&[outcome]).reset();
         }
+        let _ = REGISTRY.register(Box::new(CANDIDATE_BLOB_PREFETCH.clone()));
+        for outcome in CANDIDATE_BLOB_PREFETCH_OUTCOMES {
+            CANDIDATE_BLOB_PREFETCH.with_label_values(&[outcome]).reset();
+        }
         for outcome in SYNC_HALF_ROW_HEAL_OUTCOMES {
             SYNC_HALF_ROW_HEAL.with_label_values(&[outcome]).reset();
         }
@@ -3508,6 +3531,21 @@ pub fn inc_inventory_page(kind: &str, outcome: &str) {
 /// One content-row touch from a bus-less writer.
 pub fn inc_content_touch(outcome: &str) {
     CONTENT_TOUCHES.with_label_values(&[outcome]).inc();
+}
+
+/// `outcome` vocabulary of `CANDIDATE_BLOB_PREFETCH`, pre-touched at zero.
+pub const CANDIDATE_BLOB_PREFETCH_OUTCOMES: &[&str] = &[
+    "observed",
+    "dropped",
+    "no_sink",
+    "already_local",
+    "fetched",
+    "unfetched",
+];
+
+/// One staged-candidate observation or candidate-byte acquisition.
+pub fn inc_candidate_blob_prefetch(outcome: &str) {
+    CANDIDATE_BLOB_PREFETCH.with_label_values(&[outcome]).inc();
 }
 
 /// `outcome` vocabulary of `SYNC_HALF_ROW_HEAL`, pre-touched at zero.

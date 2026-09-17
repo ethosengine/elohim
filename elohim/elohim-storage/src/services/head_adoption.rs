@@ -2294,6 +2294,18 @@ async fn try_obey_visible_election(
         }
     };
 
+    // OFF-READ-PATH candidate observation. This sweep is the only route by
+    // which a non-authoring peer learns that a release was staged beneath the
+    // earned head — post-commit signals are cell-local, so no
+    // `ContentHeadDeclared` for someone else's declaration ever arrives here.
+    // Announcing it lets the candidate-byte prefetcher acquire the bytes BEFORE
+    // a doorway asks, instead of the serving read discovering `local_blob
+    // absent` and having no path to fix it. Non-blocking; a full channel drops
+    // the id and the next sweep re-observes it.
+    if election.staging_candidate.is_some() {
+        crate::rea_projection::notify_candidate_observed(id);
+    }
+
     let winner = election.winner_target.to_string();
 
     // (3) Fetch. The peer answers with ITS head for this id; that is only useful

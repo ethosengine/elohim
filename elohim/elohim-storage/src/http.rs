@@ -1705,6 +1705,8 @@ impl HttpServer {
             "HTTP server listening"
         );
 
+        Arc::clone(&self).spawn_candidate_blob_prefetcher();
+
         loop {
             let (stream, remote_addr) = listener.accept().await?;
             let io = TokioIo::new(stream);
@@ -8296,6 +8298,146 @@ impl HttpServer {
                     "head read: staging-candidate ask timed out — reporting unavailable"
                 );
                 (None, None, StagingCandidateState::Unavailable)
+            }
+        }
+    }
+
+    /// Drain staged-candidate observations and acquire the candidate's bytes
+    /// BEFORE a doorway asks for them.
+    ///
+    /// ## The gap this closes
+    ///
+    /// Candidate bytes were only ever acquired lazily, by a `/blob` read. A
+    /// peer that correctly elects a candidate it did not author therefore
+    /// answered `local_blob absent` on the candidate read and had no path to
+    /// fix it — a byte-MOBILITY gap, not a timing one, which no read budget can
+    /// close. The election sweep already observes the candidate
+    /// (`rea_projection::notify_candidate_observed`); this turns that
+    /// observation into an acquisition through the EXISTING heal machinery
+    /// (`heal_from_peers` → inventory → `blob_fetch::race_fetch` →
+    /// `finalize_fetch_success`), which verifies by hash and books the
+    /// `serve-blob` event exactly as a lazy read would.
+    ///
+    /// Strictly SERIAL, with an immediate-repeat guard: a sweep that
+    /// re-observes the same channel every tick must not storm the blob plane.
+    /// Nothing here is on a request path and nothing here carries a request
+    /// deadline. Idempotent — a second call finds the sink installed and
+    /// returns without spawning a second drain.
+    fn spawn_candidate_blob_prefetcher(self: Arc<Self>) {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<String>(
+            crate::rea_projection::CANDIDATE_BLOB_PREFETCH_CAPACITY,
+        );
+        if !crate::rea_projection::install_candidate_blob_sink(tx) {
+            return;
+        }
+        tokio::spawn(async move {
+            let mut previous: Option<String> = None;
+            while let Some(content_id) = rx.recv().await {
+                if previous.as_deref() == Some(content_id.as_str()) {
+                    continue;
+                }
+                self.prefetch_candidate_blob(&content_id).await;
+                previous = Some(content_id);
+            }
+        });
+        info!(
+            "candidate-blob prefetcher spawned — staged candidates acquire their bytes off the \
+             serving read path"
+        );
+    }
+
+    /// Resolve ONE observed candidate and, if its proven blob is not held
+    /// locally, acquire it from peers.
+    ///
+    /// Uses the same single-call extern and the same public-scalar
+    /// anti-laundering guard the serving read uses, so this can never acquire
+    /// bytes for a record that does not name the elected candidate action AND
+    /// the requested content id.
+    async fn prefetch_candidate_blob(&self, content_id: &str) {
+        use crate::services::conductor_writes::{
+            call_resolve_staging_candidate_head, is_unknown_function_error,
+        };
+
+        let Some(hc) = self
+            .hc_registry
+            .as_ref()
+            .and_then(|registry| registry.lamad_client())
+        else {
+            return;
+        };
+        let answer = match call_resolve_staging_candidate_head(&hc, content_id).await {
+            Ok(Some(answer)) => answer,
+            // No election locally yet — the sweep re-observes.
+            Ok(None) => return,
+            Err(error) => {
+                if is_unknown_function_error(&error) {
+                    debug!(
+                        content_id = %content_id,
+                        "candidate prefetch: coordinator has no single-call candidate extern yet"
+                    );
+                } else {
+                    debug!(
+                        content_id = %content_id, error = %error,
+                        "candidate prefetch: candidate ask failed — retried on the next observation"
+                    );
+                }
+                return;
+            }
+        };
+        let Some(candidate_action) = answer
+            .election
+            .staging_candidate
+            .as_ref()
+            .map(ToString::to_string)
+        else {
+            return;
+        };
+        // Honest absence: this conductor holds the election but not the
+        // candidate's record yet. Nothing to acquire until it does.
+        let Some(proven) = answer.candidate_head else {
+            return;
+        };
+        let Some(blob) = exact_candidate_blob(content_id, &candidate_action, &proven) else {
+            warn!(
+                content_id = %content_id,
+                "candidate prefetch: verified candidate record carried an invalid content claim"
+            );
+            return;
+        };
+        if self.blob_available_locally(&blob).await {
+            crate::metrics::inc_candidate_blob_prefetch("already_local");
+            return;
+        }
+        // `heal_from_peers` is keyed on the canonical `sha256-{hex}` form, the
+        // same normalization `blob_available_locally` applies.
+        let Ok(hex) = crate::blob_store::BlobStore::parse_content_address(&blob) else {
+            warn!(
+                content_id = %content_id, blob = %blob,
+                "candidate prefetch: candidate blob is not a content address"
+            );
+            return;
+        };
+        let hash = format!("sha256-{hex}");
+        match self.heal_from_peers(&hash).await {
+            BlobHealOutcome::Bytes { healed_from, .. } => {
+                crate::metrics::inc_candidate_blob_prefetch("fetched");
+                info!(
+                    content_id = %content_id,
+                    candidate_action = %candidate_action,
+                    healed_from = ?healed_from,
+                    "candidate prefetch: candidate bytes acquired before any doorway asked"
+                );
+            }
+            // No peer served them yet. Honest and retryable — the next
+            // observation tries again, and the replication plane is still the
+            // floor.
+            _ => {
+                crate::metrics::inc_candidate_blob_prefetch("unfetched");
+                debug!(
+                    content_id = %content_id,
+                    candidate_action = %candidate_action,
+                    "candidate prefetch: no peer served the candidate bytes yet"
+                );
             }
         }
     }

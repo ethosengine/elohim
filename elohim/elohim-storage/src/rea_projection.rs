@@ -101,6 +101,53 @@ pub fn notify_content_touched(id: &str) {
     }
 }
 
+/// Content ids whose election was observed to name a STAGING candidate, pushed
+/// to the candidate-byte prefetcher.
+///
+/// ## Why a sink, and why off the read path
+///
+/// Candidate bytes used to be acquired ONLY by a `/blob` read, so a peer that
+/// correctly elects a candidate it did not author reported
+/// `local_blob absent` on the first candidate read and every read before
+/// replication caught up. That is a byte-MOBILITY gap: no read budget can close
+/// it, because the bytes are not on this peer to find.
+///
+/// Post-commit signals are cell-local, so a non-authoring peer never receives a
+/// `ContentHeadDeclared` signal for someone else's declaration — the periodic
+/// election sweep is the only observation route that exists. It pushes ids
+/// here; the prefetcher resolves and acquires.
+///
+/// Bounded channel, `try_send`, drop-on-full (counted): a sweep that
+/// re-observes the same candidate every tick must never storm the blob plane,
+/// and a dropped id is simply re-observed next sweep. NOTHING here writes a
+/// projection — the `ReconcileController` remains the only projection writer.
+static CANDIDATE_BLOB_TX: std::sync::OnceLock<tokio::sync::mpsc::Sender<String>> =
+    std::sync::OnceLock::new();
+
+/// Capacity of the candidate-observation channel. Small on purpose: the
+/// interesting set is "channels with a release staged right now", not the
+/// corpus, and the drain does real network work per item.
+pub const CANDIDATE_BLOB_PREFETCH_CAPACITY: usize = 256;
+
+/// Install the sink once; returns `false` if one is already installed (the
+/// caller must not spawn a second prefetcher for a channel nobody feeds).
+pub fn install_candidate_blob_sink(tx: tokio::sync::mpsc::Sender<String>) -> bool {
+    CANDIDATE_BLOB_TX.set(tx).is_ok()
+}
+
+/// Announce that an election for `content_id` names a STAGING candidate.
+/// Non-blocking and safe to call from any observer; never fails a caller.
+pub fn notify_candidate_observed(content_id: &str) {
+    if let Some(tx) = CANDIDATE_BLOB_TX.get() {
+        match tx.try_send(content_id.to_string()) {
+            Ok(()) => crate::metrics::inc_candidate_blob_prefetch("observed"),
+            Err(_) => crate::metrics::inc_candidate_blob_prefetch("dropped"),
+        }
+    } else {
+        crate::metrics::inc_candidate_blob_prefetch("no_sink");
+    }
+}
+
 fn record_pending_state_link(commitment_cid: &str, state: &str, event_hash: &str, signed_at: &str) {
     if let Some(tx) = STATE_LINK_TX.get() {
         let _ = tx.send(PendingStateLink {
@@ -1986,6 +2033,50 @@ mod tests {
         // If install_sink_receives_pending_state_link already ran and set the
         // OnceLock, this still must not panic (the send is best-effort).
         record_pending_state_link("anchor:x", "active", "uhCkk-y", "2026-06-11T00:00:00Z");
+    }
+
+    /// The candidate-observation seam, whole, in ONE test: the `OnceLock`
+    /// means only one test in this process may install this sink.
+    ///
+    /// Covers the three properties the prefetcher depends on — an observed
+    /// candidate arrives on the channel; a second install is REFUSED so nobody
+    /// spawns a second drain for a channel nobody feeds; and a full channel
+    /// DROPS the observation rather than blocking the election sweep (the next
+    /// sweep re-observes, which is why dropping is safe).
+    #[tokio::test]
+    async fn observed_candidates_reach_the_prefetch_sink_and_never_block_the_sweep() {
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        assert!(
+            install_candidate_blob_sink(tx),
+            "the first install must win the OnceLock"
+        );
+
+        notify_candidate_observed("runtime:coordinators:elohim:commons");
+        // Capacity is 1 and nothing has drained yet, so this second observation
+        // must be DROPPED, not awaited — an election sweep that blocks on a
+        // full prefetch channel would stall head adoption fleet-wide.
+        notify_candidate_observed("runtime:coordinators:elohim:other");
+
+        let got = rx.recv().await.expect("the observation must arrive");
+        assert_eq!(got, "runtime:coordinators:elohim:commons");
+        assert!(
+            rx.try_recv().is_err(),
+            "the observation past capacity must be dropped, not queued"
+        );
+
+        let (second_tx, _second_rx) = tokio::sync::mpsc::channel(1);
+        assert!(
+            !install_candidate_blob_sink(second_tx),
+            "a second install must be refused so only one drain exists"
+        );
+    }
+
+    /// No-op without a sink — `notify_candidate_observed` must never panic in
+    /// conductor-less/unit-test mode, where nothing has installed a channel.
+    /// Counted as `no_sink`, never a failure.
+    #[test]
+    fn notify_candidate_without_a_sink_is_a_noop() {
+        notify_candidate_observed("runtime:coordinators:elohim:unwired");
     }
 
     /// End-to-end: `substrate_signal` reaches the SQL `economic_events` row
