@@ -51,6 +51,14 @@ interface Args {
    * scripts/ci/run-dataplane-validation.sh keeps working unchanged.
    */
   lane?: string;
+  /**
+   * The path/tag scope a caller requested for this run (`just test mesh
+   * <scope>`), OPTIONAL. When present and this run measured zero scenarios,
+   * that is an empty-selection receipt — the scope resolved to nothing
+   * rather than a real (possibly red) run — and main() exits non-zero
+   * instead of writing a quiet, exit-0 "0 scenarios" report.
+   */
+  scope?: string;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -74,6 +82,8 @@ function parseArgs(argv: string[]): Args {
       'unknown',
     doorway: opts.get('--doorway') ?? process.env.E2E_DOORWAY_ALPHA,
     lane: opts.get('--lane') ?? process.env.A2O_LANE,
+    // "" (the justfile's unscoped default) means absent, same as omitted.
+    scope: (opts.get('--scope') ?? '').length > 0 ? opts.get('--scope') : undefined,
   };
 }
 
@@ -144,6 +154,21 @@ function main() {
       (env.unknown.length > 0 ? ` · unknown: ${env.unknown.join(', ')}` : '')
   );
   printDeclaredHeadline(report);
+
+  // Empty-selection receipt: a scoped run that measured ZERO scenarios did
+  // not exercise anything — most often the scope resolved to nothing
+  // (silently, at exit 0, from cucumber's own end). A clean report with 0
+  // scenarios and a scope on record is exactly that false-green shape, so
+  // this is the one case where the BUILDER itself fails the run rather than
+  // deferring entirely to cucumber's own exit code.
+  if (args.scope && report.summary.scenarios.total === 0) {
+    console.error(
+      `EMPTY SELECTION: scope '${args.scope}' measured 0 scenarios — this is an ` +
+        `empty-selection receipt, not a passing run. Check the scope resolves to ` +
+        `something relative to genesis/a2o (a bad path silently selects nothing).`
+    );
+    process.exit(3);
+  }
 }
 
 /**

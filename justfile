@@ -201,6 +201,27 @@ test target="changed" scope="":
             @*|*" and "*|*" or "*|*"not "*)
               "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --config "$cfg_rel" --profile "$a2o_profile" --tags "{{ scope }}" || rc=$? ;;
             *)
+              # REFUSE-BEFORE-LAUNCH: a path scope is resolved by cucumber-js
+              # relative to genesis/a2o (this recipe already `cd`'d there) — a
+              # repo-relative scope like `genesis/a2o/features/x.feature` matches
+              # nothing, and cucumber silently reports "0 scenarios" with exit 0
+              # (the previous silent-no-op class this guard exists to catch).
+              # `compgen -G` is glob-aware, so a bare path AND a glob scope both
+              # resolve the same way a positional argument to cucumber-js would.
+              if ! compgen -G "{{ scope }}" >/dev/null 2>&1; then
+                hint=""
+                case "{{ scope }}" in
+                  genesis/a2o/*)
+                    candidate="{{ scope }}"
+                    candidate="${candidate#genesis/a2o/}"
+                    if compgen -G "$candidate" >/dev/null 2>&1; then
+                      hint=" — did you mean '${candidate}'? (scope is relative to genesis/a2o, not the repo root)"
+                    fi
+                    ;;
+                esac
+                echo "REFUSED: scope '{{ scope }}' selects nothing relative to genesis/a2o (cwd for this run)${hint}. Pass a path relative to genesis/a2o (e.g. 'features/dataplane/x.feature') or a tag expression (e.g. '@concern:foo')." >&2
+                exit 2
+              fi
               "{{ a2o_dir }}/node_modules/.bin/cucumber-js" --config "$cfg_rel" --profile "$a2o_profile" "{{ scope }}" || rc=$? ;;
           esac
         fi
@@ -221,6 +242,9 @@ test target="changed" scope="":
         # partial dual restart resolves to unknown rather than forging a dual
         # evidence key from MESH_TRANSPORT_BACKEND alone.
         observed_transport="$(mesh_transport_backend_from_status)"
+        # --scope (empty string when unscoped, parsed as absent by build-sprint-report.ts):
+        # an empty-selection receipt (a scoped run that measured 0 scenarios) fails
+        # THIS step, not just cucumber's own exit code — see its --scope handling.
         node --import tsx scripts/build-sprint-report.ts \
           --cucumber "$CUCUMBER_JSON_REPORT" \
           --console-dir  "$reports_dir/console-household" \
@@ -231,6 +255,7 @@ test target="changed" scope="":
           --lane     household \
           --transport "$observed_transport" \
           --run-id   "$run_id" \
+          --scope    "{{ scope }}" \
           --doorway  "$E2E_DOORWAY_ALPHA" || report_rc=$?
         # Cucumber's code wins so a red run stays red; a GREEN run whose evidence could not
         # be written is not a green run either, so the builder's code is the fallback.
