@@ -8,6 +8,7 @@ import { describe, it } from 'node:test';
 import {
   awaitCanonicalManifestoCandidate,
   classifyFirstPartyHttpError,
+  httpOriginForWebSocketUrl,
   isOptionalNavigationCancellation,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
@@ -17,12 +18,17 @@ import {
   unexpectedOptionalNegatives,
 } from '../real-app-network.js';
 
+const OWNED_HOSTNAME = 'elohim.local';
+const OWNED_ORIGIN = 'http://elohim.local:8889';
+const OWNED_TOPOLOGY = {
+  selectedOrigin: OWNED_ORIGIN,
+  publicHostname: OWNED_HOSTNAME,
+  ownedPorts: ['8888', '8889'],
+};
+
 void describe('public doorway browser routing', () => {
   void it('keeps the selected socket leg while using the declared public hostname', () => {
-    assert.equal(
-      publicDoorwayUrl('http://localhost:8889', 'elohim.local'),
-      'http://elohim.local:8889'
-    );
+    assert.equal(publicDoorwayUrl('http://localhost:8889', OWNED_HOSTNAME), OWNED_ORIGIN);
   });
 
   void it('derives immutable ports from canonical fixture topology keys', () => {
@@ -38,11 +44,7 @@ void describe('public doorway browser routing', () => {
   });
 
   void it('rejects a withdrawn localhost leg absent from survivor membership', () => {
-    const common = {
-      selectedOrigin: 'http://elohim.local:8889',
-      publicHostname: 'elohim.local',
-      ownedPorts: ['8888', '8889'],
-    };
+    const common = OWNED_TOPOLOGY;
     assert.match(
       requiredRequestRoutingFailure({
         ...common,
@@ -81,7 +83,7 @@ void describe('public doorway browser routing', () => {
     assert.equal(
       requiredRequestRoutingFailure({
         ...common,
-        requestUrl: 'http://elohim.local:8889/db/content',
+        requestUrl: `${OWNED_ORIGIN}/db/content`,
       }),
       undefined
     );
@@ -110,6 +112,100 @@ void describe('public doorway browser routing', () => {
       requiredRequestRoutingFailure({
         ...common,
         requestUrl: 'https://api.example.org/api/player',
+      }),
+      undefined
+    );
+  });
+
+  void it('closes the origin-escape gap: ANY resource on elohim.host or a subdomain must route through the selected origin, not just /db/, /epr-head/, /api/', () => {
+    const common = OWNED_TOPOLOGY;
+
+    // Root document (no path prefix at all) on an unowned elohim.host origin.
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://doorway-alpha.elohim.host/',
+      }) ?? '',
+      /bypassed selected doorway/
+    );
+
+    // A static asset — never matches /db/, /epr-head/, /api/ — on the same
+    // unowned elohim.host origin.
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://doorway-alpha.elohim.host/main.js',
+      }) ?? '',
+      /bypassed selected doorway/
+    );
+
+    // A lookalike host is never treated as elohim.host: no dot precedes the
+    // suffix, so a naive string-suffix/substring check would wrongly match.
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://notelohim.host.example/',
+      }),
+      undefined
+    );
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: 'https://evil-elohim.host/',
+      }),
+      undefined
+    );
+
+    // The selected origin itself always passes, even though it isn't
+    // literally under elohim.host in this fixture's local topology.
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: `${OWNED_ORIGIN}/`,
+      }),
+      undefined
+    );
+
+    // A genuine elohim.host origin that IS the currently-selected owned
+    // origin passes for any path, including one that would otherwise be
+    // unguarded (root document).
+    assert.equal(
+      requiredRequestRoutingFailure({
+        selectedOrigin: 'https://doorway-alpha.elohim.host',
+        publicHostname: 'doorway-alpha.elohim.host',
+        ownedPorts: [],
+        requestUrl: 'https://doorway-alpha.elohim.host/',
+      }),
+      undefined
+    );
+  });
+});
+
+void describe('httpOriginForWebSocketUrl + websocket origin-escape', () => {
+  void it('maps ws/wss to the http/https counterpart, keeping host/path/query', () => {
+    assert.equal(
+      httpOriginForWebSocketUrl('ws://elohim.local:8889/signal'),
+      `${OWNED_ORIGIN}/signal`
+    );
+    assert.equal(
+      httpOriginForWebSocketUrl('wss://doorway-alpha.elohim.host/signal?x=1'),
+      'https://doorway-alpha.elohim.host/signal?x=1'
+    );
+  });
+
+  void it('a wss escape to an unowned elohim.host origin is a routing failure once mapped', () => {
+    const common = OWNED_TOPOLOGY;
+    assert.match(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: httpOriginForWebSocketUrl('wss://doorway-alpha.elohim.host/signal'),
+      }) ?? '',
+      /bypassed selected doorway/
+    );
+    assert.equal(
+      requiredRequestRoutingFailure({
+        ...common,
+        requestUrl: httpOriginForWebSocketUrl('ws://elohim.local:8889/signal'),
       }),
       undefined
     );

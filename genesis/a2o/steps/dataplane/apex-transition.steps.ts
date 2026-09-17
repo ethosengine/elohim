@@ -51,12 +51,20 @@ import { promisify } from 'node:util';
 
 import { After, Given, When, Then } from '@cucumber/cucumber';
 
-import { chromium, type Browser, type BrowserContext, type Page, type Request } from 'playwright';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type Request,
+  type WebSocket,
+} from 'playwright';
 
 import { awaitOwnedProcessRecovery } from '../../src/framework/dataplane/owned-process-recovery.js';
 import {
   awaitCanonicalManifestoCandidate,
   classifyFirstPartyHttpError,
+  httpOriginForWebSocketUrl,
   isOptionalNavigationCancellation,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
@@ -522,6 +530,19 @@ async function completeRealAppJourney(world: E2EWorld, phase: string): Promise<v
         optionalDiscovery:
           request.method() === 'GET' && url.pathname === '/api/v1/federation/doorways',
       });
+    });
+    // A websocket is invisible to page.on('request') — the same owned-origin
+    // rule must still see it, mapped to its http(s) counterpart so a ws(s)://
+    // origin compares against the selected http(s):// origin correctly.
+    page.on('websocket', (socket: WebSocket) => {
+      const httpUrl = httpOriginForWebSocketUrl(socket.url());
+      const routingFailure = requiredRequestRoutingFailure({
+        requestUrl: httpUrl,
+        selectedOrigin: publicOrigin,
+        publicHostname: state.authority.publicName,
+        ownedPorts: state.ownedPorts,
+      });
+      if (routingFailure) requiredFirstPartyFailures.push(`WS ${socket.url()}: ${routingFailure}`);
     });
     page.on('requestfinished', request => activeFirstParty.delete(request));
     page.on('requestfailed', request => {

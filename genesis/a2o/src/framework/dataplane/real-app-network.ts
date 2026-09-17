@@ -16,6 +16,16 @@ export function publicDoorwayPorts(fixture: HouseholdMeshFixture): string[] {
   return ['alpha', 'apex'].map(id => new URL(requireFixtureDoorwayUrl(fixture, id)).port);
 }
 
+/**
+ * True when `hostname` IS `elohim.host` or a genuine subdomain of it. Matches
+ * on the parsed `URL.hostname` with exact/`.`-suffix comparison only — never
+ * a string prefix/substring check, which would also accept an attacker host
+ * like `evil-elohim.host` (no dot before the label) as if it were owned.
+ */
+function isElohimHostFamily(hostname: string): boolean {
+  return hostname === 'elohim.host' || hostname.endsWith('.elohim.host');
+}
+
 export function requiredRequestRoutingFailure(input: {
   requestUrl: string;
   selectedOrigin: string;
@@ -28,16 +38,34 @@ export function requiredRequestRoutingFailure(input: {
     request.hostname === input.publicHostname ||
     ((request.hostname === 'localhost' || request.hostname === '127.0.0.1') &&
       input.ownedPorts.includes(request.port));
-  const targetsProductionDoorway =
-    request.hostname === 'elohim.host' || request.hostname.endsWith('.elohim.host');
-  const requiresSelectedOrigin =
+  const targetsElohimHost = isElohimHostFamily(request.hostname);
+  // Stricter substrate-path rule, unconditional on host: a request for a
+  // notarized/federation route always needs the selected origin.
+  const requiresSelectedOriginByPath =
     request.pathname.startsWith('/db/') ||
     request.pathname.startsWith('/epr-head/') ||
-    (request.pathname.startsWith('/api/') && targetsProductionDoorway);
-  if (!targetsOwnedDoorway && !requiresSelectedOrigin) return undefined;
+    (request.pathname.startsWith('/api/') && targetsElohimHost);
+  // ANY resource on elohim.host or a subdomain — root document, static
+  // asset, any other route — that isn't already recognized as an owned
+  // doorway is a routing failure regardless of path. Genuinely third-party
+  // hosts (YouTube, a CDN, …) are unaffected and stay governed by the
+  // existing per-owner optional-negative baseline.
+  const requiresSelectedOriginByHost = targetsElohimHost && !targetsOwnedDoorway;
+  if (!targetsOwnedDoorway && !requiresSelectedOriginByPath && !requiresSelectedOriginByHost)
+    return undefined;
   return request.origin === selected.origin
     ? undefined
     : `${request.origin} bypassed selected doorway ${selected.origin}`;
+}
+
+/** Maps a websocket URL's scheme to its http(s) counterpart, host/path/query
+ * untouched — so a `ws(s)://` origin can be compared against the same
+ * owned-origin rule an ordinary `http(s)://` request is checked against. */
+export function httpOriginForWebSocketUrl(wsUrl: string): string {
+  const url = new URL(wsUrl);
+  if (url.protocol === 'ws:') url.protocol = 'http:';
+  else if (url.protocol === 'wss:') url.protocol = 'https:';
+  return url.toString();
 }
 
 export function selectCanonicalManifestoCandidate(candidates: readonly string[]): number {
