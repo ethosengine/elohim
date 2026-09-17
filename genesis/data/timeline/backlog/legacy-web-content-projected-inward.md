@@ -1,0 +1,102 @@
+---
+id: "backlog-legacy-web-content-projected-inward"
+kind: "backlog"
+contentType: "backlog-item"
+contentFormat: "markdown"
+title: "Legacy web content projected INTO the network — external references as typed, witnessed, bounded things rather than markup"
+slug: "legacy-web-content-projected-inward"
+written: "2026-09-17"
+author: "doorway-overnight-20260914 shift, from an operator design conversation prompted by the apex-transition sibling-browser failure"
+status: "backlog"
+priority: "medium"
+tags: [open-question, legacy-web-projection, bridge, external-format, embed, privacy, reach, witnessed-interaction, chrome, a2o-oracle, design-pass]
+cites:
+  - bridges/CLAUDE.md
+  - doorway/CLAUDE.md
+  - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - app/elohim-app/src/app/components/hero/hero.component.html
+  - genesis/a2o/steps/dataplane/apex-transition.steps.ts
+  - genesis/a2o/src/framework/dataplane/real-app-network.ts
+  - genesis/a2o/reports/recovery/doorway-pickup-20260917/laneA-failure-analysis.md
+---
+
+# Legacy web content projected inward
+
+**This entry is a collection point, not a design.** It names the question and gives every place
+that touches it one tag to carry — `legacy-web-projection` — so a later deep design pass can
+surface and reconcile them together. Tag a site when you meet it; do not fix it locally in a way
+that pre-empts the design.
+
+## What prompted it
+
+The landing page is a notarized, content-addressed ContentNode served under a declared head. Inside
+it, `hero.component.html` embeds a YouTube player — an iframe whose bytes, behaviour and telemetry
+belong to a third party. On 2026-09-17 the a2o scenario "The apex name survives its doorway's shed"
+failed at `apex-transition.steps.ts:1135` on four `net::ERR_ABORTED` requests to
+`youtube.com/api/stats/atr` and `youtubei/v1/log_event`: a doorway-failover proof went red on a
+third-party beacon. The scenario was right to *notice* those requests and wrong about what they
+*meant* — because the protocol has no way to say what they are.
+
+The page's integrity story stops at the iframe boundary, and nothing declares that it does.
+
+## The question
+
+How does legacy web content live inside a governed, content-addressed place — when online, and
+when not — without either pretending it is native or pretending it is absent?
+
+## Design directions to evaluate (none decided)
+
+1. **The reference is first-class and typed.** `external` is already a core DNA-notarized format.
+   An embed becomes an EPR whose payload is a *claim about an outside resource* (URL, kind, who
+   cited it, when last witnessed). The reference is notarized; the bytes are not. The network can
+   then answer "what outside resources does this household depend on?"
+2. **Bridge seam, not renderer.** Translating an external protocol means adding a crate
+   (`bridges/`); legacy web is the largest external protocol. A web bridge would own projection
+   policy: reference-only · witnessed snapshot (title, thumbnail, transcript, hash of what was
+   seen) · full capture where licensing allows.
+3. **Online/offline is a gradient, stated honestly.** Online: the live resource inside a declared
+   boundary. Offline or peer-only: the last witnessed projection, labelled as a snapshot with its
+   date and witness. Same shape as verify-locally-then-serve; staleness graded by stakes.
+4. **The boundary is a protection surface.** A raw third-party iframe lets an outside party observe
+   a person inside a governed place, which undercuts what the chrome signals. Candidate default:
+   click-to-load or a privacy-preserving facade; the chrome marks leaving governed ground. Reach
+   applies — a commons page may cite the open web; an intimate-reach space may not phone out.
+5. **Witnessing turns link rot into shared memory.** Peers attesting "this URL resolved to this
+   hash at this time" is the witnessed-interaction primitive pointed outward: a plural,
+   attributable record of what a link meant when cited. Thin — notarized observations, not a
+   warehouse of other people's bytes.
+6. **Test oracles gain a category.** With typed external references, "requests to declared
+   external origins" is something a harness can reason about: a hidden request to an *undeclared*
+   origin still fails; a declared embed's telemetry abort is not evidence about the system under
+   test.
+
+**Standing caution:** the bridge must not launder the legacy web into looking native. Its value is
+that the seam stays visible — this part is governed, that part is theirs, here is what was witnessed.
+
+## Open questions for the design pass
+
+- P2P design gate: is an external reference Notarized (A), Linked (A2 — an attribute of the
+  citing ContentNode), or does only the *witness observation* get notarized? What is the head-plane
+  cost of witness records at one year?
+- Which existing entry types and the `external` format already carry this, and what is missing?
+- Who may witness, and does a witness observation earn or spend anything (REA)?
+- What does the chrome show at the boundary, and what is the friend-voice wording for a person?
+- Where does consent for a live third-party load get recorded, and at what reach is it refused?
+- Licensing and takedown: what may a snapshot hold, and how is redress routed?
+
+## Sites already known (tag these `legacy-web-projection` when touched)
+
+| Site | Why it belongs here |
+|---|---|
+| `app/elohim-app/src/app/components/hero/hero.component.html` | The live YouTube embed inside the notarized landing node |
+| `genesis/a2o/steps/dataplane/apex-transition.steps.ts` (~1135-1143) | Raw request-failure capture with no notion of a declared external origin |
+| `genesis/a2o/src/framework/dataplane/real-app-network.ts` (`EXPECTED_NEGATIVE_HTTP`, origin-escape guard) | The harness's hand-kept list standing in for a protocol-level declaration |
+| `bridges/` | Home for a web bridge if direction 2 holds |
+| `doorway/doorway-service` web2 bridge consumption | Where an inward projection would be served and cached |
+
+## Current decision
+
+Captured, not started. No owner; blocks nothing. The narrow harness question (whether the
+sibling-browser capture at `apex-transition.steps.ts:1135` may be scoped to household origins) is
+the operator's call and is tracked in the shift journal, not here — settle it without foreclosing
+direction 6.
