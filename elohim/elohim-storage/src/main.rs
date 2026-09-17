@@ -3218,6 +3218,39 @@ async fn async_main(
         // publishes the shared snapshot.
         p2p_node = p2p_node.with_provide_loop_state(provide_loop_state.clone());
 
+        // EVENT-DRIVEN HEAD-ADOPTION TRIGGER.
+        //
+        // Deliberately spawned HERE, not inside the projection-reconcile arm
+        // below: the measured defect is that adoption was sweep-bound, so the
+        // cure must not inherit the sweep's lifecycle, its single-flight flag,
+        // or its `PROJECTION_RECONCILE_SECS=0` disable switch. It needs only a
+        // conductor (resolved lazily — `lamad_client()` is interior-mutable, so
+        // a late bridge is picked up without re-plumbing), the SQL pool, and
+        // this node's `SyncManager`.
+        //
+        // Requires both a pool and a conductor registry; without either there is
+        // nothing to adopt into and the node keeps its pre-trigger behaviour.
+        if let (Some(pool), Some(registry)) = (db_pool.clone(), hc_registry_for_http.clone()) {
+            use elohim_storage::services::head_adoption_trigger as hat;
+            let (gate, rx) = hat::TriggerGate::new(hat::DEFAULT_TRIGGER_COOLDOWN);
+            p2p_node = p2p_node.with_head_adoption_trigger(gate.clone());
+            let trigger_sync = p2p_node.sync_manager().clone();
+            let trigger_shutdown = shutdown_tx.subscribe();
+            tokio::spawn(hat::run_head_adoption_trigger_worker(
+                rx,
+                gate,
+                registry,
+                pool,
+                trigger_sync,
+                trigger_shutdown,
+            ));
+        } else {
+            info!(
+                "head-adoption trigger: not wired (needs the content DB pool and a conductor \
+                 registry) — head adoption stays sweep-bound"
+            );
+        }
+
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
         info!("  Relay mode: {}", relay_mode);

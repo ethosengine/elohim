@@ -797,6 +797,13 @@ pub struct P2PNode {
     command_tx: mpsc::Sender<P2PCommand>,
     /// Database pool for EPR Head construction from content records
     db_pool: Option<DbPool>,
+    /// Event-driven head-ADOPTION TRIGGER gate. When wired, a converged
+    /// content-node doc schedules the adopt-before-author decision for that id
+    /// instead of waiting on the projection-reconcile heal leg's period (which
+    /// is single-flight and backlog-driven — measured 130–450 s on a healthy
+    /// 3-peer household, 2026-09-17). Absent ⇒ the pre-trigger behaviour
+    /// exactly: the sweep is the only carrier.
+    head_adoption_trigger: Option<Arc<crate::services::head_adoption_trigger::TriggerGate>>,
     /// Conductor bridge for view-federation kinds that must ask this peer's own
     /// conductor — currently `ContentHeadRecord` (adopt-before-author's
     /// declare-carries-Record source half). Absent ⇒ that view kind serves the
@@ -3025,6 +3032,7 @@ impl P2PNode {
             command_rx: Arc::new(tokio::sync::Mutex::new(command_rx)),
             command_tx,
             db_pool: None,
+            head_adoption_trigger: None,
             hc_registry: None,
             policy_enforcement: None,
             peer_trust_cache: trust_cache::PeerTrustCache::new(),
@@ -3157,6 +3165,20 @@ impl P2PNode {
     /// Also replaces the default stub identity map with a
     /// `HolochainBackedPeerIdentityMap` backed by the provided pool, enabling
     /// real PeerId → agent CID resolution from the `peer_identity_bindings` table.
+    /// Wire the event-driven head-ADOPTION TRIGGER gate.
+    ///
+    /// The node only OFFERS converged content-node docs to the gate; the gate
+    /// owns the claim ledger and the bounded queue, and a separate serial worker
+    /// owns the conductor work. Nothing about the sync apply path can block or
+    /// fail on account of this (see `TriggerGate::offer`).
+    pub fn with_head_adoption_trigger(
+        mut self,
+        gate: Arc<crate::services::head_adoption_trigger::TriggerGate>,
+    ) -> Self {
+        self.head_adoption_trigger = Some(gate);
+        self
+    }
+
     pub fn with_db_pool(mut self, pool: DbPool) -> Self {
         self.identity_map = Arc::new(identity_map::HolochainBackedPeerIdentityMap::new(
             pool.clone(),
@@ -8044,7 +8066,8 @@ impl P2PNode {
                             // CRDT-heal: reverse-project a converged content doc into
                             // the local SQL row (amber tier). Before moving the strings
                             // into the response.
-                            self.heal_content_row(&h_app_id, &doc_id).await;
+                            self.heal_content_row(&h_app_id, &doc_id, &peer.to_string())
+                                .await;
                             SyncResponse::ChangeAck {
                                 h_app_id,
                                 doc_id,
@@ -8446,7 +8469,8 @@ impl P2PNode {
                     );
                     // CRDT-heal: reverse-project a converged content doc into the
                     // local SQL row (amber tier) now that the changes landed.
-                    self.heal_content_row(&h_app_id, &doc_id).await;
+                    self.heal_content_row(&h_app_id, &doc_id, &peer.to_string())
+                        .await;
                 }
             }
             SyncResponse::Heads {
@@ -8576,10 +8600,27 @@ impl P2PNode {
     ///
     /// A `None` `db_pool` (a p2p-only node with no SQL projection) skips silently;
     /// a reverse-projection error is logged (warn) but never fails the sync round.
-    async fn heal_content_row(&self, h_app_id: &str, doc_id: &str) {
+    async fn heal_content_row(&self, h_app_id: &str, doc_id: &str, peer: &str) {
         if h_app_id != crate::sync::projector::PROJECTION_NAMESPACE || !doc_id.starts_with("node:")
         {
             return;
+        }
+        // HEAD-ADOPTION TRIGGER, raised FIRST and unconditionally for a content
+        // doc — before the `db_pool` guard and before the reverse projection's
+        // own `Ok(false)` early-outs, because none of those conditions bear on
+        // whether a HEAD moved. The doc's arrival is the evidence; the amber
+        // blob heal below is a different concern that happens to share a
+        // trigger point.
+        //
+        // This is the repair for the measured 130–450 s head-adoption lag
+        // (2026-09-17 `head-adoption-lag-analysis.md`): the doc body crosses in
+        // under a second while adoption waited on a single-flight heal leg whose
+        // period is backlog-driven. `offer` never awaits, never blocks and
+        // never fails — a saturated trigger degrades to exactly the pre-trigger
+        // world, in which the sweep is the only carrier.
+        if let Some(gate) = self.head_adoption_trigger.as_ref() {
+            let decision = gate.offer(h_app_id, doc_id, peer);
+            crate::metrics::inc_head_adoption_trigger(decision.label());
         }
         let Some(pool) = self.db_pool.as_ref() else {
             return;

@@ -1445,6 +1445,32 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Event-driven head-ADOPTION TRIGGER outcomes
+    /// ([`crate::services::head_adoption_trigger`]). label: outcome =
+    ///
+    /// - `not_content_doc` / `deduped` / `enqueued` / `dropped_full` — the
+    ///   hot-path claim gate's closed vocabulary (`EnqueueDecision::label`);
+    /// - `skipped_current` — the worker found the row already declaring exactly
+    ///   the doc's head hint, so no conductor call was spent. On a converged
+    ///   corpus this is the series that should dominate;
+    /// - `adopted` — a canonical head landed FROM a sync apply rather than from
+    ///   the heal leg's period. This is the series that says the 2026-09-17
+    ///   130–450 s adoption lag is actually closed;
+    /// - `held` — nothing to adopt (row held or contested);
+    /// - `author_deferred` — the adopt pre-flight returned an author verdict,
+    ///   which this path deliberately does NOT act on;
+    /// - `no_bridge` / `failed` — no conductor yet, or a local read failed. The
+    ///   sweep remains the backstop in both cases, so these are not errors —
+    ///   they are the visible statement that the trigger did nothing here.
+    pub static ref HEAD_ADOPTION_TRIGGER: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_head_adoption_trigger_total",
+            "Event-driven head-adoption trigger outcomes, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     // -----------------------------------------------------------------------
     // iroh plane (Track-2 substrate, dual/iroh modes). These are the counters
     // that answer "did iroh carry anything" — every one of them read ZERO on
@@ -2641,6 +2667,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_BLOB_FETCHES.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
+        let _ = REGISTRY.register(Box::new(HEAD_ADOPTION_TRIGGER.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
         // Pre-touch the always-live combination so the series renders before
@@ -3364,6 +3391,12 @@ pub fn inc_sync_round() {
 /// "sync_changes" | "announce_change").
 pub fn inc_sync_request(kind: &str) {
     SYNC_REQUESTS.with_label_values(&[kind]).inc();
+}
+
+/// Record one event-driven head-adoption trigger outcome. See
+/// [`HEAD_ADOPTION_TRIGGER`] for the closed `outcome` vocabulary.
+pub fn inc_head_adoption_trigger(outcome: &str) {
+    HEAD_ADOPTION_TRIGGER.with_label_values(&[outcome]).inc();
 }
 
 /// Record document entries received in one `DocumentList` answer — the round's
