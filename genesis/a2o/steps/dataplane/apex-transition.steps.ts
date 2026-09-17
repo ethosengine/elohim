@@ -66,6 +66,7 @@ import {
   classifyFirstPartyHttpError,
   httpOriginForWebSocketUrl,
   isOptionalNavigationCancellation,
+  partitionByDeclaredExternalEmbedOrigin,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
   publicDoorwayPorts,
@@ -524,6 +525,11 @@ async function completeRealAppJourney(world: E2EWorld, phase: string): Promise<v
       });
       if (routingFailure)
         requiredFirstPartyFailures.push(`${request.method()} ${request.url()}: ${routingFailure}`);
+      // Every failure/HTTP-error track below is scoped to publicOrigin only, so
+      // third-party origins — including the hero's declared external YouTube
+      // embed (real-app-network.ts DECLARED_EXTERNAL_EMBED_ORIGINS) — are
+      // excluded from this journey's assertions by construction, not by a
+      // per-owner optional-negative entry.
       if (url.origin !== publicOrigin) return;
       activeFirstParty.set(request, {
         rendered: `${request.method()} ${request.url()}`,
@@ -1139,8 +1145,36 @@ Then(
     const state = getState(this);
     const browser = await visitInBrowser(`${state.siblingOrigin}/`);
     assert.deepEqual(browser.pageErrors, [], 'sibling browser page errors');
-    assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
-    assert.deepEqual(browser.httpErrors, [], 'sibling browser HTTP errors');
+    // The landing page's hero embeds a declared external YouTube player
+    // (real-app-network.ts DECLARED_EXTERNAL_EMBED_ORIGINS); its own aborted
+    // telemetry requests are third-party flakiness, never a household routing
+    // defect. Record them, then hold every OTHER failure to the original bar.
+    const requestFailures = partitionByDeclaredExternalEmbedOrigin(browser.failedRequests);
+    const httpErrorEntries = partitionByDeclaredExternalEmbedOrigin(browser.httpErrors);
+    if (requestFailures.declared.length > 0 || httpErrorEntries.declared.length > 0) {
+      this.attach(
+        JSON.stringify(
+          {
+            note: 'declared external embed failures — not household traffic',
+            requestFailures: requestFailures.declared,
+            httpErrors: httpErrorEntries.declared,
+          },
+          null,
+          2
+        ),
+        'application/json'
+      );
+    }
+    assert.deepEqual(
+      requestFailures.undeclared,
+      [],
+      'sibling browser request failures (excluding declared external embeds)'
+    );
+    assert.deepEqual(
+      httpErrorEntries.undeclared,
+      [],
+      'sibling browser HTTP errors (excluding declared external embeds)'
+    );
     assert.ok(browser.rootPresent, 'sibling browser saw no app-root');
     assert.ok(browser.bootstrapReady, 'sibling browser did not bootstrap its entry script');
     assert.ok(browser.rootText.trim().length > 0, 'sibling browser booted an empty app root');
