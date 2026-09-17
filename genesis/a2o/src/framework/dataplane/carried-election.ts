@@ -137,6 +137,22 @@ export interface CarriedElectionRail {
 const SIGNING_AUTH_BACKOFFS_MS = [100, 200, 400] as const;
 
 /**
+ * Exact match for Holochain's optimistic-concurrency source-chain conflict —
+ * "Attempted to commit a bundle to the source chain, but the source chain
+ * head has moved since the bundle began" (or its short `HeadMoved` form).
+ * One predicate so every author-side retry in this module recognizes the
+ * IDENTICAL error class; a near-miss like `NotHeadMovedPermanent` must NOT
+ * match (the unit tests pin this both here and for
+ * {@link retryOnSourceChainHeadMoved}).
+ */
+function isSourceChainHeadMovedError(message: string): boolean {
+  return (
+    message.includes('source chain head has moved') ||
+    /(?:^|[:(\s])HeadMoved(?:$|[:,)\s])/.test(message)
+  );
+}
+
+/**
  * Mint signing credentials once for this exact, currently provisioned cell.
  * The Holochain client keys its process-global cache by the complete CellId;
  * the caller has just resolved that cell through a live admin connection.
@@ -156,10 +172,7 @@ export async function authorizeSigningCredentialsWithRetry(
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (
-        !message.includes('source chain head has moved') &&
-        !/(?:^|[:(\s])HeadMoved(?:$|[:,)\s])/.test(message)
-      ) {
+      if (!isSourceChainHeadMovedError(message)) {
         throw error;
       }
       await sleep(delay);
@@ -168,6 +181,53 @@ export async function authorizeSigningCredentialsWithRetry(
   }
   if (cached(cell)) return;
   await authorize(cell);
+}
+
+const HEAD_ELECTION_RETRY_BACKOFFS_MS = [200, 400, 800, 1600] as const;
+
+/**
+ * Bounded retry for an author-side zome call that can lose Holochain's
+ * optimistic-concurrency race against WRITES THIS FIXTURE DOES NOT MAKE —
+ * Matthew's storage peer moves his source chain head concurrently via its own
+ * reconciliation/adoption, so an author-side commit can legitimately lose the
+ * race (documented client behaviour for this exact error is to retry). Only
+ * {@link isSourceChainHeadMovedError} messages are retried; anything else
+ * propagates on the first attempt. A `HeadMoved` failure means Holochain
+ * rejected the bundle before appending anything to the chain, so re-issuing
+ * the SAME call with the SAME arguments afterward is always safe — nothing
+ * was half-committed to retry over.
+ *
+ * 5 attempts total (4 backoffs, ~200-2000ms each with jitter, well under 3s of
+ * sleep) — callers with a tighter step timeout budget this against it.
+ */
+export async function retryOnSourceChainHeadMoved<T>(
+  label: string,
+  attempt: () => Promise<T>,
+  sleep: (milliseconds: number) => Promise<void> = async milliseconds => {
+    await new Promise(resolve => setTimeout(resolve, milliseconds));
+  }
+): Promise<T> {
+  const maxAttempts = HEAD_ELECTION_RETRY_BACKOFFS_MS.length + 1;
+  let lastMessage = '';
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      return await attempt();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isSourceChainHeadMovedError(message)) throw error;
+      lastMessage = message;
+      if (i === maxAttempts - 1) break;
+      const base = HEAD_ELECTION_RETRY_BACKOFFS_MS[i];
+      // eslint-disable-next-line sonarjs/pseudo-random -- backoff jitter, not security
+      const jitter = Math.floor(base * 0.25 * Math.random());
+      console.warn(`${label}: source chain head moved, retrying (attempt ${i + 2}/${maxAttempts})`);
+      await sleep(base + jitter);
+    }
+  }
+  const detail = /Bundle head:.*$/s.exec(lastMessage)?.[0] ?? lastMessage;
+  throw new Error(
+    `${label}: gave up after ${maxAttempts} attempts against a moving source chain head — ${detail}`
+  );
 }
 
 /**
@@ -512,20 +572,29 @@ export interface VerifiedCarriedElection {
  * staging calls do. It is recorded with `method: 'zome'` and the
  * `<zome>.<fn>` target, which is what makes the ledger's "covers every mutating
  * call the fixture can make" claim true rather than approximately true.
+ *
+ * The call is wrapped in {@link retryOnSourceChainHeadMoved}: this peer's
+ * storage-driven reconciliation/adoption can move Matthew's source chain head
+ * between this function's read of the candidate and its own commit, and
+ * Holochain's documented client behaviour for that exact race is to retry —
+ * see `retryOnSourceChainHeadMoved`'s doc for why replaying the same call is
+ * safe.
  */
 export async function declareEarnedCanonicalHead(
   rail: CarriedElectionRail,
   id: string,
   headActionHash: string
 ): Promise<{ canonical?: boolean } | null> {
-  recordStagingWrite('zome', `${CONTENT_STORE_ZOME}.declare_earned_canonical_head`);
-  return (await rail.call('declare_earned_canonical_head', {
-    id,
-    head_action_hash: headActionHash,
-    carried_record: null,
-    adopt_before_author: false,
-    delegation: null,
-  })) as { canonical?: boolean } | null;
+  return retryOnSourceChainHeadMoved(`declareEarnedCanonicalHead(${id})`, async () => {
+    recordStagingWrite('zome', `${CONTENT_STORE_ZOME}.declare_earned_canonical_head`);
+    return (await rail.call('declare_earned_canonical_head', {
+      id,
+      head_action_hash: headActionHash,
+      carried_record: null,
+      adopt_before_author: false,
+      delegation: null,
+    })) as { canonical?: boolean } | null;
+  });
 }
 
 /**

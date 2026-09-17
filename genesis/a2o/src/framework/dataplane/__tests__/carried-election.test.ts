@@ -2,7 +2,10 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { authorizeSigningCredentialsWithRetry } from '../carried-election.js';
+import {
+  authorizeSigningCredentialsWithRetry,
+  retryOnSourceChainHeadMoved,
+} from '../carried-election.js';
 
 import type { CellId } from '@holochain/client';
 
@@ -124,5 +127,80 @@ void describe('authorizeSigningCredentialsWithRetry', () => {
       }
     );
     assert.equal(attempts, 1);
+  });
+});
+
+const RETRY_LABEL = 'declareEarnedCanonicalHead(test-id)';
+
+void describe('retryOnSourceChainHeadMoved', () => {
+  void it('retries the exact source-chain-head-moved error then resolves', async () => {
+    let attempts = 0;
+    const sleeps: number[] = [];
+    const result = await retryOnSourceChainHeadMoved(
+      RETRY_LABEL,
+      async () => {
+        attempts += 1;
+        if (attempts <= 3) {
+          throw new Error(
+            'internal_error: Source chain error: Attempted to commit a bundle to the source ' +
+              'chain, but the source chain head has moved since the bundle began. Bundle head: ' +
+              'aaa Current head: bbb seq: 8918'
+          );
+        }
+        return { canonical: true };
+      },
+      async delay => {
+        sleeps.push(delay);
+      }
+    );
+    assert.deepEqual(result, { canonical: true });
+    assert.equal(attempts, 4, 'N failures then one success is N+1 calls');
+    assert.equal(sleeps.length, 3);
+  });
+
+  void it('propagates a different error immediately without retrying', async () => {
+    let attempts = 0;
+    await assert.rejects(
+      retryOnSourceChainHeadMoved(
+        RETRY_LABEL,
+        async () => {
+          attempts += 1;
+          throw new Error('CellDisabled');
+        },
+        async () => undefined
+      ),
+      /CellDisabled/
+    );
+    assert.equal(attempts, 1, 'a non-retryable error propagates after exactly one call');
+  });
+
+  void it('exhausts bounded attempts on persistent HeadMoved and names attempts + heads', async () => {
+    let attempts = 0;
+    const sleeps: number[] = [];
+    await assert.rejects(
+      retryOnSourceChainHeadMoved(
+        RETRY_LABEL,
+        async () => {
+          attempts += 1;
+          throw new Error(
+            'internal_error: Source chain error: … the source chain head has moved since the ' +
+              'bundle began. Bundle head: aaa Current head: bbb seq: 8918'
+          );
+        },
+        async delay => {
+          sleeps.push(delay);
+        }
+      ),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /gave up after 5 attempts/);
+        assert.match(error.message, /Bundle head: aaa/);
+        assert.match(error.message, /Current head: bbb/);
+        assert.match(error.message, /seq: 8918/);
+        return true;
+      }
+    );
+    assert.equal(attempts, 5, 'bounded at 5 attempts (4 backoffs)');
+    assert.equal(sleeps.length, 4);
   });
 });
