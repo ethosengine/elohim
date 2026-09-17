@@ -3594,10 +3594,15 @@ async fn serve_admitted_projection(
             elohim_views::projection::Channel::Candidate,
         ) {
             Some(observed) if observed.no_candidate_staged => {
+                // The candidate channel's NAMED absence — one definition, shared
+                // with the relay that recognises a holder's answer of the same
+                // shape (`name_routing::NO_CANDIDATE_STAGED_BODY`).
                 return Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .header("content-type", "application/json")
-                    .body(Full::new(Bytes::from(r#"{"error":"no-candidate-staged"}"#)))
+                    .body(Full::new(Bytes::from_static(
+                        crate::services::name_routing::NO_CANDIDATE_STAGED_BODY.as_bytes(),
+                    )))
                     .expect("infallible candidate 404");
             }
             Some(observed) => match observed.browser {
@@ -6958,6 +6963,11 @@ async fn relay_by_name(
     query: Option<&str>,
     ctx: &RelayContext,
     trigger: crate::services::name_routing::RelayTrigger,
+    // The head channel THIS doorway resolved for the requested name. Only a
+    // locally-resolved candidate channel widens the relay's answer class to
+    // include the holder's named absence; every other name stays `Public`,
+    // which is the unchanged behaviour.
+    channel: crate::services::name_routing::RelayChannel,
     require_exact_host: bool,
     // The mount this doorway WOULD serve the request from, when it holds one
     // AND can serve it. `None` for a local 404 or shed — then every holder
@@ -6999,7 +7009,7 @@ async fn relay_by_name(
         return None;
     }
 
-    let outcome = relay_one_hop(&holders, |holder| {
+    let outcome = relay_one_hop(&holders, channel, |holder| {
         let client = RELAY_CLIENT.clone();
         let path = path.to_string();
         let query = query.map(|q| q.to_string());
@@ -7280,6 +7290,9 @@ async fn handle_request(
                 relay_query.as_deref(),
                 &relay_ctx,
                 crate::services::name_routing::RelayTrigger::LessSpecificThanHolder,
+                // A more-specific sibling contract is a different mount, not
+                // this mount's channel — nothing local resolves its channel.
+                crate::services::name_routing::RelayChannel::Public,
                 exact_host,
                 Some(&local_mount),
             )
@@ -7364,6 +7377,17 @@ async fn handle_request(
                 build_chrome_context_json_for(&path, &req, Some(&projection.epr_id));
             let wants_html = routes::catching_up::accepts_html(req.headers());
             let standing = standing_from_request(&state, &req);
+            // The head channel this name resolved to HERE, captured before the
+            // projection is consumed. The candidate channel is the one channel
+            // whose absence the holder states as a structured 404, and a name
+            // this doorway can SHOW by relaying a holder's bytes must also be
+            // withdrawable by relaying that holder's named absence.
+            let relay_channel = match projection.channel {
+                elohim_views::projection::Channel::Candidate => {
+                    crate::services::name_routing::RelayChannel::Candidate
+                }
+                _ => crate::services::name_routing::RelayChannel::Public,
+            };
             let local = dispatch_to_projected_epr(
                 &state,
                 &path,
@@ -7386,6 +7410,7 @@ async fn handle_request(
                     relay_query.as_deref(),
                     &relay_ctx,
                     crate::services::name_routing::RelayTrigger::LocalVerdict(local.status()),
+                    relay_channel,
                     exact_host,
                     // No local mount filter: we hold a contract but cannot
                     // serve it. The exact-host boundary above still excludes
@@ -7413,6 +7438,9 @@ async fn handle_request(
                 relay_query.as_deref(),
                 &relay_ctx,
                 crate::services::name_routing::RelayTrigger::LocalVerdict(StatusCode::NOT_FOUND),
+                // No local projection matched this host, so this doorway
+                // resolved no channel for the name and its refusal stays opaque.
+                crate::services::name_routing::RelayChannel::Public,
                 true,
                 None,
             )
@@ -8719,6 +8747,8 @@ async fn handle_request(
         relay_query.as_deref(),
         &relay_ctx,
         crate::services::name_routing::RelayTrigger::LocalVerdict(response.status()),
+        // Nothing here resolved a projection, so no channel was resolved either.
+        crate::services::name_routing::RelayChannel::Public,
         relay_ctx.host.is_some() && local_path_requires_exact_host(&relay_state.epr_router, &path),
         // We hold no mount for this request (404) or could not serve it (503),
         // so there is nothing to be more specific than.

@@ -84,6 +84,65 @@ pub use crate::services::serve_receipt::RECEIPT_HEADER;
 /// doorway with a staler projection said yes — reach-laundering by retry.
 const AUTHORITATIVE_REFUSAL: u16 = 403;
 
+/// A holder's **named absence**. Not a failed attempt either: a bare 404 is
+/// "that holder did not serve", but a 404 carrying the candidate channel's own
+/// structured absence from the doorway that holds the name is a statement about
+/// the RECORD — the same rationale as [`AUTHORITATIVE_REFUSAL`], and strictly
+/// less permissive than the 200 already relayed for that same name.
+const NAMED_ABSENCE: u16 = 404;
+
+/// The candidate channel's named absence, as the `error` field of the body its
+/// handler answers with. ONE definition for the crate: the local candidate
+/// handler answers [`NO_CANDIDATE_STAGED_BODY`], and the relay recognises a
+/// holder's answer by comparing this exact token.
+pub const NO_CANDIDATE_STAGED_ERROR: &str = "no-candidate-staged";
+
+/// The exact body the candidate channel answers with when nothing is staged.
+/// Kept beside the token it carries; `the_named_absence_body_carries_its_token`
+/// fixes the two together so neither can drift from the other.
+pub const NO_CANDIDATE_STAGED_BODY: &str = r#"{"error":"no-candidate-staged"}"#;
+
+/// The most body read before deciding whether a 404 is a named absence. A
+/// structured absence is tens of bytes; anything larger is by construction
+/// something else, so the question can never cost this doorway more than this.
+const NAMED_ABSENCE_MAX_BODY: usize = 256;
+
+/// Which head channel the requested name resolved to HERE, before any hop.
+///
+/// An ENUM, never a bool: the channel set is the projection's, and a bool would
+/// have to be re-read at every call site the day a third channel appears.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum RelayChannel {
+    /// The public channel — and every name whose channel this doorway cannot
+    /// resolve locally at all. The DEFAULT, and the class whose relay
+    /// behaviour is exactly what it has always been.
+    #[default]
+    Public,
+    /// A candidate-bound name: the staging channel, the one channel that states
+    /// its absence as a structured 404 rather than merely failing to serve.
+    Candidate,
+}
+
+/// True iff `reply` is the declared holder's named absence for a candidate
+/// channel this doorway already resolved locally.
+///
+/// Opacity: this opens only for a name THIS doorway resolved to the candidate
+/// channel, so it speaks only about a channel the requester was already
+/// answered for. An unrelated or closed hostname resolves no local candidate
+/// projection, stays [`RelayChannel::Public`], and its refusal remains opaque.
+fn is_named_absence(channel: RelayChannel, reply: &HolderReply) -> bool {
+    if channel != RelayChannel::Candidate || reply.status != NAMED_ABSENCE {
+        return false;
+    }
+    if reply.body.len() > NAMED_ABSENCE_MAX_BODY {
+        return false;
+    }
+    let Ok(parsed) = serde_json::from_slice::<serde_json::Value>(&reply.body) else {
+        return false;
+    };
+    parsed.get("error").and_then(serde_json::Value::as_str) == Some(NO_CANDIDATE_STAGED_ERROR)
+}
+
 /// How live a candidate holder looked at the last discovery tick.
 ///
 /// Declaration order IS the preference order (`derive(Ord)`): a serving holder
@@ -788,12 +847,21 @@ pub struct RelayOutcome {
 /// - `503` → that holder is shedding: a statement about the HOLDER's liveness,
 ///   not about the requester or the record. Record it and **try the next
 ///   holder before answering the shed**;
-/// - any other status (incl. the sibling's honest `404`) → it did not serve:
+/// - `404` carrying the candidate channel's named absence, when `channel` is
+///   [`RelayChannel::Candidate`] → **answered, stop.** See [`NAMED_ABSENCE`]:
+///   the channel that can be SHOWN by relaying a holder's 200 must also be
+///   withdrawable by relaying that same holder's structured absence, or a
+///   relayed candidate could never be un-shown.
+/// - any other status (incl. the sibling's bare `404`) → it did not serve:
 ///   a failed attempt, try the next holder; if it was the last, the caller
 ///   keeps ITS original status. A sibling 404 therefore surfaces as our own
 ///   404, never as a rewritten one.
 /// - transport error → a failed attempt, same as above.
-pub async fn relay_one_hop<F, Fut>(holders: &[NameHolder], fetch: F) -> RelayOutcome
+pub async fn relay_one_hop<F, Fut>(
+    holders: &[NameHolder],
+    channel: RelayChannel,
+    fetch: F,
+) -> RelayOutcome
 where
     F: Fn(NameHolder) -> Fut,
     Fut: std::future::Future<Output = Result<HolderReply, String>>,
@@ -827,11 +895,14 @@ where
         attempted += 1;
         match fetch(holder.clone()).await {
             // An ANSWER from the holder that holds this name's contract. Bytes
-            // (2xx/3xx) or an authoritative refusal (403) are the same kind of
-            // thing here: the doorway that owns the fold has spoken, so the
-            // relay stops and the client receives what it said.
+            // (2xx/3xx), an authoritative refusal (403), and the candidate
+            // channel's named absence (404 + its structured body) are the same
+            // kind of thing here: the doorway that owns the fold has spoken, so
+            // the relay stops and the client receives what it said.
             Ok(reply)
-                if (200..400).contains(&reply.status) || reply.status == AUTHORITATIVE_REFUSAL =>
+                if (200..400).contains(&reply.status)
+                    || reply.status == AUTHORITATIVE_REFUSAL
+                    || is_named_absence(channel, &reply) =>
             {
                 return RelayOutcome {
                     verdict: RelayVerdict::Served {
@@ -1332,7 +1403,7 @@ mod tests {
         );
 
         let attempted = Mutex::new(Vec::new());
-        let outcome = relay_one_hop(&holders, |holder| {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |holder| {
             attempted.lock().unwrap().push(holder.doorway_id);
             async { Ok(reply(503, "candidate unavailable")) }
         })
@@ -1395,7 +1466,7 @@ mod tests {
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
         let dialled = Mutex::new(Vec::new());
-        let outcome = relay_one_hop(&holders, |h| {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| {
             dialled.lock().unwrap().push(h.doorway_id.clone());
             async move { Ok(reply(200, "served by c")) }
         })
@@ -1619,7 +1690,7 @@ mod tests {
             HolderLiveness::Serving,
         )];
         let calls = Mutex::new(Vec::new());
-        let outcome = relay_one_hop(&holders, |h| {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| {
             calls.lock().unwrap().push(h.origin.clone());
             async move { Ok(reply(200, "<app-root></app-root>")) }
         })
@@ -1658,7 +1729,10 @@ mod tests {
             "https://b.example",
             HolderLiveness::Serving,
         )];
-        let outcome = relay_one_hop(&holders, |_| async { Ok(reply(404, "not here")) }).await;
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply(404, "not here"))
+        })
+        .await;
         assert_eq!(outcome.verdict, RelayVerdict::AllFailed { attempted: 1 });
         assert!(outcome.shed_doorways.is_empty());
     }
@@ -1670,7 +1744,7 @@ mod tests {
             holder("b-doorway", "https://b.example", HolderLiveness::Serving),
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
-        let outcome = relay_one_hop(&holders, |h| async move {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| async move {
             if h.doorway_id == "b-doorway" {
                 Ok(reply(503, r#"{"status":"catching-up"}"#))
             } else {
@@ -1696,14 +1770,20 @@ mod tests {
             holder("b-doorway", "https://b.example", HolderLiveness::Serving),
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
-        let outcome = relay_one_hop(&holders, |_| async { Ok(reply(503, "catching up")) }).await;
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply(503, "catching up"))
+        })
+        .await;
         assert_eq!(outcome.verdict, RelayVerdict::AllFailed { attempted: 2 });
         assert_eq!(outcome.shed_doorways.len(), 2);
     }
 
     #[tokio::test]
     async fn no_candidates_is_distinct_from_a_failed_attempt() {
-        let outcome = relay_one_hop(&[], |_| async { Ok(reply(200, "never")) }).await;
+        let outcome = relay_one_hop(&[], RelayChannel::Public, |_| async {
+            Ok(reply(200, "never"))
+        })
+        .await;
         assert_eq!(outcome.verdict, RelayVerdict::NoCandidates);
     }
 
@@ -1719,7 +1799,7 @@ mod tests {
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
         let dialled = Mutex::new(Vec::new());
-        let outcome = relay_one_hop(&holders, |h| {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| {
             dialled.lock().unwrap().push(h.doorway_id.clone());
             async move { Ok(refusal("household")) }
         })
@@ -1766,6 +1846,151 @@ mod tests {
         );
     }
 
+    /// The candidate channel's named absence, shaped exactly as the local
+    /// candidate handler answers it.
+    fn named_absence() -> HolderReply {
+        HolderReply {
+            content_type: Some("application/json".to_string()),
+            ..reply(NAMED_ABSENCE, NO_CANDIDATE_STAGED_BODY)
+        }
+    }
+
+    /// Whether one holder's 404 with `body` counts as an answer on `channel`.
+    async fn relayed_404_is_an_answer(channel: RelayChannel, body: String) -> bool {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, channel, |_| {
+            let body = body.clone();
+            async move { Ok(reply(NAMED_ABSENCE, &body)) }
+        })
+        .await;
+        matches!(outcome.verdict, RelayVerdict::Served { .. })
+    }
+
+    /// THE CANDIDATE FIX. A holder's `404 {"error":"no-candidate-staged"}` is an
+    /// ANSWER about the RECORD, from the doorway that holds this name's
+    /// contract — the same rationale as a 403. Without it a candidate this
+    /// doorway can SHOW by relaying the holder's 200 can never be WITHDRAWN by
+    /// relaying that same holder's absence: the channel is one-way.
+    #[tokio::test]
+    async fn a_holders_named_absence_withdraws_a_relayed_candidate() {
+        let holders = vec![
+            holder("b-doorway", "https://b.example", HolderLiveness::Serving),
+            holder("c-doorway", "https://c.example", HolderLiveness::Serving),
+        ];
+        let dialled = Mutex::new(Vec::new());
+        let outcome = relay_one_hop(&holders, RelayChannel::Candidate, |h| {
+            dialled.lock().unwrap().push(h.doorway_id.clone());
+            async move { Ok(named_absence()) }
+        })
+        .await;
+
+        let RelayVerdict::Served {
+            origin,
+            doorway_id,
+            reply,
+        } = outcome.verdict
+        else {
+            panic!("a named absence is an authoritative outcome, not a failed attempt");
+        };
+        assert_eq!(reply.status, 404);
+        assert_eq!(
+            reply.body,
+            NO_CANDIDATE_STAGED_BODY.as_bytes(),
+            "the withdrawal is relayed body-and-all, or the client cannot read it"
+        );
+        assert_eq!(
+            *dialled.lock().unwrap(),
+            vec!["b-doorway".to_string()],
+            "the holder that owns the fold has answered -- no second holder is asked"
+        );
+        assert!(
+            outcome.shed_doorways.is_empty(),
+            "a named absence says nothing about the holder's liveness"
+        );
+
+        let response = build_relayed_response(&origin, &doorway_id, reply);
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            response.headers().get(SERVED_BY_HEADER).unwrap(),
+            "https://b.example",
+            "and it still names who decided it"
+        );
+    }
+
+    /// The public channel is untouched. The identical body from the identical
+    /// holder is still a failed attempt there, so the caller keeps ITS status —
+    /// and a name this doorway resolved no candidate channel for can never be
+    /// told apart from any other name by this class.
+    #[tokio::test]
+    async fn a_named_absence_on_the_public_channel_changes_nothing() {
+        assert!(
+            !relayed_404_is_an_answer(RelayChannel::Public, NO_CANDIDATE_STAGED_BODY.to_string())
+                .await,
+            "only a locally-resolved candidate channel widens the answer class"
+        );
+    }
+
+    /// Exact match on the structured body, or today's behaviour. A route miss,
+    /// a different error, a body that merely mentions the token, HTML, and an
+    /// unparseable body are all still failed attempts.
+    #[tokio::test]
+    async fn only_the_exact_named_absence_body_is_an_answer() {
+        assert!(
+            relayed_404_is_an_answer(
+                RelayChannel::Candidate,
+                NO_CANDIDATE_STAGED_BODY.to_string()
+            )
+            .await
+        );
+        for other in [
+            r#"{"error":"candidate-head-unobserved"}"#,
+            r#"{"detail":"no-candidate-staged"}"#,
+            r#"{"error":"no-candidate-staged-elsewhere"}"#,
+            r#"{"error":null}"#,
+            r#"{}"#,
+            "<html>404 not found</html>",
+            "",
+        ] {
+            assert!(
+                !relayed_404_is_an_answer(RelayChannel::Candidate, other.to_string()).await,
+                "a 404 body of {other:?} is not the candidate channel's named absence"
+            );
+        }
+    }
+
+    /// A structured absence is tens of bytes. A larger body is by construction
+    /// something else, and is refused WITHOUT being parsed — so a holder cannot
+    /// spend this doorway's memory on the question.
+    #[tokio::test]
+    async fn an_oversized_body_is_never_read_into_an_answer() {
+        let padded = format!(
+            r#"{{"error":"{NO_CANDIDATE_STAGED_ERROR}","pad":"{}"}}"#,
+            "p".repeat(NAMED_ABSENCE_MAX_BODY)
+        );
+        assert!(padded.len() > NAMED_ABSENCE_MAX_BODY);
+        assert!(
+            !relayed_404_is_an_answer(RelayChannel::Candidate, padded).await,
+            "the body cap is checked before the parse, so an unbounded body is never buffered"
+        );
+    }
+
+    /// The token the relay matches and the body the candidate handler answers
+    /// with are one statement; this fixes them together so neither can drift.
+    #[test]
+    fn the_named_absence_body_carries_its_token() {
+        let parsed: serde_json::Value =
+            serde_json::from_str(NO_CANDIDATE_STAGED_BODY).expect("the named absence body is JSON");
+        assert_eq!(
+            parsed.get("error").and_then(serde_json::Value::as_str),
+            Some(NO_CANDIDATE_STAGED_ERROR),
+            "the body the candidate channel answers with carries the token the relay matches"
+        );
+    }
+
     /// The contrast that keeps the two statuses from collapsing into one rule:
     /// a 503 is about the HOLDER (liveness), so the next holder is tried; a 403
     /// is about the REQUESTER, so it is not. Same loop, opposite handling.
@@ -1776,7 +2001,7 @@ mod tests {
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
         let dialled = Mutex::new(Vec::new());
-        let outcome = relay_one_hop(&holders, |h| {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| {
             dialled.lock().unwrap().push(h.doorway_id.clone());
             async move {
                 if h.doorway_id == "b-doorway" {
@@ -1868,7 +2093,7 @@ mod tests {
             holder("b-doorway", "https://b.example", HolderLiveness::Serving),
             holder("c-doorway", "https://c.example", HolderLiveness::Serving),
         ];
-        let outcome = relay_one_hop(&holders, |h| async move {
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| async move {
             if h.doorway_id == "b-doorway" {
                 Err("connection refused".to_string())
             } else {
