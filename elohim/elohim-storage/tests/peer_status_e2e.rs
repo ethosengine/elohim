@@ -231,11 +231,17 @@ fn build_peer_status_view_without_capability() {
     );
 }
 
+/// The capability loader reads one process-wide env var, and the test harness runs
+/// tests on parallel threads: every test that touches that var holds this lock.
+static CAPABILITY_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// `load_elohim_capability_from_env` returns None when env var is unset.
 #[test]
 fn load_capability_unset_env_returns_none() {
+    let _env = CAPABILITY_ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     // Guard: remove the env var for this test (may be set in CI).
-    // Safety: single-threaded test; env mutation is local to this process.
     std::env::remove_var("ELOHIM_CAPABILITY_CONFIG_FILE");
     assert!(load_elohim_capability_from_env().is_none());
 }
@@ -243,6 +249,9 @@ fn load_capability_unset_env_returns_none() {
 /// `load_elohim_capability_from_env` returns None when the file does not exist.
 #[test]
 fn load_capability_missing_file_returns_none() {
+    let _env = CAPABILITY_ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     std::env::set_var(
         "ELOHIM_CAPABILITY_CONFIG_FILE",
         "/tmp/elohim-capability-does-not-exist-xyzzy.json",
@@ -254,6 +263,9 @@ fn load_capability_missing_file_returns_none() {
 /// `load_elohim_capability_from_env` returns None when the file contains malformed JSON.
 #[test]
 fn load_capability_malformed_json_returns_none() {
+    let _env = CAPABILITY_ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let mut tmp = tempfile::NamedTempFile::new().expect("temp file");
     use std::io::Write;
     write!(tmp, "{{ this is not valid json }}").unwrap();
@@ -265,6 +277,9 @@ fn load_capability_malformed_json_returns_none() {
 /// `load_elohim_capability_from_env` returns Some(profile) when pointed at a valid JSON file.
 #[test]
 fn load_capability_valid_file_returns_some() {
+    let _env = CAPABILITY_ENV_LOCK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let profile_json = serde_json::json!({
         "modelName": "claude-opus-4-7",
         "modelFamily": "claude",
