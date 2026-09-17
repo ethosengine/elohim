@@ -8187,7 +8187,7 @@ impl HttpServer {
             .as_ref()
             .and_then(|registry| registry.lamad_client())
         else {
-            warn!(
+            info!(
                 phase = "client",
                 outcome = "unavailable",
                 elapsed_ms = client_started.elapsed().as_millis(),
@@ -8345,7 +8345,7 @@ impl HttpServer {
                 return None;
             }
             Ok(Ok(None)) => {
-                warn!(
+                info!(
                     phase = "record_fetch",
                     outcome = "ok_none",
                     elapsed_ms = fetch_started.elapsed().as_millis(),
@@ -8451,7 +8451,7 @@ impl HttpServer {
                 Some(blob)
             }
             Ok(false) => {
-                warn!(
+                info!(
                     phase = "local_blob",
                     outcome = "absent",
                     elapsed_ms = blob_started.elapsed().as_millis(),
@@ -8521,7 +8521,8 @@ impl HttpServer {
                                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                             let span = tracing::info_span!(
                                 "candidate_head_http",
-                                candidate_head_request_id = request_id
+                                candidate_head_request_id = request_id,
+                                content_id = %content_id
                             );
                             let (candidate, candidate_blob, candidate_state) = self
                                 .resolve_staging_candidate(content_id, &view.head_action_hash)

@@ -43,6 +43,8 @@ fn is_correlated_head_record_call(zome_name: &str, fn_name: &str) -> bool {
             (fn_name, metadata.name()),
             ("get_record_for_action", "head_record_http")
                 | ("resolve_canonical_election", "candidate_head_http")
+                | ("get_record_for_action", "candidate_head_http")
+                | ("validate_carried_head_record", "candidate_head_http")
         )
     })
 }
@@ -1256,10 +1258,19 @@ mod head_record_trace_scope_tests {
                     "content_store",
                     "resolve_canonical_election"
                 ));
-                assert!(!is_correlated_head_record_call(
+                // The two later conductor calls on the same candidate-head path —
+                // fetching the elected action's record, then verifying it — are
+                // part of the same phase-correlated request and must be included.
+                assert!(is_correlated_head_record_call(
                     "content_store",
                     "get_record_for_action"
                 ));
+                assert!(is_correlated_head_record_call(
+                    "content_store",
+                    "validate_carried_head_record"
+                ));
+                // The batch/background variant stays OUT of scope: it is not part
+                // of the single-content candidate-head HTTP read.
                 assert!(!is_correlated_head_record_call(
                     "content_store",
                     "resolve_canonical_elections"
