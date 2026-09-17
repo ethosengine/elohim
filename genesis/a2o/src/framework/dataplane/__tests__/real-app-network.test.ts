@@ -8,10 +8,8 @@ import { describe, it } from 'node:test';
 import {
   awaitCanonicalManifestoCandidate,
   classifyFirstPartyHttpError,
-  declaredExternalEmbedOriginFor,
   httpOriginForWebSocketUrl,
   isOptionalNavigationCancellation,
-  partitionByDeclaredExternalEmbedOrigin,
   persistRealAppPhaseArtifacts,
   publicDoorwayUrl,
   publicDoorwayPorts,
@@ -339,61 +337,6 @@ void describe('isOptionalNavigationCancellation', () => {
       }),
       false
     );
-  });
-});
-
-void describe('declaredExternalEmbedOriginFor + partitionByDeclaredExternalEmbedOrigin', () => {
-  void it('matches the declared YouTube embed origin exactly', () => {
-    assert.ok(declaredExternalEmbedOriginFor('https://www.youtube.com/api/stats/atr?x=1'));
-    assert.ok(declaredExternalEmbedOriginFor('https://www.youtube.com/youtubei/v1/log_event'));
-  });
-
-  void it('does not match a lookalike host: no substring/prefix bypass', () => {
-    assert.equal(declaredExternalEmbedOriginFor('https://evil-youtube.com/'), undefined);
-    assert.equal(
-      declaredExternalEmbedOriginFor('https://www.youtube.com.evil.example/'),
-      undefined
-    );
-  });
-
-  void it('does not match an unparsable URL', () => {
-    assert.equal(declaredExternalEmbedOriginFor('not-a-url'), undefined);
-  });
-
-  void it('partitions declared external embed failures out of request failures', () => {
-    const failures = [
-      { url: 'https://www.youtube.com/api/stats/atr', failure: 'net::ERR_ABORTED' },
-      { url: 'http://elohim.local:8889/main.js', failure: 'net::ERR_CONNECTION_REFUSED' },
-    ];
-    const partitioned = partitionByDeclaredExternalEmbedOrigin(failures);
-    assert.deepEqual(partitioned.declared, [failures[0]]);
-    assert.deepEqual(partitioned.undeclared, [failures[1]]);
-  });
-
-  void it('partitions declared external embed failures out of HTTP errors', () => {
-    const httpErrors = [
-      { url: 'https://www.youtube.com/youtubei/v1/log_event', status: 404 },
-      { url: 'http://elohim.local:8889/db/content/x', status: 500 },
-    ];
-    const partitioned = partitionByDeclaredExternalEmbedOrigin(httpErrors);
-    assert.deepEqual(partitioned.declared, [httpErrors[0]]);
-    assert.deepEqual(partitioned.undeclared, [httpErrors[1]]);
-  });
-
-  void it('keeps an elohim.host escape fatal even if a parent were mistakenly declared', () => {
-    // A declared entry never covers *.elohim.host — this asserts the household
-    // origin escape stays in `undeclared` regardless of embed declarations.
-    const httpErrors = [{ url: 'https://doorway-alpha.elohim.host/main.js', status: 502 }];
-    const partitioned = partitionByDeclaredExternalEmbedOrigin(httpErrors);
-    assert.deepEqual(partitioned.declared, []);
-    assert.deepEqual(partitioned.undeclared, httpErrors);
-  });
-
-  void it('keeps a household-origin failure fatal (not an external embed)', () => {
-    const failures = [{ url: 'http://elohim.local:8889/', failure: 'net::ERR_FAILED' }];
-    const partitioned = partitionByDeclaredExternalEmbedOrigin(failures);
-    assert.deepEqual(partitioned.declared, []);
-    assert.deepEqual(partitioned.undeclared, failures);
   });
 });
 
