@@ -38,6 +38,17 @@ margin is thin, and the ladder being *needed at all* is the evidence that DHT wa
 content sync by ~45–60s. That measurement is the case for the carried-record slice below, not a
 sign the ladder is sufficient on its own.
 
+## The scenario that pins the destination (measured 2026-09-18, final binaries)
+
+`doorway-apex-transition.feature` "A current governed version crosses withdrawal and recovery",
+step `doorway "elohim.host" serves authority B's exact head…` (`apex-transition.steps.ts:1252`)
+reads the surviving doorway's head **once**, immediately after the canonical author publishes
+authority B — no polling, by design (`assertExactPublishedAuthority`). On a healthy fresh household
+the adoption trigger adopts on attempt 1 in ~1.0–1.1 s; the single read lands inside that second
+and sees authority A (`governed action diverged`, runs 20260918T230005Z and 20260918T231158Z). The
+ladder cannot close a zero-lag oracle; only a head that arrives WITH the content can. This step is
+the acceptance check for item (1) below.
+
 ## Open items
 
 1. **Carried-record adoption** — the successor of the ladder: sync delivers `{content, signed
