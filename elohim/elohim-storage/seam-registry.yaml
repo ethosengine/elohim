@@ -4516,7 +4516,7 @@ decisionPoints:
       a reconcile reads the links.
 
   - name: resolve_staging_candidate
-    kind: resolver
+    kind: boundary-answer-type
     sourceLocation:
       file: src/http.rs
       modulePath: http::HttpServer::resolve_staging_candidate

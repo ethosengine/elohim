@@ -2,7 +2,7 @@
  "n_concerns": 16,
  "n_seams": 16,
  "n_cells": 256,
- "n_points_routed": 156,
+ "n_points_routed": 229,
  "plane_groups": [
   {
    "id": "control-truth",
@@ -163,7 +163,7 @@
    "name": "Peer-hoster dataplane (Tracks 2 + 3)",
    "plane": "data",
    "plane_note": "Durable availability of records across disconnect. The head-election/notary side of the same record family is T1 (see t1_routing) \u2014 one column, two tracks, which is exactly why track is a cell ATTRIBUTE and not an axis.\n",
-   "t1_routing": "The content_store zome (select_canonical_winner, declare_canonical_head_inner) is the T1-notary/control side of this seam's record family and routes here, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent applied to content heads.\n",
+   "t1_routing": "The content_store zome (select_canonical_winner, declare_canonical_head_inner) is the T1-notary/control side of this seam's record family and routes here, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent applied to content heads. The imagodei zome (agent/peer bindings, hosted-agent binding round-trips) routes here on the same precedent: its T1 records are the identity side of the record family this dataplane projects (peer_identity_bindings). shefa-types routes here as the shared commitment-terms predicates (same_commitment_metadata, validate_project_epr_current_terms) that the content_store coordinator and the native storage projection must agree on \u2014 one decision read from both sides of this seam.\n",
    "tracks": [
     "T1",
     "T2",
@@ -172,7 +172,9 @@
    "reach_tier": "familiar",
    "registry_crates": [
     "elohim-storage",
-    "content_store"
+    "content_store",
+    "imagodei",
+    "shefa-types"
    ],
    "habits": [
     "dataplane-convergence",
@@ -227,7 +229,10 @@
     "T4"
    ],
    "reach_tier": "community",
-   "registry_crates": [],
+   "registry_crates": [
+    "mishpat",
+    "rakia-executor"
+   ],
    "habits": [
     "doorway-failover",
     "operator-runtime-surface"
@@ -417,9 +422,9 @@
   }
  },
  "counts": {
-  "unexamined": 170,
-  "variant": 59,
-  "conformant": 24,
+  "unexamined": 158,
+  "variant": 78,
+  "conformant": 17,
   "n-a": 3
  },
  "cells": [
@@ -546,8 +551,8 @@
    "concern": "C0",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "15 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "answered but NO verified contract test: compute_local_admission, compute_task",
    "tracks": [
     "T1",
     "T2",
@@ -557,10 +562,52 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "select_path",
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -666,6 +713,118 @@
      "status": "answered",
      "verified": true,
      "file": "src/app_deliverability.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compute_local_admission",
+     "status": "answered",
+     "verified": false,
+     "file": "src/api/compute_tasks.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "compute_task",
+     "status": "answered",
+     "verified": false,
+     "file": "src/compute_task.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "self_revocation_reason_accepted",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -687,8 +846,37 @@
    "concern": "C0",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 18.0
+   "state": "variant",
+   "reason": "answered but NO verified contract test: Task::validate",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "Task::validate",
+     "status": "answered",
+     "verified": false,
+     "file": "src/contract.rs"
+    }
+   ]
   },
   {
    "concern": "C0",
@@ -702,7 +890,7 @@
    "seam": "S3.9",
    "plane": "projection",
    "state": "conformant",
-   "reason": "10 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "13 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T4"
    ],
@@ -777,6 +965,27 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ServeEligibility",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -826,8 +1035,8 @@
    "concern": "C0",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "conformant",
-   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -872,6 +1081,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/stocks.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -1029,10 +1273,52 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "ghost_decay_authorizes_author",
      "status": "answered",
      "verified": true,
      "file": "src/services/head_adoption.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -1217,6 +1503,83 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "FeedbackActRef",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/feedback_signal.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AcceptanceVerdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "select_canonical_winner",
      "status": "answered",
@@ -1243,6 +1606,27 @@
      "status": "answered",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -1264,8 +1648,30 @@
    "concern": "C1",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 24.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C1",
@@ -1279,7 +1685,7 @@
    "seam": "S3.9",
    "plane": "projection",
    "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T4"
    ],
@@ -1333,6 +1739,20 @@
      "status": "answered",
      "verified": true,
      "file": "src/auth/http_permission.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -1414,6 +1834,41 @@
      "status": "n-a",
      "verified": true,
      "file": "src/flow/stocks.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -1541,7 +1996,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "answered but NO verified contract test: verify_carried_election",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: verify_carried_election",
    "tracks": [
     "T1",
     "T2",
@@ -1549,6 +2004,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "decide_head_action",
@@ -1725,6 +2222,90 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "RevokeVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_cid",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "select_canonical_winner",
      "status": "answered",
@@ -1737,6 +2318,34 @@
      "status": "answered",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "self_revocation_reason_accepted",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -1758,8 +2367,30 @@
    "concern": "C2",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 30.0
+   "state": "n-a",
+   "reason": "2 point(s) declare n-a with justification",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C2",
@@ -1773,7 +2404,7 @@
    "seam": "S3.9",
    "plane": "projection",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "7 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T4"
    ],
@@ -1848,6 +2479,41 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "close_account_row_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "closed_identifier_tombstone",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "account_stamp",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -1898,7 +2564,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "11 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -1943,6 +2609,48 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "placement::budget_state",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/placement.rs"
     }
    ]
   },
@@ -2087,6 +2795,41 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "ghost_decay_authorizes_author",
      "status": "answered",
      "verified": true,
@@ -2098,6 +2841,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -2254,11 +3004,95 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "classify_chain_gate",
      "status": "partial",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -2280,8 +3114,30 @@
    "concern": "C3",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 15.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C3",
@@ -2342,6 +3198,27 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "MembershipReadFailure",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -2391,8 +3268,8 @@
    "concern": "C3",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -2409,6 +3286,34 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/claim.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
     }
    ]
   },
@@ -2573,6 +3478,41 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "ghost_decay_authorizes_author",
      "status": "answered",
      "verified": true,
@@ -2584,6 +3524,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -2796,6 +3743,104 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "FeedbackActRef",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/feedback_signal.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AcceptanceVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "RevokeVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_cid",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "resolve_canonical_election",
      "status": "answered",
@@ -2822,6 +3867,34 @@
      "status": "answered",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "self_revocation_reason_accepted",
+     "status": "answered",
+     "verified": true,
+     "file": "src/lib.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -2844,7 +3917,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "conformant",
-   "reason": "1 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [
     "T2",
     "T3",
@@ -2852,6 +3925,20 @@
    ],
    "reach_tier": "community",
    "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
     {
      "crate": "elohim-node",
      "point": "AdmissionDecision",
@@ -3039,6 +4126,181 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "judge_coherence",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/warm_shell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "BehindReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/coherence.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "HeadMove",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/bundle_heads.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "should_provision",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "synthetic_identity_fallback_allowed",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "should_subscribe_to_signals",
+     "status": "answered",
+     "verified": true,
+     "file": "src/main.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "CloseVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "closed_identifier_tombstone",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "account_stamp",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "pool_compute_config",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "live_hosted_cell_filter",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "humans_served",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "household_steward_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "household_display_name",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provider_named_by_peer",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "count_distinct_agents_by_conductor",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "build_receipt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_receipt.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "Receipt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_receipt.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ChallengeOutcome",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_receipt.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "due_from_responsive_reach",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/owed_response.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "owed_from_contract",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/owed_response.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ServeEligibility",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "MembershipReadFailure",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -3260,6 +4522,69 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "gaps::decompose",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/gaps.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "project::derive_doc_stations / project::derive_gap_items",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "placement::budget_state",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/placement.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "scope::scope_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/scope.rs"
     }
    ]
   },
@@ -3387,7 +4712,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial; answered but NO verified contract test: verify_carried_election",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: compute_local_admission, verify_carried_election",
    "tracks": [
     "T1",
     "T2",
@@ -3395,6 +4720,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -3536,6 +4903,83 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compute_local_admission",
+     "status": "answered",
+     "verified": false,
+     "file": "src/api/compute_tasks.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "declare_canonical_head_inner",
      "status": "answered",
@@ -3569,6 +5013,27 @@
      "status": "answered",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -3590,8 +5055,30 @@
    "concern": "C5",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 24.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C5",
@@ -3659,6 +5146,48 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "CoherenceVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/coherence.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "live_hosted_cell_filter",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "household_steward_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "provider_named_by_peer",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -3775,6 +5304,62 @@
      "status": "answered",
      "verified": true,
      "file": "src/govern.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "gaps::decompose",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/gaps.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "project::derive_doc_stations / project::derive_gap_items",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "placement::budget_state",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/placement.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "scope::scope_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/scope.rs"
     }
    ]
   },
@@ -3926,6 +5511,41 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "ghost_decay_authorizes_author",
      "status": "answered",
      "verified": true,
@@ -3937,6 +5557,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -4142,6 +5769,83 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_cid",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "resolve_canonical_election",
      "status": "answered",
@@ -4168,6 +5872,34 @@
      "status": "answered",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "compute_task",
+     "status": "partial",
+     "verified": false,
+     "file": "src/compute_task.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -4190,7 +5922,7 @@
    "seam": "S3.15",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: Retention::expired",
    "tracks": [
     "T2",
     "T3",
@@ -4198,6 +5930,34 @@
    ],
    "reach_tier": "community",
    "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "Task::validate",
+     "status": "partial",
+     "verified": false,
+     "file": "src/contract.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "Retention::expired",
+     "status": "answered",
+     "verified": false,
+     "file": "src/contract.rs"
+    },
     {
      "crate": "elohim-node",
      "point": "DeferReason",
@@ -4287,6 +6047,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "judge_coherence",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/warm_shell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "HeadMove",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/bundle_heads.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hosted_cell_grant_body",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -4368,6 +6163,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/scope.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -4503,6 +6333,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -4672,11 +6544,137 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "FeedbackActRef",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/feedback_signal.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AcceptanceVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "commit_group",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "RevokeVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "classify_chain_gate",
      "status": "partial",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "compute_task",
+     "status": "partial",
+     "verified": false,
+     "file": "src/compute_task.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -4698,8 +6696,37 @@
    "concern": "C6b",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 12.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "run",
+     "status": "partial",
+     "verified": false,
+     "file": "src/runtime.rs"
+    }
+   ]
   },
   {
    "concern": "C6b",
@@ -4712,8 +6739,8 @@
    "concern": "C6b",
    "seam": "S3.9",
    "plane": "projection",
-   "state": "conformant",
-   "reason": "4 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T4"
    ],
@@ -4753,6 +6780,83 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "HeadMove",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/bundle_heads.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "close_account_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "close_account_row_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "closed_identifier_tombstone",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "revoke_hosted_cell_grant",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "normalize_agent_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/agent_key.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "count_distinct_agents_by_conductor",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ChallengeOutcome",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/serve_receipt.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "due_from_responsive_reach",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/owed_response.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -4803,7 +6907,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "5 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "12 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -4838,6 +6942,55 @@
     {
      "crate": "elohim-epr-cli",
      "point": "project::event_key (the act-identity dedupe guard)",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "gaps::decompose",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/gaps.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "project::derive_doc_stations / project::derive_gap_items",
      "status": "answered",
      "verified": true,
      "file": "src/flow/project.rs"
@@ -4978,10 +7131,52 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "select_path",
      "status": "partial",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -5094,6 +7289,90 @@
      "status": "answered",
      "verified": true,
      "file": "src/app_deliverability.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -5115,8 +7394,37 @@
    "concern": "C7",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 18.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "Retention::expired",
+     "status": "partial",
+     "verified": false,
+     "file": "src/contract.rs"
+    }
+   ]
   },
   {
    "concern": "C7",
@@ -5233,6 +7541,55 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "normalize_agent_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/agent_key.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "count_distinct_agents_by_conductor",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/registry.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "build_receipt",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_receipt.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "owed_from_contract",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/owed_response.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ServeEligibility",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -5321,6 +7678,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/stocks.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -5455,7 +7847,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T1",
     "T2",
@@ -5463,6 +7855,41 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "partial",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "ghost_decay_authorizes_author",
@@ -5476,6 +7903,13 @@
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -5681,11 +8115,95 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_failure_disposition",
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -5707,8 +8225,8 @@
    "concern": "C8",
    "seam": "S3.15",
    "plane": "data",
-   "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
    "tracks": [
     "T2",
     "T3",
@@ -5716,6 +8234,20 @@
    ],
    "reach_tier": "community",
    "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
     {
      "crate": "elohim-node",
      "point": "AdmissionController::evaluate",
@@ -5847,6 +8379,48 @@
      "status": "partial",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "judge_coherence",
+     "status": "partial",
+     "verified": true,
+     "file": "src/render/warm_shell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "BehindReason",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/coherence.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "HeadMove",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/bundle_heads.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "MembershipReadFailure",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -5942,6 +8516,55 @@
      "status": "answered",
      "verified": true,
      "file": "src/govern.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "gaps::decompose",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/gaps.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "placement::budget_state",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/placement.rs"
     }
    ]
   },
@@ -6062,7 +8685,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: compute_task",
    "tracks": [
     "T1",
     "T2",
@@ -6070,6 +8693,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -6188,6 +8853,104 @@
      "status": "n-a",
      "verified": true,
      "file": "src/app_deliverability.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "commit_group",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "compute_task",
+     "status": "answered",
+     "verified": false,
+     "file": "src/compute_task.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -6209,8 +8972,30 @@
    "concern": "C9",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 12.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C9",
@@ -6223,8 +9008,8 @@
    "concern": "C9",
    "seam": "S3.9",
    "plane": "projection",
-   "state": "n-a",
-   "reason": "4 point(s) declare n-a with justification",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T4"
    ],
@@ -6257,6 +9042,34 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "close_account_row_update",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "normalize_agent_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/agent_key.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -6352,6 +9165,41 @@
      "status": "partial",
      "verified": true,
      "file": "src/actor.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -6471,8 +9319,8 @@
    "concern": "C10",
    "seam": "S3.10",
    "plane": "data",
-   "state": "conformant",
-   "reason": "16 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T1",
     "T2",
@@ -6480,6 +9328,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -6600,11 +9490,102 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "FeedbackActRef",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/feedback_signal.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "answered",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_deadline_admission",
      "status": "n-a",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "answered",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -6626,8 +9607,37 @@
    "concern": "C10",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 12.0
+   "state": "variant",
+   "reason": "documented waiver: status partial; answered but NO verified contract test: Task::validate",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "Task::validate",
+     "status": "answered",
+     "verified": false,
+     "file": "src/contract.rs"
+    }
+   ]
   },
   {
    "concern": "C10",
@@ -6681,6 +9691,41 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hosted_cell_grant_body",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "normalize_agent_key",
+     "status": "answered",
+     "verified": true,
+     "file": "src/conductor/agent_key.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "MembershipReadFailure",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -6731,7 +9776,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "13 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -6776,6 +9821,55 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/project.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "gaps::decompose",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/gaps.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "scope::scope_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/scope.rs"
     }
    ]
   },
@@ -6913,10 +10007,52 @@
    "points": [
     {
      "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
      "point": "select_path",
      "status": "answered",
      "verified": true,
      "file": "src/p2p/transport_paths.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
     },
     {
      "crate": "elohim-storage",
@@ -7045,6 +10181,76 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "classify_cid",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_failure_disposition",
      "status": "partial",
@@ -7057,6 +10263,27 @@
      "status": "partial",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -7078,8 +10305,8 @@
    "concern": "C11",
    "seam": "S3.15",
    "plane": "data",
-   "state": "conformant",
-   "reason": "3 point(s) answered with a cited contract test that exists and contains the named fn",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [
     "T2",
     "T3",
@@ -7087,6 +10314,20 @@
    ],
    "reach_tier": "community",
    "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
     {
      "crate": "elohim-node",
      "point": "AdmissionController::evaluate",
@@ -7190,6 +10431,20 @@
      "status": "n-a",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -7257,6 +10512,41 @@
      "status": "partial",
      "verified": true,
      "file": "src/store.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "scope::scope_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/scope.rs"
     }
    ]
   },
@@ -7384,7 +10674,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial/unbound; answered but NO verified contract test: compute_local_admission",
    "tracks": [
     "T1",
     "T2",
@@ -7392,6 +10682,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "answered",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -7554,11 +10886,130 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compute_local_admission",
+     "status": "answered",
+     "verified": false,
+     "file": "src/api/compute_tasks.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "commit_group",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "RevokeVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "verify_carried_election",
      "status": "partial",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "compute_task",
+     "status": "partial",
+     "verified": false,
+     "file": "src/compute_task.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -7580,8 +11031,37 @@
    "concern": "C12",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 12.0
+   "state": "variant",
+   "reason": "documented waiver: status partial/unbound",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "run",
+     "status": "partial",
+     "verified": false,
+     "file": "src/runtime.rs"
+    }
+   ]
   },
   {
    "concern": "C12",
@@ -7684,6 +11164,48 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/auth_discovery.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "close_account_verdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "active_user_filter",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "pool_compute_config",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ServeEligibility",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -7754,8 +11276,8 @@
    "concern": "C12",
    "seam": "SGOV",
    "plane": "governing-meta",
-   "state": "n-a",
-   "reason": "1 point(s) declare n-a with justification",
+   "state": "variant",
+   "reason": "documented waiver: status partial",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -7765,6 +11287,48 @@
      "status": "n-a",
      "verified": true,
      "file": "src/freshness.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "scope::scope_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/scope.rs"
     }
    ]
   },
@@ -7892,7 +11456,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status unbound",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T1",
     "T2",
@@ -7900,6 +11464,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -8027,11 +11633,95 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "authorize_canonical_head_declarer",
      "status": "unbound",
      "verified": false,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -8053,8 +11743,37 @@
    "concern": "C13",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 18.0
+   "state": "variant",
+   "reason": "documented waiver: status partial",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "rakia-executor",
+     "point": "run",
+     "status": "partial",
+     "verified": false,
+     "file": "src/runtime.rs"
+    }
+   ]
   },
   {
    "concern": "C13",
@@ -8122,6 +11841,27 @@
      "status": "answered",
      "verified": true,
      "file": "src/auth/http_permission.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "closed_identifier_tombstone",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "n-a",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -8172,7 +11912,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "variant",
-   "reason": "documented waiver: status unbound",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -8196,6 +11936,41 @@
      "status": "unbound",
      "verified": true,
      "file": "src/flow/stocks.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "memory::execute",
+     "status": "partial",
+     "verified": true,
+     "file": "src/flow/memory/mod.rs"
     }
    ]
   },
@@ -8323,7 +12098,7 @@
    "seam": "S3.10",
    "plane": "data",
    "state": "variant",
-   "reason": "documented waiver: status partial",
+   "reason": "documented waiver: status partial/unbound",
    "tracks": [
     "T1",
     "T2",
@@ -8331,6 +12106,48 @@
    ],
    "reach_tier": "familiar",
    "points": [
+    {
+     "crate": "elohim-storage",
+     "point": "authenticated_ordered_head_projection",
+     "status": "answered",
+     "verified": true,
+     "file": "src/rea_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "project_epr_current_terms_update",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/rea_commitment_service.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "recover_before_mint",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/binding_recovery.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "refresh_by_id",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/rea_commitment_projection.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "take_replication_dispatches",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/mod.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "serialize_bounded_messagepack",
+     "status": "partial",
+     "verified": true,
+     "file": "src/p2p/shard_protocol.rs"
+    },
     {
      "crate": "elohim-storage",
      "point": "AcquisitionReconcileOutcome",
@@ -8451,11 +12268,109 @@
      "file": "src/app_deliverability.rs"
     },
     {
+     "crate": "elohim-storage",
+     "point": "verify_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "AuthenticatedCommitmentRecord",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/services/commitment_record.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "compute_local_admission",
+     "status": "partial",
+     "verified": false,
+     "file": "src/api/compute_tasks.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "feedback_generation_rebuild",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/feedback_projector/rebuild.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "grant_scope",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "withdrawn_by_provider",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "revoke_verdict",
+     "status": "partial",
+     "verified": true,
+     "file": "src/api/compute_grants.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "read_notarized_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/commitment_read_fallback.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "resolve_staging_candidate",
+     "status": "partial",
+     "verified": true,
+     "file": "src/http.rs"
+    },
+    {
+     "crate": "elohim-storage",
+     "point": "count_household_peers",
+     "status": "partial",
+     "verified": true,
+     "file": "src/services/household_resilience.rs"
+    },
+    {
+     "crate": "content_store",
+     "point": "observe_with",
+     "status": "partial",
+     "verified": true,
+     "file": "src/commitment_observation.rs"
+    },
+    {
      "crate": "content_store",
      "point": "batch_failure_disposition",
      "status": "answered",
      "verified": true,
      "file": "src/lib.rs"
+    },
+    {
+     "crate": "imagodei",
+     "point": "recoverable_own_bindings",
+     "status": "partial",
+     "verified": true,
+     "file": "src/agent_peer_binding.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "same_commitment_metadata",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
+    },
+    {
+     "crate": "shefa-types",
+     "point": "validate_project_epr_current_terms",
+     "status": "answered",
+     "verified": true,
+     "file": "src/commitment_terms.rs"
     }
    ]
   },
@@ -8477,8 +12392,30 @@
    "concern": "C14",
    "seam": "S3.15",
    "plane": "data",
-   "state": "unexamined",
-   "score": 12.0
+   "state": "variant",
+   "reason": "documented waiver: status unbound",
+   "tracks": [
+    "T2",
+    "T3",
+    "T4"
+   ],
+   "reach_tier": "community",
+   "points": [
+    {
+     "crate": "mishpat",
+     "point": "get_commitment_record",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    },
+    {
+     "crate": "mishpat",
+     "point": "is_commitment_create",
+     "status": "unbound",
+     "verified": true,
+     "file": "src/commitment_record.rs"
+    }
+   ]
   },
   {
    "concern": "C14",
@@ -8525,6 +12462,62 @@
      "status": "answered",
      "verified": true,
      "file": "src/routes/storage_proxy.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "CoherenceVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/render/coherence.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "CloseVerdict",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "account_stamp",
+     "status": "partial",
+     "verified": true,
+     "file": "src/routes/auth_routes.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "revoke_hosted_cell_grant",
+     "status": "answered",
+     "verified": true,
+     "file": "src/routes/hosted_cell.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "ServeEligibility",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "MembershipReadFailure",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/serve_eligibility.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "hostname_namespace_holders",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
+    },
+    {
+     "crate": "doorway",
+     "point": "relay_named_absence_is_authoritative",
+     "status": "answered",
+     "verified": true,
+     "file": "src/services/name_routing.rs"
     }
    ]
   },
@@ -8575,7 +12568,7 @@
    "seam": "SGOV",
    "plane": "governing-meta",
    "state": "conformant",
-   "reason": "2 point(s) answered with a cited contract test that exists and contains the named fn",
+   "reason": "6 point(s) answered with a cited contract test that exists and contains the named fn",
    "tracks": [],
    "reach_tier": "community",
    "points": [
@@ -8599,6 +12592,34 @@
      "status": "answered",
      "verified": true,
      "file": "src/flow/stocks.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "acceptance::validate_record",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/acceptance.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "reconciliation::reconcile",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/reconciliation.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "concerns::concerns",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/concerns.rs"
+    },
+    {
+     "crate": "elohim-epr-cli",
+     "point": "context_sections::project_section",
+     "status": "answered",
+     "verified": true,
+     "file": "src/flow/context_sections.rs"
     }
    ]
   }
@@ -8617,30 +12638,6 @@
    }
   },
   {
-   "concern": "C2",
-   "seam": "S3.15",
-   "score": 30.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
-   "concern": "C1",
-   "seam": "S3.15",
-   "score": 24.0,
-   "score_parts": {
-    "recurrence": 4,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C5",
    "seam": "S3.12",
    "score": 24.0,
@@ -8650,18 +12647,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
-   }
-  },
-  {
-   "concern": "C5",
-   "seam": "S3.15",
-   "score": 24.0,
-   "score_parts": {
-    "recurrence": 4,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -8689,18 +12674,6 @@
    }
   },
   {
-   "concern": "C0",
-   "seam": "S3.15",
-   "score": 18.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C13",
    "seam": "S3.12",
    "score": 18.0,
@@ -8710,18 +12683,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
-   }
-  },
-  {
-   "concern": "C13",
-   "seam": "S3.15",
-   "score": 18.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -8737,18 +12698,6 @@
    }
   },
   {
-   "concern": "C7",
-   "seam": "S3.15",
-   "score": 18.0,
-   "score_parts": {
-    "recurrence": 3,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C3",
    "seam": "S3.12",
    "score": 15.0,
@@ -8758,18 +12707,6 @@
     "severity_class": "loud-fail",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
-   }
-  },
-  {
-   "concern": "C3",
-   "seam": "S3.15",
-   "score": 15.0,
-   "score_parts": {
-    "recurrence": 5,
-    "severity": 1.0,
-    "severity_class": "loud-fail",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -8785,18 +12722,6 @@
    }
   },
   {
-   "concern": "C10",
-   "seam": "S3.15",
-   "score": 12.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C12",
    "seam": "S3.12",
    "score": 12.0,
@@ -8809,18 +12734,6 @@
    }
   },
   {
-   "concern": "C12",
-   "seam": "S3.15",
-   "score": 12.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C14",
    "seam": "S3.12",
    "score": 12.0,
@@ -8830,18 +12743,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
-   }
-  },
-  {
-   "concern": "C14",
-   "seam": "S3.15",
-   "score": 12.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -8869,18 +12770,6 @@
    }
   },
   {
-   "concern": "C6b",
-   "seam": "S3.15",
-   "score": 12.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
-   }
-  },
-  {
    "concern": "C9",
    "seam": "S3.12",
    "score": 12.0,
@@ -8890,18 +12779,6 @@
     "severity_class": "silent-corruption",
     "rung_proximity": 3.0,
     "rung_reason": "identity-cross-signed red"
-   }
-  },
-  {
-   "concern": "C9",
-   "seam": "S3.15",
-   "score": 12.0,
-   "score_parts": {
-    "recurrence": 2,
-    "severity": 2.0,
-    "severity_class": "silent-corruption",
-    "rung_proximity": 3.0,
-    "rung_reason": "doorway-failover red"
    }
   },
   {
@@ -9083,6 +12960,150 @@
     "rung_proximity": 1.0,
     "rung_reason": "operator-runtime-surface green"
    }
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.11",
+   "score": 6.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 1.0,
+    "rung_reason": "notary-authority green"
+   }
+  },
+  {
+   "concern": "C7",
+   "seam": "S3.4",
+   "score": 6.0,
+   "score_parts": {
+    "recurrence": 3,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 1.0,
+    "rung_reason": "operator-runtime-surface green"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.1",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.13",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.14",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.2",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.5",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.7",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C2",
+   "seam": "S3.8",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.11",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 1.0,
+    "severity_class": "loud-fail",
+    "rung_proximity": 1.0,
+    "rung_reason": "notary-authority green"
+   }
+  },
+  {
+   "concern": "C3",
+   "seam": "S3.4",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 1.0,
+    "severity_class": "loud-fail",
+    "rung_proximity": 1.0,
+    "rung_reason": "operator-runtime-surface green"
+   }
+  },
+  {
+   "concern": "C4",
+   "seam": "S3.1",
+   "score": 5.0,
+   "score_parts": {
+    "recurrence": 5,
+    "severity": 2.0,
+    "severity_class": "silent-corruption",
+    "rung_proximity": 0.5,
+    "rung_reason": "no linked habits article"
+   }
   }
  ],
  "errors": [],
@@ -9092,7 +13113,7 @@
    "detail": "\u00a73 has no identity/T1-notary section; T1 concerns route under the \u00a73 seam owning their artifact, per the \u00a74 \"T1 notary floor (under 3.11)\" precedent. Candidate atlas correction: either an explicit \u00a73.16 identity/notary section, or an explicit statement in \u00a73 that T1 concerns route under the artifact-owning seam.\n"
   }
  ],
- "digest": "sha256:6653f151e1556e1773068cd3c7b46500",
+ "digest": "sha256:2c4f9714fe939b11caf36b85eceaba50",
  "ranked_unexamined_note": "head only \u2014 the full ranking is `cells` filtered to state=unexamined, sorted by -score then (concern, seam)",
  "_generated": {
   "by": ".claude/scripts/_lib/seam_matrix.py",

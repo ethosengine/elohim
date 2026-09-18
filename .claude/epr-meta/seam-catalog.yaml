@@ -270,9 +270,12 @@ seams:
       floor (under 3.11)" precedent applied to content heads. The imagodei zome (agent/peer bindings,
       hosted-agent binding round-trips) routes here on the same precedent: its T1 records are the
       identity side of the record family this dataplane projects (peer_identity_bindings).
+      shefa-types routes here as the shared commitment-terms predicates (same_commitment_metadata,
+      validate_project_epr_current_terms) that the content_store coordinator and the native storage
+      projection must agree on — one decision read from both sides of this seam.
     tracks: [T1, T2, T3]
     reach_tier: familiar
-    registry_crates: [elohim-storage, content_store, imagodei]
+    registry_crates: [elohim-storage, content_store, imagodei, shefa-types]
     habits: [dataplane-convergence, blob-durability, notary-authority, sync-scale-honesty,
                   reach-enforced-everywhere]
     n_a_concerns: []
