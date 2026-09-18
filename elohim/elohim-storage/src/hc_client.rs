@@ -136,23 +136,32 @@ async fn authorize_signing_credentials_fenced(
     label: Option<&str>,
 ) -> Result<holochain_client::SigningCredentials, StorageError> {
     let label = label.unwrap_or("default");
-    match crate::closed_chain_fence::fence() {
-        Some(fence) => fence
-            .authorize(admin_ws, cell_id, label)
-            .await
-            .map_err(|e| StorageError::Connection(e.to_string())),
-        None => admin_ws
-            .authorize_signing_credentials(holochain_client::AuthorizeSigningCredentialsPayload {
-                cell_id: cell_id.clone(),
-                functions: None,
-            })
-            .await
-            .map_err(|e| {
-                StorageError::Connection(format!(
-                    "authorize_signing_credentials ({label}) failed: {e}"
-                ))
-            }),
-    }
+    // A CapGrant is a chain write on the ADMIN socket, so it takes the same
+    // per-cell lock every zome write takes — otherwise a mint during a running
+    // sweep moves the head under a gated writer, which then reports an external
+    // co-author it does not have. See `chain_write_gate::grant_capability_serialized`.
+    crate::chain_write_gate::grant_capability_serialized(cell_id, || async {
+        match crate::closed_chain_fence::fence() {
+            Some(fence) => fence
+                .authorize(admin_ws, cell_id, label)
+                .await
+                .map_err(|e| StorageError::Connection(e.to_string())),
+            None => admin_ws
+                .authorize_signing_credentials(
+                    holochain_client::AuthorizeSigningCredentialsPayload {
+                        cell_id: cell_id.clone(),
+                        functions: None,
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    StorageError::Connection(format!(
+                        "authorize_signing_credentials ({label}) failed: {e}"
+                    ))
+                }),
+        }
+    })
+    .await
 }
 
 /// Substrings that mark a zome-call failure as "the conductor does not honour
@@ -523,11 +532,9 @@ impl HcClient {
         let cell_for_heal = cell_id.clone();
         // Same gate, same pool: the imagodei cell is a different DNA but the same
         // conductor, so its calls compete for the same read permits.
-        let _permit = crate::conductor_admission::admission()
-            .acquire(AdmissionClass::Interactive, zome_name)
-            .await?;
-        // Capacity first, THEN chain exclusivity — so a writer never holds the
-        // imagodei chain's write lock while queued for an admission permit.
+        // CHAIN LOCK FIRST, capacity INSIDE it — `chain_write_gate`'s
+        // "Capacity is acquired INSIDE the lock" section has the why: a writer
+        // parked on the mutex must not be sitting on a conductor read permit.
         let chain_key = crate::chain_write_gate::chain_key_of(&cell_id);
         let (result, _rtt) =
             crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
@@ -535,6 +542,12 @@ impl HcClient {
                 let target = cell_id.clone();
                 let heal_cell = cell_for_heal.clone();
                 async move {
+                    // Same gate, same pool: a different DNA on the same
+                    // conductor competes for the same read permits. Held across
+                    // the call only, then dropped.
+                    let _permit = crate::conductor_admission::admission()
+                        .acquire(AdmissionClass::Interactive, zome_name)
+                        .await?;
                     self.app_ws
                         .call_zome(
                             ZomeCallTarget::CellId(target),
@@ -579,10 +592,9 @@ impl HcClient {
         // rejected grant can be blamed on the right cell (Task 32 fix round 1).
         let cell_for_heal = cell_id.clone();
         // Same gate, same pool — see `call_zome_imagodei`.
-        let _permit = crate::conductor_admission::admission()
-            .acquire(AdmissionClass::Interactive, zome_name)
-            .await?;
-        // Capacity first, THEN chain exclusivity — see `call_zome_imagodei`.
+        // CHAIN LOCK FIRST, capacity INSIDE it — `chain_write_gate`'s
+        // "Capacity is acquired INSIDE the lock" section has the why: a writer
+        // parked on the mutex must not be sitting on a conductor read permit.
         let chain_key = crate::chain_write_gate::chain_key_of(&cell_id);
         let (result, _rtt) =
             crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
@@ -590,6 +602,12 @@ impl HcClient {
                 let target = cell_id.clone();
                 let heal_cell = cell_for_heal.clone();
                 async move {
+                    // Same gate, same pool: a different DNA on the same
+                    // conductor competes for the same read permits. Held across
+                    // the call only, then dropped.
+                    let _permit = crate::conductor_admission::admission()
+                        .acquire(AdmissionClass::Interactive, zome_name)
+                        .await?;
                     self.app_ws
                         .call_zome(
                             ZomeCallTarget::CellId(target),
@@ -651,50 +669,55 @@ impl HcClient {
         // conductor nothing and can never reach the websocket.
         refuse_write_on_closed_chain(&self.cell_id, zome_name, fn_name)?;
 
-        // ADMISSION BEFORE DISPATCH. The bound below is on acquiring LOCAL
-        // capacity — nothing has crossed the websocket yet, so a shed costs the
-        // conductor nothing. This is deliberately NOT a timeout on the call:
-        // once admitted, the call runs unbounded on our side exactly as before,
-        // bounded on the far side by the extern's own in-wasm deadline.
+        // CHAIN LOCK BEFORE CAPACITY. The gate takes this cell's write lock (for
+        // a write; a read passes straight through), and the closure below takes
+        // the admission permit INSIDE it. That order is the whole point — see
+        // `chain_write_gate`'s "Capacity is acquired INSIDE the lock": a writer
+        // queued on the mutex must not be sitting on one of the pool's ~5
+        // permits, or eight concurrent sweep declares starve every interactive
+        // read into a 503 shed.
+        //
+        // Admission is still a bound on acquiring LOCAL capacity, never a
+        // timeout: once admitted the call runs unbounded on our side exactly as
+        // before, bounded on the far side by the extern's own in-wasm deadline.
         if is_head_record {
             info!(phase = "admission_waiting", "head-record conductor phase");
-        }
-        let permit = match crate::conductor_admission::admission()
-            .acquire(class, zome_name)
-            .await
-        {
-            Ok(permit) => permit,
-            Err(error) => {
-                if is_head_record {
-                    info!(phase = "admission_error", error = %error, "head-record conductor phase");
-                }
-                return Err(error);
-            }
-        };
-        if is_head_record {
-            info!(
-                phase = "admission_acquired",
-                admission_wait_ms = permit.wait().as_millis(),
-                "head-record conductor phase"
-            );
         }
 
         let dispatched_at = Instant::now();
         // The holochain_client handles signing automatically
         // Use ExternIO::from() for raw bytes - payload is already MessagePack encoded
         //
-        // Routed through the chain write gate: a READ passes straight through
-        // (byte-identical to the pre-gate path), a WRITE takes this cell's write
-        // lock for the duration of the call so two of our own tasks can never
-        // begin a bundle on the same head. `rtt` is the gate's per-ATTEMPT
-        // measurement, not the serialized wall-clock, so the controller signal
-        // documented above keeps meaning "what the conductor took".
+        // `rtt` is the gate's per-ATTEMPT measurement, not the serialized
+        // wall-clock, so the controller signal documented above keeps meaning
+        // "what the conductor took".
         let chain_key = crate::chain_write_gate::chain_key_of(&self.cell_id);
         let dispatched = crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
             let payload = payload.clone();
             let target = self.cell_id.clone();
             async move {
-                self.app_ws
+                let permit = match crate::conductor_admission::admission()
+                    .acquire(class, zome_name)
+                    .await
+                {
+                    Ok(permit) => permit,
+                    Err(error) => {
+                        if is_head_record {
+                            info!(phase = "admission_error", error = %error, "head-record conductor phase");
+                        }
+                        return Err(error);
+                    }
+                };
+                let admission_wait = permit.wait();
+                if is_head_record {
+                    info!(
+                        phase = "admission_acquired",
+                        admission_wait_ms = admission_wait.as_millis(),
+                        "head-record conductor phase"
+                    );
+                }
+                let result = self
+                    .app_ws
                     .call_zome(
                         ZomeCallTarget::CellId(target),
                         zome_name.into(),
@@ -702,13 +725,20 @@ impl HcClient {
                         ExternIO::from(payload),
                     )
                     .await
-                    .map_err(|e| self.zome_call_failed(e))
+                    .map_err(|e| self.zome_call_failed(e));
+                // Held across the whole call on purpose: the permit models
+                // capacity the conductor is still spending, and releasing it
+                // early would understate occupancy by exactly the interval that
+                // matters most. It is released HERE — before any backoff sleep
+                // and before this writer re-queues on the chain lock.
+                drop(permit);
+                result.map(|bytes| (bytes, admission_wait))
             }
         })
         .await;
-        let (result, rtt) = match dispatched {
-            Ok((result, rtt)) => (Ok(result), rtt),
-            Err(error) => (Err(error), dispatched_at.elapsed()),
+        let (result, rtt, admission_wait) = match dispatched {
+            Ok(((result, admission_wait), rtt)) => (Ok(result), rtt, admission_wait),
+            Err(error) => (Err(error), dispatched_at.elapsed(), Duration::ZERO),
         };
         let result = match result {
             Ok(result) => {
@@ -739,13 +769,9 @@ impl HcClient {
         record_role_success(self.role_key());
 
         let timing = ZomeCallTiming {
-            admission_wait: permit.wait(),
+            admission_wait,
             rtt,
         };
-        // Held across the whole call on purpose: the permit models capacity the
-        // conductor is still spending, and releasing it early would understate
-        // occupancy by exactly the interval that matters most.
-        drop(permit);
 
         // Return raw bytes - caller will deserialize as needed
         Ok((result.into_vec(), timing))

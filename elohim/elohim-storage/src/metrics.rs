@@ -2236,11 +2236,16 @@ lazy_static! {
     )
     .unwrap();
 
-    /// Source-chain head races ABSORBED by a retry — a race against a writer
-    /// outside this process (a fixture, the steward's app). In-process races are
-    /// prevented by the lock and never reach this counter, so a non-zero value
-    /// here is evidence of a genuine external co-author, not of our own tasks
-    /// colliding.
+    /// Source-chain head races ABSORBED by a retry.
+    ///
+    /// Read it as "a head moved under a gated writer", NOT as proof of an
+    /// external co-author. The per-cell lock removes zome-call contention
+    /// between our own tasks, but three in-process sources remain and land here
+    /// too: a cross-DNA bridge call committing on another cell's chain, the
+    /// conductor's own `post_commit`/publish work, and (until the gate learns a
+    /// bridge's target) anything `chain_write_gate`'s "What this does NOT close"
+    /// names. A genuine external writer — a fixture, the steward's app — is one
+    /// cause among those, not the only one.
     pub static ref CHAIN_WRITE_HEAD_MOVED_RETRIED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_chain_write_head_moved_retried_total",

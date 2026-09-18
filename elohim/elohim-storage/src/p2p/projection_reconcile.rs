@@ -1372,8 +1372,33 @@ where
     let mut retried = false;
     let mut attempt: u32 = 0;
     loop {
-        let outcome = match tokio::time::timeout(pacing.attempt_timeout, op()).await {
+        // WITNESS THE DISPATCH. A timeout means two different things and the
+        // ledger records them differently. If the call reached the conductor, it
+        // is uncancellable and MAY STILL COMMIT — that is what
+        // `HEAL_SYNTHETIC_TIMEOUT_MARKER` asserts downstream. If it timed out
+        // while still PARKED on the chain write gate's per-cell lock, nothing was
+        // ever offered and nothing can have committed — a shed shape, not a
+        // maybe-committed one. Reporting the second as the first writes a phantom
+        // write into the heal ledger.
+        //
+        // `parked_without_dispatch`, not `!dispatched`: an `op` that never
+        // reaches the gate at all (a non-zome operation, a test fake) keeps the
+        // conservative maybe-committed reading, because nothing observed it.
+        let witness = crate::chain_write_gate::DispatchWitness::new();
+        let outcome = match tokio::time::timeout(
+            pacing.attempt_timeout,
+            crate::chain_write_gate::witnessed(&witness, op()),
+        )
+        .await
+        {
             Ok(r) => r,
+            Err(_elapsed) if witness.parked_without_dispatch() => {
+                Err(crate::error::StorageError::Timeout(format!(
+                    "{}: chain write still queued after {:?} — never dispatched",
+                    crate::conductor_admission::ADMISSION_SHED_MARKER,
+                    pacing.attempt_timeout
+                )))
+            }
             Err(_elapsed) => Err(crate::error::StorageError::Timeout(format!(
                 "{HEAL_SYNTHETIC_TIMEOUT_MARKER} {:?}",
                 pacing.attempt_timeout
