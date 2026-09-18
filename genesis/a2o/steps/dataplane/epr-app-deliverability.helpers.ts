@@ -424,6 +424,24 @@ export async function withStorageRetryBudget<T>(
 }
 
 /**
+ * The blob hash a `PUT /blob/` reply names, normalized to `sha256-<hex>`.
+ *
+ * The storage wire is camelCase (`blobHash`); the SDK's hand-written `BlobManifest` still types it
+ * `blob_hash`, so read the wire first. A reply naming neither is a shape defect, not a shed — it
+ * is refused at once rather than retried for the whole ladder budget.
+ */
+export function uploadedBlobHash(reply: unknown): string {
+  const manifest = (reply ?? {}) as { blobHash?: unknown; blob_hash?: unknown };
+  const wireHash = manifest.blobHash ?? manifest.blob_hash;
+  if (typeof wireHash !== 'string' || wireHash.length === 0) {
+    throw new NonRetryableStageError(
+      `source storage answered the blob upload without a blob hash: ${JSON.stringify(reply).slice(0, 200)}`
+    );
+  }
+  return wireHash.startsWith('sha256-') ? wireHash : `sha256-${wireHash}`;
+}
+
+/**
  * Upload and author through one storage peer, without touching a survivor
  * doorway — the intent b344f533a fixed (elohim/dev, publish authority
  * through source storage: the PATCH must reach the AUTHOR/source storage
@@ -469,10 +487,9 @@ export async function stageBundleThroughStorage(opts: {
       async () => {
         let uploadedHash: string;
         try {
-          const manifest = await client.putBlob(new Uint8Array(bytes), 'application/zip');
-          uploadedHash = manifest.blob_hash.startsWith('sha256-')
-            ? manifest.blob_hash
-            : `sha256-${manifest.blob_hash}`;
+          uploadedHash = uploadedBlobHash(
+            await client.putBlob(new Uint8Array(bytes), 'application/zip')
+          );
         } catch (error) {
           if (error instanceof NonRetryableStageError || error instanceof RetryableStageShed)
             throw error;

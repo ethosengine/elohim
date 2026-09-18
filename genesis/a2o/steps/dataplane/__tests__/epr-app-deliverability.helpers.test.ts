@@ -47,7 +47,12 @@ class MockResponse {
  * response queue, GET (the seatbelt) answers with the last uploaded hash
  * unless `seatbeltHash` overrides it (to simulate drift). No `async`: every
  * branch resolves synchronously, so the function itself never awaits. */
-function makeFetchMock(opts: { patchResponses: MockResponse[]; seatbeltHash?: string }): {
+function makeFetchMock(opts: {
+  patchResponses: MockResponse[];
+  seatbeltHash?: string;
+  /** Overrides the upload reply body (to simulate a wire-shape mismatch). */
+  uploadBody?: string;
+}): {
   fetchFn: typeof fetch;
   patchCallCount: () => number;
 } {
@@ -61,8 +66,11 @@ function makeFetchMock(opts: { patchResponses: MockResponse[]; seatbeltHash?: st
       uploadedHash = `sha256-${createHash('sha256').update(Buffer.from(bytes)).digest('hex')}`;
       return Promise.resolve(
         new MockResponse({
-          status: 200,
-          body: JSON.stringify({ blob_hash: uploadedHash, cid: 'cid-fixture' }),
+          // Shape captured from a live household `PUT /blob/` (201, camelCase wire).
+          status: 201,
+          body:
+            opts.uploadBody ??
+            JSON.stringify({ blobHash: uploadedHash, totalSize: bytes.byteLength }),
         }) as unknown as Response
       );
     }
@@ -361,5 +369,36 @@ void describe('stageBundleThroughStorage', () => {
       ),
       /blobHash drift after PATCH/
     );
+  });
+
+  void it('refuses an upload reply that names no blob hash, on the first attempt', async () => {
+    // The defect this pins: a reply shaped unlike the wire used to surface as a TypeError that the
+    // ladder retried as a shed for its whole budget (11 attempts / 275 s on the household).
+    const { fetchFn, patchCallCount } = makeFetchMock({
+      patchResponses: [],
+      uploadBody: JSON.stringify({ cid: 'cid-fixture' }),
+    });
+    const sleepCalls: number[] = [];
+
+    await assert.rejects(
+      withGlobalFetchMock(fetchFn, async () =>
+        withFixtureBundle(async bundle =>
+          stageBundleThroughStorage({
+            bundle,
+            slug: SLUG,
+            storageUrl: STORAGE_URL,
+            fetchFn,
+            sleep: async seconds => {
+              sleepCalls.push(seconds);
+              return Promise.resolve();
+            },
+            budget: { budgetSecs: 30, attempts: 5, maxWaitSecs: 5 },
+          })
+        )
+      ),
+      /answered the blob upload without a blob hash/
+    );
+    assert.equal(sleepCalls.length, 0, 'a shape defect must not be retried');
+    assert.equal(patchCallCount(), 0);
   });
 });
