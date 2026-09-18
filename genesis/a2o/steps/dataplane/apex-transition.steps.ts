@@ -1139,9 +1139,10 @@ Then(
     const state = getState(this);
     const browser = await visitInBrowser(`${state.siblingOrigin}/`);
     assert.deepEqual(browser.pageErrors, [], 'sibling browser page errors');
-    // TODO(legacy-web-projection): this capture has no notion of a declared external origin, so the
-    // landing hero's live YouTube embed fails this step whenever its telemetry aborts. Do not
-    // allowlist it here — the declaration belongs to the view and the protocol, not the harness.
+    // Open design (legacy-web-projection): this capture has no notion of a declared external
+    // origin, so any outside content a page loads on its own fails this step when that origin's
+    // telemetry aborts. Do not allowlist it here — the declaration belongs to the view and the
+    // protocol, not the harness. The landing hero answers it for now with a click-to-load facade.
     // genesis/data/timeline/backlog/legacy-web-content-projected-inward.md
     assert.deepEqual(browser.failedRequests, [], 'sibling browser request failures');
     assert.deepEqual(browser.httpErrors, [], 'sibling browser HTTP errors');
