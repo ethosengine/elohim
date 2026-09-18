@@ -33,6 +33,7 @@
  */
 
 import type { AppClient, CellId } from '@holochain/client';
+import { retryOnSourceChainHeadMoved } from './retry-source-chain-head-moved.js';
 
 // =============================================================================
 // Types
@@ -340,27 +341,38 @@ export class SeedingVerification {
     try {
       // Try to create a test content entry
       // Use 'concept' as content_type since it's a valid type that the zome accepts
-      await this.appWs.callZome({
-        cell_id: this.cellId,
-        zome_name: this.zomeName,
-        fn_name: 'create_content',
-        payload: {
-          id: testId,
-          content_type: 'concept',  // Must be a valid content type
-          title: 'Preflight Test Entry',
-          description: 'This entry tests write capability. Safe to delete.',
-          summary: '',
-          content: '{}',
-          content_format: 'json',
-          tags: ['__preflight', '__test'],  // Tag for easy identification/cleanup
-          source_path: '',
-          related_node_ids: [],
-          reach: 'private',
-          estimated_minutes: 0,
-          thumbnail_url: null,
-          metadata_json: '{}',
-        },
-      });
+      //
+      // This is a direct-conductor write racing this same peer's storage
+      // process for the source chain head, so it can lose that race with
+      // Holochain's exact HeadMoved conflict — retry only that error (see
+      // retry-source-chain-head-moved.ts). `testId` is computed once above
+      // (not per attempt), so every retry re-issues the SAME create_content
+      // call: a HeadMoved failure writes nothing to the chain, so retrying
+      // cannot leave a duplicate probe entry — at most one `testId` row ever
+      // exists, and it is a throwaway `__preflight`-tagged entry either way.
+      await retryOnSourceChainHeadMoved('write_capability preflight', () =>
+        this.appWs.callZome({
+          cell_id: this.cellId,
+          zome_name: this.zomeName,
+          fn_name: 'create_content',
+          payload: {
+            id: testId,
+            content_type: 'concept',  // Must be a valid content type
+            title: 'Preflight Test Entry',
+            description: 'This entry tests write capability. Safe to delete.',
+            summary: '',
+            content: '{}',
+            content_format: 'json',
+            tags: ['__preflight', '__test'],  // Tag for easy identification/cleanup
+            source_path: '',
+            related_node_ids: [],
+            reach: 'private',
+            estimated_minutes: 0,
+            thumbnail_url: null,
+            metadata_json: '{}',
+          },
+        }),
+      );
 
       // Verify we can read it back
       const readBack = await this.appWs.callZome({

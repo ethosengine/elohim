@@ -57,6 +57,7 @@ import {
 } from './peer-id.js';
 import type { CustodyPeerIds } from './seed-commitments.js';
 import { parseConductorUrls, selectStewardApp } from './seed-conductor-identities.js';
+import { retryOnSourceChainHeadMoved } from './retry-source-chain-head-moved.js';
 
 // =============================================================================
 // Canonical household triad
@@ -1192,12 +1193,19 @@ async function main(): Promise<void> {
           collectiveCid,
         }, peerIds);
         try {
-          await providerSession.session.appWs.callZome({
-            cell_id: lamadCell,
-            zome_name: 'content_store',
-            fn_name: 'create_rea_commitment',
-            payload: input,
-          });
+          // Direct-conductor write racing the provider's own storage peer
+          // for the same source chain head — retry ONLY the exact HeadMoved
+          // conflict (see retry-source-chain-head-moved.ts).
+          await retryOnSourceChainHeadMoved(
+            `custody ${provider.humanId} -> ${receiver.humanId}`,
+            () =>
+              providerSession.session.appWs.callZome({
+                cell_id: lamadCell,
+                zome_name: 'content_store',
+                fn_name: 'create_rea_commitment',
+                payload: input,
+              }),
+          );
           custodyOk += 1;
           console.log(`  [+] custody ${provider.humanId} -> ${receiver.humanId}`);
         } catch (err) {

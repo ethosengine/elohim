@@ -34,6 +34,7 @@ import {
   resolveExistingCollectiveCid,
   type HouseholdMember,
 } from './seed-household-formation.js';
+import { retryOnSourceChainHeadMoved } from './retry-source-chain-head-moved.js';
 
 type CellId = [Uint8Array, Uint8Array];
 
@@ -338,12 +339,19 @@ async function main(): Promise<void> {
             continue;
           }
 
-          await provider.appWs.callZome({
-            cell_id: provider.lamadCell,
-            zome_name: 'content_store',
-            fn_name: 'create_rea_commitment',
-            payload: input,
-          });
+          // This is a direct-conductor write racing the provider's own
+          // storage peer for the same source chain head — retry ONLY the
+          // exact HeadMoved conflict (see retry-source-chain-head-moved.ts).
+          await retryOnSourceChainHeadMoved(
+            `custody-spool ${provider.member.humanId} -> ${receiver.member.humanId}`,
+            () =>
+              provider.appWs.callZome({
+                cell_id: provider.lamadCell,
+                zome_name: 'content_store',
+                fn_name: 'create_rea_commitment',
+                payload: input,
+              }),
+          );
           authored += 1;
           console.log(
             `  [+] ${provider.member.humanId} -> ${receiver.member.humanId} (${input.id})`,
