@@ -37,6 +37,24 @@ describe('HeroComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('outside video', () => {
+    it('renders both videos as facades and no iframe on load', () => {
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      expect(root.querySelectorAll('app-external-embed').length).toBe(2);
+      expect(root.querySelectorAll('iframe').length).toBe(0);
+    });
+
+    it('makes no request to an outside host on load', () => {
+      fixture.detectChanges();
+      const root = fixture.nativeElement as HTMLElement;
+      const outside = Array.from(root.querySelectorAll<HTMLElement>('*')).filter(el =>
+        ['src', 'href', 'srcset'].some(attr => /^(https?:)?\/\//i.test(el.getAttribute(attr) ?? ''))
+      );
+      expect(outside).toEqual([]);
+    });
+  });
+
   describe('Property Initialization', () => {
     it('should initialize isVideoVisible to false', () => {
       expect(component.isVideoVisible).toBe(false);

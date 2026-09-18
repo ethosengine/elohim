@@ -30,25 +30,13 @@
 
       <div class="video-section intro-video" [class.visible]="isVideoVisible">
         <div class="hero-video">
-          <!-- TODO(legacy-web-projection): a live third-party embed inside the notarized landing node loads
-               and phones out undeclared. How legacy web content is projected into a governed view is an open
-               design: genesis/data/timeline/backlog/legacy-web-content-projected-inward.md -->
-          <iframe
-            width="560"
-            height="315"
-            src="https://www.youtube.com/embed/6g6v7ZMEAxk"
-            title="The Elohim Protocol: Reimagining Digital Infrastructure for Human Flourishing & the Care Economy"
-            allow="
-              accelerometer;
-              autoplay;
-              clipboard-write;
-              encrypted-media;
-              gyroscope;
-              picture-in-picture;
-              web-share;
-            "
-            allowfullscreen
-          ></iframe>
+          <!-- legacy-web-projection: design home for how outside web content lives inside a governed place — genesis/data/timeline/backlog/legacy-web-content-projected-inward.md -->
+          <app-external-embed
+            class="hero-video__embed"
+            url="https://www.youtube.com/embed/6g6v7ZMEAxk"
+            embedTitle="The Elohim Protocol: Reimagining Digital Infrastructure for Human Flourishing &amp; the Care Economy"
+            providerName="YouTube"
+          />
         </div>
         <p class="video-subtitle">Summary (~7min)</p>
         <div class="video-buttons">
@@ -73,22 +61,12 @@
 
       <div class="video-section deep-dive-video" [class.visible]="isDeepDiveVisible">
         <div class="hero-video">
-          <iframe
-            width="560"
-            height="315"
-            src="https://www.youtube.com/embed/sVXwZ087ffA"
-            title="Elohim Protocol Deep Dive - Technical Overview"
-            allow="
-              accelerometer;
-              autoplay;
-              clipboard-write;
-              encrypted-media;
-              gyroscope;
-              picture-in-picture;
-              web-share;
-            "
-            allowfullscreen
-          ></iframe>
+          <app-external-embed
+            class="hero-video__embed"
+            url="https://www.youtube.com/embed/sVXwZ087ffA"
+            embedTitle="Elohim Protocol Deep Dive - Technical Overview"
+            providerName="YouTube"
+          />
         </div>
         <p class="video-subtitle">Deep Dive Podcast (~51min)</p>
         <div class="video-buttons">

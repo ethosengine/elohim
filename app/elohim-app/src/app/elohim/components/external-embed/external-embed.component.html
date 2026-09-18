@@ -1,0 +1,89 @@
+<div class="external-embed" data-testid="external-embed">
+  @if (activated()) {
+    <div class="external-embed__player">
+      <iframe
+        #playerFrame
+        class="external-embed__frame"
+        data-testid="external-embed-frame"
+        [src]="playerSrc()"
+        [title]="embedTitle()"
+        allow="
+          accelerometer;
+          autoplay;
+          clipboard-write;
+          encrypted-media;
+          gyroscope;
+          picture-in-picture;
+          web-share;
+        "
+        sandbox="allow-scripts allow-same-origin allow-presentation allow-popups"
+        referrerpolicy="strict-origin-when-cross-origin"
+        loading="lazy"
+        allowfullscreen
+      ></iframe>
+    </div>
+    <p class="external-embed__caption" data-testid="external-embed-caption">
+      Playing from {{ playingHost() }} — outside content
+    </p>
+  } @else {
+    <div class="external-embed__facade">
+      @if (localPoster(); as posterPath) {
+        <img class="external-embed__poster" [src]="posterPath" alt="" aria-hidden="true" />
+      } @else {
+        <div class="external-embed__placeholder" aria-hidden="true"></div>
+      }
+
+      <div class="external-embed__panel">
+        <svg class="external-embed__glyph" viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        <p class="external-embed__flag">Outside content</p>
+        <h3 class="external-embed__title">{{ embedTitle() }}</h3>
+
+        @if (recognised()) {
+          <p
+            class="external-embed__note"
+            [id]="disclosureId"
+            data-testid="external-embed-disclosure"
+          >
+            This video is kept by
+            <span class="external-embed__host">{{ sourceHost() }}</span>
+            — it isn't part of this place, and nobody here vouches for it. Playing it lets
+            {{ providerName() }} see that you watched.
+          </p>
+          <button
+            type="button"
+            class="external-embed__action"
+            [attr.aria-describedby]="disclosureId"
+            (click)="load()"
+            data-testid="external-embed-load"
+          >
+            Play from {{ providerName() }}
+          </button>
+        } @else {
+          <p
+            class="external-embed__note"
+            [id]="disclosureId"
+            data-testid="external-embed-disclosure"
+          >
+            This points at
+            <span class="external-embed__host">
+              {{ sourceHost() || 'an address we could not read' }}
+            </span>
+            , which isn't one of the few outside hosts this place will open. Nothing is loaded from
+            it here.
+          </p>
+          <button
+            type="button"
+            class="external-embed__action"
+            disabled
+            [attr.aria-describedby]="disclosureId"
+            data-testid="external-embed-load"
+          >
+            Can't play this here
+          </button>
+        }
+      </div>
+    </div>
+  }
+</div>

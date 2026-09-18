@@ -1,0 +1,191 @@
+/* The boundary, made visible.
+   Tokens are the shell's --el-* brand set (src/styles/brand.css), which flips with
+   :root[data-theme] AND the device preference — so this surface is at home on the
+   landing page in constellation dark and in linen light without a second rule set. */
+
+:host {
+  display: block;
+}
+
+.external-embed {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* ---- Before the person asks: the facade ---------------------------------- */
+
+.external-embed__facade {
+  position: relative;
+  flex: 1 1 auto;
+  display: grid;
+  place-items: center;
+  padding: clamp(0.75rem, 4%, 1.75rem);
+  overflow: hidden;
+  border: 1px dashed var(--el-warm);
+  border-radius: 12px;
+  background: var(--el-surface);
+}
+
+.external-embed__poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 30%;
+}
+
+.external-embed__placeholder {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, var(--el-surface-2), transparent 68%);
+}
+
+/* A small mark that says "video" without pretending to be a player. */
+.external-embed__glyph {
+  width: 26px;
+  height: 26px;
+  fill: var(--el-warm);
+  opacity: 70%;
+}
+
+.external-embed__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  max-width: 48ch;
+  text-align: center;
+}
+
+.external-embed__flag {
+  margin: 0;
+  font-family: var(--el-font-ui);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--el-warm);
+}
+
+.external-embed__title {
+  margin: 0;
+  font-family: var(--el-font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--el-text-strong);
+}
+
+.external-embed__note {
+  margin: 0;
+  font-family: var(--el-font-ui);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--el-text);
+}
+
+.external-embed__host {
+  font-family: var(--el-font-mono);
+  font-size: 0.86em;
+  color: var(--el-text-strong);
+  white-space: nowrap;
+}
+
+.external-embed__action {
+  margin-top: 0.3rem;
+  padding: 0.7rem 1.5rem;
+  font-family: var(--el-font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--el-on-action);
+  background: var(--el-action);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.external-embed__action:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+}
+
+.external-embed__action:focus-visible {
+  outline: 3px solid var(--el-warm);
+  outline-offset: 3px;
+}
+
+.external-embed__action:disabled {
+  color: var(--el-text-muted);
+  background: transparent;
+  border-color: var(--el-border);
+  cursor: not-allowed;
+}
+
+/* ---- After the person asks: their player, our caption -------------------- */
+
+.external-embed__player {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px dashed var(--el-warm);
+  border-radius: 12px;
+  background: #000;
+}
+
+.external-embed__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.external-embed__frame:focus-visible {
+  outline: 3px solid var(--el-warm);
+  outline-offset: -3px;
+}
+
+.external-embed__caption {
+  flex: 0 0 auto;
+  margin: 0.4rem 0 0;
+  font-family: var(--el-font-ui);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-align: center;
+  color: var(--el-warm);
+}
+
+@media (width <= 768px) {
+  .external-embed__glyph {
+    width: 64px;
+    height: 64px;
+  }
+
+  .external-embed__title {
+    font-size: 1rem;
+  }
+
+  .external-embed__note {
+    font-size: 0.82rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .external-embed__action {
+    transition: none;
+  }
+
+  .external-embed__action:hover:not(:disabled) {
+    transform: none;
+  }
+}

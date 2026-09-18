@@ -2,13 +2,15 @@ import { Component, OnInit, ElementRef, ViewEncapsulation } from '@angular/core'
 
 // @coverage: 100.0% (2026-02-24)
 
+import { ExternalEmbedComponent } from '@app/elohim/components/external-embed/external-embed.component';
+
 import { eprToUniversalHref } from '@elohim/service';
 
 import { DomInteractionService } from '../../services/dom-interaction.service';
 
 @Component({
   selector: 'app-hero',
-  imports: [],
+  imports: [ExternalEmbedComponent],
   templateUrl: './hero.component.html',
   styleUrl: './hero.component.css',
   encapsulation: ViewEncapsulation.None,

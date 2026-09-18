@@ -88,15 +88,47 @@ that the seam stays visible — this part is governed, that part is theirs, here
 
 | Site | Why it belongs here |
 |---|---|
-| `app/elohim-app/src/app/components/hero/hero.component.html` | The live YouTube embed inside the notarized landing node |
+| `app/elohim-app/src/app/components/hero/hero.component.html` | FACADE as of slice 1 (below) — was the live YouTube embed inside the notarized landing node |
 | `genesis/a2o/steps/dataplane/apex-transition.steps.ts` (~1135-1143) | Raw request-failure capture with no notion of a declared external origin |
 | `genesis/a2o/src/framework/dataplane/real-app-network.ts` (`EXPECTED_NEGATIVE_HTTP`, origin-escape guard) | The harness's hand-kept list standing in for a protocol-level declaration |
 | `bridges/` | Home for a web bridge if direction 2 holds |
 | `doorway/doorway-service` web2 bridge consumption | Where an inward projection would be served and cached |
 
+## Slice 1 (landed 2026-09-18, `feat(app): load outside video only when the person asks for it`)
+
+Direction 4 only — **the boundary as a protection surface**, at the one site that was actively
+phoning out. `ExternalEmbedComponent`
+(`app/elohim-app/src/app/elohim/components/external-embed/`) replaces both hero iframes with a
+click-to-load facade. Before the person asks: no iframe, no remote thumbnail, no preconnect —
+nothing third-party is fetched. The facade names the host (derived from `new URL(...).hostname`,
+so the label cannot lie), says the content isn't part of this place and that playing it lets the
+provider see they watched, and offers one button. On activation it embeds the privacy-enhanced
+host (`www.youtube-nocookie.com`) under a restrictive `sandbox`, moves focus into the player, and
+keeps a persistent caption so the seam stays visible after load. An unrecognised host is never
+embedded — the facade says so honestly instead.
+
+**What slice 1 deliberately does NOT decide** — these stay open above, and the component holds no
+opinion on them:
+
+- **Where consent is recorded.** Consent is per-embed and per-page-view; nothing is persisted (no
+  localStorage, no cookie). The open question is which layer owns a durable consent and at what
+  reach a live outside load is refused.
+- **The typed external reference** (direction 1). The embed URL is still authored as markup in a
+  template. Nothing here mints an EPR for the outside resource, and the provider allow-list is a
+  hardcoded TS table, not a notarized declaration.
+- **Witnessing** (direction 5). No observation of what the URL resolved to is recorded or shared.
+- **The bridge seam** (direction 2). No crate, no projection policy, no snapshot; the online case
+  only, and only for video.
+- **The test-oracle category** (direction 6). The harness still has no notion of a *declared*
+  external origin — slice 1 merely removes the undeclared requests from this page's load.
+
+Evidence: `app/elohim-app` vitest (32 tests across the component + hero), `ng build --configuration
+development` (AOT + strict templates), and a `pnpm look` render of the built bundle in both schemes
+showing zero requests to any youtube/ytimg/google host on load.
+
 ## Current decision
 
-Captured, not started. No owner; blocks nothing. The narrow harness question (whether the
-sibling-browser capture at `apex-transition.steps.ts:1135` may be scoped to household origins) is
-the operator's call and is tracked in the shift journal, not here — settle it without foreclosing
-direction 6.
+Captured, direction 4 partially landed (slice 1 above). No owner for the remaining directions;
+blocks nothing. The narrow harness question (whether the sibling-browser capture at
+`apex-transition.steps.ts:1135` may be scoped to household origins) is the operator's call and is
+tracked in the shift journal, not here — settle it without foreclosing direction 6.

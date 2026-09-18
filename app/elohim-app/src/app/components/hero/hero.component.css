@@ -302,6 +302,12 @@
   border: none;
 }
 
+/* The outside-content facade fills the 16:9 well; the component owns its own frame. */
+.hero-video .hero-video__embed {
+  position: absolute;
+  inset: 0;
+}
+
 /* Responsive adjustments */
 @media (width <= 768px) {
   .hero-logo {
