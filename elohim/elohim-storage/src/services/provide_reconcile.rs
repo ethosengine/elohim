@@ -355,7 +355,12 @@ impl ProvideReconciler {
                 head_ref: d.head_ref.clone(),
                 reach: d.reach.clone(),
             };
-            match author.author_commons(&req).await {
+            match crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::Provide,
+                author.author_commons(&req),
+            )
+            .await
+            {
                 Ok(cid) => {
                     authored += 1;
                     // Back-fill the pin's commitment_cid back-reference. The T10

@@ -198,9 +198,12 @@ pub async fn emit<F: CommitmentFetcher, R: RateHistory>(
 
     // Step 3 — validation passed; build the conductor input and emit.
     let conductor_input = build_event_input(input);
-    conductor_writes::call_create_rea_economic_event(hc, &conductor_input)
-        .await
-        .map_err(EmitError::Conductor)
+    crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::ReaSignal,
+        conductor_writes::call_create_rea_economic_event(hc, &conductor_input),
+    )
+    .await
+    .map_err(EmitError::Conductor)
 }
 
 // ---------------------------------------------------------------------------

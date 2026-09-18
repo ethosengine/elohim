@@ -577,7 +577,11 @@ impl ReaCommitmentService {
         //    emits ProjectionSignal::ReaCommitmentCommitted, which the
         //    in-process signal subscriber routes to
         //    rea_projection::project_signal — upsert with dht_anchor_hash.
-        let output_bytes = conductor_writes::call_create_rea_commitment(hc, &shefa_input).await?;
+        let output_bytes = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::ReaSignal,
+            conductor_writes::call_create_rea_commitment(hc, &shefa_input),
+        )
+        .await?;
 
         // The acknowledged action is a hint for the same authenticated
         // prepare/CAS path used by signals and reconciliation.
@@ -831,8 +835,11 @@ impl ReaCommitmentService {
                 .flatten(),
         };
 
-        let output_bytes =
-            conductor_writes::call_update_rea_commitment_state(hc, &zome_input).await?;
+        let output_bytes = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::ReaSignal,
+            conductor_writes::call_update_rea_commitment_state(hc, &zome_input),
+        )
+        .await?;
 
         // Never split lifecycle and anchor writes: a delayed HTTP response
         // must not overwrite a newer signal/reconciliation observation.

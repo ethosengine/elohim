@@ -2765,21 +2765,24 @@ async fn witness_ghost_anchors(
             // Q11 atomic timing budget: the whole per-candidate adopt/declare
             // decision — this is where the chain-head collision cost shows.
             let adopt_declare_started = std::time::Instant::now();
-            let preflight = crate::services::head_adoption::try_adopt_canonical_head(
-                hc,
-                pool,
-                &ghost_ctx,
-                id,
-                crate::services::head_adoption::LocalResolve::observed(None),
-                election_resolve,
-                adopt,
-                // UNPRICED (Q7). The ghost sweep's whole population is rows the
-                // own conductor answered EMPTY for; its convergence depends on
-                // the very election probe and evidence fetch that
-                // `AcceptWithProvenance` skips, so pricing it cheap would be
-                // removing the arm's only evidence. Deliberately full chain at
-                // every stage.
-                crate::trust::PricedVerification::inert(),
+            let preflight = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::SweepAdopt,
+                crate::services::head_adoption::try_adopt_canonical_head(
+                    hc,
+                    pool,
+                    &ghost_ctx,
+                    id,
+                    crate::services::head_adoption::LocalResolve::observed(None),
+                    election_resolve,
+                    adopt,
+                    // UNPRICED (Q7). The ghost sweep's whole population is rows the
+                    // own conductor answered EMPTY for; its convergence depends on
+                    // the very election probe and evidence fetch that
+                    // `AcceptWithProvenance` skips, so pricing it cheap would be
+                    // removing the arm's only evidence. Deliberately full chain at
+                    // every stage.
+                    crate::trust::PricedVerification::inert(),
+                ),
             )
             .await;
             crate::metrics::observe_atom_duration(
@@ -5590,19 +5593,22 @@ async fn adopt_deferred_heads(
             // Q11 atomic timing budget: the whole per-candidate adopt/declare
             // decision — this is where the chain-head collision cost shows.
             let adopt_declare_started = std::time::Instant::now();
-            let adopt_outcome = crate::services::head_adoption::try_adopt_canonical_head(
-                hc,
-                pool,
-                app_ctx_ref,
-                id,
-                local_resolve,
-                election_resolve,
-                adopt,
-                // SKIP-POINT 2 (Q7) rides in here: an `AcceptWithProvenance`
-                // verdict tells the `AdoptPeer` arm to declare the advertised
-                // head without the per-id `ContentHeadRecord` verify RPC. The
-                // write path is unchanged either way.
-                pricing_ref.for_id(id),
+            let adopt_outcome = crate::chain_write_gate::as_writer(
+                crate::chain_write_gate::WriterKind::SweepAdopt,
+                crate::services::head_adoption::try_adopt_canonical_head(
+                    hc,
+                    pool,
+                    app_ctx_ref,
+                    id,
+                    local_resolve,
+                    election_resolve,
+                    adopt,
+                    // SKIP-POINT 2 (Q7) rides in here: an `AcceptWithProvenance`
+                    // verdict tells the `AdoptPeer` arm to declare the advertised
+                    // head without the per-id `ContentHeadRecord` verify RPC. The
+                    // write path is unchanged either way.
+                    pricing_ref.for_id(id),
+                ),
             )
             .await;
             crate::metrics::observe_atom_duration(

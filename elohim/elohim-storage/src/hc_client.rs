@@ -526,16 +526,27 @@ impl HcClient {
         let _permit = crate::conductor_admission::admission()
             .acquire(AdmissionClass::Interactive, zome_name)
             .await?;
-        let result = self
-            .app_ws
-            .call_zome(
-                ZomeCallTarget::CellId(cell_id),
-                zome_name.into(),
-                fn_name.into(),
-                ExternIO::from(payload),
-            )
-            .await
-            .map_err(|e| self.zome_call_failed_on(&cell_for_heal, e))?;
+        // Capacity first, THEN chain exclusivity — so a writer never holds the
+        // imagodei chain's write lock while queued for an admission permit.
+        let chain_key = crate::chain_write_gate::chain_key_of(&cell_id);
+        let (result, _rtt) =
+            crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
+                let payload = payload.clone();
+                let target = cell_id.clone();
+                let heal_cell = cell_for_heal.clone();
+                async move {
+                    self.app_ws
+                        .call_zome(
+                            ZomeCallTarget::CellId(target),
+                            zome_name.into(),
+                            fn_name.into(),
+                            ExternIO::from(payload),
+                        )
+                        .await
+                        .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                }
+            })
+            .await?;
         record_role_success(self.role_key());
         Ok(result.into_vec())
     }
@@ -571,16 +582,26 @@ impl HcClient {
         let _permit = crate::conductor_admission::admission()
             .acquire(AdmissionClass::Interactive, zome_name)
             .await?;
-        let result = self
-            .app_ws
-            .call_zome(
-                ZomeCallTarget::CellId(cell_id),
-                zome_name.into(),
-                fn_name.into(),
-                ExternIO::from(payload),
-            )
-            .await
-            .map_err(|e| self.zome_call_failed_on(&cell_for_heal, e))?;
+        // Capacity first, THEN chain exclusivity — see `call_zome_imagodei`.
+        let chain_key = crate::chain_write_gate::chain_key_of(&cell_id);
+        let (result, _rtt) =
+            crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
+                let payload = payload.clone();
+                let target = cell_id.clone();
+                let heal_cell = cell_for_heal.clone();
+                async move {
+                    self.app_ws
+                        .call_zome(
+                            ZomeCallTarget::CellId(target),
+                            zome_name.into(),
+                            fn_name.into(),
+                            ExternIO::from(payload),
+                        )
+                        .await
+                        .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                }
+            })
+            .await?;
         record_role_success(self.role_key());
         Ok(result.into_vec())
     }
@@ -661,16 +682,34 @@ impl HcClient {
         let dispatched_at = Instant::now();
         // The holochain_client handles signing automatically
         // Use ExternIO::from() for raw bytes - payload is already MessagePack encoded
-        let result = self
-            .app_ws
-            .call_zome(
-                ZomeCallTarget::CellId(self.cell_id.clone()),
-                zome_name.into(),
-                fn_name.into(),
-                ExternIO::from(payload),
-            )
-            .await;
-        let rtt = dispatched_at.elapsed();
+        //
+        // Routed through the chain write gate: a READ passes straight through
+        // (byte-identical to the pre-gate path), a WRITE takes this cell's write
+        // lock for the duration of the call so two of our own tasks can never
+        // begin a bundle on the same head. `rtt` is the gate's per-ATTEMPT
+        // measurement, not the serialized wall-clock, so the controller signal
+        // documented above keeps meaning "what the conductor took".
+        let chain_key = crate::chain_write_gate::chain_key_of(&self.cell_id);
+        let dispatched = crate::chain_write_gate::dispatch(&chain_key, zome_name, fn_name, || {
+            let payload = payload.clone();
+            let target = self.cell_id.clone();
+            async move {
+                self.app_ws
+                    .call_zome(
+                        ZomeCallTarget::CellId(target),
+                        zome_name.into(),
+                        fn_name.into(),
+                        ExternIO::from(payload),
+                    )
+                    .await
+                    .map_err(|e| self.zome_call_failed(e))
+            }
+        })
+        .await;
+        let (result, rtt) = match dispatched {
+            Ok((result, rtt)) => (Ok(result), rtt),
+            Err(error) => (Err(error), dispatched_at.elapsed()),
+        };
         let result = match result {
             Ok(result) => {
                 if is_head_record {
@@ -683,7 +722,9 @@ impl HcClient {
                 result
             }
             Err(error) => {
-                let error = self.zome_call_failed(error);
+                // Already mapped (and observed, and credential-healed) inside
+                // the gated closure — one observation per ATTEMPT, which is the
+                // honest count: each attempt really did fail at the conductor.
                 if is_head_record {
                     info!(
                         phase = "zome_call_error",

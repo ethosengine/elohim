@@ -55,6 +55,7 @@ pub mod api;
 pub mod app_deliverability; // Pure deliverability verdict over a bundle's extracted entries
 pub mod blob_reach; // Reach enforcement for the blob BYTE route (GET /blob/{hash})
 pub mod blob_store;
+pub mod chain_write_gate; // One source chain, one writer at a time (per-cell write serialization)
 pub mod closed_chain_fence; // Task 32 (Holochain Evolution Epic MVP): the post-close write fence
 pub mod compute_payload_store;
 pub mod conductor; // Conductor process manager — spawns/monitors holochain binary

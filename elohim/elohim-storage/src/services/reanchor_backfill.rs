@@ -354,20 +354,23 @@ pub async fn run_once(
         // Q11 atomic timing budget: the whole per-candidate adopt/declare
         // decision — this is where the chain-head collision cost shows.
         let adopt_declare_started = std::time::Instant::now();
-        let preflight = crate::services::head_adoption::try_adopt_canonical_head(
-            hc,
-            pool,
-            &app_ctx,
-            id,
-            crate::services::head_adoption::LocalResolve::Probe,
-            // `Probe` for the same reason: this sweep has paid for neither read.
-            crate::services::head_adoption::ElectionResolve::Probe,
-            adopt,
-            // UNPRICED (Q7). The boot re-anchor pass runs before P2P discovery,
-            // so it has no peer hints and therefore no provenance to accept —
-            // the inert verdict is not a policy choice here, it is the only
-            // honest one.
-            crate::trust::PricedVerification::inert(),
+        let preflight = crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::Reanchor,
+            crate::services::head_adoption::try_adopt_canonical_head(
+                hc,
+                pool,
+                &app_ctx,
+                id,
+                crate::services::head_adoption::LocalResolve::Probe,
+                // `Probe` for the same reason: this sweep has paid for neither read.
+                crate::services::head_adoption::ElectionResolve::Probe,
+                adopt,
+                // UNPRICED (Q7). The boot re-anchor pass runs before P2P discovery,
+                // so it has no peer hints and therefore no provenance to accept —
+                // the inert verdict is not a policy choice here, it is the only
+                // honest one.
+                crate::trust::PricedVerification::inert(),
+            ),
         )
         .await;
         crate::metrics::observe_atom_duration(

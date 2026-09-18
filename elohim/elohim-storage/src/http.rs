@@ -8785,10 +8785,13 @@ impl HttpServer {
         // re-verifies the delegation in-wasm against the chain's root author.
         let declare_result = match delegate_wire {
             None => {
-                crate::services::conductor_writes::call_declare_content_head(
-                    &hc,
-                    content_id,
-                    head_action_hash,
+                crate::chain_write_gate::as_writer(
+                    crate::chain_write_gate::WriterKind::HttpAuthor,
+                    crate::services::conductor_writes::call_declare_content_head(
+                        &hc,
+                        content_id,
+                        head_action_hash,
+                    ),
                 )
                 .await
             }
@@ -8796,11 +8799,14 @@ impl HttpServer {
                 let target = head_action_hash
                     .clone()
                     .expect("checked in (d1): delegate path requires headActionHash");
-                crate::services::conductor_writes::call_declare_earned_canonical_head(
-                    &hc,
-                    content_id,
-                    target,
-                    Some(wire),
+                crate::chain_write_gate::as_writer(
+                    crate::chain_write_gate::WriterKind::HttpAuthor,
+                    crate::services::conductor_writes::call_declare_earned_canonical_head(
+                        &hc,
+                        content_id,
+                        target,
+                        Some(wire),
+                    ),
                 )
                 .await
             }
@@ -9028,20 +9034,23 @@ impl HttpServer {
         // (c) Declare the cross-root canonical HEAD via the conductor. Errors
         // (including a fn-not-found-class error from a pre-cure coordinator —
         // the hot-swap probe signal callers key on) are surfaced verbatim.
-        let declared = match crate::services::conductor_writes::call_declare_canonical_content_head(
-            &hc,
-            content_id,
-            head_action_hash,
-            carried_record,
-            // ADOPT-BEFORE-AUTHOR is NOT offered on the HTTP declare route, and
-            // that is deliberate rather than an omission. This route is an
-            // explicit operator/deploy act naming a target; the residual the flag
-            // exists for is the AUTOMATED sweep's both-sides-missing class, where
-            // no human is choosing the target. Exposing the bypass here would let
-            // an HTTP caller declare a head for an id the node has never held —
-            // widening the seam well past the residual, with none of the sweep's
-            // own gates (backoff, candidacy ledger, declare-storm) in front of it.
-            false,
+        let declared = match crate::chain_write_gate::as_writer(
+            crate::chain_write_gate::WriterKind::HttpAuthor,
+            crate::services::conductor_writes::call_declare_canonical_content_head(
+                &hc,
+                content_id,
+                head_action_hash,
+                carried_record,
+                // ADOPT-BEFORE-AUTHOR is NOT offered on the HTTP declare route, and
+                // that is deliberate rather than an omission. This route is an
+                // explicit operator/deploy act naming a target; the residual the flag
+                // exists for is the AUTOMATED sweep's both-sides-missing class, where
+                // no human is choosing the target. Exposing the bypass here would let
+                // an HTTP caller declare a head for an id the node has never held —
+                // widening the seam well past the residual, with none of the sweep's
+                // own gates (backoff, candidacy ledger, declare-storm) in front of it.
+                false,
+            ),
         )
         .await
         {

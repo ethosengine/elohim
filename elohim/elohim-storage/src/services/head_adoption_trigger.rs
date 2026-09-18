@@ -1062,15 +1062,18 @@ async fn process_trigger(
     // `AdoptContext::none()` because no CRDT-derived hint may sit in the seat that
     // selects a head; `inert()` because with no peer hints there is no provenance
     // to price.
-    let outcome = head_adoption::try_adopt_canonical_head(
-        &hc,
-        pool,
-        ctx,
-        id,
-        LocalResolve::observed(Some(head)),
-        ElectionResolve::unresolved(),
-        &AdoptContext::none(),
-        PricedVerification::inert(),
+    let outcome = crate::chain_write_gate::as_writer(
+        crate::chain_write_gate::WriterKind::TriggerAdopt,
+        head_adoption::try_adopt_canonical_head(
+            &hc,
+            pool,
+            ctx,
+            id,
+            LocalResolve::observed(Some(head)),
+            ElectionResolve::unresolved(),
+            &AdoptContext::none(),
+            PricedVerification::inert(),
+        ),
     )
     .await;
 

@@ -2215,6 +2215,52 @@ lazy_static! {
         &["class", "zome"],
     )
     .unwrap();
+
+    /// Milliseconds a chain WRITE spent queued behind another writer on the same
+    /// source chain (`crate::chain_write_gate`).
+    ///
+    /// This is the cost of the serialization that makes a cell's writes safe, so
+    /// it is the number to watch if writers start backing up: rising here means
+    /// offered write concurrency exceeds what one source chain can absorb, which
+    /// is a pacing problem upstream — never something to fix by loosening the
+    /// gate, since the alternative is the `HeadMoved` refusals it replaced.
+    pub static ref CHAIN_WRITE_SERIALIZED_WAIT_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_chain_write_serialized_wait_ms",
+            "Milliseconds a source-chain write waited for the per-cell write lock, by writer.",
+        )
+        .buckets(vec![
+            1.0, 5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 2_000.0, 5_000.0,
+        ]),
+        &["writer"],
+    )
+    .unwrap();
+
+    /// Source-chain head races ABSORBED by a retry — a race against a writer
+    /// outside this process (a fixture, the steward's app). In-process races are
+    /// prevented by the lock and never reach this counter, so a non-zero value
+    /// here is evidence of a genuine external co-author, not of our own tasks
+    /// colliding.
+    pub static ref CHAIN_WRITE_HEAD_MOVED_RETRIED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_write_head_moved_retried_total",
+            "Source-chain head-moved refusals retried by the chain write gate, by writer.",
+        ),
+        &["writer"],
+    )
+    .unwrap();
+
+    /// Writes that ran out of attempts or budget and returned the conductor's
+    /// original refusal to their caller. Every increment here is a surfaced
+    /// error, so this is the series an alert belongs on.
+    pub static ref CHAIN_WRITE_HEAD_MOVED_EXHAUSTED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_chain_write_head_moved_exhausted_total",
+            "Chain writes that exhausted their head-moved retries, by writer.",
+        ),
+        &["writer"],
+    )
+    .unwrap();
 }
 
 // Q3/Q4 (minutes-quiesce W1.2/W1.3): blob-swarm shard-manifest propagation +
@@ -2789,6 +2835,21 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_SERIALIZED_WAIT_MS.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_RETRIED.clone()));
+        let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_EXHAUSTED.clone()));
+        // Pre-touch the whole closed writer vocabulary so a node that has never
+        // lost a head race reads as a MEASURED zero rather than an absent
+        // series — the same "measured vs never-deployed" distinction the
+        // witness-reauthor classes above are pre-touched for.
+        for writer in crate::chain_write_gate::WriterKind::ALL {
+            CHAIN_WRITE_HEAD_MOVED_RETRIED
+                .with_label_values(&[writer.label()])
+                .inc_by(0);
+            CHAIN_WRITE_HEAD_MOVED_EXHAUSTED
+                .with_label_values(&[writer.label()])
+                .inc_by(0);
+        }
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_SIZE.clone()));
         let _ = REGISTRY.register(Box::new(HEAD_BATCH_FALLBACK.clone()));
         let _ = REGISTRY.register(Box::new(BLOB_SWARM_MANIFESTS_RECEIVED.clone()));
@@ -3013,6 +3074,29 @@ pub fn observe_admission_release(zome: &str, held: std::time::Duration) {
     // Occupancy falls by exactly one; read as a delta so a release cannot race a
     // concurrent acquire's absolute `set` into a stale value.
     CONDUCTOR_ADMISSION_IN_FLIGHT.dec();
+}
+
+/// Record how long one source-chain write queued behind its cell's other
+/// writers. Observed once per write (summing every attempt's queueing), so the
+/// series counts WRITES, not lock acquisitions.
+pub fn observe_chain_write_serialized(writer: &str, waited: std::time::Duration) {
+    CHAIN_WRITE_SERIALIZED_WAIT_MS
+        .with_label_values(&[writer])
+        .observe(waited.as_secs_f64() * 1_000.0);
+}
+
+/// Count one source-chain head race absorbed by a retry.
+pub fn inc_head_moved_retried(writer: &str) {
+    CHAIN_WRITE_HEAD_MOVED_RETRIED
+        .with_label_values(&[writer])
+        .inc();
+}
+
+/// Count one write that gave up and surfaced the conductor's refusal.
+pub fn inc_head_moved_exhausted(writer: &str) {
+    CHAIN_WRITE_HEAD_MOVED_EXHAUSTED
+        .with_label_values(&[writer])
+        .inc();
 }
 
 /// Count one call shed at the gate. NOT a conductor failure — nothing was
