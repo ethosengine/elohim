@@ -3753,3 +3753,91 @@ decisionPoints:
       - path: doorway/doorway-service/src/server/http.rs
         testName: exact_advertised_holder_precedes_a_stale_local_commitment_200
         kind: integration
+
+  - name: relay_named_absence_is_authoritative
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/name_routing.rs
+      modulePath: services::name_routing::is_named_absence
+      line: 133
+    summary: >
+      One-hop relay counts a declared holder's reply as the answer only when it is authoritative.
+      Besides 2xx/3xx/403, the candidate channel alone accepts the holder's named absence — a 404
+      whose small JSON body carries the shared `no-candidate-staged` token emitted by the holder's
+      own candidate route — so a withdrawn candidate is withdrawn at every doorway instead of the
+      relaying doorway falling back to its stale local copy. Any other 404, an oversized body, or
+      the same body on the public channel is not an answer and changes nothing.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral (C): a read of one relayed reply already in memory; no entity, DHT entry, head
+          or stored row is created.
+      - id: C1
+        status: answered
+        justification: The self_doorway_id exclusion still runs before any holder can be relayed to.
+      - id: C2
+        status: answered
+        justification: >
+          The predicate can only turn a relayed candidate answer into an absence; it never widens
+          what is served and never promotes a public-channel 404.
+      - id: C3
+        status: answered
+        justification: Holder ordering and liveness are untouched; only the accepted-reply set grows by one exact shape.
+      - id: C4
+        status: answered
+        justification: >
+          Absence is honest only when the declared holder names it; an unparseable, oversized or
+          differently-worded 404 stays a failed attempt and the caller's original answer stands.
+      - id: C5
+        status: answered
+        justification: The holder remains the authority for its own candidate channel; the relay only repeats it.
+      - id: C6a
+        status: answered
+        justification: Bounded by a 256-byte body ceiling before any JSON parse; no I/O.
+      - id: C6b
+        status: n-a
+        justification: Read-only predicate; no repeatable effect.
+      - id: C7
+        status: answered
+        justification: >
+          The token is one shared constant (NO_CANDIDATE_STAGED_ERROR) used by the emitting route
+          and the predicate, pinned by the_named_absence_body_carries_its_token.
+      - id: C8
+        status: partial
+        justification: Existing relay logs carry holder, status and attempt count; no dedicated named-absence metric.
+      - id: C9
+        status: n-a
+        justification: No identity is minted or rewritten.
+      - id: C10
+        status: answered
+        justification: >
+          A holder on an older build answers a plain 404 without the token; the relay treats it as
+          before (not authoritative), so mixed-version doorways degrade to the prior behaviour.
+      - id: C11
+        status: n-a
+        justification: No queue, retry or budget is introduced.
+      - id: C12
+        status: answered
+        justification: >
+          Opens only for a name this doorway itself resolved to the candidate channel, so it never
+          discloses the existence of a channel the requester was not already answered for.
+      - id: C13
+        status: n-a
+        justification: No authority stage or graduation is introduced or changed.
+      - id: C14
+        status: answered
+        justification: The witnessed residual is the holder's own named absence, relayed verbatim in status.
+    contractTests:
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_holders_named_absence_withdraws_a_relayed_candidate
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_named_absence_on_the_public_channel_changes_nothing
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: only_the_exact_named_absence_body_is_an_answer
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: the_named_absence_body_carries_its_token
+        kind: unit
