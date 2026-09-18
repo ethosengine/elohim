@@ -40,14 +40,21 @@ Full evidence: `genesis/a2o/reports/recovery/doorway-pickup-20260917/final/house
 - No FK-787 (grepped, count 0) — this is a **distinct** defect from
   `genesis/data/timeline/backlog/conductor-publish-livelock-fk787.md`, not a recurrence of it.
 
-## 2. Cause read
+## 2. Cause read (corrected 2026-09-18, same night)
 
-Four prologue runs (plus sweeps) on one household inflated matthew's lamad source chain to
-`action_seq 26,821` and the lamad DHT to ~120k local ops. At that size, a full-arc gossip round
-cannot complete inside 60s under the observed SQL saturation, so matthew's newest ~4.5k ops
-(including the re-staged landing head) never propagate to jessica/james, and the conductor
-cascade's `get` finds no selectable peer holding the head. **Prologue is not idempotent in DHT
-cost**: each rerun re-authors the corpus rather than skipping content already anchored.
+The size came from the **full content seed**, not from prologue reruns. On 2026-09-17
+`just seed apply mesh content` put the whole genesis corpus (~4,000 nodes) on the household to give
+the landing page's ten probed slugs a head; that is what took matthew's lamad source chain to
+`action_seq 26,821` and the lamad DHT to ~115–120k ops. Measured contrast on a fresh household the
+same night: after one prologue the lamad DHT holds **~1,250 ops** (27 content rows), gossip
+completes 77–84 rounds with each peer in ~10 minutes with 0–1 timeouts, and all three storage
+peers return the landing head-record.
+
+At ~120k ops a full-arc gossip round does not complete inside 60 s under the observed SQL
+saturation, so matthew's newest ~4.5k ops (including the re-staged landing head) never propagate to
+jessica/james, and the conductor cascade's `get` finds no selectable peer holding the head. The
+household ran lanes green for some hours at that size on 2026-09-17 and wedged after the
+2026-09-18 restarts — the wall is size × restart catch-up, not size alone.
 
 ## 3. Fleet relevance — stated as unconfirmed risk
 
@@ -67,10 +74,12 @@ discriminator used above.
   retrieve the staged landing head-record": assertion — all three storage peers (not only both
   doorways' happy-path instant) return 200 on `/db/content/elohim-host-landing/head-record`;
   probe — three-peer poll, not a two-doorway spot check. State: **unmet** (jessica 404s for 75s).
-- chain / between "household resumed" → "prologue reruns" / missing node "prologue skips content
-  already anchored": assertion — a resumed household's prologue does not re-author content whose
-  head is already canonical; probe — action_seq delta across consecutive prologue runs on one
-  household. State: **not built** (four runs → 26,821 action_seq).
+- chain / between "prologue" → "apex-transition browser bootstrap" / missing node "the household
+  fixture seeds exactly the content the staged landing page references": assertion — the ten slugs
+  the landing carousel probes (`/epr-head/<slug>`) have declared heads without seeding the whole
+  corpus; probe — `/epr-head/<slug>` 200 on both doorways for each slug. State: **not built**
+  (the only available lever was the full corpus seed; `seed.ts --ids=` exists but no prologue leg
+  uses it).
 
 ## 5. Preserved state
 
