@@ -212,10 +212,63 @@ That is a design of its own, opened when this spec graduates.
 - No workspace-wide restructuring: the existing extracted crates' membership conventions are followed as found.
 - No extraction rides inside a feature story, and no feature story waits on an extraction.
 
+## 8a. Settled by the step-2 / step-3 groundwork (2026-09-19)
+
+**Q1 is answered: `epr_codec` FOLDS into `elohim-epr`, as `elohim/epr/src/head.rs`.** Folding adds zero
+dependencies — every crate `epr_codec.rs` uses is already declared by `elohim-epr` at matching versions — and
+`elohim/epr/src/cid.rs:9` already defines the identical `DAG_CBOR_CODEC = 0x71` and the same CIDv1 construction, so a
+separate crate would be a fifth EPR crate whose dependency set is a subset of an existing one's. No consumer of
+`elohim-epr` is wasm-compiled (its own `flake.nix` says "Native crate"), and it is already a path dep of storage,
+already COPY'd by the Dockerfile and already in the edge manifest's globs, so no build wiring is needed.
+**Licence — decided provisionally, 2026-09-19 (operator delegated the call "for now, we're still in
+development"; the stated ideal: encourage re-use that supports a commons while discouraging borrowers from breaking
+the base primitives).** `elohim-epr` is CAL-1.0 and `elohim-storage` is AGPL-3.0. The rule for this decomposition:
+
+- code that FOLDS into an existing crate takes that crate's licence — so the head codec becomes CAL-1.0;
+- a crate carved out as a storage INTERNAL (`elohim-error`, `elohim-settings`, `elohim-blob`, `elohim-db`) keeps
+  storage's AGPL-3.0;
+- the protocol's base primitives — what others build ON — are CAL-1.0. It is the closest existing fit to the stated
+  ideal: share-alike, so re-use stays in the commons, and its distinctive obligation is that whoever runs the
+  software for others must give those users their own data and the keys to it — "borrow this, but do not break
+  the primitive that makes it trustworthy", in licence form. OSI-approved.
+
+This creates no new situation: AGPL storage already depends on CAL `elohim-epr`. Copyleft incompatibility binds
+downstream redistributors, not the copyright holder, and all of this code has one. Who may redistribute the
+combined binary, and the 20 unlicensed crates, remain the workspace-discipline backlog's item 2 — the sweep that
+should be done with legal advice before the first outside contributor or the first published release. Not legal
+advice; an engineering default, recorded so it can be revisited rather than rediscovered. Step 2 is unblocked.
+
+**`elohim-settings` (step 3) — the cut list holds, with three additions.**
+- Exactly one outward reference, as predicted (`config.rs:432` → `ALTERNATE_ADVERTISER_CAP`); move the constant down
+  and leave an alias at `services/head_adoption.rs:335`. `config.rs:592 DEFAULT_HEAL_RESOLVE_FANOUT` is `pub(crate)`
+  and consumed from `p2p/projection_reconcile.rs:9000`, so it becomes `pub`.
+- **The file watcher stays in storage.** `runtime_config::spawn_watcher` (`:1037-1095`) is the one place the pair
+  touches tokio (`tokio::spawn` + `tokio::time::interval`); everything else — registry, parse, apply, `reload_now`,
+  `set_watched_key` — is synchronous `std`. The watcher has one call site (`main.rs:762`). It moves to a thin
+  `src/runtime_config_watch.rs`, and the settings crate's boundary test denies `tokio`.
+- Two module-scoped shims, not one glob: `src/config.rs` → `pub use elohim_settings::config::*;` and
+  `src/runtime_config.rs` → `pub use elohim_settings::runtime_config::*;` (a flattened namespace would collide
+  `Key` / `Kind` / `config_path`).
+- 31 unit tests (13 + 18) move verbatim; none reaches another storage module. No integration test targets the pair.
+
+**The spec's named risk was already live.** §4 row 3 warned that a missed `publish_boot_*` "degrades to a silent
+default". The groundwork found it had happened the same day, before any move: `set_reanchor_held_backoff_seconds` and
+`set_contest_remint_window_seconds` (serving-edge stories 1.1 / 1.2) shipped with **zero call sites** — the keys are
+registered and read live, but the operator's env var is never published. Fixed in `main.rs`, and
+`config::tests::every_boot_publisher_is_called_from_main` now fails the gate on any publisher without a call site.
+That static check is the first half of the boot assertion; the runtime half (a `published` flag per setting, asserted
+before the watcher starts at `main.rs:761`) lands in step 3, because `provenance` is seeded `BootEnv` at construction
+and cannot tell "published" from "never touched".
+
+Order for step 3, each independently landable: publishers fixed + static guard (done) → runtime boot assertion →
+invert the one cut and widen the one `pub(crate)` → split the watcher out → create the crate on the `elohim-error`
+template → two shims → build wiring → **verify at runtime**: diff `GET /admin/runtime-config` against a pre-move
+capture (9 `SPECS` + 1 `TEXT_SPECS` + 5 `BOOT_ONLY`, provenance included) — a silent default shows up there and
+nowhere else.
+
 ## 9. Open questions
 
-- **Q1** — does `epr_codec` fold into `elohim-epr` rather than becoming a crate? Decided by reading the overlap
-  before step 2; default is to fold if `elohim-epr` already owns the codec constants.
+- **Q1** — answered in §8a: fold into `elohim-epr` under CAL-1.0 (provisional licence rule recorded there).
 - **Q2** — step 0b's grouping: by directory of the code under test, or by which process globals a test touches?
   Decided by a dry run that reports which tests fail when co-located.
 - **Q3** — whether `elohim-db`'s self-instrumentation justifies `elohim-metrics-registry` — decided at step 5.

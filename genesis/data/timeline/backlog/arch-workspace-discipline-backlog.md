@@ -51,3 +51,15 @@ re-surfacing point. **Fold new workspace-discipline concerns here — do not min
 **Below the line (not backlog-ready):** docs.rs metadata + `#![warn(missing_docs)]` rollout (after #2 settles which crates are outward-facing); crates.io publication fork-in-the-road for genuinely-general crates (after #2 + #3); repointing `placement-audit.py`'s `RESEARCH` surface from the dead `genesis/docs/research` to `genesis/research` (needs a status-vocab mapping for `Capture` first, else +25 no-status debt noise).
 
 **Sequencing note:** 1, 4, 6, 7 are independent and afternoon-to-day sized. 2 gates 3's outward half. 5 is the long arc — one extraction per shift, `elohim-blob` first (zero measured coupling), transport leg only after the dataplane cluster's mod.rs decomposition chain reaches #12.
+
+## 2026-09-19 — item 2: a provisional rule, so extractions are not blocked on the sweep
+
+The storage crate decomposition (spec `storage-crate-decomposition-design` §8a) needed a licence answer to fold
+`elohim-storage/src/epr_codec.rs` (AGPL-3.0) into `elohim-epr` (CAL-1.0). The operator delegated the call for the
+development period, stating the ideal: encourage re-use that supports a commons while discouraging borrowers from
+breaking the base primitives. Rule adopted: folded code takes the destination crate's licence; a crate carved out
+as a storage internal keeps AGPL-3.0; protocol base primitives are CAL-1.0 (share-alike plus the user-data-and-keys
+obligation — the closest existing licence to the stated ideal). This does NOT close item 2: the one-decision sweep,
+the 20 unlicensed crates, the missing root LICENSE (item 9) and the redistribution question for the combined
+AGPL + CAL binary all stand, and want legal advice before the first outside contributor or published release.
+
