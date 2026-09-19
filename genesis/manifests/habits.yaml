@@ -3439,6 +3439,31 @@ habits:
       that point "served only under standing" is a statement about a component that is no longer in
       the path, and the fold has graduated from a projection surface to the person's own runtime.
 
+  - id: idle-is-free
+    declared: elohim/elohim-storage/.epr-meta/idle-is-free.habit.md
+    invariant: >
+      A node at rest is quiet. With nothing being authored, read or repaired, a storage peer asks
+      its conductor for almost nothing and the conductors leave the processor alone: background
+      work is driven by what changed, remembers what it has already settled, and backs off from
+      what keeps failing, so the cost of a quiet hour does not depend on how much history the node
+      holds. Work done on behalf of nobody is a defect, whatever it was meant to keep in order.
+    status: red
+    active: false
+    checks:
+      - "a2o @concern:idle-is-free (genesis/a2o/features/dataplane/household-at-rest.feature — @act:i, the household lane: `just test mesh features/dataplane/household-at-rest.feature`). Two snapshots 300 s apart on a settled household with nobody acting: each storage peer's conductor calls (admission permits released) at most 6 a minute, no permit refused, and the three conductors together at most 10 CPU seconds a minute. The budgets are the target, not a reading."
+    evidence: >
+      DELTA 2026-09-19 (declared RED with its check): first reading, household of three holding 27 pieces of content, settled 5 min, nobody acting, 10-minute window (genesis/a2o/reports/recovery/serving-edge-20260919/idle-baseline.log): conductor calls a minute — matthew 49.7, jessica 49.3, james 74.0 (budget 6); permits refused 0; conductor CPU 87.6 s/min — about one and a half cores pinned — storage 13.3, doorway 0.9 (budget 10). Nearly all calls are `content_store`. The storage log over the same window names the producers: projection reconcile "head unchanged — refreshed row" ×79, the same STATE-DIVERGENT commitment re-reported ×124, `apply_delta failed — page held for retry` ×63, and "serving local inventory" ×270 — reconciliation that re-derives a settled world each sweep. Born of the alpha stall, where all seven conductors sat at their CPU limit while serving no one.
+    refs:
+      - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — what unbounded per-call cost did to the fleet"
+      - "genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md"
+      - "genesis/data/timeline/backlog/projection-reconcile-actionable-sawtooth.md — the same ~50 items rediscovered every 20–30 minutes and never healed"
+      - "elohim/holochain/.epr-meta/zome-call-cost-bounded.habit.md — the sibling: what ONE call costs; this habit is how MANY calls nobody asked for"
+    retire-when: >
+      when every background loop in the node declares its trigger (an event, a change set or a
+      bounded timer) and its settled-state memory by construction — so that a loop which re-asks
+      what it already knows cannot be written — and a running node reports its own idle cost
+      against a declared ceiling, making a separate household rehearsal redundant.
+
   - id: nachalah-allotment
     declared: elohim/elohim-storage/.epr-meta/nachalah-allotment.habit.md
     invariant: >
@@ -4214,6 +4239,34 @@ habits:
       with every witness verified and zero records re-seeded from outside, each with its cycle-time
       row in the arc doc — the wipe is then not a delivery path for any class and the register
       describes a product, not a practice.
+
+  - id: zome-call-cost-bounded
+    declared: elohim/holochain/.epr-meta/zome-call-cost-bounded.habit.md
+    invariant: >
+      What a zome call costs the conductor does not grow with the agent's history. Authorising the
+      caller, and any read a coordinator function makes of its own source chain, cost the same at ten
+      capability grants or chain entries as at ten thousand: lookups are indexed by what is being
+      looked for, chain reads are range-bounded, and nothing on the per-call path loads a collection
+      in order to filter it.
+    status: unwired
+    active: false
+    checks: []
+    evidence: >
+      DELTA 2026-09-19 (declared, unwired): born from the alpha stall. All seven conductors were pinned at their CPU limit while serving nobody; on the genesis pair every storage zome call re-read the agent's entire capability-grant history because the fork's lookup assumes "cap-grant counts are small" and storage authorises a new signing credential on every connect. No check exists yet — the conductor exports no metrics and is not profiled, which is how this grew unseen.
+    first_move: >
+      A conductor-fork test that seeds one agent with 10 and then 10 000 capability grants, makes the
+      same zome call signed by a registered (non-author) key, and asserts the SQL statement count is
+      equal — red today on `valid_cap_grants` (holochain_state/src/dht_store/reads.rs), which loads
+      every grant and issues three queries per row. Then the same shape for a coordinator function
+      that reads the chain, at two chain lengths.
+    refs:
+      - "genesis/data/timeline/backlog/conductor-cap-grant-scan-per-zome-call.md — measured 2026-09-19: 11 619–18 516 grant rows read per zome call on matthew, ~47 000 SQL queries, 50–60 s per call"
+      - "genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md — what it breaks: no head can be authored through either public doorway"
+      - "elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs — the ActionSeqRange-bounded chain read that already fixed this pattern once; content_store and imagodei still carry the unbounded one"
+    retire-when: >
+      when the conductor exposes per-call cost (statements, rows read) as a metric and a declared
+      ceiling reads it on every peer, so that growth with history is caught by the running system
+      rather than by a fixture at two sizes.
 
   - id: custodial-authority-answerable
     declared: elohim/holochain/dna/imagodei/.epr-meta/custodial-authority-answerable.habit.md
