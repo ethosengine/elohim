@@ -74,3 +74,25 @@ to answer anything, for hours after the restart. The gate is doing its job; the 
 
 Reserved interactive capacity versus a background admission ceiling versus pacing the cold-start loops is a
 capacity-contract change in `conductor_admission.rs` — route to a brainstorm, not to iteration.
+
+## 2026-09-19 14:35Z — it is not draining, and the scarce thing has a name
+
+Three and a half hours after the 11:04Z restart matthew and adam are still 5/5. Mean permit hold over 30 minutes,
+by zome: matthew — mishpat 60 001 ms, infrastructure 60 001 ms, imagodei 59 254 ms, content_store 55 946 ms; adam —
+60 002 / 59 270 / 58 010 / 51 706 ms. Sixty seconds is the call timeout: on these two peers **no zome call is being
+answered**, each one holds its permit until it times out. Susan, same binaries: imagodei 0.5 ms, content_store 0.2 ms.
+
+Conductor CPU, 10-minute rate: `elohim-adam-alpha-conductor-0` **4.01 cores**, `elohim-matthew-alpha-conductor-0`
+**1.92**, the other five 0.98–1.48. Working set 2.2 GB on both against 0.8–1.7 GB elsewhere. The two peers behind the
+two public doorways are the two whose conductors are pegged.
+
+And it is not only a restart effect: across the 12 hours BEFORE the first roll of the night (2026-09-18 14:00Z →
+09-19 02:00Z, no restarts) matthew's gate sat at 3–4 of 5 while adam's sat at 0–1. The restart takes a chronically
+near-full gate to full. The earlier "drains" in this document each coincide with another restart of that peer's
+conductor or storage, not with the passage of time.
+
+Consequence for delivery: the app pipeline cannot author a head through either public doorway while this holds, so
+the app + genesis run was deliberately NOT dispatched. Readiness to dispatch it:
+`max by (pod)(max_over_time(elohim_conductor_admission_in_flight{pod=~"elohim-(matthew|adam)-alpha-0"}[10m])) < 5`
+and mean hold on those pods back under one second.
+
