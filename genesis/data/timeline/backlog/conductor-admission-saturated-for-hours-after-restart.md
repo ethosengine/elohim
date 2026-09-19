@@ -96,3 +96,41 @@ the app + genesis run was deliberately NOT dispatched. Readiness to dispatch it:
 `max by (pod)(max_over_time(elohim_conductor_admission_in_flight{pod=~"elohim-(matthew|adam)-alpha-0"}[10m])) < 5`
 and mean hold on those pods back under one second.
 
+## 2026-09-19 evening — the operator's k8s read, joined to the code
+
+**From the cluster (operator, cgroup `cpu.stat` sampled 60 s apart, conductor logs, storage `/metrics`):**
+all seven conductors are pinned at their CPU limit and 100% throttled — including susan, which answers in under a
+millisecond — so the CPU ceiling is real but is **not the discriminator**. Nodes have headroom (ethosengine 19% of
+24 cores, shem 48%); the limits bind, not the nodes. Disk is clean (iowait 0.04%, no pressure). What separates the
+two stalled peers: they are the only doorway-fronted ones (doorway-alpha → matthew, doorway-alpha-b → adam); adam
+alone shows DB connection-pool exhaustion (172 `sqlx::pool::acquire` warnings, 16–22 s to obtain a connection,
+worst statement 894 s); and both run a statement susan never runs —
+`SELECT hash, blob FROM Entry WHERE hash IN (… ×500) UNION ALL SELECT … FROM PrivateEntry WHERE author = ? AND hash IN (… ×500)`
+— matthew 273× (avg 2.0 s), adam 224× (avg 5.0 s, max 12 s), susan 0×. Every zome on the two averages 50–60 s;
+susan served 6.4× more content_store calls and stayed at 1.1 s. Not call volume.
+
+**From the code:** the 500 is not a batch size anyone chose for this workload — it is the chunk constant of
+`get_entries_by_hashes` in the conductor fork (`holochain-conductor/crates/holochain_data/src/dht/inner/entry.rs`,
+`CHUNK_SIZE = 500`), and that function has exactly two read-path callers
+(`holochain_state/src/dht_store/reads.rs`): `source_chain_records` (:2194 — a zome reading its agent's source chain
+with entries) and `valid_cap_grants` (:2312 — the capability check). A 500-hash chunk appears only when there are at
+least 500 candidates, so matthew and adam hold **something that has grown past 500 that susan's has not**: a long
+source chain, a large set of capability grants, or both. Two first-party producers are known:
+
+- `elohim-storage/src/hc_client.rs:451-469` calls `authorize_signing_credentials` for three cells on EVERY connect, and
+  `closed_chain_fence.rs:271` records that this "COMMITS a CapGrant". Nothing revokes an earlier grant. Connects in
+  12 h (Loki): adam 21, susan 11, eve 9, matthew 7 — so today's mint rate does not separate the peers; the age of the
+  chain would. matthew and adam are the genesis pair, which is never re-keyed; the other five have been reinstalled.
+- six zome sites query the chain with `include_entries(true)` (content_store, imagodei ×2, node-registry) — cost
+  linear in chain length, on the peers that author every deployed head.
+
+**Not determined:** which caller dominates, and the actual counts. One read on matthew's conductor database settles
+it — the number of CapGrant entries on the storage agent's chain, and the chain length, against susan's — and that
+read is the operator's.
+
+**What follows if it is grants:** the cure is first-party and small — reuse one signing credential across
+reconnects (persist it beside the agent key) instead of authorizing a new one per connect, and revoke superseded
+grants — plus a one-time prune on the genesis pair. If it is chain length: the chain-reading zome sites need a
+bounded query, and stories 1.1 / 1.2 of the serving-edge campaign (fewer failing declares, no re-minted contests)
+already slow the growth. Raising CPU limits helps every peer and is free, but by the susan comparison it is not the fix.
+
