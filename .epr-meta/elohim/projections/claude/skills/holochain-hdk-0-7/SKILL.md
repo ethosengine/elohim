@@ -71,6 +71,34 @@ Workflows:
 3. A coordinator-only change never moves the DNA hash; an integrity change always does.
    Upstream does not make this distinction load-bearing — here it decides whether a fix
    hot-swaps or needs a re-key. See the root CLAUDE.md before shipping either.
+4. `ChainQueryFilter` pushes NOTHING down on our conductor fork. `SourceChain::query`
+   (holochain_state/src/source_chain.rs) loads the author's WHOLE chain and, with
+   `include_entries(true)`, every entry on it, then filters in Rust afterwards — so
+   `entry_type(..)` and `sequence_range(..)` shrink nothing that is read. Only
+   `include_entries(false)` does. Pattern: headers-only query with the filter, then
+   `get_details(hash, GetOptions::local())` for the survivors. `get_details`, not `get`:
+   `query()` returns superseded records and `get()` returns only live ones.
+5. `GetStrategy::default()` is `Network`, but the read verbs differ (holochain_cascade).
+   `get()` tries the local store FIRST and returns on a hit, so converting a read-after-write
+   `get` to `Local` buys nothing. `get_links()`, `get_link_details()`, `get_details()` and
+   `count_links()` have NO local short-circuit — they are local today only because every node
+   runs full arc. In the ~20-minute window after a conductor comes back up, or under any
+   fractional arc, each one is a network round trip against a 60 s conductor timeout. Every
+   new `get_links` names its strategy: a reader whose `None` means "not in my view yet" is
+   `Local`; one whose `None` is an authoritative absence stays `Network`.
+6. `zome_info()` is not an accessor — the ribosome re-runs the integrity zome's `entry_defs`
+   callback, a live wasm invocation, on EVERY call, and the derive-generated
+   `EntryTypes::deserialize_from_type` calls it internally. Hoist it out of loops
+   (`resolve_entry_type` in content_store's `post_commit` is the template).
+7. "Latest state wins" is safe on the caller's OWN source chain and nowhere else. Integrity
+   update arms here discard `action`, so nothing checks who authors an Update; resolving the
+   newest record across the DHT lets any agent append one. See
+   `arch-authority-in-integrity-backlog` row 14 before writing such a reader.
+8. Never mint a per-relationship `Assigned`/`Transferable` cap grant. The fork's
+   `valid_cap_grants` loads every grant in the access class on every zome call — already the
+   fleet's dominant measured call cost. If a Holochain-native signal lane is ever wanted, it is
+   ONE `CapAccess::Unrestricted` grant on `recv_remote_signal` with the handler verifying the
+   payload. The fast lane already exists on the byte plane (`validate_carried_head_record`).
 
 ## Deliberately NOT adopted from upstream
 
