@@ -7,7 +7,7 @@ title: "Edge fleet-quiesce gate rides the build to global-timeout ABORT during c
 slug: "edge-quiesce-gate-timeout-aborts"
 written: "2026-09-01"
 author: "shift velocity-rungs-overnight"
-status: "in-tree"
+status: "backlog"
 priority: "medium"
 jobs: [elohim-edge, elohim-holochain]
 cluster: "arch-dataplane-refactor-backlog"
@@ -40,3 +40,21 @@ halting it, returning `4` when any peer deferred and none failed;
 and still exits 0 (warn-only policy unchanged). Fleet-unproven until the
 next edge build shows UNSTABLE-not-ABORTED and the next DNA build racing an
 in-flight edge roll shows DEFERRED-not-halted.
+
+2026-09-19: reopened — the claim above is falsified by edge/dev 1463. The quiesce leg's own
+55-minute bound only protects a build that REACHES validation with 55 minutes left. 1463 spent
+62 minutes building (doorway quality gate 1162s, storage build 2002s — both rebuilt because the
+image tag is commit-derived) and 56 minutes on `Deploy Edge Node - Alpha` (SUCCESS, every peer and
+both doorways rolled), entered Dataplane Validation at minute 118, and was killed at 120 by the
+pipeline-global `timeout(time: 120)` — `Timeout has been exceeded`, result ABORTED, orchestrator
+FAILURE, app and genesis never dispatched. The stage bounds sum past the global one by design
+arithmetic: build ~60 + roll budget 45 + storage/doorway rollouts ~15 + validation 55.
+
+- chain / between "alpha deploy succeeded" → "orchestrator dispatches app and genesis" / missing node
+  "a deploy that succeeded is reported as succeeded whether or not validation had time to measure":
+  assertion — a full cold build + full roll finishes UNSTABLE-or-better with the global limit untouched;
+  probe — edge build duration vs. `options { timeout }`. Remedy shape: raise the global limit to cover
+  the stage sum (≥ 200 min), or start validation's clock from a budget that subtracts elapsed time and
+  reports no-measure instead of being interrupted. State: **not built** (held out of the 09-19 shift's
+  pushes on purpose — any change under the edge watch globs rebuilds and re-rolls the whole fleet).
+

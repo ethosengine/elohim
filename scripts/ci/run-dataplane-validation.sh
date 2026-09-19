@@ -107,6 +107,12 @@ fi
 cd "${WORKSPACE}"
 pnpm install --frozen-lockfile --filter "@elohim/a2o..."
 
+# a2o support code imports @elohim/storage-client, whose entry point is a built
+# dist/ that no stage of a validate-only run produces. Unbuilt, cucumber dies at
+# support load and the zero-scenario guard below reads it as "did not measure"
+# (edge #1464: MODULE_NOT_FOUND). Same build install-substrate-runner.sh performs.
+pnpm --filter @elohim/storage-client build
+
 # The served-shell stations (served-shell-boots.feature "opens the page … in a browser") launch
 # Playwright's chromium even in plain cucumber mode; without the browser they red on
 # `browserType.launch: Executable doesn't exist` on every run (edge #1450, #1452). Same install

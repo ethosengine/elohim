@@ -22,6 +22,13 @@ pnpm() {
     return 0
   fi
 
+  # The a2o support code imports @elohim/storage-client, which resolves to a
+  # built dist/. Record that the wrapper builds it before cucumber loads.
+  if [ "${1:-}" = "--filter" ] && [ "${2:-}" = "@elohim/storage-client" ] && [ "${3:-}" = "build" ]; then
+    : > "${WORKSPACE}/.storage-client-built"
+    return 0
+  fi
+
   if [ "${1:-}" = "exec" ] && [ "${2:-}" = "cucumber-js" ]; then
     local arg cucumber_out=""
     for arg in "$@"; do
@@ -66,6 +73,7 @@ run_case() {
   set +e
   TEST_SCENARIO_COUNT="${scenario_count}" \
   TEST_CUCUMBER_EXIT="${cucumber_exit}" \
+  QUIESCE_SKIP=1 \
   WORKSPACE="${TEST_WORKSPACE}" \
     bash "${SCRIPT}" > "${output_file}" 2>&1
   local status=$?
@@ -90,6 +98,12 @@ PASS_OUTPUT="${TEST_ROOT}/pass.log"
 PASS_STATUS="$(run_case 2 0 "${PASS_OUTPUT}")"
 if [ "${PASS_STATUS}" -ne 0 ]; then
   echo "Expected a measured run to pass; got ${PASS_STATUS}" >&2
+  sed -n '1,200p' "${PASS_OUTPUT}" >&2
+  exit 1
+fi
+
+if [ ! -e "${TEST_WORKSPACE}/.storage-client-built" ]; then
+  echo "Expected @elohim/storage-client to be built before the cucumber run (edge 1464: MODULE_NOT_FOUND -> 0 scenarios)" >&2
   sed -n '1,200p' "${PASS_OUTPUT}" >&2
   exit 1
 fi
