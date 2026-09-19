@@ -52,6 +52,10 @@ use tracing::{debug, error, info, warn};
 pub struct ImportHandlerConfig {
     /// Conductor admin WebSocket URL
     pub admin_url: String,
+    /// Conductor app WebSocket URL, when the operator configured one
+    /// (`HOLOCHAIN_APP_URL`). Wins over the port the conductor lists: a conductor
+    /// in its own pod lists its loopback bind, which is not the reachable one.
+    pub app_url: Option<String>,
     /// Installed app ID
     pub installed_app_id: String,
     /// Zome name for import calls
@@ -72,6 +76,7 @@ impl Default for ImportHandlerConfig {
     fn default() -> Self {
         Self {
             admin_url: "ws://localhost:4444".to_string(),
+            app_url: None,
             installed_app_id: "elohim".to_string(),
             zome_name: "content_store".to_string(),
             role_name: "elohim".to_string(),
@@ -151,7 +156,9 @@ impl ImportHandler {
 
     /// Run the import handler (blocking)
     pub async fn run(&mut self) -> Result<(), StorageError> {
+        let mut consecutive_failures: u32 = 0;
         loop {
+            let attempt_started = std::time::Instant::now();
             match self.connect_and_listen().await {
                 Ok(()) => {
                     info!("Import handler connection closed cleanly");
@@ -168,11 +175,24 @@ impl ImportHandler {
                         }
                     }
 
-                    info!(
-                        delay_secs = self.config.reconnect_delay_secs,
-                        "Reconnecting in {} seconds...", self.config.reconnect_delay_secs
+                    // A session that outlived the backoff ceiling was a healthy one
+                    // that dropped — start the ladder again rather than resume it.
+                    if attempt_started.elapsed() > Duration::from_secs(MAX_RECONNECT_DELAY_SECS) {
+                        consecutive_failures = 0;
+                    }
+
+                    // Every attempt mints an auth token on the conductor's admin
+                    // API, so an unreachable conductor must cost less over time.
+                    let delay_secs = reconnect_delay_secs(
+                        self.config.reconnect_delay_secs,
+                        consecutive_failures,
                     );
-                    tokio::time::sleep(Duration::from_secs(self.config.reconnect_delay_secs)).await;
+                    consecutive_failures = consecutive_failures.saturating_add(1);
+                    info!(
+                        delay_secs,
+                        consecutive_failures, "Reconnecting in {} seconds...", delay_secs
+                    );
+                    tokio::time::sleep(Duration::from_secs(delay_secs)).await;
                 }
             }
         }
@@ -190,7 +210,7 @@ impl ImportHandler {
         info!(port = app_port, "Got auth token and app interface port");
 
         // Step 2: Connect to app interface
-        let app_url = self.derive_app_url(app_port);
+        let app_url = self.resolve_app_url(app_port);
         info!(app_url = %app_url, "Connecting to app interface");
 
         let host = app_url.split("//").last().unwrap_or("localhost");
@@ -388,23 +408,23 @@ impl ImportHandler {
                     }
                 })
                 .collect();
-            error!(keys = ?keys, "Token response map keys");
+            debug!(keys = ?keys, "Token response map keys");
 
             let data_opt = get_field(map, "value").or_else(|| get_field(map, "data"));
             if let Some(value) = &data_opt {
-                error!(value_type = %response_type_str(value), "Token response value type");
+                debug!(value_type = %response_type_str(value), "Token response value type");
             }
             match &data_opt {
                 Some(Value::Map(data_map)) => {
                     // Check for token in the data map
                     if let Some(token_val) = get_field(data_map, "token") {
-                        error!(token_type = %response_type_str(token_val), "Token field type");
+                        debug!(token_type = %response_type_str(token_val), "Token field type");
                         match token_val {
                             Value::Binary(token) => return Ok(token.clone()),
                             Value::Array(arr) => {
                                 // Token might be wrapped in array [<bytes>] OR array of byte integers
                                 if let Some(Value::Binary(token)) = arr.first() {
-                                    error!("Token was wrapped in array containing binary");
+                                    debug!("Token was wrapped in array containing binary");
                                     return Ok(token.clone());
                                 }
                                 // Try to convert array of integers to bytes
@@ -424,7 +444,7 @@ impl ImportHandler {
                             }
                             Value::Ext(_, bytes) => {
                                 // Extension type
-                                error!("Token is Ext type");
+                                debug!("Token is Ext type");
                                 return Ok(bytes.clone());
                             }
                             _ => {}
@@ -441,11 +461,11 @@ impl ImportHandler {
                             }
                         })
                         .collect();
-                    error!(keys = ?token_keys, "Token data map keys (token field not binary)");
+                    debug!(keys = ?token_keys, "Token data map keys (token field not binary)");
                 }
                 Some(Value::Binary(token)) => {
                     // Token might be directly in the value field
-                    error!("Token value is binary, length={}", token.len());
+                    debug!("Token value is binary, length={}", token.len());
                     return Ok(token.clone());
                 }
                 Some(other) => {
@@ -1115,7 +1135,7 @@ impl ImportHandler {
         // Earlier: { type: "...", data: [{ installed_app_id, cell_info: { role_name: [{ cell_id: [dna, agent] }] } }] }
 
         // Debug: log what we received
-        warn!(response_type = %response_type_str(response), "Parsing list_apps response");
+        debug!(response_type = %response_type_str(response), "Parsing list_apps response");
 
         // Handle wrapped { type, data/value: [...] } and direct [...] formats
         // Holochain responses can be: Array, or Map with "value" or "data" containing the array
@@ -1366,6 +1386,15 @@ impl ImportHandler {
         }
     }
 
+    /// The app URL to dial: the operator-configured one when present, otherwise
+    /// derived from the admin host and the conductor-listed port.
+    fn resolve_app_url(&self, app_port: u16) -> String {
+        match self.config.app_url.as_deref().map(str::trim) {
+            Some(url) if !url.is_empty() => url.to_string(),
+            _ => self.derive_app_url(app_port),
+        }
+    }
+
     /// Derive app URL from admin URL
     fn derive_app_url(&self, app_port: u16) -> String {
         if let Some(host_start) = self.config.admin_url.find("://") {
@@ -1517,6 +1546,19 @@ fn rmpv_to_json(value: &Value) -> serde_json::Value {
     }
 }
 
+/// Ceiling for the reconnect backoff.
+const MAX_RECONNECT_DELAY_SECS: u64 = 300;
+
+/// Reconnect delay after `consecutive_failures` failures: `base` doubling per
+/// failure, capped. A zero base stays zero (tests, and the operator's off switch).
+fn reconnect_delay_secs(base: u64, consecutive_failures: u32) -> u64 {
+    if base == 0 {
+        return 0;
+    }
+    base.saturating_mul(1u64 << consecutive_failures.min(16))
+        .min(MAX_RECONNECT_DELAY_SECS)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1541,6 +1583,55 @@ mod tests {
         );
 
         assert_eq!(handler.derive_app_url(4445), "ws://conductor.local:4445");
+    }
+
+    /// The fleet defect (2026-09-19): the conductor binds its app interface to
+    /// 127.0.0.1:4445 in its own pod and a bridge re-exposes it on 8445. The
+    /// handler paired the admin URL's host with the conductor-LISTED port, dialled
+    /// a loopback-only port across pods, and was refused every 5 s on all seven
+    /// peers. The operator-configured app URL is the reachable one and must win.
+    #[test]
+    fn a_configured_app_url_wins_over_the_conductor_listed_port() {
+        let handler = ImportHandler::new(
+            ImportHandlerConfig {
+                admin_url: "ws://conductor-0.conductor-headless:8444".to_string(),
+                app_url: Some("ws://conductor-0.conductor-headless:8445".to_string()),
+                ..Default::default()
+            },
+            Arc::new(BlobStore::new_memory()),
+        );
+
+        assert_eq!(
+            handler.resolve_app_url(4445),
+            "ws://conductor-0.conductor-headless:8445"
+        );
+    }
+
+    /// With no configured app URL the handler keeps deriving from the admin host —
+    /// the single-host shape (Tauri, household mesh) is unchanged.
+    #[test]
+    fn without_a_configured_app_url_the_listed_port_is_derived() {
+        let handler = ImportHandler::new(
+            ImportHandlerConfig {
+                admin_url: "ws://localhost:4444".to_string(),
+                ..Default::default()
+            },
+            Arc::new(BlobStore::new_memory()),
+        );
+
+        assert_eq!(handler.resolve_app_url(4455), "ws://localhost:4455");
+    }
+
+    /// A conductor that stays unreachable must cost less over time, not the same
+    /// forever: every attempt mints an auth token on the conductor's admin API.
+    #[test]
+    fn reconnect_delay_backs_off_and_is_capped() {
+        assert_eq!(reconnect_delay_secs(5, 0), 5);
+        assert_eq!(reconnect_delay_secs(5, 1), 10);
+        assert_eq!(reconnect_delay_secs(5, 3), 40);
+        assert_eq!(reconnect_delay_secs(5, 6), MAX_RECONNECT_DELAY_SECS);
+        assert_eq!(reconnect_delay_secs(5, 60), MAX_RECONNECT_DELAY_SECS);
+        assert_eq!(reconnect_delay_secs(0, 4), 0, "0 stays the test/off switch");
     }
 
     #[test]

@@ -4983,6 +4983,9 @@ async fn async_main(
         if let Some(admin_url) = args.admin_url {
             let import_config = ImportHandlerConfig {
                 admin_url,
+                // The same reachable app URL `HcClient` dials; the conductor-listed
+                // port is a loopback bind when the conductor runs in its own pod.
+                app_url: Some(args.app_url.clone()),
                 installed_app_id: args.app_id.clone(),
                 zome_name: args.zome_name.clone(),
                 ..ImportHandlerConfig::default()

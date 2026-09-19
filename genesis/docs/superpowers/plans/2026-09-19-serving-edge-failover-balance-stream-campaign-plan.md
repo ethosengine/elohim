@@ -90,7 +90,20 @@ Each story names: **habit** it moves · **story** that specifies it · **proof**
 The fleet cannot author a head through either public doorway, and two bounded loops are the prime suspects. Clear
 them, then close the zero-lag head oracle, then make the pair comparable.
 
-- **1.1 Held reanchor candidates back off.** Backlog head-authority item 7: `reanchor_backfill` re-probes 29–43
+- **1.0 The import handler reaches its conductor, or stops asking.** Measured 2026-09-19 (Loki, 14 h flat, all
+  seven alpha peers): every 5 s each storage opens the conductor admin API, lists apps, mints an app auth token,
+  then is refused on the app socket — ~700 cycles an hour per peer, and no import path works anywhere on the
+  fleet. Cause: the conductor binds its app interface to `127.0.0.1:4445` in its own pod and a bridge re-exposes
+  it on 8445 (`manifests/humans/_edgenode-conductor.template.yaml`); `import_handler.rs` pairs the admin URL's host
+  with the conductor-LISTED port instead of the configured `HOLOCHAIN_APP_URL` its sibling `HcClient` already
+  uses. Fix: carry the configured app URL into `ImportHandlerConfig`, back the reconnect off (5 s doubling to a
+  5 min cap), demote the token-shape dumps from ERROR. Habit: dataplane-convergence. Proof: unit red→green;
+  fleet — `"Import handler connection failed"` falls from ~700/h to 0 on every peer. Gate: `just gate elohim-storage`.
+- **1.1 Held reanchor candidates back off.** The sweep's pre-flight probe is hardcoded `AdmissionClass::Interactive`
+  (`conductor_writes.rs:948`) — a background sweep borrowing the lane a person's read stands in; it moves to
+  `Background` in this story. Task-level plan drafted 2026-09-19 (rust-architect): new
+  `services/reanchor_backoff.rs` keyed on `(id, advertised head)`, runtime-config
+  `REANCHOR_HELD_BACKOFF_SECONDS` (default 900), metric `elohim_content_reanchor_skipped_total{reason}`. Backlog head-authority item 7: `reanchor_backfill` re-probes 29–43
   held candidates every ~70 s forever, each a failing `declare_canonical_head` call. Habit: dataplane-convergence.
   Proof: household — failing-declare rate for held candidates falls to the backoff schedule; `/p2p/status`
   `provideLoop` shows it. Gate: `just gate elohim-storage`.
