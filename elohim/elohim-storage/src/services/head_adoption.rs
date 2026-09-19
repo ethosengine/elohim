@@ -793,6 +793,20 @@ fn note_declare_error_backoff(id: &str) {
 /// [`declare_was_shed`] for why a shed must never be booked as a failure.
 const SWEEP_DECLARE_CLASS: AdmissionClass = AdmissionClass::Background;
 
+/// The admission class the pre-flight's own-conductor PROBE takes — the read
+/// half of the same argument [`SWEEP_DECLARE_CLASS`] makes for the write half.
+///
+/// Named rather than inlined because the default is the wrong one and silently
+/// so: plain `conductor_writes::call_resolve_content_head` hardcodes
+/// [`AdmissionClass::Interactive`], so a probe written the obvious way puts sweep
+/// load in the lane a person's read is standing in. [`LocalResolve::Probe`] has
+/// exactly ONE production construction site
+/// (`crate::services::reanchor_backfill::run_once`), so this lane is a sweep's by
+/// construction.
+///
+/// **Contract test:** [`tests::the_sweep_preflight_probe_is_background_classed`].
+const SWEEP_PROBE_CLASS: AdmissionClass = AdmissionClass::Background;
+
 /// TRUE when a declare failed at the ADMISSION GATE rather than in the conductor.
 ///
 /// A shed establishes NOTHING: the call never crossed the websocket, so the
@@ -1411,19 +1425,30 @@ pub async fn try_adopt_canonical_head(
     // (1) LOCAL-DHT ARM. Reuse a resolve the caller already paid for.
     let probed: Option<ContentHeadWire> = match local_resolve {
         LocalResolve::Resolved(_) => None,
-        LocalResolve::Probe => match conductor_writes::call_resolve_content_head(hc, id).await {
-            Ok(head) => head,
-            Err(e) => {
-                // A conductor that will not answer cannot be shown to hold a
-                // canonical head; fall through with "not canonical" rather than
-                // aborting the whole sweep.
-                tracing::debug!(
-                    content_id = %id, error = %e,
-                    "adopt-before-author: own-conductor resolve failed; continuing to the peer arm"
-                );
-                None
+        // BACKGROUND, explicitly — not inherited. Plain
+        // `call_resolve_content_head` hardcodes `AdmissionClass::Interactive`
+        // (`conductor_writes.rs`), and `LocalResolve::Probe` has exactly ONE
+        // production construction site: `reanchor_backfill::run_once`. That is a
+        // sweep by construction, and a sweep that borrows the interactive lane is
+        // how a person's read gets starved — the shape the 2026-09-19 fleet read
+        // showed as every admission permit held for the full call timeout.
+        LocalResolve::Probe => {
+            match conductor_writes::call_resolve_content_head_classed(hc, id, SWEEP_PROBE_CLASS)
+                .await
+            {
+                Ok(head) => head,
+                Err(e) => {
+                    // A conductor that will not answer cannot be shown to hold a
+                    // canonical head; fall through with "not canonical" rather than
+                    // aborting the whole sweep.
+                    tracing::debug!(
+                        content_id = %id, error = %e,
+                        "adopt-before-author: own-conductor resolve failed; continuing to the peer arm"
+                    );
+                    None
+                }
             }
-        },
+        }
     };
     // The named C4 collapse: `Absent` (conductor answered, holds nothing) and
     // `Unreachable` (conductor never answered) both foreclose `AdoptLocal` and
@@ -4848,6 +4873,28 @@ mod tests {
         );
 
         contest_backoff::reset();
+    }
+
+    /// The sweep pre-flight's READ half must not stand in that lane either.
+    ///
+    /// This is the half that was wrong until 2026-09-19: the probe went through
+    /// plain `call_resolve_content_head`, which hardcodes
+    /// `AdmissionClass::Interactive`, so the reanchor sweep — the ONLY producer
+    /// of `LocalResolve::Probe` — spent an interactive permit per candidate per
+    /// sweep while the declare beside it was correctly Background. Pinned beside
+    /// its write-half sibling so the two lanes are asserted together.
+    #[test]
+    fn the_sweep_preflight_probe_is_background_classed() {
+        assert_eq!(SWEEP_PROBE_CLASS, AdmissionClass::Background);
+        assert_eq!(
+            SWEEP_PROBE_CLASS, SWEEP_DECLARE_CLASS,
+            "the read and write halves of one sweep belong in one lane"
+        );
+        assert_ne!(
+            SWEEP_PROBE_CLASS,
+            AdmissionClass::Interactive,
+            "a sweep probe in the interactive lane is how a person's read gets starved"
+        );
     }
 
     /// The sweep declares must not stand in the lane a person is waiting in.

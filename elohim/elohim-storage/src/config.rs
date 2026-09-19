@@ -356,6 +356,32 @@ pub fn heal_missing_backoff_window() -> std::time::Duration {
     ))
 }
 
+/// Default reanchor held-candidate skip window: 15 minutes — 3 sweeps at the
+/// 300s reconcile cadence. Long enough to stop the every-sweep re-probe, short
+/// enough that a candidate whose conductor quietly acquired a chain is re-asked
+/// within a few minutes even if no exit fires.
+pub const DEFAULT_REANCHOR_HELD_BACKOFF_SECONDS: u64 = 900;
+
+/// Publish the reanchor held-backoff window's BOOT value. Idempotent.
+/// Runtime-config backed — see [`set_adopt_before_author`].
+pub fn set_reanchor_held_backoff_seconds(seconds: u64) {
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::ReanchorHeldBackoffSeconds,
+        seconds,
+    );
+}
+
+/// How long a reanchor candidate the adopt pre-flight HELD is skipped before the
+/// sweep pays for its conductor probes again (`services::reanchor_backoff`).
+///
+/// `Duration::ZERO` DISABLES the skip — every candidate pays for its pre-flight
+/// probes every sweep, which is byte-for-byte the pre-fix loop.
+pub fn reanchor_held_backoff_window() -> std::time::Duration {
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::ReanchorHeldBackoffSeconds,
+    ))
+}
+
 /// Publish the advertiser-diversity breadth for the reconcile sweep. Idempotent.
 pub fn set_evidence_fallback_max_alternates(max: usize) {
     let _ = EVIDENCE_FALLBACK_MAX_ALTERNATES.set(max);

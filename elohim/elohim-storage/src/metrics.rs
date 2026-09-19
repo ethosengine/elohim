@@ -1931,6 +1931,23 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Reanchor candidates the sweep skipped WITHOUT paying for the adopt
+    /// pre-flight's conductor probes, by [`ReanchorSkip`].
+    ///
+    /// The honesty meter for the held-candidate loop (2026-09-18): this climbing
+    /// while the `"reanchor_backfill: sweep complete"` line's `held` falls to 0
+    /// is the fix working. It says nothing about whether the rows HEALED —
+    /// `reanchorDeadRemaining` and `deadRemainingStuck` still carry that, and a
+    /// skip deliberately leaves both untouched.
+    pub static ref CONTENT_REANCHOR_SKIPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_reanchor_skipped_total",
+            "Reanchor candidates skipped without a conductor round-trip, by backoff reason.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
     /// ADVERTISER DIVERSITY (2026-08-03). One ROUTE-AROUND decision on the
     /// adopt-evidence path, by [`AdoptEvidenceFallback`] — `attempted` |
     /// `carried` | `degraded` | `no_alternative`.
@@ -2548,6 +2565,7 @@ pub fn register_all() {
             }
         }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_EVIDENCE_FALLBACK.clone()));
         // Pre-touch every fallback outcome, same discipline as the evidence
         // states above: `no_alternative` at zero is a MEANINGFUL reading (the
@@ -3993,6 +4011,37 @@ impl seam_contracts::ReasonLabel for ContestSkip {
     }
 }
 
+/// Why the reanchor sweep skipped a candidate without paying for its adopt
+/// pre-flight — the label vocabulary of [`CONTENT_REANCHOR_SKIPPED`], as a
+/// closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary — a skip must name its
+/// cause, never vanish into a missing count).
+///
+/// Deliberately separate from [`ContestSkip`], which is the CONTEST arm's
+/// vocabulary and is additionally the persisted label set of the contest-backoff
+/// snapshot. This one gates a different, upstream decision (should the sweep
+/// call the conductor at all) and must be free to grow without touching a wire
+/// format.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReanchorSkip {
+    /// The adopt pre-flight already HELD this candidate against the SAME
+    /// advertised head, inside the reanchor held-backoff window. Re-probing
+    /// cannot change the verdict until the row moves, the advertiser changes, or
+    /// the window lapses — all three of which re-admit it automatically.
+    HeldBackoff,
+}
+
+impl seam_contracts::ReasonLabel for ReanchorSkip {
+    const ALL: &'static [Self] = &[ReanchorSkip::HeldBackoff];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ReanchorSkip::HeldBackoff => "held_backoff",
+        }
+    }
+}
+
 /// What the adopt/contest arm learned when it went looking for a peer's head
 /// `Record` — the label vocabulary of [`CONTENT_ADOPT_EVIDENCE`], as a closed
 /// type.
@@ -4192,6 +4241,14 @@ pub fn inc_contest_skipped(reason: ContestSkip) {
 /// Count one contest-backoff ledger cap-overflow fail-open clear.
 pub fn inc_contest_backoff_cleared() {
     CONTENT_CONTEST_BACKOFF_CLEARED.inc();
+}
+
+/// Count one reanchor candidate skipped without a conductor round-trip.
+pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_REANCHOR_SKIPPED
+        .with_label_values(&[reason.label()])
+        .inc();
 }
 
 /// How one adopt-before-author sweep ended — the label vocabulary of

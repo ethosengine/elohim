@@ -101,6 +101,15 @@ pub struct ReanchorReport {
     pub adopted: usize,
     /// Rows the pre-flight left alone because they already carry a declaration.
     pub held: usize,
+    /// Rows SKIPPED before the pre-flight ran, because a previous sweep already
+    /// held them against the SAME advertised head and the
+    /// `services::reanchor_backoff` window has not lapsed. Counted apart from
+    /// `held` because that is the whole observable: `held_backoff` rising while
+    /// `held` falls to 0 is the every-sweep re-probe loop stopping (2026-09-18 —
+    /// 29-43 dead candidates each re-bought an Interactive `resolve_content_head`
+    /// plus an election resolve every sweep, forever). A skip is NEITHER progress
+    /// nor failure: the row is still unhealed and still in `dead_remaining`.
+    pub held_backoff: usize,
     /// Rows skipped because their stored reach OR content_type is
     /// non-canonical — not re-authorable (the DNA rejects it), so re-attempting
     /// would fail every sweep and saturate the conductor. Fix via the seed
@@ -179,6 +188,13 @@ pub(crate) enum RowOutcome {
     /// provably supersedes it. Neither adopted nor authored; the canonical
     /// channels own it.
     Held,
+    /// The pre-flight was NOT RUN: a previous sweep already held this candidate
+    /// against the same advertised head, inside the
+    /// [`crate::services::reanchor_backoff`] window. Identical in effect to
+    /// [`RowOutcome::Held`] — the row is untouched and stays in the recount —
+    /// minus the two conductor round-trips the pre-flight would have spent to
+    /// re-derive an answer it already had.
+    HeldBackoff,
 }
 
 impl ReanchorReport {
@@ -198,6 +214,7 @@ impl ReanchorReport {
             RowOutcome::Failed => self.failed += 1,
             RowOutcome::Adopted => self.adopted += 1,
             RowOutcome::Held => self.held += 1,
+            RowOutcome::HeldBackoff => self.held_backoff += 1,
         }
     }
 }
@@ -317,6 +334,33 @@ pub async fn run_once(
     );
 
     for (id, reach, content_type) in &candidates {
+        // HELD BACKOFF — ahead of every conductor round-trip, and ahead of the
+        // vocabulary guards because it is strictly cheaper than both. A previous
+        // sweep's pre-flight already HELD this candidate against this same
+        // advertised head, and nothing it could do this sweep changes that until
+        // the row moves, the advertiser changes, or the window lapses. Skipping
+        // here saves BOTH the `resolve_content_head` probe and the election
+        // resolve — the two costs that were saturating the conductor admission
+        // gate every sweep (2026-09-18: 29-43 dead candidates, forever).
+        //
+        // `advertised` is the hint's head, or "" when this sweep carries none:
+        // the BOOT pass runs before P2P discovery and legitimately has no hints,
+        // and a hold earned with a hint must not be inherited by a sweep without
+        // one (see `reanchor_backoff::should_skip`).
+        let advertised = adopt
+            .hints
+            .get(id)
+            .map(|h| h.head_action_hash.as_str())
+            .unwrap_or("");
+        if crate::services::reanchor_backoff::should_skip(
+            id,
+            advertised,
+            crate::config::reanchor_held_backoff_window(),
+        ) {
+            report.record(RowOutcome::HeldBackoff);
+            crate::metrics::inc_reanchor_skipped(crate::metrics::ReanchorSkip::HeldBackoff);
+            continue;
+        }
         // Guard: a stored reach outside the DNA-notarized vocabulary can
         // never be re-authored (the content_store zome rejects it), so it
         // would fail every sweep forever and saturate the conductor. Skip
@@ -390,6 +434,12 @@ pub async fn run_once(
             // boot pass has no peer hints — but the arm must be explicit rather
             // than swept into a catch-all that would silently author.)
             AdoptOutcome::Held | AdoptOutcome::Contested => {
+                // Remember the verdict AND what it was held against, so the next
+                // sweeps skip this candidate instead of re-deriving the same
+                // answer with two conductor round-trips. Bounded and
+                // always-expiring: see `services::reanchor_backoff` for the three
+                // automated exits (window lapse, row stamped, advertiser change).
+                crate::services::reanchor_backoff::note_held(id, advertised);
                 report.record(RowOutcome::Held);
                 continue;
             }
@@ -468,6 +518,10 @@ pub async fn run_once(
             // cached conductor-missing verdict, so the next heal sweep must
             // RESOLVE this id for real rather than replay the stale answer.
             crate::services::heal_backoff::note_resolved(id);
+            // Same fact, this sweep's own ledger: the row MOVED, so any standing
+            // held-backoff skip against it is stale and the next sweep must run
+            // the pre-flight for real rather than replay the old verdict.
+            crate::services::reanchor_backoff::note_progress(id);
         }
 
         // AUTHOR-THEN-ADOPT, second half. The conductor now has a local chain for
@@ -554,6 +608,7 @@ pub async fn run_once(
         already_anchored = report.already_anchored,
         adopted = report.adopted,
         held = report.held,
+        held_backoff = report.held_backoff,
         failed = report.failed,
         remaining = report.remaining,
         skipped_reach = report.skipped_reach,
@@ -742,6 +797,34 @@ mod tests {
         assert_eq!(
             report.failed, 0,
             "an already-anchored row must NEVER be counted as failed"
+        );
+    }
+
+    #[test]
+    fn a_held_backoff_row_is_neither_progress_nor_failure() {
+        // The accounting contract of the 2026-09-18 fix. A skipped candidate is
+        // NOT healed (it must not inflate `completed`, which feeds `caughtUp`),
+        // NOT failed (nothing errored), and NOT a vocabulary skip (the seed data
+        // is fine). It is its own count, and it is the one that makes the
+        // every-sweep re-probe loop visible stopping: `held_backoff` rising while
+        // `held` falls to zero.
+        let mut report = ReanchorReport::default();
+        report.record(RowOutcome::HeldBackoff);
+        report.record(RowOutcome::HeldBackoff);
+        assert_eq!(report.held_backoff, 2);
+        assert_eq!(report.held, 0, "a skip never ran the pre-flight that holds");
+        assert_eq!(report.reanchored, 0);
+        assert_eq!(report.already_anchored, 0);
+        assert_eq!(report.adopted, 0);
+        assert_eq!(report.failed, 0, "a skip is not an error");
+        assert_eq!(report.skipped, 0, "a skip is not a seed-data correction");
+        // `completed` (the value published to /p2p/status) deliberately EXCLUDES
+        // it: the rows are still unhealed and still counted in `dead_remaining`,
+        // so a node that skips its whole population must still read NOT caught up.
+        let completed = report.reanchored + report.already_anchored + report.adopted + report.held;
+        assert_eq!(
+            completed, 0,
+            "skipping a candidate must never make a node look caught up"
         );
     }
 

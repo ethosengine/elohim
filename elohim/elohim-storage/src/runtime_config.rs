@@ -194,6 +194,8 @@ pub enum Key {
     ProjectionReconcileSecs = 5,
     /// `ELOHIM_FEEDBACK_NOTIFY` — the direct-notify ACCELERANT for feedback acts.
     FeedbackNotify = 6,
+    /// `REANCHOR_HELD_BACKOFF_SECONDS` — reanchor held-candidate skip window.
+    ReanchorHeldBackoffSeconds = 7,
 }
 
 impl Key {
@@ -202,7 +204,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 7] = [
+    pub const ALL: [Key; 8] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -210,6 +212,7 @@ impl Key {
         Key::EvidenceAbsentBackoffSecs,
         Key::ProjectionReconcileSecs,
         Key::FeedbackNotify,
+        Key::ReanchorHeldBackoffSeconds,
     ];
 }
 
@@ -229,7 +232,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 7] = [
+pub static SPECS: [SettingSpec; 8] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -295,6 +298,19 @@ pub static SPECS: [SettingSpec; 7] = [
             "hot — the send path reads the registry per act, so a scenario can flip this \
              between two acts on a RUNNING peer without a restart (the local mesh never \
              restarts a peer between scenarios, so a boot-only flag could not be flipped)",
+        ),
+    },
+    SettingSpec {
+        name: "REANCHOR_HELD_BACKOFF_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_REANCHOR_HELD_BACKOFF_SECONDS,
+        doc: "How long a reanchor candidate the adopt pre-flight HELD is skipped before the \
+              sweep pays for its conductor probes again. 0 DISABLES the skip (probe every \
+              candidate every sweep).",
+        note: Some(
+            "hot — the sweep reads the registry per candidate. A skip is never an exclusion: \
+             it also lapses the moment the row is stamped or a peer advertises a DIFFERENT \
+             head for it.",
         ),
     },
 ];

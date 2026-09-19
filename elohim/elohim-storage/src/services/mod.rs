@@ -123,6 +123,7 @@ pub mod rea_commitment_service;
 pub mod rea_observed_compute; // Wave 4.3 — OBSERVED-compute reciprocity adapter (consumes the 4.1 mutual_compute fold)
 pub mod reach_earning;
 pub mod reanchor_backfill; // Workstream D — re-author NULL-anchor content a cold-conductor seed left provenance-only
+pub mod reanchor_backoff; // skip a reanchor candidate the adopt pre-flight already HELD (bounded, always-expiring)
 pub mod reciprocity_view;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
