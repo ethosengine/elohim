@@ -138,7 +138,7 @@
   overflow: hidden;
   border: 1px dashed var(--el-warm);
   border-radius: 12px;
-  background: #000;
+  background: #000; /* a11y-color-ok: letterbox behind an outside video player — the frame paints over it; black in every theme, as a player's own surround is */
 }
 
 .external-embed__frame {
