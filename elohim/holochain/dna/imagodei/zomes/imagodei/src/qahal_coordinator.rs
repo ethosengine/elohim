@@ -7,7 +7,7 @@ use hdk::prelude::*;
 use imagodei_integrity::qahal::{
     CollabAgreement, Collective, MemberKind, Membership, MembershipRole,
 };
-use imagodei_integrity::{EntryTypes, LinkTypes, StringAnchor};
+use imagodei_integrity::{EntryTypes, LinkTypes, StringAnchor, UnitEntryTypes};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreateCollectiveInput {
@@ -404,22 +404,86 @@ pub fn list_memberships_for_collective_cid(collective_cid: String) -> ExternResu
 /// this returns ONLY households — matching what the live `on_membership_projected`
 /// path stamps `household_id` for (family only). Best-effort per record: an
 /// undecodable membership or an unresolved collective is skipped (next sweep).
+///
+/// ## Latest-state-wins over withdrawal
+///
+/// `withdraw_membership_clean` appends an `update_entry` on the ORIGINAL
+/// Membership rather than rewriting it, so a withdrawn household still has a
+/// live (non-withdrawn) Create record on the chain. Records are walked in
+/// ascending chain order and a collective_cid is inserted when its record is
+/// not withdrawn and removed when it is, so the last record touching a given
+/// collective_cid decides membership — a later re-join re-inserts it.
 #[hdk_extern]
 pub fn get_my_household_collective_cids(_: ()) -> ExternResult<Vec<String>> {
-    let records = query(ChainQueryFilter::new().include_entries(true))?;
-    let mut cids: Vec<String> = Vec::new();
+    // Two-phase read (perf fix — was a single `query(include_entries(true))`).
+    //
+    // Phase 1: HEADERS ONLY. On our pinned conductor fork, `SourceChain::query`
+    // (holochain_state/src/source_chain.rs) loads the WHOLE chain's actions —
+    // "no filtering applied here" — and, when `include_entries(true)`,
+    // batch-loads EVERY entry on the chain; `ChainQueryFilter` filters in Rust
+    // afterward. So `entry_type(..)` alone reduces nothing when paired with
+    // `include_entries(true)` — only `include_entries(false)` does, because
+    // `filter_actions` needs just action metadata. `identity_fill`
+    // (elohim-storage) calls this every 300s on every node, so cutting the
+    // whole-chain entry batch-load down to "just the Membership headers"
+    // matters at scale.
+    let membership_entry_type: EntryType = UnitEntryTypes::Membership.try_into()?;
+    let headers = query(
+        ChainQueryFilter::new()
+            .entry_type(membership_entry_type)
+            .include_entries(false),
+    )?;
+
+    // Phase 2: materialise ONLY the Membership-typed survivors, locally.
+    // `get_details` — NOT `get` — deliberately: `query()` (the original
+    // approach) returns tombstoned (deleted) records exactly like live ones,
+    // since it is a raw chain scan with no CRUD-liveness filter, while `get()`
+    // returns only LIVE records. Swapping in `get()` here would silently drop
+    // a deleted Membership and change this function's results relative to the
+    // behaviour being replaced. `GetOptions::local()` mirrors phase 1: this
+    // agent's own chain, no network hop.
+    let mut records: Vec<Record> = Vec::with_capacity(headers.len());
+    for header in &headers {
+        let Some(details) = get_details(header.action_address().clone(), GetOptions::local())?
+        else {
+            continue;
+        };
+        if let Details::Record(record_details) = details {
+            records.push(record_details.record);
+        }
+    }
+
+    // Latest-state-wins, in ascending chain order: `first_seen` records the
+    // insertion order of each collective_cid the FIRST time it is ever
+    // observed alive; `alive` tracks current (non-withdrawn) membership.
+    // A withdrawal removes from `alive` without touching `first_seen`, so a
+    // later re-join re-inserts into `alive` and the survivor's reported
+    // position is still its first-ever appearance.
+    let mut first_seen: Vec<String> = Vec::new();
+    let mut alive: std::collections::HashSet<String> = std::collections::HashSet::new();
     for record in &records {
         let Some(m) = record.entry().to_app_option::<Membership>().ok().flatten() else {
             continue;
         };
-        if m.member_kind != MemberKind::Person || m.withdrawn_at_block_height.is_some() {
+        if m.member_kind != MemberKind::Person {
             continue;
         }
-        if cids.contains(&m.collective_cid) {
+        if m.withdrawn_at_block_height.is_none() {
+            if alive.insert(m.collective_cid.clone()) {
+                first_seen.push(m.collective_cid.clone());
+            }
+        } else {
+            alive.remove(&m.collective_cid);
+        }
+    }
+
+    let mut cids: Vec<String> = Vec::new();
+    for collective_cid in first_seen {
+        if !alive.contains(&collective_cid) {
             continue;
         }
-        if collective_cid_is_household(&m.collective_cid)? {
-            cids.push(m.collective_cid);
+        if collective_cid_is_household(&collective_cid)? {
+            cids.push(collective_cid);
         }
     }
     Ok(cids)

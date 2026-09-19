@@ -94,6 +94,11 @@ path = "src/tests/qahal_collab_t0_test.rs"
 name = "qahal_formation_test"
 path = "src/tests/qahal_formation_test.rs"
 
+# get_my_household_collective_cids two-phase read (headers + get_details) parity.
+[[test]]
+name = "qahal_household_query_perf_test"
+path = "src/tests/qahal_household_query_perf_test.rs"
+
 [[test]]
 name = "rea_commitment_replication"
 path = "src/tests/rea_commitment_replication.rs"
