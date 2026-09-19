@@ -13,13 +13,8 @@ cleanup() {
 }
 trap cleanup EXIT
 
-curl() {
-  local arg url="" http1=0
-  for arg in "$@"; do
-    url="$arg"
-    [ "$arg" = "--http1.1" ] && http1=1
-  done
-
+fake_json_body() {
+  local url="$1"
   case "$url" in
     */admin/bootstrap-coherence)
       printf '{"spaces":2,"agents":5}\n'
@@ -39,8 +34,36 @@ curl() {
       esac
       ;;
     */db/content/elohim-host-landing/head)
-      printf '{"headActionHash":"uhCkk-test-head"}\n'
+      # Same notarized head on both doorways; the bytes under it differ only in
+      # the same-head-different-bytes case (alpha fleet, 2026-09-19).
+      if [ "${TEST_CASE:-healthy}" = "same-head-different-bytes" ] && [ "${url#https://elohim.host/}" != "$url" ]; then
+        printf '{"headActionHash":"uhCkk-test-head","blobHash":"sha256-bbbb","updatedAt":"2026-09-13 14:46:59"}\n'
+      else
+        printf '{"headActionHash":"uhCkk-test-head","blobHash":"sha256-aaaa","updatedAt":"2026-09-14 23:13:44"}\n'
+      fi
       ;;
+    *) return 1 ;;
+  esac
+}
+export -f fake_json_body
+
+curl() {
+  local arg url="" http1=0 want_code=0
+  for arg in "$@"; do
+    url="$arg"
+    [ "$arg" = "--http1.1" ] && http1=1
+    # probe_json asks for the body followed by the status on its own line.
+    [ "$arg" = '\n%{http_code}' ] && want_code=1
+  done
+  if [ "$want_code" -eq 1 ]; then
+    url="${@: -1}"
+    fake_json_body "$url"
+    printf '\n200'
+    return 0
+  fi
+  fake_json_body "$url" && return 0
+
+  case "$url" in
     */ping)
       [ "$http1" -eq 1 ] || { printf '400'; return 0; }
       printf '200'
@@ -125,6 +148,22 @@ if grep -Fq 'seam-smoke[signal-bus]' "$HEALTHY_OUTPUT"; then
   echo "Retired signal-bus smoke still ran" >&2
   exit 1
 fi
+
+grep -Fq 'seam-smoke[dht-fetch]: OK — landing canonical head CONVERGED (uhCkk-test-head) serving sha256-aaaa' "$HEALTHY_OUTPUT"
+
+# One notarized head, two different blobs under it: the head comparison alone
+# read CONVERGED on edge/dev 1465 while the pair served different bytes.
+# Advisory seam, so the run still passes — the verdict line is the assertion.
+assert_passes same-head-different-bytes
+SPLIT_OUTPUT="${TEST_ROOT}/same-head-different-bytes.log"
+if grep -Fq 'seam-smoke[dht-fetch]: OK' "$SPLIT_OUTPUT"; then
+  echo "Same head with different bytes was reported CONVERGED" >&2
+  sed -n '1,200p' "$SPLIT_OUTPUT" >&2
+  exit 1
+fi
+grep -Fq 'seam-smoke[dht-fetch]: ADVISORY-SAME-HEAD-DIFFERENT-BYTES' "$SPLIT_OUTPUT"
+grep -Fq 'A=sha256-aaaa (2026-09-14 23:13:44)' "$SPLIT_OUTPUT"
+grep -Fq 'B=sha256-bbbb (2026-09-13 14:46:59)' "$SPLIT_OUTPUT"
 
 assert_fails_with redirect '/generate_204=301'
 assert_fails_with bad-ws-status 'WS=400'

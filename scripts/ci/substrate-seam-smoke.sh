@@ -189,12 +189,30 @@ else:
 done
 
 # ── 6. dht-fetch / head convergence (ADVISORY until scenario 2 is stable) ───
-ha=$(curl -sS -m 20 "$A/db/content/elohim-host-landing/head" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('headActionHash','?'))" 2>/dev/null || echo "?")
-hb=$(curl -sS -m 20 "$B/db/content/elohim-host-landing/head" 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin).get('headActionHash','?'))" 2>/dev/null || echo "?")
-if [ "$ha" = "$hb" ] && [ "$ha" != "?" ]; then
-  note dht-fetch "OK — landing canonical head CONVERGED ($ha)"
-else
+# Compares the notarized head AND the bytes served under it. The head alone is
+# not the visitor's truth: on alpha (2026-09-19, edge/dev 1465) both doorways
+# reported one notarized headActionHash while serving two different blobHashes,
+# and this seam printed CONVERGED.
+read_head() { # doorway-url -> "<headActionHash>\t<blobHash>\t<updatedAt>", "?" for an unread field
+  curl -sS -m 20 "$1/db/content/elohim-host-landing/head" 2>/dev/null | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print('\t'.join(str(d.get(k) or '?') for k in ('headActionHash', 'blobHash', 'updatedAt')))
+except Exception:
+    print('?\t?\t?')
+" 2>/dev/null || printf '?\t?\t?\n'
+}
+IFS=$'\t' read -r ha ba_blob ua < <(read_head "$A")
+IFS=$'\t' read -r hb bb_blob ub < <(read_head "$B")
+if [ "$ha" = "?" ] || [ "$hb" = "?" ] || [ "$ha" != "$hb" ]; then
   note dht-fetch "ADVISORY-DIVERGENT — A=$ha B=$hb (scenario-2 gap; gate this once green ×2)"
+elif [ "$ba_blob" = "?" ] || [ "$bb_blob" = "?" ]; then
+  note dht-fetch "ADVISORY-UNREAD-BYTES — head CONVERGED ($ha) but a served blobHash was unreadable (A=$ba_blob B=$bb_blob)"
+elif [ "$ba_blob" != "$bb_blob" ]; then
+  note dht-fetch "ADVISORY-SAME-HEAD-DIFFERENT-BYTES — one notarized head ($ha), two blobs: A=$ba_blob ($ua) B=$bb_blob ($ub)"
+else
+  note dht-fetch "OK — landing canonical head CONVERGED ($ha) serving $ba_blob"
 fi
 
 exit $rc

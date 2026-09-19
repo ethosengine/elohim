@@ -119,7 +119,12 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   recovery", step `doorway "elohim.host" serves authority B's exact head…` — a single read, no polling, by design.
   Habit: doorway-failover. Proof: household apex-transition 3/3. **Gate: p2p-design-gate** (a signed head record
   crossing the sync plane is a data-entity decision) before any code.
-- **1.5 The pair is compared.** `verify-projected-head.sh` passes per host because its expected hash is `auto`.
+- **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
+  `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
+  served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
+  the sharpest form of the red: the row's `blobHash` moves by a per-doorway PATCH that the head action does not
+  carry, which is exactly the "per-host imperative write" dataplane-convergence forbids and what 1.4 retires.
+  Original scope, kept for the record: `verify-projected-head.sh` passes per host because its expected hash is `auto`.
   Add a pair leg that reads both doorways' `GET /api/v1/federation/coherence` and the landing row and prints one
   `pair head: SAME | DIFFERENT (a=… b=…)` line, warn-only per A:72. Habit: doorway-failover. Proof: the line in
   an edge build; the habit's same-head clause becomes a probe reading instead of a manual curl.
