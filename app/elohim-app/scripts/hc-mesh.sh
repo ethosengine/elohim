@@ -87,7 +87,9 @@
 #                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
 #                   its own OS-thread runtime; unset ⇒ liveness rides the MAIN listener and the watchdog
 #                   a2o scenarios are unconstructible)
-#   STORAGE_BIN     elohim-storage binary (default: pool release slot)
+#   STORAGE_BIN     elohim-storage binary (default: the mesh's own copy at
+#                   <pool>/elohim__elohim-storage/mesh-bin/ when present — the gate's
+#                   `cargo test` never overwrites it — else the pool release, then debug slot)
 #   DOORWAY_BIN     doorway binary (default: pool debug slot)
 #   MONGOD_BIN      mongod binary (default: first of $PATH mongod, ~/bin/mongod);
 #                   empty/absent => the doorways run WITHOUT an archive (inert
@@ -340,7 +342,15 @@ POOL="/projects/.cargo-target-pool/family/dev"
 # needed STORAGE_BIN by hand and a dual run silently fell to whatever was passed.
 _storage_release="$POOL/elohim__elohim-storage/release/release/elohim-storage"
 _storage_debug="$POOL/elohim__elohim-storage/dev/debug/elohim-storage"
-if [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_debug" ]; then
+# The mesh's OWN copy. `just gate elohim-storage` runs `cargo test` in the dev slot, which
+# rebuilds target/debug/elohim-storage with DEFAULT features — so every gate silently replaced
+# the iroh-enabled binary the mesh needs and the next `mesh start` was REFUSED (four rebuilds on
+# 2026-09-19). The gate never writes here. A copy older than the source is still refused by the
+# staleness check below, so this cannot hide a stale binary; print_iroh_build_command refreshes it.
+_storage_mesh="$POOL/elohim__elohim-storage/mesh-bin/elohim-storage"
+if [ -z "${STORAGE_BIN:-}" ] && [ -x "$_storage_mesh" ]; then
+  STORAGE_BIN="$_storage_mesh"
+elif [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storage_debug" ]; then
   STORAGE_BIN="$_storage_debug"
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
@@ -1397,7 +1407,7 @@ storage_has_iroh_feature() { # <binary>
 }
 
 print_iroh_build_command() { # <binary>
-  local bin="$1" target_dir profile=""
+  local bin="$1" target_dir profile="" built
   case "$bin" in
     */debug/elohim-storage) target_dir="${bin%/debug/elohim-storage}" ;;
     */release/elohim-storage)
@@ -1405,8 +1415,12 @@ print_iroh_build_command() { # <binary>
       profile=" --release" ;;
     *) target_dir="$POOL/elohim__elohim-storage/dev" ;;
   esac
+  built="$target_dir/debug/elohim-storage"
+  [ -n "$profile" ] && built="$target_dir/release/elohim-storage"
   echo "  cd '$REPO_ROOT/elohim/elohim-storage'"
   echo "  CARGO_TARGET_DIR='$target_dir' RUSTFLAGS='--cfg getrandom_backend=\"custom\"' cargo build$profile --features \"p2p p2p-iroh\" --bin elohim-storage"
+  # …then park it where the gate's `cargo test` cannot overwrite it (see _storage_mesh).
+  echo "  install -D '$built' '$_storage_mesh'"
 }
 
 # A pool binary that PREDATES the source it is built from is the quietest way to
