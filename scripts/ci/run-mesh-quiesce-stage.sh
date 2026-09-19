@@ -553,6 +553,21 @@ PEER_CSV="matthew=localhost:8090,jessica=localhost:8091,james=localhost:8092"
     pnpm install --frozen-lockfile --filter "@elohim/a2o..." >/dev/null 2>&1
 ) || say "WARN: a2o workspace install returned non-zero — attempting the suite anyway"
 
+# The a2o support tree (`require: ['steps/**/*.ts']` in genesis/a2o/cucumber.mjs,
+# inherited by the saga profile) imports @elohim/storage-client, whose entry
+# point is a BUILT dist/index.js. Installing the workspace links the package but
+# never builds it, and no stage of this mesh run produces that dist — so without
+# this line cucumber dies at SUPPORT LOAD (MODULE_NOT_FOUND) and the tally below
+# reads the empty log as `MESH-E2E: 0/0 scenarios`: a load failure wearing a
+# measurement's clothes. Edge #1464 was this exact miss at the sibling
+# Dataplane Validation site; run-dataplane-validation.sh and
+# genesis/scripts/ci/install-substrate-runner.sh each carry the same build for
+# the same reason — three sites, one required step, none of them shared.
+(
+    cd "$WORKSPACE_ROOT" || exit 1
+    pnpm --filter @elohim/storage-client build
+) || say "WARN: @elohim/storage-client build returned non-zero — the saga suite will likely fail at support load"
+
 left="$(remaining)"
 e2e_timeout=$(( left > 60 ? left : 600 ))
 (
@@ -581,7 +596,15 @@ e2e_passed="$(printf '%s' "$e2e_line" | grep -oE '[0-9]+ passed' | sed 's/ passe
 [ -n "${e2e_passed:-}" ] || e2e_passed=0
 
 echo ""
-if [ "$e2e_rc" -eq 0 ]; then
+if [ "$e2e_total" -eq 0 ]; then
+    # No summary line at all: cucumber never got as far as running a scenario.
+    # Printing `0/0` here reads as "measured, nothing passed" when the truth is
+    # "did not measure" — the same conflation edge #1464 produced at the
+    # Dataplane Validation site (support-load MODULE_NOT_FOUND on the unbuilt
+    # @elohim/storage-client dist). Name the condition; stay non-blocking,
+    # because phase 2 is UNSTABLE-grade by design (see the step-debt note above).
+    echo "MESH-E2E: DID NOT LOAD — cucumber printed no scenario summary (exit ${e2e_rc}, saga profile); see ${E2E_LOG}. Suspect a support-load failure (a workspace package whose dist/ was never built) before suspecting the substrate."
+elif [ "$e2e_rc" -eq 0 ]; then
     echo "MESH-E2E: ${e2e_passed}/${e2e_total} scenarios (PASS, saga profile)"
 else
     echo "MESH-E2E: ${e2e_passed}/${e2e_total} scenarios (cucumber exit ${e2e_rc}, saga profile) — UNSTABLE-grade; see ${E2E_LOG}. Some saga steps still assert global-quiesce predicates inside e2e (known step-debt), so a red here is not automatically a code regression."

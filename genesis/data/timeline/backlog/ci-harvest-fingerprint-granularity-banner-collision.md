@@ -109,3 +109,31 @@ Until that is designed, the operational rule for a triage agent holding an
 description before trusting the reopen.** `UNSTABLE` + `auto: <job>` with an `Aborted by`
 line is the abort class; `FAILURE` + `❌ <job>: FAILURE` with no abort line is the echo
 class. They are not the same finding and the ledger cannot tell them apart.
+
+## 2026-09-19 — the opposite-direction instance: ONE concern, TWO fingerprints
+
+The rows above are *collision* (one fingerprint, many concerns). The
+`caughtUp` template recorded earlier in this doc has now produced the mirror
+image — **fragmentation**, one concern minting a fingerprint per peer label:
+
+```
+591656751c2b  elohim.host /health: p2p.caughtUp is false (expected true)   elohim-edge 1444,1449,1456,1457
+7db3e674ea84  alpha-A     /health: p2p.caughtUp is false (expected true)   elohim-edge 1466
+```
+
+Both are the two adjacent assertions of a SINGLE scenario,
+`genesis/a2o/features/dataplane/inventory-convergence.feature:42`. Cucumber
+short-circuits after the first failing step, so whichever peer is behind at
+probe time is the one that fingerprints — the two labels never co-occur in a
+build, which makes the pair read as two independent intermittent concerns with
+low `seen` counts instead of one concern seen five times. Canonicalized as one
+concern in `backlog/ci-edge-inventory-convergence-caughtup-sawtooth-flap.md`.
+
+**No harvester change is proposed by this note.** The earlier `false` vs
+`undefined` pair on this same template is a *semantic* distinction that must
+survive (`false` = a snapshot exists and reports behind; absent = no snapshot at
+all), so any de-duplication keyed on the message template would erase it. The
+tractable direction, if one is taken, is compositing the fingerprint with the
+nearest preceding `Scenario:` line for cucumber findings — which is the same
+"key it to the concern, not the line" remedy the banner class wants, applied to
+the other polarity. Recorded here so the two directions stay in one doc.

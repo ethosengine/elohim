@@ -64,3 +64,14 @@ gossip", on `alpha-A /health: p2p.caughtUp is false`. Nothing was deployed betwe
 once; the flag follows the sweep phase (doorway `/p2p/status` `projectionReconcile.caughtUp` was seen true,
 false, true at five-minute polls with `pending` 0, 34, 0). The scenario's verdict is the phase of the sawtooth at
 the instant it reads.
+
+## 2026-09-19 — the CI-side concern this blocks
+
+`backlog/ci-edge-inventory-convergence-caughtup-sawtooth-flap.md` is the CI half:
+`inventory-convergence.feature:42` samples `p2p.caughtUp` once and has now failed
+in elohim-edge 1444, 1449, 1456, 1457 (peer `elohim.host`) and 1466 (peer
+`alpha-A`), green in 1467 — the coin toss above, counted. It is parked
+`ci_status: blocked` naming THIS doc's missing node as what unblocks it, and it
+deliberately declines to add a settle window (a 20-30 minute cycle means a
+bounded poll either does not help or masks the sawtooth). When the reconcile
+cure lands, that scenario is its free confirmation probe.
