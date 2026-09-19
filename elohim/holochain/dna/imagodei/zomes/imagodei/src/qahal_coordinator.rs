@@ -548,19 +548,18 @@ fn current_block_height() -> ExternResult<u64> {
 /// Verify that the given agent CID is an active Steward of the given Collective.
 ///
 /// Traverses `HasMembership` links from the Collective's ActionHash and checks
-/// for a non-withdrawn Steward Membership with matching `member_cid`.
-/// This is intentionally coordinator-only (link traversal is not permitted in
-/// the integrity zome).
+/// for a CURRENT (see `membership_is_current`) Steward Membership with matching
+/// `member_cid`. This is intentionally coordinator-only (link traversal is not
+/// permitted in the integrity zome).
 fn require_caller_is_steward_of(agent_cid: &str, collective_cid: &str) -> ExternResult<()> {
     let collective_hash = decode_collective_cid_to_action(collective_cid)?;
     let membership_records = list_memberships_for_collective(collective_hash)?;
     for record in membership_records {
         if let Some(m) = record.entry().to_app_option::<Membership>().ok().flatten() {
-            if m.member_cid == agent_cid
-                && matches!(m.role, MembershipRole::Steward)
-                && m.withdrawn_at_block_height.is_none()
-            {
-                return Ok(());
+            if m.member_cid == agent_cid && matches!(m.role, MembershipRole::Steward) {
+                if membership_is_current(&record)? {
+                    return Ok(());
+                }
             }
         }
     }
@@ -568,6 +567,120 @@ fn require_caller_is_steward_of(agent_cid: &str, collective_cid: &str) -> Extern
         "caller is not a current Steward of {}",
         collective_cid
     ))
+}
+
+/// True iff `create_record` (a Membership fetched by its ORIGINAL Create
+/// ActionHash, e.g. from `list_memberships_for_collective`) is CURRENT:
+/// the Create itself is not withdrawn, AND no Update of it **authored by the
+/// same agent as the Create** is withdrawn.
+///
+/// ## Why this exists — the bug this closes
+///
+/// `get(create_action_hash, ..)` always resolves to the Create's own record;
+/// it does NOT follow to the latest Update (unlike an EntryHash-addressed
+/// get, or `get_my_household_collective_cids`'s own-chain walk, which is
+/// already latest-state-wins by construction). `withdraw_membership_clean`
+/// withdraws by appending an `update_entry` on the original — it never
+/// rewrites it — so a plain `get()` on the Create hash reports "not
+/// withdrawn" forever. Any authority gate that read `.withdrawn_at_block_height`
+/// straight off a `list_memberships_for_collective` record (as
+/// `require_caller_is_steward_of` used to) was checking stale state: a
+/// Steward who had withdrawn kept full authority indefinitely.
+///
+/// ## Why same-author, not "any Update"
+///
+/// `imagodei_integrity`'s `validate` callback has an `OpEntry::UpdateEntry`
+/// arm that discards `action` (`lib.rs` ~:1154) and has no `Membership` case
+/// at all, falling through to `Ok(ValidateCallbackResult::Valid)` — so ANY
+/// agent can append a syntactically-valid Update to ANY Membership entry,
+/// including one they neither authored nor are the subject of. Honouring a
+/// foreign-authored update here would trade "a withdrawn Steward keeps
+/// power" for "any agent can revoke (or fabricate) any Steward's standing" —
+/// strictly worse. Only an Update authored by the SAME agent as the Create
+/// is treated as authoritative; a foreign Update is ignored by this helper
+/// (until the imagodei integrity zome gains an update-author-must-match-
+/// create-author validation rule — see the backlog row this fix updates).
+///
+/// ## Network read, on purpose
+///
+/// This is an AUTHORITY gate: "no withdrawal found" must mean "there truly
+/// is none reachable," not "none is cached locally." `get_details` here uses
+/// `GetOptions::default()` (Network), matching every other authority read in
+/// this file (`get`, `get_collective_by_action`, `list_memberships_for_collective`).
+/// Do NOT switch this to `GetOptions::local()`.
+///
+/// ## Single level only — updates-of-updates
+///
+/// `withdraw_membership_clean` is the only extern in this zome that calls
+/// `update_entry` on a Membership. Its `membership_action_hash` input is not
+/// restricted to an original Create hash at the type level, so an
+/// update-of-update chain (a second `update_entry` targeting a previously
+/// -returned Update's action hash rather than the Create's) is not
+/// structurally impossible. But no extern in this zome ever hands a caller
+/// an Update's action hash to feed back in, and every current caller
+/// (`create_collective`'s founder membership, `instantiate_collab_qahal`'s
+/// per-participant memberships, `affirm_membership`'s returned hash) passes
+/// only the ORIGINAL Create hash into `withdraw_membership_clean`. So this
+/// walk follows only DIRECT updates of the Create (`record_details.updates`),
+/// not updates-of-updates — there is no exercised path today that produces a
+/// second level to walk. If a future extern starts chaining updates off a
+/// previously-returned Update hash, this must become a recursive walk.
+fn membership_is_current(create_record: &Record) -> ExternResult<bool> {
+    let create_membership: Membership = create_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!("{}", e))?
+        .ok_or_else(|| wasm_error!("Membership decode failure"))?;
+    if create_membership.withdrawn_at_block_height.is_some() {
+        return Ok(false);
+    }
+
+    let create_action_hash = create_record.action_address().clone();
+    let create_author = create_record.action().author().clone();
+
+    // This is an authority gate, so an unreadable answer is a refusal, never a
+    // grant: wrongly refusing a current Steward costs a retry once the DHT
+    // settles; wrongly honouring a withdrawn one cannot be undone. Both read
+    // holes below fail CLOSED, and say why.
+    let Some(details) = get_details(create_action_hash, GetOptions::default())? else {
+        return Err(wasm_error!(
+            "cannot verify this Membership is current (its update details are not readable yet) — retry"
+        ));
+    };
+    let Details::Record(record_details) = details else {
+        return Err(wasm_error!(
+            "expected Record details for a Membership Create"
+        ));
+    };
+
+    for update in &record_details.updates {
+        if update.action().author() != &create_author {
+            continue;
+        }
+        // A same-author update EXISTS; withdrawal is the only extern that
+        // updates a Membership, so one we cannot read is most likely exactly
+        // the withdrawal we are looking for.
+        let update_hash = update.action_address().clone();
+        let Some(update_record) = get(update_hash, GetOptions::default())? else {
+            return Err(wasm_error!(
+                "cannot verify this Membership is current (a same-author update is not readable yet) — retry"
+            ));
+        };
+        let Some(updated_membership) = update_record
+            .entry()
+            .to_app_option::<Membership>()
+            .map_err(|e| wasm_error!("{}", e))?
+        else {
+            return Err(wasm_error!(
+                "cannot verify this Membership is current (a same-author update carries no readable Membership)"
+            ));
+        };
+        if updated_membership.withdrawn_at_block_height.is_some() {
+            return Ok(false);
+        }
+    }
+
+    Ok(true)
 }
 
 /// Decode a `collective:<ActionHash>` CID string back to its ActionHash.

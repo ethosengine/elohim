@@ -127,7 +127,7 @@ Compatibility classes, used in the last column:
 | 11 | Stale comment at `content_store_integrity/src/lib.rs` ~:1358-1365 (and the `post_commit_signal_dispatch_tests` module doc at ~:4620) still describes `post_commit` as an ordered `to_app_option` first-match-wins dispatch. The coordinator is now header-driven (`resolve_entry_type`, guarded by `post_commit_dispatch_tests`). The `#[serde(deny_unknown_fields)]` the comment justifies is still load-bearing and must stay; only the reasoning is out of date. | Comment-only. Fold into the elohim crossing (item 8) so the hash question is moot — see §"Is `#[cfg(test)]` really hash-neutral" below for why a comment edit in an integrity crate is not automatically free. |
 | 12 | `validate_human` hardcodes `["public", "community", "private"]` for `profile_reach` while `VISIBILITY_LEVELS` (same file, ~:54) declares five (`public`, `community`, `unlisted`, `connections`, `private`) and `validate_agent` uses the constant. | Use the constant. Note this is a **loosening**, which is still a breaking validation change: old validators would refuse `unlisted` data the new ones accept, so it cannot be back-deployed piecemeal. Reconcile against the canonical reach taxonomy, never a fourth local list. |
 | 13 | A `#[cfg(test)]` link-type / entry-type headroom assertion (content_store is at 225 of the 256 `u8` link-type cap). | Wanted as a guard-rail; see §"Is `#[cfg(test)]` really hash-neutral" for the answer and the one construction trap. |
-| 14 | **A withdrawn Steward keeps steward standing** (read from source 2026-09-19, not executed). `require_caller_is_steward_of` (imagodei `qahal_coordinator.rs` ~:554) tests `withdrawn_at_block_height.is_none()` on records from `list_memberships_for_collective`, which resolves each membership with a plain `get()` on the ORIGINAL Create action. `withdraw_membership_clean` appends an Update and never rewrites the Create, so the Create reads "not withdrawn" forever: a Steward who has left can still issue household invites and sign agreements. The sweettest `qahal_household_query_perf_test` scenario (e) re-joins through exactly this path, so it must be revisited when this row lands. | The coordinator half (follow the update chain, latest state wins) is a hot-swap — and is **unsafe alone**: imagodei's update arm is `OpEntry::UpdateEntry { app_entry, .. }` (~:1154), `action` discarded, so nothing checks WHO authors a Membership update. Latest-wins without that check converts "a withdrawn steward keeps power" into "anyone can revoke a steward". Order is therefore fixed: the integrity rule first (a Membership update is valid only from the original author; rides the imagodei crossing with rows 1-4 and is the update-side twin of row 7), the coordinator read second. The own-chain reader `get_my_household_collective_cids` already applies latest-state-wins safely — a foreign Update cannot land on the caller's own source chain. |
+| 14 | **A withdrawn Steward keeps steward standing — coordinator half landed 2026-09-19.** `require_caller_is_steward_of` (imagodei `qahal_coordinator.rs`) now resolves currency through `membership_is_current`: a Membership is current iff its Create is not withdrawn AND no Update of it **authored by the same agent as the Create** is withdrawn (network `get_details`, matching every other authority read in the file). Same-author-only is what makes the coordinator half safe standing alone: imagodei's update arm is `OpEntry::UpdateEntry { app_entry, .. }` (~:1154), `action` discarded, no `Membership` case — so any agent can author a syntactically-valid Update against any Membership, but `membership_is_current` ignores every Update not authored by the Create's own author, so a foreign-authored Update can never flip a Steward's currency either way. `qahal_household_query_perf_test` scenario (e) now asserts the withdrawn founder's own `issue_household_invite` is refused. | What remains is write-time, not read-time: the imagodei integrity zome has no rule that a Membership Update is valid only from the original author — the update-side twin of row 7 (imagodei_integrity's `UpdateEntry` dispatch discards `action` the same way row 7 describes for content_store/node-registry's `CreateEntry` dispatch). Landing it turns a foreign-authored Update from "silently ignored by this one coordinator read" into "refused outright at commit," closing the gap for any future reader that forgets the same-author filter; it rides the imagodei crossing with rows 1-4. The own-chain reader `get_my_household_collective_cids` is unaffected (own-chain read, already latest-state-wins). |
 
 ## The landing design
 
@@ -245,53 +245,51 @@ expected hash-neutral — and "expected" is the correct word. Prove it the one c
 same caveat for the comment-only edit in rider 11 — which is why the safe route is to land it inside
 the elohim crossing, where the hash moves anyway.
 
-## Operator decisions
+## Decisions (taken 2026-09-19)
 
-Each has a recommendation. None should be taken by an implementing agent.
+Each was taken from what the protocol's vision requires, not from convenience. They bind the
+implementing crossings.
 
-**D1 — Is this cluster scheduled before any `_alpha` → `_beta` promotion?**
-*Recommendation: yes, and treat it as the gating condition.* Class-C rows (3, 4-founder, 6) are
-absorbed by reseed at `_alpha` and require authored transforms at `_beta`, forever. This is the only
-row in this document with a closing window.
+**D1 — The authority crossing gates any `_alpha` → `_beta` promotion.** Trust here must be earned
+by provenance; a network promoted while authority is only coordinator-polite has promoted configured
+trust. Class-C rows (3, 4-founder, 6) are absorbed by reseed at `_alpha` and cost an authored
+transform forever after.
 
-**D2 — Do REA `Commitment.provider`/`receiver` gain agent-key fields?**
-*Recommendation: yes, additively — keep the display `String`, add `provider_agent`/`receiver_agent:
-Option<AgentPubKey>` with `#[serde(default)]`, and validate the binding when present.* This keeps the
-row class-B instead of class-C, and lets the check tighten from "when present" to "required" in a
-later crossing without a second shape change. The alternative — retyping the existing fields — is a
-class-C break on the largest corpus for no additional guarantee.
+**D2 — REA agent keys are additive and ride the attribution cut.** `provider_agent` /
+`receiver_agent: Option<AgentPubKey>`, `#[serde(default)]`. They cannot be *required*: an REA
+provider may be a stewarded presence with no key, and commons stewardship of such presences is part
+of the design, not an edge case. So: when a key is present it MUST equal `action.author()` (or the
+counterparty's key); when absent the entry is the author's *attestation about* a presence, and its
+projection carries an unverified proof status so no economic join credits it — the same cut
+`peer_identity_bindings.proof_status` / `AttributableBindings` already enforces by type in storage.
+Optional on the wire, never optional in what downstream may price.
 
-**D3 — `StewardshipGrant`: who is the legitimate author?**
-The subject (consented self-grant), the delegating steward (verified via `delegated_from`), or
-either? *Recommendation: either, with the distinction recorded on the entry.* A grant a subject
-cannot initiate is paternalistic; a grant a steward cannot delegate breaks the depth-3 chain the
-entry already models. This is the row where the custodial-authority-answerable habit and this one
-meet: the *answerability* of an institutional grant is that habit's question, and the cure here must
-not foreclose it. Design them together.
+**D3 — A `StewardshipGrant` is authored by the subject, or by the steward WITH a verified witness
+signature — never by the steward alone.** Subject-only is impossible (guardianship exists: a child
+cannot consent). Steward-alone is today's behaviour and is a capture vector. The method is
+neither-party-alone: `verified_by` becomes an `AgentPubKey` + `Signature` over the grant's canonical
+bytes, `verify_signature`-checked, and must differ from both steward and subject. Integrity proves
+that a distinct third key signed; whether that witness was the *right* one is discernment and
+belongs to Mishpat, as do the subject's appeal rights. Delegation follows `delegated_from` as an
+`ActionHash` to the parent grant's author. Design with `custodial-authority-answerable`.
 
-**D4 — `CustodianAssignment`: what is the authority model?**
-Integrity can enforce self-assignment (a node accepting custody it authored) or an assignment signed
-by a named authority; it cannot enforce a placement policy. *Recommendation: self-assignment plus an
-optional signed placement directive* — the node's acceptance is the authenticated act, and the
-placement decision stays in the substrate's placement strategy where it belongs. Do not try to
-express diversity-aware placement as a validation rule.
+**D4 — A `CustodianAssignment` is authored by the custodian and no one else.** Custody is a
+commitment a holder makes, not a duty assigned to it. Placement directives are advisory signals in
+the placement strategy; they carry no authority and need no validator.
 
-**D5 — Is there a membrane, and on which DNAs?**
-*Recommendation: infrastructure and node-registry only; explicitly none on the elohim content DNA.*
-Who may claim to *be infrastructure* is a bounded, capture-relevant question with a natural issuer.
-Who may *read and author content* is not: an invite-gated commons is a capture vector of exactly the
-kind the doorway's thin-projection posture exists to avoid, and gating participation on a progenitor
-key would make the founding key an apex the protocol says it does not have. Two hard preconditions
-if adopted: `progenitor_pubkey` is still the `~` placeholder in `happ.yaml` (a membrane shipped
-against an unset key refuses every join, including ours), and the invite-issuance path must exist
-before the refusal does.
+**D5 — No progenitor-key membrane, on any DNA, in this crossing or later.** A founding key that
+admits members is an apex, and the protocol has none: doorways are plural, a doorway's standing is
+a commons privilege open to challenge, and an invite-gated commons is a capture vector.
+`progenitor_pubkey` stays what its own module says it is — a bootstrap-steward identity, not an
+admission gate. If measured sybil pressure on node-registry ever demands a membrane, its shape is
+PEER-VOUCHED — a join proof signed by any already-registered node, checkable deterministically with
+`must_get_valid_record` on the voucher's registration — never founder-signed. Until that pressure is
+measured, self-bound entries (row 6) plus the attribution cut are the defence.
 
-**D6 — Does item 1's link arm become exhaustive (no `_ =>` wildcard)?**
-*Recommendation: yes, and this is the item with the longest-lived value.* An exhaustive match makes
-"who may author this link" a question the compiler asks at every new link type, forever — 225 of 256
-in content_store, so the answer will be asked often. It is also the largest single diff in the
-cluster, and the one most likely to be trimmed under time pressure. Trimming it converts a permanent
-guarantee into a one-time sweep.
+**D6 — Item 1's link arm is exhaustive; no `_ =>`.** Each `LinkTypes` variant is classified by an
+exhaustive fn into `AuthorIsBase` / `AuthorIsTargetAuthor` / `OpenIndex(<reason>)`, so an anchor or
+path link is open *by declaration* rather than by fallthrough. This is the habit's `retire-when`:
+the compiler asks "who may author this link" at every new link type.
 
 ## Cluster registration
 

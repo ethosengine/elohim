@@ -10,13 +10,13 @@
 //! agent's own source chain — all reads are local (no cross-conductor DHT
 //! consistency wait needed, unlike qahal_formation_test.rs):
 //!
-//!   (a) a household Membership              -> included
-//!   (b) a non-household Membership          -> excluded (charter isn't household)
-//!   (c) a withdrawn household Membership    -> excluded
-//!   (d) a DELETED Membership record         -> NOT covered here (see note below)
-//!   (e) withdrawn then re-joined household  -> included
+//!   (a) a household Membership                 -> included
+//!   (b) a non-household Membership              -> excluded (charter isn't household)
+//!   (c) a withdrawn household Membership        -> excluded
+//!   (d) a DELETED Membership record              -> NOT covered here (see note below)
+//!   (e) a withdrawn Steward's own re-invite      -> REFUSED (authority-in-integrity fix)
 //!
-//! ## (c)/(e) — latest-state-wins over withdrawal
+//! ## (c) — latest-state-wins over withdrawal
 //!
 //! `withdraw_membership_clean` uses `update_entry`, which appends a NEW
 //! Update action to the chain rather than rewriting the ORIGINAL Create
@@ -24,9 +24,31 @@
 //! `get_my_household_collective_cids` walks records in ascending chain order
 //! and treats the LAST record touching a given collective_cid as authoritative:
 //! a non-withdrawn record inserts the cid, a withdrawn record removes it. So
-//! (c) a withdrawn household is excluded, and (e) a later re-join (a fresh
-//! non-withdrawn Membership Create, via `issue_household_invite` +
-//! `affirm_membership` self-invite) re-inserts it.
+//! (c) a withdrawn household is excluded.
+//!
+//! ## (e) — a withdrawn Steward can no longer act, at all
+//!
+//! This scenario used to prove the OPPOSITE: it had the withdrawn founder
+//! self-issue a `steward` invite for the collective they had just withdrawn
+//! from, and affirm it, re-joining as Steward — which only "worked" because
+//! `require_caller_is_steward_of` read `withdrawn_at_block_height` off the
+//! record fetched by the Membership's ORIGINAL Create ActionHash, which
+//! never reflects `withdraw_membership_clean`'s `update_entry`. A withdrawn
+//! Steward kept full standing forever. That gate now resolves currency via
+//! `qahal_coordinator::membership_is_current` (Create not withdrawn AND no
+//! same-author Update withdrawn), so this scenario instead asserts the
+//! authority gate holds: the same (former) founder's `issue_household_invite`
+//! for that collective is REFUSED post-withdrawal.
+//!
+//! A genuine re-join — a SECOND, still-current Steward inviting the withdrawn
+//! member back — is not added here as (f): it would require converting this
+//! suite's single-agent, local-only-reads design (explicitly no
+//! cross-conductor DHT consistency wait, per the module doc above) into a
+//! two-conductor test with peer-info exchange and `await_consistency_s`, the
+//! `qahal_formation_test.rs` pattern. That is not a cheap addition to a test
+//! whose stated purpose is the two-phase LOCAL chain read, and the
+//! invite/affirm flow across two conductors is already covered there — a
+//! withdrawn-then-genuinely-rejoined variant belongs alongside it, not here.
 //!
 //! ## (d) — deleted Membership record: not constructible via public externs
 //!
@@ -86,11 +108,6 @@ struct HouseholdInviteToken {
     signature: Signature,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
-struct AffirmMembershipInput {
-    token: HouseholdInviteToken,
-}
-
 fn far_future_micros() -> i64 {
     4_102_444_800_000_000
 } // 2100-01-01
@@ -135,7 +152,7 @@ async fn get_my_household_collective_cids_two_phase_read_parity() -> Result<()> 
     let community_cid = format!("collective:{community_hash}");
 
     // (c)/(e) A third household Collective, whose founder Membership is then
-    //     cleanly withdrawn (spec §6.4 clean-exit path), and later re-joined.
+    //     cleanly withdrawn (spec §6.4 clean-exit path).
     let withdrawn_household_hash: ActionHash = conductor
         .call(
             &cell.zome(ZOME),
@@ -194,13 +211,16 @@ async fn get_my_household_collective_cids_two_phase_read_parity() -> Result<()> 
         "(c) latest-state-wins: a withdrawn household must be excluded; got {cids:?}"
     );
 
-    // (e) Re-join the withdrawn household: the founder (still a stale-read
-    // Steward per `require_caller_is_steward_of`) issues themselves an
-    // invite and affirms it, producing a fresh non-withdrawn Membership
-    // Create for the SAME collective_cid, later on the chain than the
-    // withdrawal.
-    let token: HouseholdInviteToken = conductor
-        .call(
+    // (e) The withdrawn founder is no longer a current Steward of that
+    // collective: `issue_household_invite` (which gates on
+    // `require_caller_is_steward_of` -> `membership_is_current`) must refuse
+    // them, even though the caller is the ONLY agent who was ever a Steward
+    // of this collective. Prior to the authority-in-integrity fix, this same
+    // call succeeded (the withdrawn founder could self-issue a fresh
+    // `steward` invite and re-join) because the gate read the stale,
+    // never-updated Create record.
+    let invite_after_withdrawal: Result<HouseholdInviteToken, _> = conductor
+        .call_fallible(
             &cell.zome(ZOME),
             "issue_household_invite",
             IssueHouseholdInviteInput {
@@ -211,28 +231,14 @@ async fn get_my_household_collective_cids_two_phase_read_parity() -> Result<()> 
             },
         )
         .await;
-    let _rejoin_membership_hash: ActionHash = conductor
-        .call(
-            &cell.zome(ZOME),
-            "affirm_membership",
-            AffirmMembershipInput { token },
-        )
-        .await;
-
-    let cids_after_rejoin: Vec<String> = conductor
-        .call(&cell.zome(ZOME), "get_my_household_collective_cids", ())
-        .await;
     assert!(
-        cids_after_rejoin.contains(&household_cid),
-        "(a) household Membership must remain included after re-join; got {cids_after_rejoin:?}"
+        invite_after_withdrawal.is_err(),
+        "(e) a withdrawn Steward's own issue_household_invite must be refused, not succeed"
     );
+    let err_str = format!("{:?}", invite_after_withdrawal.unwrap_err());
     assert!(
-        !cids_after_rejoin.contains(&community_cid),
-        "(b) non-household Membership must remain excluded after re-join; got {cids_after_rejoin:?}"
-    );
-    assert!(
-        cids_after_rejoin.contains(&withdrawn_household_cid),
-        "(e) a re-join after withdrawal must re-insert the household cid; got {cids_after_rejoin:?}"
+        err_str.to_lowercase().contains("steward"),
+        "(e) refusal should name the Steward-authority gate; got: {err_str}"
     );
 
     Ok(())
