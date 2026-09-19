@@ -142,9 +142,19 @@ take roughly ten minutes off every gate.
 |---|---|---|---|---|
 | baseline, 2026-09-19 | ~1 980 s | 3 912 | — | — |
 | step 1 `elohim-error` (c63079ac2) | 1 368 s | 3 912 (+2 in the new crate) | 13 s / 7 s | 1 s |
+| step 0b test binaries 168 → 14 | 1 048 s | 3 913 | — | — |
 
 The 1 980 → 1 368 s drop is cache warmth, not the extraction — `error.rs` was 122 lines. It is recorded so that
 later rows are read against an honest neighbour rather than against the cold baseline.
+
+Step 0b moved no code out of the crate; it grouped 165 single-file integration-test binaries into 11 by domain
+(`tests/<group>/main.rs`), leaving three standalone. Same tests, same verdicts — 821 passed, 0 failed, 41 ignored
+before and after — and `cargo test --no-run` fell from 7 m 42 s to 3 m 49 s because 154 links disappeared. It is the
+first storage gate under the 1 200 s ceiling; the finding needs one more to close. One thing changed shape and not
+coverage: the 68 files that carried a crate-root `#![cfg(feature = …)]` now sit behind `#[cfg(…)] mod x;` in their
+group's `main.rs`, so under default features they are no longer even tokenised. They were already empty binaries
+there. The 46 gated on `p2p-iroh` run only under `just test-iroh`, which no gate or pipeline calls —
+`genesis/data/timeline/backlog/storage-gate-skips-iroh-two-peer-test.md` carries that gap, widened on this date.
 
 The step-1 gate was also the first run under the gate-cycle ceiling (`gate-cycle-full-ceiling@1`, hard 1 200 s,
 `.claude/epr-meta/measures.yaml`). It fired: finding `984ccc2c18d8` in `.claude/data/architecture-findings.jsonl`,

@@ -54,51 +54,51 @@ test-iroh:
 # Release-mode + ignored-test pattern keeps the bench out of `just test-iroh`
 # but makes it explicit-to-invoke.
 bench-blob:
-    cargo test --release --features "p2p p2p-iroh" --test bench_blob_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_blob_perf::
 
 # Head-to-head sync plane perf bench: iroh /elohim/sync/2.0.0 vs libp2p
 # /elohim/storage-sync/1.0.0 — request/response with reused connections.
 bench-sync:
-    cargo test --release --features "p2p p2p-iroh" --test bench_sync_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_sync_perf::
 
 # Head-to-head EPR plane perf bench: iroh /elohim/epr/2.0.0 vs libp2p
 # /elohim/epr/1.0.0 — Resolve→Head round-trip on MessagePack codec.
 bench-epr:
-    cargo test --release --features "p2p p2p-iroh" --test bench_epr_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_epr_perf::
 
 # Head-to-head EPR-atom plane perf bench: iroh /elohim/epr-atom/2.0.0 vs libp2p
 # /elohim/epr-atom/1.0.0 — Fetch→Atom round-trip on CBOR codec.
 bench-epr-atom:
-    cargo test --release --features "p2p p2p-iroh" --test bench_epr_atom_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_epr_atom_perf::
 
 # Head-to-head shard plane perf bench: iroh /elohim/shard/2.0.0 vs libp2p
 # /elohim/shard/1.0.0 — Get→Data round-trip; sweeps RS-shard sizes.
 bench-shard:
-    cargo test --release --features "p2p p2p-iroh" --test bench_shard_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_shard_perf::
 
 # Head-to-head view-federation plane perf bench: iroh
 # /elohim/view-federation/2.0.0 vs libp2p /elohim/view-federation/1.0.0 —
 # ViewFederationRequest/Response with topology-edge payloads (256 KiB cap).
 bench-view-fed:
-    cargo test --release --features "p2p p2p-iroh" --test bench_view_fed_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_view_fed_perf::
 
 # Head-to-head gossip plane perf bench: iroh-gossip vs libp2p-gossipsub —
 # inventory delta publish→receive latency.
 bench-gossip:
-    cargo test --release --features "p2p p2p-iroh" --test bench_gossip_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_gossip_perf::
 
 # Head-to-head identity-handshake plane perf bench: iroh /elohim/identity-handshake/2.0.0
 # vs libp2p /elohim/identity/handshake/1.0.0 — IdentityHandshakeRequest/Response with
 # signature payload size sweep (64 B – 2048 B raw; ~2730 B base64 + binding
 # overhead stays under the 4 KiB IDENTITY_HANDSHAKE_REQ_MAX cap).
 bench-identity-handshake:
-    cargo test --release --features "p2p p2p-iroh" --test bench_identity_handshake_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_identity_handshake_perf::
 
 # Head-to-head trust plane perf bench: iroh /elohim/trust/2.0.0
 # vs libp2p /elohim/trust/1.0.0 — TrustHandshake/Response with attestation CID count sweep
 # (1–768 CIDs, under the 64 KiB request cap).
 bench-trust:
-    cargo test --release --features "p2p p2p-iroh" --test bench_trust_perf -- --ignored --nocapture
+    cargo test --release --features "p2p p2p-iroh" --test bench_perf -- --ignored --nocapture bench_trust_perf::
 
 # Run every bench in sequence and print a combined summary report.
 # Each plane runs independently; the umbrella target streams output as it goes.
