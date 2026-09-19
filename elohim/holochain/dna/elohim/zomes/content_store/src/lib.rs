@@ -883,6 +883,10 @@ mod compute_task;
 mod gate;
 use gate::gate_check_for_content;
 
+// Native unit tests for post_commit's header-driven type resolution (Gap F guard).
+#[cfg(test)]
+mod post_commit_dispatch_tests;
+
 // =============================================================================
 // Cross-DNA Bridge Calls to Imagodei
 // =============================================================================
@@ -6852,7 +6856,12 @@ pub fn process_import_chunk(
 
     let batch_action_hash = links
         .last()
-        .unwrap()
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Batch '{}' has no links",
+                input.batch_id
+            )))
+        })?
         .target
         .clone()
         .into_action_hash()
@@ -7166,7 +7175,11 @@ pub fn get_import_status(batch_id: String) -> ExternResult<Option<ImportBatch>> 
     // Get the most recent batch (by creation order)
     let action_hash = links
         .last()
-        .unwrap()
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Batch '{batch_id}' has no links"
+            )))
+        })?
         .target
         .clone()
         .into_action_hash()
@@ -14754,29 +14767,147 @@ pub enum ProjectionSignal {
 /// Called by Holochain after each successful commit. Inspects the
 /// committed entries and emits signals that Doorway subscribes to
 /// for real-time cache updates.
+///
+/// # Dispatch is header-driven, never decode-driven
+///
+/// The action header carries the `AppEntryDef { zome_index, entry_index }` that the
+/// integrity zome assigned at commit time, so the committed type is a FACT we read —
+/// `resolve_entry_type` (the generated `EntryTypes::deserialize_from_type` machinery
+/// with its `zome_info()` lookup hoisted out of the loop) maps that pair to exactly
+/// one `EntryTypes` variant.
+///
+/// The previous implementation instead tried `to_app_option::<T>()` against ~24
+/// candidate types in a fixed order and took the first success. MessagePack struct
+/// decoding is structurally permissive, so any type whose fields are a subset of a
+/// type appearing LATER in the chain silently stole that type's signal. That is how
+/// "Gap F" happened: `Agreement` decoded successfully from `Commitment` bytes, so
+/// `AgreementCommitted` fired and `ReaCommitmentCommitted` never landed — and the
+/// elohim-storage projection for REA commitments never saw its entries. Only one
+/// type (`Agreement`) was ever patched with `#[serde(deny_unknown_fields)]`; the
+/// other ~23 stayed exposed. Header dispatch retires the whole class at once and
+/// removes the ordering dependency entirely: adding a type to the match below can no
+/// longer shadow, or be shadowed by, any other type.
+///
+/// # Fault isolation
+///
+/// Each committed action is handled by `post_commit_one`. A failure on one action
+/// (record not gettable, undecodable entry bytes, a rejected `emit_signal`) is logged
+/// and skipped so the remaining actions in the same batch still emit their signals.
+/// The previous `?`-per-item shape aborted every LATER signal in the batch on the
+/// first failure — a single bad record silently dropped an arbitrary tail of the
+/// projection stream.
 #[hdk_extern]
 pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+    // Resolve the coordinator's scoped entry types ONCE per batch. See
+    // `resolve_entry_type` — `EntryTypes::deserialize_from_type` would call
+    // `zome_info()` per action, and `zome_info()` re-runs the integrity zome's
+    // `entry_defs` callback on every call. A bulk import commits hundreds of
+    // entries in one post_commit batch; that would be hundreds of extra wasm
+    // invocations inside a callback that already does one `get()` per action.
+    let scoped_entry_types = zome_info()?.zome_types.entries;
+
     for signed_action in committed_actions {
-        let action = signed_action.hashed.content.clone();
         let action_hash = signed_action.hashed.hash.clone();
+        if let Err(e) = post_commit_one(signed_action, &scoped_entry_types) {
+            error!(
+                "post_commit: skipping signals for action {:?} — {:?}",
+                action_hash, e
+            );
+        }
+    }
 
-        // Only process Create and Update actions (not deletes, links, etc.)
-        let entry_hash = match &action.data {
-            ActionData::Create(create) => create.entry_hash.clone(),
-            ActionData::Update(update) => update.entry_hash.clone(),
-            _ => continue,
-        };
+    Ok(())
+}
 
-        // Get the entry to determine its type and emit the appropriate signal
-        let record = match get(action_hash.clone(), GetOptions::default())? {
-            Some(r) => r,
-            None => continue,
-        };
+/// `EntryTypes::deserialize_from_type` with the `zome_info()` lookup lifted out.
+///
+/// This is a PURE HOIST of the `EntryTypesHelper` impl that `#[hdk_entry_types]`
+/// generates for `EntryTypes`: same `ScopedZomeTypes::find` over the same
+/// `UnitEntryTypes::iter()`, same generated `TryFrom<(UnitEntryTypes, &Entry)>`
+/// decode, same `Ok(None)` / `Err` split on a miss. The only difference is WHERE
+/// `zome_info()` comes from — the caller fetches it once per batch instead of the
+/// helper fetching it once per action.
+fn resolve_entry_type(
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+    zome_index: ZomeIndex,
+    entry_index: EntryDefIndex,
+    entry: &Entry,
+) -> ExternResult<Option<EntryTypes>> {
+    let scoped = ScopedEntryDefIndex {
+        zome_index,
+        zome_type: entry_index,
+    };
+    match scoped_entry_types.find(UnitEntryTypes::iter(), scoped) {
+        Some(unit) => Ok(Some((unit, entry).try_into()?)),
+        // A miss on a zome we DO depend on means the header named an entry index
+        // outside this integrity zome's range — a real inconsistency, surfaced.
+        None if scoped_entry_types
+            .dependencies()
+            .any(|z| z == scoped.zome_index) =>
+        {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "post_commit: entry type {scoped:?} is out of range for this zome"
+            ))))
+        }
+        // A miss on a zome we do NOT depend on: not ours to project.
+        None => Ok(None),
+    }
+}
 
-        let author = action.author().clone();
+/// Emit the projection (and cache) signals for ONE committed action.
+///
+/// Returning `Err` loses the signals for this action only; the caller logs it and
+/// continues with the rest of the batch.
+fn post_commit_one(
+    signed_action: SignedActionHashed,
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+) -> ExternResult<()> {
+    let action = signed_action.hashed.content.clone();
+    let action_hash = signed_action.hashed.hash.clone();
 
-        // Try to deserialize as each entry type and emit the corresponding signal
-        if let Some(content) = record.entry().to_app_option::<Content>().ok().flatten() {
+    // Only process Create and Update actions (not deletes, links, etc.)
+    let entry_hash = match &action.data {
+        ActionData::Create(create) => create.entry_hash.clone(),
+        ActionData::Update(update) => update.entry_hash.clone(),
+        _ => return Ok(()),
+    };
+
+    // Header-driven type resolution. Non-App entry types (AgentPubKey, CapClaim,
+    // CapGrant) carry no app entry definition; they were never projected and still
+    // are not.
+    let (zome_index, entry_index) = match action.entry_type() {
+        Some(EntryType::App(def)) => (def.zome_index, def.entry_index),
+        _ => return Ok(()),
+    };
+
+    // Fetch the entry bytes. A private entry is not readable here
+    // (`RecordEntry::Hidden` / `NotStored`) and a not-yet-available record yields
+    // `None` — both are skipped silently, exactly as the old decode chain did for
+    // the same inputs (`to_app_option` returns `Ok(None)` when there is no entry).
+    let record = match get(action_hash.clone(), GetOptions::default())? {
+        Some(r) => r,
+        None => return Ok(()),
+    };
+    // Borrowed, not cloned — an `Entry` can be megabytes and this runs per action.
+    let entry = match record.entry().as_option() {
+        Some(e) => e,
+        None => return Ok(()),
+    };
+
+    let author = action.author().clone();
+
+    // `Ok(None)` means the action was authored against an integrity zome this
+    // coordinator does not depend on — nothing of ours to project. An `Err` here
+    // means the header named one of OUR entry types but the bytes did not decode
+    // as that type; that is a real integrity problem, so it propagates to the
+    // caller's log rather than being swallowed the way the old chain swallowed it.
+    let Some(entry_type) = resolve_entry_type(scoped_entry_types, zome_index, entry_index, entry)?
+    else {
+        return Ok(());
+    };
+
+    match entry_type {
+        EntryTypes::Content(content) => {
             // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::ContentCommitted {
                 action_hash,
@@ -14786,31 +14917,24 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             })?;
             // Emit cache signal (for Doorway)
             emit_signal(DoorwaySignal::new(CacheSignal::upsert(&content)))?;
-        } else if let Some(manifest) = record.entry().to_app_option::<Manifest>().ok().flatten() {
+        }
+        EntryTypes::Manifest(manifest) => {
             emit_signal(ProjectionSignal::ManifestCommitted {
                 action_hash,
                 entry_hash,
                 manifest,
                 author,
             })?;
-        } else if let Some(signal) = record
-            .entry()
-            .to_app_option::<FeedbackSignal>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::FeedbackSignal(signal) => {
             emit_signal(ProjectionSignal::FeedbackSignalCommitted {
                 action_hash,
                 entry_hash,
                 signal,
                 author,
             })?;
-        } else if let Some(path) = record
-            .entry()
-            .to_app_option::<LearningPath>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::LearningPath(path) => {
             // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::PathCommitted {
                 action_hash,
@@ -14820,26 +14944,24 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             })?;
             // Emit cache signal (for Doorway)
             emit_signal(DoorwaySignal::new(CacheSignal::upsert(&path)))?;
-        } else if let Some(step) = record.entry().to_app_option::<PathStep>().ok().flatten() {
+        }
+        EntryTypes::PathStep(step) => {
             emit_signal(ProjectionSignal::StepCommitted {
                 action_hash,
                 entry_hash,
                 step,
                 author,
             })?;
-        } else if let Some(chapter) = record.entry().to_app_option::<PathChapter>().ok().flatten() {
+        }
+        EntryTypes::PathChapter(chapter) => {
             emit_signal(ProjectionSignal::ChapterCommitted {
                 action_hash,
                 entry_hash,
                 chapter,
                 author,
             })?;
-        } else if let Some(relationship) = record
-            .entry()
-            .to_app_option::<Relationship>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::Relationship(relationship) => {
             // Auto-create custodian commitments when relationship reaches trusted/intimate
             let _ = on_relationship_updated(relationship.clone());
 
@@ -14852,185 +14974,136 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             })?;
             // Emit cache signal (for Doorway)
             emit_signal(DoorwaySignal::new(CacheSignal::upsert(&relationship)))?;
-        } else if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
+        }
+        EntryTypes::Human(human) => {
             emit_signal(ProjectionSignal::HumanCommitted {
                 action_hash,
                 entry_hash,
                 human,
                 author,
             })?;
-        } else if let Some(agent) = record.entry().to_app_option::<Agent>().ok().flatten() {
+        }
+        EntryTypes::Agent(agent) => {
             emit_signal(ProjectionSignal::AgentCommitted {
                 action_hash,
                 entry_hash,
                 agent,
                 author,
             })?;
-        } else if let Some(presence) = record
-            .entry()
-            .to_app_option::<ContributorPresence>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::ContributorPresence(presence) => {
             emit_signal(ProjectionSignal::PresenceCommitted {
                 action_hash,
                 entry_hash,
                 presence,
                 author,
             })?;
-        } else if let Some(commitment) = record
-            .entry()
-            .to_app_option::<CustodianCommitment>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::CustodianCommitment(commitment) => {
             emit_signal(ProjectionSignal::CustodianCommitmentCommitted {
                 action_hash,
                 entry_hash,
                 commitment,
                 author,
             })?;
-        } else if let Some(profile) = record
-            .entry()
-            .to_app_option::<MemberRiskProfile>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::MemberRiskProfile(profile) => {
             emit_signal(ProjectionSignal::MemberRiskProfileCommitted {
                 action_hash,
                 entry_hash,
                 profile: member_risk_profile_to_wire(&profile),
                 author,
             })?;
-        } else if let Some(policy) = record
-            .entry()
-            .to_app_option::<CoveragePolicy>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::CoveragePolicy(policy) => {
             emit_signal(ProjectionSignal::CoveragePolicyCommitted {
                 action_hash,
                 entry_hash,
                 policy: coverage_policy_to_wire(&policy),
                 author,
             })?;
-        } else if let Some(claim) = record
-            .entry()
-            .to_app_option::<InsuranceClaim>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::InsuranceClaim(claim) => {
             emit_signal(ProjectionSignal::InsuranceClaimCommitted {
                 action_hash,
                 entry_hash,
                 claim: insurance_claim_to_wire(&claim),
                 author,
             })?;
-        } else if let Some(reasoning) = record
-            .entry()
-            .to_app_option::<AdjustmentReasoning>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::AdjustmentReasoning(reasoning) => {
             emit_signal(ProjectionSignal::AdjustmentReasoningCommitted {
                 action_hash,
                 entry_hash,
                 reasoning: adjustment_reasoning_to_wire(&reasoning),
                 author,
             })?;
-        } else if let Some(request) = record
-            .entry()
-            .to_app_option::<ServiceRequest>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::ServiceRequest(request) => {
             emit_signal(ProjectionSignal::ServiceRequestCommitted {
                 action_hash,
                 entry_hash,
                 request: service_request_to_wire(&request),
                 author,
             })?;
-        } else if let Some(offer) = record
-            .entry()
-            .to_app_option::<ServiceOffer>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::ServiceOffer(offer) => {
             emit_signal(ProjectionSignal::ServiceOfferCommitted {
                 action_hash,
                 entry_hash,
                 offer: service_offer_to_wire(&offer),
                 author,
             })?;
-        } else if let Some(service_match) = record
-            .entry()
-            .to_app_option::<ServiceMatch>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::ServiceMatch(service_match) => {
             emit_signal(ProjectionSignal::ServiceMatchCommitted {
                 action_hash,
                 entry_hash,
                 service_match: service_match_to_wire(&service_match),
                 author,
             })?;
-        } else if let Some(doorway) = record
-            .entry()
-            .to_app_option::<DoorwayRegistration>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::DoorwayRegistration(doorway) => {
             emit_signal(ProjectionSignal::DoorwayCommitted {
                 action_hash,
                 entry_hash,
                 doorway,
                 author,
             })?;
-        } else if let Some(heartbeat) = record
-            .entry()
-            .to_app_option::<DoorwayHeartbeat>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::DoorwayHeartbeat(heartbeat) => {
             emit_signal(ProjectionSignal::DoorwayHeartbeatCommitted {
                 action_hash,
                 entry_hash,
                 heartbeat,
                 author,
             })?;
-        } else if let Some(summary) = record
-            .entry()
-            .to_app_option::<DoorwayHeartbeatSummary>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::DoorwayHeartbeatSummary(summary) => {
             emit_signal(ProjectionSignal::DoorwaySummaryCommitted {
                 action_hash,
                 entry_hash,
                 summary,
                 author,
             })?;
-        } else if let Some(agreement) = record.entry().to_app_option::<Agreement>().ok().flatten() {
+        }
+        EntryTypes::Agreement(agreement) => {
             emit_signal(ProjectionSignal::AgreementCommitted {
                 action_hash,
                 entry_hash,
                 agreement,
                 author,
             })?;
-        } else if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten()
-        {
+        }
+        EntryTypes::Commitment(commitment) => {
             emit_signal(ProjectionSignal::ReaCommitmentCommitted {
                 action_hash,
                 entry_hash,
                 commitment,
                 author,
             })?;
-        } else if let Some(event) = record
-            .entry()
-            .to_app_option::<EconomicEvent>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::EconomicEvent(event) => {
             emit_signal(ProjectionSignal::ReaEconomicEventCommitted {
                 action_hash,
                 entry_hash,
@@ -15038,7 +15111,11 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 author,
             })?;
         }
-        // Other entry types can be added here as needed
+        // Every other entry type in the integrity zome is deliberately unprojected,
+        // exactly as before: the old chain had no branch for them and fell through
+        // without emitting. Adding one here is a projection-contract change, not a
+        // refactor — the elohim-storage side must have a handler first.
+        _ => {}
     }
 
     Ok(())
@@ -16182,6 +16259,18 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
 /// mirrors `imagodei::qahal_coordinator::get_my_household_collective_cids`,
 /// which took the same turn for the same reason.
 ///
+/// ## Two-phase read (perf fix — was a single `query(include_entries(true))`)
+///
+/// `entry_type(..)` alone reduces nothing when paired with
+/// `include_entries(true)`: on our pinned conductor fork, `SourceChain::query`
+/// loads the WHOLE chain's actions and, when `include_entries(true)`,
+/// batch-loads EVERY entry on the chain before `ChainQueryFilter` filters in
+/// Rust afterward. So phase 1 queries headers only (`include_entries(false)`,
+/// same `entry_type` filter) and phase 2 materialises only the Commitment
+/// survivors locally via `get_details(.., GetOptions::local())` →
+/// `Details::Record(d).record` — mirroring
+/// `get_my_household_collective_cids`'s phase split exactly.
+///
 /// ## The division of labour this serves
 ///
 /// The DHT notarizes the MANIFEST — the commitment is the witnessed promise
@@ -16199,11 +16288,22 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
 #[hdk_extern]
 pub fn get_my_custody_epr_scopes(_: ()) -> ExternResult<Vec<String>> {
     let own_author = agent_info()?.agent_initial_pubkey;
-    let records = query(
+    let commitment_entry_type: EntryType = UnitEntryTypes::Commitment.try_into()?;
+    let headers = query(
         ChainQueryFilter::new()
-            .entry_type(UnitEntryTypes::Commitment.try_into()?)
-            .include_entries(true),
+            .entry_type(commitment_entry_type)
+            .include_entries(false),
     )?;
+    let mut records: Vec<Record> = Vec::with_capacity(headers.len());
+    for header in &headers {
+        let Some(details) = get_details(header.action_address().clone(), GetOptions::local())?
+        else {
+            continue;
+        };
+        if let Details::Record(record_details) = details {
+            records.push(record_details.record);
+        }
+    }
     let mut ids: std::collections::BTreeMap<String, Vec<ActionHash>> =
         std::collections::BTreeMap::new();
     for record in &records {
