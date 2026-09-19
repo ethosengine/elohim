@@ -209,6 +209,12 @@ def archivePipelineBaselines(String checkpoint) {
         def cbResult = currentBuild.result ?: 'SUCCESS'
         if (cbResult in ['FAILURE', 'ABORTED', 'NOT_BUILT']) {
             shouldAdvanceGlobal = false
+            // The 'plan' checkpoint already advanced __global__ to this run's own
+            // commit; restore the baseline the run LOADED so the failed diff
+            // re-dispatches on the next push (orchestrator/dev #1875).
+            if (env.LOADED_GLOBAL_BASELINE) {
+                baselines['__global__'] = env.LOADED_GLOBAL_BASELINE
+            }
             def prior = baselines['__global__']
             echo "[baseline:${checkpoint}] currentBuild.result=${cbResult} — NOT advancing __global__ (preserving prior ${prior?.toString()?.take(8) ?: '(null)'})"
         }
@@ -902,6 +908,7 @@ def autoModeAnalyze() {
     def changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
 
     env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+    env.LOADED_GLOBAL_BASELINE = pipelineBaselines['__global__'] ?: ''
     env.CHANGED_FILES_COUNT = changedFiles.size().toString()
 
     // Group changed files by top-level area for the decision-matrix log.

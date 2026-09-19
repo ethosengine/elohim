@@ -29,7 +29,7 @@ lint-fix:
 # env-bridge scope loss and validate-only dispatch/stage drift.
 # Fast — no Jenkins required.
 test-jenkinsfile-lints:
-    node --test jenkinsfile-cps-scope.test.mjs validate-only-pipeline.test.mjs
+    node --test jenkinsfile-cps-scope.test.mjs baseline-hold.test.mjs validate-only-pipeline.test.mjs
 
 # Quality gate: validate Jenkinsfiles against Jenkins itself, run the
 # Jenkinsfile static lints, and run the orchestrator suite. The suite is

@@ -12,7 +12,7 @@ import { resolve, relative, sep } from 'path';
 export function discoverManifests(rootDir) {
   const root = resolve(rootDir);
   const found = [];
-  const skipped = new Set(['.claude', '.git', '.superpowers', 'node_modules']);
+  const skipped = new Set(['.claude', '.git', '.superpowers', '.worktrees', 'node_modules']);
 
   function visit(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
