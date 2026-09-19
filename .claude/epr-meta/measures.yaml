@@ -351,6 +351,16 @@ measures:
     status: active
     established_by: memory-kit-replacement-station-1-2026-09-10
 
+  - id: gate-cycle-seconds
+    version: 1
+    family: dev-cycle
+    unit: seconds
+    procedure: "genesis/orchestrator/gate-runner.mjs runProject — wall-clock of ONE project's gate recipe, recorded by gate-cycle.mjs as `epr flow note --kind observation --measure gate-cycle-seconds@1 --subject <project dir> --value <s> --env run-kind=… --env exit=ok|fail --env jobs=<CARGO_BUILD_JOBS>`. A failed gate stopped early: its fold carries exit=fail and no ceiling reads it."
+    provenance: "2026-09-19: `just gate elohim-storage` measured ~1980 s at jobs=1 (12 m test build linking 168 integration-test binaries, 4 m lib tests) and nobody was told — a person noticed by waiting. genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md §1."
+    default-authority: observation
+    status: active
+    established_by: operator-requested-2026-09-19
+
   - id: cleanup-cycle-history
     version: 1
     family: cleanup-pressure
@@ -1410,3 +1420,46 @@ lenses:
     hard: 0.2
     status: active
     established_by: governed-discovery-station-3-2026-09-12
+
+  # A gate that has become too slow to live with is a DESIGN signal, not a capacity one: the
+  # remedy is rarely a bigger machine. gate-cycle.mjs reads these watermarks (never its own
+  # numbers), files one fingerprinted finding in .claude/data/architecture-findings.jsonl per
+  # (ceiling, project, run-kind), prints the dispatch directive once, and closes the finding
+  # itself after two consecutive runs back under `hard`. A project with a legitimate reason to be
+  # slower declares its own row with `subject: <project dir>`; the scoped row wins.
+  - id: gate-cycle-full-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: measure
+    consumes: [gate-cycle-seconds@1]
+    env: { run-kind: full-gate, exit: ok }
+    context: local-gate
+    soft: 600
+    hard: 1200
+    concern: dev-system-equilibrium
+    dispatch-agent: rust-architect
+    dispatch-prompt: "Report only. One question: does this gate's cycle time make sense for what it verifies — can this project be modularized (smaller crates or packages, fewer test binaries, a narrower gate) so a change costs minutes, not tens of minutes? Measure before you opine: where does the time go (compile, link, test run), what is the coupling, what is the cheapest cut. If there is an obvious improvement, say so plainly — it then REQUIRES an architectural design pass (a spec under genesis/docs/superpowers/specs/) and an implementation cycle, and you name the first bounded step. If the time is honest, say that instead and propose the project-scoped ceiling that records why."
+    retire-when: >
+      when no gate project has crossed `soft` for two consecutive quarters — a ceiling that never
+      fires is describing a habit rather than enforcing one
+    status: active
+    established_by: operator-requested-2026-09-19
+
+  - id: gate-cycle-pre-push-ceiling
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: measure
+    consumes: [gate-cycle-seconds@1]
+    env: { run-kind: pre-push, exit: ok }
+    context: local-gate
+    soft: 600
+    hard: 1200
+    concern: dev-system-equilibrium
+    dispatch-agent: rust-architect
+    dispatch-prompt: "Report only. One question: does this gate's cycle time make sense for what it verifies — can this project be modularized (smaller crates or packages, fewer test binaries, a narrower gate) so a change costs minutes, not tens of minutes? Measure before you opine: where does the time go (compile, link, test run), what is the coupling, what is the cheapest cut. If there is an obvious improvement, say so plainly — it then REQUIRES an architectural design pass (a spec under genesis/docs/superpowers/specs/) and an implementation cycle, and you name the first bounded step. If the time is honest, say that instead and propose the project-scoped ceiling that records why."
+    retire-when: >
+      when no gate project has crossed `soft` for two consecutive quarters
+    status: active
+    established_by: operator-requested-2026-09-19

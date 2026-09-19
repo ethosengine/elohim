@@ -704,7 +704,8 @@ for PROJECT in $PROJECTS; do
   INDEX=$((INDEX + 1))
   PROJECT_START=$(date +%s)
 
-  node genesis/orchestrator/gate-runner.mjs --target "$PROJECT"
+  # Declares what kind of run this is for the gate-cycle observation (gate-cycle.mjs).
+  GATE_RUN_KIND=pre-push node genesis/orchestrator/gate-runner.mjs --target "$PROJECT"
   GATE_EXIT=$?
 
   PROJECT_END=$(date +%s)

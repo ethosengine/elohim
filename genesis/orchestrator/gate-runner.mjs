@@ -10,6 +10,7 @@ import { loadManifests } from './manifest-utils.mjs';
 import { loadGateRegistry } from './pipeline-registry.mjs';
 import { walkGraph } from './graph-walker.mjs';
 import { filterChanged } from './ci-ignore.mjs';
+import { recordCycle } from './gate-cycle.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
@@ -106,12 +107,36 @@ function runProject(project, printOnly, namesOnly) {
   }
 
   process.stdout.write(`\n[gate] ${project.name} (${project.dir})\n`);
+  const childEnv = gateChildEnv(project, process.env);
+  const started = process.hrtime.bigint();
   const result = spawnSync('bash', [resolve(ROOT, 'genesis/orchestrator/run-local-gate.sh'), ...args], {
     cwd: ROOT,
     stdio: 'inherit',
-    env: gateChildEnv(project, process.env),
+    env: childEnv,
   });
-  return result.status ?? 1;
+  const status = result.status ?? 1;
+  const seconds = Number(process.hrtime.bigint() - started) / 1e9;
+  // Cycle time is observed here because this is the one place every gate runs.
+  // The ceiling, the reviewer and its charter are declared in measures.yaml.
+  recordCycle(project, seconds, status, { ...process.env, ...cargoEnvOf(childEnv) }, {
+    root: ROOT,
+    measuresPath: resolve(ROOT, '.claude/epr-meta/measures.yaml'),
+    ledgerPath: resolve(ROOT, '.claude/data/architecture-findings.jsonl'),
+    runEpr: eprArgs => spawnSync(process.env.EPR_BIN || 'epr', eprArgs, { cwd: ROOT, stdio: 'ignore', timeout: 30000 }).status,
+    print: line => process.stdout.write(`${line}\n`),
+    now: () => new Date().toISOString().replace(/\.\d+Z$/, 'Z'),
+  });
+  return status;
+}
+
+// The per-project cargo cap travels as one serialized variable; the jobs count
+// is part of what a duration means, so it rides on the observation.
+function cargoEnvOf(childEnv) {
+  try {
+    return JSON.parse(childEnv.GATE_CARGO_ENV || '{}');
+  } catch {
+    return {};
+  }
 }
 
 function usage() {
