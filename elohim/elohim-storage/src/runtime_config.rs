@@ -196,6 +196,8 @@ pub enum Key {
     FeedbackNotify = 6,
     /// `REANCHOR_HELD_BACKOFF_SECONDS` — reanchor held-candidate skip window.
     ReanchorHeldBackoffSeconds = 7,
+    /// `CONTEST_REMINT_WINDOW_SECONDS` — peer-head contest re-mint suppression.
+    ContestRemintWindowSeconds = 8,
 }
 
 impl Key {
@@ -204,7 +206,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 8] = [
+    pub const ALL: [Key; 9] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -213,6 +215,7 @@ impl Key {
         Key::ProjectionReconcileSecs,
         Key::FeedbackNotify,
         Key::ReanchorHeldBackoffSeconds,
+        Key::ContestRemintWindowSeconds,
     ];
 }
 
@@ -232,7 +235,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 8] = [
+pub static SPECS: [SettingSpec; 9] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -311,6 +314,18 @@ pub static SPECS: [SettingSpec; 8] = [
             "hot — the sweep reads the registry per candidate. A skip is never an exclusion: \
              it also lapses the moment the row is stamped or a peer advertises a DIFFERENT \
              head for it.",
+        ),
+    },
+    SettingSpec {
+        name: "CONTEST_REMINT_WINDOW_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_CONTEST_REMINT_WINDOW_SECONDS,
+        doc: "How long a SUCCESSFULLY minted peer-head contest suppresses an identical re-mint \
+              of the same (id, head). 0 DISABLES the suppression (re-mint every sweep).",
+        note: Some(
+            "hot — the contest arm reads the registry per candidate. This is a SUCCESS dedup, \
+             not a failure backoff: a refused declare hands its claim straight back, and the \
+             window only bounds how long an un-projected election suppresses a re-nomination.",
         ),
     },
 ];

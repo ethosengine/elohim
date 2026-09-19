@@ -382,6 +382,37 @@ pub fn reanchor_held_backoff_window() -> std::time::Duration {
     ))
 }
 
+/// Default peer-head contest re-mint suppression: one hour — the same clock as
+/// [`DEFAULT_CONTEST_BACKOFF_SECONDS`], because both bound "how long is it fair
+/// to assume nothing has changed for this id".
+///
+/// A SEPARATE knob rather than reusing the contest backoff: that one holds back
+/// a predictable FAILURE, this one de-duplicates a SUCCESS. Conflating them
+/// would make the operator lever ambiguous — "lengthen the backoff" would
+/// silently also suppress re-nominations, which is a different decision.
+pub const DEFAULT_CONTEST_REMINT_WINDOW_SECONDS: u64 = 3600;
+
+/// Publish the contest re-mint window's BOOT value. Idempotent.
+/// Runtime-config backed — see [`set_adopt_before_author`].
+pub fn set_contest_remint_window_seconds(seconds: u64) {
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::ContestRemintWindowSeconds,
+        seconds,
+    );
+}
+
+/// How long a successfully minted peer-head contest suppresses an identical
+/// re-mint of the same `(id, head)` pair
+/// (`services::head_adoption::claim_peer_head_candidacy`).
+///
+/// `Duration::ZERO` DISABLES the suppression — every candidate re-mints every
+/// sweep, which is byte-for-byte the pre-fix ARM 1.
+pub fn contest_remint_window() -> std::time::Duration {
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::ContestRemintWindowSeconds,
+    ))
+}
+
 /// Publish the advertiser-diversity breadth for the reconcile sweep. Idempotent.
 pub fn set_evidence_fallback_max_alternates(max: usize) {
     let _ = EVIDENCE_FALLBACK_MAX_ALTERNATES.set(max);

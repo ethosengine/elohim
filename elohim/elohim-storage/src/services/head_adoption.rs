@@ -2552,6 +2552,94 @@ fn release_candidacy(id: &str, target: &str) {
     }
 }
 
+/// The PEER-HEAD arm's own de-dup ledger — timestamped, unlike
+/// [`SELF_CANDIDATE_MINTS`].
+///
+/// Deliberately a second ledger and not a reuse. The un-windowed set above is
+/// correct for the arms that pair it with [`release_candidacy`] on EVERY failure
+/// and whose only success exit is the election projecting. ARM 1 has a success
+/// with no release counterpart — a mint that lands and then waits on an election
+/// that may never project — so an un-windowed claim there would be a PERMANENT
+/// exclusion for the life of the process, which C3 forbids. The timestamp is
+/// what converts it into a bounded suppression.
+///
+/// Keeping the two separate also keeps [`release_peer_head_candidacy`] honest:
+/// ARM 1 releases on failure and then falls through into ARM 2, which takes its
+/// OWN `(id, own_head)` claim in the set above. One shared ledger would let
+/// ARM 1's release hand back a self-head claim it never took.
+#[allow(clippy::type_complexity)]
+static PEER_HEAD_MINTS: std::sync::OnceLock<std::sync::Mutex<HashMap<String, std::time::Instant>>> =
+    std::sync::OnceLock::new();
+
+/// The one accessor both halves share, so the `OnceLock` is initialised in
+/// exactly one place.
+fn peer_head_mints() -> &'static std::sync::Mutex<HashMap<String, std::time::Instant>> {
+    PEER_HEAD_MINTS.get_or_init(|| std::sync::Mutex::new(HashMap::new()))
+}
+
+/// Claim the right to mint a PEER-HEAD candidate for `(id, target)`.
+///
+/// `true` on the first call for a pair, and again once `window` has elapsed;
+/// `false` while a mint from inside the window still stands. `window == 0` is
+/// the OFF switch — always `true`, which is byte-for-byte the pre-fix ARM 1.
+///
+/// Like [`claim_candidacy`] the claim is taken BEFORE the declare, not after it
+/// succeeds: the fan-out sweep can reach this arm for one id concurrently, and
+/// claim-on-success would let every task mint. The cost is that a FAILED attempt
+/// must hand the claim back — see [`release_peer_head_candidacy`].
+///
+// bounded-work: memory budget = SELF_CANDIDATE_LEDGER_CAP entries (fail-open
+// clear on overflow, shared with the sibling ledger's bound); time budget =
+// `crate::config::contest_remint_window()` per entry, proven finite by
+// `a_remint_suppression_always_expires_and_zero_disables_it`. No loop, no retry
+// ladder, no I/O — a bounded map and a comparison.
+fn claim_peer_head_candidacy(id: &str, target: &str, window: std::time::Duration) -> bool {
+    let id = id.trim();
+    let target = target.trim();
+    if id.is_empty() || target.is_empty() {
+        // Not a pair. Never occupy a slot for one, and never suppress on one.
+        return true;
+    }
+    let Ok(mut guard) = peer_head_mints().lock() else {
+        // A poisoned lock must not silently license a re-mint storm; refuse.
+        return false;
+    };
+    if guard.len() >= SELF_CANDIDATE_LEDGER_CAP {
+        // FAIL-OPEN, same rule as `claim_candidacy`: the worst case is one
+        // redundant mint per id, never a silent permanent hold.
+        guard.clear();
+    }
+    let key = self_candidate_key(id, target);
+    match guard.get(&key) {
+        Some(at) if !window.is_zero() && at.elapsed() < window => false,
+        _ => {
+            guard.insert(key, std::time::Instant::now());
+            true
+        }
+    }
+}
+
+/// Hand back a peer-head claim whose declare FAILED — the C3 half of
+/// [`claim_peer_head_candidacy`].
+///
+/// Called on EVERY `Err` out of ARM 1's declare, including the admission shed
+/// (nothing was dispatched), the no-chain refusal (the adopt-before-author
+/// bypass may mint in its own ledger, but ARM 1 did not), the generic declare
+/// error, and the not-retrievable fall-through into ARM 2. Nothing stands, so
+/// nothing may be suppressed.
+fn release_peer_head_candidacy(id: &str, target: &str) {
+    let id = id.trim();
+    let target = target.trim();
+    if id.is_empty() || target.is_empty() {
+        return;
+    }
+    if let Some(ledger) = PEER_HEAD_MINTS.get() {
+        if let Ok(mut guard) = ledger.lock() {
+            guard.remove(&self_candidate_key(id, target));
+        }
+    }
+}
+
 /// Which candidate a contest attempt named — the label for
 /// `elohim_content_canonical_links_minted_total{source}`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2702,6 +2790,31 @@ async fn contest_peer(
     // served, so the dormant path clones nothing.
     let adopt_retry = adopt_retry_bytes(carried_record.as_ref());
 
+    // IDEMPOTENCE — the gate ARM 1 was missing (2026-09-18). ARM 2,
+    // `contest_divergent` and `try_adopt_before_author` have all carried a claim
+    // since they were written; this arm declared straight through. A contest does
+    // NOT stamp the row, so `declaration_would_move` above stays true for the
+    // whole window between minting and the election projecting — and the
+    // identical link was re-minted every sweep (james: the same 28 ids, 11 times
+    // each). `contest_backoff` cannot catch it: it is recorded only on `Err`, and
+    // this declare SUCCEEDS.
+    //
+    // `Held` is what every other suppression in this function returns, so no
+    // caller sees a new outcome.
+    if !claim_peer_head_candidacy(id, &peer_head, crate::config::contest_remint_window()) {
+        crate::metrics::inc_contest_remint_suppressed();
+        tracing::debug!(
+            target: "elohim_storage::head_adoption",
+            content_id = %id,
+            contested_head = %peer_head,
+            from_peer = %hint.peer_id,
+            "adopt-before-author: contest gate — this node already nominated the peer's head \
+             for this id and that declaration still stands as an election candidate; awaiting \
+             the election rather than re-minting it"
+        );
+        return AdoptOutcome::Held;
+    }
+
     // ARM 1 — PEER-HEAD CANDIDACY. `adopt_before_author: false` — this is the
     // classic attempt, and it must stay the classic attempt: the bypass may only
     // ever run AFTER the no-chain gate has actually refused, never instead of it.
@@ -2727,6 +2840,20 @@ async fn contest_peer(
             );
         }
         Err(e) => {
+            // C3 — hand the claim back, FIRST and unconditionally. This one
+            // placement covers every exit from this block: the shed below, the
+            // no-chain refusal (whose adopt-before-author bypass mints in its own
+            // ledger, never this one), the generic declare error, and the
+            // not-retrievable FALL-THROUGH into ARM 2. Nothing was minted here,
+            // so nothing may be suppressed — one refusal must never retire the
+            // pair for the window.
+            //
+            // Safe against the `chain_write_gate` HeadMoved retry: that loop
+            // lives inside `hc_client::call_zome_timed`, below this call, and
+            // re-invokes the websocket closure — never this function. One claim
+            // spans N wire attempts, and an exhausted retry surfaces here as an
+            // ordinary `Err` that this line releases.
+            release_peer_head_candidacy(id, &peer_head);
             // ADMISSION SHED — before any classification, because a shed carries
             // no coordinator verdict to classify. The gate refused LOCAL
             // capacity; the zome never ran, so neither the no-chain gate nor the
@@ -4873,6 +5000,124 @@ mod tests {
         );
 
         contest_backoff::reset();
+    }
+
+    /// Serializes the tests that own the process-global peer-head candidacy
+    /// ledger, so a sibling's assertion cannot land between another's claim and
+    /// its check. Recovers from poisoning — one failing test must report its own
+    /// failure, not cascade.
+    static PEER_HEAD_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn peer_head_exclusive() -> std::sync::MutexGuard<'static, ()> {
+        PEER_HEAD_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// THE DEFECT (item 6, 2026-09-18): `contest_peer` ARM 1 declared the peer's
+    /// head with NO idempotence claim, while ARM 2, `contest_divergent` and
+    /// `try_adopt_before_author` all take one. A contest does not stamp the row,
+    /// so `declaration_would_move` stays true and the IDENTICAL link was
+    /// re-minted every sweep — 28 ids, 11 times each, on james.
+    #[test]
+    fn a_peer_head_contest_is_minted_once_per_window() {
+        let _g = peer_head_exclusive();
+        let window = std::time::Duration::from_secs(3600);
+        let id = "remint:peer-head";
+        let peer_head = "uhCkk-peer-head";
+
+        assert!(
+            claim_peer_head_candidacy(id, peer_head, window),
+            "the FIRST contest for an (id, peer head) pair must mint"
+        );
+        assert!(
+            !claim_peer_head_candidacy(id, peer_head, window),
+            "the same pair must NOT re-mint inside the window — the earlier \
+             contested declaration already stands as a DHT election candidate"
+        );
+        assert!(
+            claim_peer_head_candidacy(id, "uhCkk-different-head", window),
+            "a DIFFERENT head is a different candidate and must stay nominable"
+        );
+    }
+
+    /// C3: never a permanent exclusion. If the election never projects, the pair
+    /// becomes nominable again on window expiry with no intervention — and a
+    /// zero window is the OFF switch, restoring re-mint-every-sweep exactly.
+    #[test]
+    fn a_remint_suppression_always_expires_and_zero_disables_it() {
+        let _g = peer_head_exclusive();
+        let head = "uhCkk-h";
+        let id = "remint:expires";
+        assert!(claim_peer_head_candidacy(
+            id,
+            head,
+            std::time::Duration::from_secs(3600)
+        ));
+        // A real elapse, not a mocked clock — the same `Instant::elapsed`
+        // comparison the sweep makes. Milliseconds keep it instant while the
+        // production window is an hour.
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        assert!(
+            claim_peer_head_candidacy(id, head, std::time::Duration::from_millis(1)),
+            "an expired suppression must re-admit the pair, never strand it"
+        );
+
+        let id2 = "remint:disabled";
+        assert!(claim_peer_head_candidacy(
+            id2,
+            head,
+            std::time::Duration::ZERO
+        ));
+        assert!(
+            claim_peer_head_candidacy(id2, head, std::time::Duration::ZERO),
+            "window 0 is the OFF switch — the pre-fix re-mint-every-sweep exactly"
+        );
+    }
+
+    /// A REFUSED declare must hand the claim back at once: one refusal may never
+    /// retire a pair for the window. Same C3 repair `release_candidacy` exists
+    /// for (the live `contest_self_head=4` vs `fetch_none=603` split).
+    #[test]
+    fn a_released_peer_head_claim_is_immediately_re_nominable() {
+        let _g = peer_head_exclusive();
+        let window = std::time::Duration::from_secs(3600);
+        let id = "remint:released";
+        let head = "uhCkk-h";
+        assert!(claim_peer_head_candidacy(id, head, window));
+        assert!(!claim_peer_head_candidacy(id, head, window));
+        release_peer_head_candidacy(id, head);
+        assert!(
+            claim_peer_head_candidacy(id, head, window),
+            "a declare the conductor refused leaves nothing standing — retry now"
+        );
+    }
+
+    /// The two ledgers are SEPARATE. `claim_candidacy` (ARM 2 / contest_divergent
+    /// / adopt-before-author) is an un-windowed set; this one is timestamped.
+    /// Releasing in one must not silently release in the other, or ARM 1's
+    /// release-on-failure would hand back a self-head claim it never took.
+    #[test]
+    fn the_peer_head_ledger_is_not_the_self_candidate_ledger() {
+        let _g = peer_head_exclusive();
+        let window = std::time::Duration::from_secs(3600);
+        let id = "remint:separate";
+        let head = "uhCkk-shared-target";
+
+        assert!(
+            claim_candidacy(id, head),
+            "self-candidate ledger: first claim"
+        );
+        assert!(
+            claim_peer_head_candidacy(id, head, window),
+            "the peer-head ledger must not see the self-candidate claim"
+        );
+        release_peer_head_candidacy(id, head);
+        assert!(
+            !claim_candidacy(id, head),
+            "releasing the peer-head claim must NOT release the self-candidate one"
+        );
+        release_candidacy(id, head);
     }
 
     /// The sweep pre-flight's READ half must not stand in that lane either.

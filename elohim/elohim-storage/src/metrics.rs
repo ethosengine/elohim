@@ -1931,6 +1931,22 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Peer-head contests SUPPRESSED because this node had already minted the
+    /// identical `(id, head)` candidate and the DHT election has not projected
+    /// yet. Unlabeled: one bounded de-duplication guard, not a per-reason
+    /// vocabulary — same shape as [`CONTENT_CONTEST_BACKOFF_CLEARED`].
+    ///
+    /// The honesty meter for the re-mint loop (2026-09-18): this climbing while
+    /// `elohim_content_canonical_links_minted_total{source="contest_peer_head"}`
+    /// stays FLAT is the fix working. A suppression is not a refusal and not a
+    /// backoff — nothing failed, and the standing nomination is still a live
+    /// election candidate.
+    pub static ref CONTENT_CONTEST_REMINT_SUPPRESSED: IntCounter = IntCounter::new(
+        "elohim_content_contest_remint_suppressed_total",
+        "Peer-head contests suppressed as an identical already-standing nomination.",
+    )
+    .unwrap();
+
     /// Reanchor candidates the sweep skipped WITHOUT paying for the adopt
     /// pre-flight's conductor probes, by [`ReanchorSkip`].
     ///
@@ -2566,6 +2582,7 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_REMINT_SUPPRESSED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_EVIDENCE_FALLBACK.clone()));
         // Pre-touch every fallback outcome, same discipline as the evidence
         // states above: `no_alternative` at zero is a MEANINGFUL reading (the
@@ -4241,6 +4258,11 @@ pub fn inc_contest_skipped(reason: ContestSkip) {
 /// Count one contest-backoff ledger cap-overflow fail-open clear.
 pub fn inc_contest_backoff_cleared() {
     CONTENT_CONTEST_BACKOFF_CLEARED.inc();
+}
+
+/// Count one peer-head contest suppressed as an already-standing nomination.
+pub fn inc_contest_remint_suppressed() {
+    CONTENT_CONTEST_REMINT_SUPPRESSED.inc();
 }
 
 /// Count one reanchor candidate skipped without a conductor round-trip.
