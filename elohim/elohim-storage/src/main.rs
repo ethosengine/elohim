@@ -729,6 +729,30 @@ async fn async_main(
          are deferrals or bounds — neither excludes an id from a sweep"
     );
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
+    // The two sweep-memory windows (serving-edge stories 1.1 / 1.2). Published here like every
+    // other boot value: an unparseable value keeps the default rather than silently disabling
+    // the window, and 0 is each key's documented OFF switch.
+    for (name, default, publish) in [
+        (
+            "REANCHOR_HELD_BACKOFF_SECONDS",
+            elohim_storage::config::DEFAULT_REANCHOR_HELD_BACKOFF_SECONDS,
+            elohim_storage::config::set_reanchor_held_backoff_seconds as fn(u64),
+        ),
+        (
+            "CONTEST_REMINT_WINDOW_SECONDS",
+            elohim_storage::config::DEFAULT_CONTEST_REMINT_WINDOW_SECONDS,
+            elohim_storage::config::set_contest_remint_window_seconds as fn(u64),
+        ),
+    ] {
+        let seconds = match std::env::var(name) {
+            Ok(v) => v.trim().parse::<u64>().unwrap_or_else(|_| {
+                tracing::warn!(value = %v, default, "{name} is not an integer — keeping the default");
+                default
+            }),
+            Err(_) => default,
+        };
+        publish(seconds);
+    }
     elohim_storage::config::set_evidence_absent_backoff_seconds(
         config.evidence_absent_backoff_seconds,
     );

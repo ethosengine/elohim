@@ -1481,6 +1481,35 @@ mod transport_backend_tests {
     use super::TransportBackend;
     use std::str::FromStr;
 
+    /// Every `set_*` publisher in this module must be called from the boot sequence.
+    ///
+    /// A publisher nobody calls is not a compile error: the key is registered, it is read
+    /// live, and it silently rides its default while the operator's env var is ignored. That
+    /// shipped on 2026-09-19 for `REANCHOR_HELD_BACKOFF_SECONDS` and
+    /// `CONTEST_REMINT_WINDOW_SECONDS` — added with setters and no call sites, and passed
+    /// review. This is the cheap, static half of the boot assertion; it becomes load-bearing
+    /// when these publishers turn cross-crate `pub` in the storage decomposition.
+    #[test]
+    fn every_boot_publisher_is_called_from_main() {
+        let config_src = include_str!("config.rs");
+        let main_src = include_str!("main.rs");
+        let orphans: Vec<&str> = config_src
+            .lines()
+            .filter_map(|line| line.strip_prefix("pub fn set_"))
+            .filter_map(|rest| rest.split('(').next())
+            .filter(|name| !main_src.contains(&format!("config::set_{name}")))
+            .collect();
+        assert!(
+            orphans.is_empty(),
+            "config publishers with no call site in main.rs (their env value is never published): {}",
+            orphans
+                .iter()
+                .map(|n| format!("set_{n}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
     #[test]
     fn defaults_to_libp2p() {
         let cfg = super::Config::default();
