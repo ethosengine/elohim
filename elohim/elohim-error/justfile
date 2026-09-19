@@ -1,0 +1,52 @@
+# elohim-error — the storage error vocabulary
+#
+# RUSTFLAGS is baked in — just `just gate` and go.
+#
+# Explicitly EMPTY, unlike elohim-storage's justfile: this is a native build
+# with no wasm-facing dependency in the graph (no holochain family, no
+# getrandom shim), and the ambient `--cfg getrandom_backend="custom"` the
+# workspace exports for the WASM/Holochain path would only break linking here.
+# See root CLAUDE.md "RUSTFLAGS Override Required".
+#
+# CARGO_TARGET_DIR is supplied by the caller, not baked here — same convention as
+# elohim-storage/justfile and doorway-service/justfile. `just gate elohim-error`
+# resolves the cargo-pool slot from this crate's `gate.projects` entry in
+# elohim/holochain/build-manifest.json (`run.cargo.workspace`) and exports it.
+# Invoking this justfile directly needs it in the environment, or the disk-guard
+# hook denies plain native cargo:
+#   CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/<branch>/elohim-error/dev just gate
+
+set dotenv-load := false
+
+export RUSTFLAGS := ''
+
+# List available recipes
+default:
+    @just --list
+
+# Build debug binary
+build:
+    cargo build
+
+# Run tests (unit + the tests/boundary.rs lockfile boundary test)
+test:
+    cargo test
+
+# Format code
+fmt:
+    cargo fmt
+
+# Check formatting without modifying
+fmt-check:
+    cargo fmt --check
+
+# Lint — warnings are errors
+clippy:
+    cargo clippy --all-targets -- -D warnings
+
+# Remove build artifacts
+clean:
+    cargo clean
+
+# Quality gate: fmt-check + clippy + test (the boundary test rides in `test`)
+gate: fmt-check clippy test

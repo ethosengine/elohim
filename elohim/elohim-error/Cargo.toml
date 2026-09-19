@@ -1,0 +1,32 @@
+# Nested single-crate workspace (mirrors elohim-views / elohim-facings) so this
+# crate self-excludes from the parent `elohim/Cargo.toml` workspace and resolves
+# standalone. There is NO root monorepo workspace — crates wire via path deps.
+[workspace]
+
+[package]
+name = "elohim-error"
+version = "0.1.0"
+edition = "2021"
+description = "The storage error vocabulary, and nothing else. It refuses to know what a service, a transport, a route or a runtime is — the only foreign types it names are the four whose failures it converts (diesel, std::io, serde_json, sled)."
+license = "AGPL-3.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "error", "storage"]
+categories = ["rust-patterns"]
+
+[dependencies]
+# The enum derive. Same major as elohim-storage declares (`thiserror = "1"`), so
+# the two unify to one package in the storage build graph.
+thiserror = "1"
+
+# The four foreign error types this vocabulary converts with `#[from]`. Each
+# version requirement is the one elohim-storage declares, so cargo unifies the
+# package rather than resolving a second copy — a version skew here would make
+# `From<diesel::result::Error>` a DIFFERENT type and break every `?` upstream.
+#
+# `diesel` is taken with default-features = false: this crate names
+# `diesel::result::Error` and nothing more, and the storage build unions its own
+# `["sqlite", "r2d2"]` + defaults onto the same package. Do not add a backend
+# feature here — the standalone gate must stay free of libsqlite3-sys.
+diesel = { version = "2.2", default-features = false }
+serde_json = "1"
+sled = "0.34"

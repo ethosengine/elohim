@@ -2454,6 +2454,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-error"
+version = "0.1.0"
+dependencies = [
+ "diesel",
+ "serde_json",
+ "sled",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "elohim-facings"
 version = "0.1.0"
 dependencies = [
@@ -2537,6 +2547,7 @@ dependencies = [
  "elohim-chrome-asset",
  "elohim-compute",
  "elohim-epr",
+ "elohim-error",
  "elohim-facings",
  "elohim-peer-fabric",
  "elohim-render",

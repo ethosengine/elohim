@@ -25,6 +25,16 @@ elohim-sdk = { path = "../../crates/elohim-sdk" }
 # Wire-shape view types (ts-rs-anchored) — atomic migration from views.rs (VIEWS.T2)
 elohim-views = { path = "../elohim-views" }
 
+# The StorageError vocabulary — step 1 of the storage decomposition. `src/error.rs`
+# is now a re-export shim over this crate, so `crate::error::StorageError` and
+# `crate::StorageError` resolve unchanged at ~244 call sites.
+# The four `From` conversions live there BECAUSE of the orphan rule: diesel,
+# std::io, serde_json and sled are declared in BOTH manifests at the same version
+# requirement so cargo unifies each to one package — a skew would make
+# `From<diesel::result::Error>` a different type and break every `?` here.
+# See genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md §4 row 1.
+elohim-error = { path = "../elohim-error" }
+
 # Pure lens crate — select→fold→aggregate folds over the holder-relation. The
 # resiliency facing's folds live here (DB-free); household_resilience.rs is a thin
 # adapter that loads the relation and calls them. See 2026-06-19 facings design §11.

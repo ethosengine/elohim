@@ -82,6 +82,13 @@ COPY elohim/constitution ./constitution
 COPY elohim/elohim-cache-core ./elohim-cache-core
 COPY elohim/elohim-compute ./elohim-compute
 COPY elohim/epr ./epr
+# elohim-error: the StorageError vocabulary (step 1 of the storage
+# decomposition, 2026-09-19). The bottom crate of the stack — src/error.rs is a
+# re-export shim over it — and a non-optional path-dep, so like every sibling
+# below it must exist before the dep-cache stage's first `cargo build` or the
+# resolve aborts: "failed to read /elohim-error/Cargo.toml: No such file".
+# Flattened /app layout; sed-rewritten below.
+COPY elohim/elohim-error ./elohim-error
 # Plan 2 SDK boundary: elohim-views holds wire-shape Views; elohim-storage
 # depends on it directly. Without this COPY the build aborts at resolve time:
 # "failed to read /elohim-views/Cargo.toml: No such file".
@@ -168,6 +175,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-error"|path = "elohim-error"|' Cargo.toml && \
     sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-peer-fabric"|path = "elohim-peer-fabric"|' Cargo.toml && \
