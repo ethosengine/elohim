@@ -63,3 +63,30 @@ shift_objective: |
   pipelines whose builds failed or never ran. Prove it with an orchestrator
   run where a Level-0 failure leaves edge/genesis baselines untouched and
   the NEXT run re-plans them without [build:*] tags.
+
+## 2026-09-19 — half closed, and the other half now bites the other way
+
+**Closed (34f652bdb, verified live):** the plan checkpoint advanced `__global__` to the run's own commit and the
+failed-post branch "preserved prior" from that already-overwritten value, so orchestrator/dev 1875 logged "baseline
+held so the next push re-dispatches" while archiving its own head. Auto mode now records the baseline it loaded and a
+failed post restores it. Proof on fresh triggers: 1878 and 1880 both print `[baseline:plan] archived — __global__=<own
+head>` then `[baseline:post] … preserving prior 6ab3c790` / `archived — __global__=6ab3c790`.
+`genesis/orchestrator/baseline-hold.test.mjs` guards both halves.
+
+**Still open — per-pipeline.** Routing reads only `__global__` (`autoModeAnalyze` → `analyzeChangeset`), and every
+archive since 1875 says `per-pipeline=0`. So in orchestrator/dev 1880 — `✅ elohim-edge: SUCCESS (7472s)`,
+`❌ elohim: FAILURE` — the held global baseline means the NEXT push re-dispatches edge too: a full rebuild and a
+whole-fleet re-roll to retry an app stage. That is worse than waste here: the re-roll re-saturates conductor admission
+for hours (backlog `conductor-admission-saturated-for-hours-after-restart`), which is what failed the app stage — a
+limit cycle. Until this is fixed, **any push to dev, docs included, re-rolls alpha** unless its head commit says
+skip-ci or the run is started manually for app + genesis only.
+
+Two pieces are needed, and the first already exists uncommitted:
+
+1. Persist what succeeded before the fail-fast throw. The index of the shared checkout has held staged work since
+   2026-09-14 that does exactly this in Execute Builds (`env.PIPELINE_BASELINES = …pipelineBaselines` then
+   `archivePipelineBaselines('execute')` before throwing, plus the stale-controller-workspace backstop and
+   `orchestrator-integration.test.mjs` +67). It passes `just gate orchestrator` in the tree. It needs its owner's review
+   and a commit; this shift committed around it and left it staged as found.
+2. Consult it when routing: a pipeline whose recorded success sha already contains every changed file that routes to
+   it (graph-walker over `<its sha>..HEAD`) is dropped from the dispatch set.
