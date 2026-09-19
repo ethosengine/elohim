@@ -158,56 +158,120 @@ pub enum InfrastructureSignal {
 // =============================================================================
 
 /// Post-commit callback - emits signals for projection.
+///
+/// Header-driven dispatch: `action.entry_type()` names the entry's
+/// `(zome_index, entry_index)`, which `resolve_entry_type` maps to exactly one
+/// `EntryTypes` variant — no guess-decode chain to keep in step with the
+/// integrity zome's entry order. `post_commit_one` handles a single action;
+/// a failure there is logged and the rest of the batch still runs.
 #[hdk_extern]
 pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+    // Resolve the coordinator's scoped entry types ONCE per batch — see
+    // `resolve_entry_type`; `zome_info()` re-runs the integrity zome's
+    // `entry_defs` callback on every call.
+    let scoped_entry_types = zome_info()?.zome_types.entries;
+
     for signed_action in committed_actions {
-        let action = signed_action.hashed.content.clone();
         let action_hash = signed_action.hashed.hash.clone();
+        if let Err(e) = post_commit_one(signed_action, &scoped_entry_types) {
+            error!(
+                "post_commit: skipping signals for action {:?} — {:?}",
+                action_hash, e
+            );
+        }
+    }
 
-        let entry_hash = match &action.data {
-            ActionData::Create(create) => create.entry_hash.clone(),
-            ActionData::Update(update) => update.entry_hash.clone(),
-            _ => continue,
-        };
+    Ok(())
+}
 
-        let record = match get(action_hash.clone(), GetOptions::default())? {
-            Some(r) => r,
-            None => continue,
-        };
-
-        let author = action.author().clone();
-
-        if let Some(doorway) = record
-            .entry()
-            .to_app_option::<DoorwayRegistration>()
-            .ok()
-            .flatten()
+/// `EntryTypes::deserialize_from_type` with the `zome_info()` lookup lifted out
+/// of the per-action loop (see `post_commit`).
+fn resolve_entry_type(
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+    zome_index: ZomeIndex,
+    entry_index: EntryDefIndex,
+    entry: &Entry,
+) -> ExternResult<Option<EntryTypes>> {
+    let scoped = ScopedEntryDefIndex {
+        zome_index,
+        zome_type: entry_index,
+    };
+    match scoped_entry_types.find(UnitEntryTypes::iter(), scoped) {
+        Some(unit) => Ok(Some((unit, entry).try_into()?)),
+        // A miss on a zome we DO depend on means the header named an entry
+        // index outside this integrity zome's range — a real inconsistency.
+        None if scoped_entry_types
+            .dependencies()
+            .any(|z| z == scoped.zome_index) =>
         {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "post_commit: entry type {scoped:?} is out of range for this zome"
+            ))))
+        }
+        // A miss on a zome we do NOT depend on: not ours to project.
+        None => Ok(None),
+    }
+}
+
+/// Emit the projection signal for ONE committed action.
+///
+/// Returning `Err` loses the signal for this action only; the caller logs it
+/// and continues with the rest of the batch.
+fn post_commit_one(
+    signed_action: SignedActionHashed,
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+) -> ExternResult<()> {
+    let action = signed_action.hashed.content.clone();
+    let action_hash = signed_action.hashed.hash.clone();
+
+    let entry_hash = match &action.data {
+        ActionData::Create(create) => create.entry_hash.clone(),
+        ActionData::Update(update) => update.entry_hash.clone(),
+        _ => return Ok(()),
+    };
+
+    // Non-App entry types (AgentPubKey, CapClaim, CapGrant) carry no app entry
+    // definition; they were never projected and still are not.
+    let (zome_index, entry_index) = match action.entry_type() {
+        Some(EntryType::App(def)) => (def.zome_index, def.entry_index),
+        _ => return Ok(()),
+    };
+
+    let record = match get(action_hash.clone(), GetOptions::default())? {
+        Some(r) => r,
+        None => return Ok(()),
+    };
+    // Borrowed, not cloned.
+    let entry = match record.entry().as_option() {
+        Some(e) => e,
+        None => return Ok(()),
+    };
+
+    let author = action.author().clone();
+
+    let Some(entry_type) = resolve_entry_type(scoped_entry_types, zome_index, entry_index, entry)?
+    else {
+        return Ok(());
+    };
+
+    match entry_type {
+        EntryTypes::DoorwayRegistration(doorway) => {
             emit_signal(InfrastructureSignal::DoorwayCommitted {
                 action_hash,
                 entry_hash,
                 doorway,
                 author,
             })?;
-        // DoorwayHeartbeat signal branch removed (observation-event-layer spec §10 Stage 6)
-        } else if let Some(server) = record
-            .entry()
-            .to_app_option::<ContentServer>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::ContentServer(server) => {
             emit_signal(InfrastructureSignal::ContentServerCommitted {
                 action_hash,
                 entry_hash,
                 server,
                 author,
             })?;
-        } else if let Some(ps) = record
-            .entry()
-            .to_app_option::<PeerStatus>()
-            .ok()
-            .flatten()
-        {
+        }
+        EntryTypes::PeerStatus(ps) => {
             emit_signal(InfrastructureSignal::PeerStatusRecorded {
                 peer_id: ps.peer_id.clone(),
                 status: ps.status.to_string(),
@@ -218,6 +282,8 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
             })?;
         }
+        // StringAnchor: deliberately unprojected today, same as before.
+        _ => {}
     }
 
     Ok(())

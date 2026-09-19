@@ -211,7 +211,9 @@ pub fn claim_node(_input: ClaimNodeInput) -> ExternResult<ActionHash> {
     // Validate claim_status == "unclaimed"
     // Create updated entry with claim_status = "claimed"
     // Return new action hash
-    todo!("Will be implemented when conductor integration is wired")
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "claim_node: not implemented — stewardship claim flow is not wired yet".into()
+    )))
 }
 
 /// Release a claimed node — transitions claim_status to "released"
@@ -220,7 +222,9 @@ pub fn release_node(_node_id: String) -> ExternResult<ActionHash> {
     // Look up existing registration
     // Create updated entry with claim_status = "released"
     // Return new action hash
-    todo!("Will be implemented when conductor integration is wired")
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "release_node: not implemented — stewardship claim flow is not wired yet".into()
+    )))
 }
 
 // ============================================================================

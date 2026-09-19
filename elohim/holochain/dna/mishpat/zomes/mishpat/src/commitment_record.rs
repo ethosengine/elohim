@@ -16,10 +16,18 @@ pub fn get_commitment_record(action_hash: ActionHash) -> ExternResult<Option<Rec
             "expected exact Commitment Create record".into()
         )));
     }
-    let entry = record.entry().as_option().expect("shape checked above");
+    let entry = record.entry().as_option().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Commitment record missing entry data".into()
+        ))
+    })?;
     if entry
         .as_app_entry()
-        .expect("shape checked above")
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Commitment record entry is not an app entry".into()
+            ))
+        })?
         .bytes()
         .len()
         > 256 * 1024

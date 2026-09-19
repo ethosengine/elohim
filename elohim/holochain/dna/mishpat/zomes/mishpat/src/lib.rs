@@ -240,7 +240,7 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
         metadata_json: input.metadata_json.clone(),
     };
 
-    let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
+    call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
         governance_kind: "governance-action:challenge".to_string(),
         subject_cid: format!("{}:{}", input.entity_type, input.entity_id),
         title: format!(
@@ -266,7 +266,7 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
             "assigned_elohim": input.assigned_elohim,
             "metadata_json": input.metadata_json,
         })),
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     // Stage F will migrate callers to query elohim::get_governance_action_with_children.
@@ -334,7 +334,7 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
         })
         .unwrap_or_else(|| "consent".to_string());
 
-    let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
+    call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
         governance_kind: "governance-action:proposal".to_string(),
         subject_cid: input.proposer_id.clone(),
         title: input.title.clone(),
@@ -354,7 +354,7 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
             "voting_config_json": input.voting_config_json,
             "metadata_json": input.metadata_json,
         })),
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     // Stage F will migrate callers to query elohim::get_governance_action_with_children.
@@ -668,12 +668,10 @@ pub fn query_discussions(input: QueryDiscussionsInput) -> ExternResult<Vec<Discu
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
-    if input.entity_type.is_some() && input.entity_id.is_some() {
-        let entity_key = format!(
-            "{}:{}",
-            input.entity_type.as_ref().unwrap(),
-            input.entity_id.as_ref().unwrap()
-        );
+    if let (Some(entity_type), Some(entity_id)) =
+        (input.entity_type.as_ref(), input.entity_id.as_ref())
+    {
+        let entity_key = format!("{}:{}", entity_type, entity_id);
         let entity_anchor = StringAnchor::new("discussion_entity", &entity_key);
         let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
 
@@ -916,7 +914,7 @@ pub fn create_governance_reaction(
         metadata_json: input.metadata_json.clone(),
     };
 
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:governance-reaction".to_string(),
         subject_cid: input.content_id.clone(),
         subject_kind: "content".to_string(),
@@ -939,7 +937,7 @@ pub fn create_governance_reaction(
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({"class": "witness"}),
         expires_at: None,
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
@@ -1126,7 +1124,7 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
         metadata_json: input.metadata_json.clone(),
     };
 
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:proposal-vote".to_string(),
         subject_cid: input.proposal_id.clone(),
         subject_kind: "governance-action".to_string(),
@@ -1153,7 +1151,7 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
             "reasoning": input.reasoning,
         }),
         expires_at: None,
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
@@ -1341,7 +1339,7 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
         metadata_json: input.metadata_json.clone(),
     };
 
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:statement-vote".to_string(),
         subject_cid: input.statement_id.clone(),
         subject_kind: "governance-action".to_string(),
@@ -1362,7 +1360,7 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({"class": "witness"}),
         expires_at: None,
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
@@ -1425,7 +1423,7 @@ pub enum MishpatSignal {
 pub fn create_gate_decision_attestation(
     input: CreateGateDecisionAttestationInput,
 ) -> ExternResult<ActionHash> {
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:gate-decision".to_string(),
         subject_cid: input.elohim_id.clone(),
         subject_kind: "agent".to_string(),
@@ -1456,7 +1454,7 @@ pub fn create_gate_decision_attestation(
             "reasoning_json": input.reasoning_json,
         }),
         expires_at: None,
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     Ok(ActionHash::from_raw_36(vec![0u8; 36]))
@@ -1475,7 +1473,7 @@ pub fn create_gate_decision_attestation(
 pub fn create_gate_decision_challenge(
     input: CreateGateDecisionChallengeInput,
 ) -> ExternResult<ActionHash> {
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:gate-decision-challenge".to_string(),
         subject_cid: input.challenged_decision_cid.clone(),
         subject_kind: "governance-action".to_string(),
@@ -1499,7 +1497,7 @@ pub fn create_gate_decision_challenge(
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({"class": "witness"}),
         expires_at: None,
-    });
+    })?;
 
     // Sentinel ActionHash — canonical state now lives on elohim DNA.
     Ok(ActionHash::from_raw_36(vec![0u8; 36]))
@@ -1641,72 +1639,133 @@ pub fn get_outcomes_by_verdict(
 /// so elohim-storage can project them into SQLite.
 ///
 /// Handles:
-/// - `ChallengeOutcome` → `MishpatSignal::ChallengeOutcomeCreated` (Phase 11 T11.1)
 /// - `Commitment`       → `MishpatSignal::CommitmentCommitted`      (Slice-2a T5)
+/// - `ChallengeOutcome` → `MishpatSignal::ChallengeOutcomeCreated` (Phase 11 T11.1)
 ///
 /// GateDecisionAttestation and GateDecisionChallenge arms removed (Stage C) —
 /// those entry types now live on elohim DNA and elohim-storage projects from
 /// elohim's content_store signals.
 ///
-/// Each `to_app_option` call is independent: a record that matches `Commitment`
-/// will not also match `ChallengeOutcome` (different entry type discriminants),
-/// so the two arms are mutually exclusive in practice, but the code is safe even
-/// if that invariant were somehow violated (both would emit, both are idempotent
-/// on the storage side).
+/// Header-driven dispatch: `action.entry_type()` names the entry's
+/// `(zome_index, entry_index)`, which `resolve_entry_type` maps to exactly one
+/// `EntryTypes` variant, so the two arms above are mutually exclusive by
+/// construction rather than by convention. `post_commit_one` handles a single
+/// action; a failure there is logged and the rest of the batch still runs.
 #[hdk_extern]
 pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+    // Resolve the coordinator's scoped entry types ONCE per batch — see
+    // `resolve_entry_type`; `zome_info()` re-runs the integrity zome's
+    // `entry_defs` callback on every call.
+    let scoped_entry_types = zome_info()?.zome_types.entries;
+
     for signed_action in committed_actions {
-        let action = signed_action.action();
-        let author = action.author().clone();
-
-        // Only handle Create/Update actions that carry an entry
-        let (action_hash, entry_hash) = match &action.data {
-            ActionData::Create(create) => {
-                (signed_action.as_hash().clone(), create.entry_hash.clone())
-            }
-            ActionData::Update(update) => {
-                (signed_action.as_hash().clone(), update.entry_hash.clone())
-            }
-            _ => continue,
-        };
-
-        let record = match get(action_hash.clone(), GetOptions::default())? {
-            Some(r) => r,
-            None => continue,
-        };
-
-        // ── Commitment ────────────────────────────────────────────────────────
-        // Slice-2a T5: emit so elohim-storage can project into mishpat_commitments.
-        if let Some(commitment) = record
-            .entry()
-            .to_app_option::<mishpat_integrity::Commitment>()
-            .ok()
-            .flatten()
-        {
-            let _ = emit_signal(MishpatSignal::CommitmentCommitted {
-                action_hash: action_hash.clone(),
-                entry_hash: entry_hash.clone(),
-                commitment,
-                author: author.clone(),
-            });
+        let action_hash = signed_action.hashed.hash.clone();
+        if let Err(e) = post_commit_one(signed_action, &scoped_entry_types) {
+            error!(
+                "post_commit: skipping signals for action {:?} — {:?}",
+                action_hash, e
+            );
         }
+    }
 
-        // ── ChallengeOutcome ──────────────────────────────────────────────────
-        // Phase 11 T11.1: emit so elohim-storage can project into challenge_outcomes.
-        if let Some(entry) = record
-            .entry()
-            .to_app_option::<mishpat_integrity::ChallengeOutcome>()
-            .ok()
-            .flatten()
+    Ok(())
+}
+
+/// `EntryTypes::deserialize_from_type` with the `zome_info()` lookup lifted out
+/// of the per-action loop (see `post_commit`).
+fn resolve_entry_type(
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+    zome_index: ZomeIndex,
+    entry_index: EntryDefIndex,
+    entry: &Entry,
+) -> ExternResult<Option<EntryTypes>> {
+    let scoped = ScopedEntryDefIndex {
+        zome_index,
+        zome_type: entry_index,
+    };
+    match scoped_entry_types.find(UnitEntryTypes::iter(), scoped) {
+        Some(unit) => Ok(Some((unit, entry).try_into()?)),
+        // A miss on a zome we DO depend on means the header named an entry
+        // index outside this integrity zome's range — a real inconsistency.
+        None if scoped_entry_types
+            .dependencies()
+            .any(|z| z == scoped.zome_index) =>
         {
-            let _ = emit_signal(MishpatSignal::ChallengeOutcomeCreated {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "post_commit: entry type {scoped:?} is out of range for this zome"
+            ))))
+        }
+        // A miss on a zome we do NOT depend on: not ours to project.
+        None => Ok(None),
+    }
+}
+
+/// Emit the projection signal for ONE committed action.
+///
+/// Returning `Err` loses the signal for this action only; the caller logs it
+/// and continues with the rest of the batch.
+fn post_commit_one(
+    signed_action: SignedActionHashed,
+    scoped_entry_types: &ScopedZomeTypes<EntryDefIndex>,
+) -> ExternResult<()> {
+    let action = signed_action.hashed.content.clone();
+    let action_hash = signed_action.hashed.hash.clone();
+
+    // Only handle Create/Update actions that carry an entry.
+    let entry_hash = match &action.data {
+        ActionData::Create(create) => create.entry_hash.clone(),
+        ActionData::Update(update) => update.entry_hash.clone(),
+        _ => return Ok(()),
+    };
+
+    // Non-App entry types (AgentPubKey, CapClaim, CapGrant) carry no app entry
+    // definition; they were never projected and still are not.
+    let (zome_index, entry_index) = match action.entry_type() {
+        Some(EntryType::App(def)) => (def.zome_index, def.entry_index),
+        _ => return Ok(()),
+    };
+
+    let record = match get(action_hash.clone(), GetOptions::default())? {
+        Some(r) => r,
+        None => return Ok(()),
+    };
+    // Borrowed, not cloned.
+    let entry = match record.entry().as_option() {
+        Some(e) => e,
+        None => return Ok(()),
+    };
+
+    let author = action.author().clone();
+
+    let Some(entry_type) = resolve_entry_type(scoped_entry_types, zome_index, entry_index, entry)?
+    else {
+        return Ok(());
+    };
+
+    match entry_type {
+        // Slice-2a T5: emit so elohim-storage can project into mishpat_commitments.
+        EntryTypes::Commitment(commitment) => {
+            emit_signal(MishpatSignal::CommitmentCommitted {
+                action_hash,
+                entry_hash,
+                commitment,
+                author,
+            })?;
+        }
+        // Phase 11 T11.1: emit so elohim-storage can project into challenge_outcomes.
+        EntryTypes::ChallengeOutcome(entry) => {
+            emit_signal(MishpatSignal::ChallengeOutcomeCreated {
                 action_hash,
                 entry_hash,
                 entry,
                 author,
-            });
+            })?;
         }
+        // Every other entry type in the integrity zome is deliberately
+        // unprojected, exactly as before.
+        _ => {}
     }
+
     Ok(())
 }
 
