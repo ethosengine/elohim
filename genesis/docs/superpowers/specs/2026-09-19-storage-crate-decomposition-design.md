@@ -136,6 +136,22 @@ take roughly ten minutes off every gate.
   build after each extraction is the reading. Extractions batch with other storage pushes — they do not earn
   their own fleet roll.
 
+### Readings
+
+| after | storage full gate | storage lib tests | new crate gate (cold / warm) | storage no-op `cargo test --lib` |
+|---|---|---|---|---|
+| baseline, 2026-09-19 | ~1 980 s | 3 912 | — | — |
+| step 1 `elohim-error` (c63079ac2) | 1 368 s | 3 912 (+2 in the new crate) | 13 s / 7 s | 1 s |
+
+The 1 980 → 1 368 s drop is cache warmth, not the extraction — `error.rs` was 122 lines. It is recorded so that
+later rows are read against an honest neighbour rather than against the cold baseline.
+
+The step-1 gate was also the first run under the gate-cycle ceiling (`gate-cycle-full-ceiling@1`, hard 1 200 s,
+`.claude/epr-meta/measures.yaml`). It fired: finding `984ccc2c18d8` in `.claude/data/architecture-findings.jsonl`,
+charter "does this make sense — can this be modularized?". **This spec is that finding's design pass**; no second
+review is dispatched for it. The finding closes itself when two consecutive storage gates come in under the
+ceiling, which is this decomposition's own success reading.
+
 ## 6. Born governed — `.epr-meta` in every new crate
 
 None of the four crates already carved out (`elohim-views`, `elohim-facings`, `elohim-peer-fabric`,
