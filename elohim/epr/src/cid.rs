@@ -6,7 +6,10 @@ use cid::Cid;
 use multihash_codetable::{Code, MultihashDigest};
 
 /// Codec byte for dag-cbor per the IPLD multicodec table.
-const DAG_CBOR_CODEC: u64 = 0x71;
+///
+/// The crate's single definition — [`crate::head`] re-exports it rather than
+/// declaring a second one.
+pub const DAG_CBOR_CODEC: u64 = 0x71;
 
 /// Compute CIDv1(dag-cbor, sha2-256) over the given canonical bytes.
 pub fn compute_cid(canonical_bytes: &[u8]) -> Cid {

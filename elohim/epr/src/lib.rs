@@ -33,6 +33,7 @@ pub mod envelope;
 pub mod epr;
 pub mod error;
 pub mod generated;
+pub mod head;
 pub mod kind;
 pub mod measure;
 pub mod proof;

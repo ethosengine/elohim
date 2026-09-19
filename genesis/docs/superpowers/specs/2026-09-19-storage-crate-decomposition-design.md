@@ -143,6 +143,7 @@ take roughly ten minutes off every gate.
 | baseline, 2026-09-19 | ~1 980 s | 3 912 | — | — |
 | step 1 `elohim-error` (c63079ac2) | 1 368 s | 3 912 (+2 in the new crate) | 13 s / 7 s | 1 s |
 | step 0b test binaries 168 → 14 | 1 048 s | 3 913 | — | — |
+| step 2 head codec folded into `elohim-epr` | over the ceiling — a cold rebuild, `elohim-epr` sits under everything | 3 904 (−9, now 10 in `elohim-epr` with the golden) | `elohim-epr` gate green | — |
 
 The 1 980 → 1 368 s drop is cache warmth, not the extraction — `error.rs` was 122 lines. It is recorded so that
 later rows are read against an honest neighbour rather than against the cold baseline.

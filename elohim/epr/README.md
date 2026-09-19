@@ -11,6 +11,8 @@ Canonical codec for the Elohim EPR (EntityPortalReference) atom defined in
 - **Envelope** struct (kind, schemaRef, schemaKey, reach, coupling, claims, supersedes, proof)
 - **Epr** = Envelope + payload bytes, with builder + sign + verify
 - **Structural validator** — coupling requirement enforcement per EprKind
+- **EPR Head codec** (`head`) — DAG-CBOR encode/decode for the ~500B three-pillar
+  metadata envelope, with JSON auto-detection for pre-CBOR heads
 
 ## What this crate does NOT provide (Phase 2+)
 

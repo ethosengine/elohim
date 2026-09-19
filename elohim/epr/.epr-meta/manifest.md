@@ -60,7 +60,8 @@ rules:
       (add a field, assert prior fixtures' CIDs are unmoved) rather than per-author discipline — the
       test then catches what this advisory can only remind
 cites:
-  - requisite-variety-guidestar-epr-family-composition
+  - "requisite-variety-guidestar-epr-family-composition | path: genesis/docs/superpowers/specs/2026-08-12-requisite-variety-guidestar-epr-family-composition.md"
+  - "storage-crate-decomposition-design | elohim-storage decomposes into cohesive crates | sha256:0beba286f9f0a5a3 | path: genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md"
 ---
 
 # `elohim/epr` — the assertion layer
