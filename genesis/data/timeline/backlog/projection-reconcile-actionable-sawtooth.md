@@ -54,3 +54,13 @@ It also makes "wait for the fleet to settle before rolling" unanswerable by this
 Which ~50 anchors they are (the count is close to the 51 that `elohim.host` reports and to the REA
 stream counts named in the 09-19 handoff), and whether the rise coincides with a periodic sweep phase
 that reports "pending, not yet compared" as "actionable".
+
+## 2026-09-19 — it already costs a scenario
+
+Two validate-only measurements of the same fleet, same commit, one hour apart: edge/dev 1465 (08:31Z) ran
+122 scenarios with 10 passed and 0 failed; edge/dev 1466 (09:3xZ) ran the same 122 with 9 passed and 1 failed —
+`inventory-convergence.feature:42`, "the seed-facing doorway peer catches its projection up under sustained
+gossip", on `alpha-A /health: p2p.caughtUp is false`. Nothing was deployed between them. The step reads the flag
+once; the flag follows the sweep phase (doorway `/p2p/status` `projectionReconcile.caughtUp` was seen true,
+false, true at five-minute polls with `pending` 0, 34, 0). The scenario's verdict is the phase of the sawtooth at
+the instant it reads.

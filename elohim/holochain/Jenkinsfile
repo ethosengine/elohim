@@ -229,7 +229,7 @@ def checkEdgeNodeHealth(String url) {
 def runStorageQualityGate() {
     try {
         // Stage-local timeout: a runaway gate (cold dep-graph compile, hung
-        // test) degrades to UNSTABLE instead of eating the global 120-min
+        // test) degrades to UNSTABLE instead of eating the pipeline-global
         // budget and aborting the deploy stages behind it.
         timeout(time: 45, unit: 'MINUTES') {
             sh "bash '${env.WORKSPACE}/scripts/ci/storage-quality-gate.sh'"
@@ -346,7 +346,7 @@ def runDataplaneValidation() {
         sh "bash '${env.WORKSPACE}/scripts/ci/substrate-seam-smoke.sh' https://doorway-alpha.elohim.host https://elohim.host"
     }
     // 2700 s gate + cucumber + report must fit inside this bound; 55 min leaves
-    // the pipeline-global 120 min for the deploy stages that follow.
+    // room inside the pipeline-global limit for the deploy stages that follow.
     def strict = isValidateOnly()
     def body = {
         timeout(time: 55, unit: 'MINUTES') {
@@ -2087,7 +2087,11 @@ spec:
     }
 
     options {
-        timeout(time: 120, unit: 'MINUTES')
+        // Must exceed the sum of the stage bounds beneath it, or a healthy deploy
+        // reads as ABORTED: edge #1463 spent 62 min building (commit-derived tags
+        // rebuild doorway + storage), 56 min rolling alpha (SUCCESS), and was
+        // killed at 120 three minutes into a validation stage bounded at 55.
+        timeout(time: 240, unit: 'MINUTES')
         // abortPrevious: true — when a new orchestrator dispatch arrives while a
         // previous build of this pipeline is in-flight, abort the old one. Without
         // this, the previous orchestrator's downstream queues up behind the in-flight

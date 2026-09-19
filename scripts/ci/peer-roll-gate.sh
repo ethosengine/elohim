@@ -69,7 +69,7 @@
 # The configured minimum is a requested floor only; it is subordinate to fair
 # share so it can never consume time reserved for later gates.
 # Without the clamp, 6 gates x 900s = 90 min of gate wall-clock would push the
-# Deploy stage past the pipeline-global 120-min option — and an interrupt at
+# Deploy stage past the pipeline-global timeout option — and an interrupt at
 # that level cannot be caught by a stage's catchError (edge #1406-#1408: a
 # HEALTHY deploy read as ABORTED). The clamp also stops the first two peers
 # eating the entire budget and leaving the tail ungated.
