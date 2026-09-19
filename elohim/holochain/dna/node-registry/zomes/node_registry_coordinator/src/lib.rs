@@ -1861,10 +1861,22 @@ impl CarriedTypes {
 /// `N * N/EXPORT_CAP` entry loads. They are now three separate reads, and the
 /// two that scale with the chain are paid ONCE per walk rather than per page:
 ///
-///   * **Entries are loaded for THIS WINDOW only** — a query bounded by
-///     `ChainQueryFilterRange::ActionSeqRange` over the window's first and last
-///     sequence. Unconditional: the landed storage driver gets it without
-///     changing a byte it sends. Total entry loads across a walk: N, once.
+///   * **Entries are loaded for THIS WINDOW only** — NOT via a
+///     `sequence_range`-bounded `query`. On this fork, `SourceChain::query`
+///     (`holochain_state::source_chain`) fetches the author's WHOLE chain from
+///     the `DhtStore` and, when `include_entries(true)`, batch-loads EVERY
+///     entry on it before `ChainQueryFilter` (including `ActionSeqRange`) is
+///     applied in Rust afterward — "no filtering applied here" is the
+///     source's own comment. There is no filter pushdown on this fork, so a
+///     `sequence_range`-bounded `query(include_entries(true))` still pays for
+///     the chain's full entry set on every page; it looks bounded and is not.
+///     Instead, each window action named by step (3) is materialised
+///     individually via `get_details(.., GetOptions::local())`, which
+///     reproduces exactly the record `query(include_entries(true))` would
+///     have returned for that one action (see `get_my_custody_epr_scopes` in
+///     `content_store` and `get_my_household_collective_cids` in `imagodei`
+///     for the same turn taken on the same fork behaviour). Total entry loads
+///     across a walk: N, once.
 ///   * **The digest is computed once**, on the first (unpinned) page, and
 ///     reported verbatim by every page that hands the pin back.
 ///   * **The POSITION scan is bounded on a pinned page.** The page cursor is an
@@ -2000,44 +2012,49 @@ pub fn export_records(input: ExportInput) -> ExternResult<ExportPage> {
         _ => None,
     };
 
-    // (4) Entries for the window, and only the window. The sequence range spans
-    //     any non-app actions that happen to sit between the first and last
-    //     record of the page — those carry no entry, so they cost nothing — and
-    //     the records are re-ordered by the window's own order rather than the
-    //     query's, so the page can never disagree with the ordinals it was
-    //     asked for.
+    // (4) Entries for the window, and only the window. `window` already names
+    //     the exact `(action_seq, ActionHash)` pairs this page carries — step
+    //     (3) resolved them from a HEADERS-ONLY read, either the pinned
+    //     `scan_forward` probe or the full ordinal index — so this step never
+    //     re-queries the chain by range at all. A `sequence_range`-bounded
+    //     `query(include_entries(true))` looks like it would do that, but does
+    //     not: see the doc comment above this function for why `include_entries`
+    //     defeats `ActionSeqRange` on this fork. Each window action is instead
+    //     materialised individually via `get_details(.., GetOptions::local())`,
+    //     which resolves through the same author-context cascade `query()`
+    //     does — including this agent's own private entries — so it reproduces
+    //     exactly the record `query(include_entries(true))` would have
+    //     returned for that one action, and only the window's entries are ever
+    //     read from disk. The records are assembled in the window's own order,
+    //     so the page can never disagree with the ordinals it was asked for.
     let mut records = Vec::with_capacity(window.len());
     let mut entries = Vec::with_capacity(window.len());
     // The page names its own types (Task 26). One `zome_info()` for the page,
     // not one per record.
     let type_table = local_entry_types()?;
     let mut type_names = Vec::with_capacity(window.len());
-    if let (Some((first_seq, _)), Some((last_seq, _))) = (window.first(), window.last()) {
-        let loaded = query(
-            ChainQueryFilter::new()
-                .sequence_range(ChainQueryFilterRange::ActionSeqRange(*first_seq, *last_seq))
-                .include_entries(true),
-        )?;
-        let mut by_hash: std::collections::HashMap<ActionHash, Record> = loaded
-            .into_iter()
-            .map(|r| (r.action_address().clone(), r))
-            .collect();
-        for (_, action_hash) in &window {
-            // The header scan named this action a moment ago in the same call,
-            // so a miss is not a stale-view problem — it is this export
-            // disagreeing with itself. Refuse loudly rather than return a page
-            // shorter than the cursor it advances.
-            let record = by_hash.remove(action_hash).ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "export_records: action {action_hash} was named by the chain header scan but \
-                     not returned by the windowed entry query — refusing to return a page that \
-                     disagrees with its own cursor"
-                )))
-            })?;
-            type_names.push(exported_type_name(&type_table, record.action()));
-            entries.push(record.entry().as_option().cloned());
-            records.push(record.signed_action);
-        }
+    for (_, action_hash) in &window {
+        // The position scan named this action a moment ago in the same call,
+        // so a miss is not a stale-view problem — it is this export
+        // disagreeing with itself. Refuse loudly rather than return a page
+        // shorter than the cursor it advances.
+        let details = get_details(action_hash.clone(), GetOptions::local())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "export_records: action {action_hash} was named by the position scan but could \
+                 not be materialised locally — refusing to return a page that disagrees with its \
+                 own cursor"
+            )))
+        })?;
+        let Details::Record(record_details) = details else {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "export_records: action {action_hash} resolved to entry-level details, not \
+                 record-level — refusing to return a page that disagrees with its own cursor"
+            ))));
+        };
+        let record = record_details.record;
+        type_names.push(exported_type_name(&type_table, record.action()));
+        entries.push(record.entry().as_option().cloned());
+        records.push(record.signed_action);
     }
 
     Ok(ExportPage {
@@ -3743,14 +3760,22 @@ const HALF_SEAL_SCAN: u32 = 32;
 #[cfg(feature = "lineage-witness")]
 fn existing_seal(lineage_dna_hash: &DnaHash) -> ExternResult<Option<SealReceipt>> {
     let target = MigrationTarget::Dna(lineage_dna_hash.clone());
-    let records = query(ChainQueryFilter::new().include_entries(true))?;
+
+    // Phase 1: HEADERS ONLY. An `OpenChain` action carries no entry, so this
+    // pass needs nothing `include_entries(true)` would add — and on this
+    // fork, `include_entries(true)` would batch-load EVERY entry on the WHOLE
+    // chain regardless (see the doc above `export_records`), which is exactly
+    // the cost most calls here would pay for nothing: a chain not sealed
+    // toward this lineage returns at the `None` below without materialising a
+    // single entry.
+    let headers = query(ChainQueryFilter::new().include_entries(false))?;
 
     // (1) the OpenChain — the seal's own record on this chain.
     let mut open: Option<(ActionHash, ActionHash)> = None;
-    for record in &records {
-        if let ActionData::OpenChain(data) = &record.action().data {
+    for header in &headers {
+        if let ActionData::OpenChain(data) = &header.action().data {
             if data.prev_target == target {
-                open = Some((record.action_address().clone(), data.close_hash.clone()));
+                open = Some((header.action_address().clone(), data.close_hash.clone()));
             }
         }
     }
@@ -3758,18 +3783,30 @@ fn existing_seal(lineage_dna_hash: &DnaHash) -> ExternResult<Option<SealReceipt>
         return Ok(None);
     };
 
-    // (2) the witness carrying THAT close.
+    // (2) the witness carrying THAT close. Materialise ONLY `Create` actions —
+    // the one shape a `NotarizationWitness` entry can be carried on — and only
+    // now that an Open is known to exist. `get_details(.., GetOptions::local())`
+    // reproduces exactly the record `query(include_entries(true))` would have
+    // returned for that action.
     let mut witness_hash: Option<ActionHash> = None;
-    for record in &records {
+    for header in &headers {
         if witness_hash.is_some() {
             break;
         }
-        if !matches!(record.action().data, ActionData::Create(_)) {
+        if !matches!(header.action().data, ActionData::Create(_)) {
             continue;
         }
+        let Some(details) = get_details(header.action_address().clone(), GetOptions::local())?
+        else {
+            continue;
+        };
+        let Details::Record(record_details) = details else {
+            continue;
+        };
+        let record = record_details.record;
         // A record that is not a witness simply fails to decode as one; that is
-        // a skip, never an error, because this walk crosses every app entry on
-        // the chain.
+        // a skip, never an error, because this walk crosses every Create action
+        // on the chain.
         let Ok(Some(w)) = record.entry().to_app_option::<NotarizationWitness>() else {
             continue;
         };

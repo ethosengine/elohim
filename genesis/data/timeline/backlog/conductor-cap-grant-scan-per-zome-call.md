@@ -88,9 +88,17 @@ first-party caller mints grants.
    new one per connect. First-party, small, stops the growth; does nothing for the 15 000 already there.
 4. **BATCH / RATE-LIMIT** apply to the second caller of the same batch read, `source_chain_records`: three zome sites
    still `query(ChainQueryFilter::new().include_entries(true))` over the whole chain (`content_store/src/lib.rs:16205`,
-   `imagodei/qahal_coordinator.rs:409`, `imagodei/lib.rs:4853`); `node_registry_coordinator/src/lib.rs:1854` already
-   fixed the identical pattern with an `ActionSeqRange`-bounded read. Coordinator-only, so it hot-swaps without moving
-   the DNA hash.
+   `imagodei/qahal_coordinator.rs:409`, `imagodei/lib.rs:4853`); `node_registry_coordinator/src/lib.rs:1854` was
+   claimed here as already-fixed with an `ActionSeqRange`-bounded read — that claim was wrong, sourced from the
+   coordinator's own doc comment, which was itself wrong: on this fork `SourceChain::query` batch-loads EVERY entry
+   on the WHOLE chain before `ChainQueryFilter` (including `ActionSeqRange`) applies — no pushdown, so a
+   `sequence_range`-bounded `include_entries(true)` still pays for the whole chain. Corrected 2026-09-19: of the
+   three sites originally listed, `content_store::get_my_custody_epr_scopes` and
+   `imagodei::qahal_coordinator::get_my_household_collective_cids` are now headers-only two-phase reads (this fix
+   landed on both, same day); `imagodei::query_my_source_chain` (`imagodei/lib.rs:4853`) legitimately needs every
+   entry — it is a full source-chain dump — and is unchanged. The coordinator's own `export_records` window-load and
+   `existing_seal`'s witness scan (`node_registry_coordinator/src/lib.rs`) got the same headers-then-materialise
+   split the same day. Coordinator-only, so it hot-swaps without moving the DNA hash.
 
 Order that the evidence supports: **2 first** (it is the only one that relieves the two stalled peers without a
 re-key), **3 with it** (stops the growth), **4** alongside as the cheap coordinator change, **1** as the design that
