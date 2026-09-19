@@ -1988,7 +1988,10 @@ async fn mint_app_auth_token(
     for attempt in 1..=MAX_ATTEMPTS {
         match TypedAdminClient::connect(admin_url).await {
             Ok(admin) => match admin
-                .issue_app_authentication_token(installed_app_id, TOKEN_EXPIRY_SECS)
+                // Class R: this 24h token is cached in the WorkerPool's
+                // PoolConfig and reused by every worker on every reconnect —
+                // never single_use.
+                .issue_app_authentication_token(installed_app_id, TOKEN_EXPIRY_SECS, false)
                 .await
             {
                 Ok(token) => {

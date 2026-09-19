@@ -34,6 +34,16 @@ use super::protocol::encode_admin_request;
 use super::transport::Transport;
 use crate::error::StorageError;
 
+/// Expiry (seconds) for the token minted in [`AuthToken::obtain`]. Class M
+/// (mint-and-consume): `Session::establish` calls `obtain()` then immediately
+/// authenticates a fresh `Transport` with the result; the token is never
+/// stored beyond the `Session` handshake, and a reconnect calls
+/// `Session::establish` (via `ConductorClient::reconnect`) again, minting a
+/// new token. `single_use: true` is the posture; the expiry only bounds an
+/// UNUSED token and is generous on purpose — a handshake that outlives it
+/// fails auth and forces a reconnect, which a stalled conductor cannot afford.
+const MINT_AND_CONSUME_EXPIRY_SECS: i64 = 300;
+
 /// An authentication token obtained from the admin interface.
 ///
 /// This type can only be created via `AuthToken::obtain()`, which
@@ -78,9 +88,9 @@ impl AuthToken {
             ),
             (
                 Value::String("expiry_seconds".into()),
-                Value::Integer(3600.into()),
+                Value::Integer(MINT_AND_CONSUME_EXPIRY_SECS.into()),
             ),
-            (Value::String("single_use".into()), Value::Boolean(false)),
+            (Value::String("single_use".into()), Value::Boolean(true)),
         ]);
 
         let request_bytes =
@@ -103,7 +113,10 @@ impl AuthToken {
 
         Ok(Self {
             bytes: token_bytes,
-            expires_at: Some(std::time::Instant::now() + Duration::from_secs(3600)),
+            expires_at: Some(
+                std::time::Instant::now()
+                    + Duration::from_secs(MINT_AND_CONSUME_EXPIRY_SECS as u64),
+            ),
         })
     }
 

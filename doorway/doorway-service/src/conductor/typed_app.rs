@@ -27,6 +27,17 @@ use tracing::{debug, info, warn};
 
 use super::typed_admin::TypedAdminClient;
 
+/// Expiry for the token minted in [`TypedAppClient::connect`]. Class M
+/// (mint-and-consume): the token is used exactly once, in the
+/// `AppWebsocket::connect()` call immediately below its issuance, and is
+/// never stored on `TypedAppClient` or reused — a reconnect calls `connect()`
+/// again, which mints a fresh token. `single_use: true` is the posture — it
+/// burns the token on first use; the expiry only bounds an UNUSED token's
+/// window. It is deliberately generous (not Holochain's 30s default): a
+/// connect that outlives the expiry fails auth and re-enters the reconnect
+/// loop, and on a stalled conductor every reconnect is expensive.
+const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
+
 /// Typed Holochain app interface client backed by `holochain_client::AppWebsocket`.
 ///
 /// Provides authenticated connection to the conductor's app interface with
@@ -55,7 +66,7 @@ impl TypedAppClient {
         // Step 1: Issue auth token via admin
         let admin = TypedAdminClient::connect(admin_url).await?;
         let token = admin
-            .issue_app_authentication_token(installed_app_id, 0)
+            .issue_app_authentication_token(installed_app_id, MINT_AND_CONSUME_EXPIRY_SECS, true)
             .await?;
 
         info!(

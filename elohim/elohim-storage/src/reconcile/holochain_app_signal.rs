@@ -404,6 +404,17 @@ fn parse_device_archetype(s: &str) -> DeviceArchetype {
 /// Mirror-variant tags for the storage-side `RecoveryV2Signal` enum. A decode
 /// failure on one of these tags is a REAL projection miss (loud) — same
 /// classification pattern as `signals::IMAGODEI_MIRROR_VARIANTS`.
+/// Expiry for the token minted while establishing
+/// [`HolochainAppSignalStream`]'s connection. Class M (mint-and-consume): the
+/// token is used exactly once, in the `AppWebsocket::connect()` call
+/// immediately below its issuance, and is never stored — per the module's
+/// own comment, "the signal stream reconnects on every conductor restart,
+/// which makes it exactly as dangerous a re-minter as the bridge," i.e. every
+/// reconnect mints a fresh token rather than reusing this one. That same
+/// danger is why the expiry is generous: a connect that outlives it fails
+/// auth and reconnects, and a reconnect here is the expensive event.
+const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
+
 const RECOVERY_V2_MIRROR_VARIANTS: &[&str] = &[
     "RecoveryRequestCreated",
     "IntimateWitnessSubmitted",
@@ -659,8 +670,8 @@ impl HolochainAppSignalStream {
         let token = admin_ws
             .issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
                 installed_app_id: app_id.to_string(),
-                expiry_seconds: 3600,
-                single_use: false,
+                expiry_seconds: MINT_AND_CONSUME_EXPIRY_SECS,
+                single_use: true,
             })
             .await
             .map_err(|e| AppSignalStreamError::Credentials(format!("issue_app_auth_token: {e}")))?;

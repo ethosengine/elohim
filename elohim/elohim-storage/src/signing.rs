@@ -37,6 +37,16 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::{debug, info};
 
+/// Expiry for the token minted in [`ConductorSigningClient::connect`]. Class
+/// M (mint-and-consume): the token is used exactly once, in the
+/// `AppWebsocket::connect()` call immediately below its issuance, and is
+/// never stored — `ConductorSigningClient` only holds the resulting
+/// authenticated `AppWebsocket`. A reconnect requires a fresh `connect()`
+/// call (there is no separate reconnect path that reuses the token), so a
+/// single-use token never blocks reconnection. The expiry only bounds an
+/// UNUSED token and is generous on purpose (see `hc_client.rs`).
+const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
+
 // =============================================================================
 // Errors
 // =============================================================================
@@ -201,8 +211,8 @@ impl ConductorSigningClient {
         let token = admin_ws
             .issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
                 installed_app_id: app_id.to_string(),
-                expiry_seconds: 3600,
-                single_use: false,
+                expiry_seconds: MINT_AND_CONSUME_EXPIRY_SECS,
+                single_use: true,
             })
             .await
             .map_err(|e| SigningError::Credentials(format!("issue_app_auth_token: {e}")))?;

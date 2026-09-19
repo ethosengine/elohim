@@ -43,6 +43,18 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
+/// Expiry (seconds) for the token minted in [`ImportHandler::get_app_token`].
+/// Class M (mint-and-consume): `connect_and_listen` fetches this token once
+/// via `setup_from_admin` and immediately sends it in the app-interface
+/// `AppAuthenticationRequest`; it is never stored beyond that connection, and
+/// `run()`'s reconnect loop re-enters `connect_and_listen` fresh on every
+/// attempt — "Every attempt mints an auth token" (see the comment at the
+/// reconnect-backoff site below). `single_use: true` is the posture; the
+/// expiry only bounds an UNUSED token and is generous on purpose — an auth
+/// that outlives it costs another admin-API mint on a conductor that is
+/// already slow.
+const MINT_AND_CONSUME_EXPIRY_SECS: i64 = 300;
+
 // ============================================================================
 // Configuration
 // ============================================================================
@@ -379,9 +391,9 @@ impl ImportHandler {
             ),
             (
                 Value::String("expiry_seconds".into()),
-                Value::Integer(3600.into()),
+                Value::Integer(MINT_AND_CONSUME_EXPIRY_SECS.into()),
             ),
-            (Value::String("single_use".into()), Value::Boolean(false)),
+            (Value::String("single_use".into()), Value::Boolean(true)),
         ]);
 
         let inner = Value::Map(vec![

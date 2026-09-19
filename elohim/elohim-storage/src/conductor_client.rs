@@ -28,6 +28,16 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
+/// Expiry (seconds) for the token minted in `get_auth_token` below. Class M
+/// (mint-and-consume): `connection_loop` fetches a fresh token at the top of
+/// its `loop`, uses it once to authenticate the connection it is about to
+/// open, and never stores it — the next reconnect re-enters the loop and
+/// mints a new token. `single_use: true` is the posture; the expiry only
+/// bounds an UNUSED token and is generous on purpose — a connect that
+/// outlives it fails auth and re-enters this loop, which a stalled conductor
+/// cannot afford.
+const MINT_AND_CONSUME_EXPIRY_SECS: i64 = 300;
+
 use crate::error::StorageError;
 
 /// Configuration for conductor client
@@ -461,9 +471,9 @@ async fn get_auth_token(admin_url: &str, app_id: &str) -> Result<Vec<u8>, Storag
         ),
         (
             Value::String("expiry_seconds".into()),
-            Value::Integer(3600.into()),
+            Value::Integer(MINT_AND_CONSUME_EXPIRY_SECS.into()),
         ),
-        (Value::String("single_use".into()), Value::Boolean(false)),
+        (Value::String("single_use".into()), Value::Boolean(true)),
     ]);
 
     let inner = Value::Map(vec![

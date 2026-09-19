@@ -117,6 +117,16 @@ pub fn zome_call_timeout() -> Duration {
 /// an env var: it is an availability invariant, not an operator tuning knob.
 const PRIMARY_UNHEALTHY_COOLDOWN: Duration = Duration::from_secs(60);
 
+/// Expiry for the token minted in [`connect_endpoint`]. Class M
+/// (mint-and-consume): the token is used exactly once, in the
+/// `AppWebsocket::connect()` call immediately below its issuance, and is
+/// never stored — only the resulting authenticated `AppWebsocket` is cached
+/// on `ZomeCaller`. A reconnect calls `connect_endpoint` again, minting a
+/// fresh token, so a single-use token never blocks reconnection. Generous on
+/// purpose (see `conductor/typed_app.rs`): a connect that outlives the expiry
+/// fails auth and loops, which a stalled conductor cannot afford.
+const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
+
 /// Why a conductor call failed, at the only granularity failover cares about.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CallFailureClass {
@@ -883,8 +893,8 @@ async fn connect_endpoint(
         deadline,
         admin_ws.issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
             installed_app_id: installed_app_id.to_string(),
-            expiry_seconds: 3600,
-            single_use: false,
+            expiry_seconds: MINT_AND_CONSUME_EXPIRY_SECS,
+            single_use: true,
         }),
     )
     .await

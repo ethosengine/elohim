@@ -505,7 +505,10 @@ pub async fn handle_hc_connect(
 
     // --- Step 6: Issue app authentication token ---
     let app_token = match admin
-        .issue_app_authentication_token(&installed_app_id, 3600)
+        // Class R: returned in the ConnectResponse to the browser client,
+        // which holds it and may reconnect its own AppWebsocket with this
+        // same token later — never single_use.
+        .issue_app_authentication_token(&installed_app_id, 3600, false)
         .await
     {
         Ok(token) => BASE64.encode(&token),

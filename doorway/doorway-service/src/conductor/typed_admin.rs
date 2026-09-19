@@ -277,17 +277,24 @@ impl TypedAdminClient {
     /// Issue an app authentication token for AppWebsocket connections.
     ///
     /// Returns the raw token bytes that the client passes to `AppWebsocket.connect()`.
+    ///
+    /// `single_use` is caller-decided, not hardcoded: a token minted and
+    /// consumed immediately by a connect in the same flow (never stored,
+    /// cached, or reused on reconnect) should pass `true`; a token that is
+    /// cached, handed to a worker pool, or returned across an API boundary to
+    /// a caller that reconnects later must pass `false`.
     pub async fn issue_app_authentication_token(
         &self,
         installed_app_id: &str,
         expiry_seconds: u64,
+        single_use: bool,
     ) -> Result<Vec<u8>, String> {
         let result = self
             .admin_ws
             .issue_app_auth_token(IssueAppAuthenticationTokenPayload {
                 installed_app_id: installed_app_id.to_string(),
                 expiry_seconds,
-                single_use: false,
+                single_use,
             })
             .await
             .map_err(|e| format!("Admin error (issue_app_authentication_token): {e}"))?;

@@ -172,6 +172,20 @@ async fn authorize_signing_credentials_fenced(
 /// wide enough to catch a transport error would spend that grant on every
 /// conductor hiccup. `signature` is NOT here for exactly that reason: it
 /// appears in transport and serialization failures too.
+/// Expiry for the token minted in [`HcClient::connect`]. Class M
+/// (mint-and-consume): the token is used exactly once, in the
+/// `AppWebsocket::connect()` call immediately below its issuance, and is
+/// never stored — `HcClient` only holds the resulting authenticated
+/// `AppWebsocket`. A reconnect goes through `HcClientRegistry`, which calls
+/// `HcClient::connect` fresh each time, minting a new token, so a single-use
+/// token never blocks reconnection. `single_use: true` is the posture; the
+/// expiry only bounds an UNUSED token. It is generous on purpose (not
+/// Holochain's 30s default): a connect that outlives it fails auth and
+/// reconnects, and each reconnect here re-runs `authorize_signing_credentials`
+/// — a cap-grant mint, the row class whose scan is the fleet's dominant
+/// zome-call cost.
+const MINT_AND_CONSUME_EXPIRY_SECS: u64 = 300;
+
 const CAP_GRANT_REJECTION_MARKERS: &[&str] = &[
     "unauthorized",
     "capability",
@@ -475,8 +489,8 @@ impl HcClient {
         let token = admin_ws
             .issue_app_auth_token(holochain_client::IssueAppAuthenticationTokenPayload {
                 installed_app_id: config.app_id.clone(),
-                expiry_seconds: 3600, // 1 hour
-                single_use: false,
+                expiry_seconds: MINT_AND_CONSUME_EXPIRY_SECS,
+                single_use: true,
             })
             .await
             .map_err(|e| StorageError::Connection(format!("issue_app_auth_token failed: {}", e)))?;
