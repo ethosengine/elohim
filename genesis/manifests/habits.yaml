@@ -4280,9 +4280,35 @@ habits:
       alone, and is therefore refused identically by every peer. A rule enforced only by a
       well-behaved coordinator is not enforced: coordinators are hot-swappable application code,
       so any peer running modified coordinator WASM can mint standing that every validator accepts.
-    status: unwired
+    status: red
     active: false
+    checks:
+      - "python3 .claude/scripts/_lib/__tests__/authority_in_integrity_source_shape_test.py — textual source-shape probe over the five LIVE integrity zomes (elohim/imagodei/infrastructure/node-registry/mishpat; NOT lamad-v1, NOT hrea). Measures L1 (an unconditional `{ .. }` open link arm), L2 (`OpEntry::CreateEntry`/`UpdateEntry { app_entry, .. }` discarding `action` at the dispatch site) and L3 (a `_ => Ok(ValidateCallbackResult::Valid)` catch-all inside a `match app_entry { ... }` create/update dispatch), per DNA, exit 0 only when every DNA is clear of all three. RED today (exit 1, 24 hits across 5 DNAs) — this is the habit's `first_move` option 1, a shape-guard, not the behaviour proof (that is genesis/a2o/features/trust/counterfeit-standing-is-refused.feature, not written yet)."
     evidence: >
+      2026-09-19 (later same day): RED WRITTEN (`unwired` -> `red`, first_move option 1 completed) —
+      `.claude/scripts/_lib/__tests__/authority_in_integrity_source_shape_test.py` measures the three
+      known-open shapes textually across the five live integrity zomes. Run today: 24 hits, all five
+      DNAs fail at least one leg (exit 1). Per DNA — L1 unconditional open link arm / L2 dispatch
+      discards `action` / L3 entry-type catch-all: elohim 2/2/1 (content_store_integrity:4256-4261,
+      :4323); imagodei 2/1/2 (imagodei_integrity:1152,1154,1171,1175-1176 — the L2 hit is
+      `OpEntry::UpdateEntry`, not `CreateEntry`: imagodei's CreateEntry arm already binds `action`, its
+      UpdateEntry arm does not, which is the same hole backlog row 14 names for `Membership` updates);
+      infrastructure 2/0/1 (infrastructure_integrity:299,304-305 — both CreateEntry and UpdateEntry
+      already bind `action`, so L2 is clean here; the L3 hit is UpdateEntry's catch-all, CreateEntry's
+      inner match is exhaustive over its 4 entry types); node-registry 4/4/1
+      (node_registry_integrity:266-267,271-272,282,514-515,519-520 — doubled because the
+      `lineage-witness`-off and `lineage-witness`-on `validate()` variants both carry the same two
+      open shapes; the feature is off by default per the habit's own refs); mishpat 0/2/0
+      (mishpat_integrity:418-419 — `validate_create_entry`'s match is exhaustive with no L1/L3 hit at
+      all, and its `OpLink::CreateLink` dispatch is a real per-link-type match, `{ link_type, action }`,
+      not `{ .. }`, so it correctly scores 0 on L1 even though `validate_create_link`'s own fallthrough
+      for every link type but `CommitmentByState` is still open BY FALLTHROUGH rather than by D6's
+      declared classification — a real gap the probe does not claim to catch, since it is not the L1
+      shape). Three hits hand-verified by reading the cited lines directly (elohim :4260-4261,
+      node-registry :514-515, imagodei :1171) — all matched the probe's excerpt exactly. Nothing here
+      claims the invariant holds or that any DNA's L1=0 means a link is actually author-checked (see the
+      probe's own caveat, printed on every run): this is a shape-guard, not the behaviour proof — that
+      remains `genesis/a2o/features/trust/counterfeit-standing-is-refused.feature`, not yet written.
       2026-09-19: DECLARED `unwired` — committed to, with no runnable check, from a whole-DNA audit
       that found ONE systemic finding rather than a list of defects. The finding: authority in this
       protocol is enforced in COORDINATOR zomes, and coordinators are hot-swappable application code.
