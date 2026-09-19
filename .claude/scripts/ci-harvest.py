@@ -19,6 +19,11 @@ Stores:
 Modes:
   (default)      harvest all jobs since cursor; human-readable summary
   --hook         harvest; emit SessionStart-hook JSON (silent when nothing)
+  --dispatch     also emit the agent-dispatch imperative for new/reopened
+                 findings. OFF by default: an ordinary session gets a passive
+                 one-line notice and decides for itself. Pass this only from a
+                 topical surface — pipeline/CI work, a /shift kickoff, or a
+                 stasis sweep — where draining the ledger IS the session's job.
   --wait JOB     bounded poll until JOB's running build completes, then
                  harvest that job (post-push loop-closer; run in background)
   --jobs a,b     restrict harvest to listed jobs
@@ -618,7 +623,7 @@ def reconcile(results, cursor):
     return new_entries, bumped, confirmed, reopened
 
 
-def render(results, new_entries, bumped, confirmed, reopened, as_hook):
+def render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch=False):
     urgent = [r for r in results if r["urgent"]]
     parts, sys_parts = [], []
     if urgent:
@@ -639,27 +644,42 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook):
             for e in new_entries[:5]
         )
         more = f" (+{len(new_entries) - 5} more)" if len(new_entries) > 5 else ""
-        parts.append(
-            f"[ci-harvest] {len(new_entries)} NEW CI finding(s) captured to "
-            f".claude/data/ci-findings.jsonl — {lines}{more}. "
-            f"DISPATCH (do not derail the current task): launch the "
-            f"`ci-failure-triage` agent via the Agent tool with "
-            f"run_in_background: true and the prompt 'Triage CI ledger "
-            f"fingerprint(s) {fps} per your agent definition "
-            f"(.claude/agents/ci-failure-triage.md). Your goal is the largest "
-            f"genuine step toward stasis this run supports — canonicalize by "
-            f"concern, land what is bounded, document live trajectories for "
-            f"the rest.' Fall back to general-purpose with the same prompt if "
-            f"the type is unavailable."
-        )
-        sys_parts.append(f"+{len(new_entries)} new finding(s) → ci-failure-triage dispatch")
+        if dispatch:
+            parts.append(
+                f"[ci-harvest] {len(new_entries)} NEW CI finding(s) captured to "
+                f".claude/data/ci-findings.jsonl — {lines}{more}. "
+                f"DISPATCH (do not derail the current task): launch the "
+                f"`ci-failure-triage` agent via the Agent tool with "
+                f"run_in_background: true and the prompt 'Triage CI ledger "
+                f"fingerprint(s) {fps} per your agent definition "
+                f"(.claude/agents/ci-failure-triage.md). Your goal is the largest "
+                f"genuine step toward stasis this run supports — canonicalize by "
+                f"concern, land what is bounded, document live trajectories for "
+                f"the rest.' Fall back to general-purpose with the same prompt if "
+                f"the type is unavailable."
+            )
+            sys_parts.append(f"+{len(new_entries)} new finding(s) → ci-failure-triage dispatch")
+        else:
+            parts.append(
+                f"[ci-harvest] {len(new_entries)} NEW CI finding(s) captured to "
+                f".claude/data/ci-findings.jsonl — {lines}{more}. Captured for the "
+                f"trail; NO action is being asked of this session. Raise it only if "
+                f"the pilot's topic is already pipeline/CI work or a shift kickoff — "
+                f"then triage is `ci-failure-triage` on fingerprint(s) {fps}, or "
+                f"/delivery-stasis for the whole ledger."
+            )
+            sys_parts.append(f"+{len(new_entries)} new finding(s) captured (no dispatch)")
     if bumped:
         sys_parts.append(f"{len(bumped)} known finding(s) recurred (flake evidence)")
     if reopened:
         fps = ", ".join(e["fp"] for e in reopened)
         parts.append(
             f"[ci-harvest] {len(reopened)} triaged fix(es) RECURRED — reopened: {fps}. "
-            f"The fix didn't take; re-dispatch ci-failure-triage for these."
+            f"The fix didn't take."
+            + (" Re-dispatch ci-failure-triage for these."
+               if dispatch else
+               " Captured for the trail; act only if this session's topic is"
+               " pipeline/CI work or a shift kickoff.")
         )
         sys_parts.append(f"{len(reopened)} triaged finding(s) recurred → reopened")
     if confirmed:
@@ -693,13 +713,13 @@ def render(results, new_entries, bumped, confirmed, reopened, as_hook):
     return "\n".join(out)
 
 
-def run_harvest(jobs, as_hook):
+def run_harvest(jobs, as_hook, dispatch=False):
     cursor = load_cursor()
     taxonomy = load_taxonomy()
     with ThreadPoolExecutor(max_workers=6) as ex:
         results = list(ex.map(lambda j: harvest_job(j, cursor, taxonomy), jobs))
     new_entries, bumped, confirmed, reopened = reconcile(results, cursor)
-    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook)
+    rendered = render(results, new_entries, bumped, confirmed, reopened, as_hook, dispatch)
     if rendered:
         print(rendered)
     elif not as_hook:
@@ -730,12 +750,18 @@ def main():
     ap.add_argument("--wait", metavar="JOB", help="poll JOB until its build completes, then harvest")
     ap.add_argument("--timeout-mins", type=int, default=30)
     ap.add_argument("--jobs", help="comma-separated job subset")
+    ap.add_argument(
+        "--dispatch",
+        action="store_true",
+        help="emit the ci-failure-triage dispatch imperative (topical surfaces only: "
+             "pipeline/CI work, /shift kickoff, stasis sweep)",
+    )
     args = ap.parse_args()
     jobs = [j.strip() for j in args.jobs.split(",")] if args.jobs else JOBS
     if args.wait:
         wait_mode(args.wait, args.timeout_mins)
     else:
-        run_harvest(jobs, as_hook=args.hook)
+        run_harvest(jobs, as_hook=args.hook, dispatch=args.dispatch)
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ Each round:
 ### 1. Measure (full scoreboard — deterministic, local)
 
 ```bash
-python3 .claude/scripts/ci-harvest.py            # fresh CI evidence (network)
+python3 .claude/scripts/ci-harvest.py --dispatch # fresh CI evidence (network)
 python3 .claude/scripts/delivery-scoreboard.py   # the whole board, pure-local
 python3 epr flow report placement --ledger | head -25   # per-file queue when needed
 ```
