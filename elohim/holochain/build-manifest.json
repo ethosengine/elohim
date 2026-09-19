@@ -70,7 +70,18 @@
           "elohim/constitution/**",
           "crates/**",
           "bridges/**",
-          "elohim/Cargo.lock"
+          "elohim/Cargo.lock",
+          "elohim/elohim-storage/config/**",
+          "elohim/ark/core/**",
+          "elohim/elohim-cache-core/**",
+          "elohim/elohim-compute/**",
+          "elohim/epr-rea/**",
+          "elohim/rakia/schemas/**",
+          "elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs",
+          "elohim/holochain/dna/mishpat/dna.yaml",
+          "elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs",
+          "genesis/a2o/scripts/__tests__/fixtures/**",
+          "scripts/ci/elohim-sdk-feature-matrix.sh"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"
