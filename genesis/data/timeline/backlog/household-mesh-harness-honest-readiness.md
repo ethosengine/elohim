@@ -119,6 +119,23 @@ Red 2026-09-18 on baseline-alpha with four required first-party errors,
   projection cache fills only on the authoring side (post_commit signals are cell-local) and the
   route has no storage fall-through on a miss. State: **unmet**.
 
+## 11. The household `environment.sh` puts `TMPDIR` inside the repository
+
+`genesis/local-dev/household-dowell/environment.sh` exports
+`TMPDIR=<repo>/genesis/local-dev/household-dowell/tmp`. Any process started from a shell that
+sourced it inherits a temp root INSIDE the git work tree. Measured 2026-09-18/19: a `git push`
+launched from such a shell failed the pre-push agentic-library leg twice
+(`capacity_ratification_test.py`, `epr_habits_test.py`) while the same harnesses passed 3/3 from a
+clean shell and the same push passed 47/47 with `TMPDIR` unset. Those harnesses build fixture
+repositories under the temp root; inside the work tree their upward walks (git discovery, the
+`.epr-meta` cascade) resolve into the real repository.
+
+- chain / between "mesh env sourced" → "any repo gate run from that shell" / missing node "a
+  harness's fixture root is outside every git work tree": probe — run the `_lib/__tests__` suite
+  with `TMPDIR` set to a path under the repo; State: **unmet** (2 of 47 red). Either the harnesses
+  pin their own temp root outside the tree, or the household env stops exporting an in-tree
+  `TMPDIR` to child shells that are not mesh processes.
+
 ## Current decision
 
 **Captured, not started**, except item 7 (already landed — listed for context, not as work).
