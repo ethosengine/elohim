@@ -1200,32 +1200,35 @@ def runReconciliationBackstop() {
     def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
     def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
 
-    // Post block runs in node('built-in'); Determine Build Plan + Post
-    // Predicted Build Graph ran in container('builder') with a different
-    // workspace. Recover the archived predictedFile into this workspace
-    // before checking — otherwise we'd false-positive "Determine Build
-    // Plan did not complete" on every cascade-abort run.
-    if (!fileExists(predictedFile)) {
-        try {
-            copyArtifacts(
-                projectName: env.JOB_NAME,
-                selector: specific(env.BUILD_NUMBER),
-                filter: predictedFile,
-                optional: true,
-                fingerprintArtifacts: false,
-            )
-        } catch (Exception e) {
-            echo "[backstop] could not copy-back ${predictedFile} from this build: ${e.message}"
-        }
+    // post.always runs in the persistent controller workspace, while graph
+    // stages run in the ephemeral builder pod. Never trust a controller-local
+    // graph file: it may belong to an earlier build. Copy the current build's
+    // predicted artifact back unconditionally, then verify its build identity.
+    try {
+        copyArtifacts(
+            projectName: env.JOB_NAME,
+            selector: specific(env.BUILD_NUMBER),
+            filter: predictedFile,
+            optional: true,
+            fingerprintArtifacts: false,
+        )
+    } catch (Exception e) {
+        echo "[backstop] could not copy-back ${predictedFile} from this build: ${e.message}"
     }
 
-    if (!fileExists(predictedFile)) {
-        echo "[backstop] No ${predictedFile} after copy-back — Determine Build Plan never archived it (early abort or archive failure); skipping reconciliation backstop"
+    def predicted = fileExists(predictedFile) ? readJSON(file: predictedFile) : null
+    def predictedIsCurrent = predicted &&
+        "${predicted.buildNumber ?: ''}" == "${env.BUILD_NUMBER ?: ''}" &&
+        "${predicted.commitSha ?: ''}" == "${env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: ''}"
+    if (!predictedIsCurrent) {
+        echo "[backstop] No current-build ${predictedFile} after copy-back — refusing stale controller-workspace state"
         return
     }
 
-    if (!fileExists(actualFile)) {
-        def predicted = readJSON(file: predictedFile)
+    // The stage sets this only after archiving the current build's artifact.
+    // If it is absent, synthesize unconditionally: fileExists(actualFile) is
+    // not evidence because node('built-in') workspaces persist across builds.
+    if (env.ACTUAL_BUILD_GRAPH_POSTED != 'true') {
         def predictedPipelines = predicted.pipelines ?: []
         def buildResults = readJSON(text: env.BUILD_RESULTS ?: '{}')
         def abortedBeforeStart = predictedPipelines.findAll { name -> !buildResults.containsKey(name) }
@@ -1245,7 +1248,10 @@ def runReconciliationBackstop() {
         echo "[backstop] Synthesized ${actualFile} from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
     }
 
-    if (!fileExists(reconciliationFile)) {
+    // Same rule for reconciliation: a controller-local file with this static
+    // name may be stale. Trust only the flag set after the current build's
+    // Reconcile stage archived its artifact.
+    if (env.BUILD_GRAPH_RECONCILED != 'true') {
         echo '[backstop] No reconciliation artifact yet — Reconcile Build Graph stage was skipped (cascade abort path).'
         echo '[backstop] Both predicted and actual artifacts are archived. To reconcile externally:'
         echo "[backstop]   curl -O \${BUILD_URL}artifact/${predictedFile}"
@@ -1977,6 +1983,10 @@ spec:
             }
             steps {
                 container('builder') {
+                    // A downstream FAILURE is a real orchestrator FAILURE, but
+                    // catching the fail-fast throw lets the post-dispatch
+                    // observational stages publish the truth before the run ends.
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                     script {
                         def pipelines = (env.PIPELINES_TO_RUN ?: '').split(',').findAll { it }
                         // Recover changedFiles from env-bridge (see Determine Build Plan).
@@ -2042,6 +2052,15 @@ spec:
                             // Fail fast: abort if any pipeline in this level failed.
                             def levelFailed = level.findAll { !results[it]?.success }
                             if (levelFailed) {
+                                // Checkpoint before throwing. Previously the
+                                // post.always backstop saw `{}` here, so the CI
+                                // summary claimed 0 failures and the actual graph
+                                // omitted the downstream result that caused the red.
+                                env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                                env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+                                def failedActualGraph = buildActualGraph(pipelines, results, levels)
+                                writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: failedActualGraph, pretty: 2)
+                                archivePipelineBaselines('execute')
                                 error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
                         }
@@ -2116,6 +2135,7 @@ spec:
                         // during this Execute Builds run.
                         archivePipelineBaselines('execute')
                     }
+                    }
                 }
             }
         }
@@ -2149,6 +2169,7 @@ spec:
                             // give external watchers two clean artifacts to diff.
                             def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
                             archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
+                            env.ACTUAL_BUILD_GRAPH_POSTED = 'true'
 
                             // Defensive null-safety: actual.results may be null if
                             // Execute Builds wrote the file before populating any
@@ -2205,6 +2226,7 @@ spec:
                             returnStatus: true,
                         )
                         archiveArtifacts(artifacts: env.BUILD_GRAPH_RECONCILIATION_FILE, fingerprint: true)
+                        env.BUILD_GRAPH_RECONCILED = 'true'
 
                         if (reconcileExit != 0) {
                             unstable("Build graph drift detected — see ${env.BUILD_GRAPH_RECONCILIATION_FILE}")

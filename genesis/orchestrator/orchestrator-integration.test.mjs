@@ -357,3 +357,70 @@ describe('ABORTED classification (Jenkinsfile honours pipeline-results.mjs)', ()
     );
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// Failed dispatches still publish a current actual build graph
+//
+// Regression: orchestrator/dev #1859-#1868 threw from Execute Builds
+// after a downstream failure. Declarative skipped Post Actual Build
+// Graph, while post.always trusted a same-named file in the persistent
+// controller workspace. Build #1868 claimed both graphs were archived,
+// but actual-build-graph.json returned 404 and its summary reported zero
+// failed downstreams.
+// ══════════════════════════════════════════════════════════════════
+
+describe('failed dispatch build-graph publication', () => {
+  const jenkinsfile = readFileSync(resolve(__dirname, 'Jenkinsfile'), 'utf8');
+  const executeStage = jenkinsfile.slice(
+    jenkinsfile.indexOf("stage('Execute Builds')"),
+    jenkinsfile.indexOf("stage('Post Actual Build Graph')"),
+  );
+  const backstop = jenkinsfile.slice(
+    jenkinsfile.indexOf('def runReconciliationBackstop()'),
+    jenkinsfile.indexOf('def maintainBuildStateContinuity()'),
+  );
+
+  test('Execute Builds records current results and graph before fail-fast throws', () => {
+    assert.match(
+      executeStage,
+      /catchError\(buildResult: 'FAILURE', stageResult: 'FAILURE'\)/,
+      'the genuine failure must stay red while later observational stages continue',
+    );
+    const throwAt = executeStage.indexOf('error "Build(s) failed:');
+    assert.ok(throwAt > 0, 'fail-fast throw not found');
+    const beforeThrow = executeStage.slice(0, throwAt);
+    assert.ok(
+      beforeThrow.lastIndexOf('env.BUILD_RESULTS = writeJSON') >
+        beforeThrow.lastIndexOf('def levelFailed ='),
+      'BUILD_RESULTS must be checkpointed in the failure branch before error()',
+    );
+    assert.ok(
+      beforeThrow.lastIndexOf('writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE') >
+        beforeThrow.lastIndexOf('def levelFailed ='),
+      'actual-build-graph.json must be written in the failure branch before error()',
+    );
+  });
+
+  test('backstop rejects stale controller graph files', () => {
+    assert.match(
+      backstop,
+      /predicted\.buildNumber[\s\S]*env\.BUILD_NUMBER/,
+      'the copied predicted graph must be tied to the current Jenkins build',
+    );
+    assert.match(
+      backstop,
+      /env\.ACTUAL_BUILD_GRAPH_POSTED != 'true'/,
+      'actual graph recovery must use a current-build stage receipt',
+    );
+    assert.equal(
+      backstop.includes('if (!fileExists(actualFile))'),
+      false,
+      'a static controller-workspace filename is not evidence of a current artifact',
+    );
+    assert.match(
+      backstop,
+      /env\.BUILD_GRAPH_RECONCILED != 'true'/,
+      'reconciliation recovery must use a current-build stage receipt',
+    );
+  });
+});
