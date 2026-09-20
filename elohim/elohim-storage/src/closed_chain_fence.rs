@@ -766,14 +766,52 @@ fn unix_now() -> i64 {
         .unwrap_or(0)
 }
 
-/// Write `body` to `path` with owner-only permissions.
+/// Write `body` to `path` with owner-only permissions, ATOMICALLY.
 ///
-/// The file is CREATED at 0600 rather than created-then-chmodded: a plain
-/// `fs::write` followed by `set_permissions` leaves a credential readable at
-/// `0666 & ~umask` for the window between the two syscalls. The chmod stays as
-/// belt-and-braces for a file that already existed at a looser mode.
+/// Two properties, both load-bearing:
+///
+/// * **Secret at rest.** The file is CREATED at 0600 rather than
+///   created-then-chmodded: a plain `fs::write` followed by `set_permissions`
+///   leaves a credential readable at `0666 & ~umask` for the window between the
+///   two syscalls. The chmod stays as belt-and-braces for a path that already
+///   existed at a looser mode.
+/// * **All-or-nothing.** The bytes go to a sibling temp file, are flushed to
+///   disk, and are `rename(2)`d over the target, so no reader ever observes a
+///   half-written credential and a crash mid-write leaves the PREVIOUS file
+///   intact.
+///
+/// # Why truncating in place was not good enough
+///
+/// The earlier shape opened the real path with `truncate(true)` and wrote into
+/// it, so a process killed between the truncate and the last byte — an OOM
+/// kill, a pod eviction, the workspace RAM guard — left a truncated credential
+/// file behind. [`ClosedChainFence::decide`] then splits on the cell's state,
+/// and only one of those two branches is self-healing:
+///
+/// * on an OPEN cell the unusable file is discarded and re-minted — one extra
+///   `CapGrant` on a chain that accepts them, recoverable;
+/// * on a CLOSED cell it is **refused by name and never re-minted**, because
+///   minting is the one thing a sealed chain must never receive. The role stays
+///   unconnected until an operator deletes the file by hand.
+///
+/// A torn write must therefore be impossible rather than merely rare, and
+/// `rename(2)` is what makes it impossible. Same sibling-temp shape as
+/// [`crate::runtime_config::set_watched_key`].
 fn write_private(path: &Path, body: &str) {
     use std::io::Write;
+
+    let Some(file_name) = path.file_name().map(|n| n.to_string_lossy().to_string()) else {
+        tracing::warn!(
+            path = %path.display(),
+            "closed-chain fence: refusing to write a path with no file name"
+        );
+        return;
+    };
+    // Sibling temp, so the rename stays inside ONE filesystem (a cross-device
+    // rename is not atomic and fails outright) and the new file inherits the
+    // 0700 directory. Pid-suffixed so two processes sharing a data dir cannot
+    // collide on it.
+    let tmp = path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()));
 
     let mut options = std::fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
@@ -782,19 +820,36 @@ fn write_private(path: &Path, body: &str) {
         use std::os::unix::fs::OpenOptionsExt;
         options.mode(0o600);
     }
-    let written = options
-        .open(path)
-        .and_then(|mut file| file.write_all(body.as_bytes()));
+    // `sync_all` before the rename is the durability half: a rename that
+    // reaches disk ahead of the data would publish an EMPTY file across a power
+    // loss, which is precisely the torn-credential case this function exists to
+    // rule out.
+    let written = options.open(&tmp).and_then(|mut file| {
+        file.write_all(body.as_bytes())?;
+        file.sync_all()
+    });
     if let Err(e) = written {
-        tracing::warn!(path = %path.display(), error = %e, "closed-chain fence: write failed");
+        tracing::warn!(path = %tmp.display(), error = %e, "closed-chain fence: write failed");
+        let _ = std::fs::remove_file(&tmp);
         return;
     }
+    // Only reachable for a stale temp that already existed at a looser mode —
+    // `OpenOptions::mode` applies to creation, not to an existing file.
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
-            tracing::warn!(path = %path.display(), error = %e, "closed-chain fence: chmod 0600 failed");
+        if let Err(e) = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600)) {
+            tracing::warn!(path = %tmp.display(), error = %e, "closed-chain fence: chmod 0600 failed");
         }
+    }
+    if let Err(e) = std::fs::rename(&tmp, path) {
+        tracing::warn!(
+            path = %path.display(),
+            error = %e,
+            "closed-chain fence: rename failed — the previous file is left intact and the next \
+             restart will read it"
+        );
+        let _ = std::fs::remove_file(&tmp);
     }
 }
 
@@ -994,6 +1049,148 @@ mod tests {
                 .mode()
                 & 0o777;
             assert_eq!(mode, 0o600, "the credential file holds a secret");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The credential vault is rewritten in place over a cell's life (a heal
+    /// discards and the next mint stores again). Each rewrite must land
+    /// whole — and must not litter the 0700 vault with temp files that a later
+    /// `load_credentials` would never read but an operator would have to
+    /// explain.
+    #[test]
+    fn a_rewritten_credential_lands_whole_and_leaves_no_temp_behind() {
+        let dir = tmp_dir("atomic-rewrite");
+        let cell = test_cell(21, 22);
+        let key = cell_key(&cell);
+        let fence = ClosedChainFence::open(&dir);
+
+        fence.store_credentials(&key, &good_credentials());
+        let replacement = holochain_client::SigningCredentials {
+            signing_agent_key: AgentPubKey::from_raw_32(vec![31; 32]),
+            keypair: ed25519_dalek::SigningKey::from_bytes(&[29u8; 32]),
+            cap_secret: holochain_types::prelude::CapSecret::from([23u8; 64]),
+        };
+        fence.store_credentials(&key, &replacement);
+
+        // Read from a FRESH fence so the answer comes off disk, not the cache.
+        let reopened = ClosedChainFence::open(&dir);
+        let rebuilt = to_signing_credentials(
+            &reopened
+                .load_credentials(&key)
+                .expect("the rewritten credential is readable"),
+        )
+        .expect("the rewritten credential is complete, not torn");
+        assert_eq!(rebuilt.keypair.to_bytes(), replacement.keypair.to_bytes());
+
+        let leftovers: Vec<_> = std::fs::read_dir(dir.join(FENCE_DIR).join(CREDENTIALS_DIR))
+            .expect("vault dir")
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".tmp-"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "the sibling temp is renamed away, never left in the vault: {leftovers:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The property the rename buys, stated as the failure it prevents: when a
+    /// write cannot complete, the PREVIOUS credential is still there. A
+    /// truncate-in-place writer would have destroyed it before failing — and a
+    /// destroyed credential on a closed cell is refused forever rather than
+    /// re-minted.
+    #[test]
+    fn a_failed_write_leaves_the_previous_credential_intact() {
+        let dir = tmp_dir("atomic-failure");
+        let cell = test_cell(24, 25);
+        let key = cell_key(&cell);
+        let fence = ClosedChainFence::open(&dir);
+        fence.store_credentials(&key, &good_credentials());
+        let path = fence.credentials_path(&key);
+        let before = std::fs::read_to_string(&path).expect("the first credential is on disk");
+
+        // A path that cannot be replaced by a rename: a non-empty DIRECTORY
+        // standing where the file would go. This is the one way to drive the
+        // failure arm deterministically without a real crash, and it exercises
+        // exactly the branch that must not have already destroyed the target.
+        let blocked = dir
+            .join(FENCE_DIR)
+            .join(CREDENTIALS_DIR)
+            .join("blocked.json");
+        std::fs::create_dir_all(blocked.join("occupied")).expect("blocking dir");
+        write_private(&blocked, "{}");
+        assert!(
+            blocked.is_dir(),
+            "a rename that cannot succeed must not have clobbered the target"
+        );
+
+        // And the real credential, untouched by any of it, still round-trips.
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("still there"),
+            before,
+            "an unrelated failed write never disturbs a good credential"
+        );
+        to_signing_credentials(
+            &fence
+                .load_credentials(&key)
+                .expect("the good credential survives"),
+        )
+        .expect("and is still usable");
+
+        let leftovers: Vec<_> = std::fs::read_dir(dir.join(FENCE_DIR).join(CREDENTIALS_DIR))
+            .expect("vault dir")
+            .filter_map(Result::ok)
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .filter(|n| n.contains(".tmp-"))
+            .collect();
+        assert!(
+            leftovers.is_empty(),
+            "a failed write cleans up its own temp: {leftovers:?}"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A stale temp left by a previous process (killed between open and
+    /// rename) must not make the next write fail or downgrade the mode — the
+    /// vault heals itself on the next store.
+    #[test]
+    fn a_stale_temp_from_a_dead_process_does_not_block_or_loosen_the_next_write() {
+        let dir = tmp_dir("atomic-stale-temp");
+        let cell = test_cell(26, 27);
+        let key = cell_key(&cell);
+        let fence = ClosedChainFence::open(&dir);
+        let path = fence.credentials_path(&key);
+
+        let file_name = path.file_name().unwrap().to_string_lossy().to_string();
+        let stale = path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()));
+        std::fs::write(&stale, "torn").expect("stale temp");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o644))
+                .expect("loosen the stale temp");
+        }
+
+        fence.store_credentials(&key, &good_credentials());
+
+        let reopened = ClosedChainFence::open(&dir);
+        to_signing_credentials(
+            &reopened
+                .load_credentials(&key)
+                .expect("the write went through despite the stale temp"),
+        )
+        .expect("and landed whole");
+        assert!(!stale.exists(), "the stale temp was consumed by the rename");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).expect("stat").permissions().mode() & 0o777;
+            assert_eq!(
+                mode, 0o600,
+                "a credential inherited from a loose temp is still owner-only"
+            );
         }
         let _ = std::fs::remove_dir_all(&dir);
     }

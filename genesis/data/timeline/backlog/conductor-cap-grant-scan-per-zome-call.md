@@ -62,9 +62,44 @@ The design assumes a handful of grants; the lookup never uses the secret it was 
 `elohim-storage/src/hc_client.rs:451-469` calls `authorize_signing_credentials` for three cells on every connect, and
 `closed_chain_fence.rs:271` records that each call "COMMITS a CapGrant". Nothing revokes a superseded grant. Today's
 mint rate is small (connects in 12 h: adam 21, susan 11, matthew 7) and does not separate the peers, so the
-thousands are accumulated history on the two chains that are never re-keyed — the genesis pair. **Not determined:**
-which era minted them (a reconnect storm before the fence bounded minting is the likely one) and whether any other
-first-party caller mints grants.
+thousands are accumulated history on the two chains that are never re-keyed — the genesis pair.
+
+**Corrected 2026-09-19 — storage is not the minter, and the second caller is named.** Two claims above were left
+open; both now have answers read from source.
+
+*Storage stopped minting per connect on 2026-09-05* (`0fb64726e`, `ddaf54383` — the post-close write fence, Task 32).
+Rail 1 of `closed_chain_fence.rs` persists one credential per cell and reuses it forever; `decide`
+(`closed_chain_fence.rs:475`) returns `Reuse` before any conductor call. The fence is armed in the composition root
+at `main.rs:872`, before anything dials a conductor, and **all three** storage mint sites route through it —
+`hc_client.rs:133` (`authorize_signing_credentials_fenced`, the bridge), `signing.rs:193`
+(`ConductorSigningClient`), and `reconcile/holochain_app_signal.rs:652` (the signal stream, which reconnects on
+every conductor restart). Credentials live at
+`<storage_dir>/closed-chain-fence/credentials/<dna39hex>-<agent39hex>.json`, 0600 inside a 0700 directory, and
+`STORAGE_DIR=/data` on alpha is a per-pod `openebs-hostpath` PVC (`genesis/orchestrator/manifests/edgenode/alpha.yaml`
+`volumeClaimTemplates: storage-data`), so the durability rail 1 depends on is actually present on the fleet. Storage's
+ceiling is therefore **one mint per cell per data-dir lifetime**, plus at most one heal per cell per process
+(`discard_stale_credentials`, bounded by a `healed` set). Remedy 3 as scoped — "storage stops minting" — was already
+delivered, and it did not stop the growth, because storage was never the dominant minter.
+
+*The other first-party caller is the doorway, and it has two unfenced minting paths, neither of which persists
+anything.*
+
+1. `doorway/doorway-service/src/services/zome_caller.rs:805` (`connect_endpoint`) authorizes signing credentials for
+   **every provisioned cell** of the conductor it dials, on every connect, and a fresh `ClientAgentSigner` is built
+   per connection by design (the per-conductor credential crux, module doc lines 32-37). Any transport-dead
+   classification clears the socket and the next call reconnects; the same module records observed
+   NXDOMAIN/WebSocket-reset churn (lines 228-232). Each churn cycle is one CapGrant per cell on that conductor's
+   agent chain.
+2. `doorway/doorway-service/src/conductor/chaperone.rs` (`POST /hc/connect`) calls `grant_zome_call_capability` once
+   per role cell per browser session, tagged `chaperone-<role>`. The browser mints a **fresh** keypair and cap secret
+   on every connect and keeps them in memory only
+   (`app/elohim-library/projects/elohim-service/src/connection/doorway-connection-strategy.ts:384-386`), so no grant
+   is ever reused, and the client retries the call up to three times on 502/503.
+
+Path 2 is an unbounded per-browser-session minter pointed at exactly the conductors the two public doorways front,
+which is the shape that fits the measurement: 11 619 / 15 768 / 18 516 rows on matthew and adam against susan's
+sampled handful, and three distinct counts because each role cell carries its own source chain. Neither doorway path
+is in `elohim-storage`, so neither is reachable by a change to the peer binary.
 
 ## What does NOT fix it
 
@@ -86,6 +121,15 @@ first-party caller mints grants.
    through the submodule pin; helps every caller, including hosted humans.
 3. **STOP MINTING — persist and reuse one signing credential per cell** beside the agent key instead of authorizing a
    new one per connect. First-party, small, stops the growth; does nothing for the 15 000 already there.
+   **In `elohim-storage` this is done** (the closed-chain fence, 2026-09-05 — see the correction above), and the
+   remaining growth is the doorway's, not the peer's. The fence's one durability gap was closed 2026-09-19:
+   `write_private` truncated the credential in place, so a process killed mid-write (OOM kill, eviction, RAM guard)
+   left a torn file — recoverable on an OPEN cell, which discards and re-mints, but on a CLOSED cell `decide` refuses
+   by name and never re-mints, leaving the role unconnected until an operator deletes the file. It now writes a
+   sibling temp, `sync_all`s it, and `rename(2)`s over the target, the same shape as
+   `runtime_config::set_watched_key`. Carrying the remedy to the doorway means giving `connect_endpoint` the same
+   per-cell persisted reuse, and giving the chaperone a per-session grant that is either reused or revoked — a
+   browser-held key that is never revoked is the growth, and it is a doorway concern, not a storage one.
 4. **BATCH / RATE-LIMIT** apply to the second caller of the same batch read, `source_chain_records`: three zome sites
    still `query(ChainQueryFilter::new().include_entries(true))` over the whole chain (`content_store/src/lib.rs:16205`,
    `imagodei/qahal_coordinator.rs:409`, `imagodei/lib.rs:4853`); `node_registry_coordinator/src/lib.rs:1854` was
