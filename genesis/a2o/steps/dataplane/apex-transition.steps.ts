@@ -86,8 +86,10 @@ import {
 import {
   householdMeshDir,
   loadHouseholdMeshFixture,
+  membershipLanes,
   requireFixtureDoorwayUrl,
   requireMembershipAuthority,
+  type MembershipLaneFixture,
 } from '../../src/framework/fixtures/household-mesh.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
@@ -162,21 +164,41 @@ interface MembershipDocument {
   updated_at: string;
 }
 
-async function readMembership(authority: MembershipAuthority): Promise<MembershipDocument> {
+/**
+ * ONE DOCUMENT NAMES ONE PUBLIC NAME. A household publishing several names has
+ * one document per name, maintained by the SAME legs (one repeatable
+ * `--shared-record <name>=<owner>` per name, `relay-addr-beacon/src/config.rs`).
+ * Every membership read below therefore names WHICH document it read — the
+ * authority satisfies this shape for the converged name, and each entry of the
+ * fixture's `lanes` satisfies it for its own name.
+ */
+interface MembershipDocumentSource {
+  publicName: string;
+  membershipFile: string;
+}
+
+async function readMembership(lane: MembershipDocumentSource): Promise<MembershipDocument> {
   let raw: string;
   try {
-    raw = await readFile(authority.membershipFile, 'utf8');
+    raw = await readFile(lane.membershipFile, 'utf8');
   } catch (error) {
     throw new Error(
-      `the household's membership document is missing (${authority.membershipFile}): ` +
-        `${String(error)}. The beacon legs write it within a probe interval of ` +
-        '`just mesh start`; check <logDir>/beacon-*.log.'
+      `the household's membership document for "${lane.publicName}" is missing ` +
+        `(${lane.membershipFile}): ${String(error)}. The beacon legs write it within a probe ` +
+        'interval of `just mesh start`; check <logDir>/beacon-*.log.'
     );
   }
   const doc = JSON.parse(raw) as MembershipDocument;
   assert.ok(
     Array.isArray(doc.members),
-    `membership document ${authority.membershipFile} carries no members array`
+    `membership document ${lane.membershipFile} carries no members array`
+  );
+  assert.equal(
+    doc.name,
+    lane.publicName,
+    `the document at ${lane.membershipFile} names "${doc.name}", but the household declares it ` +
+      `as the set for "${lane.publicName}" — one document names one public name, so a document ` +
+      'carrying another name means a leg wrote the wrong set'
   );
   return doc;
 }
@@ -196,7 +218,7 @@ function memberFor(doc: MembershipDocument, owner: string): MembershipMember | u
  * every membership assertion is a bounded convergence, never an instant read.
  */
 async function untilMembership(
-  authority: MembershipAuthority,
+  lane: MembershipDocumentSource,
   boundMs: number,
   predicate: (doc: MembershipDocument) => boolean,
   what: string
@@ -204,12 +226,12 @@ async function untilMembership(
   const deadline = Date.now() + boundMs;
   let last: MembershipDocument | undefined;
   for (;;) {
-    last = await readMembership(authority);
+    last = await readMembership(lane);
     if (predicate(last)) return last;
     if (Date.now() >= deadline) {
       throw new Error(
-        `${what} within ${boundMs}ms; the set advertised for "${authority.publicName}" is ` +
-          `[${advertised(last).join(', ')}] (document ${authority.membershipFile})`
+        `${what} within ${boundMs}ms; the set advertised for "${lane.publicName}" is ` +
+          `[${advertised(last).join(', ')}] (document ${lane.membershipFile})`
       );
     }
     await delay(MEMBERSHIP_POLL_MS);
@@ -226,14 +248,14 @@ async function untilMembership(
  * would be the test-only proxy this feature's preamble refuses.
  */
 async function resolvePublicName(
-  authority: MembershipAuthority,
+  lane: MembershipDocumentSource,
   path: string
 ): Promise<{ owner: string; origin: string; status: number; text: string }> {
-  const doc = await readMembership(authority);
+  const doc = await readMembership(lane);
   assert.ok(
     doc.members.length > 0,
-    `no origin is advertised for "${authority.publicName}": the public name resolves to nothing ` +
-      `(document ${authority.membershipFile})`
+    `no origin is advertised for "${lane.publicName}": the public name resolves to nothing ` +
+      `(document ${lane.membershipFile})`
   );
   const attempts: string[] = [];
   for (const member of doc.members) {
@@ -250,7 +272,7 @@ async function resolvePublicName(
     }
   }
   throw new Error(
-    `no origin advertised for "${authority.publicName}" served ${path}: ${attempts.join('; ')}`
+    `no origin advertised for "${lane.publicName}" served ${path}: ${attempts.join('; ')}`
   );
 }
 
@@ -288,6 +310,10 @@ interface ApexTransitionState {
   authorityB?: ChaosAuthorReceipt;
   /** The sibling's entry captured before the fault, for the unchanged assertion. */
   siblingEntryBeforeFault?: MembershipMember;
+  /** Every public name this household publishes, when the scenario is about all of them. */
+  lanes?: MembershipLaneFixture[];
+  /** Per public name, the sibling's entry before the fault — keyed by public name. */
+  siblingEntryByName?: Map<string, MembershipMember>;
   pid?: number;
   ticks?: string;
   executable?: string;
@@ -1006,6 +1032,236 @@ Then(
     const doc = await readMembership(state.authority);
     for (const owner of Object.values(state.authority.owners)) {
       assert.equal(doc.members.filter(member => member.owner === owner).length, 1);
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Scenario: A doorway that sheds leaves every public name it was advertised
+// under.
+//
+// The household publishes several public names at once and BOTH doorways are
+// members of all of them: `hc-mesh.sh start_membership_beacons` gives each leg
+// one repeatable `--shared-record <name>=<owner>` per name, so a leg holds one
+// membership per name under its own owner slug and writes one document per
+// name. A shed is a fact about the DOORWAY — the serving probe is per leg, not
+// per name — so it must reach every name that leg was advertised under. This
+// scenario is what would catch a regression back to one shared name per leg:
+// the leg would keep serving one set while its doorway cannot answer.
+// ---------------------------------------------------------------------------
+
+/** Every lane the scenario is about, or the named refusal for a single-name household. */
+function requireLanes(state: ApexTransitionState): MembershipLaneFixture[] {
+  const lanes = state.lanes ?? [];
+  assert.ok(lanes.length > 0, 'the scenario must establish the household public names first');
+  return lanes;
+}
+
+Given(
+  'the household publishes its site under more than one public name',
+  function (this: E2EWorld): void {
+    const state = beginScenario(this);
+    const fixture = loadHouseholdMeshFixture();
+    const lanes = membershipLanes(fixture);
+    assert.ok(
+      lanes.length >= 2,
+      `this household publishes ${lanes.length} public name(s) ` +
+        `[${lanes.map(lane => lane.publicName).join(', ')}]; this scenario is about a doorway ` +
+        'that belongs to SEVERAL names at once. `just mesh start` stages the second name ' +
+        '(MESH_MEMBERSHIP_CANDIDATE_NAME) and `just mesh prologue` copies the lane list into ' +
+        'this manifest — a manifest staged before the household carried a second name declares ' +
+        'only the converged one. This is a missing-apparatus refusal, not a defect in the doorways.'
+    );
+    // Distinct names, or "every name" would be one name counted twice.
+    const names = new Set(lanes.map(lane => lane.publicName));
+    assert.equal(
+      names.size,
+      lanes.length,
+      `the household declares the same public name more than once: ` +
+        `[${lanes.map(lane => lane.publicName).join(', ')}]`
+    );
+    state.lanes = lanes;
+  }
+);
+
+Given(
+  'both owned doorways advertise eligibility under every one of those names',
+  { timeout: DEFAULT_REJOIN_BOUND_MS + 30_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const lanes = requireLanes(state);
+    const owners = Object.values(state.authority.owners);
+    assert.ok(
+      owners.length >= 2,
+      `the household declares only ${owners.length} membership owner(s); this scenario needs a ` +
+        'doorway and a sibling under each name'
+    );
+
+    state.siblingEntryByName = new Map();
+    for (const lane of lanes) {
+      const doc = await untilMembership(
+        lane,
+        rejoinBound(state) + 10_000,
+        current => owners.every(owner => memberFor(current, owner) !== undefined),
+        `owners [${owners.join(', ')}] did not all advertise eligibility under "${lane.publicName}"`
+      );
+      for (const owner of owners) {
+        assert.equal(
+          doc.members.filter(member => member.owner === owner).length,
+          1,
+          `owner "${owner}" holds more than one entry under "${lane.publicName}"`
+        );
+      }
+    }
+
+    // The leg that will be faulted, and the sibling that must survive under
+    // every name. Bound to the fixture doorway ids the story names, so a
+    // fixture reordering cannot silently reverse which doorway is measured.
+    const faulted = state.authority.owners['alpha'];
+    const sibling = state.authority.owners['apex'];
+    assert.ok(faulted && sibling, 'the household declares no alpha/apex owner pair to measure');
+    state.observedOwner = faulted;
+    state.siblingOwner = sibling;
+
+    // Capture each name's sibling entry WHOLE — freshness stamp included — so
+    // the later assertion can see a leg that rewrote a record it does not own.
+    for (const lane of lanes) {
+      const doc = await readMembership(lane);
+      const entry = memberFor(doc, sibling);
+      assert.ok(entry, `the sibling "${sibling}" is not advertised under "${lane.publicName}"`);
+      state.siblingEntryByName.set(lane.publicName, entry);
+    }
+
+    // The fault control needs the origin this doorway contributes; take it from
+    // the converged name's set, which is the one the ordinary visit resolves.
+    const converged = lanes[0];
+    const baselineVisit = await resolvePublicName(converged, '/');
+    assert.equal(
+      baselineVisit.owner,
+      faulted,
+      `ordinary selection under "${converged.publicName}" used "${baselineVisit.owner}", but the ` +
+        `owned operation withdraws "${faulted}"; reorder the declared membership fixture so the ` +
+        'operation measures an actual entrance transition'
+    );
+    state.observedOrigin = baselineVisit.origin;
+    state.siblingOrigin = state.siblingEntryByName.get(converged.publicName)?.origin;
+  }
+);
+
+Then(
+  'doorway {string} is advertised under none of those public names',
+  { timeout: 60_000 },
+  async function (this: E2EWorld, doorway: string): Promise<void> {
+    assert.equal(doorway, ALPHA_DOORWAY_ID, 'the withdrawn doorway must be alpha-A');
+    const state = getState(this);
+    const withdrawn = state.authority.owners['alpha'];
+    const stillAdvertised: string[] = [];
+    for (const lane of requireLanes(state)) {
+      const doc = await readMembership(lane);
+      if (memberFor(doc, withdrawn)) {
+        stillAdvertised.push(`${lane.publicName} -> [${advertised(doc).join(', ')}]`);
+      }
+    }
+    assert.deepEqual(
+      stillAdvertised,
+      [],
+      `after ${withdrawBound(state)}ms of non-serving probes, "${withdrawn}" is still advertised ` +
+        `under ${stillAdvertised.length} of its public name(s): ${stillAdvertised.join('; ')}. ` +
+        'A shed is a fact about the doorway, so it must reach every name that doorway holds.'
+    );
+  }
+);
+
+Then(
+  'doorway {string} keeps its own unchanged entry under every one of them',
+  { timeout: 60_000 },
+  async function (this: E2EWorld, doorway: string): Promise<void> {
+    assert.equal(doorway, APEX_DOORWAY_ID, 'the surviving doorway must be elohim.host');
+    const state = getState(this);
+    const sibling = state.authority.owners['apex'];
+    const before = state.siblingEntryByName;
+    assert.ok(before, 'the scenario captured no per-name sibling entries before the fault');
+    for (const lane of requireLanes(state)) {
+      const doc = await readMembership(lane);
+      // Compared WHOLE, freshness stamp included: a leg that rewrote a record
+      // it does not own — even to the same value — is visible only here.
+      assert.deepEqual(
+        memberFor(doc, sibling),
+        before.get(lane.publicName),
+        `the sibling "${sibling}" entry under "${lane.publicName}" changed across the ` +
+          'withdrawal; under any name a doorway writes only its own entry'
+      );
+    }
+  }
+);
+
+Then(
+  'a new visitor using any one of those public names still receives the landing page',
+  { timeout: FIRST_VISIT_TIMEOUT_MS },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const sibling = state.authority.owners['apex'];
+    for (const lane of requireLanes(state)) {
+      const visit = await resolvePublicName(lane, '/');
+      assert.equal(
+        visit.status,
+        200,
+        `"${lane.publicName}" answered ${visit.status} while one of its doorways sheds`
+      );
+      assert.ok(
+        visit.text.includes('app-root'),
+        `"${lane.publicName}" served a page with no app-root mount from ${visit.origin}`
+      );
+      assert.equal(
+        visit.owner,
+        sibling,
+        `"${lane.publicName}" was served by "${visit.owner}"; while "${state.observedOwner}" ` +
+          'sheds, every name must resolve to the survivor'
+      );
+    }
+  }
+);
+
+Then(
+  'doorway {string} is advertised again under every one of those public names',
+  { timeout: DEFAULT_REJOIN_BOUND_MS + 60_000 },
+  async function (this: E2EWorld, doorway: string): Promise<void> {
+    assert.equal(doorway, ALPHA_DOORWAY_ID, 'the recovering doorway must be alpha-A');
+    const state = getState(this);
+    const recovered = state.authority.owners['alpha'];
+    for (const lane of requireLanes(state)) {
+      await untilMembership(
+        lane,
+        rejoinBound(state),
+        current => memberFor(current, recovered) !== undefined,
+        `"${recovered}" did not rejoin "${lane.publicName}"`
+      );
+    }
+  }
+);
+
+Then(
+  'no public name advertises the same doorway twice',
+  { timeout: 60_000 },
+  async function (this: E2EWorld): Promise<void> {
+    const state = getState(this);
+    const owners = Object.values(state.authority.owners);
+    for (const lane of requireLanes(state)) {
+      const doc = await readMembership(lane);
+      for (const owner of owners) {
+        assert.equal(
+          doc.members.filter(member => member.owner === owner).length,
+          1,
+          `owner "${owner}" is advertised ${doc.members.filter(m => m.owner === owner).length} ` +
+            `times under "${lane.publicName}": [${advertised(doc).join(', ')}]`
+        );
+      }
+      assert.equal(
+        doc.members.length,
+        owners.length,
+        `the set advertised for "${lane.publicName}" is [${advertised(doc).join(', ')}], not ` +
+          'exactly one entry per declared owner'
+      );
     }
   }
 );

@@ -278,6 +278,92 @@ async fn two_lanes_on_one_leg_write_two_documents_and_withdraw_together() {
     assert_eq!(owners(&set_doc), vec!["alpha", "apex"]);
 }
 
+/// One lane's document being UNWRITABLE must not corrupt, stall or silently
+/// skip the other lane's. A beacon leg contributes to several public names at
+/// once, and those names are independent commitments: a household that cannot
+/// project one of them must still project the rest, and must not mark the
+/// failed one as done.
+///
+/// The jam is a real filesystem fault rather than a mock: a DIRECTORY sitting
+/// where one lane's document belongs, so the sink's final `rename` fails.
+/// (It cannot be a permission bit — these tests run as root, which bypasses
+/// the check.)
+#[tokio::test]
+async fn one_lane_with_an_unwritable_document_does_not_disturb_the_other() {
+    let dir = doc_path("jammed-lane").parent().unwrap().to_path_buf();
+    let base = PathBuf::from(format!("{}/", dir.display()));
+    let jammed_doc = dir.join("elohim.local.json");
+    let healthy_doc = dir.join("doorways.elohim.local.json");
+
+    // Jam the first lane's document path before the leg ever runs.
+    std::fs::create_dir_all(&jammed_doc).expect("stage the jammed lane");
+
+    let mut alpha = Leg::with_lanes(
+        &base,
+        &[
+            "elohim.local=alpha".to_string(),
+            "doorways.elohim.local=alpha".to_string(),
+        ],
+        "http://localhost:8888",
+    )
+    .await;
+    assert_eq!(alpha.sinks.len(), 2);
+
+    // The cycle REPORTS the incomplete projection rather than claiming success…
+    for _ in 0..2 {
+        let outcome = serving_cycle(
+            &alpha.cfg,
+            &alpha.client,
+            &alpha.sinks,
+            &mut alpha.membership,
+        )
+        .await;
+        assert!(
+            outcome.is_err(),
+            "a lane that cannot be written must not read as a completed projection"
+        );
+    }
+
+    // …and the healthy lane is fully projected anyway: the failure is scoped to
+    // the lane that owns it, never a reason to stop maintaining the others.
+    assert_eq!(owners(&healthy_doc), vec!["alpha"]);
+    assert_eq!(read(&healthy_doc).name, "doorways.elohim.local");
+
+    // The jammed lane is not marked applied, so it keeps retrying rather than
+    // going quiet with a commitment it never met.
+    assert_eq!(
+        alpha
+            .membership
+            .lane("elohim.local")
+            .expect("jammed lane is configured")
+            .membership
+            .applied,
+        None
+    );
+    assert_eq!(
+        alpha
+            .membership
+            .lane("doorways.elohim.local")
+            .expect("healthy lane is configured")
+            .membership
+            .applied,
+        Some(true)
+    );
+
+    // Clearing the jam lets the same leg finish the lane it owed, without the
+    // healthy lane being rewritten from scratch or duplicated.
+    let healthy_before = read(&healthy_doc).member("alpha").cloned().unwrap();
+    std::fs::remove_dir(&jammed_doc).expect("clear the jam");
+    alpha.probe().await;
+    assert_eq!(owners(&jammed_doc), vec!["alpha"]);
+    assert_eq!(read(&jammed_doc).name, "elohim.local");
+    assert_eq!(owners(&healthy_doc), vec!["alpha"]);
+    assert_eq!(
+        read(&healthy_doc).member("alpha").cloned().unwrap(),
+        healthy_before
+    );
+}
+
 /// The `{name}` placeholder spelling of the same two-lane shape.
 #[tokio::test]
 async fn the_name_placeholder_spelling_derives_the_same_two_documents() {

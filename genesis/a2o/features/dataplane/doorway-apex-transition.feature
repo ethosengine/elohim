@@ -31,6 +31,17 @@ Feature: A visitor's public name continues to reach the site through a doorway's
   reaching the public name in these scenarios makes exactly that choice, over
   exactly the set membership currently advertises.
 
+  A household publishes its site under more than one public name at the same
+  time: a settled name visitors are given, and a second name where the
+  household tries the next version before it settles. Both names lead to the
+  same doorways, so one doorway belongs to several sets at once. Shedding is
+  something a doorway does, not something a name does — so a doorway that
+  cannot serve has to leave every name it was advertised under, and return to
+  all of them together when it recovers. If it left only the name the
+  household happened to be watching, a visitor who used the other one would
+  still be sent to a doorway that cannot answer. Each name keeps its own set,
+  and under any name a doorway writes only its own entry.
+
   Membership changes only on repeated evidence, and it is deliberately harder
   to leave than to return: a doorway must look non-serving three times running
   before its records leave, and serving twice running before they come back.
@@ -52,12 +63,28 @@ Feature: A visitor's public name continues to reach the site through a doorway's
   outside: continuing ingress over the wide-area network is a separate
   prerequisite, which a working membership set does not supply.
 
+  The household's two doorways are named here as they are named in its own
+  fixture: "alpha-A" and "elohim.host". They are labels for the two machines,
+  not public names a visitor types — the scenarios below fault "alpha-A" and
+  expect "elohim.host" to carry the site while it is down.
+
   The first scenario proves the mechanism — that membership tracks which
   doorway can serve, per doorway, without collateral damage to its sibling.
-  The second proves the promise that mechanism exists for: that a visitor who
-  arrives during the outage, knowing only the one name, still gets the page.
+  The one after it proves that the mechanism is not confined to a single name:
+  the doorway that sheds leaves every public name it was advertised under, and
+  comes back to all of them together. It checks that each of those names still
+  reaches the survivor — reachability, which is what makes the bookkeeping
+  matter, and no more than that.
+  The one after that proves the promise the mechanism exists for, in full: that
+  a visitor who arrives during the outage, knowing only the one name, gets the
+  page and boots the version the head names.
+  The fourth proves the same crossing for a site that CHANGES mid-outage — a
+  newly authored version, not a static page, has to reach the visitor through
+  the survivor and then match on the recovered doorway.
+  The fifth proves it at the level a person actually experiences: a visitor
+  walking the real app's pages, before, during and after the fault.
 
-  Both scenarios are tagged with the capability they depend on: a substrate
+  Every scenario is tagged with the capability it depends on: a substrate
   this run owns. On a run that owns none — a deployed fleet nobody here may
   fault on purpose — they are HELD (skipped), never failed, because a
   scenario that cannot be exercised has proved nothing either way.
@@ -75,6 +102,18 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     And its exclusive diagnostic name and its sibling's membership remain unchanged
     When that doorway reports serving for two consecutive probes
     Then its owner records rejoin shared membership without duplicating the sibling
+
+  @requires:owned-substrate
+  Scenario: A doorway that sheds leaves every public name it was advertised under
+    Given the household publishes its site under more than one public name
+    And both owned doorways advertise eligibility under every one of those names
+    When the household makes doorway "alpha-A" report non-serving for three consecutive probes
+    Then doorway "alpha-A" is advertised under none of those public names
+    And doorway "elohim.host" keeps its own unchanged entry under every one of them
+    And a new visitor using any one of those public names still receives the landing page
+    When doorway "alpha-A" reports serving for two consecutive probes
+    Then doorway "alpha-A" is advertised again under every one of those public names
+    And no public name advertises the same doorway twice
 
   @requires:owned-substrate
   Scenario: The apex name survives its doorway's shed

@@ -20,6 +20,41 @@
 # The two documents are intentionally separate one-replica Deployments rather
 # than one homogeneous two-replica Deployment: each premise owns a different
 # exclusive record and a different shared-record owner slug.
+#
+# APEX OWNERSHIP IS DECLARED HERE, NOT INHERITED
+# ----------------------------------------------
+# These legs re-home the SAME Cloudflare lanes the coturn beacon sidecars hold,
+# so this file and alpha-coturn-{shem,operations}.yaml must agree about the
+# apex (elohim.host) before either is applied. The posture below is today's and
+# is stated on purpose, because it was once carried only as a duplicated arg
+# list: shem owns `elohim.host` EXCLUSIVELY (`--record-name`), and both premises
+# contribute to the shared doorway-set name `doorways.elohim.host`. An exclusive
+# record is drift-gated — the leg restores it within ~30s of an external change
+# (design §6.2) — so applying an exclusive `--record-name elohim.host` on top of
+# a shared multi-A apex does not merely disagree with it, it CLOBBERS it back
+# (the 2026-07-28 apex clobber). If the coturn manifests have since moved the
+# apex to a shared lane, this file must be moved with them IN THE SAME CHANGE.
+#
+# The shared-lane flag is repeatable (`--shared-record <name>=<owner>`, one per
+# name; the legacy `--shared-record-name`/`--record-owner` pair means the same
+# single lane), so a leg can hold the doorway-set name AND the apex at once —
+# adding the apex no longer costs the doorway-set lane. Turning the apex into a
+# shared lane is an OPERATOR-GATED flip, not a deploy-time default: it changes
+# outward-facing DNS semantics. The exact edit, on BOTH legs together:
+#
+#   1. delete shem's `--record-name elohim.host` pair (its exclusive claim),
+#   2. add `--shared-record elohim.host=<shem|operations>` beside each leg's
+#      existing `--shared-record doorways.elohim.host=<owner>`,
+#   3. make each premise's ingress accept the `elohim.host` host (the host and
+#      its TLS SAN in manifests/doorway/alpha.yaml), or the premise that does
+#      not answers 404 for apex traffic,
+#   4. verify: genesis/orchestrator/scripts/check-ingress-conflicts.sh passes
+#      against the rendered manifests and no other manifest claims the apex host.
+#
+# Rollback is step 1 and 2 reversed: restore shem's exclusive `--record-name`
+# and drop both apex `--shared-record` flags. Partial application is the failure
+# mode to avoid — one leg on a shared apex while the other holds it exclusively
+# means the exclusive leg's drift gate reaps the shared contribution every cycle.
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -84,10 +119,13 @@ spec:
             - "elohim.host"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "operations"
+            # Shared doorway-set lane, repeatable spelling: one `--shared-record
+            # <name>=<owner>` per shared name this leg contributes to. Exactly
+            # the lane the coturn sidecar holds today, under the same owner slug.
+            # The apex lane is NOT here — see APEX OWNERSHIP at the top of this
+            # file for the operator-gated flip that adds it.
+            - "--shared-record"
+            - "doorways.elohim.host=operations"
           env:
             - name: CF_API_TOKEN
               valueFrom:
@@ -172,16 +210,21 @@ spec:
             - "30"
             - "--sink"
             - "cloudflare"
+            # EXCLUSIVE apex ownership — drift-gated, so this leg restores
+            # elohim.host within ~30s of any external change to it. This is the
+            # declared apex posture; do not carry it forward past a coturn-side
+            # move to a shared apex lane (APEX OWNERSHIP, top of file).
             - "--record-name"
             - "elohim.host"
             - "--cf-zone"
             - "elohim.host"
             - "--state-file"
             - "/var/lib/relay-addr-beacon/state.json"
-            - "--shared-record-name"
-            - "doorways.elohim.host"
-            - "--record-owner"
-            - "shem"
+            # Shared doorway-set lane, repeatable spelling — same lane and owner
+            # slug the coturn sidecar holds today. Step 2 of the operator-gated
+            # apex flip adds `--shared-record elohim.host=shem` beside this one.
+            - "--shared-record"
+            - "doorways.elohim.host=shem"
           env:
             - name: CF_API_TOKEN
               valueFrom:
