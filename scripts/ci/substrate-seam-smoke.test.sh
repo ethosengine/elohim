@@ -36,7 +36,9 @@ fake_json_body() {
     */db/content/elohim-host-landing/head)
       # Same notarized head on both doorways; the bytes under it differ only in
       # the same-head-different-bytes case (alpha fleet, 2026-09-19).
-      if [ "${TEST_CASE:-healthy}" = "same-head-different-bytes" ] && [ "${url#https://elohim.host/}" != "$url" ]; then
+      if [ "${TEST_CASE:-healthy}" = "no-blob-served" ]; then
+        printf '{"headActionHash":"uhCkk-test-head","blobHash":null,"updatedAt":"2026-09-14 23:13:44"}\n'
+      elif [ "${TEST_CASE:-healthy}" = "same-head-different-bytes" ] && [ "${url#https://elohim.host/}" != "$url" ]; then
         printf '{"headActionHash":"uhCkk-test-head","blobHash":"sha256-bbbb","updatedAt":"2026-09-13 14:46:59"}\n'
       else
         printf '{"headActionHash":"uhCkk-test-head","blobHash":"sha256-aaaa","updatedAt":"2026-09-14 23:13:44"}\n'
@@ -46,6 +48,53 @@ fake_json_body() {
   esac
 }
 export -f fake_json_body
+
+# Fakes GET .../head-record — story-1.4a seam-6b (per-doorway torn-row check).
+# `record` is base64 of arbitrary noise with a `sha256-...` run embedded, the
+# same byte shape the real msgpack `Record` carries its `blob_cid` string in
+# (containment target, not a real Holochain Record — the script only tests
+# for the substring, never decodes structurally).
+fake_head_record_response() { # url -> emits "<body>\n<http_code>"
+  local url="$1" is_a=0
+  [ "${url#https://doorway-alpha.elohim.host/}" != "$url" ] && is_a=1
+
+  case "${TEST_CASE:-healthy}" in
+    unreadable-head-record)
+      printf '{"error":"Conductor error: Zome call failed: External API wire error: InternalError(\\"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(...))\\")"}'
+      printf '\n502'
+      return 0
+      ;;
+    no-blob-served)
+      # The script must never fetch head-record when the served blob is null
+      # — proven by making this URL a hard failure if it is ever reached.
+      echo "Unexpected fake curl URL: ${url} (head-record must not be fetched when no blob is served)" >&2
+      return 99
+      ;;
+  esac
+
+  local blob
+  if [ "${TEST_CASE:-healthy}" = "torn-row" ] && [ "$is_a" -eq 1 ]; then
+    # A serves sha256-aaaa but its OWN head record never named it — its
+    # record instead names a different blob. This is the torn shape: two
+    # doorways can agree with each other while one disagrees with itself.
+    blob="sha256-deadbeef"
+  elif [ "${TEST_CASE:-healthy}" = "same-head-different-bytes" ] && [ "$is_a" -eq 0 ]; then
+    blob="sha256-bbbb"
+  else
+    blob="sha256-aaaa"
+  fi
+
+  local record_b64
+  record_b64=$(SEAM_TEST_BLOB="$blob" python3 -c "
+import base64, os
+blob = os.environ['SEAM_TEST_BLOB'].encode()
+payload = b'\x81\xa8blob_cid' + bytes([0xa0 + len(blob)]) + blob + b'trailing-msgpack-noise'
+print(base64.b64encode(payload).decode())
+")
+  printf '{"headActionHash":"uhCkk-test-head","record":"%s"}' "$record_b64"
+  printf '\n200'
+}
+export -f fake_head_record_response
 
 curl() {
   local arg url="" http1=0 want_code=0
@@ -57,9 +106,17 @@ curl() {
   done
   if [ "$want_code" -eq 1 ]; then
     url="${@: -1}"
-    fake_json_body "$url"
-    printf '\n200'
-    return 0
+    case "$url" in
+      */head-record)
+        fake_head_record_response "$url"
+        return $?
+        ;;
+      *)
+        fake_json_body "$url"
+        printf '\n200'
+        return 0
+        ;;
+    esac
   fi
   fake_json_body "$url" && return 0
 
@@ -156,7 +213,7 @@ grep -Fq 'seam-smoke[dht-fetch]: OK — landing canonical head CONVERGED (uhCkk-
 # Advisory seam, so the run still passes — the verdict line is the assertion.
 assert_passes same-head-different-bytes
 SPLIT_OUTPUT="${TEST_ROOT}/same-head-different-bytes.log"
-if grep -Fq 'seam-smoke[dht-fetch]: OK' "$SPLIT_OUTPUT"; then
+if grep -Fq 'seam-smoke[dht-fetch]: OK — landing canonical head CONVERGED' "$SPLIT_OUTPUT"; then
   echo "Same head with different bytes was reported CONVERGED" >&2
   sed -n '1,200p' "$SPLIT_OUTPUT" >&2
   exit 1
@@ -164,6 +221,11 @@ fi
 grep -Fq 'seam-smoke[dht-fetch]: ADVISORY-SAME-HEAD-DIFFERENT-BYTES' "$SPLIT_OUTPUT"
 grep -Fq 'A=sha256-aaaa (2026-09-14 23:13:44)' "$SPLIT_OUTPUT"
 grep -Fq 'B=sha256-bbbb (2026-09-13 14:46:59)' "$SPLIT_OUTPUT"
+# Each doorway is internally coherent here (A's own record names aaaa, B's
+# names bbbb) — the cross-doorway split above must not read as a per-doorway
+# tear.
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://doorway-alpha.elohim.host head-record names served blob sha256-aaaa' "$SPLIT_OUTPUT"
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://elohim.host head-record names served blob sha256-bbbb' "$SPLIT_OUTPUT"
 
 assert_fails_with redirect '/generate_204=301'
 assert_fails_with bad-ws-status 'WS=400'
@@ -171,5 +233,50 @@ assert_fails_with missing-protocol 'protocol=missing'
 assert_fails_with wrong-protocol 'protocol=not-iroh'
 assert_fails_with n0 'seam-smoke[n0-contamination]: FAIL'
 assert_fails_with tx5 'seam-smoke[no-lingering-tx5]: FAIL'
+
+# ── seam 6b: per-doorway head-record torn-row check ─────────────────────────
+
+# agree → OK (both doorways of the healthy run are internally coherent).
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://doorway-alpha.elohim.host head-record names served blob sha256-aaaa' "$HEALTHY_OUTPUT"
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://elohim.host head-record names served blob sha256-aaaa' "$HEALTHY_OUTPUT"
+
+# differ → ADVISORY-TORN-ROW, and it must stay advisory (exit 0, --gate given).
+assert_passes torn-row
+TORN_OUTPUT="${TEST_ROOT}/torn-row.log"
+grep -Fq 'seam-smoke[dht-fetch]: ADVISORY-TORN-ROW doorway=https://doorway-alpha.elohim.host head=uhCkk-test-head served=sha256-aaaa record=sha256-deadbeef' "$TORN_OUTPUT"
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://elohim.host head-record names served blob sha256-aaaa' "$TORN_OUTPUT"
+if grep -Fq 'ADVISORY-TORN-ROW doorway=https://elohim.host' "$TORN_OUTPUT"; then
+  echo "torn-row falsely flagged the coherent doorway B" >&2
+  sed -n '1,200p' "$TORN_OUTPUT" >&2
+  exit 1
+fi
+
+# no blob at all → OK, never advisory, and head-record must never be fetched
+# (the fake would hard-fail the run if it were).
+assert_passes no-blob-served
+NO_BLOB_OUTPUT="${TEST_ROOT}/no-blob-served.log"
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://doorway-alpha.elohim.host no blob served for elohim-host-landing (nothing to tear)' "$NO_BLOB_OUTPUT"
+grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=https://elohim.host no blob served for elohim-host-landing (nothing to tear)' "$NO_BLOB_OUTPUT"
+if grep -Fiq 'ADVISORY-TORN-ROW\|UNREADABLE-HEAD-RECORD' "$NO_BLOB_OUTPUT"; then
+  echo "no-blob-served should never reach the head-record fetch" >&2
+  sed -n '1,200p' "$NO_BLOB_OUTPUT" >&2
+  exit 1
+fi
+
+# unreadable (CellDisabled) → UNREADABLE-HEAD-RECORD, never OK, never TORN.
+assert_passes unreadable-head-record
+UNREADABLE_OUTPUT="${TEST_ROOT}/unreadable-head-record.log"
+grep -Fq 'seam-smoke[dht-fetch]: UNREADABLE-HEAD-RECORD doorway=https://doorway-alpha.elohim.host reason=cell-disabled' "$UNREADABLE_OUTPUT"
+grep -Fq 'seam-smoke[dht-fetch]: UNREADABLE-HEAD-RECORD doorway=https://elohim.host reason=cell-disabled' "$UNREADABLE_OUTPUT"
+if grep -Fq 'seam-smoke[dht-fetch]: OK — doorway=' "$UNREADABLE_OUTPUT"; then
+  echo "unreadable-head-record falsely read as OK for a doorway" >&2
+  sed -n '1,200p' "$UNREADABLE_OUTPUT" >&2
+  exit 1
+fi
+if grep -Fq 'ADVISORY-TORN-ROW' "$UNREADABLE_OUTPUT"; then
+  echo "unreadable-head-record falsely read as TORN" >&2
+  sed -n '1,200p' "$UNREADABLE_OUTPUT" >&2
+  exit 1
+fi
 
 echo "substrate-seam-smoke: relay-sovereignty regression tests passed"

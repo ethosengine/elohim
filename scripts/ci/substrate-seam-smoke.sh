@@ -215,4 +215,107 @@ else
   note dht-fetch "OK — landing canonical head CONVERGED ($ha) serving $ba_blob"
 fi
 
+# ── 6b. per-doorway torn-row check — compare the head RECORD's own blob_cid,
+# not the anchor (story-1.4a design §e). The checks above compare the two
+# doorways to EACH OTHER; this compares each doorway to its OWN ground truth:
+# `GET /db/content/{id}/head-record` (http.rs:9152-9304) serves THIS peer's
+# local DHT `Record` for its declared head, fetched through its own
+# conductor. A doorway can agree with its neighbor on head+blobHash at the
+# projection layer while its own DHT entry never named that blob at all —
+# that is the shape 1.4a exists to make legible.
+#
+# `record` is base64 of a Holochain `Record`: the head action plus its
+# `Content` entry, msgpack-encoded (`SerializedBytes`) — NOT structured JSON.
+# Verified 2026-09-20 against the live household doorways (both currently
+# CellDisabled, so only the error shape could be read live) and against
+# source: elohim/elohim-storage/src/http.rs:9292-9298 builds the response as
+# `{"headActionHash":…, "record": base64(bytes)}`; the DNA field is
+# `content_store_integrity/src/lib.rs:521` `pub blob_cid: Option<String>` — a
+# plain string, not a nested structure. msgpack encodes a string as a length
+# prefix followed by raw UTF-8 with no escaping, so a known substring appears
+# byte-for-byte in the decoded record — this is why containment
+# (`served.encode() in decoded`) is a safe test WITHOUT a msgpack decoder
+# (python3's stdlib is not guaranteed to carry one; design §e / risk U3).
+#
+# Containment finding the served hash -> OK (positive evidence they agree).
+# Containment NOT finding it is deliberately NOT read as proof of a tear
+# (U3 is unverified from source alone) — only extracting a DIFFERENT
+# blob_cid-shaped run from the same record counts as ADVISORY-TORN-ROW
+# evidence. Anything else (HTTP error, CellDisabled, unexpected JSON shape,
+# unreadable base64, no blob_cid-shaped run at all) is UNREADABLE-HEAD-RECORD
+# — it must never read as OK and never as TORN.
+check_head_record_pointer() { # doorway-url content-id served-blob-hash head-hash
+  local doorway="$1" cid="$2" served="$3" head="$4"
+  if [ "$served" = "?" ]; then
+    # No blob served (the common corpus shape: ~100% of content has no
+    # blob_cid at all). Nothing to tear — never advisory.
+    note dht-fetch "OK — doorway=$doorway no blob served for $cid (nothing to tear)"
+    return
+  fi
+  local resp code body
+  resp=$(curl -sS -m 20 -w '\n%{http_code}' "$doorway/db/content/$cid/head-record" 2>/dev/null)
+  if [ -z "$resp" ]; then
+    note dht-fetch "UNREADABLE-HEAD-RECORD doorway=$doorway reason=curl-failed"
+    return
+  fi
+  code=${resp##*$'\n'}
+  body=${resp%$'\n'*}
+  if [ "$code" != "200" ]; then
+    local reason="http-$code"
+    # Live-verified 2026-09-20: a CellDisabled conductor answers 502 with
+    # `{"error":"...CellDisabled(...)..."}` — no structured `cause` field on
+    # the currently-running binary, so match the substring directly rather
+    # than depend on a field that may not be deployed yet.
+    case "$(printf '%s' "$body" | tr '[:upper:]' '[:lower:]')" in
+      *celldisabled*) reason="cell-disabled" ;;
+    esac
+    note dht-fetch "UNREADABLE-HEAD-RECORD doorway=$doorway reason=$reason"
+    return
+  fi
+  local verdict
+  verdict=$(printf '%s' "$body" | SEAM_SERVED_BLOB_HASH="$served" python3 -c "
+import base64, json, os, re, sys
+served = os.environ.get('SEAM_SERVED_BLOB_HASH', '')
+try:
+    d = json.load(sys.stdin)
+    record_b64 = d['record']
+except Exception:
+    print('UNREADABLE\tunexpected-shape')
+    raise SystemExit(0)
+try:
+    decoded = base64.b64decode(record_b64)
+except Exception:
+    print('UNREADABLE\tbase64-decode-failed')
+    raise SystemExit(0)
+if served.encode('utf-8') in decoded:
+    print('OK')
+    raise SystemExit(0)
+candidates = sorted(set(
+    m.decode('ascii', 'replace')
+    for m in re.findall(rb'sha256-[0-9a-fA-F]+', decoded)
+    if m.decode('ascii', 'replace') != served
+))
+if candidates:
+    print('TORN\t' + candidates[0])
+else:
+    print('UNREADABLE\tno-blob-cid-run')
+" 2>/dev/null)
+  case "$verdict" in
+    OK)
+      note dht-fetch "OK — doorway=$doorway head-record names served blob $served"
+      ;;
+    TORN$'\t'*)
+      note dht-fetch "ADVISORY-TORN-ROW doorway=$doorway head=$head served=$served record=${verdict#*$'\t'}"
+      ;;
+    UNREADABLE$'\t'*)
+      note dht-fetch "UNREADABLE-HEAD-RECORD doorway=$doorway reason=${verdict#*$'\t'}"
+      ;;
+    *)
+      note dht-fetch "UNREADABLE-HEAD-RECORD doorway=$doorway reason=verdict-unreadable"
+      ;;
+  esac
+}
+check_head_record_pointer "$A" elohim-host-landing "$ba_blob" "$ha"
+check_head_record_pointer "$B" elohim-host-landing "$bb_blob" "$hb"
+
 exit $rc
