@@ -483,24 +483,38 @@ cmd_projection() {
     fi
 
     # Sync streams: retry briefly — right after seeding the drain is legitimate.
-    local attempt=0 ok=false detail=""
+    local attempt=0 ok=false detail="" pull_state=""
     while [ "$attempt" -lt "$retries" ]; do
       attempt=$((attempt + 1))
       if body="$(http_get "$PEER_URL/p2p/status")"; then
         local repl pull projr
         repl="$(jq -r '.replication.caughtUp // .replication.caught_up // empty' <<<"$body")"
-        # pull tri-state: acquisition rollup() is spec-R-A "never false-complete" —
-        # caught_up = total>0 && fetched==total, so total==0 (NO acquisition
-        # workload) reports caughtUp=false BY DESIGN (genesis #1119 failed all 3
-        # pods on exactly this misread). BUT total==0 cannot distinguish
-        # resolved-empty from an acquisition loop that never registered pins —
-        # so "idle" is WARN-class (not proven), never a clean pass; and idle is
-        # only claimed when the wire actually carries a total field (a schema
-        # rename must fail closed via the caughtUp path, not read as idle).
-        pull="$(jq -r 'if .pull == null then "null" elif ((.pull | has("total")) and .pull.total == 0) then "idle" else (.pull.caughtUp // .pull.caught_up // false | tostring) end' <<<"$body")"
+        # story 4.1 (serving-edge campaign): elohim-storage now emits an explicit
+        # `pull.state: idle|active|caughtUp`, derived server-side from the SAME
+        # total/fetched pair as caughtUp (never disagrees with it) — read it
+        # directly when present, instead of re-guessing from total==0. A
+        # mixed-version fleet (old pods predating this field) falls back to
+        # today's tri-state inference below, unchanged.
+        pull_state="$(jq -r 'if .pull != null and (.pull | has("state")) then .pull.state else empty end' <<<"$body" 2>/dev/null || echo "")"
+        if [ -n "$pull_state" ]; then
+          pull="$pull_state"
+        else
+          # legacy inference (no state field on the wire): acquisition rollup()
+          # is spec-R-A "never false-complete" — caught_up = total>0 &&
+          # fetched==total, so total==0 (NO acquisition workload) reports
+          # caughtUp=false BY DESIGN (genesis #1119 failed all 3 pods on exactly
+          # this misread). BUT total==0 cannot distinguish resolved-empty from
+          # an acquisition loop that never registered pins — so "idle" is
+          # WARN-class here (not proven), never a clean pass; and idle is only
+          # claimed when the wire actually carries a total field (a schema
+          # rename must fail closed via the caughtUp path, not read as idle).
+          pull="$(jq -r 'if .pull == null then "null" elif ((.pull | has("total")) and .pull.total == 0) then "idle" else (.pull.caughtUp // .pull.caught_up // false | tostring) end' <<<"$body")"
+        fi
         projr="$(jq -r 'if .projectionReconcile == null and .projection_reconcile == null then "null" else ((.projectionReconcile // .projection_reconcile).caughtUp // (.projectionReconcile // .projection_reconcile).caught_up // false | tostring) end' <<<"$body")"
         detail="replication=$repl pull=$pull projection_reconcile=$projr"
-        if [ "$repl" = "true" ] && [ "$pull" != "false" ] && [ "$projr" != "false" ]; then ok=true; break; fi
+        # "active" (state-based, still fetching) behaves like legacy "false":
+        # not yet proven, keep retrying rather than accepting it early.
+        if [ "$repl" = "true" ] && [ "$pull" != "false" ] && [ "$pull" != "active" ] && [ "$projr" != "false" ]; then ok=true; break; fi
       else
         detail="p2p/status unreachable ($(last_status))"
       fi
@@ -509,7 +523,13 @@ cmd_projection() {
     if $ok; then
       case "$detail" in
         *null*) warn "projection.$PEER_NAME.streams" "$detail — null streams are 'not computable', NEVER caught-up (spec §4.3); not failing, but not proven" ;;
-        *idle*) warn "projection.$PEER_NAME.streams" "$detail — pull total==0: resolved-empty OR an acquisition loop that never registered pins; not failing, but not proven (cross-check seeded pin expectations)" ;;
+        *idle*)
+          if [ -n "$pull_state" ]; then
+            pass "projection.$PEER_NAME.streams" "$detail — idle — no pins on this node"
+          else
+            warn "projection.$PEER_NAME.streams" "$detail — pull total==0: resolved-empty OR an acquisition loop that never registered pins; not failing, but not proven (cross-check seeded pin expectations)"
+          fi
+          ;;
         *)      pass "projection.$PEER_NAME.streams" "$detail" ;;
       esac
     else

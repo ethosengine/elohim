@@ -100,6 +100,10 @@ export interface P2PStatusView {
     pending: number;
     failed: number;
     caughtUp: boolean;
+    /**
+     * Additive/optional — OMITTED from the wire (never null) by a node older than this field, never present-but-empty. A current elohim-storage node always emits it. Closed derivation of the SAME total/fetched pair caughtUp uses, so the two can never disagree: 'idle' (total==0 — a completed reconcile observed an empty desired set, BY DESIGN, never a dead stream), 'active' (total>0, fetched<total — still fetching; a permanently-failed item sits in `failed` without moving `fetched`, so it reads as active, never caughtUp), 'caughtUp' (total>0, fetched==total). Lets a CI reader distinguish 'idle by design' from 'dead' without guessing from caughtUp:false alone — a reader that does not find this field MUST fall back to total/fetched (see substrate-verify.sh cmd_projection's legacy inference).
+     */
+    state?: 'idle' | 'active' | 'caughtUp';
   } | null;
   /**
    * P1 projection-reconcile stream status. null when the reconcile task is not running (missing lamad HcClient / pool / disabled).

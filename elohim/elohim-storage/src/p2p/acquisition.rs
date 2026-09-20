@@ -2,7 +2,10 @@
 //! replication stream. Per-pin GapTrackers over the DECLARED desired set;
 //! all state Category C (in-memory, recomputed on restart from active pins
 //! × local inventory). Wire vocabulary is the unified set (spec §4.3):
-//! {total, fetched, pending, failed, caughtUp}.
+//! {total, fetched, pending, failed, caughtUp}, plus the closed `state`
+//! derivation (`PullState`, story 4.1 of the serving-edge campaign) that lets
+//! a reader tell idle-by-design apart from dead without re-deriving it from
+//! caughtUp.
 
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
@@ -224,6 +227,51 @@ pub fn pin_cooled_down(updated_at: &str, now: chrono::DateTime<chrono::Utc>) -> 
     }
 }
 
+/// Closed states for `/p2p/status.pull.state` (story 4.1 of the serving-edge
+/// campaign). Derived from the SAME `total`/`fetched` pair `caught_up` uses,
+/// in the ONE place [`PullState::from_counts`] — so the two fields can never
+/// disagree. Lets a CI reader (`substrate-verify.sh` `cmd_projection`)
+/// distinguish "idle by design" (nobody pinned content on this node) from
+/// "dead" without guessing from `caughtUp:false` alone (backlog
+/// `ci-substrate-projection-pull-stream-dark`).
+///
+/// A permanently-failed item (one that exhausted its retry budget — see
+/// [`AcquisitionState::exhausted_pin_ids`]) sits inside `failed` without ever
+/// moving `fetched`, so it reads as `Active`, never `CaughtUp` (spec R-A:
+/// never false-complete). There is deliberately no fourth "stalled"/"failed"
+/// state here — that finer distinction belongs to `exhausted_pin_ids` and the
+/// per-pin surfaces, not this three-state rollup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum PullState {
+    /// `total == 0`: a completed reconcile observed an empty desired set.
+    /// NOT a synonym for "uninitialized" — that stays `None` on the outer
+    /// `Option<PullStatusInfo>`, never this variant.
+    #[default]
+    Idle,
+    /// `total > 0 && fetched < total`: still fetching (or holding a
+    /// permanently-failed item — see the type doc above).
+    Active,
+    /// `total > 0 && fetched == total`: byte-arrival complete.
+    CaughtUp,
+}
+
+impl PullState {
+    /// The single derivation point for `state` — computed from the same
+    /// `total`/`fetched` pair `caught_up` uses (see `rollup_inner`), so the
+    /// two fields can never read differently for the same rollup.
+    pub fn from_counts(total: i32, fetched: i32) -> Self {
+        if total == 0 {
+            PullState::Idle
+        } else if fetched >= total {
+            PullState::CaughtUp
+        } else {
+            PullState::Active
+        }
+    }
+}
+
 /// Pull-queue rollup. None on the wire means "cannot compute" = keep waiting
 /// (the wait-for-drain tri-state contract, spec §4.3) — never caught-up.
 #[derive(Debug, Clone, Default, Serialize, TS)]
@@ -235,6 +283,7 @@ pub struct PullStatusInfo {
     pub pending: i32,
     pub failed: i32,
     pub caught_up: bool,
+    pub state: PullState,
 }
 
 /// Per-pin progress, served on GET /api/v1/pins (own node only).
@@ -436,6 +485,9 @@ impl AcquisitionState {
         // with pending transiently 0 before re-queue) must NOT report caught_up.
         // total == 0 (resolved-empty) is likewise not caught_up.
         s.caught_up = s.total > 0 && s.fetched == s.total;
+        // Same total/fetched pair as the line above, in the ONE derivation
+        // point — caught_up and state can never disagree (PullState doc).
+        s.state = PullState::from_counts(s.total, s.fetched);
         s
     }
 
@@ -553,6 +605,33 @@ impl AcquisitionState {
 mod tests {
     use super::*;
 
+    /// Story 4.1 (serving-edge campaign): `state` is derived from the SAME
+    /// total/fetched pair `caught_up` uses, in one function
+    /// ([`PullState::from_counts`]) — pin the full truth table (0/0, n/0,
+    /// n/k, n/n) so the two can never silently disagree.
+    #[test]
+    fn pull_state_truth_table_matches_caught_up() {
+        let cases = [
+            (0, 0, PullState::Idle),
+            (5, 0, PullState::Active),
+            (5, 3, PullState::Active),
+            (5, 5, PullState::CaughtUp),
+        ];
+        for (total, fetched, expected) in cases {
+            assert_eq!(
+                PullState::from_counts(total, fetched),
+                expected,
+                "total={total} fetched={fetched}"
+            );
+            let caught_up = total > 0 && fetched == total;
+            assert_eq!(
+                expected == PullState::CaughtUp,
+                caught_up,
+                "state must agree with caught_up for total={total} fetched={fetched}"
+            );
+        }
+    }
+
     #[tokio::test]
     async fn reconcile_diffs_wants_and_rolls_up() {
         let acq = AcquisitionState::new();
@@ -573,6 +652,11 @@ mod tests {
         // fetched=1; need-1/need-2 are still pending. Not caught_up (3 != 1).
         assert_eq!((r.total, r.fetched, r.pending), (3, 1, 2));
         assert!(!r.caught_up);
+        assert_eq!(
+            r.state,
+            PullState::Active,
+            "total>0, fetched<total is active"
+        );
     }
 
     #[tokio::test]
@@ -596,6 +680,7 @@ mod tests {
             r.caught_up,
             "a pin whose every item is already local must be caught_up"
         );
+        assert_eq!(r.state, PullState::CaughtUp);
     }
 
     #[tokio::test]
@@ -624,6 +709,11 @@ mod tests {
         let r = acq.rollup().await;
         assert_eq!(r.total, 0);
         assert!(!r.caught_up, "zero-item desired set must not be caught_up");
+        assert_eq!(
+            r.state,
+            PullState::Idle,
+            "total==0 is idle by design, never a dead-stream guess"
+        );
         let pins = acq.per_pin().await;
         assert_eq!(pins.len(), 1);
         assert!(!pins[0].caught_up);
@@ -655,6 +745,7 @@ mod tests {
             !observed.caught_up,
             "an observed empty desired set is still not byte-arrival caught up"
         );
+        assert_eq!(observed.state, PullState::Idle);
     }
 
     #[tokio::test]
@@ -672,6 +763,13 @@ mod tests {
         assert!(
             !r.caught_up,
             "a failed (unfetched) item must not be caught_up (R-A)"
+        );
+        assert_eq!(
+            r.state,
+            PullState::Active,
+            "a permanently-failed item sits in `failed` without moving `fetched` — \
+             it reads as active, never caughtUp, and there is no separate \
+             stalled/failed state in this 3-state rollup"
         );
         let pins = acq.per_pin().await;
         assert!(!pins[0].caught_up);
@@ -743,6 +841,11 @@ mod tests {
             !r.caught_up,
             "before retirement the unsatisfiable want holds the queue open"
         );
+        assert_eq!(
+            r.state,
+            PullState::Active,
+            "an exhausted-but-not-yet-retired pin still reads as active, not a distinct stalled state"
+        );
 
         assert_eq!(
             acq.exhausted_pin_ids().await,
@@ -761,6 +864,7 @@ mod tests {
             r.caught_up,
             "with the unsatisfiable pin retired the pull queue can finally drain"
         );
+        assert_eq!(r.state, PullState::CaughtUp);
     }
 
     #[tokio::test]

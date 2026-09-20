@@ -16,7 +16,7 @@
 // task-level mutex (wrong granularity for cross-runtime env-var contention).
 #![allow(clippy::await_holding_lock)]
 
-use elohim_storage::p2p::acquisition::PullStatusInfo;
+use elohim_storage::p2p::acquisition::{PullState, PullStatusInfo};
 use elohim_storage::p2p::projection_reconcile::ProjectionReconcileStatus;
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
@@ -268,9 +268,11 @@ fn lens_market_view_matches_schema() {
 
 // ── P2P Status ──────────────────────────────────────────────────
 
-#[test]
-fn p2p_status_view_matches_schema() {
-    let status = P2PStatusInfo {
+/// A fully-populated, schema-valid `P2PStatusInfo` fixture. Tests that only
+/// care about one field (e.g. `pull.state`) clone this and override just
+/// that field, instead of re-typing the whole literal.
+fn p2p_status_fixture() -> P2PStatusInfo {
+    P2PStatusInfo {
         peer_id: "12D3KooWTest".to_string(),
         listen_addresses: vec!["/ip4/127.0.0.1/tcp/4001".to_string()],
         connected_peers: 3,
@@ -297,6 +299,7 @@ fn p2p_status_view_matches_schema() {
             pending: 1,
             failed: 0,
             caught_up: false,
+            state: PullState::Active,
         }),
         projection_reconcile: Some(ProjectionReconcileStatus {
             pending: 1,
@@ -339,8 +342,12 @@ fn p2p_status_view_matches_schema() {
         iroh_node_id: Some(
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string(),
         ),
-    };
+    }
+}
 
+#[test]
+fn p2p_status_view_matches_schema() {
+    let status = p2p_status_fixture();
     let json = serde_json::to_value(&status).unwrap();
     validate_against_schema("views/p2p-status-view.schema.json", &json);
 }
@@ -380,6 +387,41 @@ fn p2p_status_view_with_null_drain_and_uninitialized_pull() {
         json.get("pull").is_some_and(serde_json::Value::is_null),
         "an uninitialized acquisition reconcile must serialize pull explicitly as null"
     );
+    validate_against_schema("views/p2p-status-view.schema.json", &json);
+}
+
+/// Story 4.1 (serving-edge campaign): `pull.state` in its `idle` and
+/// `caughtUp` shapes must validate against the schema and serialize as the
+/// exact camelCase strings CI's `substrate-verify.sh` reads.
+#[test]
+fn p2p_status_view_pull_state_idle_matches_schema() {
+    let mut status = p2p_status_fixture();
+    status.pull = Some(PullStatusInfo {
+        total: 0,
+        fetched: 0,
+        pending: 0,
+        failed: 0,
+        caught_up: false,
+        state: PullState::Idle,
+    });
+    let json = serde_json::to_value(&status).unwrap();
+    assert_eq!(json["pull"]["state"], "idle");
+    validate_against_schema("views/p2p-status-view.schema.json", &json);
+}
+
+#[test]
+fn p2p_status_view_pull_state_caught_up_matches_schema() {
+    let mut status = p2p_status_fixture();
+    status.pull = Some(PullStatusInfo {
+        total: 4,
+        fetched: 4,
+        pending: 0,
+        failed: 0,
+        caught_up: true,
+        state: PullState::CaughtUp,
+    });
+    let json = serde_json::to_value(&status).unwrap();
+    assert_eq!(json["pull"]["state"], "caughtUp");
     validate_against_schema("views/p2p-status-view.schema.json", &json);
 }
 

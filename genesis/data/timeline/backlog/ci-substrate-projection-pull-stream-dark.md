@@ -68,3 +68,17 @@ clean pass (review finding: total==0 cannot distinguish resolved-empty from
 an acquisition loop that never registered pins). Emitter-side follow-up
 (explicit `state: idle|active|caughtUp` field in rollup()) remains open —
 that is the fix-at-depth that lets the gate pass idle confidently.
+
+## LANDED (2026-09-20, story 4.1 serving-edge campaign) — emitter-side fix-at-depth
+
+`PullStatusInfo` now carries `state: idle|active|caughtUp`, derived from the
+same total/fetched pair as `caughtUp` in one function
+(`PullState::from_counts`, `elohim-storage/src/p2p/acquisition.rs`) so the two
+can never disagree; a permanently-failed item reads as `active`, never a
+distinct stalled state. Schema (`p2p-status-view.schema.json`) and
+`schema_contract.rs` updated and regenerated to TS. `substrate-verify.sh`
+`cmd_projection` now reads `.pull.state` when present — `idle` PASSes
+outright ("idle — no pins on this node") instead of warning, `active` retries
+the existing not-yet path, `caughtUp` passes — falling back to the prior
+tri-state inference only when `state` is absent (mixed-version fleet, old
+pods predating this field).
