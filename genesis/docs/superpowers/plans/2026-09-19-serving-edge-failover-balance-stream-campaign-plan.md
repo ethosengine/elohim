@@ -119,6 +119,19 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   recovery", step `doorway "elohim.host" serves authority B's exact head…` — a single read, no polling, by design.
   Habit: doorway-failover. Proof: household apex-transition 3/3. **Gate: p2p-design-gate** (a signed head record
   crossing the sync plane is a data-entity decision) before any code.
+  *Design gate run 2026-09-20* (genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4-gate.md): no new DHT entry
+  type and no DNA-hash move — the head `Record` is an existing notarized artifact carried as evidence, verified by the
+  receiver's own conductor (`validate_carried_record`), and it rides as one new key (`headRecord`) inside the Automerge
+  content doc because the sync wire is positional msgpack and cannot take a field without a two-phase rollout. The
+  adopt arm already stamps head + anchor + content patch in one transaction; 1.4 makes that reachable on the fast path.
+  **The live red is a torn row, read from both public doorways the same day:** both declare head `uhCkkEBj4…lGBP0K`;
+  doorway-alpha's `dhtAnchorHash` IS that head (blob `9a0bae…`, 2026-09-14), while elohim.host's `dhtAnchorHash` is a
+  later Update `uhCkk6StXD9…LYjNb` (blob `3bf228…`, 2026-09-19 18:01) — its own-commit projection applied the new
+  action's content and anchor, and the declaration never followed. So elohim.host serves the bytes of an action that
+  is not its declared head. **1.4a (first, smaller):** a declared row's content fields move only in the transaction
+  that moves its declared head — the own-commit projection records the new anchor as a candidate and leaves the served
+  content alone until the declare lands. **1.4b:** the carried record in the doc. The seam smoke also compares
+  `dhtAnchorHash` from now on, which separates "same action projected two ways" from "two actions, one elected head".
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
