@@ -2471,6 +2471,39 @@ lazy_static! {
         "SyncChanges requests re-queued by the bounded fetch window after a transport io refusal.",
     )
     .unwrap();
+
+    /// Is the conductor app behind this role's bridge RUNNING? `1` enabled,
+    /// `0` observed disabled / awaiting / unrecoverable.
+    ///
+    /// The instrument the 2026-09-18 incident had no equivalent of. For 38
+    /// hours the installed hApp was `Disabled` on three alpha pods; storage kept
+    /// serving projection reads, `/health` kept answering `zomePath: live`, and
+    /// no series anywhere carried the fact. A LEVEL rather than a counter, so it
+    /// alerts on `min_over_time(... ) == 0` without needing a transition to be
+    /// caught — and it is set on every observation (not only on the edge), so a
+    /// pod that boots already-disabled publishes a `0` on its first probe.
+    ///
+    /// Cardinality is the supervised role roster (4), which is fixed at compile
+    /// time in `hc_client_registry::SUPERVISED_ROLES`.
+    pub static ref CONDUCTOR_APP_ENABLED: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_conductor_app_enabled",
+            "1 when the conductor app behind this role's bridge is running, 0 when it is observed disabled/awaiting/unrecoverable.",
+        ),
+        &["role"],
+    )
+    .unwrap();
+}
+
+/// Publish whether ROLE's conductor app is running.
+///
+/// Called from every path that observes an app status — the zome-error
+/// classifier, the supervisor probe, and the boot enable — so the level is
+/// current rather than edge-driven.
+pub fn set_conductor_app_enabled(role: &str, enabled: bool) {
+    CONDUCTOR_APP_ENABLED
+        .with_label_values(&[role])
+        .set(i64::from(enabled));
 }
 
 /// Register every toolkit collector into [`REGISTRY`]. Idempotent (guarded by a
@@ -2509,6 +2542,13 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CONDUCTOR_ANON_BUCKET_COUNT.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CORPUS_DOCS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_APP_ENABLED.clone()));
+        // Pre-touch every supervised role at 1, so a pod that has never probed
+        // publishes a series rather than an absence. Absence is unalertable;
+        // the 2026-09-18 incident was two days of exactly that.
+        for role in crate::hc_client_registry::SUPERVISED_ROLES {
+            CONDUCTOR_APP_ENABLED.with_label_values(&[role]).set(1);
+        }
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(APP_DELIVERABILITY_VERDICTS.clone()));
         let _ = REGISTRY.register(Box::new(ATTRIBUTION_UNVERIFIED_BINDINGS.clone()));

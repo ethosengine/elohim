@@ -56,5 +56,18 @@ fence), and says so (503 with a named cause and no `retryAfter`). (3) OPEN: find
 2026-09-18 — if `enable_app` is refused, the conductor's refusal text is the diagnosis; if it succeeds, the trigger
 still needs a look further back than the log window, because it can recur.
 
+**Sharper, same day.** Two corrections from the code and one more log line. (1) `enable_app` does exist in the crate —
+`happ_manager.rs:697`, inside `ensure_happ_installed` — but it has one caller, gated on `EMBEDDED_CONDUCTOR`, which on
+the fleet is true only in the CONDUCTOR pod and runs once at its boot; storage, which probes every 20 s and sees every
+failure, had no path to it. (2) That boot check DID run on 2026-09-18: at 13:54:05Z matthew's conductor pod logged
+`App already installed … status Enabled`, thirty-one seconds before the first `CellDisabled`. So the app is ENABLED and
+its CELLS are not running — a cell-level condition, which `enable_app` will most likely not lift. Cure (2) landed
+2026-09-20: it sees the condition from the error text, says it, and logs the conductor's verbatim answer to the enable
+attempt. HYPOTHESIS, not a finding: `authorize_signing_credentials` commits a capability grant, and the closed-chain
+fence exists because a write after a chain is sealed is warranted into a cell block that Holochain 0.7 cannot lift;
+if these conductors crossed a lineage seal and storage then minted a grant on the old chain, a permanent cell block
+would look exactly like this — app enabled, every cell disabled, from boot, indefinitely. One read settles it: the
+app's cell list and any warrant or block records on matthew's conductor.
+
 **Done when:** a fleet roll carrying cure (2) shows `elohim_conductor_app_enabled{role}` = 1 on every peer, app +
 genesis deliver from one push, and the trigger of the 2026-09-18 disablement is named.

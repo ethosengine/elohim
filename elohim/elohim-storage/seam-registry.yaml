@@ -4782,3 +4782,145 @@ decisionPoints:
       (ask the advertisers whether they can still serve it); that is a designed follow-up and is
       NOT implemented. Until then the schedule is what keeps the concession honest. The dormancy
       ladder is per-process and in-memory, so a restart re-asks the whole stale set once.
+
+  # ---------------------------------------------------------------------------
+  # Conductor RUN-STATE: is the app behind the bridge actually running?
+  #
+  # EXTENDED (2026-09-20) after the elohim-alpha app-disabled incident
+  # (2026-09-18T13:54Z → 09-20, matthew/adam/eve): the installed hApp was
+  # `Disabled` in the conductor's persistent state for 38+ hours. Every zome
+  # call on every supervised role answered `CellDisabled(...)`; the classifier's
+  # marker list held only transport failures, so every one of those answers
+  # classified `PathLive` — EVIDENCE THE PATH WORKS — and `/health` reported
+  # `zomePath: live` throughout. These three predicates are the decision surface
+  # that makes the state visible, curable and legible on the wire.
+  # ---------------------------------------------------------------------------
+
+  - name: classify_zome_error_disabled_class
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor_bridge_health.rs
+      modulePath: conductor_bridge_health::classify_zome_error
+    summary: >
+      What does one zome-call error prove about the path? Shed (nothing was dispatched) /
+      PathDead (transport gone) / AppDisabled (the conductor ANSWERED that the cell is not
+      running) / PathLive. The AppDisabled arm is new: a `CellDisabled` answer crossed the
+      websocket, so it is not transport death, but nothing can be written through it, so it is
+      not evidence of a live path either.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Closes the class that read as its own opposite. A closed marker list
+          (`is_cell_disabled`) mirrors `is_transport_dead`'s contract, and transport-death is
+          still classified FIRST so every string that already read dead keeps its verdict
+          byte-for-byte.
+      - id: C8
+        status: answered
+        justification: >
+          The verdict reaches `/health` + `/health/serving` as `zomePath: "app-disabled"` with
+          an additive `appDisabledReason`, and `elohim_conductor_app_enabled{role}` publishes it
+          as a level (pre-touched at 1 per supervised role, so absence is never the signal).
+          The WARN fires once per TRANSITION, not per observation.
+      - id: C14
+        status: answered
+        justification: >
+          A disabled app can no longer impersonate a healthy path: `serving_ok()` is false for
+          AppDisabled, so `/health/serving` reds.
+    contractTests:
+      - { path: elohim/elohim-storage/src/conductor_bridge_health.rs, testName: a_cell_disabled_error_is_not_evidence_of_a_live_path, kind: unit }
+      - { path: elohim/elohim-storage/src/conductor_bridge_health.rs, testName: a_domain_error_proves_the_path_is_live, kind: unit }
+      - { path: elohim/elohim-storage/src/conductor_bridge_health.rs, testName: the_observed_live_failure_string_classifies_dead, kind: unit }
+
+  - name: classify_app_status
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/conductor_bridge_health.rs
+      modulePath: conductor_bridge_health::classify_app_status
+    summary: >
+      Is the installed app RUNNING, read from `holochain_types::app::AppStatus`? Only `Enabled`
+      is. Disabled (four reasons), AwaitingMemproofs, AwaitingRestore and Unrecoverable each
+      carry their own reason string forward verbatim. The probe half of the incident:
+      `app_info()` SUCCEEDS on a disabled app, and `HcClient::ping` discarded the payload.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          Against the real status type, not a string — the conductor's own discriminant. A
+          `ping` that only asked `is_ok()` reported a healthy bridge in front of an app that
+          could answer nothing.
+      - id: C8
+        status: answered
+        justification: >
+          The reason string is the diagnosis nothing was carrying; it reaches the log (once per
+          transition), the `/health` body and the supervisor's enable attempt.
+      - id: C11
+        status: n-a
+        justification: "No new queue or admission surface; folded into the existing 20s bridge probe."
+    contractTests:
+      - { path: elohim/elohim-storage/src/conductor_bridge_health.rs, testName: an_app_info_status_of_disabled_is_not_live, kind: unit }
+
+  - name: decide_boot_action
+    kind: verdict-fn
+    sourceLocation:
+      file: src/happ_manager.rs
+      modulePath: happ_manager::decide_boot_action
+    summary: >
+      Given the (unchanged) DriftAction verdict about the app's SHAPE, plus its AppStatus and
+      whether any provisioned cell sits in the closed-chain ledger, decide what boot does about
+      its RUN STATE: Serve / Enable{reason} / RefuseEnable{reason}. Composed with
+      `decide_drift_action` rather than folded into it, so the proven reinstall table does not
+      move.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Enable only. Never reinstall, uninstall, re-key or move a DNA hash — the cure cannot
+          reach any data-destroying path.
+      - id: C4
+        status: answered
+        justification: >
+          Four refusals, each for its own reason: a pending reinstall (install_fresh enables its
+          own app), Unrecoverable (terminal — enable_app cannot lift a validated
+          ChainIntegrityWarrant), AwaitingMemproofs/AwaitingRestore (nothing to enable yet; the
+          pre-existing `matches!(status, Disabled(_))` never enabled these either), and a CLOSED
+          chain.
+      - id: C5
+        status: answered
+        justification: >
+          The closed-chain fence is authority here: a sealed v1 cell is never re-enabled,
+          because enabling it invites this node to author on a sealed chain (a capability grant
+          suffices) which every neighbour warrants into a permanent cell block holochain 0.7
+          cannot lift. A disabled v1 app is the CORRECT end state of a crossing.
+      - id: C6a
+        status: answered
+        justification: >
+          bounded-work — boot runs this ONCE per process; the supervisor's repeat of the same
+          cure is bounded by services::enable_app_backoff (60s doubling to a 1h cap, reset on
+          observing the app running, one record per supervised role). No loop and no I/O in the
+          decision itself.
+      - id: C8
+        status: answered
+        justification: >
+          Enable logs at WARN with the conductor's reason; a refusal logs at ERROR naming which
+          refusal it is. A rejected enable_app logs the conductor's error VERBATIM — that error
+          is the missing diagnosis of why the app was disabled.
+      - id: C12
+        status: n-a
+        justification: "No permission, reach or consent boundary is read or changed."
+    contractTests:
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: a_disabled_app_with_no_structural_drift_is_enabled_once_at_boot, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: structural_drift_still_takes_the_existing_path, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: a_fenced_closed_chain_is_never_re_enabled, kind: unit }
+      - { path: elohim/elohim-storage/src/happ_manager.rs, testName: a_terminal_or_pre_genesis_app_is_named_but_never_auto_enabled, kind: unit }
+      - { path: elohim/elohim-storage/src/services/enable_app_backoff.rs, testName: enable_attempts_back_off_and_are_capped, kind: unit }
+      - { path: elohim/elohim-storage/src/services/enable_app_backoff.rs, testName: and_reset_when_the_app_runs, kind: unit }
+      - { path: elohim/elohim-storage/src/services/response.rs, testName: a_disabled_cell_write_answers_503_with_a_named_cause_and_no_retry_after, kind: unit }
+    gapNote: >
+      `fenced_cell_reason` reads the closed-chain ledger, which records only closes THIS peer
+      performed (see closed_chain_fence's own "what this fence does NOT know"). A peer that meets
+      an already-closed cell with a fresh data dir has no ledger entry, so the fence gate here
+      inherits that blind spot — the same bounded follow-on (a boot-time dump_full_state
+      close-scan) closes both. The supervisor's enable path is not unit-testable without a
+      conductor: its fence gate and backoff gate are asserted separately (closed_chain_fence and
+      enable_app_backoff), and the composition is covered only by the a2o dataplane lane.

@@ -168,9 +168,54 @@ pub fn conductor_write_error(error: &StorageError) -> Response<Full<Bytes>> {
     if crate::conductor_admission::is_admission_shed(error) {
         return admission_shed_backpressure();
     }
+    // ADDITIVE: the head routes keep their 502 verdict, but a disabled app is
+    // NAMED here too, so one `cause` vocabulary covers every seam a caller can
+    // meet the state on. (The status is deliberately NOT changed here — that
+    // would be a new status policy for this seam, not a classification.)
+    let message = error.to_string();
+    if crate::conductor_bridge_health::is_cell_disabled(&message) {
+        return json_response(
+            StatusCode::BAD_GATEWAY,
+            &serde_json::json!({
+                "error": message,
+                "cause": CONDUCTOR_APP_DISABLED_CAUSE,
+            }),
+        );
+    }
     json_response(
         StatusCode::BAD_GATEWAY,
-        &serde_json::json!({ "error": error.to_string() }),
+        &serde_json::json!({ "error": message }),
+    )
+}
+
+/// The machine-readable `cause` a caller reads to tell "the app behind this
+/// node is DISABLED" from "this node is momentarily saturated".
+///
+/// Both are 503. Only one of them is worth retrying in a minute.
+pub const CONDUCTOR_APP_DISABLED_CAUSE: &str = "conductor-app-disabled";
+
+/// The wire shape of a conductor-app-disabled refusal: 503, a NAMED cause, the
+/// conductor's own words, and deliberately **no `Retry-After` and no
+/// `retryAfter`**.
+///
+/// Measured on alpha 2026-09-18 → 09-20: the installed hApp was `Disabled` for
+/// 38+ hours and every write answered a bare `503 {"error": ...}`. That is
+/// byte-indistinguishable from the catching-up shed
+/// ([`admission_shed_backpressure`]), so the app pipeline treated it as
+/// transient backpressure and retried for 63 minutes against a node that could
+/// not have answered in an hour or a week.
+///
+/// Omitting the retry hint is the point, not an oversight: a shed HAS an honest
+/// interval (the permit frees in seconds), and this does not. A client that
+/// sees a `cause` and no interval has been told, truthfully, that coming back
+/// on a timer is not the move.
+fn conductor_app_disabled(message: &str) -> Response<Full<Bytes>> {
+    json_response(
+        StatusCode::SERVICE_UNAVAILABLE,
+        &serde_json::json!({
+            "error": message,
+            "cause": CONDUCTOR_APP_DISABLED_CAUSE,
+        }),
     )
 }
 
@@ -182,6 +227,15 @@ pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     // conductor was never asked.
     if crate::conductor_admission::is_admission_shed(&error) {
         return admission_shed_backpressure();
+    }
+    // SECOND, and before the variant table: a disabled app keeps the 503 the
+    // `Conductor` arm below would give it, but must not be mistaken for the
+    // shed above. Classified by marker for the same reason the shed is — the
+    // discriminant does not survive `holochain_client`'s formatted error.
+    if let StorageError::Conductor(msg) = &error {
+        if crate::conductor_bridge_health::is_cell_disabled(msg) {
+            return conductor_app_disabled(msg);
+        }
     }
     let (status, message) = match &error {
         StorageError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
@@ -362,6 +416,68 @@ mod tests {
     fn a_plain_timeout_is_not_reclassified_as_backpressure() {
         let resp = error_response(StorageError::Timeout("upstream read timed out".into()));
         assert_eq!(resp.status(), StatusCode::GATEWAY_TIMEOUT);
+    }
+
+    /// THE 2026-09-18 DEFECT, third face: a write that failed because the app
+    /// is DISABLED answered a plain `503 {"error": ...}` — byte-indistinguishable
+    /// from the catching-up shed above, so the app pipeline retried it as
+    /// transient backpressure for 63 minutes against a node that could not have
+    /// answered in an hour or a week.
+    ///
+    /// The status stays 503 (it IS unavailable, and it self-heals). What has to
+    /// change is that the body NAMES the cause, and carries no `retryAfter` —
+    /// because there is no honest interval to offer.
+    #[tokio::test]
+    async fn a_disabled_cell_write_answers_503_with_a_named_cause_and_no_retry_after() {
+        let resp = error_response(StorageError::Conductor(
+            "Zome call failed: Conductor returned an error while using a ConductorApi: \
+             CellDisabled(CellId(DnaHash(uhC0kY8xE), AgentPubKey(uhCAkR2vQ)))"
+                .into(),
+        ));
+        assert_eq!(
+            resp.status(),
+            StatusCode::SERVICE_UNAVAILABLE,
+            "a disabled app is unavailable, not a bad gateway"
+        );
+        assert!(
+            resp.headers().get(header::RETRY_AFTER).is_none(),
+            "there is no honest retry interval for a disabled app — a shed has one, this does not"
+        );
+        let body = body_json(resp).await;
+        assert_eq!(
+            body["cause"], CONDUCTOR_APP_DISABLED_CAUSE,
+            "the body must name the cause so a client can tell this from a shed"
+        );
+        assert!(
+            body["retryAfter"].is_null(),
+            "no retryAfter, so the shed retry rule cannot claim this response"
+        );
+        assert!(
+            body["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("CellDisabled")),
+            "the conductor's own words stay in the body"
+        );
+    }
+
+    /// And the shed keeps its own shape untouched — the two must stay
+    /// distinguishable in BOTH directions.
+    #[tokio::test]
+    async fn a_shed_is_still_a_shed_and_carries_no_disabled_cause() {
+        let body = body_json(error_response(shed_err())).await;
+        assert_eq!(body["status"], "catching-up");
+        assert!(body["cause"].is_null());
+    }
+
+    async fn body_json(resp: Response<Full<Bytes>>) -> serde_json::Value {
+        use http_body_util::BodyExt;
+        let bytes = resp
+            .into_body()
+            .collect()
+            .await
+            .expect("collect body")
+            .to_bytes();
+        serde_json::from_slice(&bytes).expect("the body is JSON")
     }
 
     /// The shed shape `ConductorAdmission::shed_error` actually produces.

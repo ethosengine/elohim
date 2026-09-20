@@ -13,7 +13,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tracing::{info, warn};
 
-use crate::hc_client::{HcClient, HcClientConfig};
+use crate::hc_client::{BridgeProbe, HcClient, HcClientConfig};
 use crate::lineage_roles::LineageRoles;
 
 /// Capped exponential backoff for a conductor-bridge reconnect loop.
@@ -407,6 +407,85 @@ impl HcClientRegistry {
     /// so routes answer `503 bridge unavailable` (honest backpressure a caller
     /// can retry) rather than `502 Websocket closed` (a broken node) during the
     /// gap.
+    /// Ask the conductor to ENABLE the app behind `role`, bounded and fenced.
+    ///
+    /// The supervisor's half of the 2026-09-18 cure. Three gates, in order, and
+    /// the order matters:
+    ///
+    /// 1. **The closed-chain fence.** A sealed v1 cell must never be re-enabled
+    ///    — a crossing DISABLES the old app on purpose, and enabling it invites
+    ///    this node to author on a sealed chain (a capability grant is enough),
+    ///    which every neighbour warrants into a permanent cell block holochain
+    ///    0.7 cannot lift. Checked FIRST, so a fenced role can never consume an
+    ///    attempt slot or reach the admin socket.
+    /// 2. **The bounded ladder.** `enable_app` is an admin-plane write against
+    ///    a conductor that is, by hypothesis, already unwell. One attempt per
+    ///    [`crate::services::enable_app_backoff::enable_backoff`] window —
+    ///    60s doubling to a 1h cap — never per 20s probe.
+    /// 3. **The conductor's own answer.** On refusal the error is logged
+    ///    VERBATIM at WARN, because THAT error is the diagnosis of why the app
+    ///    is disabled, which is the one fact the incident never produced.
+    ///
+    /// Deliberately does NOT clear or re-mint the handle: the websocket is
+    /// healthy, and an enable that lands is observed as `Running` by the very
+    /// next probe.
+    async fn try_enable_disabled_app(
+        inputs: &HcRegistryInputs,
+        role: &str,
+        hc: &Arc<HcClient>,
+        reason: &str,
+    ) {
+        if let Some(fence) = crate::closed_chain_fence::fence() {
+            if let Some(record) = fence.closed_record(hc.cell_id()) {
+                warn!(
+                    role,
+                    cell = %record.cell,
+                    why = %record.why,
+                    reason,
+                    "conductor app is not running on a role whose chain is CLOSED — REFUSING to \
+                     enable it. A close is a sealing act and a disabled v1 app is the correct end \
+                     state of a crossing; writes belong on the successor app."
+                );
+                return;
+            }
+        }
+
+        let ledger = crate::services::enable_app_backoff::enable_ledger();
+        if !ledger.should_attempt(role) {
+            return;
+        }
+        ledger.note_attempt(role);
+        let attempt = ledger.attempts(role);
+        let app_id = inputs.lineage.app_id_for(role);
+
+        info!(
+            role,
+            app_id = app_id.as_str(),
+            attempt,
+            reason,
+            "attempting enable_app on an installed app observed NOT RUNNING"
+        );
+        match hc.admin_websocket().enable_app(app_id.clone()).await {
+            Ok(_) => info!(
+                role,
+                app_id = app_id.as_str(),
+                attempt,
+                "enable_app ACCEPTED — the next bridge probe will confirm whether the app is \
+                 actually running"
+            ),
+            Err(e) => warn!(
+                role,
+                app_id = app_id.as_str(),
+                attempt,
+                error = %e,
+                next_attempt_secs =
+                    crate::services::enable_app_backoff::enable_backoff(attempt).as_secs(),
+                "enable_app REFUSED by the conductor — this error IS the missing diagnosis of why \
+                 the app is disabled; backing off and trying again"
+            ),
+        }
+    }
+
     pub fn spawn_bridge_supervisor(
         self: Arc<Self>,
         inputs: HcRegistryInputs,
@@ -439,8 +518,25 @@ impl HcClientRegistry {
                     // websocket) and folds its result into the zome-path
                     // observer, so a node with zero zome traffic still reports
                     // honestly and an app-only death triggers a full re-mint.
-                    if hc.ping().await.is_ok() {
-                        continue;
+                    //
+                    // Three outcomes, three cures. `is_ok()` used to collapse
+                    // the first two — which is how a DISABLED app read as a
+                    // healthy bridge for 38 hours on 2026-09-18.
+                    match hc.ping().await {
+                        Ok(BridgeProbe::Running) => {
+                            // The app runs: forget any enable ladder we climbed.
+                            crate::services::enable_app_backoff::enable_ledger().note_running(role);
+                            continue;
+                        }
+                        Ok(BridgeProbe::NotRunning { reason }) => {
+                            // The WEBSOCKET IS FINE. Re-minting the bridge
+                            // would be pure churn against a conductor that is
+                            // answering perfectly well; the cure for this state
+                            // is `enable_app`, on a bounded ladder.
+                            Self::try_enable_disabled_app(&inputs, role, &hc, &reason).await;
+                            continue;
+                        }
+                        Err(_) => {}
                     }
 
                     warn!(

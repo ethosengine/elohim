@@ -38,6 +38,7 @@
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tracing::{info, warn};
 
 /// Wall-clock milliseconds since the epoch, saturating at 0 on a pre-epoch
 /// clock. Only used to stamp observations; all policy is a function of
@@ -56,6 +57,13 @@ pub enum ZomePathStatus {
     Live,
     /// The most recent evidence is a TRANSPORT failure — the websocket is gone.
     Dead,
+    /// The most recent evidence is the conductor answering that the APP IS NOT
+    /// RUNNING. The websocket is fine; nothing can be written through it.
+    ///
+    /// Its own state rather than a flavour of `Dead`, because the CURE is
+    /// different: `Dead` is repaired by re-minting the bridge, and a re-mint on
+    /// a disabled app is pure churn. This one is repaired by `enable_app`.
+    AppDisabled,
     /// No evidence either way yet (fresh boot, or only admission sheds so far).
     Unknown,
 }
@@ -66,6 +74,7 @@ impl ZomePathStatus {
         match self {
             ZomePathStatus::Live => "live",
             ZomePathStatus::Dead => "dead",
+            ZomePathStatus::AppDisabled => "app-disabled",
             ZomePathStatus::Unknown => "unknown",
         }
     }
@@ -78,12 +87,70 @@ pub enum ZomeObservation {
     PathLive,
     /// The websocket is gone — the path is dead.
     PathDead,
+    /// The conductor answered, and its answer was that the cell is DISABLED.
+    /// Bytes crossed the wire, so this is not a transport failure — but nothing
+    /// can be written, so it is emphatically not evidence the path works.
+    AppDisabled,
     /// Nothing was dispatched (admission shed): proves nothing either way.
     NoEvidence,
 }
 
+/// What one `app_info()` answer proves about the app behind the bridge.
+///
+/// Separate from [`ZomeObservation`] because the evidence is a STATUS, not an
+/// error string: `app_info()` succeeds on a disabled app, and the status it
+/// returns is the only field in that answer that can tell the two apart.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AppRunObservation {
+    /// The app is enabled — the path is live.
+    Running,
+    /// The app is NOT running. `reason` is the conductor's own account of why,
+    /// rendered for a human: it is the diagnosis nothing was carrying.
+    NotRunning { reason: String },
+}
+
+/// Classify an installed app's status into what it proves about the path.
+///
+/// Only [`AppStatus::Enabled`] is running. Every other variant — disabled for
+/// any reason, awaiting memproofs, awaiting restore, unrecoverable — means zome
+/// calls will not land, and each carries its own reason forward verbatim.
+pub fn classify_app_status(status: &holochain_types::app::AppStatus) -> AppRunObservation {
+    use holochain_types::app::{AppStatus, DisabledAppReason};
+    let reason = match status {
+        AppStatus::Enabled => return AppRunObservation::Running,
+        AppStatus::Disabled(DisabledAppReason::NeverStarted) => {
+            "disabled: never started since install".to_string()
+        }
+        AppStatus::Disabled(DisabledAppReason::NotStartedAfterProvidingMemproofs) => {
+            "disabled: memproofs provided but the app was never started".to_string()
+        }
+        AppStatus::Disabled(DisabledAppReason::User) => {
+            "disabled: by an operator through the admin interface".to_string()
+        }
+        AppStatus::Disabled(DisabledAppReason::Error(e)) => {
+            format!("disabled: the conductor disabled it on an error: {e}")
+        }
+        AppStatus::AwaitingMemproofs => {
+            "not running: awaiting memproofs — genesis has not completed".to_string()
+        }
+        AppStatus::AwaitingRestore => {
+            "not running: awaiting restore — zome calls are rejected until every cell restores"
+                .to_string()
+        }
+        AppStatus::Unrecoverable(cell_id, why) => format!(
+            "not running: UNRECOVERABLE on cell {cell_id:?} ({why:?}) — terminal, enable_app \
+             cannot lift it"
+        ),
+    };
+    AppRunObservation::NotRunning { reason }
+}
+
 /// An immutable reading of [`BridgeHealth`], safe to serialize.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// No longer `Copy`: it carries the disabled REASON, which is a `String`
+/// because it is the conductor's own words and the whole point is not to lose
+/// them. Every consumer already takes it by reference or by value-move.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BridgeHealthSnapshot {
     pub status: ZomePathStatus,
     /// Age of the last observed-live evidence, in whole seconds.
@@ -94,15 +161,20 @@ pub struct BridgeHealthSnapshot {
     pub consecutive_failures: u32,
     /// How many times the supervisor has re-minted the bridge.
     pub reconnects: u64,
+    /// Why the app is not running, when [`ZomePathStatus::AppDisabled`] is the
+    /// current verdict. `None` at every other status. THE missing diagnosis of
+    /// the 2026-09-18 incident: the conductor knew, and nothing asked.
+    pub app_disabled_reason: Option<String>,
 }
 
 impl BridgeHealthSnapshot {
     /// Can this node serve its truth-writing path right now?
     ///
     /// `Unknown` answers `true` deliberately: a node with no evidence has not
-    /// earned a red. Only observed death fails the probe.
+    /// earned a red. Observed death fails the probe — and so does an observed
+    /// DISABLED app, which is a node that cannot write truth by any route.
     pub fn serving_ok(&self) -> bool {
-        self.status != ZomePathStatus::Dead
+        matches!(self.status, ZomePathStatus::Live | ZomePathStatus::Unknown)
     }
 }
 
@@ -126,6 +198,15 @@ pub struct BridgeHealth {
     seq: AtomicU64,
     last_success_seq: AtomicU64,
     last_failure_seq: AtomicU64,
+    /// Epoch-ms / sequence of the last observation that the APP IS NOT RUNNING.
+    /// A third stream rather than a flag on the failure stream, because the two
+    /// have different cures and an operator must be able to tell them apart.
+    last_disabled_ms: AtomicU64,
+    last_disabled_seq: AtomicU64,
+    /// The conductor's own reason for the most recent disabled observation.
+    /// Cleared the moment the path is observed live again, so the surface never
+    /// shows a reason for a state the node is no longer in.
+    disabled_reason: std::sync::RwLock<Option<String>>,
     consecutive_failures: AtomicU32,
     reconnects: AtomicU64,
 }
@@ -147,6 +228,29 @@ impl BridgeHealth {
         self.last_success_ms.store(at_ms, Ordering::Relaxed);
         self.last_success_seq.store(seq, Ordering::SeqCst);
         self.consecutive_failures.store(0, Ordering::Relaxed);
+        // A live path means the app is running; a stale reason would outlive
+        // the state it describes.
+        *self
+            .disabled_reason
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
+    /// Record evidence the APP IS NOT RUNNING, stamped at `at_ms`, keeping the
+    /// conductor's own `reason` verbatim.
+    pub fn record_app_disabled_at(&self, at_ms: u64, reason: &str) {
+        let seq = self.next_seq();
+        self.last_disabled_ms.store(at_ms, Ordering::Relaxed);
+        self.last_disabled_seq.store(seq, Ordering::SeqCst);
+        *self
+            .disabled_reason
+            .write()
+            .unwrap_or_else(|e| e.into_inner()) = Some(reason.to_string());
+    }
+
+    /// [`Self::record_app_disabled_at`] against the wall clock.
+    pub fn record_app_disabled(&self, reason: &str) {
+        self.record_app_disabled_at(now_ms(), reason);
     }
 
     /// Record evidence the path is dead, stamped at `at_ms`.
@@ -181,15 +285,31 @@ impl BridgeHealth {
     pub fn snapshot_at(&self, now_ms: u64) -> BridgeHealthSnapshot {
         let success = self.last_success_ms.load(Ordering::Relaxed);
         let failure = self.last_failure_ms.load(Ordering::Relaxed);
-        let success_seq = self.last_success_seq.load(Ordering::SeqCst);
-        let failure_seq = self.last_failure_seq.load(Ordering::SeqCst);
-        let status = match (success_seq, failure_seq) {
-            (0, 0) => ZomePathStatus::Unknown,
-            (_, 0) => ZomePathStatus::Live,
-            (0, _) => ZomePathStatus::Dead,
-            (s, f) if f > s => ZomePathStatus::Dead,
-            _ => ZomePathStatus::Live,
-        };
+        // Three observation streams, one verdict: the LATEST observation wins,
+        // decided by sequence. `0` means "never observed" and can never win,
+        // which reproduces the original two-stream table exactly — (0,0) is
+        // Unknown, a lone stream is its own status, and a later failure beats an
+        // earlier success — while admitting the third stream on equal terms.
+        let candidates = [
+            (
+                self.last_success_seq.load(Ordering::SeqCst),
+                ZomePathStatus::Live,
+            ),
+            (
+                self.last_failure_seq.load(Ordering::SeqCst),
+                ZomePathStatus::Dead,
+            ),
+            (
+                self.last_disabled_seq.load(Ordering::SeqCst),
+                ZomePathStatus::AppDisabled,
+            ),
+        ];
+        let status = candidates
+            .iter()
+            .filter(|(seq, _)| *seq > 0)
+            .max_by_key(|(seq, _)| *seq)
+            .map(|(_, status)| *status)
+            .unwrap_or(ZomePathStatus::Unknown);
         let age = |stamp: u64| {
             if stamp == 0 {
                 None
@@ -203,6 +323,16 @@ impl BridgeHealth {
             last_failure_age_secs: age(failure),
             consecutive_failures: self.consecutive_failures.load(Ordering::Relaxed),
             reconnects: self.reconnects.load(Ordering::Relaxed),
+            // Only reported for the state it explains — a reason beside a `live`
+            // verdict would read as a live node that is somehow also disabled.
+            app_disabled_reason: (status == ZomePathStatus::AppDisabled)
+                .then(|| {
+                    self.disabled_reason
+                        .read()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .clone()
+                })
+                .flatten(),
         }
     }
 
@@ -216,6 +346,7 @@ impl BridgeHealth {
         match classify_zome_error(msg) {
             ZomeObservation::PathLive => self.record_success(),
             ZomeObservation::PathDead => self.record_failure(),
+            ZomeObservation::AppDisabled => self.record_app_disabled(msg),
             ZomeObservation::NoEvidence => {}
         }
     }
@@ -305,23 +436,41 @@ impl RoleBridgeHealth {
     /// - **Unknown** only while EVERY supervised role has no evidence yet
     ///   (fresh boot) — a node with no evidence has not earned a red, per
     ///   [`ZomePathStatus`]'s own contract.
+    /// - **AppDisabled** sits between them: no role's websocket is gone, but at
+    ///   least one role's app is not running, so the node cannot write truth
+    ///   and the cure is an enable rather than a re-mint.
     pub fn derive_supervised_status(&self, supervised_roles: &[&str]) -> ZomePathStatus {
         let mut any_dead = false;
+        let mut any_disabled = false;
         let mut any_live = false;
         for role in supervised_roles {
             match self.for_role(role).snapshot().status {
                 ZomePathStatus::Dead => any_dead = true,
+                ZomePathStatus::AppDisabled => any_disabled = true,
                 ZomePathStatus::Live => any_live = true,
                 ZomePathStatus::Unknown => {}
             }
         }
         if any_dead {
             ZomePathStatus::Dead
+        } else if any_disabled {
+            ZomePathStatus::AppDisabled
         } else if any_live {
             ZomePathStatus::Live
         } else {
             ZomePathStatus::Unknown
         }
+    }
+
+    /// The reason of the FIRST supervised role currently observed app-disabled,
+    /// so the process-wide aggregate can carry a diagnosis rather than a bare
+    /// verdict. `None` when no supervised role is disabled.
+    pub fn supervised_disabled_reason(&self, supervised_roles: &[&str]) -> Option<String> {
+        supervised_roles.iter().find_map(|role| {
+            let snap = self.for_role(role).snapshot();
+            snap.app_disabled_reason
+                .map(|reason| format!("{role}: {reason}"))
+        })
     }
 }
 
@@ -347,11 +496,16 @@ pub fn role_bridge_health() -> &'static RoleBridgeHealth {
 /// the raw interleaved event stream that used to flap. `Unknown` leaves the
 /// singleton untouched (no evidence yet is not itself an observation).
 fn resync_aggregate() {
-    match role_bridge_health()
-        .derive_supervised_status(&crate::hc_client_registry::SUPERVISED_ROLES)
-    {
+    let roles = role_bridge_health();
+    let supervised = &crate::hc_client_registry::SUPERVISED_ROLES;
+    match roles.derive_supervised_status(supervised) {
         ZomePathStatus::Live => bridge_health().record_success(),
         ZomePathStatus::Dead => bridge_health().record_failure(),
+        ZomePathStatus::AppDisabled => bridge_health().record_app_disabled(
+            &roles
+                .supervised_disabled_reason(supervised)
+                .unwrap_or_else(|| "the installed app is not running".to_string()),
+        ),
         ZomePathStatus::Unknown => {}
     }
 }
@@ -361,7 +515,15 @@ fn resync_aggregate() {
 /// instead of `bridge_health().observe_zome_error(..)` directly from any
 /// `HcClient` call site — the aggregate updates itself.
 pub fn observe_role_zome_error(role: &str, msg: &str) {
-    role_bridge_health().for_role(role).observe_zome_error(msg);
+    let observer = role_bridge_health().for_role(role);
+    if classify_zome_error(msg) == ZomeObservation::AppDisabled {
+        // Route through the transition-logging path so a disabled app is loud
+        // ONCE rather than on every failing call — a busy node produces
+        // thousands of these per minute.
+        record_role_app_disabled(role, msg);
+        return;
+    }
+    observer.observe_zome_error(msg);
     resync_aggregate();
 }
 
@@ -369,8 +531,55 @@ pub fn observe_role_zome_error(role: &str, msg: &str) {
 /// aggregate. Call this instead of `bridge_health().record_success()`
 /// directly from any `HcClient` call site.
 pub fn record_role_success(role: &str) {
-    role_bridge_health().for_role(role).record_success();
+    let observer = role_bridge_health().for_role(role);
+    let was_disabled = observer.snapshot().status == ZomePathStatus::AppDisabled;
+    observer.record_success();
+    crate::metrics::set_conductor_app_enabled(role, true);
+    if was_disabled {
+        // The recovery line an operator greps for after a heal lands.
+        info!(
+            role,
+            "conductor app is RUNNING again — the zome path is live and the enable backoff is \
+             reset"
+        );
+    }
     resync_aggregate();
+}
+
+/// Record that ROLE's app is NOT RUNNING, with the conductor's own `reason`.
+///
+/// WARNs **once per transition**, not once per observation: the disabled state
+/// is discovered by every failing zome call and by every supervisor probe, so
+/// logging per observation would bury the one line that matters under thousands
+/// of copies of itself. The `elohim_conductor_app_enabled{role}` gauge is set on
+/// every call, because a gauge is a level and a level must not be edge-driven.
+pub fn record_role_app_disabled(role: &str, reason: &str) {
+    let observer = role_bridge_health().for_role(role);
+    let already_disabled = observer.snapshot().status == ZomePathStatus::AppDisabled;
+    observer.record_app_disabled(reason);
+    crate::metrics::set_conductor_app_enabled(role, false);
+    if !already_disabled {
+        warn!(
+            role,
+            reason,
+            "conductor app is NOT RUNNING — every zome call on this role will fail while it \
+             stays this way, and the node's own projection reads will keep looking healthy. \
+             Storage will attempt enable_app on a bounded backoff (60s doubling to a 1h cap)."
+        );
+    }
+    resync_aggregate();
+}
+
+/// Fold one `app_info()` probe answer into ROLE's observer.
+///
+/// The probe half of the cure: `app_info()` SUCCEEDS on a disabled app, so a
+/// probe that only checks `is_ok()` reports a healthy bridge in front of an app
+/// that can answer nothing.
+pub fn observe_role_app_status(role: &str, observation: &AppRunObservation) {
+    match observation {
+        AppRunObservation::Running => record_role_success(role),
+        AppRunObservation::NotRunning { reason } => record_role_app_disabled(role, reason),
+    }
 }
 
 /// Count one supervisor-driven re-mint of ROLE's bridge, in both the
@@ -403,13 +612,39 @@ pub fn is_transport_dead(msg: &str) -> bool {
     DEAD_MARKERS.iter().any(|marker| m.contains(marker))
 }
 
+/// Does this error text mean the conductor ANSWERED, and its answer was that
+/// the cell (and therefore the app) is not running?
+///
+/// Same closed-marker-list contract as [`is_transport_dead`], for the same
+/// reason: the underlying crate hands us a formatted `ConductorApiError`, not a
+/// discriminant. The first marker is verbatim from the 2026-09-18 incident —
+/// `Conductor returned an error while using a ConductorApi: CellDisabled(CellId(
+/// DnaHash(…), AgentPubKey(…)))` — which every supervised role answered with,
+/// on three pods, for 38 hours, while `/health` said `live`.
+pub fn is_cell_disabled(msg: &str) -> bool {
+    let m = msg.to_ascii_lowercase();
+    const DISABLED_MARKERS: [&str; 3] = ["celldisabled", "cell is disabled", "app is disabled"];
+    DISABLED_MARKERS.iter().any(|marker| m.contains(marker))
+}
+
 /// Classify one zome-call error into what it proves about the path.
+///
+/// Order is load-bearing and deliberately conservative. The shed check stays
+/// first (nothing was dispatched, so nothing is proven). Transport-death stays
+/// SECOND, ahead of the disabled check, so the pre-existing classification of
+/// every string that already read as dead is preserved byte-for-byte — a
+/// message that somehow named both would keep its older, more urgent verdict.
+/// The observed `CellDisabled` text carries no transport marker, so it lands in
+/// the arm that exists for it.
 pub fn classify_zome_error(msg: &str) -> ZomeObservation {
     if msg.contains(crate::conductor_admission::ADMISSION_SHED_MARKER) {
         return ZomeObservation::NoEvidence;
     }
     if is_transport_dead(msg) {
         return ZomeObservation::PathDead;
+    }
+    if is_cell_disabled(msg) {
+        return ZomeObservation::AppDisabled;
     }
     ZomeObservation::PathLive
 }
@@ -424,6 +659,9 @@ fn role_status_json(snap: &BridgeHealthSnapshot) -> serde_json::Value {
         "lastZomeFailureAgeSecs": snap.last_failure_age_secs,
         "consecutiveFailures": snap.consecutive_failures,
         "bridgeReconnects": snap.reconnects,
+        // ADDITIVE: null at every status but `app-disabled`. The field an
+        // operator reads to learn WHY, without opening a conductor database.
+        "appDisabledReason": snap.app_disabled_reason,
     })
 }
 
@@ -458,6 +696,7 @@ pub fn health_block(mode: &str, snap: &BridgeHealthSnapshot) -> serde_json::Valu
         "lastZomeFailureAgeSecs": snap.last_failure_age_secs,
         "consecutiveFailures": snap.consecutive_failures,
         "bridgeReconnects": snap.reconnects,
+        "appDisabledReason": snap.app_disabled_reason,
         "perRole": per_role_block(role_bridge_health()),
     })
 }
@@ -563,6 +802,89 @@ mod tests {
                 "{msg} must not read as transport-dead"
             );
             assert_eq!(classify_zome_error(msg), ZomeObservation::PathLive, "{msg}");
+        }
+    }
+
+    /// THE 2026-09-18 DEFECT, as a claim about evidence.
+    ///
+    /// Verbatim from Loki (elohim-alpha, matthew/adam/eve storage pods,
+    /// 2026-09-18T13:54Z onward): every zome call on every supervised role came
+    /// back with this, for two days, while `/health` reported `zomePath: live`
+    /// — because the marker list held only TRANSPORT failures and everything
+    /// else fell through to `PathLive`. The conductor DID answer, so the bytes
+    /// crossed; but the answer was that nothing can be written. Calling that
+    /// evidence of a live path is how a disabled app hid for 38 hours.
+    #[test]
+    fn a_cell_disabled_error_is_not_evidence_of_a_live_path() {
+        let msg = "Zome call failed: Conductor returned an error while using a ConductorApi: \
+                   CellDisabled(CellId(DnaHash(uhC0kY8xE), AgentPubKey(uhCAkR2vQ)))";
+        assert!(
+            is_cell_disabled(msg),
+            "the observed live string must be recognised as a disabled cell"
+        );
+        assert_eq!(
+            classify_zome_error(msg),
+            ZomeObservation::AppDisabled,
+            "a disabled cell is its own class — not live, and not a dead websocket"
+        );
+        assert_ne!(
+            classify_zome_error(msg),
+            ZomeObservation::PathLive,
+            "EVIDENCE THE PATH WORKS is exactly the lie that cost two days"
+        );
+
+        // And it must move the observed status off live, so `/health/serving`
+        // can red and an operator has something to look at.
+        let h = BridgeHealth::new();
+        h.record_success_at(T0);
+        h.observe_zome_error(msg);
+        let snap = h.snapshot();
+        assert_eq!(snap.status, ZomePathStatus::AppDisabled);
+        assert!(
+            !snap.serving_ok(),
+            "a node whose app is disabled cannot write truth"
+        );
+        assert!(
+            snap.app_disabled_reason.is_some(),
+            "the reason is the missing diagnosis — it must reach the surface"
+        );
+    }
+
+    /// The probe half of the same defect: `spawn_bridge_supervisor` pinged with
+    /// `app_info()`, which SUCCEEDS on a disabled app, and threw the returned
+    /// status away. The status is the only thing in that answer that can tell
+    /// a running app from a dead one.
+    #[test]
+    fn an_app_info_status_of_disabled_is_not_live() {
+        use holochain_types::app::{AppStatus, DisabledAppReason};
+
+        assert_eq!(
+            classify_app_status(&AppStatus::Enabled),
+            AppRunObservation::Running
+        );
+
+        for (status, needle) in [
+            (
+                AppStatus::Disabled(DisabledAppReason::NeverStarted),
+                "never started",
+            ),
+            (AppStatus::Disabled(DisabledAppReason::User), "operator"),
+            (
+                AppStatus::Disabled(DisabledAppReason::Error("cell db locked".into())),
+                "cell db locked",
+            ),
+            (AppStatus::AwaitingMemproofs, "memproof"),
+            (AppStatus::AwaitingRestore, "restore"),
+        ] {
+            match classify_app_status(&status) {
+                AppRunObservation::NotRunning { reason } => assert!(
+                    reason.to_ascii_lowercase().contains(needle),
+                    "the reason must name why: {reason} (looking for {needle})"
+                ),
+                AppRunObservation::Running => {
+                    panic!("{status:?} is not running and must never read as running")
+                }
+            }
         }
     }
 

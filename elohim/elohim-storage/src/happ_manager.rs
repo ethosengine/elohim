@@ -375,6 +375,111 @@ pub fn decide_drift_action(
     }
 }
 
+/// What boot should do about the installed app's RUN STATE, decided after
+/// [`decide_drift_action`] has ruled on its SHAPE.
+///
+/// A separate verdict from [`DriftAction`], composed with it rather than folded
+/// into it, because the two answer different questions and the drift gate is a
+/// proven table that must not move: drift asks "is this the right app?", this
+/// asks "is it running?". Before the 2026-09-18 incident the second question
+/// was answered by an `else if matches!(status, Disabled(_))` tucked behind the
+/// coordinator hot-swap — reachable only in embedded-conductor mode, run once
+/// per boot, and unassertable without a conductor. Here the answer is a value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BootAction {
+    /// Nothing to do about the run state: the app is enabled, or a reinstall is
+    /// about to install and enable a fresh one anyway.
+    Serve,
+    /// The app is installed, structurally sound and NOT running. Enable it.
+    /// `reason` is the conductor's own account of why it was down — the line an
+    /// operator reads to learn what happened, which nothing was carrying.
+    Enable { reason: String },
+    /// The app is not running and must NOT be auto-enabled. `reason` says which
+    /// refusal this is and what the way forward is.
+    RefuseEnable { reason: String },
+}
+
+/// Decide what boot does about the run state.
+///
+/// Four refusals, each for its own reason — auto-remediation is only safe where
+/// the remedy is bounded and reversible:
+///
+/// * **A reinstall is pending.** `install_fresh` enables what it installs; an
+///   enable here would target the app that is about to be uninstalled.
+/// * **`Unrecoverable`.** Terminal by the conductor's own definition (a
+///   locally-validated `ChainIntegrityWarrant`): `enable_app` cannot lift it,
+///   and reinstalling/uninstalling on it is the same class of unsafe
+///   auto-remediation as a retried torn uninstall. `DNA_MIGRATION_INTENT` /
+///   `FORCE_DNA_REINSTALL=wipe` remain the only ways off it.
+/// * **`AwaitingMemproofs` / `AwaitingRestore`.** Genesis or restore has not
+///   completed; there is nothing to enable yet and the conductor moves out of
+///   both states on its own. (This is also exactly the pre-existing behaviour:
+///   the old `matches!(status, Disabled(_))` never enabled these either.)
+/// * **A CLOSED chain.** `fenced` is `Some(why)` when a provisioned cell of
+///   this app sits in the [`crate::closed_chain_fence`] ledger — a v1 app whose
+///   chain was sealed by a lineage migration. Re-enabling it invites the
+///   connect path to author on a sealed chain, which every neighbour warrants
+///   into a permanent cell block that holochain 0.7 cannot lift. A disabled old
+///   app is the CORRECT end state of a crossing; healing it would undo the
+///   migration.
+pub fn decide_boot_action(
+    drift: &DriftAction,
+    status: &AppStatus,
+    fenced: Option<&str>,
+) -> BootAction {
+    if drift.reinstalls() {
+        return BootAction::Serve;
+    }
+    match crate::conductor_bridge_health::classify_app_status(status) {
+        crate::conductor_bridge_health::AppRunObservation::Running => BootAction::Serve,
+        crate::conductor_bridge_health::AppRunObservation::NotRunning { reason } => {
+            if let Some(why) = fenced {
+                return BootAction::RefuseEnable {
+                    reason: format!(
+                        "REFUSING to enable an app whose chain is CLOSED ({why}): {reason}. A \
+                         close is a sealing act — enabling the sealed app invites this node to \
+                         author on it (a capability grant is enough), which every neighbour \
+                         warrants into a permanent cell block holochain 0.7 cannot lift. A \
+                         disabled v1 app is the correct end state of a crossing; the successor \
+                         app is where writes belong."
+                    ),
+                };
+            }
+            match status {
+                AppStatus::Disabled(_) => BootAction::Enable { reason },
+                // Terminal, or not yet genesised/restored — the conductor is
+                // the only thing that can move these, and only forward.
+                _ => BootAction::RefuseEnable {
+                    reason: format!(
+                        "{reason}. NOT enabling: enable_app cannot move this state. Operator \
+                         action (DNA_MIGRATION_INTENT or FORCE_DNA_REINSTALL=wipe) is the only \
+                         way off a terminal one; the awaiting states clear themselves."
+                    ),
+                },
+            }
+        }
+    }
+}
+
+/// Is any provisioned cell of this app sitting in the closed-chain ledger?
+///
+/// Returns the recorded `why` of the FIRST sealed cell found, so the refusal
+/// can quote the close that produced it. `None` when no fence is armed (unit
+/// tests, library consumers) or no cell of this app is sealed.
+fn fenced_cell_reason(app_info: &holochain_client::AppInfo) -> Option<String> {
+    let fence = crate::closed_chain_fence::fence()?;
+    app_info
+        .cell_info
+        .values()
+        .flatten()
+        .find_map(|info| match info {
+            CellInfo::Provisioned(cell) => fence
+                .closed_record(&cell.cell_id)
+                .map(|record| format!("cell {} sealed: {}", record.cell, record.why)),
+            _ => None,
+        })
+}
+
 /// Emit the operator-facing narration for a verdict. Kept beside the pure
 /// decision so the decision itself never logs.
 ///
@@ -674,30 +779,46 @@ pub async fn ensure_happ_installed(
                 ),
             }
 
-            // 0.7 `AppStatus::Unrecoverable(cell_id, reason)` is TERMINAL: restore
-            // hit a permanent failure (a locally-validated ChainIntegrityWarrant
-            // against the agent) and the app cannot be enabled. It is deliberately
-            // NOT folded into `Disabled(_)` — automatically enabling, reinstalling,
-            // uninstalling or hot-swapping on it is the same class of unsafe
-            // auto-remediation as the torn-uninstall guard. Log it once, loudly,
-            // with the reason payload, and leave the DNA_MIGRATION_INTENT /
-            // FORCE_DNA_REINSTALL=wipe gates as the only path off it.
-            if let AppStatus::Unrecoverable(cell_id, reason) = &app_info.status {
-                error!(
-                    app_id = app_id,
-                    cell_id = ?cell_id,
-                    reason = ?reason,
-                    "App is UNRECOVERABLE — restore failed permanently. Not enabling, \
-                     not reinstalling: operator action required via DNA_MIGRATION_INTENT \
-                     or FORCE_DNA_REINSTALL=wipe."
-                );
-            } else if matches!(app_info.status, AppStatus::Disabled(_)) {
-                info!(app_id = app_id, "Enabling disabled app");
-                admin_ws
-                    .enable_app(app_id.to_string())
-                    .await
-                    .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
-                info!(app_id = app_id, "App enabled");
+            // The RUN-STATE half of the boot check, now a decided value rather
+            // than an inline status match — see [`decide_boot_action`] for the
+            // four refusals and why each is a refusal.
+            //
+            // 0.7 `AppStatus::Unrecoverable(cell_id, reason)` is TERMINAL:
+            // restore hit a permanent failure (a locally-validated
+            // ChainIntegrityWarrant against the agent) and the app cannot be
+            // enabled. It is deliberately NOT folded into `Disabled(_)` —
+            // automatically enabling, reinstalling, uninstalling or hot-swapping
+            // on it is the same class of unsafe auto-remediation as the
+            // torn-uninstall guard.
+            match decide_boot_action(
+                &action,
+                &app_info.status,
+                fenced_cell_reason(app_info).as_deref(),
+            ) {
+                BootAction::Serve => {}
+                BootAction::RefuseEnable { reason } => {
+                    error!(
+                        app_id = app_id,
+                        status = ?app_info.status,
+                        reason = reason.as_str(),
+                        "App is NOT RUNNING and will NOT be auto-enabled"
+                    );
+                }
+                BootAction::Enable { reason } => {
+                    // The line the 2026-09-18 incident needed and did not have:
+                    // the app came up disabled from the conductor's persistent
+                    // state, and no surface anywhere said so.
+                    warn!(
+                        app_id = app_id,
+                        reason = reason.as_str(),
+                        "Installed app came up NOT RUNNING — enabling it"
+                    );
+                    admin_ws
+                        .enable_app(app_id.to_string())
+                        .await
+                        .map_err(|e| anyhow::anyhow!("enable_app failed: {e}"))?;
+                    info!(app_id = app_id, "App enabled");
+                }
             }
         }
     } else {
@@ -1928,6 +2049,147 @@ mod tests {
         assert!(r["error"].is_null());
         assert!(r.get("installed_coordinators").is_none());
         assert!(r.get("bundled_coordinators").is_none());
+    }
+
+    // ---------------------------------------------------------------------
+    // The RUN-STATE gate (`decide_boot_action`), written against the
+    // 2026-09-18 incident: the installed hApp on matthew, adam and eve came up
+    // `Disabled` from the conductor's persistent state and stayed that way for
+    // 38+ hours, answering `CellDisabled(...)` to every zome call on every
+    // supervised role, while storage served its own SQLite projection and
+    // looked alive.
+    // ---------------------------------------------------------------------
+
+    fn disabled() -> AppStatus {
+        AppStatus::Disabled(holochain_types::app::DisabledAppReason::User)
+    }
+
+    /// The cure, as a decision: a structurally-correct app that is not running
+    /// yields `Enable`, not `Serve`. `NoOp` forever is what the node did.
+    #[test]
+    fn a_disabled_app_with_no_structural_drift_is_enabled_once_at_boot() {
+        let installed = installed_app(&[("lamad", "uhC0k-a")], true);
+        let bundle = bundle_roles(&[("lamad", "uhC0k-a")]);
+        let drift = decide_drift_action(&installed, &bundle, &ReinstallFlags::default());
+        assert_eq!(
+            drift,
+            DriftAction::NoOp,
+            "no structural staleness and no content drift — the shape is fine"
+        );
+
+        match decide_boot_action(&drift, &disabled(), None) {
+            BootAction::Enable { reason } => assert!(
+                reason.contains("operator"),
+                "the conductor's own reason must be carried forward: {reason}"
+            ),
+            other => panic!("a sound-but-disabled app must be enabled, got {other:?}"),
+        }
+
+        // And an app that IS running asks for nothing.
+        assert_eq!(
+            decide_boot_action(&drift, &AppStatus::Enabled, None),
+            BootAction::Serve
+        );
+    }
+
+    /// The run-state gate must not touch the reinstall gate. Every reinstalling
+    /// verdict already installs AND enables a fresh app, so enabling here would
+    /// target the app that is about to be uninstalled.
+    #[test]
+    fn structural_drift_still_takes_the_existing_path() {
+        // Stale + no data → the pre-existing ReinstallStale branch, unchanged.
+        let stale = stale_app(&[("lamad", "uhC0k-a")], false, &["imagodei"]);
+        let bundle = bundle_roles(&[("lamad", "uhC0k-a"), ("imagodei", "uhC0k-b")]);
+        let drift = decide_drift_action(&stale, &bundle, &ReinstallFlags::default());
+        assert_eq!(drift, DriftAction::ReinstallStale);
+        assert_eq!(
+            decide_boot_action(&drift, &disabled(), None),
+            BootAction::Serve,
+            "a reinstall enables what it installs — boot must not enable the doomed app"
+        );
+
+        // Stale + data + no intent → the pre-existing refusal, which KEEPS the
+        // installed cells. That node still has to run what it kept.
+        let stale_with_data = stale_app(&[("lamad", "uhC0k-a")], true, &["imagodei"]);
+        let refused = decide_drift_action(&stale_with_data, &bundle, &ReinstallFlags::default());
+        assert!(matches!(
+            refused,
+            DriftAction::RefuseStaleWithoutIntent { .. }
+        ));
+        assert!(
+            matches!(
+                decide_boot_action(&refused, &disabled(), None),
+                BootAction::Enable { .. }
+            ),
+            "a node told to keep serving what it has must actually be running it"
+        );
+    }
+
+    /// The one state whose cure is NOT an enable. A crossing DISABLES the v1
+    /// app on purpose; re-enabling it invites this node to author on a sealed
+    /// chain (a capability grant is enough), which every neighbour warrants
+    /// into a permanent cell block holochain 0.7 cannot lift.
+    #[test]
+    fn a_fenced_closed_chain_is_never_re_enabled() {
+        let installed = installed_app(&[("node_registry", "uhC0k-v1")], true);
+        let bundle = bundle_roles(&[("node_registry", "uhC0k-v1")]);
+        let drift = decide_drift_action(&installed, &bundle, &ReinstallFlags::default());
+        assert_eq!(drift, DriftAction::NoOp);
+
+        match decide_boot_action(&drift, &disabled(), Some("cell abcd sealed: seal_close")) {
+            BootAction::RefuseEnable { reason } => {
+                assert!(reason.contains("CLOSED"), "{reason}");
+                assert!(reason.contains("seal_close"), "{reason}");
+                assert!(reason.contains("cell block"), "{reason}");
+            }
+            other => panic!("a sealed chain must never be re-enabled: {other:?}"),
+        }
+
+        // Identical inputs WITHOUT the fence do enable — so the refusal is the
+        // fence's doing and nothing else's.
+        assert!(matches!(
+            decide_boot_action(&drift, &disabled(), None),
+            BootAction::Enable { .. }
+        ));
+    }
+
+    /// Terminal and pre-genesis states keep the pre-existing behaviour: the old
+    /// code matched `Disabled(_)` alone, so it never enabled these either.
+    #[test]
+    fn a_terminal_or_pre_genesis_app_is_named_but_never_auto_enabled() {
+        let installed = installed_app(&[("lamad", "uhC0k-a")], true);
+        let bundle = bundle_roles(&[("lamad", "uhC0k-a")]);
+        let drift = decide_drift_action(&installed, &bundle, &ReinstallFlags::default());
+
+        for status in [AppStatus::AwaitingMemproofs, AppStatus::AwaitingRestore] {
+            match decide_boot_action(&drift, &status, None) {
+                BootAction::RefuseEnable { reason } => {
+                    assert!(reason.contains("NOT enabling"), "{reason}")
+                }
+                other => panic!("{status:?} must not be auto-enabled: {other:?}"),
+            }
+        }
+
+        let terminal = AppStatus::Unrecoverable(
+            holochain_client::CellId::new(
+                holochain_types::prelude::DnaHash::from_raw_32(vec![1; 32]),
+                holochain_types::prelude::AgentPubKey::from_raw_32(vec![2; 32]),
+            ),
+            holochain_types::app::UnrecoverableCellReason::ChainIntegrityWarrant(Box::new(
+                holochain_types::app::WarrantSummary {
+                    author: holochain_types::prelude::AgentPubKey::from_raw_32(vec![3; 32]),
+                    warrantee: holochain_types::prelude::AgentPubKey::from_raw_32(vec![2; 32]),
+                    timestamp: holochain_types::prelude::Timestamp::from_micros(0),
+                },
+            )),
+        );
+        match decide_boot_action(&drift, &terminal, None) {
+            BootAction::RefuseEnable { reason } => {
+                assert!(reason.contains("UNRECOVERABLE"), "{reason}");
+                assert!(reason.contains("FORCE_DNA_REINSTALL=wipe"), "{reason}");
+            }
+            other => panic!("a terminal app must never be auto-enabled: {other:?}"),
+        }
     }
 
     // ---------------------------------------------------------------------

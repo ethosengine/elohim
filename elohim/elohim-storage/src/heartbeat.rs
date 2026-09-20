@@ -381,7 +381,13 @@ impl LiveProbe for DefaultProbe {
         // re-mint is reflected on the very next tick.
         let conductor_healthy = match self.registry.client(self.role) {
             Some(hc) => match hc.ping().await {
-                Ok(()) => true,
+                Ok(crate::hc_client::BridgeProbe::Running) => true,
+                // The websocket is fine and the app is not. A node in this
+                // state cannot write truth, so it is not healthy — reporting
+                // otherwise is the heartbeat's share of the same lie `/health`
+                // was telling. The WARN is already emitted once per transition
+                // by the observer `ping` folded into.
+                Ok(crate::hc_client::BridgeProbe::NotRunning { .. }) => false,
                 Err(e) => {
                     tracing::warn!("conductor ping failed: {e}");
                     false

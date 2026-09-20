@@ -31,7 +31,9 @@ use holochain_client::{
 };
 
 use crate::conductor_admission::AdmissionClass;
-use crate::conductor_bridge_health::{observe_role_zome_error, record_role_success};
+use crate::conductor_bridge_health::{
+    observe_role_app_status, observe_role_zome_error, record_role_success,
+};
 use crate::error::StorageError;
 
 fn is_correlated_head_record_call(zome_name: &str, fn_name: &str) -> bool {
@@ -1271,7 +1273,9 @@ impl HcClient {
     /// the bridge supervisor must cure by constructing a fresh `HcClient`.
     /// `app_info` is side-effect-free, crosses the same authenticated websocket
     /// as `call_zome`, and inherits the client's bounded request timeout.
-    pub async fn ping(&self) -> Result<(), StorageError> {
+    /// A probe that got an answer: the websocket is alive, so the only
+    /// remaining question is whether the APP behind it is.
+    pub async fn ping(&self) -> Result<BridgeProbe, StorageError> {
         // Folded into the zome-path observer because on a node with NO zome
         // traffic this is the only evidence there is — and a node with no
         // traffic is exactly the reported shape: the bridge died at a conductor
@@ -1280,9 +1284,35 @@ impl HcClient {
         // it IS a conductor round-trip — counted so the cost is visible.
         crate::metrics::inc_conductor_call("-", "app_info", "ungated");
         match self.app_ws.app_info().await {
-            Ok(_) => {
-                record_role_success(self.role_key());
-                Ok(())
+            // THE STATUS IS THE ANSWER. `app_info()` succeeds on a DISABLED app
+            // — that is precisely how the 2026-09-18 incident hid for 38 hours
+            // behind a probe that only asked `is_ok()` and threw the payload
+            // away. Reading it is the whole of the fix on this side.
+            Ok(Some(info)) => {
+                let observation = crate::conductor_bridge_health::classify_app_status(&info.status);
+                observe_role_app_status(self.role_key(), &observation);
+                Ok(match observation {
+                    crate::conductor_bridge_health::AppRunObservation::Running => {
+                        BridgeProbe::Running
+                    }
+                    crate::conductor_bridge_health::AppRunObservation::NotRunning { reason } => {
+                        BridgeProbe::NotRunning { reason }
+                    }
+                })
+            }
+            // The socket answered but named no app. Not a transport failure and
+            // not a status we can read — treat it as not-running so it can
+            // never launder into evidence of health.
+            Ok(None) => {
+                let reason =
+                    "the conductor answered app_info with no app for this connection".to_string();
+                observe_role_app_status(
+                    self.role_key(),
+                    &crate::conductor_bridge_health::AppRunObservation::NotRunning {
+                        reason: reason.clone(),
+                    },
+                );
+                Ok(BridgeProbe::NotRunning { reason })
             }
             Err(e) => {
                 let msg = format!("Conductor ping failed: {}", e);
@@ -1291,6 +1321,20 @@ impl HcClient {
             }
         }
     }
+}
+
+/// What one [`HcClient::ping`] observed, for a caller that must choose a CURE.
+///
+/// `Err` means the websocket is gone and the cure is a bridge re-mint.
+/// `Ok(NotRunning)` means the websocket is fine and a re-mint would be pure
+/// churn — the cure is `enable_app`. Collapsing the two into `is_ok()` is the
+/// supervisor half of the 2026-09-18 defect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BridgeProbe {
+    /// The app answered and is enabled.
+    Running,
+    /// The app answered and is NOT running, for this reason.
+    NotRunning { reason: String },
 }
 
 /// A `CellOwner` exposes the agent key of the cell a client is connected to.

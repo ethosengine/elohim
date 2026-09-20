@@ -60,6 +60,7 @@ pub mod distribution_view;
 pub mod economic_event_emit_service; // Slice-2a T3 — bounds-validated conductor-path emit
 pub mod economic_event_service;
 pub mod elohim_gate;
+pub mod enable_app_backoff; // bound the enable_app cure for an observed-DISABLED conductor app (60s→1h, reset on running)
 pub mod epr_compose;
 pub mod epr_kind;
 pub mod epr_nav_context_view; // Category C read-only projection for nav-context endpoint
