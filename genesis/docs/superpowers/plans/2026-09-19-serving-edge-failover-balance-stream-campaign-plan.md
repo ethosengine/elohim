@@ -149,6 +149,18 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   **1.4b:** the carried record in the doc. Honest-view and probe work rides with 1.4a: the head view calls a torn row
   `notarized` because `trust` is derived from anchor presence alone, and the authority for "which doorway is wrong" is
   the decoded `blob_cid` of `/head-record`, not the anchor.
+  *1.4a design pass 2026-09-20* (genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md): **proceed
+  reshaped — the rule above is wrong as written.** A guard keyed on the patch's blob pointer would freeze head
+  convergence for the corpus: 3 770 sampled content items carry zero blob pointers (only app bundles have one), and
+  `ContentProjectionPatch.blob_cid: None` means "preserve the column", not "no blob" (`content_diesel.rs:922-938`).
+  **T-1 (the cure):** `adopt_local` carries `blob_cid` + `content_size_bytes` from the conductor answer it already
+  holds, as its three sibling call sites do — no fetch is needed. **T-2 (the backstop, its own commit, after a
+  household reading of T-1 alone):** `LegacySignal` / `HealCanonical` decline a move that carries NO PATCH AT ALL,
+  counted under a new `pointer_absent` reason; this overturns the pinned backward-compat tail at
+  `content_diesel.rs:5198-5225`. **T-3:** the head view gains an additive `pointerFromDeclaredHead` (the `trust`
+  vocabulary, shared with `ContentView`, is left alone) and seam 6 reads the head record's `blob_cid`.
+  **1.4d (new, unscheduled):** 1.4a prevents new tears and heals none — no candidate query selects a row because
+  it is torn; a torn row classifies `InSync` (`projection_reconcile.rs:4454-4476`).
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
@@ -169,6 +181,11 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   are single-valued, so one leg cannot contribute to both `doorways.elohim.host` and the apex, and the staged
   beacon manifest silently reverts apex ownership. Story: extend `doorway-apex-transition.feature` membership
   scenario to two shared names on the household `file` sink. Proof: household.
+  *Corrected 2026-09-20:* the code half was already done — repeatable `--shared-record NAME=OWNER` landed in
+  `906d7b159` (2026-08-23) and per-lane state in `2a10415d5`; A's evidence predates both. What was open, and landed
+  in `04abd05ef`: the two-name scenario, the file-sink lane-isolation pin, and the staged manifest's apex posture
+  stated with its operator-gated flip. The manifest's exclusive apex claim agrees with the coturn manifests today;
+  it bites only if the coturn side moves the apex to a shared lane first. Household run still owed.
 - **2.2 A doorway answers for a name it is a member of.** With the ingress out of the path (household), a request
   for the sibling's name is served under this doorway's contract or relayed to the holder with
   `x-elohim-served-by` — and resolves the same head (needs 1.4). Story: `name-routing.feature` + a host-bound
@@ -241,6 +258,9 @@ household-only first story that can start once 1.4 lands; every fleet story wait
 
 - A:75, A:53, A:199-200 — multi-A for a shared name is not live: public DNS has one A record per name, and the
   ingress at each premise pins a name to one doorway, so apex client fallback cannot reach the sibling premise.
+- A:205-217 — "`--shared-record-name` is single-valued, a second flag silently last-value-wins": evidence dated
+  2026-08-18; the repeatable lane landed 2026-08-23 (`906d7b159`). A Task 3.1's `check-ingress-conflicts.sh` is at
+  `genesis/orchestrator/scripts/`, not `scripts/ci/`.
 - A:155, C:1480 — same-declared-head reads green on the household; the fleet pair serves two heads.
 - B:12 — per-host head islands "by construction": every live projection contract is any-host now.
 - C:1546, C:1632 — evidence stamped `face02de` / `2c338124a` predates the fleet's `a6ba209e2`.
