@@ -43,6 +43,7 @@ pub mod storage_proxy;
 pub mod stream;
 pub mod threshold;
 pub mod upstream_health;
+pub mod validators;
 pub mod zome_helpers;
 
 pub use admin::{

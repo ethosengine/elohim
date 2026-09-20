@@ -36,6 +36,7 @@ use hyper::{Response, StatusCode};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+use crate::routes::validators::etag_matches;
 use crate::server::AppState;
 
 /// The auth endpoints this doorway serves, as origin-relative paths.
@@ -124,18 +125,6 @@ pub struct AuthDiscovery {
 
 /// The doorway-hosted sign-in portal, served by doorway-app under `/threshold/*`.
 const PORTAL_PATH: &str = "/threshold/login";
-
-/// Does an `If-None-Match` header match our current ETag?
-///
-/// The header is a comma-separated LIST (RFC 9110 §13.1.2) and `*` matches any
-/// current representation, so a naive string equality answers 200 to a
-/// well-formed conditional request and the validator silently never fires.
-fn etag_matches(if_none_match: &str, current: &str) -> bool {
-    if_none_match
-        .split(',')
-        .map(str::trim)
-        .any(|candidate| candidate == "*" || candidate == current)
-}
 
 /// `GET /.well-known/elohim-auth`
 ///

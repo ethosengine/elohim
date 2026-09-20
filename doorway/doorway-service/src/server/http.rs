@@ -3277,6 +3277,7 @@ async fn stock_warm_shell(
 fn judged_shell_response(
     outcome: crate::render::warm_shell::ShellOutcome,
     chrome_context_json: &str,
+    if_none_match: Option<&hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     if let crate::render::warm_shell::ShellOutcome::Converging(reason) = &outcome {
         return converging_shell_response(CONVERGING_SHELL_RETRY_AFTER_SECS, reason);
@@ -3288,6 +3289,7 @@ fn judged_shell_response(
             &shell.content_type,
             chrome_context_json,
             provenance,
+            if_none_match,
         ),
         _ => converging_shell_response(
             CONVERGING_SHELL_RETRY_AFTER_SECS,
@@ -3305,6 +3307,7 @@ mod judged_shell_tests {
                 crate::render::coherence::BehindReason::MissingAsset("main-MISSING.js".into()),
             ),
             "{}",
+            None,
         );
         assert_eq!(response.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(
@@ -3318,29 +3321,176 @@ mod judged_shell_tests {
 /// One shape for every shell the EPR dispatch serves — warm, upgraded, or
 /// slug-resolved — so the chrome island, the cache-control parity and the
 /// provenance marker cannot drift between arms.
+///
+/// **Validators, not caching (serving-edge story 6.1).** A chrome-injected page
+/// carries THIS request's omnibar context — it stays `no-store`, exactly as
+/// before, and gets no `ETag` at all (two requests never share one answer, so
+/// there is nothing to revalidate). When chrome was NOT injected the shell is
+/// the same bytes for every requester, so it gets a strong `ETag` over the
+/// exact bytes served (`routes::freshness::mint_served_head`, the same
+/// convention `routes::epr`'s validated GET uses — same body ⇒ same ETag on
+/// every doorway, which is the point: siblings are swappable) and
+/// `Cache-Control: no-cache` — revalidate every time, never served fresh by a
+/// shared cache. `if_none_match` is honoured with a `304` (empty body, same
+/// `ETag`, the same provenance headers as the 200 it replaces) so a client
+/// that already holds this exact release pays no body cost to confirm it.
 fn projected_shell_response(
     bytes: Vec<u8>,
     content_type: &str,
     chrome_context_json: &str,
     provenance: ShellProvenance,
+    if_none_match: Option<&hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     let (body_bytes, chrome_injected) =
         maybe_inject_chrome(200, content_type, Bytes::from(bytes), chrome_context_json);
-    let mut builder = Response::builder()
-        .status(StatusCode::OK)
-        .header("content-type", content_type)
-        .header("x-epr-router", "dispatched");
     if chrome_injected {
         // An injected page carries this request's omnibar context, so it must
-        // not be shared-cached.
-        builder = builder.header("cache-control", "no-store");
+        // not be shared-cached — and NOT revalidated as if two requests could
+        // ever share one answer.
+        let builder = Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", content_type)
+            .header("x-epr-router", "dispatched")
+            .header("cache-control", "no-store");
+        return with_bundle_provenance_header(
+            builder
+                .body(Full::new(body_bytes))
+                .expect("infallible shell response"),
+            provenance,
+        );
     }
+
+    let etag = format!(
+        "\"{}\"",
+        crate::routes::freshness::mint_served_head(&body_bytes)
+    );
+    let matched = if_none_match
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| crate::routes::validators::etag_matches(v, &etag));
+
+    if matched {
+        let builder = Response::builder()
+            .status(StatusCode::NOT_MODIFIED)
+            .header("x-epr-router", "dispatched")
+            .header("cache-control", "no-cache")
+            .header("etag", etag);
+        return with_bundle_provenance_header(
+            builder
+                .body(Full::new(Bytes::new()))
+                .expect("infallible 304 shell response"),
+            provenance,
+        );
+    }
+
+    let builder = Response::builder()
+        .status(StatusCode::OK)
+        .header("content-type", content_type)
+        .header("x-epr-router", "dispatched")
+        .header("cache-control", "no-cache")
+        .header("etag", etag);
     with_bundle_provenance_header(
         builder
             .body(Full::new(body_bytes))
             .expect("infallible shell response"),
         provenance,
     )
+}
+
+#[cfg(test)]
+mod projected_shell_response_tests {
+    use super::*;
+
+    #[test]
+    fn chrome_injected_html_keeps_no_store_and_carries_no_etag() {
+        let resp = projected_shell_response(
+            b"<html><body></body></html>".to_vec(),
+            "text/html",
+            "{}",
+            ShellProvenance::DeclaredHead,
+            None,
+        );
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()
+                .get("cache-control")
+                .and_then(|v| v.to_str().ok()),
+            Some("no-store")
+        );
+        assert!(
+            resp.headers().get("etag").is_none(),
+            "an injected page carries request-specific context and must never be revalidated"
+        );
+    }
+
+    /// `maybe_inject_chrome` never injects into an invalid-UTF-8 `text/html`
+    /// body — the realistic shape of a shell that is served but not spliced.
+    #[test]
+    fn non_injected_shell_gets_a_validator_and_no_cache() {
+        let resp = projected_shell_response(
+            vec![0xff, 0xfe, 0xfd],
+            "text/html",
+            "{}",
+            ShellProvenance::DeclaredHead,
+            None,
+        );
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers()
+                .get("cache-control")
+                .and_then(|v| v.to_str().ok()),
+            Some("no-cache")
+        );
+        assert!(resp.headers().get("etag").is_some());
+    }
+
+    #[tokio::test]
+    async fn matching_if_none_match_returns_304_preserving_provenance_headers() {
+        let bytes = vec![0xff, 0xfe, 0xfd];
+        let first = projected_shell_response(
+            bytes.clone(),
+            "text/html",
+            "{}",
+            ShellProvenance::SlugResolved,
+            None,
+        );
+        let etag = first.headers().get("etag").cloned().expect("etag on 200");
+        let bundle = first
+            .headers()
+            .get("x-elohim-bundle")
+            .cloned()
+            .expect("provenance header on 200");
+
+        let second = projected_shell_response(
+            bytes,
+            "text/html",
+            "{}",
+            ShellProvenance::SlugResolved,
+            Some(&etag),
+        );
+        assert_eq!(second.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(second.headers().get("etag").cloned(), Some(etag));
+        assert_eq!(
+            second.headers().get("x-elohim-bundle").cloned(),
+            Some(bundle),
+            "provenance must survive onto the 304, not just the 200"
+        );
+        let body = second.into_body().collect().await.unwrap().to_bytes();
+        assert_eq!(body, Bytes::new(), "a 304 carries no body");
+    }
+
+    #[test]
+    fn non_matching_if_none_match_returns_200_with_etag() {
+        let stale = hyper::header::HeaderValue::from_static("\"stale\"");
+        let resp = projected_shell_response(
+            vec![0xff, 0xfe, 0xfd],
+            "text/html",
+            "{}",
+            ShellProvenance::DeclaredHead,
+            Some(&stale),
+        );
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().get("etag").is_some());
+    }
 }
 
 /// The first path segment after `prefix`, or `None` when there is none.
@@ -3458,6 +3608,7 @@ async fn dispatch_to_projected_epr(
     chrome_context_json: &str,
     wants_html: bool,
     standing: RequesterStanding,
+    if_none_match: Option<hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     // ── THE FOLD, re-asked NOW ───────────────────────────────────────────────
     // Reach + standing, resolved against the projection row the router holds at
@@ -3500,6 +3651,7 @@ async fn dispatch_to_projected_epr(
         projection,
         chrome_context_json,
         wants_html,
+        if_none_match,
     )
     .await
 }
@@ -3515,6 +3667,7 @@ async fn serve_admitted_projection_response(
     projection: elohim_views::projection::EprProjectionView,
     chrome_context_json: &str,
     wants_html: bool,
+    if_none_match: Option<hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     let reach = projection.reach.clone();
     let epr_id = projection.epr_id.clone();
@@ -3524,6 +3677,7 @@ async fn serve_admitted_projection_response(
         projection,
         chrome_context_json,
         wants_html,
+        if_none_match,
     )
     .await;
     crate::services::stamp_admitted_standing(&mut response, &reach);
@@ -3546,6 +3700,7 @@ async fn serve_admitted_projection(
     projection: elohim_views::projection::EprProjectionView,
     chrome_context_json: &str,
     wants_html: bool,
+    if_none_match: Option<hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     use elohim_views::projection::ProjectionMode;
 
@@ -3677,7 +3832,7 @@ async fn serve_admitted_projection(
                     upstream_available,
                 )
                 .await;
-                return judged_shell_response(outcome, chrome_context_json);
+                return judged_shell_response(outcome, chrome_context_json, if_none_match.as_ref());
             }
             ShellPlan::UpgradeThenWarm => {
                 // We already hold a serviceable answer, so this read gets the
@@ -3716,7 +3871,7 @@ async fn serve_admitted_projection(
                         .await
                     }
                 };
-                return judged_shell_response(outcome, chrome_context_json);
+                return judged_shell_response(outcome, chrome_context_json, if_none_match.as_ref());
             }
             // COLD + upstream unavailable: this doorway holds NOTHING for an
             // app it is mounted to serve, and cannot read one. Say so now with
@@ -3883,7 +4038,11 @@ async fn serve_admitted_projection(
                             &content_type,
                         )
                         .await;
-                        return judged_shell_response(outcome, chrome_context_json);
+                        return judged_shell_response(
+                            outcome,
+                            chrome_context_json,
+                            if_none_match.as_ref(),
+                        );
                     }
                     // Native runtime chrome: an HTML page served via this proxy is
                     // an EPR-router HTML serve (the landing `/`, a pillar mount),
@@ -4210,6 +4369,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             true,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(
@@ -4235,6 +4395,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             true,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
 
@@ -4318,7 +4479,8 @@ mod epr_dispatch_breaker_tests {
             memberships: vec![],
         };
         let served =
-            dispatch_to_projected_epr(&state, "/", narrowed.clone(), "{}", true, member).await;
+            dispatch_to_projected_epr(&state, "/", narrowed.clone(), "{}", true, member, None)
+                .await;
         assert_eq!(
             served.status(),
             StatusCode::OK,
@@ -4332,6 +4494,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             true,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(
@@ -4514,6 +4677,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             true,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(root.status(), StatusCode::OK);
@@ -4527,6 +4691,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             false,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(main.status(), StatusCode::OK);
@@ -4542,6 +4707,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             false,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(version.status(), StatusCode::OK);
@@ -4595,7 +4761,8 @@ mod epr_dispatch_breaker_tests {
         .await;
         assert!(matches!(stale, Err(SsrFallbackReason::BrowserShellBehind)));
         let fallback_root =
-            serve_admitted_projection(&stale_state, "/", projection.clone(), "{}", true).await;
+            serve_admitted_projection(&stale_state, "/", projection.clone(), "{}", true, None)
+                .await;
         let fallback_html = fallback_root
             .into_body()
             .collect()
@@ -4609,6 +4776,7 @@ mod epr_dispatch_breaker_tests {
             projection.clone(),
             "{}",
             false,
+            None,
         )
         .await;
         assert_eq!(fallback_version.status(), StatusCode::OK);
@@ -4672,6 +4840,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             false,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(version.status(), StatusCode::OK);
@@ -4791,6 +4960,7 @@ mod epr_dispatch_breaker_tests {
                 "{}",
                 false,
                 RequesterStanding::anonymous(),
+                None,
             )
             .await;
             assert_eq!(response.status(), StatusCode::OK);
@@ -4859,6 +5029,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             false,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(response.status(), StatusCode::OK);
@@ -4874,6 +5045,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             true,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(candidate_root.status(), StatusCode::OK);
@@ -4911,6 +5083,7 @@ mod epr_dispatch_breaker_tests {
             "{}",
             false,
             RequesterStanding::anonymous(),
+            None,
         )
         .await;
         assert_eq!(withdrawn.status(), StatusCode::NOT_FOUND);
@@ -5079,13 +5252,22 @@ async fn dispatch_epr_universal(
     chrome_context_json: &str,
     wants_html: bool,
     standing: RequesterStanding,
+    if_none_match: Option<hyper::header::HeaderValue>,
 ) -> Response<Full<Bytes>> {
     match epr_universal_root(&state.epr_router, host) {
         Some(root) => {
             tracing::debug!(path = %original_path,
                 "universal /epr address — serving shell (root projection bundle)");
-            dispatch_to_projected_epr(state, "/", root, chrome_context_json, wants_html, standing)
-                .await
+            dispatch_to_projected_epr(
+                state,
+                "/",
+                root,
+                chrome_context_json,
+                wants_html,
+                standing,
+                if_none_match,
+            )
+            .await
         }
         None => {
             tracing::debug!(path = %original_path,
@@ -5503,6 +5685,7 @@ async fn ssr_fallback_response(
 ) -> Response<Full<Bytes>> {
     // Negotiated before `req` is consumed by the proxy/dispatch arms below.
     let wants_html = routes::catching_up::accepts_html(req.headers());
+    let if_none_match = req.headers().get(hyper::header::IF_NONE_MATCH).cloned();
     match fallback {
         SsrFallback::Registry => match reason {
             SsrFallbackReason::AuthModeUnsupported
@@ -5553,6 +5736,7 @@ async fn ssr_fallback_response(
                 *projection,
                 chrome_context_json,
                 wants_html,
+                if_none_match,
             )
             .await;
             with_ssr_skipped_header(resp, &reason)
@@ -7071,6 +7255,11 @@ async fn handle_request(
     let method = req.method().clone();
     let method_str = method.to_string();
     let path = req.uri().path().to_string();
+    // Captured once, up front: neither match arm below that reads it moves
+    // `req` beforehand, and a cheap `HeaderValue` clone lets the EPR-router
+    // shell arms (story 6.1 — validators, not caching, on mutable routes)
+    // honour `If-None-Match` without borrowing `req` across the dispatch.
+    let if_none_match = req.headers().get(hyper::header::IF_NONE_MATCH).cloned();
 
     // ── Request throughput accounting ──────────────────────────────────
     // Counted HERE, once per inbound request, and nowhere else. The counter
@@ -7400,6 +7589,7 @@ async fn handle_request(
                 &chrome_context_json,
                 wants_html,
                 standing,
+                if_none_match.clone(),
             )
             .await;
             // We DO hold a contract for this root, so a 404 here is OUR
@@ -8230,6 +8420,7 @@ async fn handle_request(
                     &chrome_context_json,
                     wants_html,
                     standing_from_request(&state, &req),
+                    if_none_match.clone(),
                 )
                 .await,
             ));
