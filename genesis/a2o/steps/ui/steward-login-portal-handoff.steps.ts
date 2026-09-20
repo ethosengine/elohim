@@ -96,8 +96,10 @@ function requireDoorwayUrl(world: E2EWorld): string {
 
 /**
  * Resolve a bearer token from the first human's first token-bearing device.
- * The dev-mode portal-health override route is hard-gated by dev_mode (no admin
- * auth required), but we pass a token when one exists for forward-compatibility.
+ * The portal-health override route opens only on a doorway whose declared
+ * network stage is "simulacra" AND for a loopback caller (the household mesh,
+ * `just test mesh-browser`) — no admin auth required there — but we pass a
+ * token when one exists for forward-compatibility.
  */
 function firstAuthToken(world: E2EWorld): string | undefined {
   for (const [, human] of world.humans) {
@@ -355,9 +357,11 @@ Given(String.raw`the portal host does not respond to \/healthz`, async function 
   if (statusCode === 403) {
     throw new Error(
       `Failed to set portal-health override (unhealthy) for "${hostUrl}": ` +
-        `PUT /admin/dev/portal-health → 403: ${body}. A 403 with code ` +
-        '"FIXTURE_ONLY" means the doorway is NOT in dev mode — this override ' +
-        'surface is hard-gated off unless dev_mode is set.'
+        `PUT /admin/dev/portal-health → 403: ${body}. This fixture surface opens ` +
+        'ONLY on a doorway whose declared network stage is "simulacra" AND for a ' +
+        'loopback caller — i.e. the household mesh (`just test mesh-browser`). A ' +
+        'deployed doorway (e.g. alpha) always refuses it; this scenario needs the ' +
+        '`@requires:owned-substrate` household-only gate.'
     );
   }
 });

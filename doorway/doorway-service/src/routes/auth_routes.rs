@@ -13,6 +13,7 @@ use bson::doc;
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
 use hyper::{Method, Request, Response, StatusCode};
+use seam_contracts::freshness::NetworkStage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
@@ -4747,7 +4748,13 @@ async fn generate_oauth_token_response(
             .as_deref()
             .unwrap_or("http://127.0.0.1:8090");
         let overrides = state.portal_health_override.read().await;
-        probe_first_portal_host(storage_base, agent_pub_key, state.args.dev_mode, &overrides).await
+        probe_first_portal_host(
+            storage_base,
+            agent_pub_key,
+            state.network_stage == NetworkStage::Simulacra,
+            &overrides,
+        )
+        .await
     } else {
         None
     };
@@ -4929,20 +4936,26 @@ enum PortalProbeDecision {
 
 /// Decide how to probe a single portal host.
 ///
-/// The **only** behaviour change from the original live-only probe is gated
-/// behind `dev_mode`: when on AND the host has a doorway-local health override,
-/// the override flag short-circuits the live HEAD (`Return`/`Skip`). With
-/// `dev_mode` off, OR with no override entry for this host, the result is always
-/// `ProbeLive` — so production behaviour is byte-for-byte unchanged.
+/// **UPDATED 2026-09-20.** The **only** behaviour change from the original
+/// live-only probe is gated behind `override_permitted` — the DECLARED
+/// network stage being `Simulacra` (`AppState::network_stage`), never
+/// `args.dev_mode`. `dev_mode` is `true` on every deployed manifest including
+/// public alpha, so gating the READ side on it meant a doorway-local override
+/// could be consulted on the fleet even after the write-side gate
+/// (`routes::admin_dev::fixture_surface_gate`) closed. When permitted AND the
+/// host has a doorway-local health override, the override flag short-circuits
+/// the live HEAD (`Return`/`Skip`). With `override_permitted` false, OR with
+/// no override entry for this host, the result is always `ProbeLive` — so
+/// off-household behaviour is byte-for-byte unchanged.
 ///
 /// This consults doorway-local OPERATIONAL state (`AppState::portal_health_override`),
 /// never the notarized `portal_hosts` DHT entry. See that field's doc comment.
 fn portal_probe_decision(
-    dev_mode: bool,
+    override_permitted: bool,
     override_map: &std::collections::HashMap<String, bool>,
     host_url: &str,
 ) -> PortalProbeDecision {
-    if dev_mode {
+    if override_permitted {
         if let Some(&healthy) = override_map.get(host_url) {
             return if healthy {
                 PortalProbeDecision::Return
@@ -4959,14 +4972,16 @@ fn portal_probe_decision(
 /// Used by the login / OAuth-token / session-exchange paths to opportunistically
 /// populate `portal_host_url` without a full `handle_portal_host` round-trip.
 ///
-/// `dev_mode` + `override_map` thread doorway-local OPERATIONAL health state
-/// (`AppState::portal_health_override`) into the per-host decision via
-/// `portal_probe_decision`. When `dev_mode` is off the override is ignored and
-/// every host takes the original live HEAD path — production is unchanged.
+/// `override_permitted` + `override_map` thread doorway-local OPERATIONAL
+/// health state (`AppState::portal_health_override`) into the per-host
+/// decision via `portal_probe_decision`. Callers pass
+/// `state.network_stage == NetworkStage::Simulacra` — never `args.dev_mode`.
+/// When not permitted the override is ignored and every host takes the
+/// original live HEAD path — non-household behaviour is unchanged.
 async fn probe_first_portal_host(
     storage_base: &str,
     agent_pub_key: &str,
-    dev_mode: bool,
+    override_permitted: bool,
     override_map: &std::collections::HashMap<String, bool>,
 ) -> Option<String> {
     let storage_url = format!(
@@ -4986,7 +5001,7 @@ async fn probe_first_portal_host(
         .ok()?;
 
     for h in &hosts {
-        match portal_probe_decision(dev_mode, override_map, &h.host_url) {
+        match portal_probe_decision(override_permitted, override_map, &h.host_url) {
             PortalProbeDecision::Return => return Some(h.host_url.clone()),
             PortalProbeDecision::Skip => continue,
             PortalProbeDecision::ProbeLive => {
@@ -5248,7 +5263,7 @@ async fn handle_exchange_session(
                 probe_first_portal_host(
                     storage_base,
                     &agent_pub_key,
-                    state.args.dev_mode,
+                    state.network_stage == NetworkStage::Simulacra,
                     &overrides,
                 )
                 .await
@@ -5356,7 +5371,13 @@ async fn generate_auth_response(
             .as_deref()
             .unwrap_or("http://127.0.0.1:8090");
         let overrides = state.portal_health_override.read().await;
-        probe_first_portal_host(storage_base, agent_pub_key, state.args.dev_mode, &overrides).await
+        probe_first_portal_host(
+            storage_base,
+            agent_pub_key,
+            state.network_stage == NetworkStage::Simulacra,
+            &overrides,
+        )
+        .await
     } else {
         None
     };
@@ -6057,9 +6078,19 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // F1: DEV_MODE portal-host health-probe override
+    // F1: portal-host health-probe override — the READ side of the
+    // fixture-surface gate
     //
-    // The override decision is split into a pure helper so it is unit-testable
+    // UPDATED 2026-09-20: these four tests used to name their boolean
+    // "dev_mode" (`portal_probe_decision(true/false, ...)` reading as
+    // dev-mode-on/off). `dev_mode` is `true` on every deployed manifest
+    // including public alpha, so gating the override CONSULT on it meant a
+    // doorway-local override could be read back on the fleet even after the
+    // write-side gate (`admin_dev::fixture_surface_gate`) closed. The
+    // function's first argument is now `override_permitted` — callers pass
+    // `state.network_stage == NetworkStage::Simulacra` — and these tests are
+    // renamed to stop implying `dev_mode` still has any role here. The
+    // override decision is split into a pure helper so it is unit-testable
     // without a live HTTP server. The live HEAD path (ProbeLive) is exercised
     // by the steward-login-portal-handoff a2o scenarios.
     // -----------------------------------------------------------------------
@@ -6069,54 +6100,56 @@ mod tests {
     const HOST: &str = "https://matthew.steward.example/account";
 
     #[test]
-    fn dev_mode_override_healthy_returns_without_live_probe() {
+    fn permitted_healthy_override_returns_without_live_probe() {
         let mut overrides = HashMap::new();
         overrides.insert(HOST.to_string(), true);
         assert_eq!(
             portal_probe_decision(true, &overrides, HOST),
             PortalProbeDecision::Return,
-            "dev_mode + override healthy=true must short-circuit to Return (no live HEAD)"
+            "override_permitted + override healthy=true must short-circuit to Return (no live HEAD)"
         );
     }
 
     #[test]
-    fn dev_mode_override_unhealthy_skips_without_live_probe() {
+    fn permitted_unhealthy_override_skips_without_live_probe() {
         let mut overrides = HashMap::new();
         overrides.insert(HOST.to_string(), false);
         assert_eq!(
             portal_probe_decision(true, &overrides, HOST),
             PortalProbeDecision::Skip,
-            "dev_mode + override healthy=false must Skip this host (no live HEAD)"
+            "override_permitted + override healthy=false must Skip this host (no live HEAD)"
         );
     }
 
     #[test]
-    fn dev_mode_absent_override_falls_back_to_live_probe() {
+    fn permitted_but_absent_override_falls_back_to_live_probe() {
         let overrides: HashMap<String, bool> = HashMap::new();
         assert_eq!(
             portal_probe_decision(true, &overrides, HOST),
             PortalProbeDecision::ProbeLive,
-            "dev_mode but no override for this host must fall back to the live HEAD probe"
+            "override_permitted but no override for this host must fall back to the live HEAD probe"
         );
     }
 
     #[test]
-    fn prod_mode_ignores_override_entirely() {
-        // Even with an override present, dev_mode OFF must take the live path —
-        // production behaviour is byte-for-byte unchanged.
+    fn not_permitted_ignores_a_set_override_entirely() {
+        // Even with an override present, override_permitted=false (i.e. the
+        // declared stage is not Simulacra — every deployed doorway including
+        // alpha) must take the live path — non-household behaviour is
+        // byte-for-byte unchanged.
         let mut overrides = HashMap::new();
         overrides.insert(HOST.to_string(), true);
         assert_eq!(
             portal_probe_decision(false, &overrides, HOST),
             PortalProbeDecision::ProbeLive,
-            "dev_mode OFF must ignore the override map and always probe live"
+            "override_permitted=false must ignore the override map and always probe live"
         );
 
         overrides.insert(HOST.to_string(), false);
         assert_eq!(
             portal_probe_decision(false, &overrides, HOST),
             PortalProbeDecision::ProbeLive,
-            "dev_mode OFF must ignore an unhealthy override too"
+            "override_permitted=false must ignore an unhealthy override too"
         );
     }
 

@@ -1977,6 +1977,204 @@ decisionPoints:
         testName: non_dev_no_bearer_is_unauthorized
         kind: unit
 
+  - name: admin_dev::fixture_surface_gate
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/admin_dev.rs
+      modulePath: routes::admin_dev::fixture_surface_gate
+      line: 218
+    summary: >
+      Gates BOTH doorway-local fixture-only mutators: PUT /admin/dev/shed (declares this
+      doorway a busy holder for a named window, story 3.1) and PUT /admin/dev/portal-health
+      (overrides a portal host's health, closed onto this shared predicate 2026-09-20 — it
+      was gated on `dev_mode` alone, a live public-web exposure on every deployed manifest
+      including public alpha). Admits a caller on exactly one path: a loopback socket peer
+      AND the DECLARED network stage equal to Simulacra. Deliberately NOT `< Coordinated`
+      (require_seed_authority's comparison) and deliberately NOT `dev_mode`.
+    notes: >
+      Registered 2026-09-20 (shed); widened 2026-09-20 to also gate portal-health after an
+      adversarial-review follow-up found the identical `dev_mode` exposure on the older
+      surface. `hc-mesh.sh` is the only caller in this tree that declares
+      `ELOHIM_NETWORK_STAKES=simulacra`; every deployed manifest (alpha included) declares
+      none and fail-closes to Bootstrap — verified against
+      genesis/orchestrator/manifests/doorway/alpha.yaml, which sets `DEV_MODE: "true"` but no
+      `ELOHIM_NETWORK_STAKES`. A `< Coordinated` comparison (require_seed_authority's) would
+      therefore reopen this gate on alpha, since Bootstrap < Coordinated is also true —
+      pinned directly by bootstrap_is_not_simulacra_even_though_both_precede_coordinated.
+      The READ side of the portal-health override (`auth_routes::portal_probe_decision`, its
+      own row below) had the identical `dev_mode` flaw and is closed the same way. Two live
+      a2o fleet-lane scenarios (steward-login-portal-handoff.feature, scenario "Portal host
+      unreachable — fall through to local auth" and "Hosted visitor receives no
+      portalHostUrl"; recovery-m5-doorway-handoff-to-steward.feature, all three scenarios)
+      call PUT /admin/dev/portal-health against doorway "alpha" (E2E_DOORWAY_ALPHA) with no
+      household-only tag — they will now 403 on a deployed fleet run until re-tagged or
+      re-pointed at a household doorway; reported to the operator, not silently patched here.
+      Canon: genesis/docs/content/elohim-protocol/architecture/2026-08-25-doorway-auth-posture-declared-stage.md.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Doorway-local Operational (Category C) plane only — no DHT entry, no coordinator
+          fn, no notarized projection touched. The gate and the state it guards
+          (AppState::dev_shed) both live entirely inside this crate's web2-projection plane.
+      - id: C1
+        status: answered
+        justification: >
+          The doorway cannot self-elect this affordance: it requires a stage declaration only
+          the household mesh makes (hc-mesh.sh), which no deployed manifest can produce, AND a
+          kernel-observed loopback peer (never X-Forwarded-For) — pinned by
+          bootstrap_stage_refuses_even_loopback and simulacra_stage_refuses_a_non_loopback_caller.
+      - id: C4
+        status: answered
+        justification: >
+          Gate-closed answers the same FIXTURE_ONLY 403 shape as the sibling portal-health
+          fixture — invisible on a production doorway, never a distinguishable 404 or an
+          empty grant. the_gate_takes_no_body_and_so_cannot_run_after_parsing pins that the
+          predicate is checked before any body parsing (no body parameter in its signature).
+      - id: C7
+        status: answered
+        justification: >
+          The shed a relaying sibling observes is produced by the SAME catching_up::shed_response
+          builder every real predicate (admission semaphore, upstream breaker, converging-shell)
+          uses — dev_fixture_variant_matches_the_real_shed_shape (routes/catching_up.rs) pins
+          identical JSON shape/status/Retry-After to a real shed, distinguished only by a `cause`
+          label that can never be miscounted as real backpressure.
+      - id: C8
+        status: answered
+        justification: >
+          One warn! on set (retry_after_secs logged) and one info! on clear/expiry-on-read —
+          both targeted "doorway::admin_dev" so they are greppable independent of the a2o
+          scenario's own assertions.
+      - id: C13
+        status: answered
+        justification: >
+          Self-clearing by construction: the window expires at until_secs with no further call
+          (an_elapsed_window_self_clears_on_the_next_check_with_no_call), and the gate itself is
+          unreachable the instant a doorway declares any stage other than Simulacra — no flag to
+          remember to unset.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: bootstrap_stage_refuses_even_loopback
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: dev_mode_true_does_not_open_the_gate_when_stage_is_not_simulacra
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: bootstrap_is_not_simulacra_even_though_both_precede_coordinated
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: simulacra_stage_refuses_a_non_loopback_caller
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: simulacra_stage_plus_loopback_opens_the_gate
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: the_gate_takes_no_body_and_so_cannot_run_after_parsing
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: over_the_cap_is_rejected
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: an_elapsed_window_self_clears_on_the_next_check_with_no_call
+        kind: unit
+      - path: doorway/doorway-service/src/routes/catching_up.rs
+        testName: dev_fixture_variant_matches_the_real_shed_shape
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: dev_mode_true_does_not_open_portal_health_when_stage_is_not_simulacra
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: portal_health_non_loopback_refused_at_simulacra_stage
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: portal_health_loopback_admitted_at_simulacra_stage
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: shed_fixture_wire_level_gate_and_a_real_request_is_shed
+        kind: integration
+
+  - name: auth_routes::portal_probe_decision
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/auth_routes.rs
+      modulePath: routes::auth_routes::portal_probe_decision
+      line: 4947
+    summary: >
+      The READ-side half of the portal-health fixture. Decides whether a single portal host's
+      live /healthz HEAD probe is short-circuited by a doorway-local override
+      (AppState::portal_health_override): Return (skip live probe, treat as reachable) / Skip
+      (skip live probe, treat as unreachable) / ProbeLive (ignore the override, run the real
+      probe). UPDATED 2026-09-20: the `override_permitted` conjunct is now
+      `state.network_stage == NetworkStage::Simulacra`, never `args.dev_mode`.
+    notes: >
+      Companion to admin_dev::fixture_surface_gate (this doc's sibling row) — closing the write
+      side alone would have left a doorway that once had an override set (e.g. before a config
+      change) still able to serve it on the fleet, since `dev_mode` is true everywhere. Both
+      sides now key on the identical Simulacra-stage predicate.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Doorway-local Operational (Category C) state only — consults `portal_health_override`,
+          never the notarized `portal_hosts` DHT entry (see that field's doc comment).
+      - id: C1
+        status: answered
+        justification: >
+          The doorway cannot self-elect this read either: it requires the same household-only
+          stage declaration as the write-side gate, which no deployed manifest can produce.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: permitted_healthy_override_returns_without_live_probe
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: permitted_unhealthy_override_skips_without_live_probe
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: permitted_but_absent_override_falls_back_to_live_probe
+        kind: unit
+      - path: doorway/doorway-service/src/routes/auth_routes.rs
+        testName: not_permitted_ignores_a_set_override_entirely
+        kind: unit
+
+  - name: admin_dev::dev_shed_exempt
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/routes/admin_dev.rs
+      modulePath: routes::admin_dev::dev_shed_exempt
+      line: 410
+    summary: >
+      Paths the household-fixture declared shed must NEVER shed: the existing admission-exempt
+      liveness/metrics family, /admin* (or the fixture could never be cleared), /.well-known/*,
+      and any path with a `federation` segment (so the 60s discovery tick still reads this
+      doorway as live — a shedding doorway is a LIVE, answering one). Segment match, never
+      substring, mirroring routes/freshness.rs's has_segment precedent.
+    concernIds:
+      - id: C4
+        status: answered
+        justification: >
+          federation_as_a_slug_substring_is_not_exempt pins the substring trap directly: a
+          content slug that merely CONTAINS "federation" must still be shed while the fixture
+          is active.
+    contractTests:
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: health_stays_exempt_via_the_admission_exempt_carry_through
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: admin_star_stays_exempt_so_the_fixture_can_be_cleared
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: well_known_stays_exempt
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: federation_discovery_and_peer_cache_stay_exempt
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: an_ordinary_content_path_is_not_exempt
+        kind: unit
+      - path: doorway/doorway-service/src/routes/admin_dev.rs
+        testName: federation_as_a_slug_substring_is_not_exempt
+        kind: unit
+
   - name: websocket::extract_permission
     kind: verdict-fn
     sourceLocation:

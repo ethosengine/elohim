@@ -108,8 +108,9 @@ async function rawPost(
 
 /**
  * Make a raw PUT call and capture the status code + body without throwing —
- * mirrors rawPost. Used by the dev-mode portal-health override step so a
- * FIXTURE_ONLY/dev_mode rejection surfaces a clear diagnostic.
+ * mirrors rawPost. Used by the portal-health override step (household-mesh-only
+ * fixture: opens on a declared "simulacra" stage AND a loopback caller) so a
+ * FIXTURE_ONLY rejection surfaces a clear diagnostic.
  */
 async function rawPut(
   baseUrl: string,
@@ -252,9 +253,11 @@ Given(String.raw`the portal host responds to \/healthz with 200`, async function
   if (statusCode < 200 || statusCode >= 300) {
     throw new Error(
       `Failed to set portal-health override (healthy) for "${hostUrl}": PUT ` +
-        `/admin/dev/portal-health → ${statusCode}: ${body}. ` +
-        'A 403 with code "FIXTURE_ONLY" means the doorway is NOT in dev mode — this ' +
-        'override surface is hard-gated off unless dev_mode is set.'
+        `/admin/dev/portal-health → ${statusCode}: ${body}. This fixture surface ` +
+        'opens ONLY on a doorway whose declared network stage is "simulacra" AND ' +
+        'for a loopback caller — i.e. the household mesh (`just test mesh-browser`). ' +
+        'A deployed doorway (e.g. alpha) always refuses it; this scenario needs the ' +
+        '`@requires:owned-substrate` household-only gate.'
     );
   }
 });

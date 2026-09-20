@@ -1,4 +1,4 @@
-@e2e @auth @browser-only @requires:doorway @recovery-m5 @auth-portal-convergence @act:i
+@e2e @auth @browser-only @requires:doorway @requires:owned-substrate @recovery-m5 @auth-portal-convergence @act:i
 Feature: Doorway hands the login session off to the steward's portal host
   As Matthew, a graduated steward whose peer-native portal is registered
   I want doorway to recognize me as a steward and hand authentication to my portal host

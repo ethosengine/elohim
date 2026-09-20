@@ -407,15 +407,35 @@ pub struct AppState {
     /// portal host as reachable/unreachable WITHOUT standing up a real server at a
     /// non-resolving `.example` origin, which the live HEAD probe could never reach.
     ///
-    /// Consulted by `probe_first_portal_host` ONLY when `args.dev_mode` is true:
+    /// Consulted by `probe_first_portal_host` ONLY when the DECLARED network
+    /// stage is `Simulacra` (`AppState::network_stage`; UPDATED 2026-09-20 —
+    /// was `args.dev_mode`, which is `true` on every deployed manifest
+    /// including public alpha, so the override could be read back on the
+    /// fleet even after the write-side gate closed):
     ///   - host present, healthy=true  → return the host (no live HEAD)
     ///   - host present, healthy=false → skip the host (no live HEAD)
     ///   - host absent                 → fall back to the real HEAD probe
     ///
-    /// When `dev_mode` is false the map is ignored entirely, so production
-    /// behaviour is byte-for-byte unchanged. Written via the dev-mode-gated
-    /// `PUT /admin/dev/portal-health` route (`routes::admin_dev`).
+    /// Off the household mesh the map is ignored entirely, so non-household
+    /// behaviour is byte-for-byte unchanged. Written via the household-fixture
+    /// `PUT /admin/dev/portal-health` route
+    /// (`routes::admin_dev::fixture_surface_gate` — never `dev_mode`).
     pub portal_health_override: Arc<tokio::sync::RwLock<std::collections::HashMap<String, bool>>>,
+
+    /// **DEV/FIXTURE ONLY** declared-shed override (story 3.1, serving-edge
+    /// campaign): `Some(until_secs)` while this doorway declares itself a
+    /// busy holder, an absolute wall-clock second, `None` otherwise.
+    ///
+    /// Doorway-local OPERATIONAL state — Category C, no DHT entry, no
+    /// persistence, self-clearing (`routes::admin_dev::check_and_clear`).
+    /// Written by the household-fixture-only `PUT /admin/dev/shed`
+    /// (`routes::admin_dev::handle_set_shed`, gated on the DECLARED network
+    /// stage being `Simulacra` AND a loopback caller — never `dev_mode`,
+    /// which is `true` on every deployed manifest including public alpha).
+    /// Consulted on every inbound request outside `dev_shed_exempt`'s
+    /// allow-list, and the shed it produces is the SAME
+    /// `catching_up::shed_response` builder every real predicate uses.
+    pub dev_shed: Arc<tokio::sync::RwLock<Option<u64>>>,
 
     /// Global inbound admission limiter (Pillar 2 layer 2). Bounds total
     /// in-flight requests; `try_acquire_owned()` sheds 503+Retry-After when
@@ -787,6 +807,7 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -907,6 +928,7 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1042,6 +1064,7 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -1197,6 +1220,7 @@ impl AppState {
             portal_health_override: Arc::new(tokio::sync::RwLock::new(
                 std::collections::HashMap::new(),
             )),
+            dev_shed: Arc::new(tokio::sync::RwLock::new(None)),
             inbound_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT)),
             read_semaphore: Arc::new(tokio::sync::Semaphore::new(DEFAULT_MAX_INFLIGHT_READ)),
             storage_proxy_client: init_storage_proxy_client(),
@@ -7359,6 +7383,30 @@ async fn handle_request(
         }
     }
 
+    // ── Household-fixture-only declared shed (story 3.1) ──────────────────────
+    // Placed AFTER the membrane and BEFORE the admission semaphore — the same
+    // neighbourhood as every other "does this doorway serve or shed" decision
+    // on this path. Consulted for every path outside `dev_shed_exempt`'s
+    // allow-list (health/admin/.well-known/federation), using the SAME
+    // `catching_up::shed_response` builder the real admission and upstream
+    // predicates use below, so the bytes a relaying sibling's
+    // `fetch_from_holder` observes are a genuine catching-up shed with a
+    // genuine `Retry-After` — the fixture supplies the CAUSE, never the
+    // response. See `routes::admin_dev::handle_set_shed` for how the window
+    // is set (household-fixture-only; never `dev_mode`).
+    {
+        let is_ws = hyper_tungstenite::is_upgrade_request(&req);
+        if !routes::admin_dev::dev_shed_exempt(&path, admission_exempt(&path, is_ws)) {
+            if let Some(retry_after_secs) = routes::admin_dev::check_and_clear(&state).await {
+                return Ok(to_boxed(routes::catching_up::shed_response(
+                    routes::catching_up::accepts_html(req.headers()),
+                    retry_after_secs,
+                    routes::catching_up::ShedCause::DevFixture,
+                )));
+            }
+        }
+    }
+
     // ── Pillar 2 / layer 2: global inbound admission ──────────────────────────
     // Placed AFTER the wisdom gate and BEFORE routing. Liveness, /version, and
     // WebSocket upgrades are exempt (admission_exempt) so /health stays
@@ -7886,7 +7934,7 @@ async fn handle_request(
         // production" message described a state the fleet was never in.
         (Method::GET, "/hc/admin") => {
             if hyper_tungstenite::is_upgrade_request(&req) {
-                to_boxed(websocket::handle_admin_upgrade(state, req, addr.ip().is_loopback()).await)
+                to_boxed(websocket::handle_admin_upgrade(state, req, peer_is_loopback(&addr)).await)
             } else {
                 to_boxed(bad_request_response(
                     "WebSocket upgrade required for /hc/admin",
@@ -7918,7 +7966,7 @@ async fn handle_request(
             if hyper_tungstenite::is_upgrade_request(&req) {
                 // Same single authorization decision as /hc/admin — see that arm.
                 debug!("Legacy WebSocket path used - consider migrating to /hc/admin");
-                to_boxed(websocket::handle_admin_upgrade(state, req, addr.ip().is_loopback()).await)
+                to_boxed(websocket::handle_admin_upgrade(state, req, peer_is_loopback(&addr)).await)
             } else {
                 // Post-B14: ROOT_APP_SLUG is gone. The EPR router (consulted earlier in
                 // handle_request) serves "/" when a projection exists for url_path="/".
@@ -8186,7 +8234,7 @@ async fn handle_request(
         // PUT /admin/seed/blob - Upload blob to projection cache
         (Method::PUT, "/admin/seed/blob") => {
             to_boxed(
-                routes::handle_seed_blob(req, Arc::clone(&state), addr.ip().is_loopback()).await,
+                routes::handle_seed_blob(req, Arc::clone(&state), peer_is_loopback(&addr)).await,
             )
         }
         // HEAD /admin/seed/blob/{hash} - Check if blob exists
@@ -8200,19 +8248,19 @@ async fn handle_request(
             to_boxed(routes::admin_cache::cache_stats(Arc::clone(&state)).await)
         }
         (Method::POST, "/admin/cache/disable") => {
-            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
+            match routes::seed::require_seed_authority(&state, &req, peer_is_loopback(&addr)) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_disable(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }
         }
         (Method::POST, "/admin/cache/enable") => {
-            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
+            match routes::seed::require_seed_authority(&state, &req, peer_is_loopback(&addr)) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_enable(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }
         }
         (Method::POST, p) if p.starts_with("/admin/cache/clear/") => {
-            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
+            match routes::seed::require_seed_authority(&state, &req, peer_is_loopback(&addr)) {
                 Ok(()) => {
                     let slug = p.strip_prefix("/admin/cache/clear/").unwrap_or("");
                     to_boxed(routes::admin_cache::cache_clear_slug(Arc::clone(&state), slug).await)
@@ -8221,7 +8269,7 @@ async fn handle_request(
             }
         }
         (Method::POST, "/admin/cache/warm") => {
-            match routes::seed::require_seed_authority(&state, &req, addr.ip().is_loopback()) {
+            match routes::seed::require_seed_authority(&state, &req, peer_is_loopback(&addr)) {
                 Ok(()) => to_boxed(routes::admin_cache::cache_warm(Arc::clone(&state)).await),
                 Err(resp) => to_boxed(resp),
             }
@@ -8229,14 +8277,35 @@ async fn handle_request(
 
         // ====================================================================
         // DEV/FIXTURE ONLY — doorway-local portal-host health override.
-        // Hard-gated behind dev_mode (403 FIXTURE_ONLY otherwise). Lets a2o
-        // fixtures assert a portal host reachable/unreachable without standing
-        // up a real server at a non-resolving .example origin. Doorway-local
-        // OPERATIONAL state — never touches the notarized portal_hosts entry.
+        // Gated on the DECLARED network stage being Simulacra AND a loopback
+        // caller (routes::admin_dev::fixture_surface_gate — the SAME predicate
+        // PUT /admin/dev/shed uses); deliberately NOT dev_mode, which is true
+        // on every deployed manifest including public alpha. Lets a2o fixtures
+        // assert a portal host reachable/unreachable without standing up a real
+        // server at a non-resolving .example origin. Doorway-local OPERATIONAL
+        // state — never touches the notarized portal_hosts entry.
         // ====================================================================
-        (Method::PUT, "/admin/dev/portal-health") => {
-            to_boxed(routes::admin_dev::handle_set_portal_health(req, Arc::clone(&state)).await)
-        }
+        (Method::PUT, "/admin/dev/portal-health") => to_boxed(
+            routes::admin_dev::handle_set_portal_health(
+                req,
+                Arc::clone(&state),
+                peer_is_loopback(&addr),
+            )
+            .await,
+        ),
+
+        // ====================================================================
+        // DEV/FIXTURE ONLY — household-fixture declared shed (story 3.1).
+        // Gated on the DECLARED network stage being Simulacra AND a loopback
+        // caller — deliberately NOT dev_mode, which is true on every deployed
+        // manifest including public alpha. See routes::admin_dev's module doc
+        // and handle_set_shed's doc comment for the full eight-question gate
+        // rationale.
+        // ====================================================================
+        (Method::PUT, "/admin/dev/shed") => to_boxed(
+            routes::admin_dev::handle_set_shed(req, Arc::clone(&state), peer_is_loopback(&addr))
+                .await,
+        ),
 
         // ====================================================================
         // Admin User Management API
@@ -8609,7 +8678,7 @@ async fn handle_request(
         // Elohim Agent invocation
         (_, p) if p.starts_with("/api/v1/elohim") => {
             return Ok(to_boxed(
-                routes::handle_elohim_agent_request(req, Arc::clone(&state), p, addr.ip().is_loopback())
+                routes::handle_elohim_agent_request(req, Arc::clone(&state), p, peer_is_loopback(&addr))
                     .await,
             ));
         }
@@ -9456,6 +9525,20 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
+}
+
+/// The kernel-observed loopback predicate every auth-adjacent gate in this
+/// crate keys on (never `X-Forwarded-For` — see `doorway-auth-posture-declared-stage`).
+///
+/// Canonicalises first (`IpAddr::to_canonical()`): a doorway that ever binds a
+/// dual-stack listener (`[::]`) sees an IPv4 loopback caller as the
+/// IPv4-mapped-IPv6 form `::ffff:127.0.0.1`, which `Ipv6Addr::is_loopback()`
+/// does NOT recognise as loopback on its own (only the bare `::1` is). Every
+/// `SocketAddr` this crate hands the predicate comes from a live
+/// `TcpListener::accept()` peer address, so there is no "absent" case to
+/// refuse — the type itself guarantees one is always present.
+fn peer_is_loopback(addr: &SocketAddr) -> bool {
+    addr.ip().to_canonical().is_loopback()
 }
 
 /// True ONLY for paths that must NEVER be shed by the inbound admission gate:
@@ -11177,6 +11260,40 @@ mod admission_tests {
         );
     }
 
+    /// THE RED-TEAM FINDING, PINNED. A dual-stack listener (`[::]`) sees an
+    /// IPv4 loopback caller as `::ffff:127.0.0.1` — the IPv4-mapped-IPv6 form
+    /// — which `Ipv6Addr::is_loopback()` does NOT recognise on its own (only
+    /// bare `::1`). `peer_is_loopback` canonicalises first so every
+    /// auth-adjacent gate in this crate keeps working if the household
+    /// doorway ever binds dual-stack.
+    #[test]
+    fn peer_is_loopback_recognizes_every_loopback_spelling() {
+        use std::net::SocketAddr;
+        for addr in ["127.0.0.1:9999", "[::1]:9999", "[::ffff:127.0.0.1]:9999"] {
+            let socket: SocketAddr = addr.parse().unwrap();
+            assert!(
+                peer_is_loopback(&socket),
+                "{addr} must canonicalise to a recognised loopback address"
+            );
+        }
+    }
+
+    #[test]
+    fn peer_is_loopback_refuses_every_non_loopback_spelling() {
+        use std::net::SocketAddr;
+        for addr in [
+            "[::ffff:10.0.0.1]:9999", // mapped private, NOT loopback
+            "203.0.113.5:9999",       // public v4 (TEST-NET-3)
+            "[2001:db8::1]:9999",     // public v6 (documentation range)
+        ] {
+            let socket: SocketAddr = addr.parse().unwrap();
+            assert!(
+                !peer_is_loopback(&socket),
+                "{addr} must NOT be recognised as loopback"
+            );
+        }
+    }
+
     #[test]
     fn liveness_paths_are_exempt() {
         for p in [
@@ -11881,6 +11998,21 @@ mod root_projection_shadow_regression_tests {
         .unwrap_or_else(|e| panic!("GET {path} as {host} transport error: {e}"))
     }
 
+    /// One PUT with a JSON body through a real listener — same shape as
+    /// `get`, for the admin_dev fixture routes.
+    async fn put_json(addr: SocketAddr, path: &str, body: serde_json::Value) -> reqwest::Response {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            reqwest::Client::new()
+                .put(format!("http://{addr}{path}"))
+                .json(&body)
+                .send(),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("PUT {path} did not answer within 5s"))
+        .unwrap_or_else(|e| panic!("PUT {path} transport error: {e}"))
+    }
+
     #[tokio::test]
     async fn malformed_present_host_returns_400_before_wildcard_relay() {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -12157,5 +12289,174 @@ mod root_projection_shadow_regression_tests {
                  projection's SPA shell (status={status}, content-type={content_type})"
             );
         }
+    }
+
+    /// A bare `AppState` at the default declared stage — deliberately NO root
+    /// EPR projection, so an unmatched path 404s cleanly instead of engaging
+    /// the SSR/converging-shell machinery (which has its own, unrelated,
+    /// fixed-window 503 when no warm shell has materialized — using this
+    /// state class keeps the shed-fixture test unambiguous about which
+    /// mechanism produced a given 503).
+    fn plain_state() -> Arc<AppState> {
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        Arc::new(AppState::new(args))
+    }
+
+    /// `plain_state` at the household's own declared stage.
+    fn simulacra_plain_state() -> Arc<AppState> {
+        let args = Args::parse_from(["doorway", "--listen", "127.0.0.1:0"]);
+        let mut state = AppState::new(args);
+        state.network_stage = seam_contracts::freshness::NetworkStage::Simulacra;
+        Arc::new(state)
+    }
+
+    /// WIRE-LEVEL proof for `PUT /admin/dev/shed` (story 3.1): the gate closed
+    /// at the crate's default (`Bootstrap`) declared stage even though the
+    /// caller over this real TCP connection IS loopback — proving the STAGE
+    /// half of `admin_dev::fixture_surface_gate` through the actual HTTP
+    /// dispatch, not just the pure predicate in isolation. Then, at the
+    /// household's own declared `Simulacra` stage, setting the window makes an
+    /// UNRELATED ordinary request actually shed 503 with a real `Retry-After`
+    /// — end to end proof that the fixture reaches the same
+    /// `catching_up::shed_response` builder every genuine shed predicate uses
+    /// — and clearing it resumes normal (non-503) serving with no further
+    /// call needed once the window elapses.
+    #[tokio::test]
+    async fn shed_fixture_wire_level_gate_and_a_real_request_is_shed() {
+        // (a) Closed at the default declared stage.
+        let closed_addr = spawn_test_doorway(plain_state()).await;
+        let refused = put_json(
+            closed_addr,
+            "/admin/dev/shed",
+            serde_json::json!({ "retryAfterSecs": 5 }),
+        )
+        .await;
+        assert_eq!(
+            refused.status(),
+            reqwest::StatusCode::FORBIDDEN,
+            "the default (non-Simulacra) declared stage must refuse the fixture even for a \
+             loopback caller"
+        );
+
+        // (b) Open at the household's own declared stage.
+        let open_addr = spawn_test_doorway(simulacra_plain_state()).await;
+        let set = put_json(
+            open_addr,
+            "/admin/dev/shed",
+            serde_json::json!({ "retryAfterSecs": 5 }),
+        )
+        .await;
+        assert_eq!(set.status(), reqwest::StatusCode::OK);
+
+        // An UNRELATED ordinary path, not the fixture route itself, is now
+        // genuinely shed.
+        let shed = get(open_addr, "/some-unrelated-path").await;
+        assert_eq!(shed.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
+        let retry_after: u64 = shed
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .expect("a genuine shed must carry Retry-After")
+            .to_str()
+            .unwrap()
+            .parse()
+            .expect("Retry-After must be a plain integer, matching every real shed");
+        assert!(
+            (1..=5).contains(&retry_after),
+            "Retry-After must be <= the requested window and > 0, got {retry_after}"
+        );
+
+        // Clearing it resumes normal serving — the same path is no longer shed.
+        let cleared = put_json(
+            open_addr,
+            "/admin/dev/shed",
+            serde_json::json!({ "retryAfterSecs": 0 }),
+        )
+        .await;
+        assert_eq!(cleared.status(), reqwest::StatusCode::OK);
+        let resumed = get(open_addr, "/some-unrelated-path").await;
+        assert_eq!(
+            resumed.status(),
+            reqwest::StatusCode::NOT_FOUND,
+            "clearing the fixture must resume normal serving immediately — on this bare \
+             AppState an unmatched path's honest answer is 404, not a lingering 503"
+        );
+
+        // `/health` must never be shed, even while the fixture is active.
+        let set_again = put_json(
+            open_addr,
+            "/admin/dev/shed",
+            serde_json::json!({ "retryAfterSecs": 5 }),
+        )
+        .await;
+        assert_eq!(set_again.status(), reqwest::StatusCode::OK);
+        let health = get(open_addr, "/health").await;
+        assert_ne!(
+            health.status(),
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            "/health must stay answerable while the fixture is active"
+        );
+    }
+
+    /// Wire-level PATH VARIANTS, PINNED (red-team item 6): a trailing slash,
+    /// a case change, and a percent-encoded spelling of `/admin/dev/shed`
+    /// must NOT reach `handle_set_shed` — Rust's `match` on the exact string
+    /// `"/admin/dev/shed"` is case- and slash-sensitive by construction, so
+    /// these fall through to the ordinary dispatch tail. On this bare
+    /// `plain_state()` (no registry, no root projection) that tail's honest
+    /// answer is 404 — never the fixture's 200/403 FIXTURE_ONLY shape, and
+    /// never a genuine shed either (proving a lookalike path was never
+    /// silently treated as the real route).
+    #[tokio::test]
+    async fn path_variants_of_the_shed_route_are_not_routed_to_the_handler() {
+        let addr = spawn_test_doorway(simulacra_plain_state()).await;
+        for variant in [
+            "/admin/dev/shed/",
+            "/ADMIN/dev/shed",
+            "/admin/dev%2Fshed",
+            "/admin/dev/shed%2F",
+        ] {
+            let resp = put_json(addr, variant, serde_json::json!({ "retryAfterSecs": 5 })).await;
+            assert_eq!(
+                resp.status(),
+                reqwest::StatusCode::NOT_FOUND,
+                "{variant} must not be routed to handle_set_shed (got {})",
+                resp.status()
+            );
+        }
+        // None of the lookalikes may have set a standing window either.
+        let probe = get(addr, "/some-unrelated-path").await;
+        assert_ne!(
+            probe.status(),
+            reqwest::StatusCode::SERVICE_UNAVAILABLE,
+            "a lookalike path must never have armed the fixture"
+        );
+    }
+
+    /// The global admission-shed counter (`doorway_admission_shed_total`) is
+    /// M4's signal for REAL inbound-admission backpressure. The dev-fixture
+    /// shed is a different cause entirely (`ShedCause::DevFixture`) and must
+    /// never inflate that counter, or a household run would misread a staged
+    /// fixture as genuine admission pressure.
+    #[tokio::test]
+    async fn a_dev_fixture_shed_never_increments_admission_shed_total() {
+        let addr = spawn_test_doorway(simulacra_plain_state()).await;
+        let before = crate::metrics::admission_shed_total();
+
+        let set = put_json(
+            addr,
+            "/admin/dev/shed",
+            serde_json::json!({ "retryAfterSecs": 5 }),
+        )
+        .await;
+        assert_eq!(set.status(), reqwest::StatusCode::OK);
+
+        let shed = get(addr, "/some-unrelated-path").await;
+        assert_eq!(shed.status(), reqwest::StatusCode::SERVICE_UNAVAILABLE);
+
+        let after = crate::metrics::admission_shed_total();
+        assert_eq!(
+            after, before,
+            "a dev-fixture shed must not increment doorway_admission_shed_total"
+        );
     }
 }

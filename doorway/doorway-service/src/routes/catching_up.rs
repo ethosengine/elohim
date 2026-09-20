@@ -10,7 +10,9 @@
 //! `Accept` (a browser navigation) gets the HTML page. Every other client —
 //! SDKs, curl, blob/image fetches, `*/*` — keeps the exact legacy JSON body
 //! `{"status":"catching-up","retryAfter":N}`. Both variants stay 503 +
-//! `Retry-After`; the HTML adds `Cache-Control: no-store`.
+//! `Retry-After` + `Cache-Control: no-store` (added to the JSON arm
+//! 2026-09-20 red-team pass — a shed's window is a point-in-time fact, and an
+//! intermediary holding it past that window would serve a stale shed).
 
 use askama::Template;
 use http_body_util::Full;
@@ -35,6 +37,17 @@ pub enum ShedCause {
     },
     /// The doorway's own inbound admission gate is at ceiling.
     Admission,
+    /// A household-fixture-only declared shed (`PUT /admin/dev/shed`,
+    /// `routes::admin_dev`) — the fixture supplies the CAUSE, never the
+    /// response: this is the same builder every real predicate above uses,
+    /// so the bytes on the wire are a genuine catching-up shed with a
+    /// genuine `Retry-After`. Deliberately a DISTINCT cause label (never
+    /// relabelled as `Admission` or `Upstream`) so a fixture-induced shed
+    /// can never be miscounted as real backpressure by a metric or a probe
+    /// reading `cause` — see the `declares_backpressure` doc comment above
+    /// for why mislabelling a cause is exactly the class of bug this file
+    /// exists to prevent.
+    DevFixture,
 }
 
 /// Build an [`ShedCause::Upstream`] from the breaker's read-only snapshot for
@@ -96,6 +109,7 @@ pub fn shed_response(
                 ..
             } => ("upstream", *error_streak, circuit.clone()),
             ShedCause::Admission => ("admission", 0, "n/a".to_string()),
+            ShedCause::DevFixture => ("dev-fixture", 0, "n/a".to_string()),
         };
         let page = CatchingUpPage {
             retry_after: retry_after_secs,
@@ -138,6 +152,7 @@ pub fn shed_response(
             ..
         } => ("upstream", *error_streak, circuit.as_str()),
         ShedCause::Admission => ("admission", 0, "n/a"),
+        ShedCause::DevFixture => ("dev-fixture", 0, "n/a"),
     };
     let body = serde_json::json!({
         "status": "catching-up",
@@ -150,6 +165,13 @@ pub fn shed_response(
         .status(StatusCode::SERVICE_UNAVAILABLE)
         .header("Content-Type", "application/json")
         .header("Retry-After", retry_after_secs.to_string())
+        // Matches the HTML arm above. A 503 shed's Retry-After window is a
+        // point-in-time fact about THIS request; an intermediary (CDN, proxy
+        // cache) holding this response past its window would serve a stale
+        // shed to the next caller after the doorway has already recovered —
+        // correct for every real shed (admission/upstream/converging-shell)
+        // and the dev-fixture one alike. Red-team finding, 2026-09-20.
+        .header("Cache-Control", "no-store")
         .body(Full::new(Bytes::from(body.to_string())))
         .expect("infallible 503 json response")
 }
@@ -479,6 +501,33 @@ mod tests {
         );
     }
 
+    /// RED-TEAM FINDING, PINNED: the JSON arm used to lack the `no-store` the
+    /// HTML arm already carried, so an intermediary could hold a 503 shed past
+    /// its own Retry-After window and serve it stale to the next caller —
+    /// wrong for every real shed cause, not just the dev-fixture one.
+    #[test]
+    fn json_variant_never_caches_past_its_own_window() {
+        for cause in [
+            ShedCause::Admission,
+            ShedCause::DevFixture,
+            ShedCause::Upstream {
+                endpoint: "http://storage:8090".into(),
+                circuit: "open".into(),
+                error_streak: 1,
+            },
+        ] {
+            let resp = shed_response(false, 30, cause);
+            assert_eq!(
+                resp.headers()
+                    .get("Cache-Control")
+                    .expect("every shed must set Cache-Control")
+                    .to_str()
+                    .unwrap(),
+                "no-store"
+            );
+        }
+    }
+
     /// The discriminator the whole 2026-08-20 investigation turned on: a
     /// breaker-open shed (upstream never called) and a genuine admission shed
     /// must not be the same bytes. `status`/`retryAfter` keep their legacy
@@ -570,6 +619,49 @@ mod tests {
             .to_str()
             .unwrap()
             .starts_with("text/html"));
+    }
+
+    /// The household-fixture shed cause is produced by the SAME builder as
+    /// every real shed — same status, same `Retry-After`, same JSON keys
+    /// (`status`/`retryAfter`/`cause`/`circuit`/`errorStreak`) — with a
+    /// cause label that can never be mistaken for real backpressure.
+    #[tokio::test]
+    async fn dev_fixture_variant_matches_the_real_shed_shape() {
+        use http_body_util::BodyExt;
+
+        let read = |resp: Response<Full<Bytes>>| async move {
+            let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+            serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()
+        };
+
+        let dev_fixture = shed_response(false, 120, ShedCause::DevFixture);
+        assert_eq!(dev_fixture.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            dev_fixture
+                .headers()
+                .get("Retry-After")
+                .unwrap()
+                .to_str()
+                .unwrap(),
+            "120"
+        );
+        let body = read(dev_fixture).await;
+        assert_eq!(body["status"], "catching-up");
+        assert_eq!(body["retryAfter"], 120);
+        // Distinct from both real causes — never miscounted as either.
+        assert_eq!(body["cause"], "dev-fixture");
+        assert_ne!(body["cause"], "admission");
+        assert_ne!(body["cause"], "upstream");
+        // Same key set as a real shed.
+        let admission = read(shed_response(false, 120, ShedCause::Admission)).await;
+        let mut dev_keys: Vec<&String> = body.as_object().unwrap().keys().collect();
+        let mut admission_keys: Vec<&String> = admission.as_object().unwrap().keys().collect();
+        dev_keys.sort();
+        admission_keys.sort();
+        assert_eq!(
+            dev_keys, admission_keys,
+            "identical JSON shape to a real shed"
+        );
     }
 
     #[test]
@@ -819,7 +911,7 @@ mod tests {
                 assert_eq!(circuit, "unknown");
                 assert_eq!(error_streak, 0);
             }
-            ShedCause::Admission => panic!("expected upstream cause"),
+            ShedCause::Admission | ShedCause::DevFixture => panic!("expected upstream cause"),
         }
     }
 }
