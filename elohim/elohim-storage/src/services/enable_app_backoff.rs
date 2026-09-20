@@ -25,8 +25,17 @@
 //!
 //! Three exits, all automatic:
 //!
-//! 1. **The app runs.** [`EnableLedger::note_running`] clears the role's record
-//!    entirely, so a later relapse starts again at 60s rather than at the cap.
+//! 1. **A zome call on the role SUCCEEDS.** [`EnableLedger::note_running`]
+//!    clears the role's record entirely, so a later relapse starts again at 60s
+//!    rather than at the cap.
+//!
+//!    Corrected 2026-09-20: the reset used to be driven by the supervisor's
+//!    `app_info` probe reporting the app enabled. A conductor reports an app
+//!    `Enabled` throughout a startup in which its CELLS are not yet running and
+//!    every zome call answers `CellDisabled` — so that reset fired every ~20s
+//!    against a role that had never recovered, and the ladder never left its
+//!    first rung. Only [`crate::conductor_bridge_health::record_role_success`],
+//!    reached exclusively from a zome call that returned, clears it now.
 //! 2. **The window elapses.** The next probe after the current delay attempts
 //!    again; the ladder is capped, never terminal, because an app disabled by
 //!    a transient conductor fault must not need a human to come back.
@@ -134,8 +143,13 @@ impl EnableLedger {
         self.note_attempt_at(role, Instant::now());
     }
 
-    /// The app behind `role` is RUNNING — forget everything, so a later relapse
+    /// A zome call on `role` SUCCEEDED — forget everything, so a later relapse
     /// is met at 60s rather than at whatever the ladder had climbed to.
+    ///
+    /// Call this ONLY on proven recovery. An `enable_app` that answered `Ok`
+    /// and an `app_info` that answered `Enabled` are both compatible with a
+    /// role whose cells are not running, and resetting on either is what kept
+    /// a 60s-doubling ladder pinned to its first rung for eleven minutes.
     pub fn note_running(&self, role: &str) {
         if let Ok(mut guard) = self.roles.lock() {
             guard.remove(role);
@@ -243,6 +257,13 @@ mod tests {
         assert!(ledger.should_attempt_at("lamad", now + ENABLE_BACKOFF_CAP));
     }
 
+    /// UPDATED 2026-09-20 — the ASSERTION is unchanged (a reset forgets the
+    /// ladder) but its DRIVER is not: `note_running` used to be called from the
+    /// supervisor's `app_info` probe, which reports an app enabled while its
+    /// cells are not running. It is now reached only from a successful zome
+    /// call. The name says "the app runs" and is kept, because from this
+    /// ledger's side that is still exactly what the call means — what changed
+    /// is who is entitled to claim it.
     #[test]
     fn and_reset_when_the_app_runs() {
         let ledger = EnableLedger::new();

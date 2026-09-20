@@ -427,8 +427,9 @@ impl HcClientRegistry {
     ///    is disabled, which is the one fact the incident never produced.
     ///
     /// Deliberately does NOT clear or re-mint the handle: the websocket is
-    /// healthy, and an enable that lands is observed as `Running` by the very
-    /// next probe.
+    /// healthy. And deliberately does not treat its OWN answer as an outcome —
+    /// an enable that lands and an enable that was a no-op both answer `Ok`.
+    /// The episode ends when a zome call on the role succeeds, and not before.
     async fn try_enable_disabled_app(
         inputs: &HcRegistryInputs,
         role: &str,
@@ -466,13 +467,30 @@ impl HcClientRegistry {
             "attempting enable_app on an installed app observed NOT RUNNING"
         );
         match hc.admin_websocket().enable_app(app_id.clone()).await {
-            Ok(_) => info!(
-                role,
-                app_id = app_id.as_str(),
-                attempt,
-                "enable_app ACCEPTED — the next bridge probe will confirm whether the app is \
-                 actually running"
-            ),
+            Ok(_) => {
+                // ACCEPTED IS NOT RECOVERED. `enable_app` on an app that is
+                // already enabled returns success WITHOUT restarting its cells,
+                // so this answer is equally consistent with a cure and with
+                // nothing at all having happened. The ladder is therefore not
+                // reset here either; the attempt above already advanced it.
+                //
+                // From the second attempt on, a full backoff window has elapsed
+                // since an accepted enable and the role is still refusing
+                // calls — at which point "enable_app cannot lift this" is
+                // established, and gets said ONCE for the episode.
+                if attempt >= 2 {
+                    crate::conductor_bridge_health::note_app_enabled_but_not_running(role);
+                }
+                info!(
+                    role,
+                    app_id = app_id.as_str(),
+                    attempt,
+                    next_attempt_secs =
+                        crate::services::enable_app_backoff::enable_backoff(attempt).as_secs(),
+                    "enable_app ACCEPTED — this does NOT prove recovery and does NOT reset the \
+                     backoff; only a successful zome call on this role does"
+                );
+            }
             Err(e) => warn!(
                 role,
                 app_id = app_id.as_str(),
@@ -524,8 +542,28 @@ impl HcClientRegistry {
                     // healthy bridge for 38 hours on 2026-09-18.
                     match hc.ping().await {
                         Ok(BridgeProbe::Running) => {
-                            // The app runs: forget any enable ladder we climbed.
-                            crate::services::enable_app_backoff::enable_ledger().note_running(role);
+                            // The conductor says the APP is enabled. It does
+                            // NOT say its cells are running, and on 2026-09-20
+                            // the household answered exactly this while every
+                            // zome call on the same role answered CellDisabled
+                            // for eleven minutes. So the ladder is NOT reset
+                            // here — only a successful zome call resets it
+                            // (`conductor_bridge_health::record_role_success`).
+                            //
+                            // If this node's own observations still say the
+                            // role refuses calls, the episode is not over: keep
+                            // asking, on the SAME bounded ladder (60s doubling
+                            // to a 1h cap) that `try_enable_disabled_app` owns.
+                            if crate::conductor_bridge_health::role_is_not_running(role) {
+                                Self::try_enable_disabled_app(
+                                    &inputs,
+                                    role,
+                                    &hc,
+                                    "the conductor reports this app ENABLED while zome calls on \
+                                     the role are refused — its cells are not running",
+                                )
+                                .await;
+                            }
                             continue;
                         }
                         Ok(BridgeProbe::NotRunning { reason }) => {

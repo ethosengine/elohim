@@ -35,10 +35,41 @@
 //! `conductor_admission::ADMISSION_SHED_MARKER`). Collapsing those three into
 //! a boolean is exactly how a shed once reached the wire as a bare 500.
 
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+//! ## What counts as RECOVERY (corrected 2026-09-20)
+//!
+//! Only ONE thing: a zome call on the role that SUCCEEDS. Not `enable_app`
+//! returning `Ok`, and not the app's own status.
+//!
+//! The reason is a household reproduction of the alpha incident. A conductor
+//! accepts websocket traffic BEFORE its enabled apps finish initializing, and a
+//! cell that is installed but absent from the conductor's `running_cells`
+//! answers every zome call `CellDisabled` — while `app_info()` cheerfully
+//! reports `AppStatus::Enabled`, because the APP is enabled; it is its CELLS
+//! that are not running. `enable_app` on an already-enabled app is a NO-OP that
+//! returns success without touching those cells.
+//!
+//! Reading either of those answers as recovery produced this, every ~20s, for
+//! as long as the conductor took to finish starting (~11 minutes on one peer):
+//!
+//! ```text
+//! WARN  lamad  conductor app is NOT RUNNING (CellDisabled …)
+//! INFO  lamad  conductor app is RUNNING again — the enable backoff is reset
+//! WARN  lamad  NOT RUNNING      <- 1.8 s later
+//! ```
+//!
+//! — a false verdict, a log that flaps, and a bounded backoff that never backs
+//! off because every false recovery reset it. So the fold is asymmetric on
+//! purpose: an app status of "not running" is believed (it can only understate
+//! health), an app status of "enabled" is believed about NOTHING (it routinely
+//! overstates it), and the ladder is cleared exclusively by
+//! [`record_role_success`], which only a real zome call reaches.
+
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
+
+use crate::services::enable_app_backoff::{enable_ledger, EnableLedger};
 
 /// Wall-clock milliseconds since the epoch, saturating at 0 on a pre-epoch
 /// clock. Only used to stamp observations; all policy is a function of
@@ -165,6 +196,14 @@ pub struct BridgeHealthSnapshot {
     /// current verdict. `None` at every other status. THE missing diagnosis of
     /// the 2026-09-18 incident: the conductor knew, and nothing asked.
     pub app_disabled_reason: Option<String>,
+    /// How long this role has been in its CURRENT not-running episode, in whole
+    /// seconds. `None` at every status but [`ZomePathStatus::AppDisabled`].
+    ///
+    /// Measured from the observation that STARTED the episode, not from the
+    /// most recent one — "not running for 11 minutes" and "not running as of a
+    /// second ago" are the same fact stated at opposite ends, and only the
+    /// first tells an operator whether to wait or to intervene.
+    pub not_running_secs: Option<u64>,
 }
 
 impl BridgeHealthSnapshot {
@@ -207,6 +246,16 @@ pub struct BridgeHealth {
     /// Cleared the moment the path is observed live again, so the surface never
     /// shows a reason for a state the node is no longer in.
     disabled_reason: std::sync::RwLock<Option<String>>,
+    /// Epoch-ms of the observation that STARTED the current not-running
+    /// episode; 0 = not in one. Distinct from `last_disabled_ms` (the most
+    /// recent observation) because the honest recovery line reports how long
+    /// the role was down, and every failing call restamps the latter.
+    episode_started_ms: AtomicU64,
+    /// Has the "the app is enabled and its CELLS are not running" diagnosis
+    /// already been said for the current episode? One line per episode: the
+    /// sentence is the whole diagnosis, and a sentence repeated every 20s is
+    /// how the one line that matters gets buried under copies of itself.
+    diagnosis_said: AtomicBool,
     consecutive_failures: AtomicU32,
     reconnects: AtomicU64,
 }
@@ -222,12 +271,49 @@ impl BridgeHealth {
         self.seq.fetch_add(1, Ordering::SeqCst) + 1
     }
 
-    /// Record evidence the path is live, stamped at `at_ms`.
+    /// The CURRENT verdict, without building a whole snapshot.
+    ///
+    /// Three observation streams, one verdict: the LATEST observation wins,
+    /// decided by sequence. `0` means "never observed" and can never win, which
+    /// reproduces the original two-stream table exactly — (0,0) is Unknown, a
+    /// lone stream is its own status, and a later failure beats an earlier
+    /// success — while admitting the third stream on equal terms.
+    pub fn status(&self) -> ZomePathStatus {
+        let candidates = [
+            (
+                self.last_success_seq.load(Ordering::SeqCst),
+                ZomePathStatus::Live,
+            ),
+            (
+                self.last_failure_seq.load(Ordering::SeqCst),
+                ZomePathStatus::Dead,
+            ),
+            (
+                self.last_disabled_seq.load(Ordering::SeqCst),
+                ZomePathStatus::AppDisabled,
+            ),
+        ];
+        candidates
+            .iter()
+            .filter(|(seq, _)| *seq > 0)
+            .max_by_key(|(seq, _)| *seq)
+            .map(|(_, status)| *status)
+            .unwrap_or(ZomePathStatus::Unknown)
+    }
+
+    /// Record evidence the path is live, stamped at `at_ms`. This is the ONLY
+    /// proof of recovery the node accepts, so it is also the only thing that
+    /// ends a not-running episode.
     pub fn record_success_at(&self, at_ms: u64) {
         let seq = self.next_seq();
         self.last_success_ms.store(at_ms, Ordering::Relaxed);
         self.last_success_seq.store(seq, Ordering::SeqCst);
         self.consecutive_failures.store(0, Ordering::Relaxed);
+        // The episode is over: forget when it started and re-arm the diagnosis
+        // so a LATER episode is diagnosed on its own terms rather than being
+        // silenced by a sentence said about a different outage.
+        self.episode_started_ms.store(0, Ordering::Relaxed);
+        self.diagnosis_said.store(false, Ordering::SeqCst);
         // A live path means the app is running; a stale reason would outlive
         // the state it describes.
         *self
@@ -238,19 +324,47 @@ impl BridgeHealth {
 
     /// Record evidence the APP IS NOT RUNNING, stamped at `at_ms`, keeping the
     /// conductor's own `reason` verbatim.
-    pub fn record_app_disabled_at(&self, at_ms: u64, reason: &str) {
+    ///
+    /// Returns `true` when this observation STARTED an episode (the previous
+    /// verdict was anything but [`ZomePathStatus::AppDisabled`]) — the one
+    /// moment that earns a WARN. Every subsequent failing call re-observes the
+    /// same episode and returns `false`, because a busy node discovers this
+    /// state thousands of times a minute.
+    pub fn record_app_disabled_at(&self, at_ms: u64, reason: &str) -> bool {
+        let new_episode = self.status() != ZomePathStatus::AppDisabled;
         let seq = self.next_seq();
         self.last_disabled_ms.store(at_ms, Ordering::Relaxed);
         self.last_disabled_seq.store(seq, Ordering::SeqCst);
+        if new_episode {
+            self.episode_started_ms.store(at_ms, Ordering::Relaxed);
+            self.diagnosis_said.store(false, Ordering::SeqCst);
+        }
         *self
             .disabled_reason
             .write()
             .unwrap_or_else(|e| e.into_inner()) = Some(reason.to_string());
+        new_episode
     }
 
     /// [`Self::record_app_disabled_at`] against the wall clock.
-    pub fn record_app_disabled(&self, reason: &str) {
-        self.record_app_disabled_at(now_ms(), reason);
+    pub fn record_app_disabled(&self, reason: &str) -> bool {
+        self.record_app_disabled_at(now_ms(), reason)
+    }
+
+    /// Claim the right to say, ONCE for this episode, that the conductor
+    /// reports the app enabled while its cells are not running.
+    ///
+    /// `false` when the role is not currently observed not-running (there is
+    /// nothing to diagnose) and `false` for every call after the first within
+    /// one episode. A `compare_exchange` rather than a read-then-write so two
+    /// threads observing the same conductor cannot both win.
+    pub fn claim_diagnosis(&self) -> bool {
+        if self.status() != ZomePathStatus::AppDisabled {
+            return false;
+        }
+        self.diagnosis_said
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
     }
 
     /// Record evidence the path is dead, stamped at `at_ms`.
@@ -285,31 +399,8 @@ impl BridgeHealth {
     pub fn snapshot_at(&self, now_ms: u64) -> BridgeHealthSnapshot {
         let success = self.last_success_ms.load(Ordering::Relaxed);
         let failure = self.last_failure_ms.load(Ordering::Relaxed);
-        // Three observation streams, one verdict: the LATEST observation wins,
-        // decided by sequence. `0` means "never observed" and can never win,
-        // which reproduces the original two-stream table exactly — (0,0) is
-        // Unknown, a lone stream is its own status, and a later failure beats an
-        // earlier success — while admitting the third stream on equal terms.
-        let candidates = [
-            (
-                self.last_success_seq.load(Ordering::SeqCst),
-                ZomePathStatus::Live,
-            ),
-            (
-                self.last_failure_seq.load(Ordering::SeqCst),
-                ZomePathStatus::Dead,
-            ),
-            (
-                self.last_disabled_seq.load(Ordering::SeqCst),
-                ZomePathStatus::AppDisabled,
-            ),
-        ];
-        let status = candidates
-            .iter()
-            .filter(|(seq, _)| *seq > 0)
-            .max_by_key(|(seq, _)| *seq)
-            .map(|(_, status)| *status)
-            .unwrap_or(ZomePathStatus::Unknown);
+        let status = self.status();
+        let episode_started = self.episode_started_ms.load(Ordering::Relaxed);
         let age = |stamp: u64| {
             if stamp == 0 {
                 None
@@ -333,6 +424,8 @@ impl BridgeHealth {
                         .clone()
                 })
                 .flatten(),
+            not_running_secs: (status == ZomePathStatus::AppDisabled && episode_started > 0)
+                .then(|| now_ms.saturating_sub(episode_started) / 1000),
         }
     }
 
@@ -346,7 +439,9 @@ impl BridgeHealth {
         match classify_zome_error(msg) {
             ZomeObservation::PathLive => self.record_success(),
             ZomeObservation::PathDead => self.record_failure(),
-            ZomeObservation::AppDisabled => self.record_app_disabled(msg),
+            ZomeObservation::AppDisabled => {
+                self.record_app_disabled(msg);
+            }
             ZomeObservation::NoEvidence => {}
         }
     }
@@ -472,6 +567,69 @@ impl RoleBridgeHealth {
                 .map(|reason| format!("{role}: {reason}"))
         })
     }
+
+    /// Fold PROVEN evidence that `role`'s zome path is live — a zome call on
+    /// that role returned — and clear the enable ladder if this ended an
+    /// episode.
+    ///
+    /// The ladder is cleared HERE and nowhere else. `enable_app` answering `Ok`
+    /// and `app_info` answering `Enabled` are both compatible with a role whose
+    /// cells are not running, so neither may buy the ladder a reset; a call
+    /// that actually crossed into the cell is not.
+    pub fn record_success_on(
+        &self,
+        role: &str,
+        ledger: &EnableLedger,
+        at_ms: u64,
+    ) -> RecoveryOutcome {
+        let observer = self.for_role(role);
+        let before = observer.snapshot_at(at_ms);
+        observer.record_success_at(at_ms);
+        // Both reads below are taken only on the NOT-live→live edge, so the
+        // steady-state zome-call path (already live, calls succeeding) adds no
+        // lock and no map lookup to a hot path measured in thousands per minute.
+        let mut enable_attempts = 0;
+        if before.status != ZomePathStatus::Live {
+            enable_attempts = ledger.attempts(role);
+            ledger.note_running(role);
+        }
+        RecoveryOutcome {
+            recovered_from_not_running: before.status == ZomePathStatus::AppDisabled,
+            not_running_secs: before.not_running_secs.unwrap_or(0),
+            enable_attempts,
+        }
+    }
+
+    /// Fold evidence that `role`'s app is NOT RUNNING. `true` on the
+    /// transition INTO the episode — the one observation that earns a WARN.
+    pub fn record_app_disabled_on(&self, role: &str, reason: &str, at_ms: u64) -> bool {
+        self.for_role(role).record_app_disabled_at(at_ms, reason)
+    }
+
+    /// May the "the app is enabled, its CELLS are not running" diagnosis be
+    /// said for `role` right now? True at most once per episode, and never for
+    /// a role that is not currently observed not-running.
+    ///
+    /// Records NOTHING. That is the point: the caller has just been told by the
+    /// conductor that the app is enabled, and this module does not accept that
+    /// as evidence of anything.
+    pub fn note_app_enabled_but_not_running_on(&self, role: &str) -> bool {
+        self.for_role(role).claim_diagnosis()
+    }
+}
+
+/// What folding a proven-live observation into a role established.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RecoveryOutcome {
+    /// The role WAS not running and a zome call on it has now succeeded. The
+    /// only transition this node calls a recovery.
+    pub recovered_from_not_running: bool,
+    /// How long the role was not running, in whole seconds. `0` when this was
+    /// not a recovery.
+    pub not_running_secs: u64,
+    /// How many `enable_app` attempts were made during the episode that just
+    /// ended. `0` when this was not a recovery.
+    pub enable_attempts: u32,
 }
 
 impl Default for RoleBridgeHealth {
@@ -501,11 +659,13 @@ fn resync_aggregate() {
     match roles.derive_supervised_status(supervised) {
         ZomePathStatus::Live => bridge_health().record_success(),
         ZomePathStatus::Dead => bridge_health().record_failure(),
-        ZomePathStatus::AppDisabled => bridge_health().record_app_disabled(
-            &roles
-                .supervised_disabled_reason(supervised)
-                .unwrap_or_else(|| "the installed app is not running".to_string()),
-        ),
+        ZomePathStatus::AppDisabled => {
+            bridge_health().record_app_disabled(
+                &roles
+                    .supervised_disabled_reason(supervised)
+                    .unwrap_or_else(|| "the installed app is not running".to_string()),
+            );
+        }
         ZomePathStatus::Unknown => {}
     }
 }
@@ -527,23 +687,62 @@ pub fn observe_role_zome_error(role: &str, msg: &str) {
     resync_aggregate();
 }
 
-/// Record evidence ROLE's path is live, then re-sync the process-wide
-/// aggregate. Call this instead of `bridge_health().record_success()`
-/// directly from any `HcClient` call site.
+/// Record PROVEN evidence ROLE's path is live — a zome call on this role
+/// SUCCEEDED — then re-sync the process-wide aggregate. Call this instead of
+/// `bridge_health().record_success()` directly from any `HcClient` call site.
+///
+/// THE recovery transition, and the only one. It is reached from the three
+/// `HcClient` zome-call paths and from nowhere else: not from the supervisor's
+/// `app_info` probe, and not from an accepted `enable_app`.
 pub fn record_role_success(role: &str) {
-    let observer = role_bridge_health().for_role(role);
-    let was_disabled = observer.snapshot().status == ZomePathStatus::AppDisabled;
-    observer.record_success();
+    let outcome = role_bridge_health().record_success_on(role, enable_ledger(), now_ms());
+    // The gauge is a LEVEL and this is the only place entitled to raise it:
+    // it now means "a call has landed on this role", not "the conductor says
+    // the app is enabled".
     crate::metrics::set_conductor_app_enabled(role, true);
-    if was_disabled {
-        // The recovery line an operator greps for after a heal lands.
+    if outcome.recovered_from_not_running {
+        // The recovery line an operator greps for after a heal lands — now
+        // carrying what it cost: how long the role was down, and how many
+        // enable attempts were spent while it was.
         info!(
             role,
-            "conductor app is RUNNING again — the zome path is live and the enable backoff is \
-             reset"
+            not_running_secs = outcome.not_running_secs,
+            enable_attempts = outcome.enable_attempts,
+            "conductor app is RUNNING again — a zome call on this role SUCCEEDED, which is the \
+             only proof of recovery this node accepts; the enable backoff is reset"
         );
     }
     resync_aggregate();
+}
+
+/// Say, at most ONCE per not-running episode, that the conductor reports this
+/// app enabled while the role still refuses zome calls.
+///
+/// That sentence is the diagnosis an operator needs and nothing else produces
+/// it: an enabled app whose CELLS are not running is indistinguishable from a
+/// healthy one in `app_info`, in `list_apps`, and in `enable_app`'s answer. It
+/// is only distinguishable by asking the cell — which is what every failing
+/// zome call has already done.
+///
+/// Records nothing, resets nothing, and returns the role to no one: the state
+/// machine is unchanged by a conductor's opinion of itself.
+pub fn note_app_enabled_but_not_running(role: &str) {
+    if role_bridge_health().note_app_enabled_but_not_running_on(role) {
+        info!(
+            role,
+            "the conductor reports this app ENABLED while every zome call on the role is still \
+             refused — the app is enabled and its CELLS are not running. enable_app cannot lift \
+             this; waiting on the conductor. Recovery will be claimed only when a zome call on \
+             this role succeeds."
+        );
+    }
+}
+
+/// Is ROLE currently observed NOT RUNNING? The supervisor's read, so a heal
+/// can be paced by what this node has actually observed rather than by what
+/// the conductor says about itself.
+pub fn role_is_not_running(role: &str) -> bool {
+    role_bridge_health().for_role(role).status() == ZomePathStatus::AppDisabled
 }
 
 /// Record that ROLE's app is NOT RUNNING, with the conductor's own `reason`.
@@ -554,17 +753,16 @@ pub fn record_role_success(role: &str) {
 /// of copies of itself. The `elohim_conductor_app_enabled{role}` gauge is set on
 /// every call, because a gauge is a level and a level must not be edge-driven.
 pub fn record_role_app_disabled(role: &str, reason: &str) {
-    let observer = role_bridge_health().for_role(role);
-    let already_disabled = observer.snapshot().status == ZomePathStatus::AppDisabled;
-    observer.record_app_disabled(reason);
+    let new_episode = role_bridge_health().record_app_disabled_on(role, reason, now_ms());
     crate::metrics::set_conductor_app_enabled(role, false);
-    if !already_disabled {
+    if new_episode {
         warn!(
             role,
             reason,
             "conductor app is NOT RUNNING — every zome call on this role will fail while it \
              stays this way, and the node's own projection reads will keep looking healthy. \
-             Storage will attempt enable_app on a bounded backoff (60s doubling to a 1h cap)."
+             Storage will attempt enable_app on a bounded backoff (60s doubling to a 1h cap); \
+             the next line about this role will be the recovery, when a zome call succeeds."
         );
     }
     resync_aggregate();
@@ -572,12 +770,16 @@ pub fn record_role_app_disabled(role: &str, reason: &str) {
 
 /// Fold one `app_info()` probe answer into ROLE's observer.
 ///
-/// The probe half of the cure: `app_info()` SUCCEEDS on a disabled app, so a
-/// probe that only checks `is_ok()` reports a healthy bridge in front of an app
-/// that can answer nothing.
+/// ASYMMETRIC ON PURPOSE. `NotRunning` is recorded, because a conductor saying
+/// its own app is not running can only understate this node's health. `Running`
+/// records NOTHING — `app_info` answers from the app record, and the app is
+/// enabled for the whole of a startup (or a stall) in which its cells are
+/// absent from `running_cells` and every zome call answers `CellDisabled`.
+/// Recording it was how the verdict flapped every ~20s while the truth-writing
+/// path stayed dead.
 pub fn observe_role_app_status(role: &str, observation: &AppRunObservation) {
     match observation {
-        AppRunObservation::Running => record_role_success(role),
+        AppRunObservation::Running => note_app_enabled_but_not_running(role),
         AppRunObservation::NotRunning { reason } => record_role_app_disabled(role, reason),
     }
 }
@@ -662,6 +864,10 @@ fn role_status_json(snap: &BridgeHealthSnapshot) -> serde_json::Value {
         // ADDITIVE: null at every status but `app-disabled`. The field an
         // operator reads to learn WHY, without opening a conductor database.
         "appDisabledReason": snap.app_disabled_reason,
+        // ADDITIVE: how long this episode has lasted. A conductor that is still
+        // starting and one that is stuck look identical in every other field;
+        // they differ only in how long this number has been growing.
+        "notRunningSecs": snap.not_running_secs,
     })
 }
 
@@ -697,6 +903,7 @@ pub fn health_block(mode: &str, snap: &BridgeHealthSnapshot) -> serde_json::Valu
         "consecutiveFailures": snap.consecutive_failures,
         "bridgeReconnects": snap.reconnects,
         "appDisabledReason": snap.app_disabled_reason,
+        "notRunningSecs": snap.not_running_secs,
         "perRole": per_role_block(role_bridge_health()),
     })
 }
@@ -704,6 +911,8 @@ pub fn health_block(mode: &str, snap: &BridgeHealthSnapshot) -> serde_json::Valu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::enable_app_backoff::enable_backoff;
+    use std::time::{Duration, Instant};
 
     const T0: u64 = 1_700_000_000_000;
 
@@ -1032,6 +1241,342 @@ mod tests {
             roles.derive_supervised_status(&SUPERVISED),
             ZomePathStatus::Unknown
         );
+    }
+
+    // ---- the verdict and the ladder (corrected 2026-09-20) ----------------
+    //
+    // THE DEFECT these pin, observed on the household mesh at 19:16–19:18Z:
+    //
+    //   19:16:19 WARN  lamad  conductor app is NOT RUNNING (CellDisabled …)
+    //   19:16:39 INFO  lamad  conductor app is RUNNING again — backoff reset
+    //   19:17:40 WARN  lamad  NOT RUNNING      <- 1.8 s later
+    //
+    // A conductor accepts websocket traffic before its apps finish starting.
+    // `app_info` reports the app `Enabled` the whole time; `enable_app` on an
+    // already-enabled app returns `Ok` without touching its cells; and every
+    // zome call answers `CellDisabled` until the cells reach `running_cells`
+    // (~11 minutes, on one peer). Reading either conductor answer as recovery
+    // produced a false verdict AND pinned a 60s-doubling ladder to its first
+    // rung. These drive their OWN registry and ledger, for the parallel-test
+    // reason every other test in this file does.
+
+    /// Verbatim from the household reproduction.
+    const CELL_DISABLED: &str = "Zome call failed: Conductor returned an error while using a \
+                                 ConductorApi: CellDisabled(CellId(DnaHash(uhC0keuLMYBe0), \
+                                 AgentPubKey(uhCAkR2vQ)))";
+
+    #[test]
+    fn enable_ok_on_an_already_enabled_app_does_not_prove_recovery() {
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+
+        // A zome call answered CellDisabled: this role cannot write truth.
+        assert!(roles.record_app_disabled_on("lamad", CELL_DISABLED, T0));
+
+        // One attempt is spent on the ladder and the conductor answers `Ok` —
+        // as it always does for an app that is already enabled — and the probe
+        // that follows reports the app `Enabled`. Together, the whole of what
+        // the conductor is willing to tell us, and none of it is evidence.
+        assert!(ledger.should_attempt_at("lamad", t0));
+        ledger.note_attempt_at("lamad", t0);
+        assert!(roles.note_app_enabled_but_not_running_on("lamad"));
+
+        assert_eq!(
+            roles.for_role("lamad").status(),
+            ZomePathStatus::AppDisabled,
+            "an accepted enable and an `Enabled` app status must not move the verdict"
+        );
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::AppDisabled,
+            "nor the aggregate — `/health/serving` must stay red while calls are refused"
+        );
+        assert!(!roles.for_role("lamad").snapshot_at(T0).serving_ok());
+        assert_eq!(
+            ledger.attempts("lamad"),
+            1,
+            "and the ladder must still be standing where the attempt left it"
+        );
+    }
+
+    #[test]
+    fn a_no_op_enable_does_not_reset_the_backoff() {
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        roles.record_app_disabled_on("lamad", CELL_DISABLED, T0);
+
+        let mut now = Instant::now();
+        let mut windows = Vec::new();
+        for round in 1..=3 {
+            assert!(
+                ledger.should_attempt_at("lamad", now),
+                "round {round}: the window must be open"
+            );
+            ledger.note_attempt_at("lamad", now);
+            // `enable_app` answers Ok, the probe answers `Enabled`, and the
+            // next zome call is still refused. None of it may clear the ladder.
+            roles.note_app_enabled_but_not_running_on("lamad");
+            roles.record_app_disabled_on("lamad", CELL_DISABLED, T0 + round * 1_000);
+
+            let window = enable_backoff(ledger.attempts("lamad"));
+            windows.push(window.as_secs());
+            assert!(
+                !ledger.should_attempt_at("lamad", now + window - Duration::from_secs(1)),
+                "round {round}: shut for the whole {}s window",
+                window.as_secs()
+            );
+            now += window;
+        }
+        assert_eq!(
+            windows,
+            vec![60, 120, 240],
+            "three Ok-but-still-refused attempts must DOUBLE the wait each time — the observed \
+             defect held this at 60s forever by resetting on the conductor's own answer"
+        );
+    }
+
+    #[test]
+    fn recovery_is_proven_by_a_successful_zome_call_and_resets_the_backoff() {
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+        roles.record_app_disabled_on("lamad", CELL_DISABLED, T0);
+        for step in 0..3 {
+            ledger.note_attempt_at("lamad", t0 + Duration::from_secs(step * 60));
+        }
+
+        // Eleven minutes in, the conductor finishes registering its cells and
+        // the next organic call lands. THAT — and nothing before it — is the
+        // recovery.
+        let outcome = roles.record_success_on("lamad", &ledger, T0 + 660_000);
+
+        assert!(outcome.recovered_from_not_running);
+        assert_eq!(
+            outcome.not_running_secs, 660,
+            "the recovery line reports the whole episode, not the age of its last observation"
+        );
+        assert_eq!(
+            outcome.enable_attempts, 3,
+            "and what the episode cost in admin calls"
+        );
+        assert_eq!(roles.for_role("lamad").status(), ZomePathStatus::Live);
+        assert!(roles
+            .for_role("lamad")
+            .snapshot_at(T0 + 660_000)
+            .serving_ok());
+        assert_eq!(
+            ledger.attempts("lamad"),
+            0,
+            "proven recovery — and only proven recovery — clears the ladder"
+        );
+    }
+
+    #[test]
+    fn the_not_running_warning_is_logged_once_per_episode_not_per_call() {
+        // The WARN is driven by this return value, so the cadence is asserted
+        // without asserting on a log sink. A busy node discovers a disabled
+        // cell thousands of times a minute; one line per episode is the whole
+        // difference between a diagnosis and a wall of copies of itself.
+        let roles = RoleBridgeHealth::new();
+        assert!(
+            roles.record_app_disabled_on("lamad", CELL_DISABLED, T0),
+            "the transition into the episode is the line that matters"
+        );
+        for tick in 1..=50u64 {
+            assert!(
+                !roles.record_app_disabled_on("lamad", CELL_DISABLED, T0 + tick * 100),
+                "observation {tick} is the SAME episode and must stay quiet"
+            );
+        }
+    }
+
+    #[test]
+    fn the_already_enabled_diagnosis_is_said_once_per_episode() {
+        let roles = RoleBridgeHealth::new();
+
+        // Nothing to diagnose about a role that is not refusing calls.
+        assert!(!roles.note_app_enabled_but_not_running_on("lamad"));
+        roles.for_role("lamad").record_success_at(T0);
+        assert!(
+            !roles.note_app_enabled_but_not_running_on("lamad"),
+            "a live role's `Enabled` status is unremarkable"
+        );
+
+        roles.record_app_disabled_on("lamad", CELL_DISABLED, T0 + 1_000);
+        assert!(
+            roles.note_app_enabled_but_not_running_on("lamad"),
+            "enabled + refusing calls = its CELLS are not running: say so"
+        );
+        for tick in 1..=20 {
+            assert!(
+                !roles.note_app_enabled_but_not_running_on("lamad"),
+                "probe {tick}: said once per episode, not once per 20s probe"
+            );
+        }
+    }
+
+    #[test]
+    fn a_second_episode_after_recovery_starts_a_fresh_backoff() {
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+
+        // Episode one climbs the ladder and is diagnosed.
+        roles.record_app_disabled_on("lamad", CELL_DISABLED, T0);
+        for step in 0..5 {
+            ledger.note_attempt_at("lamad", t0 + Duration::from_secs(step * 4_000));
+        }
+        assert!(roles.note_app_enabled_but_not_running_on("lamad"));
+        assert_eq!(
+            enable_backoff(ledger.attempts("lamad")),
+            Duration::from_secs(960)
+        );
+
+        // A zome call lands: episode one is over.
+        let climbed = t0 + Duration::from_secs(4 * 4_000);
+        roles.record_success_on("lamad", &ledger, T0 + 60_000);
+
+        // A relapse is a NEW episode in every respect — it WARNs again, it is
+        // diagnosable again, and it is met at once rather than at the hour cap
+        // the previous outage had climbed to.
+        let relapse = climbed + Duration::from_secs(3_600);
+        assert!(
+            roles.record_app_disabled_on("lamad", CELL_DISABLED, T0 + 3_660_000),
+            "a relapse earns its own WARN"
+        );
+        assert!(
+            roles.note_app_enabled_but_not_running_on("lamad"),
+            "and its own diagnosis — episode one's sentence must not silence episode two"
+        );
+        assert!(
+            ledger.should_attempt_at("lamad", relapse),
+            "met immediately, not an hour later"
+        );
+        ledger.note_attempt_at("lamad", relapse);
+        assert_eq!(
+            enable_backoff(ledger.attempts("lamad")),
+            Duration::from_secs(60),
+            "back to the first rung"
+        );
+    }
+
+    #[test]
+    fn one_role_recovering_does_not_mark_another_running() {
+        // Cells are registered per app, and the household watched one peer
+        // finish while another sat at zero for a further six minutes. Evidence
+        // from one role says nothing whatever about another's.
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+        for role in ["lamad", "imagodei"] {
+            roles.record_app_disabled_on(role, CELL_DISABLED, T0);
+            ledger.note_attempt_at(role, t0);
+        }
+
+        roles.record_success_on("lamad", &ledger, T0 + 5_000);
+
+        assert_eq!(roles.for_role("lamad").status(), ZomePathStatus::Live);
+        assert_eq!(
+            roles.for_role("imagodei").status(),
+            ZomePathStatus::AppDisabled,
+            "a call landing on lamad proves nothing about imagodei's cells"
+        );
+        assert_eq!(
+            ledger.attempts("imagodei"),
+            1,
+            "nor may it clear imagodei's ladder"
+        );
+        assert_eq!(
+            roles.derive_supervised_status(&SUPERVISED),
+            ZomePathStatus::AppDisabled,
+            "and one role still refusing calls keeps the aggregate honest"
+        );
+        assert!(roles.note_app_enabled_but_not_running_on("imagodei"));
+        assert!(
+            !roles.note_app_enabled_but_not_running_on("lamad"),
+            "the recovered role has nothing to diagnose"
+        );
+    }
+
+    /// The same claim as the tests above, but against the PRODUCTION wiring —
+    /// the free functions `HcClient` and the bridge supervisor actually call,
+    /// with the process-wide registry, ledger and gauge behind them.
+    ///
+    /// The instance tests pin the folds; this pins that the folds are what is
+    /// wired. Under the pre-correction wiring
+    /// (`observe_role_app_status(Running) -> record_role_success`) it fails on
+    /// its first assertion, which is the defect exactly: one `app_info` answer
+    /// ended an episode the conductor had not ended.
+    ///
+    /// Safe against the process-wide singletons the rest of this file avoids,
+    /// because every one of them is keyed by ROLE and this role name belongs to
+    /// this test alone — it is not in `SUPERVISED_ROLES`, so it cannot even
+    /// reach the aggregate.
+    #[test]
+    fn the_probe_cannot_end_an_episode_the_conductor_has_not_ended() {
+        const ROLE: &str = "test-probe-cannot-end-an-episode";
+        let ledger = crate::services::enable_app_backoff::enable_ledger();
+
+        // A zome call answered CellDisabled.
+        record_role_app_disabled(ROLE, CELL_DISABLED);
+        assert!(role_is_not_running(ROLE));
+
+        // One enable attempt is spent, then the conductor spends the next
+        // several minutes insisting the app is enabled — which it is. Its cells
+        // are not. Twenty probes, one per supervisor tick.
+        ledger.note_attempt(ROLE);
+        for tick in 1..=20 {
+            observe_role_app_status(ROLE, &AppRunObservation::Running);
+            assert!(
+                role_is_not_running(ROLE),
+                "probe {tick}: an `Enabled` app status must not end the episode"
+            );
+            assert_eq!(
+                ledger.attempts(ROLE),
+                1,
+                "probe {tick}: nor rewind the bounded ladder"
+            );
+        }
+
+        // The conductor finishes starting and a zome call lands.
+        record_role_success(ROLE);
+        assert!(!role_is_not_running(ROLE));
+        assert_eq!(
+            role_bridge_health().for_role(ROLE).status(),
+            ZomePathStatus::Live
+        );
+        assert_eq!(
+            ledger.attempts(ROLE),
+            0,
+            "and THAT — a call that crossed into the cell — clears the ladder"
+        );
+    }
+
+    #[test]
+    fn the_wire_names_how_long_the_role_has_been_refusing_calls() {
+        // A conductor that is still starting and one that is stuck are
+        // identical in every other field; they differ only in how long this
+        // number has been growing.
+        let h = BridgeHealth::new();
+        h.record_app_disabled_at(T0, CELL_DISABLED);
+        h.record_app_disabled_at(T0 + 600_000, CELL_DISABLED);
+        let snap = h.snapshot_at(T0 + 660_000);
+        assert_eq!(
+            snap.not_running_secs,
+            Some(660),
+            "measured from the start of the episode, not from its last observation"
+        );
+        assert_eq!(role_status_json(&snap)["notRunningSecs"], 660);
+
+        h.record_success_at(T0 + 700_000);
+        let recovered = h.snapshot_at(T0 + 700_000);
+        assert_eq!(recovered.status, ZomePathStatus::Live);
+        assert!(
+            recovered.not_running_secs.is_none(),
+            "a live role is not 'not running for N seconds'"
+        );
+        assert!(role_status_json(&recovered)["notRunningSecs"].is_null());
     }
 
     #[test]
