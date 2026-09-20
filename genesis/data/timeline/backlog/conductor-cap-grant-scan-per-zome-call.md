@@ -158,3 +158,86 @@ retires the problem.
   its logs. Smallest instrument: a gauge of rows scanned in `valid_cap_grants`, labelled by cell. State: **not built**.
 - `elohim_conductor_admission_*` carries no zome / function / caller label, so "which first-party loop calls most"
   cannot be answered from metrics today. State: **not built**.
+
+## Delta 2026-09-20 — remedy 3 carried to the doorway: both minters are now bounded
+
+Remedy 3 ("stop minting — persist and reuse") was already delivered in `elohim-storage` (the closed-chain
+fence, 2026-09-05). It is now delivered for the two doorway paths named above, which were the ones actually
+growing. Neither path's auth posture, JWT validation, grant function scope, or caller set changed; only how
+often a grant is authored.
+
+**Path 1 — `zome_caller.rs::connect_endpoint` is bounded by a process credential cache.**
+`doorway-service/src/services/signing_credentials.rs` holds one `ClientAgentSigner` per
+(conductor admin address, installed app id) for the life of the process. `connect_endpoint` now decides
+`Reuse | Mint` per cell (`decide_credential`, the same decide-before-you-author split as
+`closed_chain_fence::decide`) and calls `authorize_signing_credentials` only for cells with no cached
+credential. Nothing is written to disk — the doorway keeps no secret at rest — so a doorway RESTART re-mints
+once per cell. Reconnect CHURN, which was the unbounded term, now mints nothing. Heal: a cap-grant-shaped
+zome error (`looks_like_a_rejected_cap_grant`, a copy of storage's `CAP_GRANT_REJECTION_MARKERS`) discards
+that cell's credential ONCE per (conductor, role) per process and drops the socket so the next call re-mints;
+a second rejection surfaces unchanged. **Ceiling: one grant per cell per doorway process, plus at most one
+heal per (conductor, role) per process.**
+
+**Path 2 — the chaperone grants once per DEVICE, not once per page load.**
+The browser now PERSISTS its signing keypair and cap secret per (doorway origin, agent) and presents the same
+ones on every later connect
+(`app/elohim-library/projects/elohim-service/src/connection/chaperone-credential-store.ts`). `localStorage`,
+not IndexedDB: `elohim-service` compiles without the DOM lib and has no IndexedDB abstraction, and the one
+precedent for client-side persistence there is `localStorage`. The credential record rides the key the
+consuming app ALREADY writes after every connect and ALREADY removes on sign-out
+(`holochain-signing-credentials`), so "clear on sign-out" is true today with no app change; a sibling
+scope record keyed by (origin, agent) + signing-key fingerprint keeps one doorway's or one human's credential
+from being presented as another's. Server side,
+`doorway-service/src/conductor/grant_memory.rs` remembers a SHA-256 fingerprint of
+(conductor, cell dna, cell agent, signing public key, cap secret) — one-way, no secret at rest — and
+`handle_hc_connect` skips `grant_zome_call_capability` for a cell it has already granted to that exact
+device. Recording happens only after a grant lands, so a `CellMissing`/`CellDisabled`/failed cell is retried
+rather than skipped, and the browser's 3× 502/503 retry cannot multiply grants. Memory is in-process and
+bounded (FIFO, 100 000 fingerprints): a doorway restart therefore costs at most one grant per device per role
+cell, not one per page load. **Ceiling: one grant per (device, cell) per doorway process.**
+
+Revoke-on-session-end was considered and REJECTED, for the reason this document already records: a deleted
+grant is still dropped in step 2 — after its three queries are paid — so deletion only removes step 3's
+share, and grant+delete per session doubles the writes on every hosted human's chain.
+
+**Heal across the pair.** If the conductor loses a grant the doorway remembers (reinstall, or a database
+restored from an older snapshot), the browser's zome calls come back unauthorized; the client discards its
+stored credential and reconnects ONCE with a fresh keypair
+(`DoorwayConnectionStrategy.healSigningCredentials`, bounded per strategy instance). That keypair is unknown
+to `grant_memory`, so it is granted. One round trip, no loop on either side.
+
+### The measurement that would show it
+
+The mint COUNT per day is the measure, not the total — the ~15 000 accumulated rows stay until remedy 2
+(indexed lookup) or a re-key, and this delta does not touch them.
+
+- **Doorway-side, immediate.** `Chaperone: connection established` now carries `cells_granted` and
+  `cells_skipped`. On a doorway serving returning browsers, `cells_skipped` should dominate within one
+  session of a client rollout; `cells_granted` should fall to roughly (new devices + re-installs) × role
+  cells per day. `Signing credentials ready` on the Path-1 side carries `minted` and `reused`: `minted`
+  should be non-zero only on the first connect after a doorway restart.
+- **Conductor-side, the real proof.** On matthew and adam, take the source-chain CapGrant action count (or
+  the daily delta of the `CapGrant … ORDER BY Action.seq` statement's `rows_returned` in the slow-statement
+  log) at the same hour on consecutive days. Before: it climbs with page loads and reconnects. After: it
+  should be flat apart from new devices. susan, which fronts no public doorway, is the control — its rate
+  should be unchanged.
+- **The symptom to watch.** `elohim_conductor_admission_hold_ms` on matthew/adam does NOT improve from this
+  change alone (the existing rows still cost ~47 000 queries per call). It improves when remedy 2 lands, or
+  after a re-key. Reading a flat hold-time as "the fix didn't work" would be the wrong conclusion: the claim
+  here is that the GROWTH stopped, and the mint count per day is the only thing that shows it.
+
+### Still open after this delta
+
+- **Remedy 2 (indexed `valid_cap_grants` in the fork)** remains the only thing that relieves the two stalled
+  peers without a re-key. Unchanged in priority.
+- **The 15 000 existing rows** are untouched. Deleting them buys only step 3.
+- **Client heal wiring.** `looksLikeCapGrantRejection` + `DoorwayConnectionStrategy.healSigningCredentials`
+  are implemented, exported and tested, but nothing in `app/elohim-app` calls them yet — the zome-call error
+  path lives outside the library. Until that one call site exists, a conductor that loses a grant leaves that
+  browser's calls failing until the human signs out (which clears the credential) or the doorway restarts
+  (which forgets the grant and re-grants). Owner: the Angular layer; scope: one error-path branch.
+- **Server-side grant memory is in-process.** Promoting it to the doorway's MongoDB records would make a
+  doorway restart free rather than one-grant-per-device. Strictly additive; `GrantMemory`'s API assumes
+  nothing about residence.
+
+**Cost to delivery, 2026-09-20 (genesis #1577, the first genesis run to reach seeding since the stall):** the seed of fixture humans failed for exactly the two conductors this item names — `Matthew … Request timed out in 60000 ms: call_zome` and `Adam … Request timed out in 60000 ms: call_zome; node+steward: not attempted (conductor unresponsive)` — and succeeded for the rest. A first-pass summary read these as a content problem; the console lines say otherwise. Until the per-call cost is bounded, genesis cannot seed the two heaviest chains, so app + genesis stay undeliverable on alpha regardless of what else is green. Separate and NOT this item's cause: Eve's seed failed with `CellDisabled(CellId(DnaHash(uhC0kRGwtzMN…AdFr), AgentPubKey(uhCAkhsVVjku…--Ks))` (×5; once for agent `uhCAkYCeIZu5…DY5v`) on `elohim-eve-alpha-conductor:4445` — a cell the conductor holds but has disabled, on the same conductor whose readiness timed out edge #1462. It needs its own read (why disabled, and whether a roll re-enables it) before it is filed as anything.
