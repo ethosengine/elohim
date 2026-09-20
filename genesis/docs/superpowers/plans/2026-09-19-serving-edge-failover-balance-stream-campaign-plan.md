@@ -201,6 +201,15 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   from what a holder already says about itself on the response path (its catching-up shed / `Retry-After`,
   `X-Available-Permits`), remembered with decay. No sibling state sync (A:107). Story: a `name-routing.feature`
   scenario where the shedding holder is demoted and promoted back. Proof: household.
+  *Designed 2026-09-20* (genesis/a2o/reports/recovery/serving-edge-20260919/story-3.1-design.md): `X-Available-Permits`
+  is emitted by elohim-storage only, never by a doorway — the one honest observation is a relay reply that
+  declares backpressure with the holder's own `Retry-After`, honoured as the demotion window (clamped 5–300 s,
+  binary rank, no probes; demotion reorders, never excludes). `note_shed` already demotes a shedding holder today
+  but `replace_all` forgets it at the next 60 s refresh — surviving the refresh is the story's whole content, so the
+  scenario (`a07134562`, `@wip`) spans one. The household cannot stage it yet: it needs a third doorway (`gamma`)
+  and a holder able to declare a window longer than the cycle (the real sheds declare 2 / 20 / 30 s). The shed
+  fixture must NOT be gated on `dev_mode` alone — alpha runs `DEV_MODE=true`, which would make it a public
+  denial-of-service lever; it takes a dedicated boot flag set only by the household launcher.
 - **3.2 Peer replica scoring gets its first data source.** `services/serve_routing.rs` admits `current_load`,
   `delivery_score`, `attested_rtt_ms` have none; `transport_paths.rs` already keeps an EWMA RTT. Feed it. Story:
   `serve-routing-rtt-ordering.feature` loses `@wip` with a topology the household can actually vary. Habit:
@@ -213,6 +222,13 @@ them, then close the zero-lag head oracle, then make the pair comparable.
 
 - **4.1 The pull stream runs.** Backlog ci-substrate-projection-pull-stream-dark: `projection.streams pull=false`
   on every alpha pod. Find why; light it. Proof: fleet `/health` shows the stream up.
+  *Corrected 2026-09-20:* nothing is dark. The CI label `projection.<peer>.streams` reads `/p2p/status` `.pull`,
+  which is the per-node content-pin ACQUISITION rollup (`elohim-storage/src/p2p/acquisition.rs`), not a
+  doorway↔doorway stream: `caughtUp=false` with `total==0` is the designed idle state of a pod nobody has pinned
+  content on, ungated by any env var, and the backlog item resolved it as an assert-ghost on 2026-06-11
+  (`substrate-verify.sh` already warns `idle` instead of failing). What remains of 4.1 is the emitter-side
+  `state: idle|active|caughtUp` field. The doorway↔doorway content-projection stream this sprint is named for does
+  not exist to be lit — building it is 4.2.
 - **4.2 Projection-index replication doorway↔doorway, reach-earned, pushed.** Replaces
   `POST /admin/federation/peers/refresh` as the freshness path; the refresh verb stays as the operator's
   actuation twin. Backpressure is bounded and lossy with the poll as backstop, the shape
@@ -223,6 +239,10 @@ them, then close the zero-lag head oracle, then make the pair comparable.
 ### Sprint 5 — the doorway terminates its own TLS (habit: doorway-failover retire-path; D:117)
 
 - **5.1 The doorway's node key persists across boots** (A:256 precondition).
+  *Landed locally 2026-09-20* (`a9910d11c`): `DOORWAY_NODE_KEY_FILE`, load-or-generate, corrupt file aborts boot,
+  first-writer-wins publish; household wired. Sessions already survive a restart (HS256 from `JWT_SECRET`
+  everywhere) — this stabilises the JWKS/DID identity only. The fleet has nowhere to keep the file: doorway pods
+  mount only an `emptyDir`; a volume or mint-once Secret is an operator manifest, owed before 5.3.
 - **5.2 rustls listener beside the plain one**, certificate from a file pair — the household mesh serves
   `https://…elohim.local` with a locally minted CA. Story: `served-shell-boots.feature` over https.
 - **5.3 Issuance and rotation.** DNS-01 is the only challenge that works for a name several doorways share, and
@@ -236,6 +256,10 @@ them, then close the zero-lag head oracle, then make the pair comparable.
 
 - **6.1 Validators, not caching, on mutable routes:** `ETag` / `If-None-Match` on EPR-head and shell HTML with a
   short TTL (B:197). Nothing mutable becomes CDN-cacheable (B:313).
+  *Landed locally 2026-09-20* (`1103207e4`): EPR-head GET carries a strong ETag over the exact body, 304 on
+  `If-None-Match`, `no-cache` (`private, no-cache` when not anonymous), `Vary: Authorization, Cookie`. The shell
+  half is narrow: a chrome-injected page carries the request's omnibar context and stays `no-store` with no
+  validator, and injection fires for nearly every real shell — a revalidatable shell waits on 6.2's render key.
 - **6.2 The shell is addressed.** The HTML entry names only `/blob/<hash>` assets (already `immutable`, one
   year); SSR output for an anonymous commons request is keyed by `{serverBlobHash, route, reach}` so it can be
   revalidated instead of re-rendered. Story: `served-shell-boots.feature` asserts every asset URL is addressed.
