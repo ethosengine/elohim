@@ -6,11 +6,37 @@ purpose: >
   THE source of truth for each human's conductor resource budget. Binds archetype-resource-alignment
   so per-human resource edits are measured against their deviceArchetype's canonical budget, not
   just an open-ended floor, then binds test-bench-aggregate-capacity so the resulting portfolio is
-  measured against the operator-promoted alpha cluster envelope.
+  measured against the operator-promoted alpha cluster envelope. resource-limit-raise-design-signal
+  is declared FIRST deliberately: all three are `ask`, `combine()` breaks the tie by declaration
+  order, and "should this be raised at all" precedes "is the raised value on-class". The other
+  two still print their full detail either way.
 coupling:
   governance: epr:alpha-test-bench-compute-envelope
   value: epr:rea-compute-commitment-primitive
 rules:
+  - id: resource-limit-raise-design-signal
+    class: ask
+    when: { write: "deployments.json" }
+    validator: epr:validator-resource-limit-raise-design-signal
+    retire-when: >
+      when demand has a native home and the gate can READ it instead of projecting it — an
+      `Envelope::demand` beside `Envelope::bound` in ark-core, rendered by bridges/k8s the way the
+      bound is rendered today — so a raise past the modelled demand fails at render rather than at
+      review. Only the recurrence count would remain, and `resource-limit-raises@1` carries that.
+    why: >
+      Raising a CPU or memory LIMIT is System 1 amplifying the regulator. Ashby admits that move
+      — a regulator needs the variety of what it regulates, and either attenuating the disturbance
+      or amplifying the regulator restores the balance — so this rule never says a raise is wrong.
+      What it does not admit is amplifying again and again while the disturbance at the source is
+      never attenuated: Meadows' shifting-the-burden-to-the-intervenor. The raise is therefore
+      treated as ALGEDONIC evidence (elohim/epr/src/algedonic.rs) — APPROACH at the band edge,
+      BREACH past it — and REFERRED to the design plane (S3/S4) rather than answered on the
+      operational one. It carries a NUMBER, not a questionnaire: requested vs a demand model
+      composed from the deviceArchetype canonical budget, a ratified `resourceOverride` read from
+      the PRE-state, the Rakia `limits.cpu_m` overcommit ratification, the `bridges/k8s::share()`
+      split, the declared `edgenodeArcFactor` and the declared hosted cast — plus the count of
+      prior raise stamps this unit already carries. Never fires on a lower or equal value, a new
+      unit, an unparseable edit, or a YAML no deployment record claims.
   - id: archetype-resource-alignment
     policy: archetype-resource-alignment@1
   - id: test-bench-aggregate-capacity
@@ -28,3 +54,80 @@ limits may exceed allocatable up to the ratified percentage; requests reserve an
 incompressible. A ledger older than 30 days refers for refresh without an aggregate-capacity ask,
 retaining the underlying violations in the message. Run `k8s-bridge observe` to promote a fresh
 cluster observation; the command lands with Station 2/3b.
+
+## A limit RAISE is an algedonic signal, not a setting
+
+The two bindings above ask whether a value is COHERENT (with its class, with the portfolio).
+The third asks a prior question: whether RAISING it is the right move at all. It fires only on a
+raise — never on a lower or equal value, never on a new human, never on an unparseable pending edit
+— and it refuses to be a questionnaire. It composes predicted demand from what this tree already
+declares (the archetype canonical budget, a ratified `resourceOverride` read from the PRE-state, the
+Rakia `limits.cpu_m` overcommit ratification, `edgenodeArcFactor`, the doorway manifests' declared
+hosted cast) and prints **requested vs predicted with the ratio**, plus the count of prior raise
+stamps this unit already carries.
+
+Ashby allows either move — attenuate the disturbance, or amplify the regulator — so a raise is
+never refused. What it is not allowed to be is *silent repetition*: at or above two prior stamps on
+one unit the message reads BREACH rather than APPROACH and says a design pass is due first. That is
+Meadows' shifting-the-burden-to-the-intervenor, and `$cpuBumpComment` / `$cpuThrottleBumpComment` /
+`$memoryBumpComment` / `$cpuLimitBump` in this very file are the evidence it counts.
+
+The demand model is a PROJECTION, named as one: `ark_core::manifest::Envelope` carries `bound`, never
+`demand`, and `elohim_compute::ResourceSnapshot` observes bytes and documents, never CPU or memory.
+The smallest native home to add is `Envelope::demand` beside `Envelope::bound` — which is also this
+rule's retire condition.
+
+The model is composed from what this tree declares, and each number names its source:
+
+| fact | declared at |
+|---|---|
+| archetype canonical budget | `genesis/data/devices/archetype-resource-budgets.json` |
+| ratified per-unit exception | `resourceOverride.{field}` + `justification`, read from the **pre**-state so a raise *of* the override is measured against the class, not against itself |
+| overcommit tolerance | `genesis/data/rakia/compute-capacity.json` `cluster.ratifications[]` where `dimension: limits.cpu_m` — 125% today; memory carries no ratification and is incompressible, so 100% |
+| conductor/storage split | `bridges/k8s::share()` — conductor 1/2 CPU and 5/8 memory, storage the remainder |
+| authority arc | `edgenodeArcFactor` (absent = full arc) |
+| hosted cast | `DOORWAY_MAX_AGENTS_PER_CONDUCTOR` in `../manifests/doorway/*.yaml` |
+| recurrence | prior raise stamps on the unit, counted from the pre-state |
+
+**BREACH is objective**, not rhetorical: requested > predicted x the ratified tolerance, **or** the
+unit already carries at/over two prior raise stamps (measure `resource-limit-raises@1`, lens
+`resource-limit-raise-recurrence` in `.claude/epr-meta/measures.yaml` — the validator reads that
+watermark rather than hardcoding it). Anything else is APPROACH. The arc-scaling spec's ruling is
+surfaced verbatim on a memory raise at full arc: *"no RAM bump reconciles that… the durable lever is
+the arc, not the limit."*
+
+The three questions the ask puts to the author, in order: (a) **what disturbance** is the limit
+absorbing — name the loop and cite a diagnosis path that *resolves on disk*, by path or by backlog
+slug, because an unresolvable citation is not a reference; (b) **which seam we own** attenuates it at
+the source, routed through the concern-routing atlas, because a raise that names no seam is the
+intervenor taking the load permanently; (c) **what is the restoration condition, and what would
+falsify the raise** — *"the unit pins at the new limit with the symptom unchanged"* is the usual
+falsifier, and it says the burn was never headroom. A stamp that already cites a resolving diagnosis
+**and** carries a restoration condition is told so, so a considered raise reads differently from a
+bare one — followed by the reminder that a citation is not an attenuation.
+
+### Why this rule is declared inline instead of bound to a pinned policy
+
+Its two siblings above bind pinned rows in `.claude/epr-meta/policies.yaml`. This one cannot: that
+registry stood at 64,922 bytes of a 65,536-byte cap (99.1%) when the rule was written, and the cap
+is enforced by **both** governance hosts — `_lib/epr_meta.py` `load_policies` and the native
+evaluator at `elohim/eprfs/eprfs-meta/src/evaluation.rs:519` (`MAX_MANIFEST_BYTES`, `lib.rs:39`).
+One more row flips the registry to "exceeds size cap", which drops *every* policy-bound rule to
+`unknown policy — rule NOT enforced`: a total governance outage. Fitting a rule into the remaining
+614 bytes would have meant shrinking it to an unreadable stub — attenuating the rule's legibility
+instead of the actual disturbance, which is this rule's own anti-pattern.
+
+The open item, escalated rather than taken unilaterally and recorded at the `load_policies` call
+site: **a registry is not a manifest and should not borrow a manifest's cap.**
+`_lib/seam_census.py` (~line 175) already ratified that distinction and carved out
+`_MAX_REGISTRY_BYTES` after `elohim-storage`'s seam registry crossed 64KB and contributed zero cells
+to the concern x seam matrix for two days; the sibling registry `measures.yaml` is already 72KB and
+loads only because no cap is applied to it at all. Fixing it is a two-host source change plus an
+`epr` rebuild, and changing one host alone makes the two disagree (`python=refer` vs `rust=permit`)
+on every governed write. Until then this rule is inline, and it is duplicated in
+`../manifests/.epr-meta` for the manifest surface — a define-once-bind-many cost the full registry
+is charging.
+
+Consequence to expect, and it is correct: an inline `ask` with no ratified policy pin is referred
+once by `epr:validator-escalation-ladder`. Under the agency charter, accepting the merge at the
+`dev` rung *is* the ratification event.

@@ -22,6 +22,7 @@ MANIFEST_NAME = ".epr-meta"
 MANIFEST_FILE_NAME = "manifest.md"
 MAX_CASCADE_DEPTH = 32
 MAX_MANIFEST_BYTES = 64 * 1024   # refuse to parse an oversized manifest (parse-DoS guard)
+
 MAX_FLOW_DEPTH = 64              # reject deeply-nested flow YAML before PyYAML can RecursionError
 
 
@@ -436,7 +437,9 @@ def _eval_rule(rule: dict, write: dict) -> Verdict | None:
                                 f"evaluated. {why}", rid, "unresolvable-validator")
         result = REFERENCE_VALIDATORS[ref](write)
         if isinstance(result, Verdict):
-            return Verdict(result.cls, result.reason, rid, result.refer_reason)
+            # `evidence` rides through: a validator that MINTS algedonic evidence must not
+            # have it dropped by the re-wrap that only exists to stamp the rule id.
+            return Verdict(result.cls, result.reason, rid, result.refer_reason, result.evidence)
         if result:
             return Verdict(cls, f"validator `{ref}` flagged this write. {why}", rid,
                            VALIDATOR_REFER_REASONS.get(ref))
@@ -1264,6 +1267,439 @@ def _dna_hash_neutrality(write: dict) -> bool:
     return True
 
 
+# ── Resource-limit raise design signal (a validator-EPR). Fires an `ask` when a write RAISES a
+# k8s resource LIMIT on a fleet unit — deployments.json `edgenodeCpuLimit`/`edgenodeMemoryLimit`
+# or `resourceOverride.cpuLimit/memoryLimit`, and a container's `resources.limits.cpu/memory` in
+# an explicit human manifest YAML. A raise is never refused; it is ROUTED, carrying a number the
+# author has to argue with.
+#
+# THE VSM READING (inherited, not invented here):
+#   · Ashby. A regulator needs at least the variety of what it regulates, and the CHANNEL between
+#     them must carry it (genesis/docs/superpowers/specs/
+#     2026-08-12-requisite-variety-guidestar-epr-family-composition.md §1-§2). Two moves restore
+#     the balance: ATTENUATE the disturbance at its source, or AMPLIFY the regulator. A limit
+#     raise is the amplify move — admissible on its own, and that same guidestar (§1b) is explicit
+#     that naming attenuation as the ONLY legitimate answer is the framework-word error. So this
+#     rule never says a raise is wrong.
+#   · Meadows. What is wrong is amplifying REPEATEDLY while the disturbance is never attenuated —
+#     shifting the burden to the intervenor, the archetype this gate names in its own retire
+#     condition (.claude/hooks/epr-meta-resolver.py RETIRE_WHEN; _lib/intervenor_census.py). The
+#     fleet-specific form is already written down: "stop treating per-node OOM as a RAM-sizing
+#     problem... we are already several bumps deep" / "Stop the RAM-bump treadmill"
+#     (genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md).
+#   · Algedonic (elohim/epr/src/algedonic.rs). The raise IS the signal: pain reported against a
+#     bound the unit itself declared — evidence-bound, valence-free, standing-neutral
+#     (STANDING_IMPACT is fixed `advisory`; this validator accuses no one). APPROACH is the band
+#     edge — the model still predicts the number and this is the first stamp; it carries
+#     `threshold_pct`. BREACH is past the bound — the request exceeds the model beyond the
+#     ratified tolerance, or the unit already carries >= the declared recurrence watermark of
+#     raise stamps; it carries no `threshold_pct`. The kind is DERIVED from the evidence, never
+#     declared beside it.
+#   · Subsidiarity (elohim/epr/src/verdict.rs `ReferQuestion`). The operational plane (S1) may not
+#     answer this alone: it REFERS to the design plane (S3/S4). `ask`, never `deny` — a refer is
+#     first-class and is never collapsed into a refusal.
+#
+# THE MODEL IS DECLARED, NOT GUESSED. Predicted demand is read from facts already on disk:
+#   archetype canonical  genesis/data/devices/archetype-resource-budgets.json (the class budget)
+#   per-unit exception   deployments.json resourceOverride.{field} + justification (the
+#                        operator-ratified exception — read from the PRE-state, so a raise of the
+#                        override itself is measured against the class, not against itself)
+#   tolerance            genesis/data/rakia/compute-capacity.json cluster.ratifications[] where
+#                        dimension == "limits.cpu_m" (overcommit_pct = 125 today). Memory carries
+#                        NO ratification and is incompressible (genesis/orchestrator/data/.epr-meta),
+#                        so its tolerance is 1.00.
+#   split                bridges/k8s/src/lib.rs `share()` — conductor takes 1/2 CPU and 5/8 memory,
+#                        storage the remainder. Predicts a per-container YAML limit.
+#   arc                  deployments.json edgenodeArcFactor (absent => full arc, the default).
+#   hosted cast          DOORWAY_MAX_AGENTS_PER_CONDUCTOR declared in the doorway manifests.
+#
+# WHERE THE MODEL SHOULD LIVE (and what is actually there). The ENVELOPE already has a native
+# home: `ark_core::manifest::Envelope { bound: Quantities { memory_bytes, cpu_millis },
+# headroom_bytes, measure, protected, shed_order }`, CID-pinned per human from deployments.json
+# `runtimeManifest` and projected to k8s by `bridges/k8s::render_envelope` — whose `quantity()` is
+# the canonical (and stricter) quantity parser this file's `_quantity` projects. What has NO
+# native home is DEMAND: nothing in elohim-compute, ark-core or bridges/k8s models what a unit is
+# EXPECTED to need. `elohim_compute::ResourceSnapshot` (src/resources.rs) is observation only
+# (request counts, connections, managed bytes, doc count — no CPU, no memory, no limit), and
+# `envelope.measure: "committed"` names the measure of a BOUND, not a prediction. The arithmetic
+# below is therefore a deliberate, minimal PROJECTION of a type that does not exist yet; the
+# follow-up named in the rule's `why` is `Envelope::demand` beside `Envelope::bound` in ark-core,
+# rendered by bridges/k8s the way the bound is rendered today.
+_RAISE_TOLERANCE_DEFAULT = 1.0          # memory: incompressible, no ratification exists
+_RAISE_RECURRENCE_HARD_DEFAULT = 2      # projection of the measures.yaml lens (read below)
+_RAISE_RECURRENCE_LENS = "resource-limit-raise-recurrence"
+_HOSTED_AGENT_HEAP_MI = 786             # CLAUDE.md: "each hosted human costs ~786MB of conductor heap"
+_DOORWAY_MANIFEST_DIR = "genesis/orchestrator/manifests/doorway"
+_ARC_SCALING_SPEC = ("genesis/docs/superpowers/specs/"
+                     "2026-06-13-conductor-authority-arc-memory-scaling.md")
+_SEAM_MAP = ("genesis/docs/content/elohim-protocol/architecture/"
+             "2026-06-21-elohim-seam-map-concern-routing.md")
+_RAISE_LIMIT_FIELDS = (("edgenodeCpuLimit", "cpuLimit", "cpu"),
+                       ("edgenodeMemoryLimit", "memoryLimit", "memory"))
+# A prior raise STAMP on a unit: a `$…Bump…`-shaped key, or a comment value opening with the
+# established TEMP/TEMPORARY BUMP convention. Both forms are already live in deployments.json.
+_RAISE_STAMP_KEY = re.compile(r"^\$.*bump", re.IGNORECASE)
+_RAISE_STAMP_VALUE = re.compile(r"\b(?:TEMP|TEMPORARY)\s+BUMP\b")
+# A repo-relative path cited inside a stamp. Narrow on purpose, and then CHECKED against disk:
+# the point is that the design pass is FINDABLE, not that a path-shaped string was typed.
+_CITED_PATH = re.compile(r"\b((?:genesis|elohim|doorway|bridges|app|steward|scripts)/[\w./+-]+)")
+# The tree also cites a backlog or spec by its SLUG, not its path — "(backlog
+# doorway-conductor-reconnect-storm-matthew-edge)" is how deployments.json's own stamps do it. A
+# slug that RESOLVES in one of the two canonical homes is a citation; one that resolves nowhere is
+# not. Bounded on purpose: >= 3 hyphens and >= 16 chars, so ordinary hyphenated prose never
+# qualifies.
+_CITED_SLUG = re.compile(r"\b([a-z0-9]+(?:-[a-z0-9]+){3,})\b")
+_SLUG_HOMES = ("genesis/data/timeline/backlog", "genesis/docs/superpowers/specs",
+               "genesis/docs/superpowers/plans")
+_RESTORATION_MARKERS = ("restoration condition", "restore to", "restoration:", "revert to",
+                        "falsified if", "falsifier")
+
+
+def _raise_repo_root(write: dict) -> Path:
+    try:
+        return find_repo_root(Path(write["path"]))
+    except Exception:  # noqa: BLE001 — root resolution must never break the gate
+        return Path.cwd()
+
+
+def _quantity(value, memory: bool) -> int | None:
+    """Millicores, or mebibytes. A thin projection of `bridges/k8s::quantity()` and as strict in
+    the direction that matters: an unrecognized spelling returns None and every caller ABSTAINS
+    rather than guessing (the resolver is fail-open by design)."""
+    if value is None:
+        return None
+    return _memory_mi(value) if memory else _cpu_m(value)
+
+
+def _ratified_cpu_tolerance(root: Path) -> tuple[float, str]:
+    """The operator-ratified CPU-limit overcommit band, read from the Rakia ledger. Absent => 1.00:
+    no ratification is not permission."""
+    try:
+        ledger = json.loads((root / _CAPACITY_LEDGER_PATH).read_text())
+    except Exception:  # noqa: BLE001
+        return _RAISE_TOLERANCE_DEFAULT, "ledger unreadable — 1.00x (no ratification)"
+    for r in (ledger.get("cluster", {}).get("ratifications") or []):
+        pct = r.get("overcommit_pct")
+        if r.get("dimension") == "limits.cpu_m" and isinstance(pct, (int, float)):
+            return float(pct) / 100.0, (f"ratified {float(pct):.0f}% on limits.cpu_m by "
+                                        f"{r.get('ratifiedBy', '?')} "
+                                        f"{r.get('ratifiedOn', '')}".strip())
+    return _RAISE_TOLERANCE_DEFAULT, "no limits.cpu_m ratification declared — 1.00x"
+
+
+def _lens_hard(root: Path, lens_id: str, default):
+    """Read a declared watermark from the measure registry's `lenses:` section. The DECLARATION is
+    the authority; this is only its reader, and it fails soft — a gate must never depend on YAML."""
+    if yaml is None:
+        return default
+    try:
+        doc = yaml.safe_load((root / ".claude/epr-meta/measures.yaml").read_text()) or {}
+        for row in (doc.get("lenses") or []):
+            if isinstance(row, dict) and row.get("id") == lens_id and "hard" in row:
+                return row["hard"]
+    except Exception:  # noqa: BLE001
+        pass
+    return default
+
+
+def _raise_stamps(human: dict) -> list[str]:
+    """Prior raise stamps carried by this unit — the recurrence evidence, read from the PRE-state
+    so the stamp the author is adding right now never counts itself."""
+    return [k for k, v in human.items()
+            if isinstance(k, str) and k.startswith("$")
+            and (_RAISE_STAMP_KEY.match(k)
+                 or (isinstance(v, str) and _RAISE_STAMP_VALUE.search(v)))]
+
+
+def _declared_hosted_cast(root: Path) -> list[tuple[str, int]]:
+    """Every DOORWAY_MAX_AGENTS_PER_CONDUCTOR ceiling DECLARED in the doorway manifests. A cast
+    the tree does not declare is an honest absence, not a zero."""
+    out = []
+    try:
+        for p in sorted((root / _DOORWAY_MANIFEST_DIR).glob("*.yaml")):
+            m = re.search(r"DOORWAY_MAX_AGENTS_PER_CONDUCTOR\s*\n\s*value:\s*\"?(\d+)\"?",
+                          p.read_text(errors="replace"))
+            if m:
+                out.append((p.name, int(m.group(1))))
+    except Exception:  # noqa: BLE001
+        pass
+    return out
+
+
+def _cited_diagnosis(root: Path, text: str) -> list[str]:
+    """Cited paths that ACTUALLY RESOLVE on disk. An unresolvable citation is not a reference."""
+    found = []
+    for cand in dict.fromkeys(_CITED_PATH.findall(text or "")):
+        cand = cand.rstrip(".,;:)")
+        for probe in (cand, cand + ".md"):
+            if (root / probe).exists():
+                found.append(probe)
+                break
+    for slug in dict.fromkeys(_CITED_SLUG.findall(text or "")):
+        if len(slug) < 16:
+            continue
+        for home in _SLUG_HOMES:
+            hit = root / home / f"{slug}.md"
+            if hit.exists():
+                found.append(f"{home}/{slug}.md")
+                break
+    return found
+
+
+def _yaml_container_limits(text: str | None) -> dict:
+    """{(block_index, 'cpu'|'memory'): value} for every `limits:` block in a manifest YAML.
+    Regex-scanned rather than parsed: these are multi-document, heavily commented k8s manifests
+    and a parse failure must not silence the guard. Block order is stable, so the pre-scan and
+    post-scan line up positionally even where a block carries no container name."""
+    out: dict = {}
+    if not text:
+        return out
+    for idx, m in enumerate(re.finditer(r"^([ \t]*)limits:[ \t]*$", text, re.MULTILINE)):
+        indent = len(m.group(1))
+        for line in text[m.end():].splitlines()[1:]:
+            if not line.strip():
+                continue
+            if len(line) - len(line.lstrip()) <= indent:
+                break
+            km = re.match(r"\s*(cpu|memory):\s*\"?([\w.]+)\"?\s*$", line)
+            if km:
+                out[(idx, km.group(1))] = km.group(2)
+    return out
+
+
+def _raises_in_deployments(write: dict, root: Path, post: str) -> list[dict]:
+    path = Path(write["path"])
+    try:
+        post_doc = json.loads(post)
+        pre_doc = json.loads(path.read_text())
+    except Exception:  # noqa: BLE001 — unparseable pending edit -> abstain, never block
+        return []
+    pre_humans = {h.get("name"): h for h in (pre_doc.get("humans") or []) if isinstance(h, dict)}
+    try:
+        budgets = json.loads((root / _ARCH_BUDGETS_PATH).read_text()).get("budgets", {})
+    except Exception:  # noqa: BLE001
+        budgets = {}
+    out = []
+    for ph in (post_doc.get("humans") or []):
+        if not isinstance(ph, dict):
+            continue
+        unit = ph.get("name")
+        prior = pre_humans.get(unit)
+        if prior is None:
+            continue  # a NEW human has no pre-state — never a raise (archetype alignment owns it)
+        arch = budgets.get(ph.get("deviceArchetype")) or {}
+        pre_ov = prior.get("resourceOverride") or {}
+        post_ov = ph.get("resourceOverride") or {}
+        for dep_field, budget_key, kind in _RAISE_LIMIT_FIELDS:
+            # The model base is the PRE-state declaration for this unit's class: a justified
+            # override if one was already ratified, else the archetype canonical.
+            if pre_ov.get("justification") and budget_key in pre_ov:
+                base, basis = pre_ov[budget_key], (f"ratified resourceOverride.{budget_key} "
+                                                   f"{pre_ov[budget_key]}")
+            else:
+                base, basis = arch.get(budget_key), (f"archetype {ph.get('deviceArchetype')} "
+                                                     f"canonical {arch.get(budget_key)}")
+            predicted = _quantity(base, kind == "memory")
+            for field, new_val, old_val in ((dep_field, ph.get(dep_field), prior.get(dep_field)),
+                                            (f"resourceOverride.{budget_key}",
+                                             post_ov.get(budget_key), pre_ov.get(budget_key))):
+                new_q, old_q = (_quantity(new_val, kind == "memory"),
+                                _quantity(old_val, kind == "memory"))
+                if new_q is None or old_q is None or new_q <= old_q:
+                    continue  # lower, equal, absent or unparseable -> never a raise
+                out.append({"unit": unit, "field": field, "kind": kind, "pre": old_val,
+                            "post": new_val, "predicted": predicted, "basis": basis,
+                            "human_pre": prior, "human_post": ph, "container": None})
+    return out
+
+
+def _raises_in_human_manifest(write: dict, root: Path, post: str) -> list[dict]:
+    path = Path(write["path"])
+    try:
+        dep = json.loads((root / _DEPLOYMENTS_PATH).read_text())
+        budgets = json.loads((root / _ARCH_BUDGETS_PATH).read_text()).get("budgets", {})
+    except Exception:  # noqa: BLE001
+        return []
+    prior = None
+    is_conductor = False
+    for h in (dep.get("humans") or []):
+        for key in ("manifest", "conductorManifest"):
+            ref = h.get(key)
+            if isinstance(ref, str) and Path(ref).name == path.name:
+                prior, is_conductor = h, key == "conductorManifest"
+    if prior is None:
+        return []  # not a human's DECLARED manifest — self-scoping; never fires elsewhere
+    try:
+        pre_limits = _yaml_container_limits(path.read_text(errors="replace"))
+    except OSError:
+        return []
+    post_limits = _yaml_container_limits(post)
+    arch = budgets.get(prior.get("deviceArchetype")) or {}
+    ov = prior.get("resourceOverride") or {}
+    out = []
+    for (idx, kind), new_val in post_limits.items():
+        old_val = pre_limits.get((idx, kind))
+        new_q, old_q = _quantity(new_val, kind == "memory"), _quantity(old_val, kind == "memory")
+        if new_q is None or old_q is None or new_q <= old_q:
+            continue
+        budget_key = "cpuLimit" if kind == "cpu" else "memoryLimit"
+        declared = ov.get(budget_key) if ov.get("justification") else None
+        declared = declared or arch.get(budget_key)
+        whole = _quantity(declared, kind == "memory")
+        if whole is None:
+            predicted, basis = None, "no archetype budget declared for this unit"
+        elif kind == "cpu":
+            predicted = whole // 2
+            basis = (f"1/2 of the unit's declared {budget_key} {declared} — bridges/k8s share(): "
+                     f"conductor 1/2 CPU, storage the remainder")
+        else:
+            predicted = whole * 5 // 8 if is_conductor else whole - (whole * 5 // 8)
+            basis = (f"{'5/8' if is_conductor else '3/8'} of the unit's declared {budget_key} "
+                     f"{declared} — bridges/k8s share()")
+        out.append({"unit": prior.get("name"), "field": f"resources.limits.{kind}", "kind": kind,
+                    "pre": old_val, "post": new_val, "predicted": predicted, "basis": basis,
+                    "human_pre": prior, "human_post": prior, "container": f"limits-block#{idx}"})
+    return out
+
+
+def _resource_limit_raise_design_signal(write: dict):
+    """Fires an `ask` on a RAISE of any declared resource limit; returns a Verdict or False.
+
+    Silent by construction on: a lower or equal value, a NEW unit with no pre-state, an
+    unparseable pending edit (abstain), a non-limit edit to the same file, and any YAML that no
+    human's deployment record declares as its manifest."""
+    import sys as _sys
+    post = write.get("content")
+    if post is None or write.get("is_new"):
+        return False
+    path = Path(write["path"])
+    root = _raise_repo_root(write)
+
+    if path.name == "deployments.json":
+        raises = _raises_in_deployments(write, root, post)
+    elif path.name.endswith((".yaml", ".yml")) and path.parent.name == "humans":
+        raises = _raises_in_human_manifest(write, root, post)
+    else:
+        return False
+    if not raises:
+        return False
+
+    cpu_tol, cpu_tol_note = _ratified_cpu_tolerance(root)
+    try:
+        recurrence_hard = int(_lens_hard(root, _RAISE_RECURRENCE_LENS,
+                                         _RAISE_RECURRENCE_HARD_DEFAULT))
+    except (TypeError, ValueError):
+        recurrence_hard = _RAISE_RECURRENCE_HARD_DEFAULT
+
+    breach = False
+    lines: list[str] = []
+    units: dict = {}
+    for r in raises:
+        tol = cpu_tol if r["kind"] == "cpu" else _RAISE_TOLERANCE_DEFAULT
+        suffix = "m" if r["kind"] == "cpu" else "Mi"
+        req = _quantity(r["post"], r["kind"] == "memory")
+        pred = r["predicted"]
+        over = bool(pred and req > pred * tol)
+        breach = breach or over
+        where = f"{r['unit']} {r['field']}" + (f" [{r['container']}]" if r["container"] else "")
+        ratio = f", ratio {req / pred:.2f}x vs tolerance {tol:.2f}x" if pred else ""
+        lines.append(f"    · {where}: {r['pre']} -> {r['post']}   requested {req}{suffix} vs "
+                     f"MODEL-PREDICTED {f'{pred}{suffix}' if pred else '(no model)'}{ratio}"
+                     + ("   << PAST THE BOUND" if over else ""))
+        lines.append(f"        model basis: {r['basis']}")
+        units.setdefault(r["unit"], r)
+
+    stamps_by_unit = {u: _raise_stamps(r["human_pre"]) for u, r in units.items()}
+    if any(len(s) >= recurrence_hard for s in stamps_by_unit.values()):
+        breach = True
+
+    kind_word, signal = (("BREACH", "algedonic-breach") if breach
+                         else ("APPROACH", "algedonic-approach"))
+    print(f"  resource-limit-raise-design-signal — {kind_word} ({signal}): this write RAISES a "
+          f"declared resource LIMIT.", file=_sys.stderr)
+    print("    A raise is System 1 AMPLIFYING the regulator. Ashby admits that move; what he does "
+          "not admit is amplifying again and again while the disturbance at the source is never "
+          "attenuated (Meadows: shifting the burden to the intervenor). So the raise is not "
+          "refused — it is REFERRED to the design plane (S3/S4), which is the only plane that can "
+          "answer it.", file=_sys.stderr)
+    for ln in lines:
+        print(ln, file=_sys.stderr)
+    print(f"    tolerance: cpu {cpu_tol:.2f}x — {cpu_tol_note}; memory 1.00x (incompressible, no "
+          f"ratification exists — genesis/orchestrator/data/.epr-meta).", file=_sys.stderr)
+    print("    model home: predicted demand is a PROJECTION — ark_core::manifest::Envelope carries "
+          "`bound`, never `demand`, and elohim_compute::ResourceSnapshot observes bytes/docs/"
+          "connections, never CPU or memory. Numbers above come from the declared archetype "
+          "budget, the ratified override, and the bridges/k8s share().", file=_sys.stderr)
+
+    for unit, stamps in stamps_by_unit.items():
+        if not stamps:
+            print(f"    recurrence: {unit} carries NO prior raise stamp — this is the first.",
+                  file=_sys.stderr)
+        else:
+            print(f"    recurrence: {unit} has been raised {len(stamps)} time(s) already — "
+                  f"{', '.join(sorted(stamps))}.", file=_sys.stderr)
+            if len(stamps) >= recurrence_hard:
+                print(f"      at/over the declared recurrence watermark ({recurrence_hard}, "
+                      f"measures.yaml lens {_RAISE_RECURRENCE_LENS}): this unit has been raised "
+                      f"{len(stamps)} times WITHOUT the disturbance being attenuated. A DESIGN "
+                      f"PASS IS DUE BEFORE ANOTHER RAISE.", file=_sys.stderr)
+
+    for unit, r in units.items():
+        arc = r["human_post"].get("edgenodeArcFactor")
+        if any(x["unit"] == unit and x["kind"] == "memory" for x in raises) and arc in (None, "1", 1):
+            shown = arc if arc is not None else "absent (full arc — the conductor default)"
+            print(f"    arc: {unit} declares edgenodeArcFactor={shown}. At FULL ARC per-node RAM is "
+                  f"proportional to the WHOLE CORPUS, and {_ARC_SCALING_SPEC} rules that no RAM "
+                  f"bump reconciles that — the durable lever is the arc, not the limit. This raise "
+                  f"is predicted to re-breach at the next ceiling.", file=_sys.stderr)
+    cast = _declared_hosted_cast(root)
+    if cast:
+        print("    hosted cast (declared): "
+              + "; ".join(f"{f} DOORWAY_MAX_AGENTS_PER_CONDUCTOR={n} => ~{n * _HOSTED_AGENT_HEAP_MI}Mi "
+                          f"conductor heap at ~{_HOSTED_AGENT_HEAP_MI}Mi/hosted agent"
+                          for f, n in cast), file=_sys.stderr)
+    print("    corpus: NO manifest in this tree declares a corpus byte count or document count, so "
+          "the archetype budget IS the demand model. That absence is the first thing to fix if the "
+          "model keeps under-predicting.", file=_sys.stderr)
+
+    stamp_text = " ".join(v for r in raises for k, v in (r["human_post"] or {}).items()
+                          if isinstance(k, str) and k.startswith("$") and isinstance(v, str))
+    if path.name.endswith((".yaml", ".yml")):
+        stamp_text += "\n" + post
+    cited = _cited_diagnosis(root, stamp_text)
+    restoring = [m for m in _RESTORATION_MARKERS if m in stamp_text.lower()]
+    if cited and restoring:
+        print(f"    design references PRESENT — cites {', '.join(cited[:4])}; restoration language "
+              f"present ({', '.join(restoring[:3])}). Confirm the disturbance is ATTENUATED AT "
+              f"SOURCE and not merely absorbed: a citation is not an attenuation.", file=_sys.stderr)
+    else:
+        missing = ([] if cited else ["no cited diagnosis path that RESOLVES on disk"]) + \
+                  ([] if restoring else ["no restoration condition / falsifier"])
+        print(f"    design references MISSING — {'; '.join(missing)}.", file=_sys.stderr)
+
+    print("    ANSWER THESE, IN ORDER, IN THE STAMP YOU LEAVE:", file=_sys.stderr)
+    print("      (a) WHAT DISTURBANCE is this limit absorbing? Name the loop, and cite a diagnosis "
+          "path that EXISTS on disk (a spec or a backlog entry).", file=_sys.stderr)
+    print(f"      (b) WHICH SEAM WE OWN attenuates it at the source? Route the concern through "
+          f"{_SEAM_MAP}. A raise that names no seam is the intervenor taking the load permanently.",
+          file=_sys.stderr)
+    print("      (c) WHAT IS THE RESTORATION CONDITION, and what would FALSIFY the raise? "
+          "\"the unit pins at the NEW limit with the symptom unchanged\" is the usual falsifier — "
+          "it says the burn was never headroom.", file=_sys.stderr)
+
+    reason = (f"resource limit RAISE ({kind_word}/{signal}) on {', '.join(sorted(units))} — "
+              f"{len(raises)} field(s). The raise is the algedonic signal and it refers to the "
+              f"design plane, not the operational one. Predicted-vs-requested numbers, the "
+              f"recurrence count and the model basis are on stderr; answer (a) the disturbance, "
+              f"(b) the attenuating seam, (c) the restoration condition + falsifier in the stamp "
+              f"you leave.")
+    evidence = {"stock": max((_quantity(r["post"], r["kind"] == "memory") or 0) for r in raises),
+                "limit": max((r["predicted"] or 0) for r in raises)}
+    if not breach:
+        evidence["threshold_pct"] = 100  # Approach carries it; Breach does not (algedonic.rs)
+    return Verdict("ask", reason, None, "resource-limit-raise-unattenuated", evidence)
+
+
 # Declared runtime-scoped validator refs: NOT unresolvable — Unavailable-by-declaration, skips
 # clean without downgrading the rule (constraint 6). Value names the runtime that owns them.
 #
@@ -1408,6 +1844,8 @@ REFERENCE_VALIDATORS = {
     "epr:validator-heal-fills-never-moves": _heal_fills_never_moves,
     "epr:validator-bounded-work": _bounded_work,
     "epr:validator-dna-hash-neutrality": _dna_hash_neutrality,
+    # Compute-layer design signal: a limit RAISE is algedonic evidence, routed to S3/S4.
+    "epr:validator-resource-limit-raise-design-signal": _resource_limit_raise_design_signal,
 }
 
 
@@ -1450,6 +1888,20 @@ def load_policies(repo_root: Path) -> tuple[dict, list[str]]:
     if yaml is None:
         return {}, [f"PyYAML unavailable — policy registry {POLICY_REGISTRY_REL} not loaded"]
     try:
+        # OPEN, ESCALATED 2026-09-13 — a REGISTRY is not a manifest, and should not borrow a
+        # manifest's cap. `_lib/seam_census.py` (~line 175) already ratified that distinction in
+        # prose and carved out `_MAX_REGISTRY_BYTES` after `elohim-storage`'s seam registry crossed
+        # 64KB and contributed ZERO cells to the concern x seam matrix for two days. This registry
+        # is the same artifact and sits at ~99% of the cap — its sibling `measures.yaml` is already
+        # 72KB and loads fine only because no cap is applied to it at all. One more policy row here
+        # flips this to `({}, [size cap])`, which drops EVERY policy-bound rule to "unknown policy
+        # — rule NOT enforced": a total governance outage from a bound borrowed off a different
+        # threat model. The carve-out is NOT taken unilaterally because the native evaluator
+        # applies the SAME cap at `elohim/eprfs/eprfs-meta/src/evaluation.rs:519` against
+        # `MAX_MANIFEST_BYTES` (lib.rs:39) — changing one host alone makes the two disagree
+        # (python=refer, rust=permit) on every governed write, and the installed `epr` binary
+        # would keep the old bound until rebuilt. The fix is a two-host change plus an `epr`
+        # rebuild; until then this file must stay under 64KB.
         if p.stat().st_size > MAX_MANIFEST_BYTES:
             return {}, [f"{POLICY_REGISTRY_REL} exceeds {MAX_MANIFEST_BYTES // 1024}KB size cap"]
         text = p.read_text()

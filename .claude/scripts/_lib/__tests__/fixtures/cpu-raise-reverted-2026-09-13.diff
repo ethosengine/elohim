@@ -1,0 +1,65 @@
+diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/data/deployments.json
+--- a/genesis/orchestrator/data/deployments.json
++++ b/genesis/orchestrator/data/deployments.json
+@@ -33,8 +33,9 @@
+       "edgenodeMemoryRequest": "2Gi",
+       "edgenodeMemoryLimit": "8Gi",
+       "edgenodeCpuRequest": "1500m",
+-      "edgenodeCpuLimit": "8000m",
++      "edgenodeCpuLimit": "12000m",
+       "edgenodeDbPoolSize": "20",
++      "$cpuBumpComment2026-09-13": "2026-09-13 (operator decision, served-under-standing sprint): edgenodeCpuLimit 8000m -> 12000m (request unchanged), kept in lockstep with adam-firstman.yaml / adam-firstman-conductor.yaml per $resourceBudgetComment. Live read 2026-09-13: adam's conductor pinned at 3.95 of 4.0 cores (~99% CFS-throttled) at 35% of memory; storage admission gate at 4.28 of 5 in-flight, 668 interactive content_store sheds in 24h, zero heal outcomes in 25 hourly buckets while matthew (same DHT) healed 35 -- the heal leg is never admitted. Conductor 4000m -> 6000m and storage 4000m -> 6000m, which lifts conductor_db_max_readers to 12 and admissible permits 5 -> 9. shem allocatable 24000m; adam+gertrude+susan+eve limits sum 21000m after this change. Restoration condition and falsifier as for matthew ($cpuBumpComment2026-09-13).",
+       "runtimeConfig": {
+         "ELOHIM_RELEASE_CHANNELS": "runtime:coordinators:elohim:workspace=observe"
+       },
+@@ -61,8 +62,9 @@
+       "edgenodeMemoryRequest": "2Gi",
+       "edgenodeMemoryLimit": "8Gi",
+       "edgenodeCpuRequest": "1500m",
+-      "edgenodeCpuLimit": "4000m",
++      "edgenodeCpuLimit": "10000m",
+       "edgenodeDbPoolSize": "20",
++      "$cpuBumpComment2026-09-13": "2026-09-13 (operator decision, served-under-standing sprint): edgenodeCpuLimit 4000m -> 10000m (request unchanged). Live read 2026-09-13: matthew's conductor pinned at 1.99 of 2.0 cores (~99% CFS-throttled) at 27% of memory; the fleet-quiesce gate reads storage A (matthew) and the apex head PATCH is answered catching-up/retryAfter 30 on both hosts. Through the 1/2:1/2 split (scripts/ci/conductor-split-budget.sh) the conductor gets 5000m and the storage pod 5000m, the smallest total that lifts conductor_db_max_readers past the 8-reader floor (10 readers, admissible permits 5 -> 7; elohim-storage conductor_admission.rs). ethosengine allocatable 24000m, limits 13400m before this change. Restoration condition: the demand-driven ramp (backlog fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11: sender back-off, boot profiles, reconcile ramp, sequenced roll) lands and CFS throttle < 0.9 holds 24h; then step back with throttle evidence. Falsified if the conductor pins at the new limit with interactive shed unchanged -- then the burn is the publish storm, not headroom. The 2026-06-15 note below still stands: pool sizing and the ramp are the targeted levers; this is evidence-stamped headroom for the browser-facing genesis pair while they land.",
+       "$cpuBumpComment": "2026-06-15: edgenodeCpuLimit 3000m→4000m (request 1000m→1500m) — band-aid headroom for the matthew-edge reconnect-storm (conductor closing app-ws sessions ~40/min; backlog doorway-conductor-reconnect-storm-matthew-edge). The TARGETED lever is the SQLite read pool (edgenodeDbPoolSize=20 → STORAGE_DB_POOL_SIZE; default 10), not raw CPU — this is insurance while pool sizing is measured on the live edge. Restore to 3000m once the reconnect-storm root (session/pool pressure) is confirmed resolved.",
+       "$dbPoolComment": "2026-06-15: edgenodeDbPoolSize renders STORAGE_DB_POOL_SIZE on the elohim-node container (elohim/elohim-storage/src/db/mod.rs init_pool; default 10). 20 doubles the shared r2d2 read/write pool over content.db to relieve read contention under the reconnect-storm load. Nodes that leave it unset render the default 10.",
+       "runtimeConfig": {
+diff --git a/genesis/orchestrator/manifests/humans/adam-firstman.yaml b/genesis/orchestrator/manifests/humans/adam-firstman.yaml
+--- a/genesis/orchestrator/manifests/humans/adam-firstman.yaml
++++ b/genesis/orchestrator/manifests/humans/adam-firstman.yaml
+@@ -320,6 +320,7 @@
+           #   memory limit   8192Mi = 5120Mi (conductor 5/8) + 3072Mi (here)
+           #   cpu request     1500m =   750m (conductor 1/2) +   750m (here)
+           #   cpu limit       8000m =  4000m (conductor 1/2) +  4000m (here)
++#   2026-09-13: 12000m = 6000m (conductor) + 6000m (here) — see deployments.json $cpuBumpComment2026-09-13.
+           # validate-deployments.ts check (3) asserts that SUM against the
+           # deployments.json record, so the two files can neither drift apart
+           # nor quietly inflate adam's real footprint.
+@@ -339,7 +340,7 @@
+               cpu: "750m"
+             limits:
+               memory: "3072Mi"
+-              cpu: "4000m"
++              cpu: "6000m"
+           volumeMounts:
+             # holochain-data / conductor-config / happ-volume moved to
+             # adam-firstman-conductor.yaml (rung 2).
+diff --git a/genesis/orchestrator/manifests/humans/adam-firstman-conductor.yaml b/genesis/orchestrator/manifests/humans/adam-firstman-conductor.yaml
+--- a/genesis/orchestrator/manifests/humans/adam-firstman-conductor.yaml
++++ b/genesis/orchestrator/manifests/humans/adam-firstman-conductor.yaml
+@@ -18,6 +18,7 @@
+ #   memory limit   5120Mi + adam-firstman.yaml's 3072Mi = 8192Mi = 8Gi
+ #   cpu request      750m + adam-firstman.yaml's   750m = 1500m
+ #   cpu limit       4000m + adam-firstman.yaml's  4000m = 8000m
++#   2026-09-13: conductor 6000m + adam-firstman.yaml storage 6000m = 12000m (deployments.json $cpuBumpComment2026-09-13: CFS-throttled ~99% at 4000m, heal leg never admitted; readers 12, permits 9).
+ # The split never adds load; validate-deployments.ts check (3) asserts that sum.
+ #
+ # OPEN, OPERATOR-OWNED: adam's 8000m single-pod limit was chosen 2026-07-07 so
+@@ -383,7 +384,7 @@
+               cpu: "750m"
+             limits:
+               memory: "5120Mi"
+-              cpu: "4000m"
++              cpu: "6000m"
+           volumeMounts:
+             - name: holochain-data
+               mountPath: /var/local/lib/holochain

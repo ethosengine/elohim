@@ -896,7 +896,51 @@ measures:
     status: active
     established_by: bounded-recall-mastery-sprint-2026-09-11
 
+  - id: resource-limit-raises
+    version: 1
+    family: resource-limit
+    unit: raises
+    procedure: >
+      Count the prior raise STAMPS a fleet unit carries in genesis/orchestrator/data/deployments.json
+      — a `$...Bump...`-shaped comment key, or a comment value opening with the established
+      TEMP/TEMPORARY BUMP convention. Counted from the PRE-state of a write, so the stamp an author
+      is adding right now never counts itself. Read by
+      epr:validator-resource-limit-raise-design-signal.
+    provenance: ".claude/scripts/_lib/epr_meta.py `_raise_stamps` (the counter); genesis/orchestrator/data/deployments.json (the stamps themselves — $cpuBumpComment, $cpuThrottleBumpComment, $memoryBumpComment, $cpuLimitBump, $comment 'TEMP BUMP')"
+    default-authority: observation
+    status: active
+    established_by: operator-requested-2026-09-13
+    why: >
+      The recurrence count is the difference between a considered raise and a treadmill. One raise
+      on a unit is an APPROACH — the band edge, worth a question. The Nth raise on the SAME unit,
+      with the disturbance never attenuated, is Meadows' shifting-the-burden-to-the-intervenor and
+      reads as a BREACH regardless of how well the Nth stamp is written. Naming it as a measure puts
+      the number in the registry rather than in a constant: the watermark below is a DECLARATION the
+      validator reads, not a magic 2 buried in Python. Teeth-free by construction like every measure
+      here; the lens is where the enforcement class lives.
+
 lenses:
+  - id: resource-limit-raise-recurrence
+    version: 1
+    compare: at-or-above
+    binding: binding-local
+    class: ask
+    consumes: [resource-limit-raises@1]
+    context: deployment-record-governance
+    hard: 2
+    status: active
+    established_by: operator-requested-2026-09-13
+    why: >
+      The contract half for resource-limit-raises@1, and the only place this family carries teeth.
+      AT OR ABOVE two prior raise stamps on one unit, a further raise is read as an algedonic BREACH
+      rather than an APPROACH and the `ask` message says plainly that a design pass is due before
+      another raise. `compare: at-or-above` because this is a TRIGGER COUNT, not a ceiling — it
+      fires AT the watermark. Consumed by the .epr-meta rule
+      `resource-limit-raise-design-signal` via epr:validator-resource-limit-raise-design-signal,
+      which reads this row's `hard` as the authority and falls back to 2 only if the registry is
+      unreadable. No `headline:` — this bound is edit-time, not a SessionStart slot, and it renders
+      `skipped` rather than 0 until a fold is noted (unmeasured must not read as measured-zero).
+
   - id: review-lint-lens
     version: 1
     binding: persuasive

@@ -59,6 +59,11 @@
       "why": "Classifies DNA-tree diffs as hash-moving (integrity zomes + modifiers) vs hot-swappable (coordinator zomes). Registered machinery with no canon class; `inject` only."
     },
     {
+      "ref": "epr:validator-resource-limit-raise-design-signal",
+      "runtime": "python",
+      "why": "Reads four repository ledgers at once (deployments.json pre/post, archetype-resource-budgets.json, the Rakia compute-capacity ratifications, the doorway manifests' declared hosted cast) and regex-scans k8s manifest YAML to project a demand model that has no native type yet. Python owns it because that projection is a repository-census concern, not a claim about Rust source; it graduates to `both` the moment `Envelope::demand` exists in ark-core and bridges/k8s renders it."
+    },
+    {
       "ref": "epr:validator-eprfs-meta-domain-neutrality",
       "runtime": "rust",
       "why": "Guards eprfs-meta against gaining concrete validator identities — it is a claim ABOUT the Rust crate's own source, so the host that compiles that crate is the only one that can meaningfully assert it."

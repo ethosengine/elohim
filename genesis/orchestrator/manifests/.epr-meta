@@ -26,6 +26,29 @@ rules:
       `scripts/ci/validate-conductor-config.sh` enforces this at deploy; do not ship a manifest
       it will reject. Evidence: Holochain conductor-config example (`iceServers`); tx5-connection
       `config.rs` `#[serde(rename_all = "camelCase")]`.
+  - id: resource-limit-raise-design-signal
+    class: ask
+    when: { write: "*.yaml" }
+    validator: epr:validator-resource-limit-raise-design-signal
+    retire-when: >
+      when demand has a native home and the gate can READ it instead of projecting it — an
+      `Envelope::demand` beside `Envelope::bound` in ark-core, rendered by bridges/k8s the way the
+      bound is rendered today — so a raise past the modelled demand fails at render rather than at
+      review. Only the recurrence count would remain, and `resource-limit-raises@1` carries that.
+    why: >
+      Raising a CPU or memory LIMIT is System 1 amplifying the regulator. Ashby admits that move
+      — a regulator needs the variety of what it regulates, and either attenuating the disturbance
+      or amplifying the regulator restores the balance — so this rule never says a raise is wrong.
+      What it does not admit is amplifying again and again while the disturbance at the source is
+      never attenuated: Meadows' shifting-the-burden-to-the-intervenor. The raise is therefore
+      treated as ALGEDONIC evidence (elohim/epr/src/algedonic.rs) — APPROACH at the band edge,
+      BREACH past it — and REFERRED to the design plane (S3/S4) rather than answered on the
+      operational one. It carries a NUMBER, not a questionnaire: requested vs a demand model
+      composed from the deviceArchetype canonical budget, a ratified `resourceOverride` read from
+      the PRE-state, the Rakia `limits.cpu_m` overcommit ratification, the `bridges/k8s::share()`
+      split, the declared `edgenodeArcFactor` and the declared hosted cast — plus the count of
+      prior raise stamps this unit already carries. Never fires on a lower or equal value, a new
+      unit, an unparseable edit, or a YAML no deployment record claims.
 cites:
   - substrate-convergence-five-defect-arc
 ---
@@ -57,3 +80,26 @@ class C7 — the phantom key was dropped 2026-08-02 by plan task P4.1, with ever
 teaching kept).
 
 See: `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`
+
+## Resource-limit raises in the explicit human manifests (edit-time refer)
+
+`humans/adam-firstman.yaml` and `humans/adam-firstman-conductor.yaml` hold **hardcoded**
+`resources: limits: {cpu, memory}` blocks — adam renders from manifests, not from the consolidated
+template, so the `edgenode*` fields in `deployments.json` are render-inert mirrors for that human
+and a raise can land here without ever touching the deployment record. The
+`resource-limit-raise-design-signal` rule covers that path.
+
+It is declared `when: { write: "*.yaml" }` because `when` patterns match by BASENAME only, but it is
+**self-scoping** rather than broad: the validator resolves the owning unit by looking the file's name
+up in `deployments.json` `manifest` / `conductorManifest`, and returns silently for any YAML no
+human's deployment record claims. It predicts the per-container limit by applying
+`bridges/k8s::share()` — conductor takes 1/2 CPU and 5/8 memory, storage the remainder — to the
+unit's declared whole, so the two halves of a split human are measured against the same declared
+budget the renderer uses. Rationale, the VSM reading, and the recurrence watermark live with the
+sibling binding at `genesis/orchestrator/data/.epr-meta`.
+
+This is the second of two inline declarations of the same rule — the other governs
+`../data/deployments.json` and carries the full reading (the demand model, its sources, the
+APPROACH/BREACH condition, and why the rule is inline rather than bound to a pinned policy row).
+The duplication is a cost of a full policy registry, not a design choice; see
+`genesis/orchestrator/data/.epr-meta`.
