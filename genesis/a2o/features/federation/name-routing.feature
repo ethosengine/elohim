@@ -12,6 +12,19 @@ Feature: Jessica reaches a hosted site through a doorway and gets a bounded 404 
   on an owned household test mesh: two HTTP gateways, alpha and beta. It assumes
   Jessica may receive the site; authorization is a separate proof.
 
+  The last scenario is about balance rather than routing, and it alone needs a
+  third gateway, gamma. Balance only becomes a question when a name has more than
+  one holder and the doorway Jessica asks holds it itself: beta stays the doorway
+  she asks, and alpha and gamma are the two holders it chooses between. The other
+  four scenarios need only alpha and beta and never mention gamma.
+
+  Three ways a holder can fail to serve, kept apart throughout. Paused means the
+  holder says nothing at all, because its process is stopped. Refusing means the
+  holder answers about Jessica: it resolved the request and declined her. Busy
+  means the holder answers about itself: it can serve, but not right now, and it
+  names how long it expects that to last. Only the last of these is what the
+  balance scenario stages, and the other two are proved elsewhere.
+
   Here garden is a site path, not a DNS hostname. Jessica supplies only beta's
   address and a unique path such as /nrt-garden-123/. Alpha's address is discovered
   by beta. Registrations publish doorway addresses; hosting contracts identify
@@ -124,3 +137,51 @@ Feature: Jessica reaches a hosted site through a doorway and gets a bounded 404 
     And Jessica received HTTP 404 for "garden"
     And neither registered doorway served content for the lapsed site
     And Jessica received that refusal in less than 15 seconds
+
+  # Balance, not only failover. Here garden has two holders, alpha and gamma.
+  # When one of them is busy and says so on its own answer — naming how long it
+  # expects to stay that way — Jessica keeps being served, and the doorway she
+  # asked stops spending her wait on the busy holder. Nobody configures
+  # anything: the only new fact in the system is what the busy holder said
+  # about itself, in reply to a request it was already answering.
+  #
+  # Busy here is the third of the three states the preamble separates: the
+  # holder answers, and its answer is about itself and names a duration.
+  #
+  # The refresh cycle is the point. Doorways refresh what they know of each
+  # other on a cycle, and anything a doorway learned from a single reply is
+  # forgotten at that refresh. So this scenario deliberately spans one full
+  # cycle: a holder that said it would be busy for longer than a cycle must
+  # still be treated that way afterwards, or Jessica pays the same wait over
+  # again every cycle for as long as the holder stays busy.
+  #
+  # Set aside means placed behind its sibling in holder order, never removed.
+  # This scenario keeps two holders throughout, so it does not measure a name
+  # with only one holder; that a sole busy holder is still asked, and still
+  # serves, is checked where the doorway's own holder ordering is tested.
+  # Recovery here is the passing of the time alpha named, not a health check:
+  # the scenario also observes that nothing asked alpha for garden while it was
+  # set aside.
+  @wip
+  Scenario: A busy holder is set aside until the time it named has passed
+    Given doorway "gamma" at "E2E_DOORWAY_GAMMA"
+    And the household stages the root "garden" as hosted by doorway "alpha" and doorway "gamma"
+    And doorway "alpha" is the first holder in owner order
+    And doorway "gamma" is the next holder after it
+    And doorway "beta" has no contract to host "garden" locally
+    When the household makes doorway "alpha" answer that it is busy for longer than one registry refresh cycle
+    And Jessica asks doorway "beta" for "garden"
+    Then Jessica is served "garden"
+    And the reply names doorway "gamma" as the origin for "garden"
+    When doorway "beta" next refreshes its registry
+    And Jessica asks doorway "beta" for "garden"
+    Then Jessica is served "garden"
+    And the reply names doorway "gamma" as the origin for "garden"
+    And doorway "beta" never asked doorway "alpha" for "garden" on that request
+    When doorway "alpha" is no longer busy
+    And the time doorway "alpha" named has passed
+    And Jessica asks doorway "beta" for "garden"
+    Then Jessica is served "garden"
+    And the reply names doorway "alpha" as the origin for "garden"
+    And nothing asked doorway "alpha" for "garden" while it was set aside
+    And doorway "beta" was never restarted or reconfigured during this scenario

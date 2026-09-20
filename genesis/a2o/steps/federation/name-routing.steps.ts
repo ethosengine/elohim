@@ -173,6 +173,25 @@ const STALE_REGISTRY_MAX_ATTEMPTS = 2;
 const STALE_REGISTRY_ATTEMPT_BUDGET_MS =
   65_000 + TICK_WAIT_BUDGET_MS + 15_000 + STALE_REGISTRY_SAFETY_MARGIN_MS + 15_000;
 
+/** Scenario 5's own timing contract ("A busy holder is set aside until the time it
+ * named has passed"). Named so the doorway's federation heartbeat cadence
+ * (`spawn_peer_discovery_task`, TICK_LOG_MESSAGE's own doc — 60s in main.rs) is
+ * findable at the call site rather than a bare "120" appearing out of nowhere. */
+const REGISTRY_REFRESH_CYCLE_SECS = 60;
+/** Strictly greater than one refresh cycle — the scenario's own narrative
+ * requirement ("busy for longer than one registry refresh cycle"), so a doorway
+ * that only remembered a single reply would still be caught treating the busy
+ * holder as available again after its first refresh. */
+const BUSY_WINDOW_SECS = REGISTRY_REFRESH_CYCLE_SECS * 2;
+/** "doorway X next refreshes its registry" budget: one 60s cadence plus buffer for
+ * the tick itself to be logged (mirrors TICK_WAIT_BUDGET_MS's own reasoning, sized
+ * a little more generously per this scenario's own stated timing contract). */
+const NEXT_REFRESH_TICK_BUDGET_MS = 150_000;
+/** Settle margin added on top of the declared busy window before asserting the
+ * window has genuinely elapsed — clear of clock/timer-granularity noise, never a
+ * substitute for the real elapsed-time assertion that follows it. */
+const BUSY_WINDOW_SETTLE_MARGIN_MS = 2_000;
+
 /** Fixture doorway id -> hc-mesh.sh's own PID-ledger letter (apex-transition.steps.ts convention). */
 const MESH_LETTER: Readonly<Record<string, 'a' | 'b'>> = { alpha: 'a', beta: 'b' };
 
@@ -600,6 +619,67 @@ async function adminCall(
     await delay(wait);
   }
   return last;
+}
+
+/** A raw response from the doorway's dev-gated busy/shed-override surface — status,
+ * body text and (lower-cased) response headers, since `Retry-After` is read directly. */
+interface ShedResponse {
+  status: number;
+  text: string;
+  headers: Record<string, string | undefined>;
+}
+
+/**
+ * `PUT {doorwayUrl}/admin/dev/shed` — the PROPOSED sibling of the already-live
+ * `PUT /admin/dev/portal-health` (`doorway/doorway-service/src/routes/admin_dev.rs`):
+ * same dev-mode-gated, doorway-local OPERATIONAL-state shape, same admin-key auth this
+ * file's own `adminCall` uses for its writes. NOT YET BUILT as of this authoring —
+ * every caller MUST check `shedRouteMissing` on the result before trusting anything
+ * else about it (a 404/405 means "route absent on this build", never "the holder
+ * genuinely refused").
+ *
+ * `{"retryAfterSecs": 0}` is this file's own convention for CLEARING a previously-set
+ * override (the task's stated alternative, DELETE, is not exercised here — "support
+ * PUT-with-0" is sufficient and keeps one call shape for both directions).
+ */
+async function putShedOverride(doorwayUrl: string, retryAfterSecs: number): Promise<ShedResponse> {
+  const response = await fetch(`${doorwayUrl}/admin/dev/shed`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ retryAfterSecs }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  const text = await response.text();
+  const headers: Record<string, string | undefined> = {};
+  response.headers.forEach((value, key) => {
+    headers[key.toLowerCase()] = value;
+  });
+  return { status: response.status, text, headers };
+}
+
+/** See `putShedOverride`'s doc: the honest "not built yet" reading of its result. */
+function shedRouteMissing(res: ShedResponse): boolean {
+  return res.status === 404 || res.status === 405;
+}
+
+/**
+ * Marks the calling step PENDING (yellow — never a false green, never an opaque red)
+ * with a message naming exactly which route is missing, mirroring this file's other
+ * `this.attach?.(...)` + `return 'pending'` degrades (see `federation-epr.steps.ts` for
+ * the same convention). Scenario 5 cannot arrange a real busy holder without this route;
+ * every step that depends on it degrades through this one function so the message is
+ * worded identically everywhere it appears in a report.
+ */
+function pendingShedRoute(world: E2EWorld, doorwayId: string, res: ShedResponse): 'pending' {
+  world.attach?.(
+    `PENDING: PUT ${world.getDoorway(doorwayId).url}/admin/dev/shed answered HTTP ${res.status} — ` +
+      'this dev-gated busy/shed-override route is not built yet on this doorway (the proposed ' +
+      'sibling of the live PUT /admin/dev/portal-health in ' +
+      'doorway/doorway-service/src/routes/admin_dev.rs). Scenario "A busy holder is set aside ' +
+      `until the time it named has passed" cannot arrange doorway "${doorwayId}" as a real busy ` +
+      'holder without it.'
+  );
+  return 'pending';
 }
 
 async function coherenceManifest(
@@ -1069,6 +1149,20 @@ async function logSince(path: string, offset: number): Promise<string> {
   return text.length >= offset ? text.slice(offset) : text;
 }
 
+/** The slice of `path` written strictly between two prior `logLength` offsets — the
+ * BOUNDED counterpart to `logSince` (which reads to end-of-file). Scenario 5's "nothing
+ * asked X while it was set aside" (step 6) needs exactly this bound: reading to
+ * end-of-file at assertion time would also pick up the LEGITIMATE ask that follows
+ * clearing the override (the busy holder is asked again, on purpose, once it is no
+ * longer set aside), which is outside the window this check is about. Clamped so a
+ * offset pair captured across a log rotation never throws. */
+async function logBetween(path: string, fromOffset: number, toOffset: number): Promise<string> {
+  const text = await readFile(path, 'utf8');
+  const from = Math.min(fromOffset, text.length);
+  const to = Math.min(Math.max(toOffset, from), text.length);
+  return text.slice(from, to);
+}
+
 // ---------------------------------------------------------------------------
 // The federation discovery loop's own tick — the timestamp anchor scenario 4's premise
 // needs (see that Given step's own doc for why: there is no admin endpoint exposing "when
@@ -1191,6 +1285,37 @@ interface AskCapture {
   otherId: string;
 }
 
+/**
+ * Scenario 5's own fault-injection record — the dev-gated shed override this file
+ * PUTs on a holder, and the two log offsets that bound the window it is honestly
+ * checkable over (see `logBetween`'s doc for why "to end-of-file" is the wrong bound).
+ */
+interface BusyOverrideState {
+  doorwayId: string;
+  doorwayUrl: string;
+  retryAfterSecs: number;
+  /** Wall-clock instant the busy window was declared — VERIFIED busy first (see the
+   * "the household makes doorway ... answer that it is busy ..." step), so this is the
+   * instant a real, confirmed busy window began, never merely the instant the PUT was
+   * sent. */
+  declaredAtMs: number;
+  /** The doorway's own stdout log — the same file `doorwayLogPath` resolves for every
+   * other request-log check in this file. */
+  logPath: string;
+  /** `logLength(logPath)` taken AFTER this step's own verify-busy probe — deliberately
+   * excluding that probe's own request line from the "nothing asked it while set aside"
+   * window (the same "the extra ... request is outside that capture" convention this
+   * file's header describes for the advertised-address scenario). */
+  logOffsetAtDeclare: number;
+  /** `logLength(logPath)` taken BEFORE the clearing step's own verify probe — same
+   * self-contamination guard, at the other end of the window. Set once "doorway ... is
+   * no longer busy" has cleared the override. */
+  logOffsetAtClear?: number;
+  /** Set once "doorway ... is no longer busy" has cleared the override — the After
+   * hook's own signal that no further best-effort clear is needed. */
+  clearedAtMs?: number;
+}
+
 interface NameRoutingState {
   root: string;
   /** The project-epr commitment's `urlPath` (no trailing slash — `/nrt-garden`). */
@@ -1202,6 +1327,15 @@ interface NameRoutingState {
   ask?: AskCapture;
   secondAsk?: AskCapture;
   staleRegistry?: { doorwayId: string; holderId: string; tickAt: number };
+  /** Scenario 5's busy/shed-override record — see `BusyOverrideState`'s doc. */
+  busyOverride?: BusyOverrideState;
+  /** Scenario 5's evidence for "doorway ... was never restarted or reconfigured during
+   * this scenario": every doorway id this scenario's OWN glue issued an admin write
+   * against (the shed-override PUTs; background staging writes never target a doorway
+   * this scenario asserts non-interference for) and each doorway's `/proc` start tick,
+   * captured once at the earliest point this file's own scenario-5 glue controls. */
+  adminWritesByDoorwayId: Set<string>;
+  startTicksByDoorwayId: Map<string, string>;
 }
 
 const states = new WeakMap<E2EWorld, NameRoutingState>();
@@ -1220,9 +1354,40 @@ function beginScenario(world: E2EWorld, root: string): NameRoutingState {
     path: nrtRequestPath(root),
     staged: [],
     paused: new Map(),
+    adminWritesByDoorwayId: new Set(),
+    startTicksByDoorwayId: new Map(),
   };
   states.set(world, state);
   return state;
+}
+
+/** Records that THIS scenario's own glue issued an admin write against `doorwayId` —
+ * scoped to the shed-override control surface Scenario 5 introduces (see
+ * `NameRoutingState.adminWritesByDoorwayId`'s doc for why the pre-existing background
+ * staging writes need no separate tracking here: they never target the doorway this
+ * scenario asserts non-interference for). */
+function recordAdminWrite(state: NameRoutingState, doorwayId: string): void {
+  state.adminWritesByDoorwayId.add(doorwayId);
+}
+
+/** Captures `doorwayId`'s `/proc` start tick once, at the EARLIEST point this file's
+ * own scenario-5 glue controls — before any fault injection. Idempotent: a second call
+ * for the same (state, doorwayId) is a no-op, so it is safe to call from more than one
+ * step without re-resolving the process each time. See the "doorway ... was never
+ * restarted or reconfigured during this scenario" Then step for why this baseline
+ * matters: an unnoticed restart mid-scenario must read as a named finding, not a
+ * silent false-green from a step that only checks "does it answer /health now". */
+async function captureBaselineStartTicks(
+  state: NameRoutingState,
+  doorwayId: string
+): Promise<void> {
+  if (state.startTicksByDoorwayId.has(doorwayId)) return;
+  const handle = await resolveOwnedMeshProcess(
+    'doorway',
+    MESH_LETTER[doorwayId],
+    `doorway ${doorwayId}`
+  );
+  state.startTicksByDoorwayId.set(doorwayId, handle.ticks);
 }
 
 async function resolvedDoorwayId(
@@ -2145,6 +2310,276 @@ Then('Jessica received that refusal in less than 15 seconds', function (this: E2
 });
 
 // =============================================================================
+// Scenario 5 — a busy holder is set aside until the time it named has passed
+//
+// Two preconditions this scenario needs do NOT exist in the tree yet, and this
+// file's glue is written to degrade HONESTLY against both rather than assume them:
+//
+//   (a) A third household doorway "gamma". `app/elohim-app/scripts/hc-mesh-prologue.sh`
+//       declares it ABSENT with a named reason, and `household-mesh.ts`'s
+//       `fixtureDoorwayUrl`/`requireFixtureDoorwayUrl` already throw that reason when
+//       nothing overrides it. That throw happens inside the ALREADY-REGISTERED
+//       `doorway {string} at {string}` step (`steps/mode-aware.steps.ts`) — this
+//       scenario's own FIRST line — which this file must reuse unchanged and cannot
+//       intercept. On a mesh with no `E2E_DOORWAY_GAMMA` set, the scenario therefore
+//       fails at that first line with the absence reason named in the thrown message,
+//       before any step in this section ever runs. None of the steps below can turn
+//       that into a Cucumber PENDING status without editing mode-aware.steps.ts, which
+//       is out of this file's scope — the honest degrade available from here is the
+//       named, non-opaque error that step already throws.
+//
+//   (b) A dev-gated busy/shed override, `PUT {doorwayUrl}/admin/dev/shed` — the
+//       proposed sibling of the already-live `PUT /admin/dev/portal-health`
+//       (`doorway/doorway-service/src/routes/admin_dev.rs`). See `putShedOverride`'s
+//       doc. Every step below that calls it checks `shedRouteMissing` FIRST and
+//       returns Cucumber PENDING (via `pendingShedRoute`) when the route is absent —
+//       never a false green, never an opaque assertion failure.
+// =============================================================================
+
+When(
+  'the household makes doorway {string} answer that it is busy for longer than one registry refresh cycle',
+  { timeout: REQUEST_TIMEOUT_MS * 2 + 15_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<string | void> {
+    const state = getState(this);
+    const doorway = this.getDoorway(doorwayId);
+
+    // Earliest point this file's own scenario-5 glue controls, before any fault
+    // injection — the baseline "doorway ... was never restarted or reconfigured"
+    // (step 7) compares against. Captured for "beta" here (not `doorwayId`, which is
+    // the busy holder, "alpha") because "beta" is the doorway that step names, and
+    // this is the first moment in the scenario this file's own glue runs at all.
+    await captureBaselineStartTicks(state, 'beta');
+
+    const declared = await putShedOverride(doorway.url, BUSY_WINDOW_SECS);
+    if (shedRouteMissing(declared)) return pendingShedRoute(this, doorwayId, declared);
+    assert.equal(
+      declared.status,
+      200,
+      `PUT ${doorway.url}/admin/dev/shed {"retryAfterSecs":${BUSY_WINDOW_SECS}} failed: ` +
+        `HTTP ${declared.status} ${declared.text.slice(0, 300)}`
+    );
+    recordAdminWrite(state, doorwayId);
+
+    // VERIFY the holder really is busy — never proceed on an unverified premise. Forced
+    // local-only (x-federation-hop:1) so this is unambiguously THIS doorway's own answer,
+    // never an accidental relay.
+    const probe = await localOnlyGet(`${doorway.url}${state.path}`);
+    assert.equal(
+      probe.status,
+      503,
+      `doorway "${doorwayId}" answered HTTP ${probe.status} to a forced local-only probe right ` +
+        'after its shed override was set — expected 503 (busy)'
+    );
+    const retryAfter = probe.headers['retry-after'];
+    assert.ok(
+      retryAfter,
+      `doorway "${doorwayId}"'s busy 503 carries no Retry-After header — the busy answer must ` +
+        'name how long it expects to stay that way'
+    );
+    assert.equal(
+      Number(retryAfter),
+      BUSY_WINDOW_SECS,
+      `doorway "${doorwayId}"'s Retry-After (${retryAfter}) does not match the declared busy ` +
+        `window (${BUSY_WINDOW_SECS}s)`
+    );
+
+    const logPath = await doorwayLogPath(MESH_LETTER[doorwayId], `doorway ${doorwayId}`);
+    state.busyOverride = {
+      doorwayId,
+      doorwayUrl: doorway.url,
+      retryAfterSecs: BUSY_WINDOW_SECS,
+      declaredAtMs: Date.now(),
+      logPath,
+      // Taken AFTER the verify-busy probe above — see `BusyOverrideState.logOffsetAtDeclare`'s
+      // doc for why: that probe's own request line must never count as "something asked the
+      // busy holder while it was set aside" (step 6).
+      logOffsetAtDeclare: await logLength(logPath),
+    };
+  }
+);
+
+When(
+  'doorway {string} next refreshes its registry',
+  { timeout: NEXT_REFRESH_TICK_BUDGET_MS + 15_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    // Same anchor-on-the-doorway's-own-tick technique as "the household withdraws the
+    // contract ... before doorway X next refreshes its registry" above: the tick log
+    // line is the only observable proxy for "this doorway's name-route registry just
+    // relearned who holds what" (see `TICK_LOG_MESSAGE`'s own doc).
+    const logPath = await doorwayLogPath(MESH_LETTER[doorwayId], `doorway ${doorwayId}`);
+    const baseline = await lastTickAt(logPath);
+    await waitForNextTick(logPath, baseline, NEXT_REFRESH_TICK_BUDGET_MS);
+  }
+);
+
+Then(
+  'doorway {string} never asked doorway {string} for {string} on that request',
+  function (this: E2EWorld, relayingId: string, holderId: string, root: string): void {
+    const state = getState(this);
+    assert.equal(root, state.root, `scenario staged root "${state.root}", not "${root}"`);
+    // "on that request" — the MOST RECENT ask (see `requireLatestAsk`'s doc), not the
+    // first: this step runs after the scenario's SECOND "Jessica asks doorway beta..."
+    const ask = requireLatestAsk(state);
+    assert.equal(
+      ask.askedId,
+      relayingId,
+      `the most recent captured ask was against "${ask.askedId}", not "${relayingId}"`
+    );
+    // Reuses the exact mechanism "doorway ... was never contacted for that request"
+    // (Scenario 3) verifies with — `ask.otherRequestHits`/`ask.otherId`, populated by
+    // the shared "Jessica asks doorway ... for ..." step — parameterised here by the
+    // NAMED holder rather than that step's own implicit "other" doorway. The equality
+    // check below is what makes that parameterisation honest: it fails loudly, rather
+    // than silently trusting the tracked sibling, if a future scenario ever asks with a
+    // holder this ask capture was not scoped to.
+    assert.equal(
+      ask.otherId,
+      holderId,
+      `this ask's tracked sibling is doorway "${ask.otherId}", not the named holder ` +
+        `"${holderId}" — the request-log evidence below would not be about "${holderId}"`
+    );
+    assert.equal(
+      ask.otherRequestHits,
+      0,
+      `doorway "${holderId}"'s access log gained ${ask.otherRequestHits} new request line(s) for ` +
+        `${state.path} during doorway "${relayingId}"'s most recent answer — it WAS asked`
+    );
+  }
+);
+
+When(
+  'doorway {string} is no longer busy',
+  { timeout: REQUEST_TIMEOUT_MS * 2 + 15_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<string | void> {
+    const state = getState(this);
+    const busy = state.busyOverride;
+    assert.ok(
+      busy?.doorwayId === doorwayId,
+      `doorway "${doorwayId}" was never declared busy by this scenario — "the household makes ` +
+        'doorway ... answer that it is busy ..." must run first'
+    );
+    const doorway = this.getDoorway(doorwayId);
+
+    const cleared = await putShedOverride(doorway.url, 0);
+    if (shedRouteMissing(cleared)) return pendingShedRoute(this, doorwayId, cleared);
+    assert.equal(
+      cleared.status,
+      200,
+      `clearing doorway "${doorwayId}"'s shed override failed: HTTP ${cleared.status} ` +
+        cleared.text.slice(0, 300)
+    );
+    recordAdminWrite(state, doorwayId);
+
+    // Taken BEFORE the verify probe below — the same self-contamination guard as
+    // `logOffsetAtDeclare`, at the other end of the window: our OWN verification
+    // request must never count as evidence either way.
+    busy.logOffsetAtClear = await logLength(busy.logPath);
+    busy.clearedAtMs = Date.now();
+
+    const probe = await localOnlyGet(`${doorway.url}${state.path}`);
+    assert.equal(
+      probe.status,
+      200,
+      `doorway "${doorwayId}" answered HTTP ${probe.status} to a forced local-only probe right ` +
+        'after clearing its shed override — expected 200 (no longer busy)'
+    );
+    const marker = nrtMarker(state.root);
+    assert.ok(
+      probe.text.includes(marker),
+      `doorway "${doorwayId}" answered 200 after clearing its shed override but without the ` +
+        `staged archive's own marker (${marker}) — this looks like its own unrelated "/" landing ` +
+        'page, not its staged mount'
+    );
+  }
+);
+
+When(
+  'the time doorway {string} named has passed',
+  { timeout: BUSY_WINDOW_SECS * 1000 + 30_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    const state = getState(this);
+    const busy = state.busyOverride;
+    assert.ok(
+      busy?.doorwayId === doorwayId,
+      `doorway "${doorwayId}" was never declared busy by this scenario`
+    );
+    const windowMs = busy.retryAfterSecs * 1000;
+    const remaining = busy.declaredAtMs + windowMs + BUSY_WINDOW_SETTLE_MARGIN_MS - Date.now();
+    if (remaining > 0) await delay(remaining);
+    // Never merely sleep and claim it: measure the real elapsed time and assert it.
+    const elapsed = Date.now() - busy.declaredAtMs;
+    assert.ok(
+      elapsed > windowMs,
+      `only ${elapsed}ms elapsed since doorway "${doorwayId}" declared its ${windowMs}ms busy ` +
+        'window — the passage of time this step asserts is not yet real'
+    );
+  }
+);
+
+Then(
+  'nothing asked doorway {string} for {string} while it was set aside',
+  { timeout: 15_000 },
+  async function (this: E2EWorld, doorwayId: string, root: string): Promise<void> {
+    const state = getState(this);
+    assert.equal(root, state.root, `scenario staged root "${state.root}", not "${root}"`);
+    const busy = state.busyOverride;
+    assert.ok(
+      busy?.doorwayId === doorwayId,
+      `doorway "${doorwayId}" was never declared busy by this scenario`
+    );
+    assert.ok(
+      busy.logOffsetAtClear !== undefined,
+      `doorway "${doorwayId}"'s busy window was never cleared — "doorway ... is no longer busy" ` +
+        'must run before this check'
+    );
+    // Bounded to [declared, cleared) — see `logBetween`'s doc: reading to end-of-file
+    // here would also pick up the LEGITIMATE ask that follows clearing the override,
+    // which is outside "while it was set aside". Scoped to `state.path` only: the
+    // ordinary federation health probe legitimately contacts the holder on OTHER
+    // paths, and asserting zero-hits-on-any-path would be false.
+    const window = await logBetween(busy.logPath, busy.logOffsetAtDeclare, busy.logOffsetAtClear);
+    const hits = requestLineHits(parseLogLines(window), state.path);
+    assert.equal(
+      hits,
+      0,
+      `doorway "${doorwayId}"'s access log gained ${hits} new request line(s) for ${state.path} ` +
+        'between the moment it was declared busy and the moment it was cleared — something asked ' +
+        'it while it was set aside'
+    );
+  }
+);
+
+Then(
+  'doorway {string} was never restarted or reconfigured during this scenario',
+  { timeout: 15_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    const state = getState(this);
+    const baseline = state.startTicksByDoorwayId.get(doorwayId);
+    assert.ok(
+      baseline,
+      `no baseline /proc start tick was captured for doorway "${doorwayId}" — this scenario's own ` +
+        '"the household makes doorway ... answer that it is busy ..." step must run first'
+    );
+    const handle = await resolveOwnedMeshProcess(
+      'doorway',
+      MESH_LETTER[doorwayId],
+      `doorway ${doorwayId}`
+    );
+    assert.equal(
+      handle.ticks,
+      baseline,
+      `doorway "${doorwayId}"'s /proc start tick changed from ${baseline} to ${handle.ticks} ` +
+        'during this scenario — it was restarted'
+    );
+    assert.ok(
+      !state.adminWritesByDoorwayId.has(doorwayId),
+      `this scenario issued an admin write to doorway "${doorwayId}" — it should never have been ` +
+        'administratively touched'
+    );
+  }
+);
+
+// =============================================================================
 // Teardown — restoration has priority over everything else. A scenario that
 // fails mid-flight never reaches its own "restores"/"cancel" steps, so this
 // hook is the only guaranteed release. Global (untagged) but a complete no-op
@@ -2158,6 +2593,16 @@ After({ timeout: 30_000 }, async function (this: E2EWorld) {
   const state = states.get(this);
   if (!state) return;
   try {
+    // Scenario 5's own fault injection: a shed override left set (a mid-scenario
+    // failure never reaches "doorway ... is no longer busy") must never survive past
+    // this scenario, or it silently poisons whatever runs against this doorway next.
+    if (state.busyOverride && state.busyOverride.clearedAtMs === undefined) {
+      try {
+        await putShedOverride(state.busyOverride.doorwayUrl, 0);
+      } catch {
+        // best-effort — matches this hook's own swallow convention below
+      }
+    }
     for (const [doorwayId, handle] of state.paused) {
       try {
         await signalOwnedMeshProcess(handle, 'SIGCONT', `doorway ${doorwayId}`);
