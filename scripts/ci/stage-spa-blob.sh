@@ -418,6 +418,17 @@ stage_once() {
 
             case "${patch_status}" in
                 503|429)
+                    # CellDisabled rides a 503 but is NOT backpressure: the conductor
+                    # holds the cell and has disabled it, so no amount of waiting
+                    # clears it. 2026-09-18→20 every write through both doorways
+                    # answered this way and the ladder spent its full budget on each
+                    # of eight combinations — 63 minutes to report what the first
+                    # response already said. A real answer, not a shed: structural.
+                    if printf '%s' "${patch_body}" | grep -q "CellDisabled"; then
+                        echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} — the conductor behind this doorway has DISABLED the cell it was asked to write through (HTTP ${patch_status}): ${patch_body}" >&2
+                        echo "    Not transient: nothing can be authored through ${DOORWAY_EPR_URL} until that app is enabled again on its conductor. Waiting will not help." >&2
+                        return 3
+                    fi
                     if [ -n "${retry_after}" ]; then
                         RETRY_AFTER_HINT="${retry_after}"
                     fi
