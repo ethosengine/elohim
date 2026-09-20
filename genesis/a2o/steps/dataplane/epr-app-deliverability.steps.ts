@@ -1957,13 +1957,25 @@ After({ tags: '@deliverability-browser', timeout: 180_000 }, async function (thi
   // convergence contract as head publication so refresh phase cannot expire
   // the cleanup check just before the observation that clears the route.
   const deadline = Date.now() + CONVERGENCE_BOUND_MS;
+  const owned = new Set(record.rootCommitments);
   await Promise.all(
     DOORWAYS.map(async peer => {
       const restored = await pollUntil(
         async () => {
           const response = await fetch(`${resolvePeerUrl(peer)}/api/v1/federation/coherence`);
-          const state = (await response.json()) as { heads: { urlPath: string }[] };
-          return !state.heads.some(head => head.urlPath === '/');
+          const state = (await response.json()) as {
+            heads: { urlPath: string; eprId?: string; commitmentId?: string }[];
+          };
+          // Only THIS run's mount. A fully cast household serves its own landing at
+          // "/" (the prologue stages it), so "no head at /" is true only while that
+          // staging is failing — which is how this check passed until the landing
+          // dist existed (2026-09-20).
+          return !state.heads.some(
+            head =>
+              head.urlPath === '/' &&
+              (head.eprId === record.slug ||
+                (head.commitmentId !== undefined && owned.has(head.commitmentId)))
+          );
         },
         Math.max(0, deadline - Date.now())
       );
