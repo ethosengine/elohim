@@ -3841,3 +3841,162 @@ decisionPoints:
       - path: doorway/doorway-service/src/services/name_routing.rs
         testName: the_named_absence_body_carries_its_token
         kind: unit
+
+  - name: selector_rank
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/name_routing.rs
+      modulePath: services::name_routing::selector_rank
+      line: 279
+    summary: >
+      The holder-selector's one comparable-rank tuple, per SELECTOR_TERMS. Story 3.1 wires the
+      `Weight` element from `NameHolder.shed_weight`: WEIGHT_SHEDDING (1) while a live declared-shed
+      window stands (the holder's own Retry-After on a 503, observed on the relay response path and
+      remembered in ShedMemory), WEIGHT_UNCONSTRAINED (0, byte-identical to the prior
+      TERM_NOT_YET_WIRED placeholder) otherwise. Binary, not graded — there is no honest magnitude
+      on the wire (a Retry-After is spent as the window, not a second time as a score). Sits below
+      Liveness/ReachStanding/Nearest and above OwnerOrder; demotion REORDERS candidates, it never
+      excludes one (a sole demoted holder is still dialled and can still serve). POST-LANDING
+      REVIEW (BLOCKER + follow-ups): observations are 503-ONLY — a 429 is NEVER read as a shed
+      (the only 429 this service emits is the per-caller membrane challenge, and scoring a holder
+      from it is a free traffic-steering lever), a 503 carrying `x-membrane` opens no window for
+      the same reason, and `X-Available-Permits` is not captured at all (no honest magnitude).
+      `ShedReason::Declared` was renamed `NoWindowNamed` (a `Retry-After` header present but
+      unparseable) now that 429/permits no longer produce a `Declared` case.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral (C): shed_weight is read from ShedMemory, an in-process map rebuilt from the
+          response path and cleared on restart — no DHT entry, no persisted row.
+      - id: C1
+        status: n-a
+        justification: >
+          selector_rank only ever ranks already-filtered sibling holders; self-exclusion
+          (self_doorway_id) runs upstream in fold_candidate_holders/fold_all_holders, so this
+          predicate has no self-authored candidate to crown.
+      - id: C2
+        status: n-a
+        justification: >
+          C2 governs choosing among competing VERSIONS of one subject on a notarized clock (head
+          election, stamp/heal, "latest" resolution). Every candidate holder here serves the SAME
+          canonical projection — Weight is a load preference among equally-authoritative servers,
+          not a correctness/version decision, so there is no "backwards move" for a clock to guard.
+      - id: C3
+        status: answered
+        justification: >
+          Demotion reorders, never excludes: a_demoted_holder_is_still_a_candidate and
+          weight_never_outranks_liveness prove a sole/every demoted holder stays a dialled
+          candidate and a busy-but-Serving holder still outranks Unreachable.
+      - id: C4
+        status: partial
+        justification: >
+          "Never observed" and "confirmed unconstrained" collapse to the SAME value
+          (WEIGHT_UNCONSTRAINED) by design — the byte-for-byte regression pin
+          (with_no_observations_the_fold_returns_exactly_the_order_it_returns_today) depends on
+          that identity. A future graded Weight would need to split the two if the distinction
+          becomes load-bearing.
+      - id: C5
+        status: answered
+        justification: >
+          The rank is derived from the holder's OWN stated Retry-After on a 503 ONLY, never from a
+          declared/asserted authority attribute — a sibling can only ever demote itself
+          (ObservedShed.doorway_id is always the id of the doorway that just answered). A 429 is
+          deliberately EXCLUDED from evidence (BLOCKER ruling, post-landing review): the only 429
+          this service emits is the membrane challenge, which is scored per CALLER (the relay
+          forwards the requester's own authorization/cookie), never per holder — reading it as
+          capacity evidence would let one challenged caller get a holder demoted for every other
+          visitor. A 503 carrying the same `x-membrane` marker is defended symmetrically.
+      - id: C6a
+        status: answered
+        justification: >
+          ShedMemory::note bounds itself at MAX_SHED_NOTES (256) and refuses a new id rather than
+          evicting a live one; the_memory_refuses_a_new_holder_at_its_ceiling_rather_than_evicting_a_live_one
+          pins it. The window itself is clamped [SHED_WINDOW_MIN_SECS, SHED_WINDOW_MAX_SECS].
+      - id: C6b
+        status: answered
+        justification: >
+          A repeated identical declaration REPLACES the standing window rather than extending it —
+          a_fresh_declaration_replaces_the_standing_window_rather_than_extending_it proves the
+          memory cannot ratchet under repeated sheds.
+      - id: C7
+        status: answered
+        justification: >
+          ShedReason::as_label() is the single source for both the Prometheus counter's `reason`
+          label and the paired warn! log line's `reason` field — the two cannot drift apart by
+          construction (house style: the tracing `counter=` field names the exact series).
+      - id: C8
+        status: answered
+        justification: >
+          One counter (doorway_name_route_holder_demoted_total, incremented only on a NEW window)
+          and one gauge (doorway_name_route_holders_demoted, refreshed on every write and fold) —
+          both_name_route_metrics_are_registered and
+          the_gauge_tracks_live_windows_across_a_demotion_and_a_promotion pin presence and the
+          demote/promote edges.
+      - id: C9
+        status: n-a
+        justification: No identity is minted, rewritten, or reinterpreted; doorway_id is carried verbatim.
+      - id: C10
+        status: answered
+        justification: >
+          A sibling that never emits `Retry-After` on a 503 (an older or non-participating build)
+          simply never opens a window, so its Weight term stays WEIGHT_UNCONSTRAINED — the
+          identical byte-for-byte order mixed-version doorways already produced before this term
+          was wired. `X-Available-Permits` is never read at all (dropped post-landing, S1
+          follow-up) — a raw permit count has no denominator on the wire and cannot be graded.
+      - id: C11
+        status: answered
+        justification: >
+          THE headline concern this decision point exists to answer: a sibling degrades by a
+          DECLARED, COUNTED policy (its own Retry-After on a 503, honored verbatim as the demotion
+          window, clamped, and counted by NAME_ROUTE_HOLDER_DEMOTED_TOTAL) rather than an invented
+          duration or unbounded preference. Externally-imposed backpressure is read ONLY from a
+          seam where the answer is genuinely about the HOLDER's own load — a 429 (the membrane
+          challenge, scored per caller) and a membrane-bearing 503 are excluded from evidence for
+          exactly this reason (a_429_is_about_the_caller_and_never_demotes_the_holder,
+          a_503_bearing_a_membrane_verdict_opens_no_window): a caller-scoped answer is never read
+          as a capacity statement about the answering doorway.
+      - id: C12
+        status: n-a
+        justification: No consent or authorization decision is made; a holder cannot act for another.
+      - id: C13
+        status: n-a
+        justification: No authority stage or graduation is introduced or changed.
+      - id: C14
+        status: answered
+        justification: >
+          shed_weight is CARRIED on NameHolder (not recomputed at sort time) specifically so a log
+          line — and a future admin read — can state the exact value that ordered this holder; the
+          demotion/promotion pair is witnessed by the paired warn!/info! log lines at target
+          "name_route_shed".
+    contractTests:
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: with_no_observations_the_fold_returns_exactly_the_order_it_returns_today
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_holder_that_declared_a_shed_sorts_behind_an_equally_live_sibling
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: weight_never_outranks_liveness
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_demoted_holder_is_still_a_candidate
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: every_holder_demoted_falls_through_to_owner_order
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_discovery_tick_does_not_forget_a_window_the_holder_named
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_429_is_about_the_caller_and_never_demotes_the_holder
+        kind: unit
+      - path: doorway/doorway-service/src/services/name_routing.rs
+        testName: a_503_bearing_a_membrane_verdict_opens_no_window
+        kind: unit
+      - path: doorway/doorway-service/src/server/http.rs
+        testName: a_permits_header_alone_opens_no_window
+        kind: unit
+      - path: doorway/doorway-service/src/metrics.rs
+        testName: both_name_route_metrics_are_registered
+        kind: unit

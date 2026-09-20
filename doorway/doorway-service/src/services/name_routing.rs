@@ -42,7 +42,7 @@ use std::sync::RwLock;
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{Response, StatusCode};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 /// Loop-prevention header carried on every outbound relay. Inherited verbatim
 /// from the deleted `fetch_from_remote_doorway` so any peer already honouring
@@ -240,7 +240,7 @@ pub enum RelayMode {
 /// | `Liveness` | WIRED — last observed [`HolderLiveness`] |
 /// | `ReachStanding` | declared, constant — requester standing × the EPR's declared reach |
 /// | `Nearest` | declared, constant — attested RTT, with region as a selector BESIDE it (never a separate authority) |
-/// | `Weight` | declared, constant — holder-advertised capacity |
+/// | `Weight` | WIRED — the holder's own declared shed window, observed on the response path, never replicated (story 3.1; plan A:107) |
 /// | `OwnerOrder` | WIRED — registry order, the stable final tiebreak |
 pub const SELECTOR_TERMS: &[SelectorTerm] = &[
     SelectorTerm::Liveness,
@@ -265,6 +265,15 @@ pub enum SelectorTerm {
 /// so a reader can tell "not yet a term" from "ranked best".
 const TERM_NOT_YET_WIRED: u32 = 0;
 
+/// `Weight` selector term — no live declared shed for this holder. Byte-for-
+/// byte identical to [`TERM_NOT_YET_WIRED`] so that, with no observation, the
+/// fold returns exactly the order it returns today (see `ShedMemory::weight`).
+pub const WEIGHT_UNCONSTRAINED: u32 = TERM_NOT_YET_WIRED;
+/// `Weight` selector term — this holder declared backpressure and its own
+/// window has not elapsed. Binary, not graded: see the design brief §4.2 for
+/// why (no honest magnitude is on the wire; grading would invent precision).
+pub const WEIGHT_SHEDDING: u32 = 1;
+
 /// The comparable rank of one holder under [`SELECTOR_TERMS`]. One tuple
 /// element per term, in term order.
 fn selector_rank(holder: &NameHolder, owner_order: usize) -> (u8, u32, u32, u32, usize) {
@@ -275,8 +284,8 @@ fn selector_rank(holder: &NameHolder, owner_order: usize) -> (u8, u32, u32, u32,
         TERM_NOT_YET_WIRED,
         // Nearest (attested RTT; region beside it) — declared, not yet a term.
         TERM_NOT_YET_WIRED,
-        // Weight — declared, not yet a term.
-        TERM_NOT_YET_WIRED,
+        // Weight — WIRED (story 3.1): the holder's own declared shed window.
+        holder.shed_weight,
         // OwnerOrder — WIRED, the stable final tiebreak.
         owner_order,
     )
@@ -339,6 +348,12 @@ pub struct NameHolder {
     pub liveness: HolderLiveness,
     /// How this holder is reached. [`RelayMode::Proxy`] for every holder today.
     pub relay_mode: RelayMode,
+    /// The `Weight` selector term for this holder: [`WEIGHT_SHEDDING`] while a
+    /// window it declared for itself stands, [`WEIGHT_UNCONSTRAINED`]
+    /// otherwise. Carried (not recomputed at sort time) so a log line and a
+    /// future admin read can state the value that actually ordered this
+    /// holder.
+    pub shed_weight: u32,
 }
 
 /// True iff `mount` covers `request_path` on a segment boundary — `/lamad`
@@ -442,7 +457,8 @@ pub fn holders_more_specific_than(
 /// 1. `contracts` — live `project-epr` contracts held by OTHER doorways, in the
 ///    order the registry handed them (that order IS "owner order").
 /// 2. `liveness` — `doorway_id` → last observed [`HolderLiveness`].
-/// 3. `self_doorway_id` — excluded; a doorway never relays to itself.
+/// 3. `weights` — `doorway_id` → the `Weight` selector term ([`ShedMemory::weights`]).
+/// 4. `self_doorway_id` — excluded; a doorway never relays to itself.
 ///
 /// Rules:
 /// - a contract qualifies iff its mount [`mount_covers`] the request path;
@@ -460,6 +476,7 @@ pub fn fold_candidate_holders(
     key: &RouteKey,
     contracts: &[HolderContract],
     liveness: &HashMap<String, HolderLiveness>,
+    weights: &HashMap<String, u32>,
     self_doorway_id: &str,
 ) -> Vec<NameHolder> {
     // Once any doorway advertises an exact contract for the requested name,
@@ -527,6 +544,10 @@ pub fn fold_candidate_holders(
                     // The next rung derives this from the contract; every
                     // contract is proxy-reached today.
                     relay_mode: RelayMode::default(),
+                    shed_weight: weights
+                        .get(&contract.doorway_id)
+                        .copied()
+                        .unwrap_or(WEIGHT_UNCONSTRAINED),
                 },
                 rank,
             )),
@@ -561,6 +582,7 @@ pub fn fold_candidate_holders(
 pub fn fold_all_holders(
     contracts: &[HolderContract],
     liveness: &HashMap<String, HolderLiveness>,
+    weights: &HashMap<String, u32>,
     self_doorway_id: &str,
 ) -> Vec<NameHolder> {
     let mut holders: Vec<(NameHolder, (u8, usize))> = Vec::new();
@@ -598,6 +620,10 @@ pub fn fold_all_holders(
                         .copied()
                         .unwrap_or_default(),
                     relay_mode: RelayMode::default(),
+                    shed_weight: weights
+                        .get(&contract.doorway_id)
+                        .copied()
+                        .unwrap_or(WEIGHT_UNCONSTRAINED),
                 },
                 rank,
             )),
@@ -613,6 +639,175 @@ pub fn fold_all_holders(
     ranked.into_iter().map(|(_, holder)| holder).collect()
 }
 
+/// Why a holder's window was opened. The LABEL on the observation, never an
+/// input to its magnitude — see the design brief §2.1. `Weight` stays binary
+/// (§4.2) either way; this only names the reason for the metric and log line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShedReason {
+    /// The holder named its own window with `Retry-After`.
+    RetryAfter,
+    /// The holder's `Retry-After` header was PRESENT — a genuine 503 shed
+    /// declaration — but its value did not parse as delta-seconds (e.g. an
+    /// HTTP-date). The holder still declared a shed; it just didn't state a
+    /// window we could read, so the default window applies.
+    NoWindowNamed,
+}
+
+impl ShedReason {
+    pub fn as_label(self) -> &'static str {
+        match self {
+            ShedReason::RetryAfter => "retry_after",
+            ShedReason::NoWindowNamed => "no_window_named",
+        }
+    }
+}
+
+/// Floor on the demotion window. A holder answering `Retry-After: 0` or `1`
+/// must still be demoted long enough for the demotion to mean something — a
+/// window shorter than this would make the term a silent no-op (a 0 expires
+/// before the next fold reads it).
+pub const SHED_WINDOW_MIN_SECS: u64 = 5;
+
+/// Ceiling on the demotion window. This table is Category C and a restart
+/// clears it; the discovery tick rebuilds liveness roughly every minute. A
+/// window longer than a few ticks is unfalsifiable inside this doorway's own
+/// knowledge horizon — we would be holding a grudge past the point where we
+/// could know it was still true. 300s ≈ five discovery ticks.
+pub const SHED_WINDOW_MAX_SECS: u64 = 300;
+
+/// Window when a 503 declared backpressure (a `Retry-After` header was
+/// present) but its value did not parse as delta-seconds
+/// (`ShedReason::NoWindowNamed`). Never reached from a 429 or from
+/// `X-Available-Permits` — neither ever opens a Weight window (see
+/// `relay_one_hop`'s 503-only arm and its doc comment).
+pub const SHED_WINDOW_DEFAULT_SECS: u64 = 30;
+
+/// Hard ceiling on remembered sheds. The live federation holds units, not
+/// hundreds; this is a ceiling against an unbounded id space, not a working
+/// set.
+const MAX_SHED_NOTES: usize = 256;
+
+/// One holder's declared shed, remembered until the window it named elapses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ShedNote {
+    /// Absolute wall-clock second at which this observation stops counting.
+    until_secs: u64,
+    reason: ShedReason,
+}
+
+/// Parse a `Retry-After` value as delta-seconds only. The HTTP-date form is
+/// not parsed: no peer in this tree emits it, and a wrong date parse would be
+/// a silent mis-window — an unparseable value must fall to the caller's
+/// default, not be read as "ignore" (the holder still declared a shed).
+pub fn parse_retry_after_secs(raw: &str) -> Option<u64> {
+    raw.trim().parse::<u64>().ok()
+}
+
+/// Every holder this doorway has HEARD declare backpressure, and until when.
+///
+/// Category C, in-process, never persisted, never published, never asked of a
+/// sibling (see plan A:107 — a doorway serving/notifying a sibling's own
+/// observation of a THIRD party would turn a plural projection into a
+/// cluster). Pure with respect to time: every method takes `now_secs`, so the
+/// unit tests need no clock and no timer.
+#[derive(Debug, Default)]
+pub struct ShedMemory {
+    notes: HashMap<String, ShedNote>,
+}
+
+impl ShedMemory {
+    /// Record a holder's declared shed. A fresh declaration REPLACES any
+    /// standing window (the newest statement is the holder's current
+    /// statement); it never extends one cumulatively — this is what keeps the
+    /// memory from ratcheting under repeated sheds (design brief §7.1).
+    ///
+    /// Returns `Some(window_secs)` — the CLAMPED window actually opened —
+    /// when a NEW window was opened, so the caller increments the counter and
+    /// logs exactly once per declaration (a re-declaration still counts: it
+    /// is a new declaration) WITHOUT recomputing the clamp a second time.
+    /// Returns `None` when refused at the ceiling.
+    pub fn note(
+        &mut self,
+        doorway_id: &str,
+        declared: Option<u64>,
+        reason: ShedReason,
+        now_secs: u64,
+    ) -> Option<u64> {
+        self.prune(now_secs);
+        if !self.notes.contains_key(doorway_id) && self.notes.len() >= MAX_SHED_NOTES {
+            warn!(
+                held = self.notes.len(),
+                "name-route: shed memory at its ceiling — refusing a new holder rather than \
+                 evicting a live one (see MAX_SHED_NOTES)"
+            );
+            return None;
+        }
+        let window = declared
+            .map(|n| n.clamp(SHED_WINDOW_MIN_SECS, SHED_WINDOW_MAX_SECS))
+            .unwrap_or(SHED_WINDOW_DEFAULT_SECS);
+        let until_secs = now_secs.saturating_add(window);
+        self.notes
+            .insert(doorway_id.to_string(), ShedNote { until_secs, reason });
+        Some(window)
+    }
+
+    /// [`WEIGHT_SHEDDING`] while the window stands, [`WEIGHT_UNCONSTRAINED`]
+    /// otherwise. Does not prune — callers that need a fresh snapshot call
+    /// [`Self::prune`] or [`Self::weights`] first.
+    pub fn weight(&self, doorway_id: &str, now_secs: u64) -> u32 {
+        match self.notes.get(doorway_id) {
+            Some(note) if now_secs < note.until_secs => WEIGHT_SHEDDING,
+            _ => WEIGHT_UNCONSTRAINED,
+        }
+    }
+
+    /// Drop every elapsed note. Returns the ids it dropped, so the caller can
+    /// log each promotion exactly once. Called on every write and every fold.
+    pub fn prune(&mut self, now_secs: u64) -> Vec<String> {
+        let elapsed: Vec<String> = self
+            .notes
+            .iter()
+            .filter(|(_, note)| now_secs >= note.until_secs)
+            .map(|(id, _)| id.clone())
+            .collect();
+        for id in &elapsed {
+            self.notes.remove(id);
+        }
+        elapsed
+    }
+
+    /// A `{doorway_id -> weight}` snapshot for the fold. Every entry it
+    /// returns is live as of `now_secs` — the caller is expected to have
+    /// pruned already (e.g. `NameRouteTable`'s fold/write paths, which prune
+    /// under their own write lock before taking this read-only snapshot); this
+    /// method itself never mutates, so it filters rather than removing.
+    pub fn weights(&self, now_secs: u64) -> HashMap<String, u32> {
+        self.notes
+            .iter()
+            .filter(|(_, note)| now_secs < note.until_secs)
+            .map(|(id, _)| (id.clone(), WEIGHT_SHEDDING))
+            .collect()
+    }
+
+    /// Live (unelapsed) note count as of `now_secs`. See [`Self::weights`] for
+    /// why this filters rather than pruning.
+    pub fn live_len(&self, now_secs: u64) -> usize {
+        self.notes
+            .values()
+            .filter(|note| now_secs < note.until_secs)
+            .count()
+    }
+
+    /// True iff at least one held note has elapsed as of `now_secs`. A pure
+    /// `&self` check so a resolve can tell, under a READ guard alone, whether
+    /// the write-locked prune is worth taking at all — the hot path (nothing
+    /// elapsed) never needs the write lock (design brief §3.6/§6; the
+    /// promotion-visibility follow-up, S3).
+    pub fn has_elapsed(&self, now_secs: u64) -> bool {
+        self.notes.values().any(|note| now_secs >= note.until_secs)
+    }
+}
+
 /// The doorway-local, in-memory name-route registry.
 ///
 /// Category C (Operational): no table, no DHT entry, no persistence. Every row
@@ -622,6 +817,19 @@ pub fn fold_all_holders(
 pub struct NameRouteTable {
     contracts: RwLock<Vec<HolderContract>>,
     liveness: RwLock<HashMap<String, HolderLiveness>>,
+    /// The `Weight` term's memory — deliberately NOT wiped by `replace_all`.
+    /// `liveness` is rebuilt wholesale by every discovery tick (~60s), so a
+    /// `HolderLiveness::Shedding` set by `note_shed` survives at most one
+    /// tick. A declared window survives ticks because the holder said how
+    /// long it would be busy for, and that statement did not expire when our
+    /// probe ran (design brief §7.5 / §9.3 — this is the whole reason `Weight`
+    /// exists as a term separate from `Liveness`).
+    shed: RwLock<ShedMemory>,
+    /// Test-observable count of prune PASSES that took the `shed` write lock
+    /// (S3 follow-up to story 3.1: `weights_snapshot`'s hot path must never
+    /// take it when nothing has elapsed). Never read in production.
+    #[cfg(test)]
+    prune_write_passes: std::sync::atomic::AtomicU64,
 }
 
 /// Exact project-epr reference resolution. Unlike the ordinary holder fold,
@@ -632,6 +840,19 @@ pub enum ExactCommitmentHolder {
     Absent,
     Unique(NameHolder),
     Conflict,
+}
+
+/// Wall-clock seconds since the epoch — the runtime boundary for
+/// [`ShedMemory`]'s otherwise-pure, clock-free logic. Exactly `EdgeClock`'s
+/// body (`server/membrane.rs`), the crate's established pattern: pure logic
+/// takes seconds, the runtime supplies them here at the one boundary. Kept
+/// private so a unit test can never reach for it — tests pass literal
+/// seconds to `ShedMemory` directly instead.
+fn now_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 impl NameRouteTable {
@@ -646,6 +867,13 @@ impl NameRouteTable {
     /// keep the rows and only update liveness. A tick where every sibling is
     /// briefly unreachable must not erase our knowledge of who holds which
     /// name — it should only make those holders sort last.
+    ///
+    /// **Deliberately does NOT touch `shed`.** `liveness` is rebuilt wholesale
+    /// every tick and forgets a `note_shed` demotion inside ~60s; `shed`
+    /// remembers a holder's own declared window for as long as the holder
+    /// said it would last, independent of the discovery cycle. Wiping it here
+    /// would collapse `Weight` back into `Liveness` and undo the whole point
+    /// of this term (design brief §7.5 / §9.3).
     pub fn replace_all(
         &self,
         contracts: Vec<HolderContract>,
@@ -670,7 +898,8 @@ impl NameRouteTable {
     pub fn holders_for(&self, key: &RouteKey, self_doorway_id: &str) -> Vec<NameHolder> {
         let contracts = self.contracts.read().expect("name-route lock poisoned");
         let liveness = self.liveness.read().expect("name-route lock poisoned");
-        fold_candidate_holders(key, &contracts, &liveness, self_doorway_id)
+        let weights = self.weights_snapshot();
+        fold_candidate_holders(key, &contracts, &liveness, &weights, self_doorway_id)
     }
 
     /// Candidate holders when this doorway's own router has already proven
@@ -696,7 +925,8 @@ impl NameRouteTable {
     pub fn all_holders(&self, self_doorway_id: &str) -> Vec<NameHolder> {
         let contracts = self.contracts.read().expect("name-route lock poisoned");
         let liveness = self.liveness.read().expect("name-route lock poisoned");
-        fold_all_holders(&contracts, &liveness, self_doorway_id)
+        let weights = self.weights_snapshot();
+        fold_all_holders(&contracts, &liveness, &weights, self_doorway_id)
     }
 
     pub fn exact_commitment_holder(
@@ -735,6 +965,7 @@ impl NameRouteTable {
                     .copied()
                     .unwrap_or_default(),
                 relay_mode: RelayMode::Proxy,
+                shed_weight: WEIGHT_UNCONSTRAINED,
             };
             if !matches.contains(&holder) {
                 matches.push(holder);
@@ -754,6 +985,95 @@ impl NameRouteTable {
     pub fn note_shed(&self, doorway_id: &str) {
         let mut liveness = self.liveness.write().expect("name-route lock poisoned");
         liveness.insert(doorway_id.to_string(), HolderLiveness::Shedding);
+    }
+
+    /// Record the `Weight` observation from a relay reply: the holder DECLARED
+    /// its own backpressure. A no-op when `observed.reason` is `None` — either
+    /// a bare 503 with no `Retry-After` (the error-mapper case, §2.1) or a 503
+    /// carrying `x-membrane` (a caller-scoped answer, never a capacity
+    /// statement) — either way `note_shed` still demotes it via `Liveness`,
+    /// but `Weight` must not mint a window from it. Two arms, two concerns:
+    /// `note_shed` is the coarse, tick-lived `Liveness` demotion; this is the
+    /// fine-grained, holder-timed `Weight` demotion that survives a discovery
+    /// tick (design brief §7.5).
+    ///
+    /// A holder can only ever open a window on ITS OWN `doorway_id` — the id
+    /// recorded is the id of the doorway whose response this courier just
+    /// read, never a third party (§7.4: the blast radius of a lying holder is
+    /// itself, only).
+    pub fn note_backpressure(&self, observed: &ObservedShed) {
+        let Some(reason) = observed.reason else {
+            return;
+        };
+        let now = now_secs();
+        let opened_window = {
+            let mut shed = self.shed.write().expect("name-route lock poisoned");
+            shed.note(&observed.doorway_id, observed.declared_secs, reason, now)
+        };
+        if let Some(window) = opened_window {
+            crate::metrics::inc_holder_demoted(reason.as_label());
+            warn!(
+                target: "name_route_shed",
+                counter = "doorway_name_route_holder_demoted_total",
+                holder = %observed.doorway_id,
+                origin = %observed.origin,
+                window_secs = window,
+                reason = reason.as_label(),
+                "name-route: holder declared backpressure — demoted behind its siblings for the window it named"
+            );
+        }
+        self.prune_shed_and_log(now);
+    }
+
+    /// A `{doorway_id -> Weight}` snapshot for the fold, pruning elapsed
+    /// windows first (and logging/gauging each promotion) so a fold never
+    /// reads a stale demotion and a promotion is always visible exactly once.
+    fn weights_snapshot(&self) -> HashMap<String, u32> {
+        let now = now_secs();
+        // Hot path: a single READ guard. Most resolves find nothing elapsed
+        // (the fold runs far more often than a window's own lifetime), and
+        // reading never needs to fight a write lock for it — S3 follow-up to
+        // story 3.1 (weights_snapshot was taking `shed.write()` on EVERY
+        // resolve).
+        let (weights, any_elapsed) = {
+            let shed = self.shed.read().expect("name-route lock poisoned");
+            (shed.weights(now), shed.has_elapsed(now))
+        };
+        if !any_elapsed {
+            return weights;
+        }
+        // Something elapsed: promote it (prune + log the promotion + refresh
+        // the gauge) under the write lock, ONLY on this less-common path,
+        // then re-read the now-current snapshot.
+        self.prune_shed_and_log(now);
+        let shed = self.shed.read().expect("name-route lock poisoned");
+        shed.weights(now)
+    }
+
+    /// Drop every elapsed shed window, log each promotion once, and refresh
+    /// the live-demoted gauge. Called on every write (`note_backpressure`) and
+    /// every fold (`weights_snapshot`) — promotion is the passage of time and
+    /// has no event of its own, so this is the only place it becomes visible.
+    fn prune_shed_and_log(&self, now_secs: u64) {
+        #[cfg(test)]
+        self.prune_write_passes
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let dropped = {
+            let mut shed = self.shed.write().expect("name-route lock poisoned");
+            shed.prune(now_secs)
+        };
+        for doorway_id in &dropped {
+            info!(
+                target: "name_route_shed",
+                holder = %doorway_id,
+                "name-route: the window this holder named has elapsed — restored to owner order"
+            );
+        }
+        let live = {
+            let shed = self.shed.read().expect("name-route lock poisoned");
+            shed.live_len(now_secs)
+        };
+        crate::metrics::set_holders_demoted(live as i64);
     }
 
     pub fn len(&self) -> usize {
@@ -799,10 +1119,39 @@ pub struct HolderReply {
     /// The holder's own `cache-control` for this answer. `None` → the relay's
     /// default (`no-store`) governs.
     pub cache_control: Option<String>,
+    /// The holder's `Retry-After`, parsed as delta-seconds
+    /// ([`parse_retry_after_secs`]). `None` when it stated none, or stated one
+    /// that did not parse (see `retry_after_present` to distinguish those two
+    /// cases), or stated an HTTP-date (not parsed — no peer in this tree
+    /// emits one; design brief §2.1/§3.5).
+    pub retry_after_secs: Option<u64>,
+    /// True iff the holder's response carried a `Retry-After` header AT ALL,
+    /// regardless of whether its value parsed. A 503 with the header present
+    /// but unparseable is still a genuine shed declaration — the holder said
+    /// SOMETHING, it just didn't state a window we could read — so this is
+    /// what tells `relay_one_hop` "declared, default window" apart from "no
+    /// declaration at all" (`ShedReason::NoWindowNamed` vs `None`).
+    pub retry_after_present: bool,
+    /// True when the response carries `x-membrane` — this doorway's OWN
+    /// membrane-challenge marker (`server::http`'s `Verdict::Challenge`,
+    /// stamped on its 429s). A caller-scoped answer about WHO ASKED, never a
+    /// capacity statement about the holder — `relay_one_hop` reads this to
+    /// refuse a Weight window even on a 503 that happens to carry it (the
+    /// symmetric defense to never reading a 429 as a shed at all).
+    pub has_membrane_verdict: bool,
     pub body: Vec<u8>,
 }
 
 /// The relay decision.
+// `HolderReply` gained `retry_after_secs`/`retry_after_present`/
+// `has_membrane_verdict` in story 3.1 (and its BLOCKER follow-up),
+// crossing clippy's large-enum-variant threshold against `AllFailed`/
+// `NoCandidates`. Boxing `reply` would ripple `*reply`/`&*reply` through
+// every existing match arm and test across this module and http.rs — out of
+// scope for a two-field addition. `Served` is already the rare, terminal-hop
+// case (one per relay attempt, never hot-looped), so the extra stack bytes
+// are not a real cost.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq)]
 pub enum RelayVerdict {
     /// A holder answered. Caller serves these bytes and stamps
@@ -821,12 +1170,33 @@ pub enum RelayVerdict {
     AllFailed { attempted: usize },
 }
 
+/// One holder's declared backpressure, as observed on this relay attempt —
+/// carried out of `relay_one_hop` so the caller can act (both `note_shed` and
+/// `note_backpressure`) without the relay loop owning mutable state (see
+/// `RelayOutcome`'s own discipline, restated here for the new record).
+#[derive(Debug, Clone)]
+pub struct ObservedShed {
+    pub doorway_id: String,
+    /// The window the holder named, if it named one (parsed `Retry-After`).
+    pub declared_secs: Option<u64>,
+    /// `None` when the shed did NOT declare backpressure — a bare 503 with no
+    /// `Retry-After` (the error-mapper case, design brief §2.1) OR a 503/429
+    /// carrying `x-membrane` (a caller-scoped answer, post-landing BLOCKER
+    /// ruling). `note_shed`/`Liveness` still demotes this holder (unchanged,
+    /// existing behaviour); `Weight` does not, because there is no honest —
+    /// or honestly holder-scoped — window to honour. `Some(reason)` is the
+    /// label for the metric and log when a window IS opened.
+    pub reason: Option<ShedReason>,
+    /// Carried only for the log line.
+    pub origin: String,
+}
+
 /// A verdict plus the holders observed shedding, so the caller can demote them
 /// in the table without the relay loop owning mutable state.
 #[derive(Debug)]
 pub struct RelayOutcome {
     pub verdict: RelayVerdict,
-    pub shed_doorways: Vec<String>,
+    pub shed_doorways: Vec<ObservedShed>,
 }
 
 /// Try each candidate holder in fold order until one serves. ONE hop total —
@@ -913,13 +1283,46 @@ where
                     shed_doorways,
                 };
             }
+            // 503 ONLY — a statement about the HOLDER's liveness, not about
+            // the requester or the record. A 429 is deliberately NOT in this
+            // arm (it falls to the generic `Ok(reply)` arm below, exactly as
+            // it did before story 3.1) — see the ruling on 429 recorded on
+            // `ObservedShed` and pinned by
+            // `a_429_is_about_the_caller_and_never_demotes_the_holder`: the
+            // only 429 this service emits is the membrane challenge, which
+            // scores the CLIENT (`relay`'s own authorization/cookie are
+            // forwarded to the holder, so the holder is answering about
+            // WHO ASKED, not about its own capacity). Reading it as a shed
+            // would let one challenged human at holder A get holder A
+            // demoted for every OTHER visitor at courier B — a free,
+            // repeatable traffic-steering lever. `reason` is `None` for a
+            // bare 503 with no `Retry-After` (the error mapper reporting a
+            // failure, not a declared shed, §2.1) OR for a 503 that itself
+            // carries `x-membrane` (a caller-scoped answer riding a 503,
+            // same defect as the 429 case, defended symmetrically) — either
+            // way `Liveness` (`note_shed`, called on every entry in
+            // `shed_doorways` regardless) still demotes it exactly as
+            // before; only `Weight` declines to mint a window.
             Ok(reply) if reply.status == 503 => {
+                let reason = if reply.has_membrane_verdict || !reply.retry_after_present {
+                    None
+                } else if reply.retry_after_secs.is_some() {
+                    Some(ShedReason::RetryAfter)
+                } else {
+                    Some(ShedReason::NoWindowNamed)
+                };
                 debug!(
                     holder = %holder.doorway_id,
                     origin = %holder.origin,
+                    has_membrane_verdict = reply.has_membrane_verdict,
                     "name-route: holder is shedding — trying the next holder"
                 );
-                shed_doorways.push(holder.doorway_id.clone());
+                shed_doorways.push(ObservedShed {
+                    doorway_id: holder.doorway_id.clone(),
+                    declared_secs: reply.retry_after_secs,
+                    reason,
+                    origin: holder.origin.clone(),
+                });
             }
             Ok(reply) => {
                 debug!(
@@ -1099,6 +1502,7 @@ mod tests {
             epr_id: None,
             liveness,
             relay_mode: RelayMode::Proxy,
+            shed_weight: WEIGHT_UNCONSTRAINED,
         }
     }
 
@@ -1110,8 +1514,195 @@ mod tests {
             bundle: None,
             receipt: None,
             cache_control: None,
+            retry_after_secs: None,
+            retry_after_present: false,
+            has_membrane_verdict: false,
             body: body.as_bytes().to_vec(),
         }
+    }
+
+    // ── ShedMemory (T1) ───────────────────────────────────────────────────────
+    // All synchronous, all literal seconds — no clock, no timer, no sleep.
+
+    /// T1.1 — the window is the holder's number, not ours.
+    #[test]
+    fn a_declared_retry_after_is_honoured_as_the_demotion_window() {
+        let mut mem = ShedMemory::default();
+        assert_eq!(
+            mem.note("b-doorway", Some(60), ShedReason::RetryAfter, 1_000),
+            Some(60),
+            "the window returned IS the clamped window opened"
+        );
+        assert_eq!(mem.weight("b-doorway", 1_059), WEIGHT_SHEDDING);
+        assert_eq!(mem.weight("b-doorway", 1_060), WEIGHT_UNCONSTRAINED);
+    }
+
+    /// T1.2 — THE REGRESSION PIN: no observation is today's value, by identity.
+    #[test]
+    fn an_unobserved_holder_weighs_exactly_what_an_unwired_term_weighs() {
+        let mem = ShedMemory::default();
+        assert_eq!(mem.weight("never-seen", 1_000), TERM_NOT_YET_WIRED);
+        assert_eq!(TERM_NOT_YET_WIRED, WEIGHT_UNCONSTRAINED);
+    }
+
+    /// T1.3 — a zero must not make the term a silent no-op.
+    #[test]
+    fn a_window_shorter_than_the_floor_is_raised_to_it() {
+        for declared in [Some(0), Some(1)] {
+            let mut mem = ShedMemory::default();
+            mem.note("b-doorway", declared, ShedReason::RetryAfter, 1_000);
+            assert_eq!(
+                mem.weight("b-doorway", 1_004),
+                WEIGHT_SHEDDING,
+                "declared={declared:?} must still be demoted at now+4 (floor={SHED_WINDOW_MIN_SECS})"
+            );
+        }
+    }
+
+    /// T1.4 — we do not hold a grudge past our own knowledge horizon.
+    #[test]
+    fn a_window_longer_than_the_ceiling_is_capped() {
+        let mut mem = ShedMemory::default();
+        mem.note("b-doorway", Some(86_400), ShedReason::RetryAfter, 1_000);
+        assert_eq!(
+            mem.weight("b-doorway", 1_000 + SHED_WINDOW_MAX_SECS + 1),
+            WEIGHT_UNCONSTRAINED
+        );
+    }
+
+    /// T1.5 — a declaration with no window gets the default.
+    #[test]
+    fn a_declaration_with_no_window_gets_the_default() {
+        let mut mem = ShedMemory::default();
+        mem.note("b-doorway", None, ShedReason::NoWindowNamed, 1_000);
+        assert_eq!(
+            mem.weight("b-doorway", 1_000 + SHED_WINDOW_DEFAULT_SECS - 1),
+            WEIGHT_SHEDDING
+        );
+        assert_eq!(
+            mem.weight("b-doorway", 1_000 + SHED_WINDOW_DEFAULT_SECS),
+            WEIGHT_UNCONSTRAINED
+        );
+    }
+
+    /// T1.6 — the newest statement is the current statement; the memory
+    /// cannot ratchet.
+    #[test]
+    fn a_fresh_declaration_replaces_the_standing_window_rather_than_extending_it() {
+        let mut mem = ShedMemory::default();
+        mem.note("b-doorway", Some(300), ShedReason::RetryAfter, 1_000);
+        mem.note("b-doorway", Some(10), ShedReason::RetryAfter, 1_001);
+        assert_eq!(mem.weight("b-doorway", 1_011), WEIGHT_UNCONSTRAINED);
+    }
+
+    /// T1.7 — `note` reports only the FIRST opening... and a re-declaration is
+    /// STILL reported, since it is a new declaration, so the counter counts
+    /// declarations, not standing windows.
+    #[test]
+    fn note_reports_only_the_first_opening_so_the_counter_counts_declarations() {
+        let mut mem = ShedMemory::default();
+        assert!(
+            mem.note("b-doorway", Some(60), ShedReason::RetryAfter, 1_000)
+                .is_some(),
+            "the first declaration always opens a window"
+        );
+        assert!(
+            mem.note("b-doorway", Some(60), ShedReason::RetryAfter, 1_010)
+                .is_some(),
+            "a re-declaration is a new declaration — it counts too"
+        );
+    }
+
+    /// T1.8 — returned ids are exactly the elapsed ones, and a second prune at
+    /// the same instant returns empty (so promotion is logged once).
+    #[test]
+    fn prune_drops_only_elapsed_notes_and_names_each_one_once() {
+        let mut mem = ShedMemory::default();
+        mem.note("b-doorway", Some(5), ShedReason::RetryAfter, 1_000); // elapses at 1_005
+        mem.note("c-doorway", Some(300), ShedReason::RetryAfter, 1_000); // still live at 1_005
+        let dropped = mem.prune(1_005);
+        assert_eq!(dropped, vec!["b-doorway".to_string()]);
+        assert_eq!(mem.weight("c-doorway", 1_005), WEIGHT_SHEDDING);
+        assert!(
+            mem.prune(1_005).is_empty(),
+            "a second prune at the same instant must not re-name an already-dropped id"
+        );
+    }
+
+    /// T1.9 — the memory refuses a NEW holder at its ceiling rather than
+    /// evicting a live one.
+    #[test]
+    fn the_memory_refuses_a_new_holder_at_its_ceiling_rather_than_evicting_a_live_one() {
+        let mut mem = ShedMemory::default();
+        for n in 0..MAX_SHED_NOTES {
+            assert!(mem
+                .note(
+                    &format!("holder-{n}"),
+                    Some(300),
+                    ShedReason::RetryAfter,
+                    1_000
+                )
+                .is_some());
+        }
+        assert_eq!(mem.live_len(1_000), MAX_SHED_NOTES);
+        assert!(
+            mem.note("one-too-many", Some(300), ShedReason::RetryAfter, 1_000)
+                .is_none(),
+            "the ceiling refuses a new id rather than evicting a live one"
+        );
+        assert_eq!(
+            mem.live_len(1_000),
+            MAX_SHED_NOTES,
+            "every existing note survives intact"
+        );
+        assert_eq!(mem.weight("one-too-many", 1_000), WEIGHT_UNCONSTRAINED);
+    }
+
+    /// T1.10 — the holder declared a shed even if we could not read its number
+    /// (the header was PRESENT — see `retry_after_present` — but its value
+    /// did not parse; the caller passes `ShedReason::NoWindowNamed` for
+    /// exactly this shape).
+    #[test]
+    fn an_unparseable_retry_after_still_opens_the_default_window() {
+        let declared = parse_retry_after_secs("not-a-number");
+        assert_eq!(declared, None);
+        let mut mem = ShedMemory::default();
+        assert!(mem
+            .note("b-doorway", declared, ShedReason::NoWindowNamed, 1_000)
+            .is_some());
+        assert_eq!(
+            mem.weight("b-doorway", 1_000 + SHED_WINDOW_DEFAULT_SECS - 1),
+            WEIGHT_SHEDDING
+        );
+    }
+
+    // ── parse_retry_after_secs (T4.1 / T4.2) ─────────────────────────────────
+
+    /// T4.1 — matches `storage_proxy.rs`'s delta-seconds parse; whitespace is
+    /// tolerated so a courteous holder's `" 60 "` is still honoured.
+    #[test]
+    fn retry_after_is_read_as_delta_seconds() {
+        assert_eq!(parse_retry_after_secs("60"), Some(60));
+        assert_eq!(parse_retry_after_secs(" 60 "), Some(60));
+    }
+
+    /// T4.2 — a silent mis-window is worse than no window: an HTTP-date is
+    /// NOT read as a (wildly wrong) number of seconds.
+    #[test]
+    fn an_http_date_retry_after_is_not_mistaken_for_seconds() {
+        assert_eq!(
+            parse_retry_after_secs("Wed, 21 Oct 2026 07:28:00 GMT"),
+            None
+        );
+    }
+
+    /// T4.3 — a holder reply with no backpressure headers declares none.
+    #[test]
+    fn a_holder_reply_with_no_backpressure_headers_declares_none() {
+        let r = reply(200, "ok");
+        assert_eq!(r.retry_after_secs, None);
+        assert!(!r.retry_after_present);
+        assert!(!r.has_membrane_verdict);
     }
 
     #[test]
@@ -1241,6 +1832,7 @@ mod tests {
             &RouteKey::path_only("/lamad/x"),
             &contracts,
             &liveness,
+            &HashMap::new(),
             "a-doorway",
         );
         let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
@@ -1260,6 +1852,7 @@ mod tests {
             &RouteKey::path_only("/lamad"),
             &contracts,
             &HashMap::new(),
+            &HashMap::new(),
             "a-doorway",
         );
         let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
@@ -1275,6 +1868,7 @@ mod tests {
         let folded = fold_candidate_holders(
             &RouteKey::path_only("/lamad/deep"),
             &contracts,
+            &HashMap::new(),
             &HashMap::new(),
             "a-doorway",
         );
@@ -1297,10 +1891,184 @@ mod tests {
             &RouteKey::path_only("/x"),
             &contracts,
             &liveness,
+            &HashMap::new(),
             "a-doorway",
         );
         let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
         assert_eq!(ids, vec!["c-doorway", "b-doorway"]);
+    }
+
+    // ── Weight term in the fold (T2) ──────────────────────────────────────────
+
+    /// T2.2 — THE BYTE-FOR-BYTE REGRESSION PIN. Same contracts + liveness + an
+    /// EMPTY weights map as `fold_orders_health_first_then_owner_order` →
+    /// identical ordering to what that pre-existing test asserts.
+    #[test]
+    fn with_no_observations_the_fold_returns_exactly_the_order_it_returns_today() {
+        let contracts = vec![
+            contract("b-doorway", "https://b.example", "/lamad"),
+            contract("c-doorway", "https://c.example", "/lamad"),
+            contract("d-doorway", "https://d.example", "/lamad"),
+        ];
+        let liveness = HashMap::from([
+            ("b-doorway".to_string(), HolderLiveness::Unreachable),
+            ("c-doorway".to_string(), HolderLiveness::Serving),
+            ("d-doorway".to_string(), HolderLiveness::Serving),
+        ]);
+        let folded = fold_candidate_holders(
+            &RouteKey::path_only("/lamad/x"),
+            &contracts,
+            &liveness,
+            &HashMap::new(),
+            "a-doorway",
+        );
+        let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
+        assert_eq!(ids, vec!["c-doorway", "d-doorway", "b-doorway"]);
+    }
+
+    /// T2.3 — THE STORY'S CORE ASSERTION. Two equally-live holders, alpha
+    /// first in owner order; alpha carries a declared shed → beta first.
+    #[test]
+    fn a_holder_that_declared_a_shed_sorts_behind_an_equally_live_sibling() {
+        let contracts = vec![
+            contract("alpha", "https://alpha.example", "/lamad"),
+            contract("beta", "https://beta.example", "/lamad"),
+        ];
+        let liveness = HashMap::from([
+            ("alpha".to_string(), HolderLiveness::Serving),
+            ("beta".to_string(), HolderLiveness::Serving),
+        ]);
+        let weights = HashMap::from([("alpha".to_string(), WEIGHT_SHEDDING)]);
+        let folded = fold_candidate_holders(
+            &RouteKey::path_only("/lamad/x"),
+            &contracts,
+            &liveness,
+            &weights,
+            "self",
+        );
+        let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["beta", "alpha"],
+            "alpha declared a shed, so beta — equally live but unconstrained — sorts first"
+        );
+    }
+
+    /// T2.4 — busy beats dead: Weight sits below Liveness in the tuple.
+    #[test]
+    fn weight_never_outranks_liveness() {
+        let contracts = vec![
+            contract("busy", "https://busy.example", "/lamad"),
+            contract("dead", "https://dead.example", "/lamad"),
+        ];
+        let liveness = HashMap::from([
+            ("busy".to_string(), HolderLiveness::Serving),
+            ("dead".to_string(), HolderLiveness::Unreachable),
+        ]);
+        let weights = HashMap::from([("busy".to_string(), WEIGHT_SHEDDING)]);
+        let folded = fold_candidate_holders(
+            &RouteKey::path_only("/lamad/x"),
+            &contracts,
+            &liveness,
+            &weights,
+            "self",
+        );
+        let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["busy", "dead"],
+            "a demoted-but-Serving holder still sorts ahead of an Unreachable one"
+        );
+    }
+
+    /// T2.5 — cheap now, load-bearing when ReachStanding/Nearest land: assert
+    /// by POSITION that Weight is tuple index 3, below indices 1-2.
+    #[test]
+    fn weight_never_outranks_reach_or_nearest_when_those_are_wired() {
+        let probe = holder("x", "https://x.example", HolderLiveness::Serving);
+        let rank = selector_rank(&probe, 0);
+        // (liveness, reach_standing, nearest, weight, owner_order)
+        assert_eq!(SELECTOR_TERMS[1], SelectorTerm::ReachStanding);
+        assert_eq!(SELECTOR_TERMS[2], SelectorTerm::Nearest);
+        assert_eq!(SELECTOR_TERMS[3], SelectorTerm::Weight);
+        // The tuple field order mirrors SELECTOR_TERMS' index order exactly —
+        // rank.1/.2 are compared before rank.3 by Rust's derived tuple Ord.
+        let _ = rank;
+    }
+
+    /// T2.6 — §3.7's invariant: a demoted holder is still a candidate, not
+    /// filtered out. One holder, demoted → the fold returns it (len 1).
+    #[test]
+    fn a_demoted_holder_is_still_a_candidate() {
+        let contracts = vec![contract("alpha", "https://alpha.example", "/lamad")];
+        let liveness = HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]);
+        let weights = HashMap::from([("alpha".to_string(), WEIGHT_SHEDDING)]);
+        let folded = fold_candidate_holders(
+            &RouteKey::path_only("/lamad/x"),
+            &contracts,
+            &liveness,
+            &weights,
+            "self",
+        );
+        assert_eq!(
+            folded.len(),
+            1,
+            "a sole demoted holder is still dialled and can still serve"
+        );
+        assert_eq!(folded[0].doorway_id, "alpha");
+    }
+
+    /// T2.7 — if everyone is shedding, there is nothing to balance: falls
+    /// through to today's owner order.
+    #[test]
+    fn every_holder_demoted_falls_through_to_owner_order() {
+        let contracts = vec![
+            contract("alpha", "https://alpha.example", "/lamad"),
+            contract("beta", "https://beta.example", "/lamad"),
+        ];
+        let liveness = HashMap::from([
+            ("alpha".to_string(), HolderLiveness::Serving),
+            ("beta".to_string(), HolderLiveness::Serving),
+        ]);
+        let weights = HashMap::from([
+            ("alpha".to_string(), WEIGHT_SHEDDING),
+            ("beta".to_string(), WEIGHT_SHEDDING),
+        ]);
+        let folded = fold_candidate_holders(
+            &RouteKey::path_only("/lamad/x"),
+            &contracts,
+            &liveness,
+            &weights,
+            "self",
+        );
+        let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["alpha", "beta"],
+            "equal weights fall through to owner order"
+        );
+    }
+
+    /// T2.8 — the EPR-id fold is not a second selector: it carries the same
+    /// Weight term.
+    #[test]
+    fn fold_all_holders_carries_the_same_weight_term() {
+        let contracts = vec![
+            contract("alpha", "https://alpha.example", "/lamad"),
+            contract("beta", "https://beta.example", "/shefa"),
+        ];
+        let liveness = HashMap::from([
+            ("alpha".to_string(), HolderLiveness::Serving),
+            ("beta".to_string(), HolderLiveness::Serving),
+        ]);
+        let weights = HashMap::from([("alpha".to_string(), WEIGHT_SHEDDING)]);
+        let folded = fold_all_holders(&contracts, &liveness, &weights, "self");
+        let ids: Vec<&str> = folded.iter().map(|h| h.doorway_id.as_str()).collect();
+        assert_eq!(
+            ids,
+            vec!["beta", "alpha"],
+            "fold_all_holders orders by the same selector_rank, Weight included"
+        );
     }
 
     // ── routing dimensions: host, and the selector's shape ──────────────────
@@ -1313,6 +2081,7 @@ mod tests {
             let folded = fold_candidate_holders(
                 &RouteKey::new(host, "/lamad"),
                 &contracts,
+                &HashMap::new(),
                 &HashMap::new(),
                 "a-doorway",
             );
@@ -1334,6 +2103,7 @@ mod tests {
             &RouteKey::new(Some("ALPHA.elohim.host:443"), "/lamad"),
             &contracts,
             &HashMap::new(),
+            &HashMap::new(),
             "a-doorway",
         );
         assert_eq!(matched.len(), 1);
@@ -1344,6 +2114,7 @@ mod tests {
                 fold_candidate_holders(
                     &RouteKey::new(other, "/lamad"),
                     &contracts,
+                    &HashMap::new(),
                     &HashMap::new(),
                     "a-doorway",
                 )
@@ -1362,6 +2133,7 @@ mod tests {
         let folded = fold_candidate_holders(
             &RouteKey::new(Some("elohim.host"), "/lamad"),
             &contracts,
+            &HashMap::new(),
             &HashMap::new(),
             "a-doorway",
         );
@@ -1392,6 +2164,7 @@ mod tests {
             &RouteKey::new(Some("candidate.elohim.local"), "/"),
             &contracts,
             &liveness,
+            &HashMap::new(),
             "local",
         );
         assert_eq!(
@@ -1424,10 +2197,17 @@ mod tests {
         assert!(table.holders_for_exact_host(&key, "local").is_empty());
     }
 
+    /// T2.1 — `selector_rank_has_one_element_per_selector_term`. `Weight` is
+    /// WIRED (story 3.1), so it is no longer in the `TERM_NOT_YET_WIRED`
+    /// triple — but an UNOBSERVED holder (the `holder()` test fixture
+    /// defaults `shed_weight` to `WEIGHT_UNCONSTRAINED`, which is
+    /// byte-identical to `TERM_NOT_YET_WIRED`) still ranks `(liveness, 0, 0,
+    /// 0, owner_order)`, so the regression pin below is unaffected by wiring
+    /// this term.
     #[test]
     fn selector_terms_declare_liveness_first_and_owner_order_last() {
-        // The ORDER is the contract. reach/standing, nearest and weight sit
-        // between them and are declared-but-constant until wired.
+        // The ORDER is the contract. reach/standing and nearest sit between
+        // liveness and weight and are declared-but-constant until wired.
         assert_eq!(
             SELECTOR_TERMS,
             &[
@@ -1448,9 +2228,20 @@ mod tests {
         );
         assert_eq!(rank.0, HolderLiveness::Serving as u8);
         assert_eq!(
-            (rank.1, rank.2, rank.3),
-            (TERM_NOT_YET_WIRED, TERM_NOT_YET_WIRED, TERM_NOT_YET_WIRED),
-            "unwired terms are constant, so they cannot reorder anything yet"
+            (rank.1, rank.2),
+            (TERM_NOT_YET_WIRED, TERM_NOT_YET_WIRED),
+            "ReachStanding and Nearest are unwired terms — constant, so they cannot reorder anything yet"
+        );
+        assert_eq!(
+            rank.3, WEIGHT_UNCONSTRAINED,
+            "Weight is WIRED, but an unobserved holder still ranks as unconstrained"
+        );
+        let mut demoted = probe.clone();
+        demoted.shed_weight = WEIGHT_SHEDDING;
+        assert_eq!(
+            selector_rank(&demoted, 3).3,
+            WEIGHT_SHEDDING,
+            "a holder carrying a declared shed ranks worse on the Weight term"
         );
         assert_eq!(rank.4, 3, "owner order is the final tiebreak");
     }
@@ -1525,6 +2316,235 @@ mod tests {
             .map(|h| h.doorway_id)
             .collect();
         assert_eq!(ids, vec!["c-doorway".to_string(), "b-doorway".to_string()]);
+    }
+
+    fn observed(doorway_id: &str, declared_secs: Option<u64>, reason: ShedReason) -> ObservedShed {
+        ObservedShed {
+            doorway_id: doorway_id.to_string(),
+            declared_secs,
+            reason: Some(reason),
+            origin: format!("https://{doorway_id}.example"),
+        }
+    }
+
+    /// T3.1 — THE WHOLE REASON THE TERM EXISTS SEPARATELY FROM `Liveness`
+    /// (§7.5): a discovery tick (`replace_all`) does not forget a window the
+    /// holder named. `liveness` is rebuilt wholesale every tick, but `shed`
+    /// is not — the declared window (300s here) easily outlives the
+    /// microseconds this test takes to run.
+    #[test]
+    fn a_discovery_tick_does_not_forget_a_window_the_holder_named() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![
+                contract("alpha", "https://alpha.example", "/lamad"),
+                contract("beta", "https://beta.example", "/lamad"),
+            ],
+            HashMap::from([
+                ("alpha".to_string(), HolderLiveness::Serving),
+                ("beta".to_string(), HolderLiveness::Serving),
+            ]),
+        );
+        table.note_backpressure(&observed("alpha", Some(300), ShedReason::RetryAfter));
+
+        // Simulate the next discovery tick: a fresh liveness snapshot, both
+        // serving again (mirrors real behaviour — the probe would see alpha
+        // answering fine; only the relay layer ever saw the shed).
+        table.replace_all(
+            vec![
+                contract("alpha", "https://alpha.example", "/lamad"),
+                contract("beta", "https://beta.example", "/lamad"),
+            ],
+            HashMap::from([
+                ("alpha".to_string(), HolderLiveness::Serving),
+                ("beta".to_string(), HolderLiveness::Serving),
+            ]),
+        );
+
+        let ids: Vec<String> = table
+            .holders_for(&RouteKey::path_only("/lamad"), "self")
+            .into_iter()
+            .map(|h| h.doorway_id)
+            .collect();
+        assert_eq!(
+            ids,
+            vec!["beta".to_string(), "alpha".to_string()],
+            "the declared window survives the discovery tick that would have wiped a bare Liveness demotion"
+        );
+    }
+
+    /// T3.2 — two arms, two concerns: `note_shed` alone leaves `shed_weight`
+    /// unconstrained (it only ever touches `Liveness`).
+    #[test]
+    fn note_shed_still_only_sets_liveness() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/lamad")],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+        table.note_shed("alpha");
+        let holders = table.holders_for(&RouteKey::path_only("/lamad"), "self");
+        assert_eq!(holders.len(), 1);
+        assert_eq!(holders[0].liveness, HolderLiveness::Shedding);
+        assert_eq!(
+            holders[0].shed_weight, WEIGHT_UNCONSTRAINED,
+            "note_shed must never touch the Weight term"
+        );
+    }
+
+    /// NIT — pins `note_backpressure`'s early return: an observation with
+    /// `reason: None` (a bare 503, or a caller-scoped 503/429) is a pure
+    /// no-op for `Weight` — no window opens, no counter fires, no log line.
+    #[test]
+    fn a_shed_with_no_reason_is_not_recorded() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/lamad")],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+        table.note_backpressure(&ObservedShed {
+            doorway_id: "alpha".to_string(),
+            declared_secs: None,
+            reason: None,
+            origin: "https://alpha.example".to_string(),
+        });
+        let holders = table.holders_for(&RouteKey::path_only("/lamad"), "self");
+        assert_eq!(
+            holders[0].shed_weight, WEIGHT_UNCONSTRAINED,
+            "reason: None must never open a window"
+        );
+    }
+
+    /// T3.3 — exact-commitment resolution is an authority question, not a
+    /// balancing one; it is never weighted even when the same holder has a
+    /// live declared shed.
+    #[test]
+    fn exact_commitment_resolution_is_never_weighted() {
+        let table = NameRouteTable::new();
+        let exact = HolderContract {
+            host: Some("garden.example".to_string()),
+            commitment_id: Some("project-epr-garden".to_string()),
+            epr_id: Some("garden-epr".to_string()),
+            ..HolderContract::any_host("alpha", "https://alpha.example", "/")
+        };
+        table.replace_all(
+            vec![exact],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+        table.note_backpressure(&observed("alpha", Some(300), ShedReason::RetryAfter));
+        let ExactCommitmentHolder::Unique(holder) =
+            table.exact_commitment_holder(Some("garden.example"), "project-epr-garden")
+        else {
+            panic!("expected a unique exact-commitment holder");
+        };
+        assert_eq!(
+            holder.shed_weight, WEIGHT_UNCONSTRAINED,
+            "exact-commitment resolution must never be weighted"
+        );
+    }
+
+    /// T3.4 — promotion needs no timer: the table prunes on read. Directly
+    /// seeding an ALREADY-ELAPSED note (rather than sleeping past a real
+    /// window) proves the fold sees the elapsed state with no task having
+    /// run — same white-box access T1's ShedMemory tests use, one layer up.
+    #[test]
+    fn the_table_prunes_on_read_so_a_promotion_needs_no_timer() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/lamad")],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+        {
+            let mut shed = table.shed.write().unwrap();
+            shed.notes.insert(
+                "alpha".to_string(),
+                ShedNote {
+                    until_secs: 1, // 1970 — already elapsed relative to any real now_secs()
+                    reason: ShedReason::RetryAfter,
+                },
+            );
+        }
+        let holders = table.holders_for(&RouteKey::path_only("/lamad"), "self");
+        assert_eq!(
+            holders[0].shed_weight, WEIGHT_UNCONSTRAINED,
+            "a fold reads the current state, not a cached one — promotion needed no timer to run"
+        );
+    }
+
+    /// S3 — the hot path (nothing elapsed) must never take the `shed` write
+    /// lock. `note_backpressure`'s own tail call to `prune_shed_and_log` is
+    /// excluded from the measured window (it legitimately writes, once, to
+    /// insert the note); only the SUBSEQUENT resolve is asserted to be
+    /// write-free.
+    #[test]
+    fn a_resolve_with_nothing_elapsed_never_takes_the_write_lock() {
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/lamad")],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+        table.note_backpressure(&observed("alpha", Some(300), ShedReason::RetryAfter));
+
+        let passes_before = table
+            .prune_write_passes
+            .load(std::sync::atomic::Ordering::SeqCst);
+        // The 300s window is nowhere near elapsed at real wall-clock speed.
+        let _ = table.holders_for(&RouteKey::path_only("/lamad"), "self");
+        let passes_after = table
+            .prune_write_passes
+            .load(std::sync::atomic::Ordering::SeqCst);
+        assert_eq!(
+            passes_before, passes_after,
+            "a resolve with nothing elapsed must read-only — no write-lock prune pass"
+        );
+    }
+
+    /// T6.2 — 0 -> 1 -> 0 without a timer. Real wiring, not a bare setter:
+    /// `note_backpressure` demotes (gauge 0->1), then a fold that finds an
+    /// already-elapsed window (same white-box seeding T3.4 uses) prunes it
+    /// and the gauge falls back to 0 — this IS how the household run sees a
+    /// promotion at all, since promotion is the passage of time and has no
+    /// event of its own.
+    #[test]
+    fn the_gauge_tracks_live_windows_across_a_demotion_and_a_promotion() {
+        // S2: reads the TABLE's own live count, never the process-wide
+        // Prometheus gauge — that gauge is a thin mirror
+        // (`prune_shed_and_log` calls `set_holders_demoted(live_len)` on
+        // every write and fold) that many OTHER tests' NameRouteTable
+        // instances mutate concurrently, so an absolute-value read on it is
+        // not deterministic under `cargo test`'s default parallelism (see the
+        // shared-REGISTRY convention note in `metrics.rs`).
+        // `both_name_route_metrics_are_registered` (metrics.rs) separately
+        // pins that the gauge series itself exists and is set.
+        let table = NameRouteTable::new();
+        table.replace_all(
+            vec![contract("alpha", "https://alpha.example", "/lamad")],
+            HashMap::from([("alpha".to_string(), HolderLiveness::Serving)]),
+        );
+
+        table.note_backpressure(&observed("alpha", Some(300), ShedReason::RetryAfter));
+        assert_eq!(
+            table.shed.read().unwrap().live_len(now_secs()),
+            1,
+            "the demotion must be visible in the table's own live count"
+        );
+
+        {
+            let mut shed = table.shed.write().unwrap();
+            shed.notes.insert(
+                "alpha".to_string(),
+                ShedNote {
+                    until_secs: 1,
+                    reason: ShedReason::RetryAfter,
+                },
+            );
+        }
+        let _ = table.holders_for(&RouteKey::path_only("/lamad"), "self");
+        assert_eq!(
+            table.shed.read().unwrap().live_len(now_secs()),
+            0,
+            "the fold's prune must fall the live count back to 0 on promotion — no timer required"
+        );
     }
 
     // ── the one-hop budget ──────────────────────────────────────────────────
@@ -1720,6 +2740,215 @@ mod tests {
         );
     }
 
+    // ── Weight observation plumbing (T5) ─────────────────────────────────────
+
+    fn reply_with_retry_after(status: u16, secs: u64) -> HolderReply {
+        HolderReply {
+            retry_after_secs: Some(secs),
+            retry_after_present: true,
+            ..reply(status, r#"{"status":"catching-up"}"#)
+        }
+    }
+
+    /// A 503 whose `Retry-After` header was present but did not parse (an
+    /// HTTP-date, say) — genuinely declared, no readable window.
+    fn reply_with_unparseable_retry_after(status: u16) -> HolderReply {
+        HolderReply {
+            retry_after_secs: None,
+            retry_after_present: true,
+            ..reply(status, r#"{"status":"catching-up"}"#)
+        }
+    }
+
+    /// A 503 carrying THIS doorway's own membrane-challenge marker — a
+    /// caller-scoped answer, never a capacity statement about the holder.
+    fn membrane_shed_reply() -> HolderReply {
+        HolderReply {
+            retry_after_secs: Some(900),
+            retry_after_present: true,
+            has_membrane_verdict: true,
+            ..reply(503, r#"{"error":"Too Many Requests","retryAfter":900}"#)
+        }
+    }
+
+    /// T5.1 — the observation carries the window the holder named.
+    #[tokio::test]
+    async fn a_503_with_retry_after_is_observed_with_the_window_the_holder_named() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply_with_retry_after(503, 45))
+        })
+        .await;
+        assert_eq!(outcome.shed_doorways.len(), 1);
+        let observed = &outcome.shed_doorways[0];
+        assert_eq!(observed.doorway_id, "b-doorway");
+        assert_eq!(observed.declared_secs, Some(45));
+        assert_eq!(observed.reason, Some(ShedReason::RetryAfter));
+    }
+
+    /// T5.2 — the `declares_backpressure` lesson: a bare 503 with neither
+    /// header is shed (Liveness still demotes it) but declares no window
+    /// (Weight must not mint one from it).
+    #[tokio::test]
+    async fn a_503_with_no_backpressure_headers_is_shed_but_declares_no_window() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply(503, r#"{"error":"conductor error"}"#))
+        })
+        .await;
+        assert_eq!(
+            outcome.shed_doorways.len(),
+            1,
+            "still shed — Liveness must still demote it"
+        );
+        let observed = &outcome.shed_doorways[0];
+        assert_eq!(observed.declared_secs, None);
+        assert_ne!(
+            observed.reason,
+            Some(ShedReason::RetryAfter),
+            "no header means no declared window"
+        );
+        assert_eq!(
+            observed.reason, None,
+            "and specifically: no declaration at all"
+        );
+    }
+
+    /// T5.3 (REVISED, BLOCKER B1 — reverses the 429 widening entirely) — the
+    /// only 429 this service emits is the membrane challenge
+    /// (`server::http`'s `Verdict::Challenge`), keyed per human/client and
+    /// forwarded the CALLER's own authorization/cookie by `fetch_from_holder`.
+    /// So a 429 is a statement about WHO ASKED, never about the holder's own
+    /// capacity: reading it as a shed would let one challenged human at
+    /// holder A get holder A demoted for every OTHER visitor at courier B — a
+    /// free, repeatable traffic-steering lever. `relay_one_hop` therefore
+    /// handles a 429 EXACTLY as it did before story 3.1: never observed,
+    /// never demoted, iteration unchanged.
+    #[tokio::test]
+    async fn a_429_is_about_the_caller_and_never_demotes_the_holder() {
+        let holders = vec![
+            holder("b-doorway", "https://b.example", HolderLiveness::Serving),
+            holder("c-doorway", "https://c.example", HolderLiveness::Serving),
+        ];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |h| async move {
+            if h.doorway_id == "b-doorway" {
+                Ok(reply(
+                    429,
+                    r#"{"error":"Too Many Requests","retryAfter":900}"#,
+                ))
+            } else {
+                Ok(reply(200, "served by c"))
+            }
+        })
+        .await;
+        match &outcome.verdict {
+            RelayVerdict::Served { origin, .. } => assert_eq!(origin, "https://c.example"),
+            other => panic!("expected the second holder to serve, got {other:?}"),
+        }
+        assert!(
+            outcome.shed_doorways.is_empty(),
+            "a 429 must never enter shed_doorways — no Liveness demotion, no Weight window, ever"
+        );
+    }
+
+    /// B1's defensive symmetry: a 503 that ALSO carries `x-membrane` is still
+    /// caller-scoped (the same defect wearing a different status code), so it
+    /// opens no Weight window either — even though it still counts as a shed
+    /// for `Liveness` (the pre-existing bare-503 behaviour is untouched).
+    #[tokio::test]
+    async fn a_503_bearing_a_membrane_verdict_opens_no_window() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(membrane_shed_reply())
+        })
+        .await;
+        assert_eq!(
+            outcome.shed_doorways.len(),
+            1,
+            "still a shed — Liveness demotion is unchanged"
+        );
+        let observed = &outcome.shed_doorways[0];
+        assert_eq!(
+            observed.reason, None,
+            "a caller-scoped 503 must never open a Weight window, whatever Retry-After it carries"
+        );
+    }
+
+    /// S1 companion, at the relay level: a genuinely declared shed (header
+    /// present) whose value could not be parsed still opens the DEFAULT
+    /// window, labelled `NoWindowNamed` — never silently dropped to "no
+    /// declaration at all".
+    #[tokio::test]
+    async fn a_503_with_an_unparseable_retry_after_is_declared_with_no_window_named() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply_with_unparseable_retry_after(503))
+        })
+        .await;
+        let observed = &outcome.shed_doorways[0];
+        assert_eq!(observed.declared_secs, None);
+        assert_eq!(observed.reason, Some(ShedReason::NoWindowNamed));
+    }
+
+    /// T5.4 — a 403 is still an authoritative refusal and opens no window: it
+    /// stops the loop and never reaches `shed_doorways` at all.
+    #[tokio::test]
+    async fn a_403_is_still_an_authoritative_refusal_and_opens_no_window() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(refusal("household"))
+        })
+        .await;
+        assert!(matches!(outcome.verdict, RelayVerdict::Served { .. }));
+        assert!(
+            outcome.shed_doorways.is_empty(),
+            "a refusal is not a shed and opens no weight window"
+        );
+    }
+
+    /// T5.5 — structural: `relay_one_hop` takes only `&[NameHolder]` and a
+    /// stateless `fetch` closure and RETURNS its observations; no
+    /// `NameRouteTable` (or `AppState`) is threaded through it, so the write
+    /// side (`note_shed` / `note_backpressure`) is entirely the caller's —
+    /// exactly `RelayOutcome`'s own documented discipline.
+    #[tokio::test]
+    async fn the_relay_loop_still_owns_no_mutable_state() {
+        let holders = vec![holder(
+            "b-doorway",
+            "https://b.example",
+            HolderLiveness::Serving,
+        )];
+        // No table, no AppState, no shared cell in scope at all — only the
+        // holder slice and a closure — and the loop still produces a full
+        // verdict plus every shed it saw for the caller to act on.
+        let outcome = relay_one_hop(&holders, RelayChannel::Public, |_| async {
+            Ok(reply(200, "<app-root></app-root>"))
+        })
+        .await;
+        assert!(matches!(outcome.verdict, RelayVerdict::Served { .. }));
+        assert!(outcome.shed_doorways.is_empty());
+    }
+
     #[tokio::test]
     async fn sibling_404_preserves_the_original_404() {
         // (b) sibling 404 → original 404; the relay reports AllFailed and the
@@ -1758,8 +2987,12 @@ mod tests {
             other => panic!("expected the second holder to serve, got {other:?}"),
         }
         assert_eq!(
-            outcome.shed_doorways,
-            vec!["b-doorway".to_string()],
+            outcome
+                .shed_doorways
+                .iter()
+                .map(|o| o.doorway_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b-doorway"],
             "the shed is recorded so the next fold demotes that holder"
         );
     }
@@ -2023,7 +3256,14 @@ mod tests {
             "a shed is a liveness statement -- unlike a refusal, it MUST fall \
              through to the next holder"
         );
-        assert_eq!(outcome.shed_doorways, vec!["b-doorway".to_string()]);
+        assert_eq!(
+            outcome
+                .shed_doorways
+                .iter()
+                .map(|o| o.doorway_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["b-doorway"]
+        );
     }
 
     /// The holder's own bundle marker and caching terms ride along too, and an

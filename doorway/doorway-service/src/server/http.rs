@@ -6844,6 +6844,27 @@ async fn fetch_from_holder(
     let bundle = header(crate::services::name_routing::BUNDLE_HEADER);
     let receipt = header(crate::services::name_routing::RECEIPT_HEADER);
     let cache_control = header(reqwest::header::CACHE_CONTROL.as_str());
+    // The holder's own declared shed window (story 3.1, design brief §2/§4.4).
+    // Delta-seconds only — an HTTP-date `Retry-After` is deliberately NOT
+    // parsed (no peer in this tree emits one, and a wrong date parse would be
+    // a silent mis-window; see `parse_retry_after_secs`). `retry_after_present`
+    // is carried SEPARATELY from the parsed value so "header present but
+    // unparseable" (still a genuine declaration) stays distinct from "no
+    // header at all" (no declaration). `X-Available-Permits` is deliberately
+    // NOT captured here (BLOCKER follow-up to story 3.1): a raw permit count
+    // has no denominator on the wire and cannot be graded, so it must never
+    // influence Weight — see `ShedReason`'s doc comment.
+    let retry_after_header = header(reqwest::header::RETRY_AFTER.as_str());
+    let retry_after_present = retry_after_header.is_some();
+    let retry_after_secs = retry_after_header
+        .as_deref()
+        .and_then(crate::services::name_routing::parse_retry_after_secs);
+    // This doorway's OWN membrane-challenge marker (`Verdict::Challenge`
+    // above stamps it on every 429). A holder's answer carrying it is
+    // scoring the CALLER (whose authorization/cookie this relay forwarded),
+    // never its own capacity — see the BLOCKER ruling on `relay_one_hop`'s
+    // 503 arm.
+    let has_membrane_verdict = response.headers().contains_key("x-membrane");
     let body = response.bytes().await.map_err(|e| e.to_string())?;
     if body.len() as u64 > RELAY_MAX_BYTES {
         return Err(format!("relayed body exceeds {RELAY_MAX_BYTES} bytes"));
@@ -6855,6 +6876,9 @@ async fn fetch_from_holder(
         bundle,
         receipt,
         cache_control,
+        retry_after_secs,
+        retry_after_present,
+        has_membrane_verdict,
         body: body.to_vec(),
     })
 }
@@ -6926,7 +6950,7 @@ mod name_relay_request_tests {
         local_path_requires_exact_host, RelayContext,
     };
     use crate::services::name_routing::{
-        HolderLiveness, NameHolder, RelayMode, FEDERATION_HOP_HEADER,
+        HolderLiveness, NameHolder, RelayMode, FEDERATION_HOP_HEADER, WEIGHT_UNCONSTRAINED,
     };
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -6941,6 +6965,7 @@ mod name_relay_request_tests {
             epr_id: None,
             liveness: HolderLiveness::Serving,
             relay_mode: RelayMode::Proxy,
+            shed_weight: WEIGHT_UNCONSTRAINED,
         }
     }
 
@@ -7014,6 +7039,46 @@ mod name_relay_request_tests {
         assert!(
             selected.received_requests().await.unwrap().is_empty(),
             "the holder's default public channel must not receive the request"
+        );
+    }
+
+    /// S1 — `X-Available-Permits` must leave NO trace that could open a
+    /// Weight window: `fetch_from_holder` doesn't capture it into
+    /// `HolderReply` at all (a raw permit count has no denominator on the
+    /// wire and cannot be graded). A response carrying it ALONE (no
+    /// `Retry-After`) must read exactly like one with no backpressure headers
+    /// at all.
+    #[tokio::test]
+    async fn a_permits_header_alone_opens_no_window() {
+        let selected = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/"))
+            .respond_with(
+                ResponseTemplate::new(503)
+                    .insert_header("x-available-permits", "3")
+                    .set_body_string(r#"{"status":"catching-up"}"#),
+            )
+            .mount(&selected)
+            .await;
+
+        let reply = fetch_from_holder(
+            &reqwest::Client::new(),
+            &holder(selected.uri()),
+            "/",
+            None,
+            &RelayContext::default(),
+        )
+        .await
+        .expect("the holder still answers, just with no Retry-After");
+
+        assert_eq!(reply.status, 503);
+        assert_eq!(
+            reply.retry_after_secs, None,
+            "a permits-only response must carry no window magnitude"
+        );
+        assert!(
+            !reply.retry_after_present,
+            "a permits-only response must not read as a Retry-After declaration"
         );
     }
 
@@ -7210,8 +7275,9 @@ async fn relay_by_name(
     // A shed observed by a relay is the only place a shed can be observed —
     // the discovery probe cannot tell a shed from a death. Record it so the
     // next fold orders that holder after the serving ones.
-    for doorway_id in &outcome.shed_doorways {
-        state.name_routes.note_shed(doorway_id);
+    for observed in &outcome.shed_doorways {
+        state.name_routes.note_shed(&observed.doorway_id); // unchanged — Liveness arm
+        state.name_routes.note_backpressure(observed); // NEW — Weight arm
     }
 
     match outcome.verdict {

@@ -405,6 +405,38 @@ lazy_static! {
         "Login sessions established alongside an issued auth token.",
     )
     .unwrap();
+
+    // ── Name-route Weight term (story 3.1) ────────────────────────────────────
+    //
+    // One counter (the demotion edge, rate) + one gauge (the promotion edge,
+    // level) — the minimum pair that shows both: a counter has no down edge
+    // and a gauge has no rate. See
+    // `services/name_routing::NameRouteTable::note_backpressure` /
+    // `prune_shed_and_log`.
+
+    /// Times a holder DECLARED backpressure on a relay and was demoted behind
+    /// its siblings for the window it named. Label `reason`: `retry_after`
+    /// (the holder named a window) or `declared` (429 / permits, default
+    /// window). Incremented only when a NEW window is opened, never on every
+    /// fold read — otherwise the series measures traffic, not sheds.
+    pub static ref NAME_ROUTE_HOLDER_DEMOTED_TOTAL: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "doorway_name_route_holder_demoted_total",
+            "Times a name-route holder declared backpressure and was demoted in the selector.",
+        ),
+        &["reason"],
+    )
+    .unwrap();
+
+    /// Holders with a live declared-shed window right now. Rises on a
+    /// demotion, FALLS TO ZERO on promotion — which is how a promotion is
+    /// visible at all, since promotion is the passage of time and has no
+    /// event of its own.
+    pub static ref NAME_ROUTE_HOLDERS_DEMOTED: IntGauge = IntGauge::new(
+        "doorway_name_route_holders_demoted",
+        "Name-route holders currently demoted by their own declared shed window.",
+    )
+    .unwrap();
 }
 
 /// Boot-set handle the watchdog stamps: (`start`, `heartbeat`). `gather_text`
@@ -709,6 +741,23 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(FRESHNESS_PANTRY_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(DOORWAY_AUTH_TOKEN_ISSUED_TOTAL.clone()));
         let _ = REGISTRY.register(Box::new(DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.clone()));
+        let _ = REGISTRY.register(Box::new(NAME_ROUTE_HOLDER_DEMOTED_TOTAL.clone()));
+        // The `reason` vocabulary is closed (`ShedReason::as_label()`), so —
+        // same discipline as `MEMBRANE_VERDICT_TOTAL` above — pre-touch both
+        // labels. A label-bearing collector emits NO series until a label
+        // combination is observed; without this, `doorway_name_route_holder_
+        // demoted_total` would be absent from a doorway that has never yet
+        // seen a sibling shed, exactly the `doorway_conductor_close_code_
+        // total` trap this file has already paid for once.
+        for reason in ["retry_after", "declared"] {
+            NAME_ROUTE_HOLDER_DEMOTED_TOTAL
+                .with_label_values(&[reason])
+                .inc_by(0);
+        }
+        let _ = REGISTRY.register(Box::new(NAME_ROUTE_HOLDERS_DEMOTED.clone()));
+        // A doorway with no live demotion must read as a MEASURED zero, not an
+        // absent gauge — same discipline as every other pre-touched series.
+        NAME_ROUTE_HOLDERS_DEMOTED.set(0);
         let _ = REGISTRY.register(Box::new(SSR_RENDER_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(SSR_RENDER_INFLIGHT.clone()));
         // Pre-touch the closed outcome vocabulary. A label-bearing collector
@@ -981,6 +1030,23 @@ pub fn inc_elohim_session_established() {
     DOORWAY_ELOHIM_SESSION_ESTABLISHED_TOTAL.inc();
 }
 
+/// Name-route `Weight`: a holder declared backpressure and a NEW demotion
+/// window was opened. `reason` is `ShedReason::as_label()` — `retry_after` or
+/// `declared`, never a hand-written string.
+pub fn inc_holder_demoted(reason: &str) {
+    NAME_ROUTE_HOLDER_DEMOTED_TOTAL
+        .with_label_values(&[reason])
+        .inc();
+}
+
+/// Name-route `Weight`: publish the current count of holders under a live
+/// declared-shed window. Called after every prune (every write and every
+/// fold) so a promotion (the count falling) is visible with no event of its
+/// own to hang a counter increment on.
+pub fn set_holders_demoted(n: i64) {
+    NAME_ROUTE_HOLDERS_DEMOTED.set(n);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1177,6 +1243,8 @@ mod tests {
             "doorway_serve_refused_total",
             "doorway_auth_token_issued_total",
             "doorway_elohim_session_established_total",
+            "doorway_name_route_holder_demoted_total",
+            "doorway_name_route_holders_demoted",
         ] {
             assert!(text.contains(name), "missing metric {name}:\n{text}");
         }
@@ -1189,6 +1257,39 @@ mod tests {
             "doorway must not duplicate storage's elohim_node_* surface:\n{text}"
         );
     }
+
+    /// T6.1 — the name-route Weight term's counter and gauge are registered
+    /// (from `register_all()` alone, no touch — see the doc comment above on
+    /// why an untouched registration is the only version of this claim a
+    /// scrape can corroborate).
+    #[test]
+    fn both_name_route_metrics_are_registered() {
+        // Presence only — never an absolute value: this binary shares one
+        // process-wide REGISTRY and `NAME_ROUTE_HOLDERS_DEMOTED` in
+        // particular is mutated by parallel `NameRouteTable` tests elsewhere
+        // (see the module-level note on this test file's own convention).
+        register_all();
+        let text = gather_text();
+        assert!(
+            text.contains("doorway_name_route_holders_demoted"),
+            "gauge must be registered from boot:\n{text}"
+        );
+        inc_holder_demoted("retry_after");
+        let text = gather_text();
+        assert!(
+            text.contains("doorway_name_route_holder_demoted_total"),
+            "missing counter:\n{text}"
+        );
+        assert!(text.contains(r#"reason="retry_after""#), "{text}");
+        assert!(
+            text.contains(r#"reason="declared""#),
+            "the closed `reason` vocabulary must be pre-touched, both labels:\n{text}"
+        );
+    }
+
+    // T6.2 (`the_gauge_tracks_live_windows_across_a_demotion_and_a_promotion`)
+    // lives in `services::name_routing::tests` — it needs `NameRouteTable` to
+    // exercise the real demotion/promotion wiring rather than the bare setter.
 
     #[test]
     fn session_gauge_inc_dec_is_balanced() {
