@@ -251,18 +251,23 @@ pub struct AppState {
     /// When set, authenticated requests route to the conductor hosting that agent.
     /// When None, all requests use the default pool (backwards compat).
     pub conductor_router: Option<Arc<ConductorRouter>>,
-    /// Node Ed25519 verifying (public) key for federation signing
-    /// Generated at startup, used in DID document and JWKS endpoint
+    /// Node Ed25519 verifying (public) key for federation signing.
+    /// Resolved at startup via `node_identity::load_or_generate` when
+    /// `DOORWAY_NODE_KEY_FILE` is set (persists across restarts, story 5.1);
+    /// otherwise generated fresh every boot. Used in the DID document and
+    /// JWKS endpoint.
     pub node_verifying_key: Option<ed25519_dalek::VerifyingKey>,
     /// Private half of the node key above. Retained (T2.2) so the JWT validator
     /// can MINT EdDSA tokens verifiable by siblings when the operator flips
     /// `DOORWAY_JWT_SIGN_ALG=eddsa`; unused on the HS256 default.
     ///
-    /// CAVEAT (honest, not hidden): the pair is generated fresh at boot, so a
-    /// restart rotates it and any EdDSA token minted before the restart becomes
-    /// unverifiable once siblings refresh their JWKS. That is why `hs256`
-    /// remains the default — flipping to `eddsa` should wait on a persisted
-    /// node key (operator menu item 3, the dual-alg migration window).
+    /// CAVEAT (honest, not hidden): unless `DOORWAY_NODE_KEY_FILE` is set,
+    /// this pair is generated fresh at boot, so a restart rotates it and any
+    /// EdDSA token minted before the restart becomes unverifiable once
+    /// siblings refresh their JWKS. That is still why `hs256` remains the
+    /// default — flipping to `eddsa` on a fleet should pair with setting
+    /// `DOORWAY_NODE_KEY_FILE` on a persistent volume (operator menu item 3,
+    /// the dual-alg migration window).
     pub node_signing_key: Option<ed25519_dalek::SigningKey>,
     /// Shared `kid` → Ed25519 public key cache for verifying sibling-minted
     /// JWTs (Task 2.1's `PeerJwksCache`). Refreshed by

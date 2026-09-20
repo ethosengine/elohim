@@ -224,6 +224,23 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_ID")]
     pub doorway_id: Option<String>,
 
+    /// Path to persist this doorway's Ed25519 node signing key across
+    /// restarts (story 5.1, serving-edge campaign). When set, the key is
+    /// loaded from this file (or generated and written here on first boot)
+    /// instead of being regenerated fresh every boot — the same key then
+    /// keeps signing EdDSA JWTs, `GET /.well-known/doorway-keys` (JWKS), and
+    /// `GET /.well-known/did.json` across restarts. When unset, the node
+    /// identity remains ephemeral (today's behavior): a fresh key is
+    /// generated every boot and a `warn!` is logged at startup, since
+    /// federation siblings and any EdDSA-minted JWTs will not survive a
+    /// restart. A present-but-corrupt file fails boot closed rather than
+    /// silently minting a new identity — see `node_identity::load_or_generate`.
+    /// One process per path is the intended deployment; a first-boot race
+    /// between two processes on the same path converges on the first
+    /// writer's key rather than leaving them on different identities.
+    #[arg(long, env = "DOORWAY_NODE_KEY_FILE")]
+    pub node_key_file: Option<std::path::PathBuf>,
+
     /// Enable the self-hostable pkarr resolver endpoint at /pkarr/{key}.
     /// See genesis/docs/content/elohim-protocol/architecture/2026-05-08-iroh-libp2p-complementarity.md
     /// (cutover gate #10).

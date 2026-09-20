@@ -29,6 +29,7 @@ pub mod keyed_lock;
 pub mod logging;
 pub mod metrics;
 pub mod nats;
+pub mod node_identity;
 pub mod orchestrator;
 pub mod projection;
 pub mod proxy;

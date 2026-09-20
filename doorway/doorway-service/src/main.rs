@@ -607,17 +607,56 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         );
     }
 
-    // Generate node Ed25519 signing key for federation
-    // This key is used in the DID document and JWKS endpoint
+    // Node Ed25519 signing key for federation (story 5.1: persists across
+    // boots when DOORWAY_NODE_KEY_FILE is set). This key is used in the DID
+    // document and JWKS endpoint, and (when DOORWAY_JWT_SIGN_ALG=eddsa) to
+    // mint EdDSA JWTs.
     {
-        let (signing_key, verifying_key) = doorway::custodial_keys::crypto::generate_keypair();
-        state.node_verifying_key = Some(verifying_key);
+        let signing_key = match &args.node_key_file {
+            Some(path) => match doorway::node_identity::load_or_generate(path) {
+                Ok((key, origin)) => {
+                    info!(
+                        path = %path.display(),
+                        fingerprint = %doorway::node_identity::fingerprint(&key.verifying_key()),
+                        mode = origin.as_str(),
+                        "Doorway node identity resolved (persisted)"
+                    );
+                    key
+                }
+                Err(e) => {
+                    error!(
+                        path = %path.display(),
+                        error = %e,
+                        "Failed to load or generate doorway node key from DOORWAY_NODE_KEY_FILE; \
+                         aborting boot rather than mint a silently different identity"
+                    );
+                    std::process::exit(1);
+                }
+            },
+            None => {
+                warn!(
+                    "DOORWAY_NODE_KEY_FILE not set: doorway node identity is EPHEMERAL. \
+                     A fresh key is generated every boot — federation siblings that cache \
+                     this doorway's JWKS entry, and any EdDSA-minted JWT, will not survive \
+                     a restart. Minting stays HS256 by default (DOORWAY_JWT_SIGN_ALG); set \
+                     DOORWAY_NODE_KEY_FILE to persist this identity."
+                );
+                let (signing_key, _verifying_key) =
+                    doorway::custodial_keys::crypto::generate_keypair();
+                info!(
+                    fingerprint = %doorway::node_identity::fingerprint(&signing_key.verifying_key()),
+                    mode = "generated-ephemeral",
+                    "Doorway node identity resolved (ephemeral)"
+                );
+                signing_key
+            }
+        };
+        state.node_verifying_key = Some(signing_key.verifying_key());
         // T2.2: retain the private half so `federation_jwt_validator()` can mint
         // and self-verify EdDSA tokens. Minting stays HS256 unless the operator
         // sets DOORWAY_JWT_SIGN_ALG=eddsa; see the AppState field doc for the
         // boot-rotation caveat that keeps hs256 the default.
         state.node_signing_key = Some(signing_key);
-        info!("Node signing key generated for federation");
     }
 
     // Create ZomeCaller for federation + service registration.

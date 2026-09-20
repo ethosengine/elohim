@@ -962,6 +962,9 @@ reset_household_state() {
   rm -rf "$LOCAL_DEV_DIR/.hc" "$LOCAL_DEV_DIR/.sandbox_log" "$LOCAL_DEV_DIR/.sandbox_run_log"
   rm -rf "$MONGO_DIR" "$MESH_DIR/membership" "$MESH_DIR/state" "$MESH_DIR/storage-restart"
   rm -f "$ARCHIVE_MODE_FILE"
+  # The doorways are not in $PEERS, so their node identities are removed by name:
+  # a recast household must not keep the signing keys of the one it replaces.
+  rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key"
   rm -f "$MESH_DIR/household-fixture.json" "$MESH_DIR/prologue-hosted-humans.json"
   echo "mesh reset authorized: conductor, storage, and doorway-account state will be recast together"
 }
@@ -4326,6 +4329,7 @@ EOF
     env "${gw_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
+    DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-a-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-a" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
@@ -4370,6 +4374,7 @@ EOF
     env "${gw_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
+    DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-b-node.key" \
     MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-b" \
     ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
     API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
