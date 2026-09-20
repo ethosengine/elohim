@@ -112,6 +112,25 @@ for (const [name, change, expected] of [
     /stale package archive/,
   ],
   [
+    "doorway reconcile scratch in server dist",
+    (f) => {
+      const reconcile = join(
+        f.server,
+        ".reconcile",
+        "elohim-host-landing",
+        "8bdaa9547181f653",
+      );
+      mkdirSync(reconcile, { recursive: true });
+      writeFileSync(join(reconcile, "main.server.mjs"), "materialized scratch");
+    },
+    /hidden path \(\.reconcile\).*doorway that materialized scratch.*SSR_BUNDLE_PATH elsewhere/s,
+  ],
+  [
+    "dotfile anywhere in dist",
+    (f) => writeFileSync(join(f.browser, ".DS_Store"), "not a build output"),
+    /hidden path \(\.DS_Store\).*SSR_BUNDLE_PATH elsewhere/s,
+  ],
+  [
     "wrong SSR export",
     (f) => writeFileSync(join(f.server, "main.server.mjs"), "export default 1"),
     /export renderApplication/,

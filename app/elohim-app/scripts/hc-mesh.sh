@@ -965,6 +965,10 @@ reset_household_state() {
   # The doorways are not in $PEERS, so their node identities are removed by name:
   # a recast household must not keep the signing keys of the one it replaces.
   rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key"
+  # Per-doorway SSR materialize scratch (see SSR_BUNDLE_PATH above) — pure
+  # cache re-fetched from the substrate on next boot, but a stale reconcile
+  # generation from a retired mesh has no reason to survive a recast.
+  rm -rf "$MESH_DIR/doorway-a/ssr" "$MESH_DIR/doorway-b/ssr"
   rm -f "$MESH_DIR/household-fixture.json" "$MESH_DIR/prologue-hosted-humans.json"
   echo "mesh reset authorized: conductor, storage, and doorway-account state will be recast together"
 }
@@ -4326,6 +4330,20 @@ EOF
     # project-epr rows, and served / as 503 and /lamad as 404 for a whole lane.
     local gw_a=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_a=("DOORWAY_URL=http://localhost:$DOORWAY_PORT")
+    # SSR_BUNDLE_PATH's directory is where the RendererRegistry materializes
+    # every adopted server bundle (elohim-render::materialize_server_bundle
+    # unzips into it fresh on boot, and reconcile.rs writes re-materializations
+    # under <dir>/.reconcile/<slug>/<hash16>/) — it must NEVER be the source
+    # dist (app/elohim-app/dist/elohim-app/server), which hc-mesh-prologue.sh
+    # packages and re-stages every cast: pointing it there made each prologue
+    # ship the previous casts' scratch back as the app (2.3 GB of .reconcile
+    # in a ~100 MB dist, doorway boot climbing past a minute). A per-doorway
+    # directory under $MESH_DIR mirrors the fleet's emptyDir (/opt/elohim-render):
+    # materialize_server_bundle creates it and fetches fresh bytes from the
+    # substrate on every boot, so it never needs to be pre-seeded — an empty
+    # dir degrades exactly like the fleet does (renderer-less until reconcile
+    # adopts the declared head).
+    mkdir -p "$MESH_DIR/doorway-a/ssr"
     env "${gw_a[@]}" \
     DOORWAY_ID="${DOORWAY_ID:-alpha-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_A_HEALTH_PORT" \
@@ -4337,7 +4355,7 @@ EOF
     DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
     DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
     SSR_STORAGE_URL="$primary" \
-    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
+    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$MESH_DIR/doorway-a/ssr/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     DOORWAY_MANIFEST_BOARD_ENABLED="${DOORWAY_MANIFEST_BOARD_ENABLED:-true}" \
@@ -4371,6 +4389,9 @@ EOF
   if ! curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null; then
     local gw_b=()
     [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_b=("DOORWAY_URL=http://localhost:$DOORWAY_B_PORT")
+    # See doorway A's block above for why this is a per-doorway $MESH_DIR
+    # directory rather than the source dist.
+    mkdir -p "$MESH_DIR/doorway-b/ssr"
     env "${gw_b[@]}" \
     DOORWAY_ID="${DOORWAY_B_ID:-apex-elohim-host}" \
     DOORWAY_HEALTH_PORT="$DOORWAY_B_HEALTH_PORT" \
@@ -4382,7 +4403,7 @@ EOF
     DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
     DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
     SSR_STORAGE_URL="http://127.0.0.1:$(http_port 1)" \
-    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$REPO_ROOT/app/elohim-app/dist/elohim-app/server/main.server.mjs}" \
+    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$MESH_DIR/doorway-b/ssr/main.server.mjs}" \
     SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
     SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
     DOORWAY_MANIFEST_BOARD_ENABLED="${DOORWAY_MANIFEST_BOARD_ENABLED:-true}" \

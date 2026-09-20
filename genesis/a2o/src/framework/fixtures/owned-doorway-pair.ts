@@ -165,6 +165,8 @@ export function fixtureDoorwayLaunch(
     database: string;
     primaryUrl: string;
     extraUrls: string[];
+    /** Scenario-owned root this fixture doorway may write scratch into. */
+    scenarioDir: string;
   }
 ): { argv: string[]; env: NodeJS.ProcessEnv } {
   let argv = replaceFlag(template.argv, '--listen', `127.0.0.1:${input.listenPort}`);
@@ -173,6 +175,16 @@ export function fixtureDoorwayLaunch(
   const extraAt = argv.indexOf('--storage-urls');
   if (extraAt >= 0) argv[extraAt + 1] = extras;
   else argv.push('--storage-urls', extras);
+  // `...template.env` below inherits the CANONICAL doorway's whole launch env
+  // (read live off /proc/<pid>/environ in templateFor), including its
+  // SSR_BUNDLE_PATH (the repo dist) and DOORWAY_NODE_KEY_FILE (its own node
+  // identity). Both must be overridden per fixture doorway, same as
+  // SSR_STORAGE_URL below: sharing SSR_BUNDLE_PATH means this fixture's
+  // materialize/reconcile scratch lands in the tree the packager zips as the
+  // next server bundle (the household server-bundle feedback loop); sharing
+  // DOORWAY_NODE_KEY_FILE means this fixture doorway signs as the canonical
+  // doorway's identity instead of its own.
+  const doorwayDir = join(input.scenarioDir, input.id);
   return {
     argv,
     env: {
@@ -183,6 +195,8 @@ export function fixtureDoorwayLaunch(
       MONGODB_URI: `mongodb://127.0.0.1:${input.mongoPort}`,
       MONGODB_DB: input.database,
       SSR_STORAGE_URL: input.primaryUrl,
+      SSR_BUNDLE_PATH: join(doorwayDir, 'ssr', 'main.server.mjs'),
+      DOORWAY_NODE_KEY_FILE: join(doorwayDir, 'node.key'),
     },
   };
 }
@@ -346,6 +360,7 @@ export class OwnedDoorwayPair {
           database,
           primaryUrl: urls[primary] as string,
           extraUrls: extras.map(peer => urls[peer] as string),
+          scenarioDir: root,
         });
         const logPath = join(root, `doorway-${name}.log`);
         const process = await startOwnedChild(

@@ -20,9 +20,28 @@ def package(dist, output, aliases=None, reject_name=None):
         if path.is_symlink():
             raise ValueError(f'symlink is not a bundle file: {path}')
         if path.is_file():
+            name = path.relative_to(source).as_posix()
+            # A dot-directory (or dotfile) anywhere under the dist is never a
+            # build output. The one known producer: a doorway's bundle-heads
+            # reconciler (doorway-service/src/render/registry.rs) materializes
+            # every adopted server bundle into `.reconcile/<slug>/<hash16>/`
+            # under whatever directory SSR_BUNDLE_PATH names — if that path is
+            # ever pointed AT this dist (the household server-bundle feedback
+            # loop), the scratch lands here and the next package ships it back
+            # out as the app. Refuse loudly instead of silently excluding it:
+            # a silent exclusion would hide the misconfiguration.
+            parts = name.split('/')
+            dotted_at = next((i for i, part in enumerate(parts) if part.startswith('.')), None)
+            if dotted_at is not None:
+                offender = source.joinpath(*parts[: dotted_at + 1])
+                raise ValueError(
+                    f"dist contains a hidden path ({'/'.join(parts[: dotted_at + 1])}): a "
+                    'build output must never contain a dot-file or dot-directory (usually a '
+                    'doorway that materialized scratch into this dist because SSR_BUNDLE_PATH '
+                    f'pointed here); remove {offender} and point SSR_BUNDLE_PATH elsewhere'
+                )
             if path.name == reject_name:
                 raise ValueError(f'stale package archive in source dist: {path}')
-            name = path.relative_to(source).as_posix()
             if '\\' in name or ':' in name:
                 raise ValueError(f'nonportable archive path: {name}')
             files[name] = path.read_bytes()

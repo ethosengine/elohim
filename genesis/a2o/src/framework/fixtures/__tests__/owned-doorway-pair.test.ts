@@ -14,6 +14,27 @@ import {
 } from '../owned-doorway-pair.js';
 import { stopOwnedProcess } from '../owned-doorway-process.js';
 
+// A fake, never-written scenario root — fixtureDoorwayLaunch only does string
+// composition, no I/O, so this never needs to exist on disk.
+const SCENARIO_DIR = '/owned/scenario';
+const PRIMARY_URL = 'http://127.0.0.1:8091'; // NOSONAR -- loopback fixture transport
+const EXTRA_URLS = ['http://127.0.0.1:8090', 'http://127.0.0.1:8092'];
+const CANONICAL_SSR_BUNDLE_PATH = '/repo/app/elohim-app/dist/elohim-app/server/main.server.mjs';
+const CANONICAL_NODE_KEY_FILE = '/repo/genesis/local-dev/household-dowell/doorway-a-node.key';
+
+function fixtureAInput(): Parameters<typeof fixtureDoorwayLaunch>[1] {
+  return {
+    id: 'fixture-a',
+    listenPort: 19001,
+    healthPort: 19101,
+    mongoPort: 19201,
+    database: 'fixture-a-db',
+    primaryUrl: PRIMARY_URL,
+    extraUrls: EXTRA_URLS,
+    scenarioDir: SCENARIO_DIR,
+  };
+}
+
 const template: LaunchTemplate = {
   executable: '/owned/doorway',
   executableHash: 'abc',
@@ -33,29 +54,69 @@ const template: LaunchTemplate = {
   env: {
     SECRET_NOT_FOR_RECEIPT: 'preserved-without-being-returned-by-the-receipt',
     SSR_BUNDLE_SLUGS: 'elohim-host-landing,epr-app-deliverability-old-run',
+    // The canonical doorway's real launch env — inherited via `...template.env`
+    // spread — points at the repo dist and the canonical node identity. A
+    // fixture doorway must override BOTH: sharing the dist means the fixture's
+    // materialize/reconcile scratch lands back in the tree the packager zips
+    // (the household server-bundle feedback loop); sharing the node key file
+    // means the fixture doorway signs with the canonical doorway's identity.
+    SSR_BUNDLE_PATH: CANONICAL_SSR_BUNDLE_PATH,
+    DOORWAY_NODE_KEY_FILE: CANONICAL_NODE_KEY_FILE,
   },
 };
 
 void test('fixture launch preserves the template and rewrites only identity-local routing', () => {
-  const launch = fixtureDoorwayLaunch(template, {
-    id: 'fixture-a',
-    listenPort: 19001,
-    healthPort: 19101,
-    mongoPort: 19201,
-    database: 'fixture-a-db',
-    primaryUrl: 'http://127.0.0.1:8091', // NOSONAR -- loopback fixture transport
-    extraUrls: ['http://127.0.0.1:8090', 'http://127.0.0.1:8092'],
-  });
+  const launch = fixtureDoorwayLaunch(template, fixtureAInput());
   assert.equal(launch.argv[launch.argv.indexOf('--conductor-url') + 1], 'ws://127.0.0.1:4444');
   assert.equal(launch.argv[launch.argv.indexOf('--listen') + 1], '127.0.0.1:19001');
-  assert.equal(launch.argv[launch.argv.indexOf('--storage-url') + 1], 'http://127.0.0.1:8091');
-  assert.equal(
-    launch.argv[launch.argv.indexOf('--storage-urls') + 1],
-    'http://127.0.0.1:8090,http://127.0.0.1:8092'
-  );
+  assert.equal(launch.argv[launch.argv.indexOf('--storage-url') + 1], PRIMARY_URL);
+  assert.equal(launch.argv[launch.argv.indexOf('--storage-urls') + 1], EXTRA_URLS.join(','));
   assert.equal(launch.env['DOORWAY_ID'], 'fixture-a');
   assert.equal(launch.env['MONGODB_DB'], 'fixture-a-db');
   assert.equal(template.argv[2], '0.0.0.0:8888', 'canonical template stays immutable');
+});
+
+void test('fixture launch never inherits the canonical dist as its SSR bundle path', () => {
+  const launch = fixtureDoorwayLaunch(template, fixtureAInput());
+  const ssrPath = launch.env['SSR_BUNDLE_PATH'];
+  assert.ok(ssrPath, 'fixture launch must set SSR_BUNDLE_PATH');
+  assert.ok(
+    ssrPath?.startsWith(`${SCENARIO_DIR}/`),
+    `fixture SSR_BUNDLE_PATH must live under its own scenario dir, got ${ssrPath}`
+  );
+  assert.ok(
+    !ssrPath?.includes('/dist/elohim-app/server'),
+    `fixture SSR_BUNDLE_PATH must never point into the repo dist, got ${ssrPath}`
+  );
+  assert.equal(
+    template.env['SSR_BUNDLE_PATH'],
+    CANONICAL_SSR_BUNDLE_PATH,
+    'canonical template stays immutable'
+  );
+});
+
+void test('fixture launch never inherits the canonical doorway node identity file', () => {
+  const launchA = fixtureDoorwayLaunch(template, fixtureAInput());
+  const launchB = fixtureDoorwayLaunch(template, {
+    id: 'fixture-b',
+    listenPort: 19002,
+    healthPort: 19102,
+    mongoPort: 19201,
+    database: 'fixture-b-db',
+    primaryUrl: EXTRA_URLS[0],
+    extraUrls: [PRIMARY_URL, EXTRA_URLS[1]],
+    scenarioDir: SCENARIO_DIR,
+  });
+  const keyFileA = launchA.env['DOORWAY_NODE_KEY_FILE'];
+  const keyFileB = launchB.env['DOORWAY_NODE_KEY_FILE'];
+  assert.ok(keyFileA, 'fixture launch must set DOORWAY_NODE_KEY_FILE');
+  assert.notEqual(
+    keyFileA,
+    template.env['DOORWAY_NODE_KEY_FILE'],
+    'fixture must not sign with the canonical doorway identity'
+  );
+  assert.ok(keyFileA?.startsWith(`${SCENARIO_DIR}/`), `got ${keyFileA}`);
+  assert.notEqual(keyFileA, keyFileB, 'each fixture doorway needs its own identity file');
 });
 
 void test('restart slug replacement keeps ordinary SSR config and removes the prior run slug', () => {

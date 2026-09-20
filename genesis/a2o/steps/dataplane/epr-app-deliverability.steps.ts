@@ -131,7 +131,16 @@ function isDeliverabilityFeature(uri?: string): boolean {
   ].some(feature => normalized?.endsWith(feature));
 }
 
-Before(async function (this: E2EWorld, scenario) {
+// Explicit budget, not cucumber's 31s default: OwnedDoorwayPair.start (see
+// src/framework/fixtures/owned-doorway-pair.ts) allows mongod up to 20s
+// (waitForPort) then, SEQUENTIALLY per doorway, 60s for /health + 10s for
+// /api/v1/federation/coherence — worst case 20_000 + 2*(60_000+10_000) =
+// 160_000ms before either doorway's own wait even times out. 180_000ms
+// leaves this hook's own timeout strictly above that sum (plus headroom for
+// binary copy/sha256/port-allocation overhead) so a genuinely slow boot
+// surfaces as OwnedDoorwayPair's own named error ("… did not become ready"),
+// not an opaque cucumber hook timeout that names no cause.
+Before({ timeout: 180_000 }, async function (this: E2EWorld, scenario) {
   if (!isDeliverabilityFeature(scenario.gherkinDocument.uri)) return;
   const fixture = loadHouseholdMeshFixture();
   assert.equal(fixture.processControl, true, 'owned doorway pair requires processControl=true');
