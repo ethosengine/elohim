@@ -1116,6 +1116,23 @@ pub(crate) enum HealOutcomeKind {
     /// existed the same condition was counted as `healed` while it walked a
     /// cancelled hosting contract back to `active`.
     ConductorBehind,
+    /// REA arm: the leg REPLAYED an already-ADJUDICATED refusal for this id
+    /// (`Refreshed` or `ConductorBehind`) rather than re-reading the own
+    /// conductor for it, because the evidence that produced that verdict is
+    /// unchanged (`services::rea_verdict_backoff`).
+    ///
+    /// Downstream effect is identical to the arm it replays in EVERY respect —
+    /// same `mark_completed`, same `divergent_refused` contribution, same
+    /// `caughtUp`/`converged`/`/p2p/status` reading — so this is counted apart
+    /// ONLY so the `refreshed` and `conductor_behind` series keep meaning "the
+    /// conductor answered", and so the reclaimed round-trips are countable. The
+    /// per-verdict split lives on
+    /// `elohim_rea_heal_refused_skipped_total{verdict}`.
+    ///
+    /// `refused_deferred` RISING while `refreshed` FALLS is the lever working.
+    /// If `refreshed` stays flat while this climbs, the ledger is not being
+    /// consulted; if `healed` falls as this rises, the window is too long.
+    RefusedDeferred,
 }
 
 impl HealOutcomeKind {
@@ -1136,6 +1153,7 @@ impl HealOutcomeKind {
             HealOutcomeKind::CallFailed => "call_failed",
             HealOutcomeKind::Unattempted => "unattempted",
             HealOutcomeKind::ConductorBehind => "conductor_behind",
+            HealOutcomeKind::RefusedDeferred => "refused_deferred",
         }
     }
 }
@@ -1652,6 +1670,18 @@ pub struct ReaDiscovery {
     /// that can know this — the ledger is per-node and long-lived, while the
     /// tracker the heal leg sees is rebuilt every sweep.
     exhausting_divergent: std::collections::HashSet<String>,
+    /// gap id → the EVIDENCE this sweep enqueued it on, as
+    /// `advertised_anchor|advertised_state|local_anchor|local_state`.
+    ///
+    /// Carried to the heal leg as the second half of the settled-verdict
+    /// ledger's key ([`crate::services::rea_verdict_backoff`]): the leg
+    /// remembers an ADJUDICATED refusal against the exact evidence that produced
+    /// it, so any change in what peers advertise OR in the local row's own
+    /// standing re-admits the id on the very next sweep. Only discovery can know
+    /// this — the advertised halves come from the peer inventory responses and
+    /// the local halves from the local-inventory query, both of which are
+    /// already in hand here, so the key costs no extra I/O.
+    heal_evidence: std::collections::HashMap<String, String>,
     /// This arm actually OBSERVED the state it reports. False when the arm
     /// short-circuited on a DB/query error (see [`ReaDiscovery::empty`]).
     ///
@@ -1675,6 +1705,7 @@ impl ReaDiscovery {
             divergent_anchor: 0,
             divergent_state: 0,
             exhausting_divergent: std::collections::HashSet::new(),
+            heal_evidence: std::collections::HashMap::new(),
             divergent_refused: 0,
             exhausted_persistent: 0,
             local_total: 0,
@@ -2084,6 +2115,7 @@ pub async fn run_heal(
         divergent_anchor: rea_divergent,
         divergent_state: rea_divergent_state,
         exhausting_divergent: rea_exhausting_divergent,
+        heal_evidence: rea_heal_evidence,
         divergent_refused: rea_divergent_refused,
         exhausted_persistent: rea_exhausted,
         local_total,
@@ -2123,6 +2155,7 @@ pub async fn run_heal(
         &mut tracker,
         &discovered_by,
         &rea_exhausting_divergent,
+        &rea_heal_evidence,
         hc,
         pool,
         &pacing,
@@ -3346,6 +3379,9 @@ async fn discover_rea(
     let mut exhausting_divergent: std::collections::HashSet<String> =
         std::collections::HashSet::new();
     let mut admitted: Vec<String> = Vec::new();
+    // Heal-leg evidence for every ADMITTED id — see [`ReaDiscovery::heal_evidence`].
+    let mut heal_evidence: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
     for id in discovered_by.keys() {
         if tracker_local.contains(id) {
             misses.resolved(PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS, id);
@@ -3375,6 +3411,20 @@ async fn discover_rea(
                 {
                     exhausting_divergent.insert(id.clone());
                 }
+                // The heal-leg key composes the MissLedger's peer-advertised
+                // evidence with the LOCAL row's own standing, so a local write
+                // (HTTP update, commitment-signal worker, an earlier heal)
+                // re-admits the id just as a changed advertisement does. An
+                // absent-local id contributes two empty halves, which is itself
+                // evidence — the moment the row lands, the key changes.
+                let (local_anchor, local_state) = local_rows
+                    .get(id)
+                    .map(|(a, s)| (a.as_str(), s.as_str()))
+                    .unwrap_or(("", ""));
+                heal_evidence.insert(
+                    id.clone(),
+                    format!("{evidence}|{local_anchor}|{local_state}"),
+                );
                 admitted.push(id.clone());
             }
             Admission::Exhausted => {
@@ -3395,6 +3445,7 @@ async fn discover_rea(
         divergent_anchor,
         divergent_state,
         exhausting_divergent,
+        heal_evidence,
         divergent_refused: exhausted_divergent,
         exhausted_persistent,
         local_total,
@@ -3415,10 +3466,108 @@ async fn discover_rea(
 /// discovery ticks on a saturated conductor, so it is scheduled single-flight OFF
 /// the discovery ticker (see `main.rs`). A heal logs WARN naming the id and the
 /// peer that discovered it (a visible mutual-aid event).
+/// The admission class the REA heal leg's `get_rea_commitment` read takes — the
+/// REA sibling of [`crate::services::head_adoption`]'s `SWEEP_PROBE_CLASS`, and
+/// for the same reason.
+///
+/// Named rather than inlined because the default is the wrong one and silently
+/// so: plain
+/// [`crate::services::conductor_writes::get_rea_commitment`] takes
+/// [`crate::services::conductor_writes::REA_COMMITMENT_READ_DEFAULT_CLASS`]
+/// (Interactive, correct for the HTTP handler in `api::rea_commitments`), so a
+/// sweep read written the obvious way puts reconciler load in the lane a
+/// person's commitment read is standing in. Measured 2026-09-20 on a SETTLED
+/// household mesh: this one function was ~80% of every conductor call the node
+/// made, 80-120/min, all Interactive, with nobody waiting on any of them.
+///
+/// **Contract test:** [`tests::the_rea_heal_commitment_read_is_background_classed`].
+const REA_HEAL_PROBE_CLASS: crate::conductor_admission::AdmissionClass =
+    crate::conductor_admission::AdmissionClass::Background;
+
+/// The evidence this sweep enqueued `id` on, as the settled-verdict ledger keys
+/// it. `""` when discovery carried none — itself a distinct key, so an id that
+/// later gains evidence re-admits.
+fn rea_heal_evidence_for(
+    heal_evidence: &std::collections::HashMap<String, String>,
+    id: &str,
+) -> String {
+    heal_evidence.get(id).cloned().unwrap_or_default()
+}
+
+/// Split this sweep's REA gap ids into the ones that must cost a
+/// `get_rea_commitment` round-trip and the ones whose ADJUDICATED verdict is
+/// already known against unchanged evidence.
+///
+/// Extracted pure so the whole lever is testable without a conductor: `heal_rea`
+/// takes an `Arc<HcClient>` and there is no mocking seam in front of it, so the
+/// assertion "a second sweep issues ZERO conductor reads for this id" is made
+/// HERE, against the exact function the leg calls — a re-read happens iff the id
+/// lands in the first returned vector.
+fn partition_rea_gap_ids(
+    gap_ids: Vec<String>,
+    heal_evidence: &std::collections::HashMap<String, String>,
+    window: std::time::Duration,
+) -> (Vec<String>, Vec<(String, crate::metrics::ReaHealSkip)>) {
+    let mut to_read = Vec::new();
+    let mut remembered = Vec::new();
+    for id in gap_ids {
+        let evidence = rea_heal_evidence_for(heal_evidence, &id);
+        match crate::services::rea_verdict_backoff::remembered(&id, &evidence, window) {
+            Some(verdict) => remembered.push((id, verdict)),
+            None => to_read.push(id),
+        }
+    }
+    (to_read, remembered)
+}
+
+/// Book every REPLAYED refusal exactly as the arm that would have been reached
+/// books it, and return its contribution to `divergent_refused`.
+///
+/// This is the HONESTY seam. Both replayed verdicts are arms that
+/// `mark_completed` the id and add 1 to `divergent_refused` — so a skip must do
+/// precisely that and nothing else. Getting this wrong in either direction is a
+/// gauge forgery: omitting `mark_completed` would leave an adjudicated gap
+/// `pending` and pin `caughtUp` false forever, and omitting the
+/// `divergent_refused` increment would make the node look LESS converged than
+/// re-reading would have, since `divergent_refused` is subtracted from the
+/// divergence the `converged` term is computed against
+/// (`set_projection_reconcile_divergent_refused`, re-published from `run_heal`
+/// after this leg returns).
+///
+/// The per-id log stays at `debug!`: this is by definition the repeat the leg
+/// has already reported at least once, and the identical WARN/INFO firing 124×
+/// per 10 minutes is a large part of why the treadmill hid in plain sight. The
+/// per-sweep roll-up line at the end of `heal_rea` carries the count.
+fn apply_remembered_rea_refusals(
+    remembered: &[(String, crate::metrics::ReaHealSkip)],
+    tracker: &mut GapTracker,
+) -> usize {
+    for (id, verdict) in remembered {
+        tracker.mark_completed(id);
+        crate::metrics::inc_rea_heal_refused_skipped(*verdict);
+        crate::metrics::inc_projection_heal_outcome(
+            "rea",
+            HealOutcomeKind::RefusedDeferred.label(),
+        );
+        tracing::debug!(
+            target: "elohim_storage::projection_reconcile",
+            commitment_id = %id,
+            verdict = %{
+                use seam_contracts::ReasonLabel as _;
+                verdict.label()
+            },
+            "projection-reconcile[rea]: replayed an adjudicated refusal — the evidence that \
+             produced it is unchanged, so the own conductor was not re-read"
+        );
+    }
+    remembered.len()
+}
+
 async fn heal_rea(
     tracker: &mut GapTracker,
     discovered_by: &std::collections::HashMap<String, String>,
     exhausting_divergent: &std::collections::HashSet<String>,
+    heal_evidence: &std::collections::HashMap<String, String>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
@@ -3432,11 +3581,26 @@ async fn heal_rea(
     // REA runs FIRST (in `run_heal`) with its own reserved budget, so a small REA
     // backlog is never starved behind the large content queue (the incident).
     let leg_start = std::time::Instant::now();
-    let gap_ids = tracker.pending_ids();
+    // SETTLED-VERDICT REPLAY. An id whose adjudicated refusal is already known
+    // against UNCHANGED evidence is booked from memory rather than re-derived
+    // from the own conductor — identical effect on the tracker, on
+    // `divergent_refused` and on every gauge; only the round-trip is elided.
+    // NOT an exclusion and NOT a terminality claim: see
+    // `services::rea_verdict_backoff` for the four automated exits.
+    let replay_window = crate::config::heal_missing_backoff_window();
+    let (gap_ids, remembered) =
+        partition_rea_gap_ids(tracker.pending_ids(), heal_evidence, replay_window);
+    divergent_refused += apply_remembered_rea_refusals(&remembered, tracker);
+    let to_read_total = gap_ids.len();
     let mut circuit = HealCircuit::new(pacing.circuit_timeout_threshold);
     for id in gap_ids {
+        let evidence = rea_heal_evidence_for(heal_evidence, &id);
         let attempt = call_with_retry(pacing, || {
-            crate::services::conductor_writes::get_rea_commitment(hc, &id)
+            crate::services::conductor_writes::get_rea_commitment_classed(
+                hc,
+                &id,
+                REA_HEAL_PROBE_CLASS,
+            )
         })
         .await;
         circuit.record(&attempt.result);
@@ -3444,6 +3608,12 @@ async fn heal_rea(
             Ok(Some(output)) => match heal_one(&output, pool, &app_ctx, hc).await {
                 Ok(ReaHealWrite::Wrote(ReaAnchorWrite::Advanced)) => {
                     tracker.mark_completed(&id);
+                    // The row MOVED, so any remembered refusal for it is now
+                    // false. The advance also changes the LOCAL half of the
+                    // evidence key (which re-admits it anyway) — this is the
+                    // belt-and-braces half, keeping "a ledger entry never
+                    // outlives the row state it describes" true by construction.
+                    crate::services::rea_verdict_backoff::note_progress(&id);
                     let peer = discovered_by
                         .get(&id)
                         .cloned()
@@ -3476,12 +3646,32 @@ async fn heal_rea(
                     // someone should see, not routine refusal bookkeeping.
                     tracker.mark_completed(&id);
                     divergent_refused += 1;
-                    tracing::warn!(
-                        target: "elohim_storage::projection_reconcile",
-                        commitment_id = %id,
-                        reason = "conductor-behind",
-                        "projection-reconcile[rea]: own conductor answered from BEHIND this row's standing — refused, row left untouched (a heal may advance standing, never regress it)"
+                    // Remember the adjudication against the evidence that
+                    // produced it, so the next sweep does not re-derive it while
+                    // nothing has changed. A REPEAT (same verdict, same
+                    // evidence, window merely lapsed) drops to `debug!`: the
+                    // first occurrence is the substrate fact worth seeing, the
+                    // 124th in ten minutes is the noise that hid it.
+                    let repeat = crate::services::rea_verdict_backoff::note_settled(
+                        &id,
+                        &evidence,
+                        crate::metrics::ReaHealSkip::ConductorBehind,
                     );
+                    if repeat {
+                        tracing::debug!(
+                            target: "elohim_storage::projection_reconcile",
+                            commitment_id = %id,
+                            reason = "conductor-behind",
+                            "projection-reconcile[rea]: own conductor still answers from BEHIND this row's standing — refused again against unchanged evidence"
+                        );
+                    } else {
+                        tracing::warn!(
+                            target: "elohim_storage::projection_reconcile",
+                            commitment_id = %id,
+                            reason = "conductor-behind",
+                            "projection-reconcile[rea]: own conductor answered from BEHIND this row's standing — refused, row left untouched (a heal may advance standing, never regress it)"
+                        );
+                    }
                     HealOutcomeKind::ConductorBehind
                 }
                 Ok(ReaHealWrite::Wrote(ReaAnchorWrite::NoAdvance)) => {
@@ -3497,11 +3687,28 @@ async fn heal_rea(
                     // the fleet's `converged` gauge at 0 against a static residue.
                     tracker.mark_completed(&id);
                     divergent_refused += 1;
-                    tracing::info!(
-                        target: "elohim_storage::projection_reconcile",
-                        commitment_id = %id,
-                        "projection-reconcile[rea]: no newer authority applied — divergence NOT resolved (own conductor answered the version this row already holds)"
+                    // Same discipline as the `RefusedConductorBehind` arm above:
+                    // remember the adjudication against its evidence, and demote
+                    // an unchanged re-adjudication to `debug!`. This is the arm
+                    // that produced the 80-120 calls/min at rest.
+                    let repeat = crate::services::rea_verdict_backoff::note_settled(
+                        &id,
+                        &evidence,
+                        crate::metrics::ReaHealSkip::NoAdvance,
                     );
+                    if repeat {
+                        tracing::debug!(
+                            target: "elohim_storage::projection_reconcile",
+                            commitment_id = %id,
+                            "projection-reconcile[rea]: still no newer authority — same verdict against unchanged evidence (only a canonical channel can converge these roots)"
+                        );
+                    } else {
+                        tracing::info!(
+                            target: "elohim_storage::projection_reconcile",
+                            commitment_id = %id,
+                            "projection-reconcile[rea]: no newer authority applied — divergence NOT resolved (own conductor answered the version this row already holds)"
+                        );
+                    }
                     HealOutcomeKind::Refreshed
                 }
                 Ok(ReaHealWrite::DeferredRace) => {
@@ -3602,6 +3809,25 @@ async fn heal_rea(
             break;
         }
     }
+
+    // SETTLED-VERDICT LEDGER LINE — the per-sweep roll-up that replaces the
+    // per-id repeat chatter. `to_read` vs `replayed` is the split that makes the
+    // lever checkable rather than asserted: `replayed` RISING while the
+    // `refreshed` / `conductor_behind` outcome series FALL is the reclaimed
+    // round-trips, and `divergent_refused` staying put across the change is the
+    // proof the adjudication itself is unaltered.
+    tracing::info!(
+        target: "elohim_storage::projection_reconcile",
+        to_read = to_read_total,
+        replayed = remembered.len(),
+        divergent_refused,
+        replay_window_secs = replay_window.as_secs(),
+        verdict_ledger_tracked = crate::services::rea_verdict_backoff::tracked(),
+        "projection-reconcile[rea]: heal leg finished (to_read = ids that cost a \
+         get_rea_commitment round-trip this sweep; replayed = ids whose adjudicated refusal \
+         was reused against unchanged evidence, adjudicated identically and still counted as \
+         divergence)"
+    );
 
     tracker.update_caught_up();
     ReaHealOutcome {
@@ -10562,5 +10788,333 @@ mod tests {
                  observed absence, and never back to a per-id conductor probe"
             );
         }
+    }
+
+    // ── REA settled-verdict replay (2026-09-20) ─────────────────────────────
+    //
+    // The seam under test is `partition_rea_gap_ids` + `apply_remembered_rea_refusals`
+    // + `services::rea_verdict_backoff`, not `heal_rea` itself: `heal_rea` takes an
+    // `Arc<HcClient>` and this crate has no mocking seam in front of the conductor
+    // websocket, so "issues ZERO conductor reads" is asserted where the decision is
+    // actually made — an id costs a `get_rea_commitment` iff `partition_rea_gap_ids`
+    // returns it in the `to_read` vector, which is the single expression the leg
+    // iterates.
+
+    /// Serializes the REA-verdict tests: they share the ONE process-global
+    /// ledger with `services::rea_verdict_backoff`'s own tests, and a sibling's
+    /// reset landing mid-test would wipe an entry under it.
+    static REA_VERDICT_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn rea_verdict_exclusive() -> std::sync::MutexGuard<'static, ()> {
+        REA_VERDICT_TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    fn evidence_map(pairs: &[(&str, &str)]) -> std::collections::HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(id, ev)| ((*id).to_string(), (*ev).to_string()))
+            .collect()
+    }
+
+    const REA_W: std::time::Duration = std::time::Duration::from_secs(600);
+
+    /// THE MEASURED DEFECT, as one assertion. At rest, discovery re-enqueues the
+    /// same divergent commitment every sweep and the heal leg re-reads it from
+    /// the OWN conductor to reach the verdict it already reached — 80-120
+    /// `get_rea_commitment` calls/min/node with nobody authoring anything.
+    ///
+    /// Sweep 2 must issue ZERO conductor reads for that id.
+    #[test]
+    fn a_verdict_is_not_re_read_while_its_evidence_is_unchanged() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let id = "heal-rea:settled";
+        let ev = evidence_map(&[(id, "peerAnchor|active|localAnchor|active")]);
+
+        // Sweep 1: nothing is remembered, so the id costs a round-trip.
+        let (to_read, remembered) = partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W);
+        assert_eq!(to_read, vec![id.to_string()]);
+        assert!(remembered.is_empty());
+
+        // ...which returns `NoAdvance`, and the leg books it.
+        crate::services::rea_verdict_backoff::note_settled(
+            id,
+            "peerAnchor|active|localAnchor|active",
+            crate::metrics::ReaHealSkip::NoAdvance,
+        );
+
+        // Sweep 2, nothing changed anywhere: ZERO reads.
+        let (to_read, remembered) = partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W);
+        assert!(
+            to_read.is_empty(),
+            "a verdict the leg already adjudicated must cost no conductor read while the \
+             evidence that produced it is unchanged"
+        );
+        assert_eq!(
+            remembered,
+            vec![(id.to_string(), crate::metrics::ReaHealSkip::NoAdvance)],
+            "the replay must carry the SAME verdict, so it can be booked identically"
+        );
+    }
+
+    /// Exit (1) at the leg seam: the peer that made this id divergent now
+    /// advertises something else, so the remembered verdict cannot speak to it
+    /// and the id is re-read on the very next sweep.
+    #[test]
+    fn changed_peer_evidence_re_admits_the_id() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let id = "heal-rea:peer-moved";
+        crate::services::rea_verdict_backoff::note_settled(
+            id,
+            "anchorA|active|anchorL|active",
+            crate::metrics::ReaHealSkip::NoAdvance,
+        );
+
+        for moved in [
+            "anchorZ|active|anchorL|active",  // a different advertised anchor
+            "anchorA|settled|anchorL|active", // a graduation at the same anchor
+            "||anchorL|active",               // the advertiser went away
+        ] {
+            let (to_read, remembered) =
+                partition_rea_gap_ids(vec![id.to_string()], &evidence_map(&[(id, moved)]), REA_W);
+            assert_eq!(
+                to_read,
+                vec![id.to_string()],
+                "{moved}: changed peer evidence must re-admit the id on the NEXT sweep, not at \
+                 window expiry"
+            );
+            assert!(remembered.is_empty());
+        }
+    }
+
+    /// Exit (2) at the leg seam: the local row moved under the remembered
+    /// verdict (an HTTP update, the commitment-signal worker), so the refusal is
+    /// about a row that no longer exists in that shape.
+    #[test]
+    fn a_changed_local_row_re_admits_the_id() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let id = "heal-rea:local-moved";
+        crate::services::rea_verdict_backoff::note_settled(
+            id,
+            "anchorA|active|anchorL|active",
+            crate::metrics::ReaHealSkip::ConductorBehind,
+        );
+
+        for moved in [
+            "anchorA|active|anchorL|cancelled", // local standing graduated
+            "anchorA|active|anchorQ|active",    // local anchor advanced
+        ] {
+            let (to_read, _) =
+                partition_rea_gap_ids(vec![id.to_string()], &evidence_map(&[(id, moved)]), REA_W);
+            assert_eq!(
+                to_read,
+                vec![id.to_string()],
+                "{moved}: a local write must re-admit the id immediately"
+            );
+        }
+    }
+
+    /// Exit (3) at the leg seam: a deferral, never an exclusion. Window 0 is the
+    /// OFF switch and restores the pre-fix leg — every gap costs a read.
+    #[test]
+    fn the_window_lapsing_re_admits_the_id() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let id = "heal-rea:expires";
+        let ev = evidence_map(&[(id, "a|b|c|d")]);
+        crate::services::rea_verdict_backoff::note_settled(
+            id,
+            "a|b|c|d",
+            crate::metrics::ReaHealSkip::NoAdvance,
+        );
+        assert!(partition_rea_gap_ids(vec![id.to_string()], &ev, REA_W)
+            .0
+            .is_empty());
+
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let (to_read, _) = partition_rea_gap_ids(
+            vec![id.to_string()],
+            &ev,
+            std::time::Duration::from_millis(1),
+        );
+        assert_eq!(
+            to_read,
+            vec![id.to_string()],
+            "an elapsed window must re-admit with no intervention"
+        );
+
+        crate::services::rea_verdict_backoff::note_settled(
+            id,
+            "a|b|c|d",
+            crate::metrics::ReaHealSkip::NoAdvance,
+        );
+        let (to_read, _) =
+            partition_rea_gap_ids(vec![id.to_string()], &ev, std::time::Duration::ZERO);
+        assert_eq!(
+            to_read,
+            vec![id.to_string()],
+            "window 0 is the OFF switch — it must read every divergent id every sweep"
+        );
+    }
+
+    /// The vocabulary is NARROW on purpose. Only the two verdicts whose own
+    /// comments say re-reading cannot resolve them are remembered; every other
+    /// outcome keeps costing a round-trip because the next read genuinely can
+    /// answer differently.
+    ///
+    /// Asserted against the CLOSED metrics vocabulary so a later variant cannot
+    /// be added without this test being read: `ReaHealSkip::ALL` is the whole
+    /// set of things `partition_rea_gap_ids` can ever hand back.
+    #[test]
+    fn only_unresolvable_verdicts_are_remembered() {
+        use seam_contracts::ReasonLabel as _;
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+
+        assert_eq!(
+            crate::metrics::ReaHealSkip::ALL.len(),
+            2,
+            "only NoAdvance and ConductorBehind may be replayed — Advanced, DeferredRace, \
+             Ok(None) and every error path must keep re-reading the conductor"
+        );
+        let labels: Vec<&str> = crate::metrics::ReaHealSkip::ALL
+            .iter()
+            .map(|v| v.label())
+            .collect();
+        assert_eq!(labels, vec!["no_advance", "conductor_behind"]);
+
+        // And each one round-trips through the ledger under its own class, so a
+        // replay reproduces the arm it stands in for rather than flattening both
+        // into one refusal.
+        for verdict in crate::metrics::ReaHealSkip::ALL {
+            let id = format!("heal-rea:vocab:{}", verdict.label());
+            crate::services::rea_verdict_backoff::note_settled(&id, "a|b|c|d", *verdict);
+            let (to_read, remembered) = partition_rea_gap_ids(
+                vec![id.clone()],
+                &evidence_map(&[(id.as_str(), "a|b|c|d")]),
+                REA_W,
+            );
+            assert!(to_read.is_empty());
+            assert_eq!(remembered, vec![(id, *verdict)]);
+        }
+    }
+
+    /// THE HONESTY FLOOR. A skipped id must be adjudicated EXACTLY as the arm it
+    /// replaces adjudicates it: `mark_completed` on the per-sweep tracker (so
+    /// `caughtUp` reads the same) and one count into `divergent_refused` (so
+    /// `converged` and `/p2p/status` read the same). Skipping the call must not
+    /// make the node look more converged — nor less — than re-reading would have.
+    ///
+    /// Pinned against a hand-run of the real arms rather than a restatement:
+    /// `sweep_arm`'s `mark_completed` leg is what both `Refreshed` and
+    /// `ConductorBehind` do, and the counts must match id-for-id.
+    #[test]
+    fn a_skipped_id_is_still_counted_as_adjudicated_divergence() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        let ids = ["heal-rea:honest:a", "heal-rea:honest:b"];
+        let remembered: Vec<(String, crate::metrics::ReaHealSkip)> = vec![
+            (ids[0].to_string(), crate::metrics::ReaHealSkip::NoAdvance),
+            (
+                ids[1].to_string(),
+                crate::metrics::ReaHealSkip::ConductorBehind,
+            ),
+        ];
+
+        let mut tracker = GapTracker::new(MAX_RETRIES);
+        tracker.discover(ids.iter().map(|s| (*s).to_string()).collect());
+        let refused = apply_remembered_rea_refusals(&remembered, &mut tracker);
+        tracker.update_caught_up();
+        let replayed_counts = tracker.counts();
+
+        assert_eq!(
+            refused,
+            ids.len(),
+            "every replayed refusal must contribute to `divergent_refused` exactly as the arm \
+             it replaces does — under-counting makes the node look LESS converged than the \
+             read would have"
+        );
+        // Byte-for-byte the arm that WOULD have run: both replayed verdicts
+        // `mark_completed`, which is `sweep_arm(.., heal_ok = true)`.
+        assert_eq!(
+            replayed_counts,
+            sweep_arm(&ids, true),
+            "a replayed sweep's gap counts — pending, completed, failed, caught_up, exhausted, \
+             converged — must be identical to the same sweep with the conductor reads made"
+        );
+        assert_eq!(replayed_counts.pending, 0);
+        assert!(replayed_counts.caught_up);
+    }
+
+    /// The ledger cap fails OPEN: past the cap it clears rather than evicting
+    /// selectively, so the worst case is the pre-fix leg (read everything every
+    /// sweep) and never a silent permanent hold. Asserted at the LEG seam —
+    /// a released id comes back in `to_read`, which is the thing that matters.
+    #[test]
+    fn the_verdict_ledger_cap_fails_open() {
+        let _g = rea_verdict_exclusive();
+        crate::services::rea_verdict_backoff::reset_for_test();
+        // bounded-work: exactly REA_VERDICT_LEDGER_CAP iterations — the fill
+        // loop that proves the cap, bounded by the constant it is asserting.
+        for n in 0..crate::services::rea_verdict_backoff::REA_VERDICT_LEDGER_CAP {
+            crate::services::rea_verdict_backoff::note_settled(
+                &format!("heal-rea:cap:{n}"),
+                "a|b|c|d",
+                crate::metrics::ReaHealSkip::NoAdvance,
+            );
+        }
+        crate::services::rea_verdict_backoff::note_settled(
+            "heal-rea:cap:overflow",
+            "a|b|c|d",
+            crate::metrics::ReaHealSkip::NoAdvance,
+        );
+        assert!(
+            crate::services::rea_verdict_backoff::tracked()
+                <= crate::services::rea_verdict_backoff::REA_VERDICT_LEDGER_CAP,
+            "the ledger must never grow past its cap"
+        );
+        let (to_read, _) = partition_rea_gap_ids(
+            vec!["heal-rea:cap:0".to_string()],
+            &evidence_map(&[("heal-rea:cap:0", "a|b|c|d")]),
+            REA_W,
+        );
+        assert_eq!(
+            to_read,
+            vec!["heal-rea:cap:0".to_string()],
+            "overflow must RELEASE ids back to read-every-sweep (fail-open), never strand them"
+        );
+        crate::services::rea_verdict_backoff::reset_for_test();
+    }
+
+    /// The sweep's commitment read must not stand in the lane a person is
+    /// waiting in. Pinned as an inequality against the class the HTTP handler
+    /// keeps, so flipping either constant to match the other fails HERE rather
+    /// than silently re-merging the two lanes. Sibling of
+    /// `head_adoption::tests::the_sweep_preflight_probe_is_background_classed`,
+    /// which pins the same contract for the content arm's probe.
+    #[test]
+    fn the_rea_heal_commitment_read_is_background_classed() {
+        use crate::conductor_admission::AdmissionClass;
+        assert_eq!(REA_HEAL_PROBE_CLASS, AdmissionClass::Background);
+        assert_ne!(
+            REA_HEAL_PROBE_CLASS,
+            AdmissionClass::Interactive,
+            "a sweep read in the interactive lane is how a person's read gets starved — at \
+             rest this one call was ~80% of the node's conductor traffic"
+        );
+        assert_eq!(
+            crate::services::conductor_writes::REA_COMMITMENT_READ_DEFAULT_CLASS,
+            AdmissionClass::Interactive,
+            "the HTTP commitment read is a person waiting and must KEEP the interactive lane"
+        );
+        assert_ne!(
+            REA_HEAL_PROBE_CLASS,
+            crate::services::conductor_writes::REA_COMMITMENT_READ_DEFAULT_CLASS,
+            "the reconciler's reads and a person's read must not draw on the same wait bound"
+        );
     }
 }

@@ -1380,6 +1380,107 @@ decisionPoints:
         testName: a_generic_declare_error_enters_the_ordinary_per_id_backoff
         kind: unit
 
+  - name: partition_rea_gap_ids
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::partition_rea_gap_ids
+    summary: >
+      Must this REA gap id cost a `content_store::get_rea_commitment` round-trip this sweep, or
+      is its ADJUDICATED refusal already known against unchanged evidence? Splits the heal
+      leg's pending set into (to_read, remembered) by consulting
+      services::rea_verdict_backoff, whose ledger is keyed
+      (commitment_id, advertised_anchor|advertised_state|local_anchor|local_state). Pure and
+      total; the ledger reads the clock, this decides. Only the two verdicts whose own code
+      comments already said "re-reading this conductor cannot resolve it" are eligible —
+      ReaAnchorWrite::NoAdvance and ReaHealWrite::RefusedConductorBehind. THE DEFECT it closes
+      (measured 2026-09-20, settled household mesh, evidence
+      genesis/a2o/reports/recovery/serving-edge-20260919/household-at-rest-named.log): that one
+      zome fn was ~80% of every conductor call the node made at rest, 80-120/min, because
+      discovery re-enqueues the divergent id every sweep and the per-sweep GapTracker that
+      recorded the adjudication is thrown away with it.
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          A deferral, never an exclusion, and it has FOUR automated exits rather than one:
+          changed peer evidence and a changed local row both re-admit on the very NEXT sweep
+          (the evidence is part of the key, so neither waits for expiry), the window always
+          lapses, and note_progress clears on an advance. Process restart is a fifth by
+          construction — the ledger is in-memory only. Window 0 is the OFF switch and restores
+          the pre-fix leg byte-for-byte. A skipped id stays a divergent gap, stays on
+          known_divergent, and is never exhausted or written off — the MissLedger's terminality
+          bookkeeping is untouched by this decision.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded on both axes and both bounds are tested. Memory - REA_VERDICT_LEDGER_CAP
+          entries with a FAIL-OPEN overflow clear (the ledger clears rather than evicting), so
+          the bound can never strand an id. Time - crate::config::heal_missing_backoff_window
+          (HEAL_MISSING_BACKOFF_SECONDS, default 600s), shared deliberately with
+          services::heal_backoff because both name one policy: how stale may a replayed
+          own-conductor answer be on the heal leg. This adds no loop, no retry ladder and no
+          I/O; HealPacing::rea_leg_budget and the HealCircuit stay authoritative over the leg.
+      - id: C8
+        status: answered
+        justification: >
+          Every skip is counted through a typed verdict (metrics::ReaHealSkip, a closed
+          ReasonLabel vocabulary) on elohim_rea_heal_refused_skipped_total{verdict}, and the
+          heal-outcome series gains its own HealOutcomeKind::RefusedDeferred so `refreshed` and
+          `conductor_behind` keep meaning "the conductor answered". The HONESTY floor is the
+          separate claim and it is pinned: apply_remembered_rea_refusals books mark_completed +
+          one divergent_refused per replayed id, exactly as the arm it stands in for, so
+          caughtUp / converged / /p2p/status read IDENTICALLY whether the call was made or
+          replayed. The per-id repeat log drops to debug! and a per-sweep roll-up line carries
+          to_read vs replayed — the identical WARN/INFO firing 124x per 10 minutes is part of
+          why the treadmill hid.
+    contractTests:
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_verdict_is_not_re_read_while_its_evidence_is_unchanged
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: changed_peer_evidence_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_changed_local_row_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_window_lapsing_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: only_unresolvable_verdicts_are_remembered
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: a_skipped_id_is_still_counted_as_adjudicated_divergence
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_verdict_ledger_cap_fails_open
+        kind: unit
+      - path: elohim/elohim-storage/src/p2p/projection_reconcile.rs
+        testName: the_rea_heal_commitment_read_is_background_classed
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: a_verdict_is_not_re_derived_while_its_evidence_is_unchanged
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: changed_peer_evidence_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: a_changed_local_row_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: the_window_lapsing_re_admits_the_id
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: a_remembered_verdict_keeps_its_own_class
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: only_an_unchanged_re_adjudication_reads_as_a_repeat
+        kind: unit
+      - path: elohim/elohim-storage/src/services/rea_verdict_backoff.rs
+        testName: the_ledger_is_bounded_and_fails_open
+        kind: unit
+
   - name: adopt_before_author_param
     kind: pure-decision-predicate
     sourceLocation:

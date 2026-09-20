@@ -1964,6 +1964,26 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Divergent REA commitments the heal leg ADJUDICATED without paying for a
+    /// `get_rea_commitment` round-trip, by the remembered [`ReaHealSkip`].
+    ///
+    /// The honesty meter for the settled-verdict treadmill (2026-09-20): this
+    /// climbing while `elohim_conductor_calls_total{fn="get_rea_commitment"}`
+    /// FALLS is the fix working. It says nothing about whether the rows
+    /// CONVERGED — `elohim_projection_reconcile_divergent_refused{stream="rea"}`
+    /// still carries exactly the same count it carried before, because a replay
+    /// books the identical adjudication (see
+    /// `p2p::projection_reconcile::apply_remembered_rea_refusals`).
+    pub static ref REA_HEAL_REFUSED_SKIPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_rea_heal_refused_skipped_total",
+            "Divergent REA commitments adjudicated from a remembered verdict without a \
+             conductor round-trip, by verdict.",
+        ),
+        &["verdict"],
+    )
+    .unwrap();
+
     /// ADVERTISER DIVERSITY (2026-08-03). One ROUTE-AROUND decision on the
     /// adopt-evidence path, by [`AdoptEvidenceFallback`] — `attempted` |
     /// `carried` | `degraded` | `no_alternative`.
@@ -2600,6 +2620,19 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_REMINT_SUPPRESSED.clone()));
+        let _ = REGISTRY.register(Box::new(REA_HEAL_REFUSED_SKIPPED.clone()));
+        // Pre-touch both verdicts, same discipline as the evidence states below:
+        // `conductor_behind` at zero is a MEANINGFUL reading (no conductor on
+        // this node is lagging its own projection), and a series that only
+        // materialises on first occurrence cannot say that.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for verdict in ReaHealSkip::ALL {
+                REA_HEAL_REFUSED_SKIPPED
+                    .with_label_values(&[verdict.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_ADOPT_EVIDENCE_FALLBACK.clone()));
         // Pre-touch every fallback outcome, same discipline as the evidence
         // states above: `no_alternative` at zero is a MEANINGFUL reading (the
@@ -4086,6 +4119,44 @@ impl seam_contracts::ReasonLabel for ReanchorSkip {
     }
 }
 
+/// Which ADJUDICATED heal verdict the REA leg replayed instead of re-deriving it
+/// from the own conductor — the label vocabulary of [`REA_HEAL_REFUSED_SKIPPED`],
+/// as a closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary — a skip must name its
+/// cause, never vanish into a missing count). C3 — both variants name a state
+/// with automated exits only (changed peer evidence, a changed local row, window
+/// expiry, progress, restart; see [`crate::services::rea_verdict_backoff`]), so a
+/// non-zero series can never mean "these commitments were abandoned".
+///
+/// Deliberately NARROW: only the two verdicts that cannot be resolved by
+/// re-reading the same conductor are admitted here. `Advanced`, `DeferredRace`,
+/// `Ok(None)` and every error path keep costing a round-trip, because for those
+/// the next read genuinely can answer differently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReaHealSkip {
+    /// The own conductor answered the version this row already holds, so no
+    /// newer authority was applied (`ReaAnchorWrite::NoAdvance`). Only a
+    /// canonical channel can converge the two roots; re-reading cannot.
+    NoAdvance,
+    /// The own conductor answered from BEHIND the local row's standing, so the
+    /// heal refused to write it (`ReaHealWrite::RefusedConductorBehind`). The
+    /// row is left untouched, and re-reading the same conductor reproduces the
+    /// same refusal.
+    ConductorBehind,
+}
+
+impl seam_contracts::ReasonLabel for ReaHealSkip {
+    const ALL: &'static [Self] = &[ReaHealSkip::NoAdvance, ReaHealSkip::ConductorBehind];
+
+    fn label(&self) -> &'static str {
+        match self {
+            ReaHealSkip::NoAdvance => "no_advance",
+            ReaHealSkip::ConductorBehind => "conductor_behind",
+        }
+    }
+}
+
 /// What the adopt/contest arm learned when it went looking for a peer's head
 /// `Record` — the label vocabulary of [`CONTENT_ADOPT_EVIDENCE`], as a closed
 /// type.
@@ -4297,6 +4368,15 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Count one divergent REA commitment adjudicated from a remembered verdict
+/// rather than a `get_rea_commitment` round-trip.
+pub fn inc_rea_heal_refused_skipped(verdict: ReaHealSkip) {
+    use seam_contracts::ReasonLabel as _;
+    REA_HEAL_REFUSED_SKIPPED
+        .with_label_values(&[verdict.label()])
         .inc();
 }
 

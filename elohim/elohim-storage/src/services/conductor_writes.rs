@@ -438,13 +438,42 @@ pub async fn get_rea_commitment(
     hc: &Arc<HcClient>,
     id: &str,
 ) -> Result<Option<shefa_types::ReaCommitmentOutput>, StorageError> {
+    get_rea_commitment_classed(hc, id, REA_COMMITMENT_READ_DEFAULT_CLASS).await
+}
+
+/// The admission class a plain [`get_rea_commitment`] takes: INTERACTIVE, because
+/// its callers of record are a person's read — the `/api/v1/rea-commitments/:id`
+/// handler through
+/// [`crate::services::commitment_read_fallback::read_notarized`], and the
+/// signal/HTTP projection path in
+/// [`crate::services::rea_commitment_projection`].
+///
+/// Named rather than inlined so the SWEEP's opposite choice can be pinned
+/// against it as an inequality (see
+/// `crate::p2p::projection_reconcile::REA_HEAL_PROBE_CLASS` and its contract
+/// test): flipping either constant to match the other then fails a test rather
+/// than silently re-merging the two lanes.
+pub const REA_COMMITMENT_READ_DEFAULT_CLASS: AdmissionClass = AdmissionClass::Interactive;
+
+/// [`get_rea_commitment`] with the caller's admission class.
+///
+/// Exists for the REA heal leg, which is reconciler work on a 30s-to-300s
+/// cadence with no one waiting on it. Standing in the interactive lane for it
+/// buys nothing and costs the one thing the gate exists to protect — the wait
+/// bound a person's commitment read is holding. On a settled mesh that leg was
+/// ~80% of all conductor calls on this node, every one of them Interactive.
+pub async fn get_rea_commitment_classed(
+    hc: &Arc<HcClient>,
+    id: &str,
+    class: AdmissionClass,
+) -> Result<Option<shefa_types::ReaCommitmentOutput>, StorageError> {
     let payload = rmp_serde::to_vec_named(&id.to_string()).map_err(|e| {
         StorageError::Internal(format!(
             "conductor_writes: encode get_rea_commitment id: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "get_rea_commitment", payload)
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "get_rea_commitment", payload, class)
         .await?;
     let out: Option<shefa_types::ReaCommitmentOutput> =
         rmp_serde::from_slice(&bytes).map_err(|e| {

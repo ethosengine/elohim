@@ -121,6 +121,7 @@ pub mod provide_reconcile;
 pub mod rate_history;
 pub mod rea_commitment_service;
 pub mod rea_observed_compute; // Wave 4.3 — OBSERVED-compute reciprocity adapter (consumes the 4.1 mutual_compute fold)
+pub mod rea_verdict_backoff; // replay an ADJUDICATED rea heal refusal instead of re-deriving it from the own conductor (bounded, always-expiring)
 pub mod reach_earning;
 pub mod reanchor_backfill; // Workstream D — re-author NULL-anchor content a cold-conductor seed left provenance-only
 pub mod reanchor_backoff; // skip a reanchor candidate the adopt pre-flight already HELD (bounded, always-expiring)
