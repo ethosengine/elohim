@@ -776,6 +776,14 @@ async fn async_main(
          exclusions"
     );
 
+    // …and PROVE it, rather than trusting the reading. Every `config::set_*`
+    // above is supposed to have landed on its registry key; a publisher that
+    // never ran leaves the key reading `boot-env` with the compile-time default
+    // while the operator's env var is silently ignored — indistinguishable on
+    // /admin/runtime-config from a correctly published value. Refuse the boot
+    // instead, naming the lever. Fail-FAST, like assert_courier_ladder_budget.
+    elohim_storage::runtime_config::assert_boot_published();
+
     // CONFIG AS A RUNTIME SURFACE (upgrade-velocity rung 4). Spawned here, AFTER
     // every `config::set_*` above has published its boot value, so the registry's
     // fallback targets are the real env-derived values before the first file read
@@ -783,7 +791,7 @@ async fn async_main(
     // ELOHIM_RUNTIME_CONFIG_PATH names a file; when active, a flag flip lands on
     // this RUNNING node within one poll instead of costing a pod roll. Provenance
     // and the boot-only knobs are readable at GET /admin/runtime-config.
-    elohim_storage::runtime_config::spawn_watcher();
+    elohim_storage::runtime_config_watch::spawn_watcher();
 
     // BACKOFF LEDGER PERSISTENCE. Restore before any sweep runs, then snapshot
     // periodically. The ledger is process-local operational state (Category C,

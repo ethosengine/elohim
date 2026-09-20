@@ -89,6 +89,16 @@ COPY elohim/epr ./epr
 # resolve aborts: "failed to read /elohim-error/Cargo.toml: No such file".
 # Flattened /app layout; sed-rewritten below.
 COPY elohim/elohim-error ./elohim-error
+# elohim-settings: the boot Config + the watched runtime-config registry (step 3
+# of the storage decomposition, 2026-09-19). src/config.rs and
+# src/runtime_config.rs are re-export shims over it, so it is a non-optional
+# path-dep and must exist before the dep-cache stage's first `cargo build` or
+# the resolve aborts: "failed to read /elohim-settings/Cargo.toml: No such file".
+# Flattened /app layout; sed-rewritten below. (Its own `../elohim-cache-core`
+# dep resolves correctly in the flattened layout — no rewrite, same as
+# elohim-facings' `../elohim-views`.) Like elohim-error it declares every
+# package field literally, so no workspace-inheritance inline is needed.
+COPY elohim/elohim-settings ./elohim-settings
 # Plan 2 SDK boundary: elohim-views holds wire-shape Views; elohim-storage
 # depends on it directly. Without this COPY the build aborts at resolve time:
 # "failed to read /elohim-views/Cargo.toml: No such file".
@@ -176,6 +186,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../elohim-error"|path = "elohim-error"|' Cargo.toml && \
+    sed -i 's|path = "../elohim-settings"|path = "elohim-settings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-peer-fabric"|path = "elohim-peer-fabric"|' Cargo.toml && \

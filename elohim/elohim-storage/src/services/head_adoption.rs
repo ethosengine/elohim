@@ -316,23 +316,17 @@ pub struct PeerHeadHint {
     pub alternates: Vec<String>,
 }
 
-/// How many ALTERNATE advertisers one hint retains.
+/// How many ALTERNATE advertisers one hint retains — see
+/// [`crate::config::ALTERNATE_ADVERTISER_CAP`] for the value and its rationale.
 ///
-/// Bounded, not unbounded: the fallback ladder in [`resolve_peer_evidence`]
-/// walks up to [`crate::config::evidence_fallback_max_alternates`] of these,
-/// healthiest first, per evidence resolution — this cap is what makes that
-/// ladder a FIXED, pre-sized walk rather than a retry loop. Raised 3 → 6
-/// (2026-08-09, B2b, drain lever 4): the household mesh the harvest observes
-/// routinely advertises the same genesis-seeded row from more than 3 couriers,
-/// so the old cap silently discarded plurality the fallback ladder could have
-/// used. The memory cost is `ids × 6` short strings — still bounded by
-/// construction, not by convention.
-///
-/// This cap and [`crate::config::evidence_fallback_max_alternates`] are BOTH
-/// held under the SAME write-guard invariant as `adopt_contest_fanout` — see
-/// `crate::config::assert_courier_ladder_budget`'s doc for the adam
-/// 2026-07-20 melt this exists to prevent a repeat of.
-pub const ALTERNATE_ADVERTISER_CAP: usize = 6;
+/// The constant lives in `config` and is re-exported HERE, where the harvest
+/// that enforces it reads it. That direction is deliberate: `config` clamps
+/// [`crate::config::evidence_fallback_max_alternates`] to this cap, so a
+/// definition in this module would make the settings layer depend upward on a
+/// service — the one outward reference the storage decomposition inverts
+/// (design spec §8a, step 3). Every existing `services::head_adoption::
+/// ALTERNATE_ADVERTISER_CAP` path keeps resolving through this alias.
+pub use crate::config::ALTERNATE_ADVERTISER_CAP;
 
 impl PeerHeadHint {
     /// A hint with no alternates — the shape every construction site had before

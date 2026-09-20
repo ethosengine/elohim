@@ -15,7 +15,10 @@
 pub mod resolution;
 pub mod write_buffer;
 
-#[cfg(feature = "native")]
+// Ungated since 2026-09-19: the module's CACHE is still `native`-only (see
+// `extraction/mod.rs`), but its CONFIG type is plain serde data that
+// `elohim-settings` embeds in the storage node's boot `Config` — and that crate
+// is runtime-free by construction, so it cannot enable `native` to reach it.
 pub mod extraction;
 
 // Re-export resolution types for convenience

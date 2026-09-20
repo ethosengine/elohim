@@ -2516,6 +2516,18 @@ name = "elohim-seam-contracts"
 version = "0.1.0"
 
 [[package]]
+name = "elohim-settings"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "elohim-cache-core",
+ "serde",
+ "serde_json",
+ "toml 0.8.23",
+ "tracing",
+]
+
+[[package]]
 name = "elohim-storage"
 version = "0.1.0"
 dependencies = [
@@ -2553,6 +2565,7 @@ dependencies = [
  "elohim-render",
  "elohim-sdk",
  "elohim-seam-contracts",
+ "elohim-settings",
  "elohim-views",
  "flate2",
  "fs4",

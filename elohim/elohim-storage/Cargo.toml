@@ -35,6 +35,17 @@ elohim-views = { path = "../elohim-views" }
 # See genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md §4 row 1.
 elohim-error = { path = "../elohim-error" }
 
+# The settings layer — the boot `Config` and the watched runtime-config registry,
+# which are mutually recursive and moved as one unit (step 3 of the storage
+# decomposition). `src/config.rs` and `src/runtime_config.rs` are now
+# MODULE-SCOPED re-export shims over it (one flattened glob would collide
+# `Key` / `Kind` / `config_path`), so ~28 files resolve `crate::config::X` and
+# `crate::runtime_config::Y` unchanged.
+# It is deliberately runtime-free — the watcher's tokio poll loop stayed HERE, in
+# `src/runtime_config_watch.rs`, and that crate's boundary test denies `tokio`.
+# See genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md §4 row 3, §8a.
+elohim-settings = { path = "../elohim-settings" }
+
 # Pure lens crate — select→fold→aggregate folds over the holder-relation. The
 # resiliency facing's folds live here (DB-free); household_resilience.rs is a thin
 # adapter that loads the relation and calls them. See 2026-06-19 facings design §11.

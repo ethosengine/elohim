@@ -144,6 +144,7 @@ take roughly ten minutes off every gate.
 | step 1 `elohim-error` (c63079ac2) | 1 368 s | 3 912 (+2 in the new crate) | 13 s / 7 s | 1 s |
 | step 0b test binaries 168 → 14 | 1 048 s | 3 913 | — | — |
 | step 2 head codec folded into `elohim-epr` | over the ceiling — a cold rebuild, `elohim-epr` sits under everything | 3 904 (−9, now 10 in `elohim-epr` with the golden) | `elohim-epr` gate green | — |
+| step 3 `elohim-settings` | 971 s | 3 880 (−30 net: 31 moved, 1 kept, 1 added; +38 in the new crate) | 17 s / <1 s | — |
 
 The 1 980 → 1 368 s drop is cache warmth, not the extraction — `error.rs` was 122 lines. It is recorded so that
 later rows are read against an honest neighbour rather than against the cold baseline.
@@ -151,7 +152,7 @@ later rows are read against an honest neighbour rather than against the cold bas
 Step 0b moved no code out of the crate; it grouped 165 single-file integration-test binaries into 11 by domain
 (`tests/<group>/main.rs`), leaving three standalone. Same tests, same verdicts — 821 passed, 0 failed, 41 ignored
 before and after — and `cargo test --no-run` fell from 7 m 42 s to 3 m 49 s because 154 links disappeared. It is the
-first storage gate under the 1 200 s ceiling; the finding needs one more to close. One thing changed shape and not
+first storage gate under the 1 200 s ceiling; step 3's 971 s is the second, which is the finding's closing condition. One thing changed shape and not
 coverage: the 68 files that carried a crate-root `#![cfg(feature = …)]` now sit behind `#[cfg(…)] mod x;` in their
 group's `main.rs`, so under default features they are no longer even tokenised. They were already empty binaries
 there. The 46 gated on `p2p-iroh` run only under `just test-iroh`, which no gate or pipeline calls —

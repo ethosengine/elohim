@@ -1,0 +1,42 @@
+# Nested single-crate workspace (mirrors elohim-error / elohim-views /
+# elohim-facings) so this crate self-excludes from the parent
+# `elohim/Cargo.toml` workspace and resolves standalone. There is NO root
+# monorepo workspace — crates wire via path deps.
+[workspace]
+
+[package]
+name = "elohim-settings"
+version = "0.1.0"
+edition = "2021"
+description = "The storage node's settings layer: the boot `Config` and the watched runtime-config registry, which are mutually recursive and move as one unit. It refuses to know what a service, a transport, a database or an async runtime is — the poll loop that drives the watcher lives above it, in elohim-storage."
+license = "AGPL-3.0"
+repository = "https://github.com/ethosengine/elohim"
+keywords = ["elohim", "config", "storage"]
+categories = ["config"]
+
+[dependencies]
+# `Config` derives Serialize/Deserialize and is loaded from / saved to TOML.
+# Version requirements mirror what elohim-storage declares so cargo unifies each
+# to ONE package in the storage build graph — a skew would make `Config` a
+# different type on each side of the re-export shim.
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+# The runtime-config registry renders its admin surface as JSON
+# (`report_json` / `reload_json`, GET /admin/runtime-config).
+serde_json = "1"
+
+# `default_storage_dir()` — the platform data-local directory.
+dirs = "5"
+
+# The WARN line on every live setting change, and the unknown-archetype warn.
+# `tracing` is a facade with no runtime of its own; taking it here does NOT
+# import tokio (the boundary test holds that).
+tracing = "0.1"
+
+# `Config::extraction_cache` IS `ExtractionCacheConfig` — the one first-party
+# crate beneath this one. DEFAULT FEATURES ON PURPOSE (`default = []`): the
+# `native` feature elohim-storage enables pulls tokio, and this crate's
+# standalone gate must stay runtime-free. Features union in the storage build
+# graph, so storage still gets `native` on the same single package.
+elohim-cache-core = { path = "../elohim-cache-core" }

@@ -5,7 +5,6 @@
 //! - Budget enforcement (evict LRA apps when over budget)
 //! - Hash-based invalidation (stale extractions auto-evict)
 
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -13,44 +12,11 @@ use tokio::sync::{broadcast, RwLock};
 
 use super::backend::CacheBackend;
 use super::CacheError;
-
-/// Configuration for the extraction cache.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExtractionCacheConfig {
-    /// Whether the extraction cache is enabled
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-    /// Maximum total cache size in bytes
-    #[serde(default = "default_budget")]
-    pub budget_bytes: u64,
-    /// Time-to-live in seconds for cached extractions
-    #[serde(default = "default_ttl")]
-    pub ttl_secs: u64,
-    /// Directory for cached extractions
-    #[serde(default)]
-    pub cache_dir: PathBuf,
-}
-
-fn default_enabled() -> bool {
-    true
-}
-fn default_budget() -> u64 {
-    512 * 1024 * 1024
-} // 512 MB
-fn default_ttl() -> u64 {
-    3600
-} // 1 hour
-
-impl Default for ExtractionCacheConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            budget_bytes: default_budget(),
-            ttl_secs: default_ttl(),
-            cache_dir: PathBuf::new(), // Must be set by caller
-        }
-    }
-}
+// `ExtractionCacheConfig` lives in the sibling `config` module, which is NOT
+// gated on `native`: it is plain serde data that the storage node's boot
+// `Config` embeds as a field, and `elohim-settings` (runtime-free, boundary
+// test denies tokio) cannot enable `native` to reach it. Same type, same path.
+use super::ExtractionCacheConfig;
 
 /// Metadata for a cached app extraction.
 #[derive(Debug, Clone)]

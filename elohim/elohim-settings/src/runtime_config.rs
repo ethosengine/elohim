@@ -1,0 +1,1706 @@
+//! Runtime configuration — a watched file whose changes apply to a RUNNING node.
+//!
+//! # Why this exists
+//!
+//! Rung 4 of the upgrade-velocity debt snowball (backlog
+//! `upgrade-propagation-p2p-design-arc`). Every operator-reserved flag in this
+//! crate is read from the environment exactly once, at boot, into a process-wide
+//! mirror. That makes a flag flip cost a pod image roll — 2–4h of wall clock and
+//! ~20min of restart churn on the fleet — for a change that alters one bit of
+//! behaviour. This module makes the same flags reachable in seconds-to-minutes:
+//! a ConfigMap edit, a poll tick, a WARN line in the log.
+//!
+//! # What it is NOT
+//!
+//! Not a second source of truth. The boot value still comes from the environment
+//! exactly as it always did (`main.rs` reads env → `Config` field →
+//! `config::set_*` → [`publish_boot_bool`] / [`publish_boot_secs`]). This module
+//! only lets a FILE override that boot value while the process runs, and
+//! restores the boot value the moment the file stops naming the key. Provenance
+//! is always visible: [`Provenance::BootEnv`] or [`Provenance::RuntimeConfig`].
+//!
+//! Not a way to reach every knob. A setting is registered here only when its
+//! read site genuinely consults the mirror per-decision. A knob captured once at
+//! task spawn (a `tokio::time::interval` built from it, a struct field moved into
+//! a closure) is honestly declared BOOT-ONLY in [`BOOT_ONLY`] rather than
+//! pretended hot — a lever that reports "applied" and changes nothing is worse
+//! than no lever.
+//!
+//! # Format
+//!
+//! Deliberately a hand-editable subset of TOML — `KEY = "value"` lines, `#`
+//! comments, `[section]` headers ignored. No dependency is added for this: the
+//! `toml` crate is not in this crate's tree, and a 40-line scanner that an
+//! operator can predict beats a parse surface nobody reads.
+//!
+//! ```text
+//! # /etc/elohim/runtime-config.toml
+//! ELOHIM_OBEY_CARRIED_ELECTION = "1"
+//! CONTEST_BACKOFF_SECONDS = 600
+//! ```
+//!
+//! Keys are the ENV VAR NAMES — one vocabulary, so an operator who knows the
+//! flag knows the key. A key that is absent, unparseable, or unknown leaves the
+//! boot value in force (the "keep the default rather than silently disabling the
+//! lever" discipline this crate already holds for env parsing).
+//!
+//! # Local-mesh usage
+//!
+//! The watcher is OFF unless `ELOHIM_RUNTIME_CONFIG_PATH` names a file. On the
+//! local mesh, export it before starting a storage peer, then edit the file and
+//! watch the log — no restart, no rebuild:
+//!
+//! ```bash
+//! # before starting the peer (the mesh's own start arm is not this module's business)
+//! export ELOHIM_RUNTIME_CONFIG_PATH=/tmp/elohim-local-mesh/runtime-config.toml
+//! : > "$ELOHIM_RUNTIME_CONFIG_PATH"
+//!
+//! # …peer is running…
+//! echo 'ELOHIM_OBEY_CARRIED_ELECTION = "1"' >> "$ELOHIM_RUNTIME_CONFIG_PATH"
+//! # within POLL_INTERVAL_SECS the log carries:
+//! #   WARN runtime-config: setting changed setting=ELOHIM_OBEY_CARRIED_ELECTION old=false new=true
+//!
+//! # confirm, or force an immediate re-read instead of waiting for the poll
+//! curl -s localhost:8090/admin/runtime-config | jq
+//! curl -s -X POST localhost:8090/admin/runtime-config/reload | jq
+//!
+//! # remove the line → the boot-env value comes back, logged the same way
+//! ```
+//!
+//! On the fleet the same path is a mounted ConfigMap (e.g.
+//! `/etc/elohim/runtime-config.toml`); a ConfigMap edit propagates to the pod's
+//! mount and the poller picks it up without restarting anything.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
+use std::sync::{LazyLock, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use tracing::{info, warn};
+
+/// How often the watcher re-stats the config file.
+///
+/// std-only by construction: no `notify`/inotify dependency is added for a
+/// once-in-a-while operator edit. 10s means a flag flip lands within one poll —
+/// seconds-to-minutes, which is the whole point of this rung — while costing one
+/// `stat(2)` per tick.
+pub const POLL_INTERVAL_SECS: u64 = 10;
+
+/// Environment variable naming the watched file. Unset (or empty) disables the
+/// watcher entirely, with one INFO line at boot and no further cost.
+pub const PATH_ENV: &str = "ELOHIM_RUNTIME_CONFIG_PATH";
+
+// ─── the registry ────────────────────────────────────────────────────────────
+
+/// Value shape of a registered setting. Both are stored in an [`AtomicU64`]
+/// (bool as 0/1) so the registry is one uniform, lock-free array.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Kind {
+    /// Truthy/falsy flag: `1|true|yes|on` / `0|false|no|off`.
+    Bool,
+    /// A duration in whole seconds.
+    Seconds,
+}
+
+impl Kind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Kind::Bool => "bool",
+            Kind::Seconds => "seconds",
+        }
+    }
+
+    /// Parse a raw file value into the registry's `u64` representation.
+    /// `None` means "unparseable" — the caller keeps the boot value.
+    fn parse(self, raw: &str) -> Option<u64> {
+        let raw = raw.trim();
+        match self {
+            Kind::Bool => match raw.to_ascii_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => Some(1),
+                "0" | "false" | "no" | "off" => Some(0),
+                _ => None,
+            },
+            Kind::Seconds => raw.parse::<u64>().ok(),
+        }
+    }
+
+    fn render(self, value: u64) -> serde_json::Value {
+        match self {
+            Kind::Bool => serde_json::Value::Bool(value != 0),
+            Kind::Seconds => serde_json::Value::from(value),
+        }
+    }
+
+    fn display(self, value: u64) -> String {
+        match self {
+            Kind::Bool => (value != 0).to_string(),
+            Kind::Seconds => value.to_string(),
+        }
+    }
+}
+
+/// Where a setting's CURRENT value came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Provenance {
+    /// The boot environment (or the compile-time default when nothing published).
+    BootEnv,
+    /// The watched runtime-config file is currently naming this key.
+    RuntimeConfig,
+}
+
+impl Provenance {
+    fn as_str(self) -> &'static str {
+        match self {
+            Provenance::BootEnv => "boot-env",
+            Provenance::RuntimeConfig => "runtime-config",
+        }
+    }
+
+    fn from_u8(v: u8) -> Self {
+        if v == 1 {
+            Provenance::RuntimeConfig
+        } else {
+            Provenance::BootEnv
+        }
+    }
+
+    fn to_u8(self) -> u8 {
+        match self {
+            Provenance::BootEnv => 0,
+            Provenance::RuntimeConfig => 1,
+        }
+    }
+}
+
+/// Identifier for a registered hot-reloadable setting.
+///
+/// The discriminant IS the index into `Registry`'s settings array, so lookup is an
+/// array index and adding a key without adding its spec is a compile-time
+/// length mismatch rather than a runtime surprise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Key {
+    /// `ELOHIM_OBEY_CARRIED_ELECTION` — the election-visibility wall's exit.
+    ObeyCarriedElection = 0,
+    /// `ELOHIM_ADOPT_BEFORE_AUTHOR` — the both-sides-missing residual's exit.
+    AdoptBeforeAuthor = 1,
+    /// `CONTEST_BACKOFF_SECONDS` — predictable-contest-failure hold-back window.
+    ContestBackoffSeconds = 2,
+    /// `HEAL_MISSING_BACKOFF_SECONDS` — heal-leg conductor-missing replay window.
+    HealMissingBackoffSeconds = 3,
+    /// `ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS` — advertiser-stated-no-record window.
+    EvidenceAbsentBackoffSecs = 4,
+    /// `PROJECTION_RECONCILE_SECS` — projection-reconcile sweep cadence.
+    ProjectionReconcileSecs = 5,
+    /// `ELOHIM_FEEDBACK_NOTIFY` — the direct-notify ACCELERANT for feedback acts.
+    FeedbackNotify = 6,
+    /// `REANCHOR_HELD_BACKOFF_SECONDS` — reanchor held-candidate skip window.
+    ReanchorHeldBackoffSeconds = 7,
+    /// `CONTEST_REMINT_WINDOW_SECONDS` — peer-head contest re-mint suppression.
+    ContestRemintWindowSeconds = 8,
+}
+
+impl Key {
+    const fn index(self) -> usize {
+        self as usize
+    }
+
+    /// Every registered key, in registry order.
+    pub const ALL: [Key; 9] = [
+        Key::ObeyCarriedElection,
+        Key::AdoptBeforeAuthor,
+        Key::ContestBackoffSeconds,
+        Key::HealMissingBackoffSeconds,
+        Key::EvidenceAbsentBackoffSecs,
+        Key::ProjectionReconcileSecs,
+        Key::FeedbackNotify,
+        Key::ReanchorHeldBackoffSeconds,
+        Key::ContestRemintWindowSeconds,
+    ];
+}
+
+/// Static description of a registered setting. The mutable state lives in
+/// `Setting`; this is the part that is the same in every process.
+pub struct SettingSpec {
+    /// The env-var name, which is ALSO the runtime-config file key.
+    pub name: &'static str,
+    pub kind: Kind,
+    /// Compile-time fallback, used when `main` never published a boot value
+    /// (embedded/test use). Mirrors the pre-registry `unwrap_or(&default)`.
+    pub default: u64,
+    /// What flipping this actually does, for the `/admin/runtime-config` reader.
+    pub doc: &'static str,
+    /// Anything an operator must know before flipping it live. `None` = clean.
+    pub note: Option<&'static str>,
+    /// Why this setting legitimately reaches the watcher with NO boot value
+    /// published — when that is by design.
+    ///
+    /// `None` (the common case) asserts the opposite: a boot publisher runs
+    /// before the watcher starts, and [`assert_boot_published`] REFUSES the
+    /// boot if it did not. That is the runtime half of the boot assertion the
+    /// static `every_boot_publisher_is_called_from_main` guard cannot reach:
+    /// the static check proves a publisher is *called* from `main`, this one
+    /// proves the call actually *landed* on the key. [`Provenance`] cannot
+    /// serve here — every setting is seeded `BootEnv` at construction, so it
+    /// reads identically for "published the env value" and "never touched".
+    pub unpublished_by_design: Option<&'static str>,
+}
+
+/// The registered settings, in [`Key`] order.
+pub static SPECS: [SettingSpec; 9] = [
+    SettingSpec {
+        name: "ELOHIM_OBEY_CARRIED_ELECTION",
+        kind: Kind::Bool,
+        default: 0,
+        doc: "May a divergent row whose OWN conductor sees no election obey a peer-carried \
+              canonical-head declaration link, after this node's conductor re-derives it in wasm?",
+        note: None,
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "ELOHIM_ADOPT_BEFORE_AUTHOR",
+        kind: Kind::Bool,
+        default: 0,
+        doc: "May this node declare a canonical head for a content id it holds no local chain \
+              for, on validated carried evidence?",
+        note: None,
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "CONTEST_BACKOFF_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_CONTEST_BACKOFF_SECONDS,
+        doc: "How long a predictable contest failure holds an id back. 0 DISABLES the backoff \
+              (contest every candidate every sweep).",
+        note: None,
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "HEAL_MISSING_BACKOFF_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_HEAL_MISSING_BACKOFF_SECONDS,
+        doc: "How long the heal leg may replay a known conductor-missing answer instead of \
+              paying for it again. 0 DISABLES the elision.",
+        note: None,
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_EVIDENCE_ABSENT_BACKOFF_SECONDS,
+        doc: "How long an id whose only advertiser states its conductor holds no record is held \
+              back. 0 records the ordinary no-chain backoff instead.",
+        note: None,
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "PROJECTION_RECONCILE_SECS",
+        kind: Kind::Seconds,
+        default: 300,
+        doc: "Projection-reconcile sweep cadence. The running loop re-sources its ticker from \
+              this value between wakes.",
+        note: Some(
+            "cadence only — a runtime 0 is IGNORED (it cannot stop a running loop, and the \
+             loop is not spawned at all when the BOOT value is 0), and the change takes effect \
+             after the next wake at the previous cadence",
+        ),
+        unpublished_by_design: Some(
+            "published LATER than the watcher, from main's feature-gated p2p block, because the \
+             env read and the loop spawn are one decision (a boot 0 means no loop at all). Until \
+             that block runs, the compile-time 300 IS this key's boot value",
+        ),
+    },
+    SettingSpec {
+        name: "ELOHIM_FEEDBACK_NOTIFY",
+        kind: Kind::Bool,
+        default: 1,
+        doc: "May this peer send the DIRECT p2p `feedback-signal` notification for a feedback \
+              act it authors? Notification is an accelerant (accountable-correction contract \
+              §4), never the path: at 0 the act is still committed to the author's own source \
+              chain and still found by every other peer's durable discovery scan (§3). The \
+              flag exists so a scenario can prove discovery ALONE is sufficient.",
+        note: Some(
+            "hot — the send path reads the registry per act, so a scenario can flip this \
+             between two acts on a RUNNING peer without a restart (the local mesh never \
+             restarts a peer between scenarios, so a boot-only flag could not be flipped)",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: this accelerant has no Config field and no boot env read, so the \
+             compile-time default 1 IS its boot value and the WATCHED FILE is the only lever \
+             that reaches it — which is the scenario lever it was added for",
+        ),
+    },
+    SettingSpec {
+        name: "REANCHOR_HELD_BACKOFF_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_REANCHOR_HELD_BACKOFF_SECONDS,
+        doc: "How long a reanchor candidate the adopt pre-flight HELD is skipped before the \
+              sweep pays for its conductor probes again. 0 DISABLES the skip (probe every \
+              candidate every sweep).",
+        note: Some(
+            "hot — the sweep reads the registry per candidate. A skip is never an exclusion: \
+             it also lapses the moment the row is stamped or a peer advertises a DIFFERENT \
+             head for it.",
+        ),
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "CONTEST_REMINT_WINDOW_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_CONTEST_REMINT_WINDOW_SECONDS,
+        doc: "How long a SUCCESSFULLY minted peer-head contest suppresses an identical re-mint \
+              of the same (id, head). 0 DISABLES the suppression (re-mint every sweep).",
+        note: Some(
+            "hot — the contest arm reads the registry per candidate. This is a SUCCESS dedup, \
+             not a failure backoff: a refused declare hands its claim straight back, and the \
+             window only bounds how long an un-projected election suppresses a re-nomination.",
+        ),
+        unpublished_by_design: None,
+    },
+];
+
+// ─── text settings ───────────────────────────────────────────────────────────
+//
+// The registry above is a lock-free array of `AtomicU64`, which is exactly
+// right for a flag or a duration and cannot hold a LIST. The release-adoption
+// controller (rung 5) needs one: the set of release channels this peer follows,
+// each with a participation mode. Rather than widen `Kind` — which would cost
+// every `AtomicU64` read site a branch for a shape almost nothing uses — text
+// settings are a small parallel family with the SAME semantics: the file value
+// overrides, an absent key restores the boot-env value, and provenance stays
+// visible on the admin route.
+
+/// Static description of a registered TEXT setting.
+pub struct TextSettingSpec {
+    /// The env-var name, which is ALSO the runtime-config file key.
+    pub name: &'static str,
+    /// What this value means, for the `/admin/runtime-config` reader.
+    pub doc: &'static str,
+}
+
+/// The registered text settings.
+pub static TEXT_SPECS: [TextSettingSpec; 1] = [TextSettingSpec {
+    name: "ELOHIM_RELEASE_CHANNELS",
+    doc: "Release channels this peer follows, as `channelId[=mode]` entries separated by \
+          commas, semicolons or newlines. `observe` is the only legal mode until the apply \
+          vehicles land; any other mode is REFUSED and reported on GET /admin/adoption \
+          rather than silently downgraded. Empty (the default) leaves the adoption \
+          controller idle.",
+}];
+
+struct TextSetting {
+    /// The file override, when the watched file names this key.
+    current: Mutex<Option<String>>,
+    /// The boot-env value, restored when the file stops naming the key.
+    boot: Mutex<Option<String>>,
+}
+
+static TEXT_SETTINGS: LazyLock<Vec<TextSetting>> = LazyLock::new(|| {
+    TEXT_SPECS
+        .iter()
+        .map(|spec| TextSetting {
+            current: Mutex::new(std::env::var(spec.name).ok().filter(|v| !v.is_empty())),
+            boot: Mutex::new(std::env::var(spec.name).ok().filter(|v| !v.is_empty())),
+        })
+        .collect()
+});
+
+fn text_index(name: &str) -> Option<usize> {
+    TEXT_SPECS.iter().position(|spec| spec.name == name)
+}
+
+/// The effective value of a registered text setting, or `None` when neither the
+/// file nor the boot environment names it.
+///
+/// An unregistered name returns `None` rather than reading the environment
+/// directly: a caller that can ask for any key at all is a caller that will
+/// eventually ask for one nothing publishes, and get a permanent silent `None`.
+pub fn get_text(name: &str) -> Option<String> {
+    let idx = text_index(name)?;
+    TEXT_SETTINGS[idx].current.lock().unwrap().clone()
+}
+
+/// Apply the parsed config map to the text settings. Same three cases as
+/// [`Registry::apply`]: file wins, absent restores boot, unchanged is silent.
+fn apply_text(parsed: &BTreeMap<String, String>) -> usize {
+    let mut changed = 0usize;
+    for (idx, spec) in TEXT_SPECS.iter().enumerate() {
+        let setting = &TEXT_SETTINGS[idx];
+        let from_file = parsed
+            .get(spec.name)
+            .map(|raw| raw.trim().to_string())
+            .filter(|v| !v.is_empty());
+        let want = match from_file {
+            Some(v) => Some(v),
+            None => setting.boot.lock().unwrap().clone(),
+        };
+        let mut current = setting.current.lock().unwrap();
+        if *current != want {
+            warn!(
+                setting = spec.name,
+                old = %current.as_deref().unwrap_or("<unset>"),
+                new = %want.as_deref().unwrap_or("<unset>"),
+                "runtime-config: setting changed on a RUNNING node"
+            );
+            *current = want;
+            changed += 1;
+        }
+    }
+    changed
+}
+
+fn text_snapshot() -> Vec<serde_json::Value> {
+    TEXT_SPECS
+        .iter()
+        .enumerate()
+        .map(|(idx, spec)| {
+            let setting = &TEXT_SETTINGS[idx];
+            let current = setting.current.lock().unwrap().clone();
+            let boot = setting.boot.lock().unwrap().clone();
+            let provenance = if current == boot {
+                Provenance::BootEnv
+            } else {
+                Provenance::RuntimeConfig
+            };
+            serde_json::json!({
+                "name": spec.name,
+                "kind": "text",
+                "effectiveValue": current,
+                "bootValue": boot,
+                "provenance": provenance.as_str(),
+                "hotReloadable": true,
+                "doc": spec.doc,
+            })
+        })
+        .collect()
+}
+
+/// A knob this module deliberately does NOT hot-wire, and why. Surfaced on the
+/// admin route so "why didn't my flip land?" is answerable without reading code.
+pub struct BootOnlyFlag {
+    pub name: &'static str,
+    pub reason: &'static str,
+}
+
+/// Boot-only knobs in the same neighbourhood as the registered ones.
+///
+/// Honesty matters more than coverage here: each entry names a read site that
+/// genuinely captures its value once, so registering it would ship a lever that
+/// reports "applied" and changes nothing.
+pub static BOOT_ONLY: [BootOnlyFlag; 5] = [
+    BootOnlyFlag {
+        name: "ACQUISITION_RECONCILE_SECS",
+        reason: "captured once at spawn into a tokio::time::interval inside P2PNode::run \
+                 (p2p/mod.rs); re-sourcing it needs a loop restructure, not an interval swap",
+    },
+    BootOnlyFlag {
+        name: "ADOPT_CONTEST_FANOUT",
+        reason: "held under assert_courier_ladder_budget (fanout * max_alternates <= 24), a \
+                 fail-FAST boot invariant guarding the adam 2026-07-20 write-guard melt; a \
+                 runtime flip would bypass the assertion instead of tripping it",
+    },
+    BootOnlyFlag {
+        name: "ELOHIM_EVIDENCE_FALLBACK_MAX_ALTERNATES",
+        reason: "the other factor in the same courier-ladder budget assertion",
+    },
+    BootOnlyFlag {
+        name: "ELOHIM_TRANSPORT_BACKEND",
+        reason: "selects which P2P stacks are BUILT at startup (libp2p / iroh / dual); a live \
+                 change would have no node to apply to",
+    },
+    BootOnlyFlag {
+        name: "PROJECTION_RECONCILE_SECS=0",
+        reason: "the DISABLED case is boot-only — at 0 the reconcile loop is never spawned, so \
+                 there is nothing for the watcher to re-source (the nonzero cadence IS hot)",
+    },
+];
+
+/// Mutable per-process state for one registered setting.
+struct Setting {
+    current: AtomicU64,
+    boot: AtomicU64,
+    provenance: AtomicU8,
+    /// Has a boot publisher ever run for this setting?
+    ///
+    /// Deliberately NOT derivable from `provenance`: every setting is seeded
+    /// [`Provenance::BootEnv`] at construction, so provenance reads identically
+    /// for "`main` published the env-derived value" and "nothing ever touched
+    /// this key and it is riding the compile-time default". That
+    /// indistinguishability is exactly how two publishers shipped with zero
+    /// call sites on 2026-09-19. This flag is the distinction.
+    published: AtomicBool,
+}
+
+/// A lock-free registry of hot-reloadable settings.
+///
+/// Instantiable rather than purely static ON PURPOSE: the unit tests drive their
+/// own `Registry` so they can exercise override/fallback/provenance transitions
+/// without mutating the process-wide one that live code reads — the parallel-test
+/// flake this crate has already paid for once with env vars.
+pub struct Registry {
+    settings: Vec<Setting>,
+}
+
+impl Default for Registry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Registry {
+    /// A registry with every setting at its compile-time default and provenance
+    /// [`Provenance::BootEnv`].
+    pub fn new() -> Self {
+        Self {
+            settings: SPECS
+                .iter()
+                .map(|spec| Setting {
+                    current: AtomicU64::new(spec.default),
+                    boot: AtomicU64::new(spec.default),
+                    provenance: AtomicU8::new(Provenance::BootEnv.to_u8()),
+                    published: AtomicBool::new(false),
+                })
+                .collect(),
+        }
+    }
+
+    fn at(&self, key: Key) -> &Setting {
+        &self.settings[key.index()]
+    }
+
+    /// Record the BOOT value for a setting (what the env said at startup).
+    ///
+    /// Updates the effective value too — UNLESS the watched file is currently
+    /// overriding this key, in which case the override stays in force and only
+    /// the fallback target moves. That ordering-independence is what lets
+    /// `config::set_*` publish at any point in boot without racing the watcher.
+    pub fn publish_boot(&self, key: Key, value: u64) {
+        let s = self.at(key);
+        s.boot.store(value, Ordering::Release);
+        s.published.store(true, Ordering::Release);
+        if Provenance::from_u8(s.provenance.load(Ordering::Acquire)) == Provenance::BootEnv {
+            s.current.store(value, Ordering::Release);
+        }
+    }
+
+    /// Has a boot publisher run for this setting?
+    pub fn published(&self, key: Key) -> bool {
+        self.at(key).published.load(Ordering::Acquire)
+    }
+
+    /// Settings that expect a boot publisher and never got one, in registry
+    /// order. Empty is the healthy state; see [`assert_boot_published`].
+    pub fn unpublished_boot_settings(&self) -> Vec<&'static str> {
+        Key::ALL
+            .iter()
+            .filter(|&&key| {
+                SPECS[key.index()].unpublished_by_design.is_none() && !self.published(key)
+            })
+            .map(|&key| SPECS[key.index()].name)
+            .collect()
+    }
+
+    /// The effective value, in registry (`u64`) representation.
+    pub fn get(&self, key: Key) -> u64 {
+        self.at(key).current.load(Ordering::Acquire)
+    }
+
+    /// The effective value of a [`Kind::Bool`] setting.
+    pub fn get_bool(&self, key: Key) -> bool {
+        self.get(key) != 0
+    }
+
+    /// The boot value this setting falls back to when the file stops naming it.
+    pub fn boot(&self, key: Key) -> u64 {
+        self.at(key).boot.load(Ordering::Acquire)
+    }
+
+    /// Where the effective value came from.
+    pub fn provenance(&self, key: Key) -> Provenance {
+        Provenance::from_u8(self.at(key).provenance.load(Ordering::Acquire))
+    }
+
+    /// Apply a parsed config map, returning how many settings CHANGED value.
+    ///
+    /// Three cases per registered setting:
+    /// - key present and parseable → the file value wins (provenance
+    ///   `runtime-config`);
+    /// - key absent, or present but unparseable → the boot value is restored
+    ///   (provenance `boot-env`);
+    /// - value equals what is already effective → nothing logged, nothing counted.
+    ///
+    /// Every actual change logs old → new at WARN, because a live behaviour flip
+    /// on a running node is exactly the kind of thing that must be greppable
+    /// after the fact.
+    pub fn apply(&self, parsed: &BTreeMap<String, String>) -> usize {
+        let mut changed = 0usize;
+        for key in Key::ALL {
+            let spec = &SPECS[key.index()];
+            let s = self.at(key);
+
+            let from_file = parsed.get(spec.name).and_then(|raw| {
+                let parsed_value = spec.kind.parse(raw);
+                if parsed_value.is_none() {
+                    warn!(
+                        setting = spec.name,
+                        value = %raw,
+                        kind = spec.kind.as_str(),
+                        "runtime-config: unparseable value — keeping the boot value"
+                    );
+                }
+                parsed_value
+            });
+
+            let (want, want_prov) = match from_file {
+                Some(v) => (v, Provenance::RuntimeConfig),
+                None => (s.boot.load(Ordering::Acquire), Provenance::BootEnv),
+            };
+
+            let old = s.current.load(Ordering::Acquire);
+            let old_prov = Provenance::from_u8(s.provenance.load(Ordering::Acquire));
+
+            if old != want {
+                s.current.store(want, Ordering::Release);
+                s.provenance.store(want_prov.to_u8(), Ordering::Release);
+                changed += 1;
+                warn!(
+                    setting = spec.name,
+                    old = %spec.kind.display(old),
+                    new = %spec.kind.display(want),
+                    provenance = want_prov.as_str(),
+                    "runtime-config: setting changed on a RUNNING node"
+                );
+            } else if old_prov != want_prov {
+                // Same value, different origin (e.g. the file names the boot
+                // value, or stops naming it). Not a behaviour change, but the
+                // provenance must stay truthful for the admin surface.
+                s.provenance.store(want_prov.to_u8(), Ordering::Release);
+            }
+        }
+        changed
+    }
+
+    /// Per-setting view for the admin route.
+    pub fn snapshot(&self) -> Vec<serde_json::Value> {
+        Key::ALL
+            .iter()
+            .map(|&key| {
+                let spec = &SPECS[key.index()];
+                serde_json::json!({
+                    "name": spec.name,
+                    "kind": spec.kind.as_str(),
+                    "effectiveValue": spec.kind.render(self.get(key)),
+                    "bootValue": spec.kind.render(self.boot(key)),
+                    "defaultValue": spec.kind.render(spec.default),
+                    "provenance": self.provenance(key).as_str(),
+                    "hotReloadable": true,
+                    "doc": spec.doc,
+                    "note": spec.note,
+                })
+            })
+            .collect()
+    }
+}
+
+/// The process-wide registry every live read site consults.
+static GLOBAL: LazyLock<Registry> = LazyLock::new(Registry::new);
+
+/// The process-wide registry. Live code should prefer the free functions below.
+pub fn global() -> &'static Registry {
+    &GLOBAL
+}
+
+/// Publish a boot-env `bool` (called from `config::set_*`).
+pub fn publish_boot_bool(key: Key, value: bool) {
+    GLOBAL.publish_boot(key, u64::from(value));
+}
+
+/// Publish a boot-env seconds value (called from `config::set_*`).
+pub fn publish_boot_secs(key: Key, value: u64) {
+    GLOBAL.publish_boot(key, value);
+}
+
+/// REFUSE the boot when a registered setting that expects a boot publisher
+/// never received one. Called once, immediately before the watcher starts.
+///
+/// The failure this forbids is silent by construction: the key is registered,
+/// it is read live, `/admin/runtime-config` reports it with `boot-env`
+/// provenance — and the operator's env var was never consulted, because the
+/// publisher has no call site. That shipped on 2026-09-19 for
+/// `REANCHOR_HELD_BACKOFF_SECONDS` and `CONTEST_REMINT_WINDOW_SECONDS` and
+/// passed review. The static `every_boot_publisher_is_called_from_main` guard
+/// catches the "no call site in `main.rs`" shape at compile time; this catches
+/// everything else that can stop a publication from landing — a `return` taken
+/// before it, a branch that skips it, a publisher wired to the wrong [`Key`].
+///
+/// Fail-FAST, in the shape of `config::assert_courier_ladder_budget`: a node
+/// whose operator levers are silently inert is worse than a node that refuses
+/// to start and says which lever.
+pub fn assert_boot_published() {
+    let missing = GLOBAL.unpublished_boot_settings();
+    assert!(
+        missing.is_empty(),
+        "runtime-config settings reached the watcher with no boot value published — their \
+         operator env vars are being silently ignored and each is riding its compile-time \
+         default: {}. Publish each from main's boot sequence (config::set_*), or declare \
+         `unpublished_by_design` on its SettingSpec with the reason",
+        missing.join(", ")
+    );
+}
+
+/// The effective value of a [`Kind::Bool`] setting.
+pub fn get_bool(key: Key) -> bool {
+    GLOBAL.get_bool(key)
+}
+
+/// The effective value of a [`Kind::Seconds`] setting.
+pub fn get_secs(key: Key) -> u64 {
+    GLOBAL.get(key)
+}
+
+/// The cadence a RUNNING projection-reconcile loop should tick at.
+///
+/// `boot_secs` is the value the loop was spawned with (already known nonzero —
+/// a boot 0 means the loop was never spawned). A runtime 0 is refused here
+/// rather than at the call site: 0 means DISABLED, and disabling a loop that is
+/// already running is not something a cadence knob may do silently.
+pub fn projection_reconcile_secs_running(boot_secs: u64) -> u64 {
+    let want = get_secs(Key::ProjectionReconcileSecs);
+    if want == 0 {
+        boot_secs
+    } else {
+        want
+    }
+}
+
+// ─── parsing ─────────────────────────────────────────────────────────────────
+
+/// Parse the hand-editable TOML subset into a key → raw-value map.
+///
+/// Accepts `KEY = "value"`, `KEY = 'value'` and bare `KEY = value`; ignores
+/// blank lines, `#`/`;` comments, `[section]` headers, and trailing comments on
+/// unquoted values. Unknown keys are carried through and dropped by
+/// [`Registry::apply`] — an operator's note-to-self in the file is not an error.
+pub fn parse(text: &str) -> BTreeMap<String, String> {
+    let mut map = BTreeMap::new();
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty()
+            || line.starts_with('#')
+            || line.starts_with(';')
+            || line.starts_with('[')
+        {
+            continue;
+        }
+        let Some((raw_key, raw_val)) = line.split_once('=') else {
+            continue;
+        };
+        let key = raw_key.trim();
+        if key.is_empty() {
+            continue;
+        }
+        let val = raw_val.trim();
+        let value = match val.chars().next() {
+            Some(q @ ('"' | '\'')) => {
+                let rest = &val[q.len_utf8()..];
+                match rest.find(q) {
+                    Some(end) => rest[..end].to_string(),
+                    None => rest.to_string(),
+                }
+            }
+            _ => match val.find('#') {
+                Some(i) => val[..i].trim_end().to_string(),
+                None => val.to_string(),
+            },
+        };
+        map.insert(key.to_string(), value);
+    }
+    map
+}
+
+// ─── writing (the operator seat) ──────────────────────────────────────────────
+//
+// Reading this file is the module's whole job everywhere else. This section is
+// the ONE exception, and it is deliberately narrow: an operator-seat route may
+// rewrite exactly ONE key's line and nothing else.
+//
+// Why the narrowness is load-bearing. The watched file is a SHARED surface — a
+// mounted ConfigMap on the fleet, a hand-editable file on the mesh, a
+// Jenkins-rendered artifact in between. A writer that rewrote the whole file
+// would silently delete every line it did not itself author: an operator's
+// comment, a second key another seat set, a `[section]` header. So the rewrite
+// below is line-scoped by construction — every line that does not declare the
+// named key is carried through VERBATIM — and there is no "write the file"
+// entry point at all.
+//
+// This is not a second source of truth. The file is still the only override
+// home; this just lets a peer edit its own copy of it through its own API
+// instead of requiring a shell on the box.
+
+/// Rewrite exactly the `key = "value"` line of a runtime-config text, carrying
+/// every other line through verbatim. Pure — no I/O, so the whole rule is
+/// testable without a filesystem.
+///
+/// - `value: Some(v)` — the key's line becomes `KEY = "v"`, **in place** (the
+///   first occurrence's position is kept, so an operator's ordering survives),
+///   or is APPENDED when the key is absent.
+/// - `value: None` — the key's line(s) are dropped. An absent key is a no-op,
+///   not an error: "stop following X" is satisfied by X not being there.
+/// - **Duplicates collapse.** A file that names the key twice (an accreted
+///   hand-edit — a shape this file has actually grown in the wild) leaves with
+///   exactly one line for it. `parse` already resolves duplicates last-wins
+///   silently; leaving the loser behind would make the file lie about what the
+///   node is doing.
+///
+/// The output always ends in a newline when non-empty, so an appended line can
+/// never fuse onto an unterminated last line.
+pub fn rewrite_key_line(text: &str, key: &str, value: Option<&str>) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut seen = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let declares_key = !(trimmed.is_empty()
+            || trimmed.starts_with('#')
+            || trimmed.starts_with(';')
+            || trimmed.starts_with('['))
+            && trimmed
+                .split_once('=')
+                .is_some_and(|(raw_key, _)| raw_key.trim() == key);
+        if !declares_key {
+            out.push(line.to_string());
+            continue;
+        }
+        if !seen {
+            seen = true;
+            if let Some(v) = value {
+                out.push(format!("{key} = \"{v}\""));
+            }
+        }
+        // Every FURTHER declaration of the same key is dropped — see the
+        // duplicates-collapse rule above.
+    }
+    if !seen {
+        if let Some(v) = value {
+            out.push(format!("{key} = \"{v}\""));
+        }
+    }
+    if out.is_empty() {
+        return String::new();
+    }
+    let mut rendered = out.join("\n");
+    rendered.push('\n');
+    rendered
+}
+
+/// Why a [`set_watched_key`] call could not happen.
+#[derive(Debug, Clone)]
+pub enum SetKeyError {
+    /// No watched file is configured ([`PATH_ENV`] unset) — there is nothing to
+    /// write, and inventing a path would create a file nothing reads.
+    NotWatched,
+    /// The read, write or rename failed. The file is left exactly as it was:
+    /// the new bytes only ever become visible through the final `rename(2)`.
+    Io(String),
+}
+
+impl std::fmt::Display for SetKeyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetKeyError::NotWatched => write!(
+                f,
+                "no runtime-config file is watched on this node ({PATH_ENV} is unset)"
+            ),
+            SetKeyError::Io(e) => write!(f, "runtime-config write failed: {e}"),
+        }
+    }
+}
+
+/// Set (or remove, with `value: None`) ONE key in the WATCHED file and reload.
+///
+/// Atomic by construction: the rewritten text is written to a sibling temp file
+/// and `rename(2)`d over the target, so a reader — the poller, another seat, a
+/// `kubectl exec cat` — never observes a half-written file, and a failure
+/// anywhere before the rename leaves the original bytes untouched.
+///
+/// A MISSING file is not an error: it is the "no overrides yet" state, and the
+/// first `follow` on a fresh peer legitimately creates it.
+///
+/// The reload is not an optimisation — it is what makes the call OBSERVABLE.
+/// Without it the caller would have to sleep out a poll interval before
+/// `/admin/adoption` could confirm anything, which is exactly the wait this
+/// route exists to remove.
+pub fn set_watched_key(
+    key: &str,
+    value: Option<&str>,
+) -> Result<(PathBuf, ReloadOutcome), SetKeyError> {
+    let path = config_path().ok_or(SetKeyError::NotWatched)?;
+
+    let current = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(SetKeyError::Io(format!("read {}: {e}", path.display()))),
+    };
+    let next = rewrite_key_line(&current, key, value);
+
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| SetKeyError::Io(format!("create {}: {e}", parent.display())))?;
+        }
+    }
+
+    // Sibling temp so the rename stays within one filesystem (a rename across
+    // devices is not atomic and would fail outright); pid-suffixed so two
+    // processes sharing a mount cannot collide on it.
+    let file_name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "runtime-config".to_string());
+    let tmp = path.with_file_name(format!(".{file_name}.tmp-{}", std::process::id()));
+    std::fs::write(&tmp, next.as_bytes())
+        .map_err(|e| SetKeyError::Io(format!("write {}: {e}", tmp.display())))?;
+    if let Err(e) = std::fs::rename(&tmp, &path) {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(SetKeyError::Io(format!(
+            "rename {} -> {}: {e}",
+            tmp.display(),
+            path.display()
+        )));
+    }
+
+    // Keep the poller from re-reading the very file we just wrote and logging a
+    // spurious "file change detected" for our own edit. Best-effort: if the
+    // signature read fails the poller simply reloads once more, which is
+    // idempotent.
+    *WATCH.last_signature.lock().unwrap() = signature(&path);
+
+    let outcome = reload_now();
+    info!(
+        path = %path.display(),
+        key,
+        removed = value.is_none(),
+        applied = outcome.changed,
+        "runtime-config: key rewritten through the operator seat and reloaded"
+    );
+    Ok((path, outcome))
+}
+
+// ─── watcher ─────────────────────────────────────────────────────────────────
+
+/// Cross-tick watcher state, so the admin route can report honestly whether the
+/// watcher is live and what it last saw.
+struct WatchState {
+    /// Last observed (mtime, len) of the file — the change signal. `len` is
+    /// carried alongside mtime because a coarse filesystem clock can hide a
+    /// same-second edit that changes the file's size.
+    last_signature: Mutex<Option<(SystemTime, u64)>>,
+    last_reload_unix: AtomicU64,
+    reload_count: AtomicU64,
+    file_present: AtomicBool,
+    watcher_running: AtomicBool,
+    last_error: Mutex<Option<String>>,
+}
+
+static WATCH: LazyLock<WatchState> = LazyLock::new(|| WatchState {
+    last_signature: Mutex::new(None),
+    last_reload_unix: AtomicU64::new(0),
+    reload_count: AtomicU64::new(0),
+    file_present: AtomicBool::new(false),
+    watcher_running: AtomicBool::new(false),
+    last_error: Mutex::new(None),
+});
+
+/// The watched path, or `None` when the watcher is disabled.
+pub fn config_path() -> Option<PathBuf> {
+    std::env::var(PATH_ENV)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
+}
+
+/// Outcome of one re-read.
+#[derive(Debug, Clone)]
+pub struct ReloadOutcome {
+    /// The path read, or `None` when the watcher is disabled.
+    pub path: Option<PathBuf>,
+    /// Whether the file existed and was readable.
+    pub file_present: bool,
+    /// How many registered settings changed value.
+    pub changed: usize,
+    /// How many keys the file named (including unknown ones).
+    pub keys_seen: usize,
+    /// Read/IO failure, if any. A missing file is NOT an error — it is the
+    /// "no overrides" state, and it correctly restores every boot value.
+    pub error: Option<String>,
+}
+
+impl ReloadOutcome {
+    /// JSON body for the reload route.
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "path": self.path.as_ref().map(|p| p.display().to_string()),
+            "filePresent": self.file_present,
+            "changed": self.changed,
+            "keysSeen": self.keys_seen,
+            "error": self.error,
+        })
+    }
+}
+
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Re-read the watched file NOW and apply it to the global registry.
+///
+/// Idempotent and safe to call at any time. With the watcher disabled this is a
+/// no-op that reports `path: None` — it does NOT fall back to reverting
+/// anything, because with no file there is nothing that could have overridden.
+pub fn reload_now() -> ReloadOutcome {
+    let Some(path) = config_path() else {
+        return ReloadOutcome {
+            path: None,
+            file_present: false,
+            changed: 0,
+            keys_seen: 0,
+            error: None,
+        };
+    };
+
+    let (parsed, present, error) = match std::fs::read_to_string(&path) {
+        Ok(text) => (parse(&text), true, None),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (BTreeMap::new(), false, None),
+        Err(e) => (BTreeMap::new(), false, Some(e.to_string())),
+    };
+
+    // A read FAILURE (not a missing file) must not be read as "the operator
+    // removed every override" — leave the registry exactly as it is.
+    if let Some(err) = error {
+        warn!(path = %path.display(), error = %err, "runtime-config: read failed — leaving current values in force");
+        *WATCH.last_error.lock().unwrap() = Some(err.clone());
+        WATCH.file_present.store(false, Ordering::Release);
+        return ReloadOutcome {
+            path: Some(path),
+            file_present: false,
+            changed: 0,
+            keys_seen: 0,
+            error: Some(err),
+        };
+    }
+
+    let keys_seen = parsed.len();
+    let changed = GLOBAL.apply(&parsed) + apply_text(&parsed);
+    WATCH.file_present.store(present, Ordering::Release);
+    WATCH.last_reload_unix.store(now_unix(), Ordering::Release);
+    WATCH.reload_count.fetch_add(1, Ordering::AcqRel);
+    *WATCH.last_error.lock().unwrap() = None;
+
+    ReloadOutcome {
+        path: Some(path),
+        file_present: present,
+        changed,
+        keys_seen,
+        error: None,
+    }
+}
+
+/// Current (mtime, len) signature of the watched file, or `None` when absent.
+fn signature(path: &std::path::Path) -> Option<(SystemTime, u64)> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.modified().ok()?, meta.len()))
+}
+
+/// Arm the watcher: boot-read the file and mark the watcher live. Returns the
+/// watched path, or `None` (with one INFO line) when [`PATH_ENV`] is unset —
+/// the default, so a node that never mounts a ConfigMap pays nothing and
+/// behaves exactly as it did before this module existed.
+///
+/// This module owns the STATE and the DECISIONS; the caller owns the CLOCK.
+/// The poll loop is a tokio task and lives in `elohim-storage`
+/// (`runtime_config_watch::spawn_watcher`, its one call site) precisely so this
+/// crate stays std-only — a settings layer that pulled an async runtime would
+/// colour every crate above it, and the boundary test denies `tokio` here.
+pub fn begin_watch() -> Option<PathBuf> {
+    let Some(path) = config_path() else {
+        info!(
+            env = PATH_ENV,
+            "runtime-config: watcher DISABLED (no path configured) — every flag stays at its \
+             boot-env value for the life of the process"
+        );
+        return None;
+    };
+
+    // Boot read: apply whatever the file already says before the first tick, so
+    // a pod that starts with a populated ConfigMap does not spend a poll
+    // interval running the boot-env values.
+    let boot = reload_now();
+    info!(
+        path = %path.display(),
+        poll_secs = POLL_INTERVAL_SECS,
+        file_present = boot.file_present,
+        applied = boot.changed,
+        "runtime-config: watcher ACTIVE — flag flips apply to this RUNNING node without a restart"
+    );
+    *WATCH.last_signature.lock().unwrap() = signature(&path);
+    WATCH.watcher_running.store(true, Ordering::Release);
+
+    Some(path)
+}
+
+/// One watcher tick: `stat(2)` the file and, ONLY when its (mtime, len)
+/// signature moved, re-read and apply it. Synchronous and idempotent.
+///
+/// Returns the outcome when the file actually changed, `None` when it did not —
+/// the caller needs nothing else to decide, and a caller that ignores the
+/// return value is still correct.
+pub fn poll_once(path: &std::path::Path) -> Option<ReloadOutcome> {
+    let current = signature(path);
+    let changed = {
+        let mut last = WATCH.last_signature.lock().unwrap();
+        if *last == current {
+            false
+        } else {
+            *last = current;
+            true
+        }
+    };
+    if !changed {
+        return None;
+    }
+    let outcome = reload_now();
+    info!(
+        path = %path.display(),
+        file_present = outcome.file_present,
+        keys_seen = outcome.keys_seen,
+        applied = outcome.changed,
+        "runtime-config: file change detected"
+    );
+    Some(outcome)
+}
+
+// ─── admin surface ───────────────────────────────────────────────────────────
+
+/// JSON body for `GET /admin/runtime-config`.
+pub fn report_json() -> serde_json::Value {
+    let path = config_path();
+    let last_reload = WATCH.last_reload_unix.load(Ordering::Acquire);
+    serde_json::json!({
+        "watcher": {
+            "active": WATCH.watcher_running.load(Ordering::Acquire),
+            "path": path.as_ref().map(|p| p.display().to_string()),
+            "pathEnv": PATH_ENV,
+            "pollSecs": POLL_INTERVAL_SECS,
+            "filePresent": WATCH.file_present.load(Ordering::Acquire),
+            "reloadCount": WATCH.reload_count.load(Ordering::Acquire),
+            "lastReloadUnixSecs": if last_reload == 0 { None } else { Some(last_reload) },
+            "lastError": WATCH.last_error.lock().unwrap().clone(),
+        },
+        "settings": GLOBAL.snapshot(),
+        "textSettings": text_snapshot(),
+        "bootOnly": BOOT_ONLY.iter().map(|f| serde_json::json!({
+            "name": f.name,
+            "reason": f.reason,
+            "hotReloadable": false,
+        })).collect::<Vec<_>>(),
+    })
+}
+
+/// JSON body for `POST /admin/runtime-config/reload` — the forced re-read plus
+/// the same report, so one call answers "did it land?" without a second GET.
+pub fn reload_json() -> serde_json::Value {
+    let outcome = reload_now();
+    serde_json::json!({
+        "reload": outcome.to_json(),
+        "report": report_json(),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Every test drives its OWN Registry. The global one is what live sweeps
+    // read; mutating it from a parallel test is the flake class this crate has
+    // already paid for once with env vars.
+
+    #[test]
+    fn parse_handles_the_hand_editable_subset() {
+        let text = r#"
+# a comment
+; another comment
+[section]
+
+ELOHIM_OBEY_CARRIED_ELECTION = "1"
+CONTEST_BACKOFF_SECONDS = 600
+HEAL_MISSING_BACKOFF_SECONDS = 42 # trailing comment
+QUOTED_SINGLE = 'yes'
+SPACED   =    padded
+EMPTY_VALUE =
+= orphan
+not a pair
+"#;
+        let m = parse(text);
+        assert_eq!(m.get("ELOHIM_OBEY_CARRIED_ELECTION").unwrap(), "1");
+        assert_eq!(m.get("CONTEST_BACKOFF_SECONDS").unwrap(), "600");
+        assert_eq!(m.get("HEAL_MISSING_BACKOFF_SECONDS").unwrap(), "42");
+        assert_eq!(m.get("QUOTED_SINGLE").unwrap(), "yes");
+        assert_eq!(m.get("SPACED").unwrap(), "padded");
+        assert_eq!(m.get("EMPTY_VALUE").unwrap(), "");
+        assert!(!m.contains_key(""), "an orphan '=' must not register a key");
+        assert!(!m.contains_key("not a pair"));
+        assert!(!m.contains_key("[section]"));
+    }
+
+    #[test]
+    fn parse_round_trips_a_rendered_file() {
+        // Render the shape an operator would write, parse it back, and assert
+        // every registered setting survives the trip in the registry's terms.
+        let mut text = String::from("# generated\n");
+        for key in Key::ALL {
+            let spec = &SPECS[key.index()];
+            // Render the OPPOSITE of each bool's default, not a fixed `true`.
+            // The assertion below is "every setting MOVED off its default", and
+            // a fixed literal only tests that for settings whose default
+            // happens to be the other value — a bool that defaults ON would
+            // silently not move and quietly weaken the count.
+            let raw = match spec.kind {
+                Kind::Bool => if spec.default == 0 { "true" } else { "false" }.to_string(),
+                Kind::Seconds => "77".to_string(),
+            };
+            text.push_str(&format!("{} = \"{}\"\n", spec.name, raw));
+        }
+        let parsed = parse(&text);
+        assert_eq!(parsed.len(), SPECS.len());
+
+        let reg = Registry::new();
+        let changed = reg.apply(&parsed);
+        assert_eq!(changed, SPECS.len(), "every setting moved off its default");
+        for key in Key::ALL {
+            let spec = &SPECS[key.index()];
+            let want = match spec.kind {
+                Kind::Bool => 1 - spec.default,
+                Kind::Seconds => 77,
+            };
+            assert_eq!(reg.get(key), want, "{} did not round-trip", spec.name);
+            assert_eq!(reg.provenance(key), Provenance::RuntimeConfig);
+        }
+    }
+
+    #[test]
+    fn file_value_overrides_boot_and_removal_restores_it() {
+        let reg = Registry::new();
+        reg.publish_boot(Key::ObeyCarriedElection, 0);
+        reg.publish_boot(Key::ContestBackoffSeconds, 3600);
+        assert!(!reg.get_bool(Key::ObeyCarriedElection));
+        assert_eq!(
+            reg.provenance(Key::ObeyCarriedElection),
+            Provenance::BootEnv
+        );
+
+        // File wins.
+        let on = parse("ELOHIM_OBEY_CARRIED_ELECTION = \"1\"\nCONTEST_BACKOFF_SECONDS = 60\n");
+        assert_eq!(reg.apply(&on), 2);
+        assert!(reg.get_bool(Key::ObeyCarriedElection));
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 60);
+        assert_eq!(
+            reg.provenance(Key::ObeyCarriedElection),
+            Provenance::RuntimeConfig
+        );
+        // The boot value is remembered, not overwritten.
+        assert_eq!(reg.boot(Key::ObeyCarriedElection), 0);
+        assert_eq!(reg.boot(Key::ContestBackoffSeconds), 3600);
+
+        // Key REMOVED from the file → boot value returns.
+        let off = parse("CONTEST_BACKOFF_SECONDS = 60\n");
+        assert_eq!(reg.apply(&off), 1);
+        assert!(!reg.get_bool(Key::ObeyCarriedElection));
+        assert_eq!(
+            reg.provenance(Key::ObeyCarriedElection),
+            Provenance::BootEnv
+        );
+        // The still-named key keeps its override.
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 60);
+        assert_eq!(
+            reg.provenance(Key::ContestBackoffSeconds),
+            Provenance::RuntimeConfig
+        );
+
+        // Empty file → everything back to boot.
+        assert_eq!(reg.apply(&parse("")), 1);
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 3600);
+        assert_eq!(
+            reg.provenance(Key::ContestBackoffSeconds),
+            Provenance::BootEnv
+        );
+    }
+
+    #[test]
+    fn publish_boot_after_an_override_moves_the_fallback_not_the_value() {
+        let reg = Registry::new();
+        reg.apply(&parse("HEAL_MISSING_BACKOFF_SECONDS = 15\n"));
+        assert_eq!(reg.get(Key::HealMissingBackoffSeconds), 15);
+
+        // Boot publication racing in AFTER the watcher must not clobber the
+        // live override — it only changes what removal falls back to.
+        reg.publish_boot(Key::HealMissingBackoffSeconds, 900);
+        assert_eq!(reg.get(Key::HealMissingBackoffSeconds), 15);
+        assert_eq!(reg.boot(Key::HealMissingBackoffSeconds), 900);
+
+        reg.apply(&parse(""));
+        assert_eq!(reg.get(Key::HealMissingBackoffSeconds), 900);
+    }
+
+    #[test]
+    fn unparseable_value_keeps_the_boot_value() {
+        let reg = Registry::new();
+        reg.publish_boot(Key::ContestBackoffSeconds, 3600);
+        reg.publish_boot(Key::AdoptBeforeAuthor, 0);
+
+        let bad = parse("CONTEST_BACKOFF_SECONDS = \"soon\"\nELOHIM_ADOPT_BEFORE_AUTHOR = maybe\n");
+        assert_eq!(reg.apply(&bad), 0, "nothing may change on a bad value");
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 3600);
+        assert!(!reg.get_bool(Key::AdoptBeforeAuthor));
+        assert_eq!(
+            reg.provenance(Key::ContestBackoffSeconds),
+            Provenance::BootEnv,
+            "an unparseable value must not claim runtime-config provenance"
+        );
+    }
+
+    #[test]
+    fn unknown_keys_are_ignored_and_zero_is_a_real_value() {
+        let reg = Registry::new();
+        reg.publish_boot(Key::ContestBackoffSeconds, 3600);
+        let m = parse("SOMETHING_ELSE = 1\nCONTEST_BACKOFF_SECONDS = 0\n");
+        assert_eq!(reg.apply(&m), 1);
+        // 0 is the documented OFF value for this window, NOT "unset".
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 0);
+        assert_eq!(
+            reg.provenance(Key::ContestBackoffSeconds),
+            Provenance::RuntimeConfig
+        );
+    }
+
+    #[test]
+    fn bool_truthiness_matches_the_boot_env_vocabulary() {
+        for on in ["1", "true", "TRUE", "yes", "on"] {
+            assert_eq!(Kind::Bool.parse(on), Some(1), "{on} should be truthy");
+        }
+        for off in ["0", "false", "No", "OFF"] {
+            assert_eq!(Kind::Bool.parse(off), Some(0), "{off} should be falsy");
+        }
+        assert_eq!(Kind::Bool.parse("perhaps"), None);
+    }
+
+    #[test]
+    fn reload_applies_a_temp_file_to_a_registry() {
+        // The file→atomics path end-to-end, without touching the global
+        // registry or the process environment: read the temp file with the same
+        // reader `reload_now` uses, then apply to a local registry.
+        let dir = std::env::temp_dir().join(format!(
+            "elohim-runtime-config-test-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("runtime-config.toml");
+
+        std::fs::write(
+            &path,
+            "# live edit\nELOHIM_OBEY_CARRIED_ELECTION = \"1\"\nPROJECTION_RECONCILE_SECS = 30\n",
+        )
+        .unwrap();
+
+        let reg = Registry::new();
+        reg.publish_boot(Key::ObeyCarriedElection, 0);
+        reg.publish_boot(Key::ProjectionReconcileSecs, 300);
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(reg.apply(&parse(&text)), 2);
+        assert!(reg.get_bool(Key::ObeyCarriedElection));
+        assert_eq!(reg.get(Key::ProjectionReconcileSecs), 30);
+
+        // Operator edits the file again — the flip is observable with no restart.
+        std::fs::write(&path, "PROJECTION_RECONCILE_SECS = 300\n").unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(reg.apply(&parse(&text)), 2, "flag reverted + cadence moved");
+        assert!(!reg.get_bool(Key::ObeyCarriedElection));
+        assert_eq!(
+            reg.get(Key::ObeyCarriedElection),
+            reg.boot(Key::ObeyCarriedElection)
+        );
+        assert_eq!(reg.get(Key::ProjectionReconcileSecs), 300);
+        assert_eq!(
+            reg.provenance(Key::ProjectionReconcileSecs),
+            Provenance::RuntimeConfig,
+            "naming the boot value in the file is still runtime-config provenance"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_running_reconcile_loop_refuses_a_runtime_zero_cadence() {
+        // Guards the one caveat the admin surface advertises: 0 means DISABLED,
+        // and a cadence knob may not stop a loop that is already running.
+        let reg = Registry::new();
+        reg.publish_boot(Key::ProjectionReconcileSecs, 300);
+        reg.apply(&parse("PROJECTION_RECONCILE_SECS = 0\n"));
+        assert_eq!(reg.get(Key::ProjectionReconcileSecs), 0);
+
+        // The clamp itself is pure over the registry value; assert its rule
+        // directly so this holds regardless of the global registry's state.
+        let running = |want: u64, boot: u64| if want == 0 { boot } else { want };
+        assert_eq!(running(reg.get(Key::ProjectionReconcileSecs), 300), 300);
+        assert_eq!(running(30, 300), 30);
+    }
+
+    #[test]
+    fn disabled_watcher_reload_is_an_honest_noop() {
+        // With no path configured, a forced reload reverts nothing and reports
+        // no path — it must never be read as "the file removed every override".
+        if config_path().is_none() {
+            let outcome = reload_now();
+            assert!(outcome.path.is_none());
+            assert!(!outcome.file_present);
+            assert_eq!(outcome.changed, 0);
+            assert!(outcome.error.is_none());
+        }
+    }
+
+    // ─── rewrite_key_line (the operator-seat write) ──────────────────────────
+
+    const CH: &str = "ELOHIM_RELEASE_CHANNELS";
+
+    #[test]
+    fn rewrite_replaces_the_key_line_in_place_and_touches_nothing_else() {
+        let text = "# operator note\n\
+                    [adoption]\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"old=observe\"\n\
+                    ELOHIM_OBEY_CARRIED_ELECTION = \"1\"\n";
+        let out = rewrite_key_line(text, CH, Some("new=canary"));
+        assert_eq!(
+            out,
+            "# operator note\n\
+             [adoption]\n\
+             CONTEST_BACKOFF_SECONDS = 600\n\
+             ELOHIM_RELEASE_CHANNELS = \"new=canary\"\n\
+             ELOHIM_OBEY_CARRIED_ELECTION = \"1\"\n",
+            "the key's line is replaced IN PLACE; every other line survives verbatim"
+        );
+    }
+
+    #[test]
+    fn rewrite_appends_an_absent_key_without_fusing_onto_an_unterminated_line() {
+        // No trailing newline on the last line — the append must not fuse.
+        let out = rewrite_key_line("CONTEST_BACKOFF_SECONDS = 600", CH, Some("a=observe"));
+        assert_eq!(
+            out,
+            "CONTEST_BACKOFF_SECONDS = 600\nELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"
+        );
+        // …and an empty file simply becomes the one line.
+        assert_eq!(
+            rewrite_key_line("", CH, Some("a=observe")),
+            "ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"
+        );
+    }
+
+    #[test]
+    fn rewrite_collapses_duplicate_declarations_to_exactly_one() {
+        // An accreted hand-edit: the key named twice. `parse` resolves that
+        // last-wins silently; leaving the loser behind would make the file lie
+        // about what the node is doing.
+        let text = "ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"b=apply\"\n";
+        let out = rewrite_key_line(text, CH, Some("c=canary"));
+        assert_eq!(
+            out,
+            "ELOHIM_RELEASE_CHANNELS = \"c=canary\"\nCONTEST_BACKOFF_SECONDS = 600\n"
+        );
+        assert_eq!(out.matches(CH).count(), 1);
+    }
+
+    #[test]
+    fn rewrite_removes_every_declaration_when_the_value_is_none() {
+        let text = "# keep me\n\
+                    ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n\
+                    CONTEST_BACKOFF_SECONDS = 600\n\
+                    ELOHIM_RELEASE_CHANNELS = \"b=apply\"\n";
+        let out = rewrite_key_line(text, CH, None);
+        assert_eq!(out, "# keep me\nCONTEST_BACKOFF_SECONDS = 600\n");
+        // Removing an ABSENT key is a no-op, not an error.
+        assert_eq!(rewrite_key_line(&out, CH, None), out);
+        // Removing the only line leaves an empty file, not a stray newline.
+        assert_eq!(
+            rewrite_key_line("ELOHIM_RELEASE_CHANNELS = \"a\"\n", CH, None),
+            ""
+        );
+    }
+
+    #[test]
+    fn rewrite_never_matches_a_comment_a_section_or_a_key_that_merely_contains_the_name() {
+        let text = "# ELOHIM_RELEASE_CHANNELS = \"commented out\"\n\
+                    [ELOHIM_RELEASE_CHANNELS]\n\
+                    ELOHIM_RELEASE_CHANNELS_EXTRA = \"not the key\"\n\
+                    PREFIX_ELOHIM_RELEASE_CHANNELS = \"nor this\"\n";
+        let out = rewrite_key_line(text, CH, Some("a=observe"));
+        assert_eq!(
+            out,
+            format!("{text}ELOHIM_RELEASE_CHANNELS = \"a=observe\"\n"),
+            "only an exact KEY = … declaration is the target; everything else is carried through"
+        );
+    }
+
+    #[test]
+    fn rewrite_round_trips_through_parse() {
+        let out = rewrite_key_line("# note\n", CH, Some("runtime:coordinators:elohim:x=canary"));
+        assert_eq!(
+            parse(&out).get(CH).map(String::as_str),
+            Some("runtime:coordinators:elohim:x=canary"),
+            "what the writer emits is exactly what the reader reads back"
+        );
+    }
+
+    #[test]
+    fn set_watched_key_refuses_when_no_file_is_watched() {
+        // Guard, not a filesystem test: with the watcher off there is nothing to
+        // edit, and a silent success would write to a path nothing reads.
+        if config_path().is_none() {
+            assert!(matches!(
+                set_watched_key(CH, Some("a=observe")),
+                Err(SetKeyError::NotWatched)
+            ));
+        }
+    }
+
+    // ─── the runtime half of the boot assertion ──────────────────────────────
+
+    #[test]
+    fn a_fresh_registry_reports_every_publisher_backed_setting_unpublished() {
+        // The state a node would boot into if `main` published nothing at all.
+        // Everything with a boot publisher must be named; everything declared
+        // `unpublished_by_design` must NOT be, or the assertion cries wolf at
+        // every boot and gets suppressed.
+        let reg = Registry::new();
+        let missing = reg.unpublished_boot_settings();
+        let expected: Vec<&'static str> = SPECS
+            .iter()
+            .filter(|spec| spec.unpublished_by_design.is_none())
+            .map(|spec| spec.name)
+            .collect();
+        assert_eq!(missing, expected);
+        assert!(
+            !missing.is_empty(),
+            "if no setting expects a boot publisher, this assertion is dead weight"
+        );
+        for spec in SPECS.iter().filter(|s| s.unpublished_by_design.is_some()) {
+            assert!(
+                !missing.contains(&spec.name),
+                "{} is declared unpublished-by-design and must never be reported",
+                spec.name
+            );
+        }
+    }
+
+    #[test]
+    fn publishing_every_expected_setting_clears_the_assertion() {
+        let reg = Registry::new();
+        for key in Key::ALL {
+            if SPECS[key.index()].unpublished_by_design.is_none() {
+                reg.publish_boot(key, SPECS[key.index()].default);
+            }
+        }
+        assert!(reg.unpublished_boot_settings().is_empty());
+    }
+
+    #[test]
+    fn one_missed_publisher_is_named_and_the_others_are_not() {
+        // The 2026-09-19 shape exactly: every publisher but one has a call
+        // site, and the orphan rides its default while reading `boot-env`.
+        let reg = Registry::new();
+        let orphan = Key::ReanchorHeldBackoffSeconds;
+        for key in Key::ALL {
+            if key != orphan && SPECS[key.index()].unpublished_by_design.is_none() {
+                reg.publish_boot(key, 1);
+            }
+        }
+        assert_eq!(
+            reg.unpublished_boot_settings(),
+            vec![SPECS[orphan.index()].name]
+        );
+    }
+
+    #[test]
+    fn publication_is_not_inferable_from_provenance() {
+        // Why the flag exists at all: an unpublished setting and a published
+        // one are INDISTINGUISHABLE through provenance, which is why the
+        // silent default could ship.
+        let reg = Registry::new();
+        let published = Key::ContestBackoffSeconds;
+        reg.publish_boot(published, SPECS[published.index()].default);
+        let untouched = Key::HealMissingBackoffSeconds;
+
+        assert_eq!(reg.provenance(published), Provenance::BootEnv);
+        assert_eq!(reg.provenance(untouched), Provenance::BootEnv);
+        assert!(reg.published(published));
+        assert!(!reg.published(untouched));
+    }
+
+    #[test]
+    fn a_runtime_override_does_not_count_as_a_boot_publication() {
+        // The watched file moving a value must never satisfy the boot
+        // assertion — a file override on top of an unpublished key is still an
+        // ignored env var, just a less visible one.
+        let reg = Registry::new();
+        reg.apply(&parse("CONTEST_BACKOFF_SECONDS = 60\n"));
+        assert_eq!(reg.get(Key::ContestBackoffSeconds), 60);
+        assert_eq!(
+            reg.provenance(Key::ContestBackoffSeconds),
+            Provenance::RuntimeConfig
+        );
+        assert!(!reg.published(Key::ContestBackoffSeconds));
+        assert!(reg
+            .unpublished_boot_settings()
+            .contains(&SPECS[Key::ContestBackoffSeconds.index()].name));
+    }
+
+    #[test]
+    fn every_unpublished_by_design_declaration_carries_a_reason() {
+        // The escape hatch is a documented decision, not a blank opt-out.
+        for spec in SPECS.iter() {
+            if let Some(reason) = spec.unpublished_by_design {
+                assert!(
+                    reason.len() > 30,
+                    "{} opts out of the boot assertion with no real reason",
+                    spec.name
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn report_json_names_every_setting_and_its_provenance() {
+        let body = report_json();
+        let settings = body["settings"].as_array().expect("settings array");
+        assert_eq!(settings.len(), SPECS.len());
+        for (entry, spec) in settings.iter().zip(SPECS.iter()) {
+            assert_eq!(entry["name"], spec.name);
+            assert_eq!(entry["hotReloadable"], true);
+            let prov = entry["provenance"].as_str().unwrap();
+            assert!(prov == "boot-env" || prov == "runtime-config");
+        }
+        let boot_only = body["bootOnly"].as_array().expect("bootOnly array");
+        assert_eq!(boot_only.len(), BOOT_ONLY.len());
+        assert!(boot_only
+            .iter()
+            .all(|f| f["hotReloadable"] == false && !f["reason"].as_str().unwrap().is_empty()));
+        assert_eq!(body["watcher"]["pathEnv"], PATH_ENV);
+        assert_eq!(body["watcher"]["pollSecs"], POLL_INTERVAL_SECS);
+    }
+}

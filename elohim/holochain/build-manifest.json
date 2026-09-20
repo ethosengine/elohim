@@ -63,6 +63,7 @@
           "elohim/sdk/**",
           "elohim/epr/**",
           "elohim/elohim-error/**",
+          "elohim/elohim-settings/**",
           "elohim/elohim-views/**",
           "elohim/elohim-facings/**",
           "elohim/elohim-peer-fabric/**",
@@ -243,6 +244,24 @@
           "recipe": "gate",
           "cargo": {
             "workspace": "elohim/elohim-error",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      },
+      "elohim-settings": {
+        "dir": "elohim/elohim-settings",
+        "inputs": {
+          "sources": [
+            "elohim/elohim-settings/**"
+          ],
+          "buildProcess": []
+        },
+        "run": {
+          "kind": "just",
+          "recipe": "gate",
+          "cargo": {
+            "workspace": "elohim/elohim-settings",
             "profile": "dev",
             "rustflags": ""
           }
