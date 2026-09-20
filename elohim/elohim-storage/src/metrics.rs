@@ -2240,6 +2240,23 @@ lazy_static! {
     /// Calls refused at the gate. NOT conductor failures — nothing was
     /// dispatched, so these cost the conductor nothing and establish nothing
     /// about the work.
+    /// Every conductor call this process dispatched, by zome, FUNCTION and
+    /// admission class. The hold-time histogram counts calls by zome only, which
+    /// is enough to say a node is busy and not enough to say with what: on
+    /// 2026-09-20 a resting household showed a 159-call `content_store` burst no
+    /// metric or default log could attribute. Cardinality is bounded by the
+    /// zome externs storage calls (a closed set in source), times three classes.
+    /// `class="ungated"` marks round-trips that bypass the admission gate
+    /// (`app_info` liveness probes) — real conductor work the gate cannot see.
+    pub static ref CONDUCTOR_CALLS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_calls_total",
+            "Conductor calls dispatched, by zome, function and admission class.",
+        ),
+        &["zome", "fn", "class"],
+    )
+    .unwrap();
+
     pub static ref CONDUCTOR_ADMISSION_SHED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_conductor_admission_shed_total",
@@ -2875,6 +2892,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_SERIALIZED_WAIT_MS.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_RETRIED.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_EXHAUSTED.clone()));
@@ -3136,6 +3154,15 @@ pub fn inc_head_moved_retried(writer: &str) {
 pub fn inc_head_moved_exhausted(writer: &str) {
     CHAIN_WRITE_HEAD_MOVED_EXHAUSTED
         .with_label_values(&[writer])
+        .inc();
+}
+
+/// Count one conductor call at the moment it is dispatched — after the gate
+/// admitted it (or, for `class = "ungated"`, where no gate applies). This is the
+/// series that lets a runaway name itself: `topk(5, rate(...[5m]))` by `fn`.
+pub fn inc_conductor_call(zome: &str, fn_name: &str, class: &str) {
+    CONDUCTOR_CALLS
+        .with_label_values(&[zome, fn_name, class])
         .inc();
 }
 

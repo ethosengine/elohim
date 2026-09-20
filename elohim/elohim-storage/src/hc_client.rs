@@ -283,6 +283,23 @@ pub struct HcClient {
     signer: Arc<ClientAgentSigner>,
 }
 
+/// The one door to the admission gate for a zome call: acquire the permit, then
+/// count the call by zome, FUNCTION and class. Every `call_zome` path goes
+/// through here so a dispatched call cannot escape attribution — the gate's own
+/// series are keyed by zome only, which says a node is busy but not with what.
+/// A shed returns before the count: nothing was dispatched.
+async fn admit(
+    class: AdmissionClass,
+    zome_name: &str,
+    fn_name: &str,
+) -> Result<crate::conductor_admission::AdmissionPermit, StorageError> {
+    let permit = crate::conductor_admission::admission()
+        .acquire(class, zome_name)
+        .await?;
+    crate::metrics::inc_conductor_call(zome_name, fn_name, class.label());
+    Ok(permit)
+}
+
 impl HcClient {
     /// This client's configured role, for keying the per-role zome-path
     /// observer (see [`crate::conductor_bridge_health::RoleBridgeHealth`]).
@@ -559,9 +576,7 @@ impl HcClient {
                     // Same gate, same pool: a different DNA on the same
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
-                    let _permit = crate::conductor_admission::admission()
-                        .acquire(AdmissionClass::Interactive, zome_name)
-                        .await?;
+                    let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
                     self.app_ws
                         .call_zome(
                             ZomeCallTarget::CellId(target),
@@ -619,9 +634,7 @@ impl HcClient {
                     // Same gate, same pool: a different DNA on the same
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
-                    let _permit = crate::conductor_admission::admission()
-                        .acquire(AdmissionClass::Interactive, zome_name)
-                        .await?;
+                    let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
                     self.app_ws
                         .call_zome(
                             ZomeCallTarget::CellId(target),
@@ -710,10 +723,7 @@ impl HcClient {
             let payload = payload.clone();
             let target = self.cell_id.clone();
             async move {
-                let permit = match crate::conductor_admission::admission()
-                    .acquire(class, zome_name)
-                    .await
-                {
+                let permit = match admit(class, zome_name, fn_name).await {
                     Ok(permit) => permit,
                     Err(error) => {
                         if is_head_record {
@@ -1266,6 +1276,9 @@ impl HcClient {
         // traffic this is the only evidence there is — and a node with no
         // traffic is exactly the reported shape: the bridge died at a conductor
         // restart and nothing asked it a question until a person did, 90s later.
+        // Not admission-gated (it must answer even when the pool is full), but
+        // it IS a conductor round-trip — counted so the cost is visible.
+        crate::metrics::inc_conductor_call("-", "app_info", "ungated");
         match self.app_ws.app_info().await {
             Ok(_) => {
                 record_role_success(self.role_key());
@@ -1383,5 +1396,40 @@ mod cell_owner_tests {
         let stub = StubOwner("uhCAkSTUB".to_string());
         let dyn_owner: &dyn CellOwner = &stub;
         assert_eq!(dyn_owner.agent_key_hex(), "uhCAkSTUB");
+    }
+}
+
+#[cfg(test)]
+mod attribution_tests {
+    /// Every zome call must be attributable to a function. `admit` is the one
+    /// place that both takes a permit and counts the call; a second direct
+    /// permit acquisition in this file is a call path the per-function series cannot
+    /// see — the blind spot that left a resting node's largest burst unnamed.
+    #[test]
+    fn every_zome_call_is_admitted_through_the_counting_door() {
+        let source = include_str!("hc_client.rs");
+        let needle = [".acq", "uire("].concat();
+        let direct = source.matches(needle.as_str()).count();
+        assert_eq!(
+            direct, 1,
+            "hc_client.rs takes an admission permit in {direct} places; only `admit` may, \
+             so every dispatched call is counted by zome, fn and class"
+        );
+    }
+
+    #[test]
+    fn a_dispatched_call_is_counted_by_zome_function_and_class() {
+        let series = crate::metrics::CONDUCTOR_CALLS.with_label_values(&[
+            "attribution_test_zome",
+            "attribution_test_fn",
+            "background",
+        ]);
+        let before = series.get();
+        crate::metrics::inc_conductor_call(
+            "attribution_test_zome",
+            "attribution_test_fn",
+            "background",
+        );
+        assert_eq!(series.get(), before + 1);
     }
 }

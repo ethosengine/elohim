@@ -13,16 +13,20 @@
  * sweep re-probing the same dead candidates forever. None of it was visible
  * until a person read the logs.
  */
-import { Given, When, Then } from '@cucumber/cucumber';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
+
+import { Given, When, Then } from '@cucumber/cucumber';
+
 import { getRaw } from '../../src/framework/dataplane/surfaces.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 interface PeerReading {
   admitted: number;
   shed: number;
+  /** Dispatched conductor calls keyed `zome::fn (class)` — who is asking, not just how much. */
+  callers: Map<string, number>;
 }
 
 interface RestReading {
@@ -61,6 +65,31 @@ function sumSeries(exposition: string, family: string): number {
   return total;
 }
 
+/** Every sample of `elohim_conductor_calls_total`, keyed by its zome, function and class labels. */
+function callersOf(exposition: string): Map<string, number> {
+  const callers = new Map<string, number>();
+  for (const line of exposition.split('\n')) {
+    if (!line.startsWith('elohim_conductor_calls_total{')) continue;
+    const label = (name: string): string => new RegExp(`${name}="([^"]*)"`).exec(line)?.[1] ?? '?';
+    const value = Number(line.slice(line.lastIndexOf(' ') + 1));
+    if (Number.isFinite(value))
+      callers.set(`${label('zome')}::${label('fn')} (${label('class')})`, value);
+  }
+  return callers;
+}
+
+/** The busiest callers between two readings of one peer, as `name ×count`, busiest first. */
+function topCallers(before: PeerReading | undefined, after: PeerReading, limit = 5): string {
+  const deltas = [...after.callers]
+    .map(([name, value]) => [name, value - (before?.callers.get(name) ?? 0)] as const)
+    .filter(([, delta]) => delta > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit);
+  return deltas.length > 0
+    ? deltas.map(([name, delta]) => `${name} ×${delta}`).join(', ')
+    : 'no per-function series on this peer (binary predates elohim_conductor_calls_total)';
+}
+
 async function readPeer(url: string): Promise<PeerReading> {
   // The framework's bounded GET, not global fetch: the harness owns HTTP.
   const { status, text } = await getRaw(`${url}/metrics`, { timeoutMs: 10_000 });
@@ -69,12 +98,13 @@ async function readPeer(url: string): Promise<PeerReading> {
     // Every conductor call passes the admission gate; a released permit is a call that was made.
     admitted: sumSeries(text, 'elohim_conductor_admission_hold_ms_count'),
     shed: sumSeries(text, 'elohim_conductor_admission_shed_total'),
+    callers: callersOf(text),
   };
 }
 
 /** Total user+system CPU seconds of every running holochain conductor on this host. */
 function conductorCpuSeconds(): number {
-  const ticksPerSecond = Number(execSync('getconf CLK_TCK').toString().trim()) || 100;
+  const ticksPerSecond = Number(execSync('/usr/bin/getconf CLK_TCK').toString().trim()) || 100;
   let ticks = 0;
   for (const entry of readdirSync('/proc')) {
     if (!/^\d+$/.test(entry)) continue;
@@ -158,8 +188,17 @@ Then(
     const { before, after } = readings(this);
     const over: string[] = [];
     for (const [name, reading] of after.peers) {
-      const rate = perMinute(reading.admitted - (before.peers.get(name)?.admitted ?? 0), before, after);
-      if (rate > budget) over.push(`${name}: ${rate.toFixed(1)}/min`);
+      const rate = perMinute(
+        reading.admitted - (before.peers.get(name)?.admitted ?? 0),
+        before,
+        after
+      );
+      // A count alone sends a person to the logs; name the callers so the runaway names itself.
+      if (rate > budget) {
+        over.push(
+          `${name}: ${rate.toFixed(1)}/min — ${topCallers(before.peers.get(name), reading)}`
+        );
+      }
     }
     assert.deepEqual(over, [], `at rest, over the ${budget} calls/min budget — ${over.join(', ')}`);
   }
@@ -172,7 +211,11 @@ Then('no storage peer was refused a conductor permit', function (this: E2EWorld)
     const delta = reading.shed - (before.peers.get(name)?.shed ?? 0);
     if (delta > 0) refused.push(`${name}: ${delta}`);
   }
-  assert.deepEqual(refused, [], `conductor permits refused while nothing was happening — ${refused.join(', ')}`);
+  assert.deepEqual(
+    refused,
+    [],
+    `conductor permits refused while nothing was happening — ${refused.join(', ')}`
+  );
 });
 
 Then(
