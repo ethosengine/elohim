@@ -24,6 +24,8 @@
 //! - **ServeEligibility**: the reach + standing terms of the serving fold,
 //!   re-asked at serve time on every cached path (Category C, Operational —
 //!   nothing is stored, the fold is resolved from the live projection)
+//! - **SigningCredentials**: process-lifetime reuse of the doorway's own
+//!   conductor signing credentials, so a reconnect authors no new `CapGrant`
 //! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
 pub mod custodian;
@@ -44,6 +46,7 @@ pub mod self_uptime;
 pub mod serve_eligibility;
 pub mod serve_receipt;
 pub mod shard_resolver;
+pub mod signing_credentials;
 pub mod storage_registration;
 pub mod verification;
 pub mod zome_caller;

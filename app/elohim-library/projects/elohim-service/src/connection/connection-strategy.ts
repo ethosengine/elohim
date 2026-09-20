@@ -310,4 +310,32 @@ export interface IConnectionStrategy {
    * Get current signing credentials (if connected).
    */
   getSigningCredentials(): SigningCredentials | null;
+
+  // ==========================================================================
+  // Device signing credential (chaperone only)
+  // ==========================================================================
+
+  /**
+   * The conductor no longer honours this device's signing credential —
+   * discard it and reconnect ONCE with a fresh keypair.
+   *
+   * Call from the zome-call error path when the failure is cap-grant-shaped
+   * (`looksLikeCapGrantRejection`). Resolves to `null` when this strategy
+   * instance has already healed once, in which case the caller must surface the
+   * error: a second rejection is not a stale credential, and an unbounded heal
+   * would re-create the per-page-load capability minting the persisted
+   * credential exists to remove.
+   *
+   * Optional: only the doorway/chaperone strategy holds a persisted device
+   * credential. A native or Tauri strategy has nothing to heal.
+   */
+  healSigningCredentials?(config: ConnectionConfig): Promise<ConnectionResult | null>;
+
+  /**
+   * Forget this device's persisted signing credential. Call on EXPLICIT
+   * sign-out; the next sign-in mints a fresh key and is granted once.
+   *
+   * Optional, for the same reason as {@link healSigningCredentials}.
+   */
+  clearPersistedSigningCredentials?(): void;
 }

@@ -33,9 +33,23 @@
 //!    grants a cap on *that* conductor's cells for *that* conductor's agent; a
 //!    credential from the primary is meaningless on a fallback. So every
 //!    endpoint is connected through the one shared [`connect_endpoint`] routine,
-//!    which builds a FRESH `ClientAgentSigner` and authorizes against that
-//!    endpoint's OWN admin interface. There is no shared signer on `ZomeCaller`
-//!    — that absence is load-bearing, not incidental.
+//!    which authorizes against that endpoint's OWN admin interface. There is
+//!    still no signer field on `ZomeCaller` — that absence is load-bearing, not
+//!    incidental: a signer reachable from the caller is a signer that can be
+//!    reused across endpoints, which is the bug this invariant forbids.
+//!
+//!    What changed (2026-09-20): the per-connection signer is no longer FRESH.
+//!    `authorize_signing_credentials` COMMITS a `CapGrant`, nothing revokes
+//!    one, and the conductor re-reads every grant on every zome call — so a
+//!    fresh signer per connect made reconnect churn (lines below) an unbounded
+//!    minter on exactly the two peers the public doorways front. Credentials
+//!    now come from
+//!    [`crate::services::signing_credentials`], a process-lifetime cache keyed
+//!    by (conductor admin address, installed app id) → per-cell credentials.
+//!    The per-conductor invariant is PRESERVED by that key: nothing is ever
+//!    shared across endpoints, and a fallback still authorizes on its own admin
+//!    interface the first time it is used. Nothing is written to disk; a
+//!    restart re-mints once per cell.
 //!
 //! ## What may fail over, and what may NOT
 //!
@@ -53,13 +67,16 @@
 //! first answering what a second author does to that entry's validation.
 
 use holochain_client::{
-    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ClientAgentSigner,
-    ConductorApiError, ZomeCallTarget,
+    AdminWebsocket, AppWebsocket, AuthorizeSigningCredentialsPayload, ConductorApiError,
+    ZomeCallTarget,
 };
 use holochain_types::prelude::ExternIO;
+
+use crate::services::signing_credentials::{
+    cache as credential_cache, endpoint_key, looks_like_a_rejected_cap_grant, CredentialDecision,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
@@ -546,6 +563,12 @@ impl ZomeCaller {
                     );
                     let mut ws = self.app_ws.write().await;
                     *ws = None;
+                } else if self.heal_if_cap_grant_rejected(&self.primary, role_name, &e.message) {
+                    // The one sanctioned clear on an application error — see
+                    // `heal_if_cap_grant_rejected`. Bounded to once per
+                    // (conductor, role) per process, so it cannot churn.
+                    let mut ws = self.app_ws.write().await;
+                    *ws = None;
                 } else {
                     warn!(
                         role_name = %role_name,
@@ -690,7 +713,20 @@ impl ZomeCaller {
                     );
                     return Ok(bytes);
                 }
-                Err(e) if e.class == CallFailureClass::Application => return Err(e),
+                Err(e) if e.class == CallFailureClass::Application => {
+                    // Same bounded heal as the primary path: a cap-grant-shaped
+                    // refusal on a fallback drops THAT fallback's socket once so
+                    // the next use re-mints on ITS own admin interface. The
+                    // error still surfaces — we never retry here.
+                    if self.heal_if_cap_grant_rejected(&self.fallbacks[idx], role_name, &e.message)
+                    {
+                        let mut ws = self.fallback_ws.write().await;
+                        if matches!(ws.as_ref(), Some((i, _)) if *i == idx) {
+                            *ws = None;
+                        }
+                    }
+                    return Err(e);
+                }
                 Err(e) => {
                     warn!(
                         conductor = %self.fallbacks[idx].app_addr,
@@ -737,6 +773,54 @@ impl ZomeCaller {
                 "Primary conductor healthy again, clearing availability cooldown"
             );
             *guard = None;
+        }
+    }
+
+    /// A zome call was refused. If the refusal is CAP-GRANT-SHAPED, ask the
+    /// process credential cache for exactly ONE replacement credential for this
+    /// (conductor, role), and report whether the socket must be dropped so the
+    /// next call reconnects and re-mints.
+    ///
+    /// # Why this is the one sanctioned exception to "application errors keep
+    /// the connection"
+    ///
+    /// The churn fix (2026-06-13 iteration 3) says a conductor that ANSWERED
+    /// has a healthy socket, so an application error must not clear it. An
+    /// unauthorized answer is an application error by that rule — and it is
+    /// also the ONLY place a vanished `CapGrant` can be observed (a conductor
+    /// reinstalled, or a database restored from an older snapshot under the
+    /// same `CellId`; the cached credential parses fine and reuse looks correct
+    /// right up to the call). So this arm clears the socket — but only when the
+    /// cache ACCEPTS the heal, which it does at most once per (conductor, role)
+    /// per process. A second rejection returns `false`, the socket is kept, and
+    /// the error surfaces unchanged. Bounded by construction: it cannot loop,
+    /// and it cannot re-create the per-connect minting it exists to replace.
+    fn heal_if_cap_grant_rejected(
+        &self,
+        endpoint: &ConductorEndpoint,
+        role_name: &str,
+        message: &str,
+    ) -> bool {
+        if !looks_like_a_rejected_cap_grant(message) {
+            return false;
+        }
+        let key = endpoint_key(&endpoint.admin_addr, &self.installed_app_id);
+        if credential_cache().mark_for_remint(&key, role_name) {
+            warn!(
+                conductor = %endpoint.admin_addr,
+                role_name = %role_name,
+                "Conductor rejected our cached signing credentials — discarding them ONCE so \
+                 the next connect mints a fresh grant: {message}"
+            );
+            true
+        } else {
+            warn!(
+                conductor = %endpoint.admin_addr,
+                role_name = %role_name,
+                "Conductor rejected our signing credentials AGAIN for this role — not \
+                 re-minting; the fault is not a stale credential: {message}"
+            );
+            false
         }
     }
 
@@ -844,35 +928,69 @@ async fn connect_endpoint(
         .find(|a| a.installed_app_id == installed_app_id)
         .ok_or_else(|| format!("App '{installed_app_id}' not found"))?;
 
-    // Step 3: Authorize signing credentials for ALL provisioned cells OF THIS
-    // CONDUCTOR. A fresh signer per connection — never shared across endpoints.
-    let signer = ClientAgentSigner::default();
+    // Step 3: Signing credentials for ALL provisioned cells OF THIS CONDUCTOR.
+    //
+    // REUSE FIRST, MINT ONLY WHAT IS MISSING. `authorize_signing_credentials`
+    // is a chain write: it commits a `CapGrant` that is never revoked and that
+    // the conductor re-reads on every subsequent zome call. Authorizing every
+    // cell on every connect made reconnect churn an unbounded minter. The
+    // process cache holds one signer per (conductor, app) — the same
+    // `ClientAgentSigner` a previous connect populated — so a reconnect
+    // authorizes NOTHING, and a genuinely new cell authorizes exactly once.
+    let ep_key = endpoint_key(&endpoint.admin_addr, installed_app_id);
+    let signer = credential_cache().signer_for(&ep_key);
     let mut cell_count = 0u32;
+    let mut minted = 0u32;
+    let mut reused = 0u32;
 
     for (role_name, cells) in &app_info.cell_info {
         for cell in cells {
             if let holochain_client::CellInfo::Provisioned(p) = cell {
-                let credentials = tokio::time::timeout(
-                    deadline,
-                    admin_ws.authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                        cell_id: p.cell_id.clone(),
-                        functions: None,
-                    }),
-                )
-                .await
-                .map_err(|_| {
-                    format!(
-                        "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
-                        deadline.as_millis()
-                    )
-                })?
-                .map_err(|e| {
-                    format!("authorize_signing_credentials failed for role '{role_name}': {e}")
-                })?;
+                // SERIALIZE THIS CELL'S MINT. `decide` … authorize …
+                // `add_credentials` straddles a conductor round trip, and two
+                // connects to one endpoint genuinely overlap (a primary connect
+                // racing the half-open re-probe, startup fan-out, or two
+                // provisions of one hosted app). The lease makes the trio atomic
+                // per cell; the second connect waits, re-decides, and sees
+                // `Reuse`. Distinct cells and conductors never contend. `None`
+                // = the holder outlived the deadline, so we behave exactly as
+                // before the lease existed.
+                let _cell_lease = credential_cache().lease(&ep_key, role_name, deadline).await;
 
-                signer.add_credentials(p.cell_id.clone(), credentials);
+                match credential_cache().decide(&signer, &ep_key, role_name, &p.cell_id) {
+                    CredentialDecision::Reuse => {
+                        reused += 1;
+                        debug!(role = %role_name, "Reusing cached signing credentials (no CapGrant authored)");
+                    }
+                    CredentialDecision::Mint => {
+                        let credentials = tokio::time::timeout(
+                            deadline,
+                            admin_ws.authorize_signing_credentials(
+                                AuthorizeSigningCredentialsPayload {
+                                    cell_id: p.cell_id.clone(),
+                                    functions: None,
+                                },
+                            ),
+                        )
+                        .await
+                        .map_err(|_| {
+                            format!(
+                                "authorize_signing_credentials timed out after {}ms for role '{role_name}'",
+                                deadline.as_millis()
+                            )
+                        })?
+                        .map_err(|e| {
+                            format!(
+                                "authorize_signing_credentials failed for role '{role_name}': {e}"
+                            )
+                        })?;
+
+                        signer.add_credentials(p.cell_id.clone(), credentials);
+                        minted += 1;
+                        info!(role = %role_name, "Authorized signing for cell (one CapGrant authored)");
+                    }
+                }
                 cell_count += 1;
-                debug!(role = %role_name, "Authorized signing for cell");
             }
         }
     }
@@ -885,7 +1003,9 @@ async fn connect_endpoint(
         app_id = %installed_app_id,
         conductor = %endpoint.admin_addr,
         cells = cell_count,
-        "Signing credentials authorized for all cells"
+        minted,
+        reused,
+        "Signing credentials ready"
     );
 
     // Step 4: Issue app auth token
@@ -906,12 +1026,15 @@ async fn connect_endpoint(
     })?
     .map_err(|e| format!("issue_app_auth_token failed: {e}"))?;
 
-    // Step 5: Connect AppWebsocket with signer
-    let signer_arc: Arc<ClientAgentSigner> = Arc::new(signer);
+    // Step 5: Connect AppWebsocket with the cached signer.
+    //
+    // `ClientAgentSigner` is internally `Arc<RwLock<HashMap<CellId, _>>>`, so
+    // handing the SAME signer to a second socket for the same conductor is
+    // safe and is precisely what makes a reconnect free.
     let app_socket = crate::conductor::resolve_host_port(&endpoint.app_addr).await?;
     let app_ws = tokio::time::timeout(
         deadline,
-        AppWebsocket::connect(app_socket, token.token, signer_arc, None),
+        AppWebsocket::connect(app_socket, token.token, signer, None),
     )
     .await
     .map_err(|_| {
@@ -1448,6 +1571,109 @@ mod tests {
             "one sick primary must not be re-tried on every subsequent request — \
              that is what kept GET /api/v1/federation/doorways dead for 5.5h"
         );
+    }
+
+    // ── cap-grant minting is bounded (2026-09-20) ──────────────────────────
+
+    /// THE INVARIANT this module's credential reuse exists for: a reconnect to
+    /// the SAME conductor must author no new `CapGrant`.
+    ///
+    /// `connect_endpoint` needs a live conductor, so this pins the layer the
+    /// decision actually lives in: the process cache hands back the same signer
+    /// for the same (conductor, app) key, and an already-credentialed cell
+    /// decides `Reuse` — the branch that skips
+    /// `authorize_signing_credentials` entirely.
+    #[test]
+    fn a_reconnect_to_the_same_conductor_reuses_one_signer() {
+        use crate::services::signing_credentials::{
+            cache as credential_cache, endpoint_key, SigningCredentialCache,
+        };
+
+        // The live path: the process cache, keyed exactly as connect_endpoint keys it.
+        let key = endpoint_key("elohim-adam-alpha:4444", "elohim");
+        let first = credential_cache().signer_for(&key);
+        let second = credential_cache().signer_for(&key);
+        assert!(
+            std::sync::Arc::ptr_eq(&first, &second),
+            "the second connect must reuse the first connect's credentials — a fresh \
+             signer here is a fresh CapGrant per cell, on a chain nothing prunes"
+        );
+
+        // An untouched cell of a fresh cache is the only thing that mints.
+        let fresh = SigningCredentialCache::new();
+        let signer = fresh.signer_for(&key);
+        assert_eq!(
+            fresh.decide(&signer, &key, "infrastructure", &test_cell(7)),
+            crate::services::signing_credentials::CredentialDecision::Mint
+        );
+    }
+
+    fn test_cell(seed: u8) -> holochain_client::CellId {
+        use holo_hash::DnaHash;
+        use holochain_client::AgentPubKey;
+        holochain_client::CellId::new(
+            DnaHash::from_raw_36(vec![seed; 36]),
+            AgentPubKey::from_raw_36(vec![seed.wrapping_add(1); 36]),
+        )
+    }
+
+    /// HEAL ONCE, THEN SURFACE. A cap-grant-shaped refusal buys exactly one
+    /// replacement credential for that (conductor, role); the next one does not,
+    /// so the error reaches the caller instead of minting again. Never a loop.
+    #[test]
+    fn a_cap_grant_rejection_heals_once_then_surfaces() {
+        // A unique admin address so this test cannot collide with another test
+        // in the same process over the shared cache.
+        let caller = ZomeCaller::new(
+            "ws://heal-once-test:4444",
+            "ws://heal-once-test:4445",
+            "elohim-heal-once-test",
+        );
+        let endpoint =
+            ConductorEndpoint::new("ws://heal-once-test:4444", "ws://heal-once-test:4445");
+
+        assert!(
+            caller.heal_if_cap_grant_rejected(
+                &endpoint,
+                "infrastructure",
+                "Zome call failed: Unauthorized"
+            ),
+            "the first cap-grant rejection must discard the cached credential once"
+        );
+        for _ in 0..5 {
+            assert!(
+                !caller.heal_if_cap_grant_rejected(
+                    &endpoint,
+                    "infrastructure",
+                    "Zome call failed: Unauthorized"
+                ),
+                "a repeated rejection must NOT mint again — it must surface"
+            );
+        }
+    }
+
+    /// An ordinary application error must never trigger the heal. If it did,
+    /// every validation failure would author a `CapGrant` — the growth this
+    /// change removes, wearing a different hat.
+    #[test]
+    fn an_ordinary_application_error_never_mints() {
+        let caller = ZomeCaller::new(
+            "ws://no-heal-test:4444",
+            "ws://no-heal-test:4445",
+            "elohim-no-heal-test",
+        );
+        let endpoint = ConductorEndpoint::new("ws://no-heal-test:4444", "ws://no-heal-test:4445");
+
+        for message in [
+            "Zome call failed: Zome function find_publishers doesn't exist",
+            "Zome call failed: validation failed",
+            "Zome call timed out after 10000ms",
+        ] {
+            assert!(
+                !caller.heal_if_cap_grant_rejected(&endpoint, "imagodei", message),
+                "must not be read as a stale grant: {message}"
+            );
+        }
     }
 
     /// The load-bearing fix #2 invariant: when every reconnect step hangs (full

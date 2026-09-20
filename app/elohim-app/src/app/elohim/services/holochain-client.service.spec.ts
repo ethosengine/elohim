@@ -6,6 +6,9 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { HolochainClientService } from './holochain-client.service';
 import { provideHttpClient } from '@angular/common/http';
 
+import type { ConnectionResult } from '@elohim/service/connection';
+import type { AppWebsocket, CellId, AgentPubKey } from '@holochain/client';
+
 /**
  * Unit tests for HolochainClientService
  *
@@ -741,5 +744,263 @@ describe('HolochainClientService', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBeTruthy();
     });
+  });
+});
+
+/**
+ * Signing-credential heal-and-retry (callZome only — see
+ * app/elohim-library/projects/elohim-service/src/connection/chaperone-credential-store.ts
+ * for the cure this exercises).
+ *
+ * A separate top-level suite: these tests need a strategy whose `connect()`
+ * and `healSigningCredentials()` are individually controllable per test,
+ * which the shared `mockStrategy` above (a fixed `connect` that always
+ * rejects) does not support.
+ */
+describe('HolochainClientService — signing-credential heal-and-retry', () => {
+  let service: HolochainClientService;
+  let httpMock: HttpTestingController;
+  let strategy: {
+    name: string;
+    mode: 'doorway';
+    isSupported: () => boolean;
+    resolveAdminUrl: () => string;
+    resolveAppUrl: () => string;
+    getBlobStorageUrl: () => string;
+    getStorageBaseUrl: () => string;
+    getContentSources: () => unknown[];
+    connect: Mock;
+    disconnect: () => Promise<void>;
+    isConnected: () => boolean;
+    getSigningCredentials: () => null;
+    healSigningCredentials: Mock;
+  };
+
+  const fakeCellId = [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])] as unknown as CellId;
+  const fakeAgentPubKey = new Uint8Array([9, 9, 9]) as unknown as AgentPubKey;
+
+  /** A successful `ConnectionResult` bound to one fake `appWs`. */
+  function connectedResult(appWs: { callZome: Mock }): ConnectionResult {
+    return {
+      success: true,
+      appWs: appWs as unknown as AppWebsocket,
+      cellIds: new Map([['lamad', fakeCellId]]),
+      agentPubKey: fakeAgentPubKey,
+      appInfo: null,
+    };
+  }
+
+  beforeEach(() => {
+    strategy = {
+      name: 'mock-doorway',
+      mode: 'doorway',
+      isSupported: () => true,
+      resolveAdminUrl: () => 'ws://mock:4444',
+      resolveAppUrl: () => 'ws://mock:4445',
+      getBlobStorageUrl: () => 'http://mock/blob',
+      getStorageBaseUrl: () => 'http://mock',
+      getContentSources: () => [],
+      connect: vi.fn(),
+      disconnect: () => Promise.resolve(),
+      isConnected: () => true,
+      getSigningCredentials: () => null,
+      healSigningCredentials: vi.fn(),
+    };
+
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        HolochainClientService,
+        { provide: CONNECTION_STRATEGY, useValue: strategy },
+      ],
+    });
+    service = TestBed.inject(HolochainClientService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('heals once and retries the same call once on a cap-grant rejection, returning the retry result', async () => {
+    const initialAppWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('Unauthorized: CapGrant not found')),
+    };
+    const healedAppWs = { callZome: vi.fn().mockResolvedValue({ ok: true }) };
+
+    strategy.connect.mockResolvedValueOnce(connectedResult(initialAppWs));
+    strategy.healSigningCredentials.mockResolvedValueOnce(connectedResult(healedAppWs));
+
+    await service.connect();
+
+    const result = await service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'test' },
+    });
+
+    expect(strategy.healSigningCredentials).toHaveBeenCalledTimes(1);
+    expect(initialAppWs.callZome).toHaveBeenCalledTimes(1);
+    expect(healedAppWs.callZome).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ success: true, data: { ok: true } });
+  });
+
+  it('surfaces the original error with no retry when the heal reports it already ran this session', async () => {
+    const initialAppWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('unauthorized: capability revoked')),
+    };
+
+    strategy.connect.mockResolvedValueOnce(connectedResult(initialAppWs));
+    strategy.healSigningCredentials.mockResolvedValueOnce(null);
+
+    await service.connect();
+
+    const result = await service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'test' },
+    });
+
+    expect(strategy.healSigningCredentials).toHaveBeenCalledTimes(1);
+    expect(initialAppWs.callZome).toHaveBeenCalledTimes(1); // no retry attempted
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('unauthorized: capability revoked');
+  });
+
+  it('surfaces the ORIGINAL rejection — never the retry error — when the retry fails too, and never heals a second time', async () => {
+    const initialAppWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('cap secret rejected')),
+    };
+    const healedAppWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('still broken after heal')),
+    };
+
+    strategy.connect.mockResolvedValueOnce(connectedResult(initialAppWs));
+    strategy.healSigningCredentials.mockResolvedValueOnce(connectedResult(healedAppWs));
+
+    await service.connect();
+
+    const result = await service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'test' },
+    });
+
+    expect(strategy.healSigningCredentials).toHaveBeenCalledTimes(1);
+    expect(healedAppWs.callZome).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('cap secret rejected');
+    expect(result.error).not.toContain('still broken after heal');
+  });
+
+  it('never heals on an ordinary (non-cap-grant-shaped) zome error', async () => {
+    const appWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('ValidationError: content not found')),
+    };
+    strategy.connect.mockResolvedValueOnce(connectedResult(appWs));
+
+    await service.connect();
+
+    const result = await service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'test' },
+    });
+
+    expect(strategy.healSigningCredentials).not.toHaveBeenCalled();
+    expect(appWs.callZome).toHaveBeenCalledTimes(1);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('content not found');
+  });
+
+  it('shares ONE heal across two concurrently rejected calls', async () => {
+    const initialAppWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('capability grant missing')),
+    };
+    const healedAppWs = { callZome: vi.fn().mockResolvedValue({ ok: true }) };
+
+    strategy.connect.mockResolvedValueOnce(connectedResult(initialAppWs));
+
+    let resolveHeal!: (value: ConnectionResult | null) => void;
+    strategy.healSigningCredentials.mockImplementationOnce(
+      () =>
+        new Promise<ConnectionResult | null>(resolve => {
+          resolveHeal = resolve;
+        })
+    );
+
+    await service.connect();
+
+    const p1 = service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'first' },
+    });
+    const p2 = service.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'second' },
+    });
+
+    // Let both calls run their rejection path and reach the shared heal
+    // await before resolving it — a macrotask tick drains every pending
+    // microtask ahead of it, so both are guaranteed to have arrived.
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    resolveHeal(connectedResult(healedAppWs));
+
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    expect(strategy.healSigningCredentials).toHaveBeenCalledTimes(1);
+    expect(healedAppWs.callZome).toHaveBeenCalledTimes(2);
+    expect(r1.success).toBe(true);
+    expect(r2.success).toBe(true);
+  });
+
+  it('behaves exactly as before when the strategy has no healSigningCredentials (Direct/Tauri)', async () => {
+    const appWs = {
+      callZome: vi.fn().mockRejectedValue(new Error('Unauthorized: CapGrant not found')),
+    };
+    const directStrategy = {
+      name: 'mock-direct',
+      mode: 'direct' as const,
+      isSupported: () => true,
+      resolveAdminUrl: () => 'ws://localhost:4444',
+      resolveAppUrl: () => 'ws://localhost:4445',
+      getBlobStorageUrl: () => 'http://localhost:8090',
+      getStorageBaseUrl: () => 'http://localhost:8090',
+      getContentSources: () => [],
+      connect: vi.fn().mockResolvedValue(connectedResult(appWs)),
+      disconnect: () => Promise.resolve(),
+      isConnected: () => true,
+      getSigningCredentials: () => null,
+      // No healSigningCredentials — matches DirectConnectionStrategy /
+      // TauriConnectionStrategy today: the interface member is optional.
+    };
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        HolochainClientService,
+        { provide: CONNECTION_STRATEGY, useValue: directStrategy },
+      ],
+    });
+    const directService = TestBed.inject(HolochainClientService);
+    httpMock = TestBed.inject(HttpTestingController);
+
+    await directService.connect();
+
+    const result = await directService.callZome({
+      zomeName: 'content_store',
+      fnName: 'get_content',
+      payload: { id: 'test' },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('CapGrant not found');
+    expect(appWs.callZome).toHaveBeenCalledTimes(1); // no heal, no retry — unchanged behavior
   });
 });

@@ -31,6 +31,8 @@ import {
 } from '@holochain/client';
 import { firstValueFrom } from 'rxjs';
 
+import { looksLikeCapGrantRejection } from '@elohim/service/connection';
+
 import { isWorkspaceRuntime, workspaceDoorwayUrl } from '@workspace/runtime';
 
 import {
@@ -50,7 +52,7 @@ import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 import { LoggerService, type LogTimer } from './logger.service';
 import { PerformanceMetricsService } from './performance-metrics.service';
 
-import type { ConnectionConfig, Logger } from '@elohim/service/connection';
+import type { ConnectionConfig, ConnectionResult, Logger } from '@elohim/service/connection';
 
 const CONNECTION_FAILED = 'Connection failed';
 
@@ -90,6 +92,16 @@ export class HolochainClientService {
 
   /** Track if we're currently attempting to reconnect */
   private isReconnecting = false;
+
+  /**
+   * The single in-flight signing-credential heal, shared across every
+   * concurrently failing zome call. Never one heal per caller — the
+   * strategy's own bound (`healSigningCredentials` returns `null` once it
+   * has already healed this session) is per-instance, but without this
+   * sharing, N calls failing on the same stale credential would each pay a
+   * heal invocation before that bound catches the (N-1) extras.
+   */
+  private healSigningCredentialsPromise: Promise<ConnectionResult | null> | null = null;
 
   /** Expose connection state as readonly */
   readonly connection = this.connectionSignal.asReadonly();
@@ -310,26 +322,9 @@ export class HolochainClientService {
         throw new Error(result.error ?? CONNECTION_FAILED);
       }
 
-      // Update state from strategy result
-      const firstCellId = result.cellIds?.values().next().value ?? null;
-
-      this.updateState({
-        state: 'connected',
-        adminWs: result.adminWs ?? undefined,
-        appWs: result.appWs ?? undefined,
-        agentPubKey: result.agentPubKey ?? undefined,
-        cellId: firstCellId,
-        cellIds: result.cellIds ?? new Map(),
-        appInfo: result.appInfo ?? null,
-        connectedAt: new Date(),
-        error: undefined,
-      });
-
-      // Store signing credentials from strategy for persistence
-      const credentials = this.strategy.getSigningCredentials();
-      if (credentials) {
-        this.storeSigningCredentials(credentials);
-      }
+      // Update state from strategy result, and persist the signing
+      // credentials it minted (shared with the heal-and-retry path below).
+      this.applyConnectionResult(result);
 
       // Reset error logging flag on successful connection
       this.connectionErrorLogged = false;
@@ -367,6 +362,33 @@ export class HolochainClientService {
       }
 
       throw err;
+    }
+  }
+
+  /**
+   * Apply a successful `ConnectionResult` to Angular state and persist the
+   * signing credentials the strategy minted — the shared tail of both a
+   * fresh `connect()` and a post-heal reconnect. Cache invalidation on heal
+   * reuses this exact path rather than a second hand-rolled copy of it.
+   */
+  private applyConnectionResult(result: ConnectionResult): void {
+    const firstCellId = result.cellIds?.values().next().value ?? null;
+
+    this.updateState({
+      state: 'connected',
+      adminWs: result.adminWs ?? undefined,
+      appWs: result.appWs ?? undefined,
+      agentPubKey: result.agentPubKey ?? undefined,
+      cellId: firstCellId,
+      cellIds: result.cellIds ?? new Map(),
+      appInfo: result.appInfo ?? null,
+      connectedAt: new Date(),
+      error: undefined,
+    });
+
+    const credentials = this.strategy.getSigningCredentials();
+    if (credentials) {
+      this.storeSigningCredentials(credentials);
     }
   }
 
@@ -561,7 +583,7 @@ export class HolochainClientService {
     }
 
     // Execute the zome call
-    return this.executeZomeCall(appWs, cellIdResult.cellId, input, callContext, timer);
+    return this.executeZomeCall(appWs, cellIdResult.cellId, input, roleName, callContext, timer);
   }
 
   /**
@@ -666,6 +688,7 @@ export class HolochainClientService {
     appWs: AppWebsocket,
     cellId: CellId,
     input: ZomeCallInput,
+    roleName: string,
     callContext: Record<string, unknown>,
     timer: LogTimer
   ): Promise<ZomeCallResult<T>> {
@@ -683,8 +706,93 @@ export class HolochainClientService {
 
       return { success: true, data: result as T };
     } catch (err) {
+      return this.handleZomeCallFailure(err, input, roleName, callContext, timer);
+    }
+  }
+
+  /**
+   * The conductor rejected this zome call. If it's cap-grant-shaped
+   * (`looksLikeCapGrantRejection`) and the connection strategy exposes a
+   * device-credential heal, attempt ONE bounded heal-and-retry: heal the
+   * signing credential, re-apply the fresh connection state, and retry this
+   * SAME call exactly once. Anything else — an ordinary zome error, a
+   * strategy with no heal (Direct/Tauri), a heal that reports it already
+   * ran this session, or a retry that fails too — surfaces the ORIGINAL
+   * error via {@link handleZomeCallError} unchanged. Never a second heal for
+   * the same failure, and never the retry's own error shape.
+   */
+  private async handleZomeCallFailure<T>(
+    err: unknown,
+    input: ZomeCallInput,
+    roleName: string,
+    callContext: Record<string, unknown>,
+    timer: LogTimer
+  ): Promise<ZomeCallResult<T>> {
+    if (!this.strategy.healSigningCredentials || !looksLikeCapGrantRejection(err)) {
       return this.handleZomeCallError(err, callContext, timer);
     }
+
+    this.logger.warn(
+      "Zome call rejected — the conductor may have lost this device's signing credential; " +
+        'attempting one bounded heal-and-retry',
+      callContext
+    );
+
+    const healResult = await this.healSigningCredentialsShared();
+    if (!healResult) {
+      // No heal happened (already attempted this session) or it failed —
+      // surface the ORIGINAL rejection, never a heal-specific message.
+      return this.handleZomeCallError(err, callContext, timer);
+    }
+
+    this.applyConnectionResult(healResult);
+
+    const { appWs: healedAppWs, cellIds: healedCellIds } = this.connectionSignal();
+    const healedCellId = healedCellIds.get(roleName);
+    if (!healedAppWs || !healedCellId) {
+      // The heal reconnected, but this role's cell isn't in the fresh
+      // connection — surface the ORIGINAL error rather than a confusing one.
+      return this.handleZomeCallError(err, callContext, timer);
+    }
+
+    try {
+      const result = await healedAppWs.callZome({
+        cell_id: healedCellId,
+        zome_name: input.zomeName,
+        fn_name: input.fnName,
+        payload: input.payload,
+      });
+
+      this.metrics.recordQuery(timer.elapsed(), true);
+      timer.end({ ...callContext, success: true, healedRetry: true });
+
+      return { success: true, data: result as T };
+    } catch {
+      // The retry failed too — surface the ORIGINAL rejection, not the
+      // retry's own error shape.
+      return this.handleZomeCallError(err, callContext, timer);
+    }
+  }
+
+  /**
+   * Run the strategy's device-credential heal, sharing ONE in-flight
+   * attempt across every concurrently failing call. Concurrent callers all
+   * await the same promise instead of each minting their own heal — the
+   * unbounded-mint failure mode this heal exists to close, wearing a
+   * different hat.
+   */
+  private healSigningCredentialsShared(): Promise<ConnectionResult | null> {
+    if (!this.healSigningCredentialsPromise) {
+      if (!this.strategy.healSigningCredentials) {
+        return Promise.resolve(null);
+      }
+      this.healSigningCredentialsPromise = this.strategy
+        .healSigningCredentials(this.buildConnectionConfig())
+        .finally(() => {
+          this.healSigningCredentialsPromise = null;
+        });
+    }
+    return this.healSigningCredentialsPromise;
   }
 
   /**

@@ -45,6 +45,20 @@ export type {
 // Logger
 export { ConsoleLogger } from './console-logger';
 
+// Device signing credential — persisted per (doorway origin, agent) so a
+// browser is granted a Holochain capability ONCE, not once per page load.
+export {
+  ChaperoneCredentialStore,
+  agentFromDoorwayToken,
+  looksLikeCapGrantRejection,
+  CHAPERONE_CREDENTIALS_KEY,
+  CHAPERONE_CREDENTIAL_SCOPE_KEY,
+  type ChaperoneCredentials,
+  type ChaperoneCredentialScope,
+  type ChaperoneKeyPair,
+  type KeyValueStore,
+} from './chaperone-credential-store';
+
 // Strategy implementations
 export { DoorwayConnectionStrategy } from './doorway-connection-strategy';
 export { DirectConnectionStrategy } from './direct-connection-strategy';

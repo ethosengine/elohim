@@ -25,6 +25,7 @@ pub mod cors;
 pub mod custodial_keys;
 pub mod db;
 pub mod hosts;
+pub mod keyed_lock;
 pub mod logging;
 pub mod metrics;
 pub mod nats;

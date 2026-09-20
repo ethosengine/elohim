@@ -29,6 +29,13 @@ import {
 
 import { SourceTier } from '../cache/content-resolver';
 
+import {
+  ChaperoneCredentialStore,
+  agentFromDoorwayToken,
+  type ChaperoneCredentialScope,
+  type ChaperoneCredentials,
+  type ChaperoneKeyPair,
+} from './chaperone-credential-store';
 import { ConsoleLogger } from './console-logger';
 
 import type {
@@ -57,6 +64,22 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
   private credentials: SigningCredentials | null = null;
   private connected = false;
   private logger: Logger = new ConsoleLogger('DoorwayStrategy');
+
+  /**
+   * The device's persisted signing credential — one witnessed trust act per
+   * browser, reused across sessions, instead of one Holochain CapGrant per page
+   * load. See `chaperone-credential-store.ts` for the full rationale.
+   */
+  private readonly credentialStore = new ChaperoneCredentialStore();
+
+  /**
+   * HEAL BUDGET. A conductor that lost our grant answers zome calls
+   * unauthorized; the cure is to discard the stored credential and reconnect
+   * with a fresh keypair — exactly ONCE per strategy instance (≈ once per page
+   * session). A second failure is a different fault, and retrying it would
+   * re-create the per-connect minting this whole change removes.
+   */
+  private healAttempted = false;
 
   /** Resolve logger from config or use default */
   private resolveLogger(config: ConnectionConfig): Logger {
@@ -380,9 +403,10 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
     try {
       this.logger.info('Chaperone: starting connection...');
 
-      // Step 1: Generate signing credentials locally
-      const [keyPair, signingKey] = await generateSigningKeyPair();
-      const capSecret = await randomCapSecret();
+      // Step 1: Reuse this device's signing credential, or mint one.
+      const credentials = await this.resolveDeviceCredentials(config);
+      const { capSecret, signingKey } = credentials;
+      const keyPair: ChaperoneKeyPair = credentials.keyPair;
       this.credentials = { capSecret, keyPair, signingKey };
 
       // Step 2: Call POST /hc/connect — at the doorway the host named, which
@@ -521,6 +545,132 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
         error: errorMessage,
       };
     }
+  }
+
+  // ==========================================================================
+  // Device signing credential — resolve, scope, heal, sign-out
+  // ==========================================================================
+
+  /**
+   * This device's zome-call signing credential: the persisted one if it has
+   * one, otherwise a freshly minted one that is persisted for next time.
+   *
+   * ONE WITNESSED TRUST ACT PER DEVICE. `POST /hc/connect` makes the doorway
+   * author a Holochain CapGrant per role cell, permanently, and the conductor
+   * re-reads every grant on every zome call. Minting a fresh keypair on every
+   * page load is what put ~15 000 grants on the conductors behind the public
+   * doorways (measured 2026-09-19). Presenting the SAME key lets the doorway
+   * recognise the device and author nothing.
+   *
+   * The private half never leaves the browser — the doorway receives only the
+   * public signing key and the cap secret, exactly as before. When storage is
+   * unavailable (private window, blocked storage, SSR) this degrades silently
+   * to a per-session in-memory key: the previous behaviour, never a failure.
+   */
+  private async resolveDeviceCredentials(config: ConnectionConfig): Promise<ChaperoneCredentials> {
+    const scope = this.credentialScope(config);
+    const restored = scope ? this.credentialStore.load(scope) : null;
+    if (restored) {
+      this.logger.debug("Chaperone: reusing this device's signing credential");
+      return restored;
+    }
+
+    const [generated, signingKey] = await generateSigningKeyPair();
+    const credentials: ChaperoneCredentials = {
+      capSecret: await randomCapSecret(),
+      signingKey,
+      keyPair: {
+        keyType: 'ed25519',
+        publicKey: generated.publicKey,
+        privateKey: generated.privateKey,
+      },
+    };
+
+    // Persisted BEFORE the request: the key is this device's identity whether
+    // or not this particular connect lands, and a connect that fails after the
+    // grant must not orphan the grant it caused.
+    if (scope && !this.credentialStore.save(scope, credentials)) {
+      this.logger.debug(
+        'Chaperone: credential storage unavailable — this session uses an in-memory key'
+      );
+    }
+    return credentials;
+  }
+
+  /**
+   * Which slot this device's signing credential belongs in.
+   *
+   * Scoped by (doorway origin, agent). The origin keeps one doorway's grant
+   * from being presented to another; the agent keeps two hosted humans sharing
+   * a browser profile from sharing a credential — the second human gets their
+   * own key and their own witnessed grant.
+   *
+   * `null` when the agent cannot be read from the session token. That is a
+   * deliberate refusal to persist rather than a guess: an unscoped credential
+   * could be handed to the wrong human on a shared device, and falling back to
+   * an in-memory key is simply the pre-2026-09-20 behaviour.
+   */
+  // eslint-disable-next-line sonarjs/function-return-type -- intentional `T | null` API; rule misfires on nullable unions in this toolchain
+  private credentialScope(config: ConnectionConfig): ChaperoneCredentialScope | null {
+    const agent = agentFromDoorwayToken(config.doorwayToken);
+    if (!agent) {
+      return null;
+    }
+    return { origin: this.chaperoneBaseUrl(config), agent };
+  }
+
+  /**
+   * The conductor no longer honours this device's grant — discard it and
+   * reconnect ONCE with a fresh keypair.
+   *
+   * ## When to call this
+   *
+   * From the zome-call error path, when
+   * {@link looksLikeCapGrantRejection} says the failure is cap-grant-shaped.
+   * A credential can be perfectly valid while the grant it names has vanished
+   * (the conductor was reinstalled, or its database restored from an older
+   * snapshot): nothing at connect time can see that, because the doorway
+   * remembers granting it. The first refused zome call is where the truth
+   * appears.
+   *
+   * ## The bound
+   *
+   * Returns `null` when this strategy instance has already healed once — the
+   * caller must then surface the error. A second rejection is not a stale
+   * credential, and an unbounded heal is the per-connect minting this change
+   * exists to remove, wearing a different hat.
+   */
+  async healSigningCredentials(config: ConnectionConfig): Promise<ConnectionResult | null> {
+    this.resolveLogger(config);
+    if (this.healAttempted) {
+      this.logger.warn(
+        'Chaperone: signing credential was already healed this session — surfacing the error ' +
+          'rather than minting another capability grant'
+      );
+      return null;
+    }
+    this.healAttempted = true;
+
+    this.logger.warn(
+      "Chaperone: the conductor rejected this device's signing credential — discarding it " +
+        'and reconnecting once with a fresh key'
+    );
+    this.credentialStore.clear();
+    await this.disconnect();
+    return this.connectViaChaperone(config);
+  }
+
+  /**
+   * Forget this device's signing credential. Call on EXPLICIT sign-out.
+   *
+   * The consuming app's session store already removes the credential record's
+   * key on sign-out, so this is belt-and-braces for that path and the single
+   * entry point for any other surface that signs a human out. The next sign-in
+   * mints a fresh key and receives one fresh grant.
+   */
+  clearPersistedSigningCredentials(): void {
+    this.credentialStore.clear();
+    this.credentials = null;
   }
 
   // ==========================================================================

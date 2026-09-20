@@ -6,12 +6,15 @@
 
 pub mod agent_key;
 pub mod chaperone;
+pub mod grant_memory;
 pub mod pool_map;
 pub mod provisioner;
 pub mod registry;
 pub mod router;
 pub mod typed_admin;
 pub mod typed_app;
+
+pub use grant_memory::{grant_memory, GrantDecision, GrantMemory};
 
 pub use agent_key::{
     canonical_agent_key, decode_key_bytes, is_agent_key_form, lookup_forms, lookup_forms_of,

@@ -176,7 +176,7 @@ once per cell. Reconnect CHURN, which was the unbounded term, now mints nothing.
 zome error (`looks_like_a_rejected_cap_grant`, a copy of storage's `CAP_GRANT_REJECTION_MARKERS`) discards
 that cell's credential ONCE per (conductor, role) per process and drops the socket so the next call re-mints;
 a second rejection surfaces unchanged. **Ceiling: one grant per cell per doorway process, plus at most one
-heal per (conductor, role) per process.**
+heal per (conductor, role) per process — held under concurrency**, see below.
 
 **Path 2 — the chaperone grants once per DEVICE, not once per page load.**
 The browser now PERSISTS its signing keypair and cap secret per (doorway origin, agent) and presents the same
@@ -194,7 +194,22 @@ from being presented as another's. Server side,
 device. Recording happens only after a grant lands, so a `CellMissing`/`CellDisabled`/failed cell is retried
 rather than skipped, and the browser's 3× 502/503 retry cannot multiply grants. Memory is in-process and
 bounded (FIFO, 100 000 fingerprints): a doorway restart therefore costs at most one grant per device per role
-cell, not one per page load. **Ceiling: one grant per (device, cell) per doorway process.**
+cell, not one per page load. **Ceiling: one grant per (device, cell) per doorway process — held under
+concurrency**, see below.
+
+**Both ceilings are enforced, not merely intended.** `decide` … conductor round trip … `record` is a
+check-then-act pair straddling an `.await`; two callers with the same identity would otherwise both observe
+"not done" and both author a chain write. Since the device credential is now persistent, that is the COMMON
+case — two browser tabs opening together carry byte-identical key material, hence one fingerprint — and on
+the doorway's own side a primary connect can race the half-open re-probe. `doorway-service/src/keyed_lock.rs`
+provides one `tokio::sync::Mutex` PER IDENTITY (fingerprint for the chaperone, conductor|app|role for the
+credential cache), taken before `decide` and held across the round trip, so the second caller waits and
+re-decides into `Skip`/`Reuse`. Distinct identities never contend (a wedged conductor for one human cannot
+stall another's connect); the key map is reclaimed when its last holder and waiter drop; a cancelled request
+releases its key via `Drop` and records nothing. The wait is bounded by the crate's per-conductor-call
+deadline, and **expiry degrades to the pre-lock behaviour** — the caller proceeds unserialized, risking one
+duplicate grant, never a failed connect and never a skip for a grant that did not land. Proven by tests that
+use real `tokio::spawn` concurrency with a stub that parks inside the grant window, not by sequential loops.
 
 Revoke-on-session-end was considered and REJECTED, for the reason this document already records: a deleted
 grant is still dropped in step 2 — after its three queries are paid — so deletion only removes step 3's
@@ -236,6 +251,11 @@ The mint COUNT per day is the measure, not the total — the ~15 000 accumulated
   path lives outside the library. Until that one call site exists, a conductor that loses a grant leaves that
   browser's calls failing until the human signs out (which clears the credential) or the doorway restarts
   (which forgets the grant and re-grants). Owner: the Angular layer; scope: one error-path branch.
+- **The deadline fall-through is a deliberate, narrow duplicate-grant window.** If a first caller wedges
+  past the per-conductor-call deadline, a second caller for the same identity proceeds unserialized and may
+  author one duplicate grant. Failing the connect instead would turn a slow conductor into an outage, and
+  skipping would leave the human with no grant at all; a bounded duplicate is the least-bad expiry. It
+  disappears with remedy 2.
 - **Server-side grant memory is in-process.** Promoting it to the doorway's MongoDB records would make a
   doorway restart free rather than one-grant-per-device. Strictly additive; `GrantMemory`'s API assumes
   nothing about residence.

@@ -11,6 +11,23 @@
 //! - Session affinity cache
 //! - Admin protocol exposure in production
 //! - Key format matching between browser and conductor
+//!
+//! ## One grant per device, not one per page load (2026-09-20)
+//!
+//! `grant_zome_call_capability` is a chain write that nothing revokes, and the
+//! conductor re-reads EVERY grant on EVERY zome call. The browser used to mint
+//! a fresh keypair + cap secret on every connect, so each page load of each
+//! hosted human authored three more permanent grants on exactly the conductors
+//! the public doorways front — the unbounded minter behind the 11 619 / 15 768
+//! / 18 516 grant counts measured on matthew and adam.
+//!
+//! A browser/device is a RELATIONSHIP: one witnessed trust act, reused. The
+//! client persists its signing keypair and cap secret per (doorway origin,
+//! agent); this endpoint recognises them through
+//! [`crate::conductor::grant_memory`] and SKIPS the grant. Nothing about who
+//! may call `/hc/connect`, what the JWT must prove, or how wide a grant's
+//! function scope is has changed — see that module for what is remembered
+//! (a one-way fingerprint, never a secret) and why the memory is in-process.
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use bytes::Bytes;
@@ -22,6 +39,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 use crate::auth::{extract_token_from_header, TokenInput};
+use crate::conductor::grant_memory::{grant_memory, GrantDecision, GrantMemory};
 use crate::conductor::typed_admin::TypedAdminClient;
 use crate::conductor::AgentProvisioner;
 use crate::server::http::AppState;
@@ -384,6 +402,15 @@ pub async fn handle_hc_connect(
     let mut reenable_attempted = false;
 
     // --- Step 4: Grant capabilities per cell ---
+    //
+    // ONE GRANT PER DEVICE, NOT ONE PER PAGE LOAD. A grant is permanent and is
+    // re-read by the conductor on every zome call; the browser now presents the
+    // SAME signing key and cap secret across sessions, so a device already
+    // granted on this cell is skipped entirely. See `conductor::grant_memory`.
+    let grants = grant_memory();
+    let mut cells_granted = 0usize;
+    let mut cells_skipped = 0usize;
+
     for (role_name, (ref dna_hash, ref agent_key)) in &app_info.cell_ids {
         let role = role_name.clone();
         let tag = format!("chaperone-{role}");
@@ -391,6 +418,42 @@ pub async fn handle_hc_connect(
         let agent = agent_key.clone();
         let sk = signing_key.clone();
         let cs = cap_secret.clone();
+
+        let fingerprint = GrantMemory::fingerprint(
+            &conductor_id,
+            dna_hash,
+            agent_key,
+            &signing_key,
+            &cap_secret,
+        );
+
+        // SERIALIZE THIS DEVICE'S GRANT. `decide` … grant … `record` straddles a
+        // conductor round trip, and two tabs of the same browser now arrive with
+        // byte-identical key material — the same fingerprint, in the window
+        // together. The lease makes the trio atomic per fingerprint; a second
+        // tab waits and then re-decides, seeing `Skip`. Distinct devices never
+        // contend. Held to the end of this loop iteration, including every
+        // `continue`, and released by `Drop` if this request is cancelled.
+        //
+        // `None` = the previous holder outlived the per-conductor-call deadline;
+        // we then behave exactly as before the lease existed (attempt the
+        // grant), which risks a duplicate but never a failed connect and never a
+        // grant recorded that did not land.
+        let _grant_lease = grants
+            .lease(
+                &fingerprint,
+                crate::services::zome_caller::zome_call_timeout(),
+            )
+            .await;
+
+        if grants.decide(&fingerprint) == GrantDecision::Skip {
+            cells_skipped += 1;
+            debug!(
+                role = %role,
+                "Chaperone: this device is already granted on this cell — no CapGrant authored"
+            );
+            continue;
+        }
 
         let grant_result = TypedAdminClient::with_source_chain_retry(
             || {
@@ -449,6 +512,8 @@ pub async fn handle_hc_connect(
                     match retry_result {
                         Ok(()) => {
                             info!(role = %role, "Cap grant succeeded after re-enable");
+                            grants.record(fingerprint);
+                            cells_granted += 1;
                             continue;
                         }
                         Err(retry_err) => {
@@ -483,6 +548,11 @@ pub async fn handle_hc_connect(
             error!("Chaperone: cap grant failed for '{}': {}", role, e);
             return sanitize_client_error(StatusCode::BAD_GATEWAY, "Cap grant");
         }
+
+        // Remembered ONLY after the grant actually landed on the chain — a
+        // failed or skipped cell must be retried, never skipped.
+        grants.record(fingerprint);
+        cells_granted += 1;
     }
 
     // NOTE: authorize_signing_credentials is a client-SDK helper that generates
@@ -567,6 +637,8 @@ pub async fn handle_hc_connect(
         identifier = %claims.identifier,
         cells = response.cell_ids.len(),
         app_port = app_port,
+        cells_granted,
+        cells_skipped,
         "Chaperone: connection established"
     );
 
@@ -1218,6 +1290,574 @@ mod tests {
                 .is_some(),
             "recovered mapping must reach a current conductor"
         );
+    }
+
+    // ================================================================
+    // One grant per device, not one per page load (2026-09-20)
+    // ================================================================
+    //
+    // `handle_hc_connect` takes `Request<hyper::body::Incoming>`, which cannot
+    // be constructed in a unit test (`Incoming` has no public constructor), so
+    // these exercise the EXACT composition its Step-4 loop performs:
+    //   fingerprint → decide → (grant) → record.
+    // `grant_memory`'s own module tests own the memory's semantics; these pin
+    // how the chaperone combines them.
+
+    /// One `/hc/connect` request, as Step 4 walks it. `grant_succeeds` models
+    /// the conductor's answer. Returns (cells granted, cells skipped).
+    fn chaperone_connect(
+        memory: &GrantMemory,
+        conductor_id: &str,
+        cells: &[(&str, &[u8], &[u8])],
+        signing_key: &[u8],
+        cap_secret: &[u8],
+        grant_succeeds: bool,
+    ) -> (usize, usize) {
+        let mut granted = 0;
+        let mut skipped = 0;
+        for (_role, dna, agent) in cells {
+            let fingerprint =
+                GrantMemory::fingerprint(conductor_id, dna, agent, signing_key, cap_secret);
+            if memory.decide(&fingerprint) == GrantDecision::Skip {
+                skipped += 1;
+                continue;
+            }
+            if grant_succeeds {
+                // Recorded ONLY after the grant landed.
+                memory.record(fingerprint);
+                granted += 1;
+            }
+        }
+        (granted, skipped)
+    }
+
+    fn three_cells() -> Vec<(&'static str, &'static [u8], &'static [u8])> {
+        vec![
+            ("lamad", b"dna-lamad" as &[u8], b"agent-0" as &[u8]),
+            ("imagodei", b"dna-imagodei" as &[u8], b"agent-0" as &[u8]),
+            ("infrastructure", b"dna-infra" as &[u8], b"agent-0" as &[u8]),
+        ]
+    }
+
+    /// GRANT WHEN UNKNOWN. A browser the doorway has never seen gets its one
+    /// witnessed trust act — one grant per role cell, exactly as before.
+    #[test]
+    fn a_first_connect_grants_every_role_cell() {
+        let memory = GrantMemory::new();
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+        assert_eq!((granted, skipped), (3, 0));
+    }
+
+    /// SKIP WHEN KNOWN. THE INVARIANT. The second page load presents the same
+    /// persisted keypair and cap secret and must author NOTHING — this is the
+    /// 15 000 rows that made every zome call cost ~47 000 SQL queries.
+    #[test]
+    fn a_second_page_load_from_the_same_device_authors_nothing() {
+        let memory = GrantMemory::new();
+        chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+        assert_eq!(
+            (granted, skipped),
+            (0, 3),
+            "a returning device must add no CapGrant to the conductor's chain"
+        );
+        assert_eq!(memory.len(), 3, "and must add no memory either");
+    }
+
+    /// IDEMPOTENT UNDER THE CLIENT'S RETRY. `connectViaChaperone` retries up to
+    /// three times on 502/503 with the SAME key material. Those retries must not
+    /// multiply grants.
+    #[test]
+    fn the_clients_502_retry_loop_grants_at_most_once_per_cell() {
+        let memory = GrantMemory::new();
+        let mut total_granted = 0;
+        for _attempt in 0..4 {
+            let (granted, _) = chaperone_connect(
+                &memory,
+                "conductor-0",
+                &three_cells(),
+                b"device-key",
+                b"device-secret",
+                true,
+            );
+            total_granted += granted;
+        }
+        assert_eq!(
+            total_granted, 3,
+            "four attempts over three cells must author three grants, not twelve"
+        );
+    }
+
+    /// A cell whose grant FAILED (CellMissing / CellDisabled / conductor error)
+    /// must not be remembered — the next connect has to try it again, or the
+    /// human's calls would be refused forever by a grant that never landed.
+    #[test]
+    fn a_failed_grant_is_retried_on_the_next_connect() {
+        let memory = GrantMemory::new();
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            false, // the conductor refused every cell
+        );
+        assert_eq!((granted, skipped), (0, 0));
+        assert!(memory.is_empty());
+
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+        assert_eq!((granted, skipped), (3, 0));
+    }
+
+    /// GRANT WHEN THE KEY IS UNKNOWN — which is also the HEAL. When the
+    /// conductor has lost a grant, the client discards its stored credential and
+    /// reconnects ONCE with a fresh keypair; the doorway has no record of that
+    /// key, so it grants. One round trip, no loop on either side.
+    #[test]
+    fn a_client_that_healed_to_a_fresh_key_is_granted_again() {
+        let memory = GrantMemory::new();
+        chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"healed-device-key",
+            b"healed-device-secret",
+            true,
+        );
+        assert_eq!(
+            (granted, skipped),
+            (3, 0),
+            "an unknown signing key must always be granted — that is the heal"
+        );
+    }
+
+    /// A SECOND human on the same browser is a different agent, hence different
+    /// cells, and must never ride the first human's grant.
+    #[test]
+    fn a_different_hosted_human_never_reuses_another_grant() {
+        let memory = GrantMemory::new();
+        chaperone_connect(
+            &memory,
+            "conductor-0",
+            &three_cells(),
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+
+        let other_human: Vec<(&str, &[u8], &[u8])> = vec![
+            ("lamad", b"dna-lamad" as &[u8], b"agent-1" as &[u8]),
+            ("imagodei", b"dna-imagodei" as &[u8], b"agent-1" as &[u8]),
+            ("infrastructure", b"dna-infra" as &[u8], b"agent-1" as &[u8]),
+        ];
+        let (granted, skipped) = chaperone_connect(
+            &memory,
+            "conductor-0",
+            &other_human,
+            b"device-key",
+            b"device-secret",
+            true,
+        );
+        assert_eq!((granted, skipped), (3, 0));
+    }
+
+    // ----------------------------------------------------------------
+    // …under real concurrency
+    // ----------------------------------------------------------------
+    //
+    // The sequential helper above cannot see the defect that matters: `decide`
+    // … grant … `record` straddles a conductor round trip, and two TABS of the
+    // same browser now present byte-identical key material — the same
+    // fingerprint, entering that window together. These drive genuine
+    // concurrency (`tokio::spawn`) with a grant stub that PARKS inside the
+    // window on a `Notify`, so both tasks are provably in flight at once.
+
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
+    use tokio::sync::Notify;
+
+    const LONG: Duration = Duration::from_secs(30);
+
+    /// Stands in for `grant_zome_call_capability`: counts its calls, signals
+    /// that it is INSIDE the window, and parks there until the test releases it.
+    #[derive(Clone)]
+    struct GrantStub {
+        calls: Arc<AtomicUsize>,
+        entered: Arc<Notify>,
+        release: Option<Arc<Notify>>,
+        succeeds: bool,
+    }
+
+    impl GrantStub {
+        fn new(calls: &Arc<AtomicUsize>, entered: &Arc<Notify>) -> Self {
+            Self {
+                calls: Arc::clone(calls),
+                entered: Arc::clone(entered),
+                release: None,
+                succeeds: true,
+            }
+        }
+        fn parking(mut self, release: &Arc<Notify>) -> Self {
+            self.release = Some(Arc::clone(release));
+            self
+        }
+        fn failing(mut self) -> Self {
+            self.succeeds = false;
+            self
+        }
+        async fn grant(&self) -> bool {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.entered.notify_one();
+            if let Some(release) = &self.release {
+                release.notified().await;
+            }
+            self.succeeds
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ConnectRun {
+        granted: usize,
+        skipped: usize,
+        serialized: bool,
+    }
+
+    /// One `/hc/connect`, in the exact order Step 4 uses:
+    /// fingerprint → lease → decide → grant → record.
+    async fn chaperone_connect_async(
+        memory: Arc<GrantMemory>,
+        conductor_id: String,
+        cells: Vec<(String, Vec<u8>, Vec<u8>)>,
+        signing_key: Vec<u8>,
+        cap_secret: Vec<u8>,
+        deadline: Duration,
+        stub: GrantStub,
+    ) -> ConnectRun {
+        let mut granted = 0;
+        let mut skipped = 0;
+        let mut serialized = true;
+        for (_role, dna, agent) in &cells {
+            let fingerprint =
+                GrantMemory::fingerprint(&conductor_id, dna, agent, &signing_key, &cap_secret);
+            let lease = memory.lease(&fingerprint, deadline).await;
+            serialized &= lease.is_some();
+            if memory.decide(&fingerprint) == GrantDecision::Skip {
+                skipped += 1;
+                continue;
+            }
+            if stub.grant().await {
+                memory.record(fingerprint);
+                granted += 1;
+            }
+            drop(lease);
+        }
+        ConnectRun {
+            granted,
+            skipped,
+            serialized,
+        }
+    }
+
+    fn one_cell() -> Vec<(String, Vec<u8>, Vec<u8>)> {
+        vec![("lamad".into(), b"dna-lamad".to_vec(), b"agent-0".to_vec())]
+    }
+
+    /// THE RACE, closed. Two tabs of one browser connect at once with identical
+    /// key material. Exactly ONE `CapGrant` may be authored; the other tab must
+    /// wait, re-decide, and Skip.
+    #[tokio::test]
+    async fn two_simultaneous_connects_from_one_device_grant_exactly_once() {
+        let memory = Arc::new(GrantMemory::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+
+        let tab_a = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered).parking(&release),
+        ));
+
+        // Tab A is provably INSIDE the grant window.
+        entered.notified().await;
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(memory.live_leases(), 1);
+
+        let tab_b = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered),
+        ));
+
+        tokio::task::yield_now().await;
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "tab B entered the grant window while tab A held the device"
+        );
+
+        // `notify_one` STORES a permit when no waiter is registered yet, so the
+        // release can never be lost to a scheduling order — unlike
+        // `notify_waiters`, which only wakes already-registered waiters.
+        release.notify_one();
+        let a = tab_a.await.unwrap();
+        let b = tab_b.await.unwrap();
+
+        assert_eq!(
+            (a.granted, a.skipped),
+            (1, 0),
+            "the first tab performs the one witnessed trust act"
+        );
+        assert_eq!(
+            (b.granted, b.skipped),
+            (0, 1),
+            "the second tab must observe it and author nothing"
+        );
+        assert!(a.serialized && b.serialized);
+        assert_eq!(
+            calls.load(Ordering::SeqCst),
+            1,
+            "exactly ONE CapGrant may reach the chain for one device+cell"
+        );
+        assert_eq!(memory.len(), 1);
+        assert_eq!(memory.live_leases(), 0, "the lease map must be reclaimed");
+    }
+
+    /// NO LOST GRANT. If the first tab's grant FAILS, nothing was recorded, so
+    /// the second must go ahead and grant. The lease must never convert a
+    /// failure into a permanent skip.
+    #[tokio::test]
+    async fn a_failed_grant_lets_the_concurrent_connect_grant() {
+        let memory = Arc::new(GrantMemory::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+
+        let tab_a = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered).parking(&release).failing(),
+        ));
+        entered.notified().await;
+
+        let tab_b = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered),
+        ));
+
+        // `notify_one` STORES a permit when no waiter is registered yet, so the
+        // release can never be lost to a scheduling order — unlike
+        // `notify_waiters`, which only wakes already-registered waiters.
+        release.notify_one();
+        let a = tab_a.await.unwrap();
+        let b = tab_b.await.unwrap();
+
+        assert_eq!((a.granted, a.skipped), (0, 0), "A's grant failed");
+        assert_eq!(
+            (b.granted, b.skipped),
+            (1, 0),
+            "a failed grant must not be read as done"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert_eq!(memory.len(), 1, "only the grant that LANDED is remembered");
+        assert_eq!(memory.live_leases(), 0);
+    }
+
+    /// NO GLOBAL SERIALIZATION. A conductor wedged mid-grant for one human must
+    /// not stall another human's connect.
+    #[tokio::test]
+    async fn a_wedged_device_does_not_stall_a_different_device() {
+        let memory = Arc::new(GrantMemory::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Notify::new());
+        let wedged = Arc::new(Notify::new());
+
+        let stuck = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-a".to_vec(),
+            b"secret-a".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered).parking(&wedged),
+        ));
+        entered.notified().await;
+
+        let other = tokio::time::timeout(
+            Duration::from_secs(2),
+            chaperone_connect_async(
+                Arc::clone(&memory),
+                "conductor-0".into(),
+                one_cell(),
+                b"device-b".to_vec(),
+                b"secret-b".to_vec(),
+                LONG,
+                GrantStub::new(&calls, &entered),
+            ),
+        )
+        .await
+        .expect("a wedged device must not stall a different device");
+
+        assert_eq!((other.granted, other.skipped), (1, 0));
+        assert!(other.serialized);
+
+        wedged.notify_one();
+        assert_eq!(stuck.await.unwrap().granted, 1);
+        assert_eq!(memory.live_leases(), 0);
+    }
+
+    /// BOUNDED WAITING. A connect queued behind a wedged holder is released by
+    /// the per-conductor-call deadline and proceeds UNSERIALIZED — the
+    /// pre-lease behaviour, a possible duplicate grant. Never a failed connect,
+    /// and never a skip for a grant that did not land.
+    #[tokio::test]
+    async fn a_waiter_past_the_deadline_still_completes_its_connect() {
+        let memory = Arc::new(GrantMemory::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Notify::new());
+        let wedged = Arc::new(Notify::new());
+
+        let stuck = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered).parking(&wedged),
+        ));
+        entered.notified().await;
+
+        let waiter = chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            Duration::from_millis(50),
+            GrantStub::new(&calls, &entered),
+        )
+        .await;
+
+        assert!(
+            !waiter.serialized,
+            "the waiter must be released by the deadline, not parked forever"
+        );
+        assert_eq!(
+            (waiter.granted, waiter.skipped),
+            (1, 0),
+            "expiry degrades to the pre-lease behaviour — the connect still succeeds"
+        );
+
+        wedged.notify_one();
+        stuck.await.unwrap();
+        assert_eq!(memory.live_leases(), 0);
+    }
+
+    /// CANCELLATION. A request dropped mid-grant releases the device key at
+    /// once, and records nothing — the next connect grants rather than
+    /// inheriting a phantom.
+    #[tokio::test]
+    async fn an_abandoned_connect_releases_the_device_and_records_nothing() {
+        let memory = Arc::new(GrantMemory::new());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(Notify::new());
+        let never = Arc::new(Notify::new());
+
+        let abandoned = tokio::spawn(chaperone_connect_async(
+            Arc::clone(&memory),
+            "conductor-0".into(),
+            one_cell(),
+            b"device-key".to_vec(),
+            b"device-secret".to_vec(),
+            LONG,
+            GrantStub::new(&calls, &entered).parking(&never),
+        ));
+        entered.notified().await;
+        abandoned.abort();
+        let _ = abandoned.await;
+
+        let next = tokio::time::timeout(
+            Duration::from_secs(2),
+            chaperone_connect_async(
+                Arc::clone(&memory),
+                "conductor-0".into(),
+                one_cell(),
+                b"device-key".to_vec(),
+                b"device-secret".to_vec(),
+                LONG,
+                GrantStub::new(&calls, &entered),
+            ),
+        )
+        .await
+        .expect("an abandoned connect must not hold the device key");
+
+        assert!(
+            next.serialized,
+            "the key was released by Drop, not by timeout"
+        );
+        assert_eq!((next.granted, next.skipped), (1, 0));
+        assert_eq!(
+            memory.len(),
+            1,
+            "nothing was recorded for the abandoned run"
+        );
+        assert_eq!(memory.live_leases(), 0);
     }
 
     // ================================================================
