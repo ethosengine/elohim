@@ -126,12 +126,29 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   adopt arm already stamps head + anchor + content patch in one transaction; 1.4 makes that reachable on the fast path.
   **The live red is a torn row, read from both public doorways the same day:** both declare head `uhCkkEBj4…lGBP0K`;
   doorway-alpha's `dhtAnchorHash` IS that head (blob `9a0bae…`, 2026-09-14), while elohim.host's `dhtAnchorHash` is a
-  later Update `uhCkk6StXD9…LYjNb` (blob `3bf228…`, 2026-09-19 18:01) — its own-commit projection applied the new
-  action's content and anchor, and the declaration never followed. So elohim.host serves the bytes of an action that
-  is not its declared head. **1.4a (first, smaller):** a declared row's content fields move only in the transaction
-  that moves its declared head — the own-commit projection records the new anchor as a candidate and leaves the served
-  content alone until the declare lands. **1.4b:** the carried record in the doc. The seam smoke also compares
-  `dhtAnchorHash` from now on, which separates "same action projected two ways" from "two actions, one elected head".
+  later Update `uhCkk6StXD9…LYjNb` and it serves blob `3bf228…`. So elohim.host serves bytes its declared head does not
+  vouch for.
+  **Correction, same day — the mechanism first written here was wrong, and the implementer was right to stop**
+  (genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-blocked-finding.md). The own-commit projection does NOT
+  tear a row: since 2026-09-08 `upsert_with_anchor_transaction` withholds `blob_cid` / size / metadata from a declared
+  row when the committed action is not its head (`content_diesel.rs:1138`, pinned by
+  `late_preserved_snapshot_cannot_replace_canonical_browser_or_server`), and the deploy PATCH declares and writes content
+  in ONE transaction — there is no separate declare step to be shed. Loki agrees: adam's 18:01:37 projection of
+  `uhCkk6StXD9…` carried a THIRD blob, `a39c96…` (that day's staged landing); the guard withheld it and only the anchor
+  moved. adam's row was already serving `3bf228…` at 02:59 that morning — the tear predates the day's deploys, and the
+  day's staged landing never became the declared head on either doorway. What CAN tear a declared row is a head MOVE
+  that carries no blob pointer; the code has two: the `ContentHeadDeclared` signal arm
+  (`rea_projection.rs:1032`, `patch: None`, `StampMode::LegacySignal` — permitted exactly when the deploy PATCH has just
+  NULLed the declaration ordering) and `adopt_local` on a move (`head_adoption.rs:1811`, metadata-only patch). Every
+  other head-move site carries a full patch. The existing cure for an already-torn row is `pointer_heal_patch` (T7),
+  which never reads the anchor and fires once the local conductor answers `canonical: true` — so the fleet row is
+  waiting on conductor health, not on new code.
+  **1.4a, re-aimed (needs its own design pass before code — three documented regressions live in this function's
+  history, `content_diesel.rs:1531-1594`):** `stamp_declared_head_mode` declines to MOVE a declared row without a
+  pointer-bearing patch, which turns the first producer into a no-op and makes the second fetch the pointer it defers.
+  **1.4b:** the carried record in the doc. Honest-view and probe work rides with 1.4a: the head view calls a torn row
+  `notarized` because `trust` is derived from anchor presence alone, and the authority for "which doorway is wrong" is
+  the decoded `blob_cid` of `/head-record`, not the anchor.
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
