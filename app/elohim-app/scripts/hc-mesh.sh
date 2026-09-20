@@ -2793,7 +2793,16 @@ os.execve(binpath, [binpath, "--http-port", port], env)
     port="$(http_port $k)"; k=$((k+1))
     case " ${targets[*]} " in *" $n2 "*) ;; *) continue ;; esac
     case "$failed" in *" $n2"*) continue ;; esac
-    if curl -s -m 2 "http://localhost:$port/health" >/dev/null; then
+    # One 2 s probe is not a verdict: a peer still running its boot burst answers
+    # /health late, and a single miss here reported "did not come back" for a peer
+    # the next line showed UP (2026-09-20, restart of all three together). Give a
+    # target the same patience the wait loop above gives the set.
+    local came_back=0 try
+    for try in 1 2 3 4 5 6; do
+      if curl -s -m 5 "http://localhost:$port/health" >/dev/null; then came_back=1; break; fi
+      sleep 2
+    done
+    if [ "$came_back" = "1" ]; then
       if [ -n "${staged_slots[$n2]:-}" ]; then
         archive_release_adoption_slot "$n2" "${staged_slots[$n2]}" applied \
           "$workdir/$n2.exe" "${previous_bins[$n2]:-}" || failed+=" $n2"
