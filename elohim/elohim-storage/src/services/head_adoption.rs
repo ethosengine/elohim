@@ -1775,6 +1775,25 @@ pub fn pointer_heal_patch(
 /// `inventory_broadcaster::gather_hints` would then broadcast to the pool.
 /// [`pointer_heal_patch`] returns BOTH or NEITHER, so that promise is kept by
 /// the return type rather than by remembering to set a second field.
+///
+/// # A genuine MOVE (or fill) carries the pointer too (story 1.4a, T-1)
+///
+/// When `local_declared` does NOT equal this answer's head, the T7 branch
+/// above does not run — this is a fill (`local_declared: None`) or a real
+/// move onto a different head. In that case this node's own conductor has
+/// already handed over the complete notarized `Content` entry for the head
+/// being adopted, so there is nothing left to defer: `verified_patch` also
+/// carries `head.content.blob_cid` and `head.content.content_size_bytes`,
+/// exactly as this stamp's three sibling call sites
+/// (`p2p/projection_reconcile.rs`, and the election-obey / adopt-via-
+/// conductor-declare arms below in this file) already build their patch from
+/// `head.content`. Before this change `adopt_local` alone built a
+/// metadata-only patch on a move, which is the asymmetry that let a row's
+/// declared head advance while its served bytes stayed behind — see
+/// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`
+/// §0 and §(f) Task 1. A stale canonical answer the `HealCanonical` verdict
+/// refuses still writes nothing (R2): the refusal returns before this patch
+/// is ever applied.
 fn adopt_local(
     pool: &DbPool,
     ctx: &AppContext,
@@ -1812,6 +1831,23 @@ fn adopt_local(
             metadata_json: Some(head.content.metadata_json.clone()),
             ..Default::default()
         });
+    let is_move_or_fill = local_declared != Some(head.head_action_hash.as_str());
+    if head.canonical && is_move_or_fill {
+        // T-1 (story 1.4a): a fill or genuine move already has the complete
+        // notarized Content entry in hand — carry ONLY its pointer and size,
+        // exactly as the siblings do (`projection_reconcile.rs:6560-6576`,
+        // this file's election-obey and adopt-via-conductor-declare arms).
+        // No `reach`/`title`/`content_type` here: `project_authenticated_content_head`
+        // guards `reach` with the RC-4 non-narrowing check and this call site
+        // has no such guard, so adding it unguarded would re-open RC-4.
+        if let Some(patch) = verified_patch.as_mut() {
+            patch.blob_cid = head.content.blob_cid.clone();
+            patch.content_size_bytes = head
+                .content
+                .content_size_bytes
+                .map(|n| i32::try_from(n).unwrap_or(i32::MAX));
+        }
+    }
     if local_declared == Some(head.head_action_hash.as_str()) {
         let row_blob_hash = match content_diesel::blob_hash_for(&mut conn, ctx, id) {
             Ok(v) => v,
@@ -3967,6 +4003,76 @@ mod tests {
         assert_eq!(
             server_hash(&pool, "fill").as_deref(),
             Some("sha256-server-fill")
+        );
+    }
+
+    /// T-1 (story 1.4a): on a genuine head MOVE, `adopt_local` must carry the
+    /// conductor answer's own `blob_cid` + `content_size_bytes` in the SAME
+    /// stamp call, exactly as its three sibling call sites already do
+    /// (`p2p/projection_reconcile.rs`, `head_adoption.rs` election-obey and
+    /// adopt-via-conductor-declare). Before the fix, `adopt_local` built a
+    /// metadata-only patch on a move, leaving the row's pointer torn against
+    /// its freshly-adopted head.
+    /// See `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md` §(f) Task 1.
+    #[test]
+    fn an_adopted_move_carries_the_head_s_own_blob_pointer() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "move-carries-pointer", "{}");
+
+        let old_head_hash = "uhCkkOldHeadBeforeMove00000000000000000000".to_string();
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "move-carries-pointer",
+                &old_head_hash,
+                Some(1),
+                None,
+                StampMode::Declare,
+                Some((1, false)),
+            )
+            .expect("seed declaration");
+        }
+
+        let mut head = wire(true);
+        head.content.id = "move-carries-pointer".to_string();
+        head.content.blob_cid = Some("sha256-conductor-answer".to_string());
+        head.content.content_size_bytes = Some(4096);
+        head.canonical_declared_at = Some(2);
+        head.canonical_earned = Some(true);
+
+        assert_eq!(
+            adopt_local(
+                &pool,
+                &ctx,
+                "move-carries-pointer",
+                &head,
+                Some(&old_head_hash)
+            ),
+            AdoptOutcome::Adopted,
+            "a genuine forward canonical move must be adopted"
+        );
+
+        let mut conn = pool.get().expect("connection");
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "move-carries-pointer",
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read content")
+        .expect("content exists");
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-conductor-answer"),
+            "T-1: an adopted move must write the head's own blob pointer"
+        );
+        assert_eq!(
+            row.content_size_bytes,
+            Some(4096),
+            "T-1: the pointer and its length move together in the same call"
         );
     }
 

@@ -4992,6 +4992,88 @@ mod tests {
         );
     }
 
+    /// R2 pin, story 1.4a T-1: making `adopt_local` carry a `blob_cid` on a
+    /// move (T-1) must not smuggle a write past `canonical_move_verdict`'s
+    /// refusal. A `HealCanonical` move the verdict refuses (a stale canonical
+    /// answer — the 2026-07-12 backwards-move regression) must write NEITHER
+    /// the head NOR the pointer, even when its patch now carries `blob_cid` +
+    /// `content_size_bytes` as every producer of that patch does after T-1.
+    /// This is a PIN, not a new behavior: the refusal already returns before
+    /// `apply_content_patch_fields` runs — see
+    /// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`
+    /// §(b) R2, §(f) Task 0 row 4.
+    #[test]
+    fn a_stale_canonical_answer_with_a_pointer_still_writes_nothing() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-stale-pointer")).unwrap();
+
+        // The row's current state: a NEWER canonical declaration, pointer included.
+        let newer = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-stale-pointer",
+            "uhCkk-new",
+            Some(2_000),
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-new".into()),
+                content_size_bytes: Some(20),
+                metadata_json: Some(r#"{"serverBlobHash":"sha256-new"}"#.into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((2_000, false)),
+        )
+        .unwrap();
+        assert_eq!(newer, StampOutcome::Stamped);
+
+        // A conductor that has not integrated the newer link answers with the
+        // OLD canonical record — canonical, yet stale — and its patch ALSO
+        // carries a pointer, exactly as T-1 makes every HealCanonical move do.
+        let stale = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-stale-pointer",
+            "uhCkk-old",
+            Some(1_000),
+            Some(ContentProjectionPatch {
+                blob_cid: Some("sha256-old".into()),
+                content_size_bytes: Some(10),
+                metadata_json: Some(r#"{"serverBlobHash":"sha256-old"}"#.into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((1_000, false)),
+        )
+        .unwrap();
+        assert_eq!(
+            stale,
+            StampOutcome::SkippedStale,
+            "a stale canonical answer must never move a declared head backwards, \
+             even carrying its own blob pointer"
+        );
+
+        let row = get_content(&mut conn, &ctx, "cid-stale-pointer", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-new"),
+            "the refused move must not advance the declared head"
+        );
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-new"),
+            "T-1's richer patch must not be smuggled past canonical_move_verdict's \
+             refusal (R2)"
+        );
+        assert_eq!(
+            row.content_size_bytes,
+            Some(20),
+            "the size travels with the pointer — neither may leak through a refused move"
+        );
+    }
+
     /// The declaration response carries the exact election that includes the
     /// link it just authored. Persisting both in the eager stamp closes the
     /// publish-before-integrate window: an older canonical answer may arrive
