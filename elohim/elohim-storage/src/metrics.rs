@@ -1013,6 +1013,34 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Retry-exhausted reconcile gaps RE-ADMITTED after their wall-clock
+    /// dormancy lapsed, by stream and by the ladder rung that just lapsed.
+    /// labels: stream = "rea" | "content" | "collectives" | "participations" |
+    /// "humans"; rung = "1" | "2" | "3" | "4" | "5+" | "capped".
+    ///
+    /// This is the series that makes the honesty clause on
+    /// [`crate::p2p::projection_reconcile::Admission::Exhausted`] CHECKABLE
+    /// rather than asserted: exhaustion is a bounded-work concession, never an
+    /// adjudication, so every held-back id must come back — and a rung
+    /// distribution that keeps producing re-admissions is that promise being
+    /// kept. `capped` rising is the steady state for a genuinely stale id (it is
+    /// still re-asked, just on the ceiling period); `1` rising is churn, ids
+    /// falling in and out of dormancy rather than settling.
+    ///
+    /// The DEFECT this replaced was invisible precisely because it had no such
+    /// series: dormancy was counted in SWEEPS, so the documented "~1h at the
+    /// 300s tick" silently became ~6min on the household mesh's 30s tick, and
+    /// every rung was the first rung forever.
+    pub static ref PROJECTION_MISS_READMISSIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_projection_reconcile_miss_readmissions_total",
+            "Retry-exhausted reconcile gaps re-admitted after dormancy lapsed, by stream and \
+             ladder rung.",
+        ),
+        &["stream", "rung"],
+    )
+    .unwrap();
+
     /// Last-sweep gaps ABANDONED at `max_retries` per reconcile stream. label:
     /// stream = "rea" | "content".
     ///
@@ -2784,6 +2812,18 @@ pub fn register_all() {
             ] {
                 PROJECTION_HEAL_OUTCOMES
                     .with_label_values(&[stream, outcome])
+                    .inc_by(0);
+            }
+        }
+        let _ = REGISTRY.register(Box::new(PROJECTION_MISS_READMISSIONS.clone()));
+        // Pre-touch every (stream, rung) pair so "no id has come back from
+        // dormancy yet" reads as a measured zero rather than an absent series —
+        // the distinction that matters when the question being asked is whether
+        // exhaustion is still temporary.
+        for stream in ["rea", "content", "collectives", "participations", "humans"] {
+            for rung in ["1", "2", "3", "4", "5+", "capped"] {
+                PROJECTION_MISS_READMISSIONS
+                    .with_label_values(&[stream, rung])
                     .inc_by(0);
             }
         }
@@ -4710,6 +4750,18 @@ pub fn inc_projection_heal_outcome_by(stream: &str, outcome: &str, count: usize)
     }
     PROJECTION_HEAL_OUTCOMES
         .with_label_values(&[stream, outcome])
+        .inc_by(count as u64);
+}
+
+/// Record `count` retry-exhausted gaps re-admitted on `stream` after the `rung`
+/// dormancy lapsed. `rung` comes from the ledger's own ladder classifier, never
+/// from a free-form string. A no-op for `count == 0`.
+pub fn add_projection_miss_readmissions(stream: &str, rung: &str, count: usize) {
+    if count == 0 {
+        return;
+    }
+    PROJECTION_MISS_READMISSIONS
+        .with_label_values(&[stream, rung])
         .inc_by(count as u64);
 }
 

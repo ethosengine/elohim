@@ -308,8 +308,13 @@ pub async fn discover_participations(
 
     // Cross-sweep retry budget. The gap key IS the anchor, so "new evidence" can
     // only arrive as a NEW key — the ledger's evidence field is the anchor
-    // itself and the cooldown is what re-admits. `divergent = false` always:
-    // this arm has no divergence class (see [`ParticipationGap`]).
+    // itself and the DORMANCY LAPSE is the only exit this arm has. That makes
+    // the wall-clock ladder ([`MissLedger`]'s `DormancySchedule`) load-bearing
+    // here in a way it is not on the anchor-carrying arms: a participation the
+    // conductor cannot see backs off 1h → 2h → … → 24h and is then re-asked
+    // daily, forever. Still never written off — the corpus is tiny and every id
+    // stays tracked and counted. `divergent = false` always: this arm has no
+    // divergence class (see [`ParticipationGap`]).
     let mut exhausted_persistent = 0usize;
     let mut admitted: Vec<String> = Vec::with_capacity(gap_anchors.len());
     for anchor in gap_anchors {

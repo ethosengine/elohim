@@ -200,7 +200,8 @@
 #
 #   Dev-tier pacing profile (see the block below the port-scheme helpers —
 #   minutes-quiesce plan W3): MESH_RECONCILE_SECS, MESH_CONTEST_BACKOFF,
-#   MESH_HEAL_MISSING_BACKOFF, MESH_EVIDENCE_ABSENT_BACKOFF,
+#   MESH_HEAL_MISSING_BACKOFF, MESH_MISS_DORMANCY_BASE, MESH_MISS_DORMANCY_CAP,
+#   MESH_EVIDENCE_ABSENT_BACKOFF,
 #   MESH_HEAD_CORPUS_DIGEST override the storage peers' reconcile/backoff
 #   cadence. Ark-launched storage peers additionally default
 #   REPLICATION_INTERVAL_SECONDS to 10 seconds and CUSTODY_SWEEP_SECONDS and
@@ -1595,6 +1596,8 @@ mesh_transport_backend_from_status() {
 #   ACQUISITION_RECONCILE_SECS           acquisition/provide pin reconcile tick (prod default 60s)
 #   CONTEST_BACKOFF_SECONDS               contest-backoff ladder rung (prod default 3600s)
 #   HEAL_MISSING_BACKOFF_SECONDS          heal-missing backoff rung (prod default 600s)
+#   MISS_DORMANCY_BASE_SECONDS            miss-ledger first dormancy rung (prod default 3600s)
+#   MISS_DORMANCY_CAP_SECONDS             miss-ledger dormancy ceiling (prod default 86400s)
 #   ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS   evidence-absent backoff rung (prod default 86400s)
 #   ELOHIM_HEAD_CORPUS_DIGEST             T5 digest-requester flip (prod default off/0)
 #   ELOHIM_NETWORK_STAKES                 T10 declared-stakes operator-config leg (prod:
@@ -1624,6 +1627,13 @@ PROJECTION_RECONCILE_SECS="${MESH_RECONCILE_SECS:-30}"
 ACQUISITION_RECONCILE_SECS="${MESH_ACQUISITION_RECONCILE_SECS:-10}"
 CONTEST_BACKOFF_SECONDS="${MESH_CONTEST_BACKOFF:-120}"
 HEAL_MISSING_BACKOFF_SECONDS="${MESH_HEAL_MISSING_BACKOFF:-60}"
+# Miss-ledger dormancy ladder (2026-09-20). Scaled by the SAME 10x the sweep is
+# (PROJECTION_RECONCILE_SECS 300 -> 30), so the mesh measures a proportional
+# system rather than a differently-paced one — which is exactly the defect the
+# wall-clock ladder cures: the predecessor counted SWEEPS, so the prod-documented
+# ~1h dormancy silently became ~6min here.
+MISS_DORMANCY_BASE_SECONDS="${MESH_MISS_DORMANCY_BASE:-360}"
+MISS_DORMANCY_CAP_SECONDS="${MESH_MISS_DORMANCY_CAP:-8640}"
 ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="${MESH_EVIDENCE_ABSENT_BACKOFF:-600}"
 ELOHIM_HEAD_CORPUS_DIGEST="${MESH_HEAD_CORPUS_DIGEST:-1}"
 # Adopt-before-author pre-flight ON for the mesh: without it cross-peer head
@@ -2952,6 +2962,8 @@ restart_env_overlay() { # <captured-environ> <peer-name>
       "ACQUISITION_RECONCILE_SECS=$ACQUISITION_RECONCILE_SECS" \
       "CONTEST_BACKOFF_SECONDS=$CONTEST_BACKOFF_SECONDS" \
       "HEAL_MISSING_BACKOFF_SECONDS=$HEAL_MISSING_BACKOFF_SECONDS" \
+      "MISS_DORMANCY_BASE_SECONDS=$MISS_DORMANCY_BASE_SECONDS" \
+      "MISS_DORMANCY_CAP_SECONDS=$MISS_DORMANCY_CAP_SECONDS" \
       "ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS=$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
       "ELOHIM_HEAD_CORPUS_DIGEST=$ELOHIM_HEAD_CORPUS_DIGEST" \
       "ELOHIM_ADOPT_BEFORE_AUTHOR=$ELOHIM_ADOPT_BEFORE_AUTHOR" \
@@ -3531,6 +3543,8 @@ start_storage_peer() { # <peer-name> <peer-index>
     ACQUISITION_RECONCILE_SECS="$ACQUISITION_RECONCILE_SECS" \
     CONTEST_BACKOFF_SECONDS="$CONTEST_BACKOFF_SECONDS" \
     HEAL_MISSING_BACKOFF_SECONDS="$HEAL_MISSING_BACKOFF_SECONDS" \
+    MISS_DORMANCY_BASE_SECONDS="$MISS_DORMANCY_BASE_SECONDS" \
+    MISS_DORMANCY_CAP_SECONDS="$MISS_DORMANCY_CAP_SECONDS" \
     ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS="$ELOHIM_EVIDENCE_ABSENT_BACKOFF_SECS" \
     ELOHIM_HEAD_CORPUS_DIGEST="$ELOHIM_HEAD_CORPUS_DIGEST" \
     ELOHIM_ADOPT_BEFORE_AUTHOR="$ELOHIM_ADOPT_BEFORE_AUTHOR" \

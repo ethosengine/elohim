@@ -132,6 +132,8 @@ pub const BOOT_PUBLISHERS: &[&str] = &[
     "heal_missing_backoff_seconds",
     "reanchor_held_backoff_seconds",
     "contest_remint_window_seconds",
+    "miss_dormancy_base_seconds",
+    "miss_dormancy_cap_seconds",
     "evidence_fallback_max_alternates",
     "contest_backoff_seconds",
     "evidence_absent_backoff_seconds",
@@ -457,6 +459,69 @@ pub fn contest_remint_window() -> std::time::Duration {
     ))
 }
 
+/// Default first-rung dormancy for a retry-exhausted `MissLedger` entry: one
+/// hour.
+///
+/// This preserves the INTENT the sweep-counted predecessor documented and the
+/// cadence silently broke. `MISS_READMIT_SWEEPS = 12` was chosen as "~1h at the
+/// default 300s tick"; on the household mesh's 30s tick the same 12 sweeps came
+/// to ~6 minutes, so the harness measured a system that retried ten times more
+/// eagerly than production. A wall-clock base means the schedule reads the same
+/// on every cadence.
+///
+/// Deliberately NOT [`DEFAULT_HEAL_MISSING_BACKOFF_SECONDS`]: that window bounds
+/// how stale a REPLAYED own-conductor answer may be (we have an answer and are
+/// reusing it). This one bounds how long we stop ASKING about an id the
+/// conductor cannot see at all. Same units, different question.
+pub const DEFAULT_MISS_DORMANCY_BASE_SECONDS: u64 = 3600;
+
+/// Default ceiling on the doubling dormancy ladder: 24 hours.
+///
+/// The ladder exists because an id exhausted against unchanged evidence for the
+/// tenth time is not as likely to resolve as one exhausted for the first, and at
+/// a flat hourly rate a long-lived stale set costs the conductor a constant
+/// stream of round-trips forever. The cap exists because exhaustion must stay
+/// TEMPORARY: a daily re-ask is still a re-ask, so an id the DHT eventually
+/// gossips to this conductor is still picked up without operator action.
+pub const DEFAULT_MISS_DORMANCY_CAP_SECONDS: u64 = 86_400;
+
+/// Publish the miss-ledger first-rung dormancy's BOOT value. Idempotent.
+/// Runtime-config backed — see [`set_adopt_before_author`].
+pub fn set_miss_dormancy_base_seconds(seconds: u64) {
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::MissDormancyBaseSeconds,
+        seconds,
+    );
+}
+
+/// Publish the miss-ledger dormancy ceiling's BOOT value. Idempotent.
+/// Runtime-config backed — see [`set_adopt_before_author`].
+pub fn set_miss_dormancy_cap_seconds(seconds: u64) {
+    crate::runtime_config::publish_boot_secs(
+        crate::runtime_config::Key::MissDormancyCapSeconds,
+        seconds,
+    );
+}
+
+/// First-rung dormancy for a retry-exhausted reconcile gap
+/// (`p2p::projection_reconcile::MissLedger`).
+///
+/// `Duration::ZERO` DISABLES dormancy — an exhausted id is re-admitted on the
+/// very next sweep, which is the pre-ledger every-sweep behaviour.
+pub fn miss_dormancy_base_window() -> std::time::Duration {
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::MissDormancyBaseSeconds,
+    ))
+}
+
+/// Ceiling on the doubling dormancy ladder. Clamped to at least the base window
+/// at the read site, so a cap below the base can never shorten the first rung.
+pub fn miss_dormancy_cap_window() -> std::time::Duration {
+    std::time::Duration::from_secs(crate::runtime_config::get_secs(
+        crate::runtime_config::Key::MissDormancyCapSeconds,
+    ))
+}
+
 /// Publish the advertiser-diversity breadth for the reconcile sweep. Idempotent.
 pub fn set_evidence_fallback_max_alternates(max: usize) {
     let _ = EVIDENCE_FALLBACK_MAX_ALTERNATES.set(max);
@@ -686,8 +751,8 @@ pub const DEFAULT_EVIDENCE_FALLBACK_MAX_ALTERNATES: usize = 4;
 
 /// Conservative default backoff window: 3600s.
 ///
-/// Deliberately the SAME ~1h dormancy as `projection_reconcile`'s
-/// `MISS_READMIT_SWEEPS` (12 sweeps × the 300s reconcile cadence) — one
+/// Deliberately the SAME ~1h first re-attempt as `projection_reconcile`'s
+/// miss-ledger dormancy ([`DEFAULT_MISS_DORMANCY_BASE_SECONDS`]) — one
 /// re-attempt horizon at this seam, not a second one with a different shape.
 pub const DEFAULT_CONTEST_BACKOFF_SECONDS: u64 = 3600;
 
@@ -1131,8 +1196,8 @@ pub struct Config {
     /// AND is cleared immediately when an author path lands a local chain.
     ///
     /// `0` DISABLES the backoff (every candidate contested every sweep — the
-    /// pre-F-B behaviour). Default 3600 = 12 sweeps at the 300s cadence, the
-    /// same ~1h horizon as `MISS_READMIT_SWEEPS`.
+    /// pre-F-B behaviour). Default 3600 — the same ~1h first re-attempt horizon
+    /// as the miss-ledger's [`DEFAULT_MISS_DORMANCY_BASE_SECONDS`].
     /// Loaded from env `CONTEST_BACKOFF_SECONDS`.
     #[serde(default = "default_contest_backoff_seconds")]
     pub contest_backoff_seconds: u64,

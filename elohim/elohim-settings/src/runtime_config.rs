@@ -198,6 +198,10 @@ pub enum Key {
     ReanchorHeldBackoffSeconds = 7,
     /// `CONTEST_REMINT_WINDOW_SECONDS` — peer-head contest re-mint suppression.
     ContestRemintWindowSeconds = 8,
+    /// `MISS_DORMANCY_BASE_SECONDS` — miss-ledger first-rung dormancy.
+    MissDormancyBaseSeconds = 9,
+    /// `MISS_DORMANCY_CAP_SECONDS` — miss-ledger dormancy ladder ceiling.
+    MissDormancyCapSeconds = 10,
 }
 
 impl Key {
@@ -206,7 +210,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 9] = [
+    pub const ALL: [Key; 11] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -216,6 +220,8 @@ impl Key {
         Key::FeedbackNotify,
         Key::ReanchorHeldBackoffSeconds,
         Key::ContestRemintWindowSeconds,
+        Key::MissDormancyBaseSeconds,
+        Key::MissDormancyCapSeconds,
     ];
 }
 
@@ -247,7 +253,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 9] = [
+pub static SPECS: [SettingSpec; 11] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -354,6 +360,34 @@ pub static SPECS: [SettingSpec; 9] = [
             "hot — the contest arm reads the registry per candidate. This is a SUCCESS dedup, \
              not a failure backoff: a refused declare hands its claim straight back, and the \
              window only bounds how long an un-projected election suppresses a re-nomination.",
+        ),
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "MISS_DORMANCY_BASE_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_MISS_DORMANCY_BASE_SECONDS,
+        doc: "First-rung dormancy for a retry-exhausted reconcile gap: how long the miss-ledger \
+              stops asking the own conductor about an id it cannot see. 0 DISABLES dormancy \
+              (re-admit every sweep).",
+        note: Some(
+            "hot — the discovery sweep re-sources the schedule each tick. WALL-CLOCK, not sweep \
+             counted: the predecessor counted 12 sweeps, so the documented ~1h became ~6min on a \
+             30s-tick mesh. Each consecutive exhaustion against UNCHANGED evidence doubles from \
+             here up to MISS_DORMANCY_CAP_SECONDS; changed evidence resets to this rung at once.",
+        ),
+        unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "MISS_DORMANCY_CAP_SECONDS",
+        kind: Kind::Seconds,
+        default: crate::config::DEFAULT_MISS_DORMANCY_CAP_SECONDS,
+        doc: "Ceiling on the doubling miss-ledger dormancy ladder. Exhaustion stays TEMPORARY: \
+              the ladder stops lengthening here and the id is still re-asked on this period.",
+        note: Some(
+            "hot, and clamped to at least MISS_DORMANCY_BASE_SECONDS at the read site — a cap \
+             below the base can never shorten the first rung. Lowering it does not re-admit \
+             already-dormant ids early; it applies to the NEXT rung each computes.",
         ),
         unpublished_by_design: None,
     },

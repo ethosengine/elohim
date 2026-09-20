@@ -729,9 +729,10 @@ async fn async_main(
          are deferrals or bounds — neither excludes an id from a sweep"
     );
     elohim_storage::config::set_contest_backoff_seconds(config.contest_backoff_seconds);
-    // The two sweep-memory windows (serving-edge stories 1.1 / 1.2). Published here like every
-    // other boot value: an unparseable value keeps the default rather than silently disabling
-    // the window, and 0 is each key's documented OFF switch.
+    // The sweep-memory windows (serving-edge stories 1.1 / 1.2) plus the miss-ledger dormancy
+    // schedule. Published here like every other boot value: an unparseable value keeps the
+    // default rather than silently disabling the window, and 0 is each key's documented OFF
+    // switch.
     for (name, default, publish) in [
         (
             "REANCHOR_HELD_BACKOFF_SECONDS",
@@ -742,6 +743,16 @@ async fn async_main(
             "CONTEST_REMINT_WINDOW_SECONDS",
             elohim_storage::config::DEFAULT_CONTEST_REMINT_WINDOW_SECONDS,
             elohim_storage::config::set_contest_remint_window_seconds as fn(u64),
+        ),
+        (
+            "MISS_DORMANCY_BASE_SECONDS",
+            elohim_storage::config::DEFAULT_MISS_DORMANCY_BASE_SECONDS,
+            elohim_storage::config::set_miss_dormancy_base_seconds as fn(u64),
+        ),
+        (
+            "MISS_DORMANCY_CAP_SECONDS",
+            elohim_storage::config::DEFAULT_MISS_DORMANCY_CAP_SECONDS,
+            elohim_storage::config::set_miss_dormancy_cap_seconds as fn(u64),
         ),
     ] {
         let seconds = match std::env::var(name) {

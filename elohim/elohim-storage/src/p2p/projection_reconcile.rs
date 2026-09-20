@@ -188,15 +188,132 @@ const WITNESS_SWEEP_BUDGET: Duration = Duration::from_secs(120);
 /// the tracker is rebuilt each sweep, so a transient miss self-heals.
 pub(crate) const MAX_RETRIES: u32 = 3;
 
-/// Sweeps an exhausted [`MissLedger`] entry stays dormant before it is re-admitted
-/// for one more round of attempts.
+/// The WALL-CLOCK dormancy schedule a retry-exhausted [`MissLedger`] entry is
+/// held under: where the ladder starts, and how far it may climb.
 ///
-/// Exhaustion must not be PERMANENT: an id the conductor cannot see today may be
-/// gossiped to it tomorrow, and a ledger with no cooldown would silently stop
-/// healing it for the process lifetime. At the default 300s tick this is ~1h of
-/// dormancy — a ~12× cut in conductor asks for a stuck id, while still retrying
-/// it roughly hourly.
-const MISS_READMIT_SWEEPS: u32 = 12;
+/// ## Why wall-clock, and not sweeps (the 2026-09-20 defect)
+///
+/// The predecessor counted SWEEPS (`MISS_READMIT_SWEEPS = 12`) and documented
+/// itself as "~1h of dormancy at the default 300s tick". The household mesh
+/// ticks every 30s, so the same 12 sweeps came to ~6 minutes: the designed
+/// hourly retry became a ~7-minute one, and the harness measured a system that
+/// re-asked its conductor ten times more eagerly than production does. A
+/// cadence-dependent cooldown cannot be reasoned about from either side — the
+/// operator reads the production number and the test rig produces a different
+/// one. Wall-clock reads the same on every cadence.
+///
+/// ## Why the ladder lengthens
+///
+/// The flat schedule never learned. An id exhausted against UNCHANGED evidence
+/// for the tenth time was re-admitted exactly as eagerly as one exhausted for
+/// the first, so a settled node paid a constant stream of round-trips for a
+/// stale set that only ever grows with history (measured: ~133 REA commitments
+/// peers advertise and the own conductor cannot see, re-read forever). Doubling
+/// spends attention where it can still pay.
+///
+/// ## Why it is capped
+///
+/// Because exhaustion must stay TEMPORARY — see the honesty clause on
+/// [`Admission::Exhausted`]. Unbounded doubling would become a silent
+/// write-off in everything but name. At the cap the id is still re-asked, just
+/// on the ceiling period, so an id the DHT eventually gossips to this conductor
+/// is still picked up with no operator action.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DormancySchedule {
+    base: Duration,
+    cap: Duration,
+}
+
+impl DormancySchedule {
+    /// `cap` is clamped up to `base`: a ceiling below the first rung would
+    /// SHORTEN dormancy, which is the one thing a ceiling must never do.
+    pub fn new(base: Duration, cap: Duration) -> Self {
+        Self {
+            base,
+            cap: cap.max(base),
+        }
+    }
+
+    /// Source the schedule from the runtime-config registry
+    /// (`MISS_DORMANCY_BASE_SECONDS` / `MISS_DORMANCY_CAP_SECONDS`). Read once
+    /// per sweep by [`run_discovery`], so an operator flip reaches a RUNNING
+    /// node rather than waiting for a pod roll.
+    pub fn from_config() -> Self {
+        Self::new(
+            crate::config::miss_dormancy_base_window(),
+            crate::config::miss_dormancy_cap_window(),
+        )
+    }
+
+    /// Dormancy for the `nth` consecutive exhaustion (1-based): `base` doubled
+    /// `nth - 1` times, capped.
+    ///
+    /// A zero `base` is the documented OFF switch — it yields zero dormancy at
+    /// every rung, so an exhausted id is re-admitted immediately.
+    fn window_for(self, nth: u32) -> Duration {
+        if self.base.is_zero() {
+            return Duration::ZERO;
+        }
+        let mut window = self.base;
+        // Bounded by construction: `cap >= base > 0`, so the break fires within
+        // log2(cap/base) steps. The `min(64)` is belt-and-braces against a
+        // pathological `nth`, never the live exit.
+        for _ in 1..nth.min(64) {
+            if window >= self.cap {
+                break;
+            }
+            window = window.saturating_mul(2);
+        }
+        window.min(self.cap)
+    }
+}
+
+impl Default for DormancySchedule {
+    fn default() -> Self {
+        Self::new(
+            Duration::from_secs(crate::config::DEFAULT_MISS_DORMANCY_BASE_SECONDS),
+            Duration::from_secs(crate::config::DEFAULT_MISS_DORMANCY_CAP_SECONDS),
+        )
+    }
+}
+
+/// The ladder rung a re-admission came off, as a CLOSED label vocabulary for
+/// `elohim_projection_reconcile_miss_readmissions_total{rung}`. Bounded
+/// cardinality (6) by construction — the rung count is unbounded, the labels
+/// are not.
+fn readmission_rung_label(exhaustions: u32, window: Duration, cap: Duration) -> &'static str {
+    if window >= cap {
+        return "capped";
+    }
+    match exhaustions {
+        0 | 1 => "1",
+        2 => "2",
+        3 => "3",
+        4 => "4",
+        _ => "5+",
+    }
+}
+
+/// Book one re-admission against its ladder rung. A free fn rather than a
+/// method so [`MissLedger::admit_at`] can hold a `&mut` into `streams` and one
+/// into `readmissions` at the same time (field-level borrow split).
+fn record_readmission(
+    readmissions: &mut std::collections::HashMap<
+        &'static str,
+        std::collections::BTreeMap<&'static str, usize>,
+    >,
+    stream: &'static str,
+    exhaustions: u32,
+    window: Duration,
+    cap: Duration,
+) {
+    let rung = readmission_rung_label(exhaustions, window, cap);
+    *readmissions
+        .entry(stream)
+        .or_default()
+        .entry(rung)
+        .or_insert(0) += 1;
+}
 
 /// Per-stream ceiling on ledger entries. Bounds the memory a hostile or merely
 /// huge peer inventory can pin: past the cap new ids are admitted WITHOUT being
@@ -226,9 +343,27 @@ pub enum Admission {
     ///
     /// Real adjudication would need a PEER-CONFIRMED answer (ask the peers that
     /// advertised it whether they can still serve it), which is a designed
-    /// follow-up and is NOT implemented here. Until it is, the cooldown is what
-    /// keeps the concession honest: after `MISS_READMIT_SWEEPS` dormant sweeps
-    /// the id is re-admitted and asked again, so exhaustion is always temporary.
+    /// follow-up and is NOT implemented here. Until it is, the DORMANCY is what
+    /// keeps the concession honest, and it is a schedule rather than a flat
+    /// window ([`DormancySchedule`]):
+    ///
+    /// - the first exhaustion holds the id for the BASE window (wall-clock,
+    ///   default 1h — read from the clock, never counted in sweeps, so the
+    ///   schedule means the same thing at a 30s tick and a 300s one);
+    /// - each FURTHER exhaustion against unchanged evidence doubles that, up to
+    ///   the CAP (default 24h), because evidence that has not moved in ten
+    ///   rounds is less likely to move in the eleventh;
+    /// - the cap is a ceiling, not a terminus. At the cap the id is still
+    ///   re-admitted, still asked, still healable — for the life of the process
+    ///   and then again after a restart. Nothing here ever stops asking.
+    ///
+    /// Changed evidence short-circuits the whole schedule: it re-admits the id
+    /// on the very next sweep AND resets the ladder to its first rung, because
+    /// the claim being advertised now is not the claim we gave up on. Every
+    /// re-admission is metered on
+    /// `elohim_projection_reconcile_miss_readmissions_total{stream,rung}`, so
+    /// "exhaustion is always temporary" is a series an operator can read rather
+    /// than a sentence in this doc comment.
     Exhausted,
 }
 
@@ -252,6 +387,27 @@ pub fn advertised_head_corpus_digest(
     }
 }
 
+/// One in-flight dormancy: when the entry went dormant, and for how long.
+///
+/// Wall-clock by construction — there is no sweep counter to drift with the
+/// cadence, so a node ticking every 30s and one ticking every 300s hold an id
+/// back for exactly the same amount of TIME.
+#[derive(Debug, Clone, Copy)]
+struct Dormancy {
+    since: std::time::Instant,
+    window: Duration,
+}
+
+impl Dormancy {
+    fn elapsed(&self, now: std::time::Instant) -> Duration {
+        now.saturating_duration_since(self.since)
+    }
+
+    fn lapsed(&self, now: std::time::Instant) -> bool {
+        self.elapsed(now) >= self.window
+    }
+}
+
 #[derive(Debug, Clone)]
 struct MissEntry {
     /// Sweeps this id has been a gap under `evidence`.
@@ -260,13 +416,39 @@ struct MissEntry {
     /// anchor; collectives: the cid). A DIFFERENT claim is new evidence and
     /// re-admits the id immediately.
     evidence: String,
-    /// Sweeps spent exhausted, counted toward [`MISS_READMIT_SWEEPS`].
-    dormant: u32,
+    /// CONSECUTIVE exhaustions under the current `evidence` — the ladder rung
+    /// [`DormancySchedule::window_for`] reads. Reset to 0 by new evidence (a
+    /// different claim starts its own ladder) and dropped entirely by
+    /// [`MissLedger::resolved`].
+    exhaustions: u32,
+    /// Set while the id is being held back; `None` while it is spending
+    /// attempts. Cleared the sweep its window lapses.
+    dormant: Option<Dormancy>,
     /// Whether the id was classified DIVERGENT (vs a plain absence gap) the last
     /// time it was admitted under the current `evidence`. Backs the persistent
     /// `elohim_projection_reconcile_known_divergent{stream}` gauge — see
     /// [`MissLedger::divergent_tracked`].
     divergent: bool,
+}
+
+/// Per-sweep, per-stream miss-ledger observability, folded into the arm's
+/// existing roll-up line instead of a per-id log that nobody can read.
+///
+/// The dormant arm used to be SILENT: an id held back produced no line at any
+/// level above `debug`, so a node quietly paying ~80 conductor calls/min for a
+/// set it had already given up on looked, from the logs, like a node at rest.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MissLedgerFacts {
+    /// Ids currently held back (dormancy set and not yet lapsed).
+    pub dormant: usize,
+    /// Ids whose dormancy lapsed and were re-admitted since the last read.
+    pub readmitted: usize,
+    /// How long the longest-dormant id has been dormant right now.
+    pub longest_dormancy: Duration,
+    /// Re-admissions since the last read, by ladder rung
+    /// ([`readmission_rung_label`]) — the label set for
+    /// `elohim_projection_reconcile_miss_readmissions_total`.
+    pub readmissions_by_rung: std::collections::BTreeMap<&'static str, usize>,
 }
 
 /// Cross-sweep miss counts for the reconcile arms — the thing that makes
@@ -291,10 +473,14 @@ struct MissEntry {
 /// ## Re-admission (why exhaustion is never a black hole)
 ///
 /// - **New evidence** — a peer advertising a DIFFERENT anchor/cid for the id
-///   resets its counter immediately. The thing we gave up on is not the thing
-///   being advertised now.
-/// - **Cooldown** — after [`MISS_READMIT_SWEEPS`] dormant sweeps the id is
-///   re-admitted for another round.
+///   resets its counter immediately AND drops it to the first rung of the
+///   dormancy ladder. The thing we gave up on is not the thing being advertised
+///   now, so it does not inherit the patience we had run out of.
+/// - **Dormancy lapse** — the id is re-admitted for another round once its
+///   WALL-CLOCK dormancy window elapses ([`DormancySchedule`]). The window
+///   lengthens — doubling, capped — with each consecutive exhaustion against
+///   unchanged evidence, so a stale set costs a settled node less and less
+///   while never costing it nothing.
 ///
 /// An id the ledger holds back is ADJUDICATED: it does not defeat convergence
 /// (we have done what the substrate permits), but it never vanishes silently —
@@ -303,11 +489,44 @@ struct MissEntry {
 #[derive(Debug, Default)]
 pub struct MissLedger {
     streams: std::collections::HashMap<&'static str, std::collections::HashMap<String, MissEntry>>,
+    /// Re-admissions since the last [`Self::take_sweep_facts`], per stream, by
+    /// ladder rung. Drained rather than summed so the counter the sweep
+    /// publishes is honestly per-sweep.
+    readmissions:
+        std::collections::HashMap<&'static str, std::collections::BTreeMap<&'static str, usize>>,
+    schedule: DormancySchedule,
 }
 
 impl MissLedger {
+    /// A ledger on the compile-time default schedule. Production re-sources it
+    /// from the runtime-config registry each sweep ([`Self::set_schedule`]).
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            schedule: DormancySchedule::default(),
+            ..Default::default()
+        }
+    }
+
+    /// A ledger on an explicit schedule — the seam tests use to pin the ladder
+    /// without touching the process-wide registry (the parallel-test flake this
+    /// crate has already paid for once; see `heal_backoff::should_replay`).
+    pub fn with_schedule(schedule: DormancySchedule) -> Self {
+        Self {
+            schedule,
+            ..Default::default()
+        }
+    }
+
+    /// Re-source the dormancy schedule. Called once per sweep by
+    /// [`run_discovery`], which is what makes `MISS_DORMANCY_BASE_SECONDS` /
+    /// `MISS_DORMANCY_CAP_SECONDS` honestly HOT rather than boot-only.
+    ///
+    /// Already-dormant entries keep the window they went dormant under; a new
+    /// schedule applies to the next rung each of them computes. Re-arming live
+    /// dormancies would let a repeated flip hold an id forever, which is the one
+    /// thing the ladder must not be able to do.
+    pub fn set_schedule(&mut self, schedule: DormancySchedule) {
+        self.schedule = schedule;
     }
 
     /// Record that `id` is STILL a gap this sweep, under `evidence`, and decide
@@ -321,7 +540,24 @@ impl MissLedger {
         evidence: &str,
         divergent: bool,
     ) -> Admission {
+        self.admit_at(std::time::Instant::now(), stream, id, evidence, divergent)
+    }
+
+    /// [`Self::admit`] with the clock INJECTED — the dormancy schedule is
+    /// wall-clock, so this is the seam that lets its whole ladder be proven
+    /// without a single `sleep`.
+    pub fn admit_at(
+        &mut self,
+        now: std::time::Instant,
+        stream: &'static str,
+        id: &str,
+        evidence: &str,
+        divergent: bool,
+    ) -> Admission {
+        let schedule = self.schedule;
+        // Field-level borrow split: `streams` and `readmissions` are disjoint.
         let entries = self.streams.entry(stream).or_default();
+        let readmissions = &mut self.readmissions;
         match entries.get_mut(id) {
             None => {
                 if entries.len() >= MISS_LEDGER_CAP {
@@ -334,7 +570,8 @@ impl MissLedger {
                     MissEntry {
                         misses: 1,
                         evidence: evidence.to_string(),
-                        dormant: 0,
+                        exhaustions: 0,
+                        dormant: None,
                         divergent,
                     },
                 );
@@ -344,10 +581,12 @@ impl MissLedger {
                 if e.evidence != evidence {
                     // New evidence — this is not the claim we gave up on.
                     // Reclassify from scratch: the divergent bit belongs to the
-                    // evidence being adjudicated, not to a stale claim.
+                    // evidence being adjudicated, not to a stale claim, and the
+                    // ladder rung belongs to it just as much.
                     e.evidence = evidence.to_string();
                     e.misses = 1;
-                    e.dormant = 0;
+                    e.exhaustions = 0;
+                    e.dormant = None;
                     e.divergent = divergent;
                     return Admission::Retry;
                 }
@@ -358,18 +597,87 @@ impl MissLedger {
                 // a divergence the ledger already knows about — the peer's
                 // claim has not changed, so what made it divergent still holds.
                 e.divergent = e.divergent || divergent;
+
+                if let Some(dormancy) = e.dormant {
+                    if !dormancy.lapsed(now) {
+                        return Admission::Exhausted;
+                    }
+                    // The rung lapsed. Exhaustion was always temporary; this is
+                    // where that promise is kept, and metered.
+                    e.dormant = None;
+                    e.misses = 1;
+                    record_readmission(
+                        readmissions,
+                        stream,
+                        e.exhaustions,
+                        dormancy.window,
+                        schedule.cap,
+                    );
+                    return Admission::Retry;
+                }
+
                 if e.misses >= MAX_RETRIES {
-                    e.dormant = e.dormant.saturating_add(1);
-                    if e.dormant >= MISS_READMIT_SWEEPS {
+                    e.exhaustions = e.exhaustions.saturating_add(1);
+                    let window = schedule.window_for(e.exhaustions);
+                    if window.is_zero() {
+                        // Dormancy DISABLED (base 0) — the documented OFF
+                        // switch. Re-admit immediately rather than recording a
+                        // zero-length hold nobody could observe.
                         e.misses = 1;
-                        e.dormant = 0;
+                        record_readmission(
+                            readmissions,
+                            stream,
+                            e.exhaustions,
+                            window,
+                            schedule.cap,
+                        );
                         return Admission::Retry;
                     }
+                    e.dormant = Some(Dormancy { since: now, window });
                     return Admission::Exhausted;
                 }
                 e.misses = e.misses.saturating_add(1);
                 Admission::Retry
             }
+        }
+    }
+
+    /// Drain this sweep's miss-ledger facts for `stream` — dormant population,
+    /// re-admissions (by rung) since the last read, and the longest dormancy
+    /// currently standing.
+    ///
+    /// READ-AND-CLEAR for the re-admission halves, a plain read for the dormancy
+    /// halves: the counter must be per-sweep or it double-counts, while the
+    /// population is a level, not a flow.
+    pub fn take_sweep_facts(&mut self, stream: &'static str) -> MissLedgerFacts {
+        self.take_sweep_facts_at(std::time::Instant::now(), stream)
+    }
+
+    /// [`Self::take_sweep_facts`] with the clock injected.
+    pub fn take_sweep_facts_at(
+        &mut self,
+        now: std::time::Instant,
+        stream: &'static str,
+    ) -> MissLedgerFacts {
+        let readmissions_by_rung = self.readmissions.remove(stream).unwrap_or_default();
+        let readmitted = readmissions_by_rung.values().sum();
+        let (dormant, longest_dormancy) = self
+            .streams
+            .get(stream)
+            .map(|entries| {
+                entries
+                    .values()
+                    .filter_map(|e| e.dormant.filter(|d| !d.lapsed(now)))
+                    .fold((0usize, Duration::ZERO), |(n, longest), d| {
+                        (n + 1, longest.max(d.elapsed(now)))
+                    })
+            })
+            .unwrap_or((0, Duration::ZERO));
+        MissLedgerFacts {
+            dormant,
+            readmitted,
+            longest_dormancy,
+            readmissions_by_rung,
         }
     }
 
@@ -1691,6 +1999,16 @@ pub struct ReaDiscovery {
     /// unmeasured arm forces `converged=false` and lights
     /// `elohim_projection_reconcile_converged_blocked_by{term="unmeasured"}`.
     measured: bool,
+    /// This sweep's [`MissLedger`] facts for the REA stream, filled in by
+    /// [`run_discovery`] once every arm has run and carried to the heal leg's
+    /// roll-up line.
+    ///
+    /// Only `run_discovery` can know this — the ledger is owned there (one
+    /// owner, no lock) and the heal leg never sees it. Before this, the dormant
+    /// arm was invisible above `debug`: a node paying nothing for a set it had
+    /// given up on and a node quietly re-asking it every 30 seconds logged
+    /// identically.
+    miss_facts: MissLedgerFacts,
 }
 
 impl ReaDiscovery {
@@ -1710,6 +2028,7 @@ impl ReaDiscovery {
             exhausted_persistent: 0,
             local_total: 0,
             measured: false,
+            miss_facts: MissLedgerFacts::default(),
         }
     }
 }
@@ -1994,7 +2313,11 @@ pub async fn run_discovery(
     window: &mut InventoryWindow,
     misses: &mut MissLedger,
 ) -> SweepPlan {
-    let rea = discover_rea(p2p, pool, window, misses).await;
+    // Re-source the dormancy schedule before the arms run, so
+    // MISS_DORMANCY_BASE_SECONDS / MISS_DORMANCY_CAP_SECONDS are honestly HOT on
+    // a RUNNING node rather than captured once at spawn.
+    misses.set_schedule(DormancySchedule::from_config());
+    let mut rea = discover_rea(p2p, pool, window, misses).await;
     let content = discover_content(p2p, pool, window, misses).await;
     let collectives = discover_collectives(p2p, pool, window, misses).await;
     let participations =
@@ -2022,6 +2345,17 @@ pub async fn run_discovery(
             known_gaps as u64,
             known_divergent as u64,
         );
+        // Drain the miss-ledger's per-sweep facts for EVERY stream (so the
+        // re-admission counter can never double-count a rung across sweeps) and
+        // carry the REA arm's share to its heal-leg roll-up line, which is the
+        // one place the dormant arm becomes readable without per-id logs.
+        let facts = misses.take_sweep_facts(table);
+        for (rung, count) in &facts.readmissions_by_rung {
+            crate::metrics::add_projection_miss_readmissions(stream, rung, *count);
+        }
+        if table == PROJECTION_INVENTORY_TABLE_REA_COMMITMENTS {
+            rea.miss_facts = facts;
+        }
     }
 
     tracing::info!(
@@ -2120,6 +2454,7 @@ pub async fn run_heal(
         exhausted_persistent: rea_exhausted,
         local_total,
         measured: rea_measured,
+        miss_facts: rea_miss_facts,
     } = rea;
     // Publish the last-sweep gauges BEFORE heal (discovered gaps + local rows), so
     // convergence is watchable on `/metrics` without tailing Loki. `exhausted` is
@@ -2153,9 +2488,12 @@ pub async fn run_heal(
         divergent_refused: rea_refused_by_conductor,
     } = heal_rea(
         &mut tracker,
-        &discovered_by,
-        &rea_exhausting_divergent,
-        &rea_heal_evidence,
+        ReaHealContext {
+            discovered_by: &discovered_by,
+            exhausting_divergent: &rea_exhausting_divergent,
+            heal_evidence: &rea_heal_evidence,
+            miss_facts: &rea_miss_facts,
+        },
         hc,
         pool,
         &pacing,
@@ -3456,6 +3794,9 @@ async fn discover_rea(
         // stop. `true` here left a peer-partition sweep publishing gauges
         // (and the A1/A1b measured bit) as if it had actually measured.
         measured: peers_asked > 0,
+        // Filled in by `run_discovery` once every arm has run — the ledger is
+        // shared across arms, so draining it here would race the others.
+        miss_facts: MissLedgerFacts::default(),
     }
 }
 
@@ -3563,15 +3904,30 @@ fn apply_remembered_rea_refusals(
     remembered.len()
 }
 
+/// What the REA heal leg knows BEFORE it touches the conductor — everything
+/// [`discover_rea`] learned, plus the cross-sweep ledger facts only
+/// [`run_discovery`] can drain. Grouped because they are produced by one pass
+/// and travel together; the heal leg reads them and never writes them.
+struct ReaHealContext<'a> {
+    discovered_by: &'a std::collections::HashMap<String, String>,
+    exhausting_divergent: &'a std::collections::HashSet<String>,
+    heal_evidence: &'a std::collections::HashMap<String, String>,
+    miss_facts: &'a MissLedgerFacts,
+}
+
 async fn heal_rea(
     tracker: &mut GapTracker,
-    discovered_by: &std::collections::HashMap<String, String>,
-    exhausting_divergent: &std::collections::HashSet<String>,
-    heal_evidence: &std::collections::HashMap<String, String>,
+    ctx: ReaHealContext<'_>,
     hc: &Arc<HcClient>,
     pool: &DbPool,
     pacing: &HealPacing,
 ) -> ReaHealOutcome {
+    let ReaHealContext {
+        discovered_by,
+        exhausting_divergent,
+        heal_evidence,
+        miss_facts,
+    } = ctx;
     let app_ctx = crate::db::AppContext::default_lamad();
     // Heal-side half of this arm's divergence adjudication (see
     // [`ReaDiscovery::divergent_refused`] for the discovery-side half).
@@ -3823,10 +4179,16 @@ async fn heal_rea(
         divergent_refused,
         replay_window_secs = replay_window.as_secs(),
         verdict_ledger_tracked = crate::services::rea_verdict_backoff::tracked(),
+        miss_dormant = miss_facts.dormant,
+        miss_readmitted = miss_facts.readmitted,
+        miss_longest_dormancy_secs = miss_facts.longest_dormancy.as_secs(),
         "projection-reconcile[rea]: heal leg finished (to_read = ids that cost a \
          get_rea_commitment round-trip this sweep; replayed = ids whose adjudicated refusal \
          was reused against unchanged evidence, adjudicated identically and still counted as \
-         divergence)"
+         divergence; miss_dormant = ids the cross-sweep ledger is holding back on its \
+         wall-clock dormancy ladder, miss_readmitted = ids whose dormancy lapsed this sweep \
+         and were asked again, miss_longest_dormancy_secs = how long the most patient one has \
+         been held — the arm that used to be silent)"
     );
 
     tracker.update_caught_up();
@@ -6646,7 +7008,10 @@ async fn discover_collectives(
 
     // Cross-sweep retry budget (see [`MissLedger`]). The gap key IS the cid here,
     // so "new evidence" can only ever arrive as a NEW key — the ledger's
-    // evidence field is the cid itself and the cooldown is what re-admits.
+    // evidence field is the cid itself and the DORMANCY LAPSE is this arm's only
+    // exit. The wall-clock ladder is therefore load-bearing here in a way it is
+    // not on the anchor-carrying arms: a cid this conductor cannot resolve backs
+    // off 1h → 2h → … → 24h and is re-asked daily thereafter, never written off.
     let mut exhausted_persistent = 0usize;
     let mut admitted: Vec<String> = Vec::with_capacity(gap_cids.len());
     for cid in gap_cids {
@@ -7745,48 +8110,399 @@ mod tests {
         );
     }
 
+    // ── The miss-ledger dormancy ladder (2026-09-20 defect) ─────────────────
+    //
+    // Dormancy is WALL-CLOCK and LENGTHENS. Every test below injects the clock
+    // through `admit_at` / `take_sweep_facts_at` — none sleeps, and none touches
+    // the process-wide runtime-config registry (`with_schedule` is the seam, for
+    // the parallel-test flake reason `heal_backoff::should_replay` documents).
+
+    const DORMANCY_STREAM: &str = "content";
+    const DORMANCY_EVIDENCE: &str = "anchor-A";
+
+    /// A short, readable ladder for the tests: 60s base, 240s cap, so the rungs
+    /// are 60 · 120 · 240 · 240 · … No wall-clock time is ever spent on these
+    /// numbers; they are arithmetic the injected clock steps over.
+    fn test_schedule() -> DormancySchedule {
+        DormancySchedule::new(Duration::from_secs(60), Duration::from_secs(240))
+    }
+
+    /// Drive an entry that currently holds a FRESH budget (`misses == 1`, which
+    /// is true right after the first admit and right after any re-admission)
+    /// through one full ladder rung, asserting the dormancy it is given is
+    /// exactly `want`. Returns the instant the entry was re-admitted, which is a
+    /// fresh-budget instant again.
+    fn assert_rung(
+        ledger: &mut MissLedger,
+        t: std::time::Instant,
+        id: &str,
+        evidence: &str,
+        want: Duration,
+    ) -> std::time::Instant {
+        for attempt in 1..MAX_RETRIES {
+            assert_eq!(
+                ledger.admit_at(t, DORMANCY_STREAM, id, evidence, false),
+                Admission::Retry,
+                "attempt {attempt} is still inside the retry budget"
+            );
+        }
+        assert_eq!(
+            ledger.admit_at(t, DORMANCY_STREAM, id, evidence, false),
+            Admission::Exhausted,
+            "budget spent against unchanged evidence — the dormancy clock starts here"
+        );
+        assert_eq!(
+            ledger.admit_at(
+                t + want - Duration::from_millis(1),
+                DORMANCY_STREAM,
+                id,
+                evidence,
+                false
+            ),
+            Admission::Exhausted,
+            "still held one millisecond before the {want:?} window closes"
+        );
+        assert_eq!(
+            ledger.admit_at(t + want, DORMANCY_STREAM, id, evidence, false),
+            Admission::Retry,
+            "re-admitted exactly when the {want:?} window closes"
+        );
+        t + want
+    }
+
+    #[test]
+    fn dormancy_is_wall_clock_not_sweep_count() {
+        // THE DEFECT. The predecessor counted 12 SWEEPS and called itself "~1h
+        // at the default 300s tick"; the household mesh ticks every 30s, so the
+        // designed hourly retry became one every ~7 minutes and the harness
+        // measured a system production does not run. Sweeps must not move the
+        // clock — only the clock moves the clock.
+        let t0 = std::time::Instant::now();
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        assert_eq!(
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        for _ in 1..MAX_RETRIES {
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false);
+        }
+        assert_eq!(
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Exhausted
+        );
+
+        // 100 sweeps inside the window — eight times what the sweep-counted
+        // ledger needed to re-admit, and at the mesh's 30s cadence nearly an
+        // hour of ticks.
+        for sweep in 0..100u64 {
+            assert_eq!(
+                ledger.admit_at(
+                    t0 + Duration::from_millis(sweep),
+                    DORMANCY_STREAM,
+                    "row-1",
+                    DORMANCY_EVIDENCE,
+                    false
+                ),
+                Admission::Exhausted,
+                "sweep {sweep} is inside the wall-clock window — sweeps do not spend it"
+            );
+        }
+        assert_eq!(
+            ledger.admit_at(
+                t0 + Duration::from_secs(60),
+                DORMANCY_STREAM,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                false
+            ),
+            Admission::Retry,
+            "one sweep past the window re-admits — the clock is the only thing that does"
+        );
+    }
+
+    #[test]
+    fn dormancy_doubles_on_repeated_exhaustion_and_is_capped() {
+        // An id exhausted against UNCHANGED evidence for the tenth time is not
+        // as likely to resolve as one exhausted for the first, and at a flat
+        // rate a stale set costs a settled node the same round-trips forever.
+        // The ladder spends attention where it can still pay — and STOPS
+        // lengthening at the cap, because exhaustion must stay temporary.
+        let s = test_schedule();
+        assert_eq!(
+            s.window_for(1),
+            Duration::from_secs(60),
+            "first rung = base"
+        );
+        assert_eq!(s.window_for(2), Duration::from_secs(120));
+        assert_eq!(s.window_for(3), Duration::from_secs(240));
+        assert_eq!(s.window_for(4), Duration::from_secs(240), "capped, not 480");
+        assert_eq!(s.window_for(40), Duration::from_secs(240), "still capped");
+
+        // A cap below the base is clamped UP: a ceiling must never shorten the
+        // first rung.
+        let inverted = DormancySchedule::new(Duration::from_secs(60), Duration::from_secs(5));
+        assert_eq!(inverted.window_for(1), Duration::from_secs(60));
+
+        // And the same ladder end-to-end through `admit`, which is the surface
+        // the reconcile arms actually call.
+        let mut ledger = MissLedger::with_schedule(s);
+        let t0 = std::time::Instant::now();
+        assert_eq!(
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        let mut t = t0;
+        for want in [60u64, 120, 240, 240] {
+            t = assert_rung(
+                &mut ledger,
+                t,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                Duration::from_secs(want),
+            );
+        }
+    }
+
+    #[test]
+    fn changed_evidence_re_admits_immediately_and_resets_the_ladder() {
+        // The re-admission rule this cure must NOT weaken: exhaustion is about a
+        // CLAIM, not an id. A peer advertising a different anchor is not the
+        // thing we gave up on, so it re-admits at once — and it does not inherit
+        // the patience we had run out of, so its ladder starts at rung 1.
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        let t0 = std::time::Instant::now();
+        assert_eq!(
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        // Climb to the capped rung under anchor-A.
+        let mut t = t0;
+        for want in [60u64, 120, 240] {
+            t = assert_rung(
+                &mut ledger,
+                t,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                Duration::from_secs(want),
+            );
+        }
+        // Exhaust once more so the id is sitting DORMANT on the capped rung.
+        for _ in 1..MAX_RETRIES {
+            ledger.admit_at(t, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false);
+        }
+        assert_eq!(
+            ledger.admit_at(t, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Exhausted
+        );
+
+        // New evidence, same instant: admitted NOW, not at window expiry.
+        assert_eq!(
+            ledger.admit_at(t, DORMANCY_STREAM, "row-1", "anchor-B", false),
+            Admission::Retry,
+            "a DIFFERENT advertised anchor is fresh evidence — ask about it now"
+        );
+        // ...and back on the FIRST rung: 60s, not the 240s it had climbed to.
+        assert_rung(&mut ledger, t, "row-1", "anchor-B", Duration::from_secs(60));
+    }
+
     #[test]
     fn exhaustion_is_never_permanent() {
         // A row the conductor cannot see today may be gossiped to it tomorrow.
-        // Without the cooldown the ledger would silently stop healing it for the
-        // process lifetime — trading one dishonest gauge for a real gap.
-        let mut ledger = MissLedger::new();
-        for _ in 0..MAX_RETRIES {
-            ledger.admit("content", "row-1", "anchor-A", false);
-        }
-        let mut exhausted_sweeps = 0;
-        for _ in 0..MISS_READMIT_SWEEPS {
-            match ledger.admit("content", "row-1", "anchor-A", false) {
-                Admission::Exhausted => exhausted_sweeps += 1,
-                Admission::Retry => break,
-            }
-        }
+        // The ladder lengthens, but it never becomes a write-off: at the cap the
+        // id is STILL re-admitted, every cap period, for as long as the process
+        // lives. `Admission::Exhausted`'s honesty clause depends on this.
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        let t0 = std::time::Instant::now();
         assert_eq!(
-            exhausted_sweeps,
-            MISS_READMIT_SWEEPS - 1,
-            "dormant for the cooldown, then re-admitted for another round"
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
         );
+        let mut t = t0;
+        // Climb past the cap, then keep going: ten more full cap periods, each
+        // of which must hand the id back.
+        for want in [
+            60u64, 120, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240, 240,
+        ] {
+            t = assert_rung(
+                &mut ledger,
+                t,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                Duration::from_secs(want),
+            );
+        }
         assert_eq!(
-            ledger.admit("content", "row-1", "anchor-A", false),
-            Admission::Retry,
-            "the fresh budget is spendable again"
+            ledger.tracked(DORMANCY_STREAM),
+            1,
+            "still tracked, still counted, still a gap — held back is never written off"
+        );
+    }
+
+    #[test]
+    fn a_zero_base_disables_dormancy_entirely() {
+        // The documented OFF switch (MISS_DORMANCY_BASE_SECONDS=0): an exhausted
+        // id is handed straight back, which is the pre-ledger every-sweep
+        // behaviour. A lever that reports "off" must actually be off.
+        let mut ledger =
+            MissLedger::with_schedule(DormancySchedule::new(Duration::ZERO, Duration::ZERO));
+        let t0 = std::time::Instant::now();
+        for _ in 0..MAX_RETRIES {
+            assert_eq!(
+                ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+                Admission::Retry
+            );
+        }
+        for sweep in 0..10 {
+            assert_eq!(
+                ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+                Admission::Retry,
+                "sweep {sweep}: dormancy is disabled, so nothing is ever held back"
+            );
+        }
+    }
+
+    #[test]
+    fn the_ledger_cap_still_fails_open() {
+        // Past MISS_LEDGER_CAP a new id is admitted WITHOUT being recorded — the
+        // pre-ledger behaviour, never a silent drop. The dormancy ladder must
+        // not have turned that fail-open into a fail-closed: an unrecorded id
+        // has no entry, so it has no dormancy and can never be held back.
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        let t0 = std::time::Instant::now();
+        for n in 0..MISS_LEDGER_CAP {
+            ledger.admit_at(
+                t0,
+                DORMANCY_STREAM,
+                &format!("row-{n}"),
+                DORMANCY_EVIDENCE,
+                false,
+            );
+        }
+        assert_eq!(ledger.tracked(DORMANCY_STREAM), MISS_LEDGER_CAP);
+        for sweep in 0..10 {
+            assert_eq!(
+                ledger.admit_at(t0, DORMANCY_STREAM, "over-cap", DORMANCY_EVIDENCE, false),
+                Admission::Retry,
+                "sweep {sweep}: an id past the cap is retried, exactly as before the ledger"
+            );
+        }
+        assert_eq!(
+            ledger.tracked(DORMANCY_STREAM),
+            MISS_LEDGER_CAP,
+            "and it is still not recorded — the cap is a memory bound, not an admission rule"
+        );
+    }
+
+    #[test]
+    fn sweep_facts_make_the_dormant_arm_readable() {
+        // The dormant arm used to be SILENT above `debug`. These are the facts
+        // the REA roll-up line now carries, and the counter the rung labels feed.
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        let t0 = std::time::Instant::now();
+        // Two ids exhausted 30s apart, so `dormant` and `longest_dormancy` have
+        // something to tell apart.
+        let mut exhaust = |ledger: &mut MissLedger, at, id| {
+            for _ in 0..MAX_RETRIES {
+                ledger.admit_at(at, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false);
+            }
+            assert_eq!(
+                ledger.admit_at(at, DORMANCY_STREAM, id, DORMANCY_EVIDENCE, false),
+                Admission::Exhausted
+            );
+        };
+        exhaust(&mut ledger, t0, "row-1");
+        exhaust(&mut ledger, t0 + Duration::from_secs(30), "row-2");
+
+        let held = ledger.take_sweep_facts_at(t0 + Duration::from_secs(30), DORMANCY_STREAM);
+        assert_eq!(held.dormant, 2, "both held");
+        assert_eq!(held.readmitted, 0);
+        assert_eq!(
+            held.longest_dormancy,
+            Duration::from_secs(30),
+            "row-1 is the most patient one"
+        );
+        assert!(held.readmissions_by_rung.is_empty());
+
+        // row-1's window closes; row-2 has 30s of its own left.
+        let t1 = t0 + Duration::from_secs(60);
+        assert_eq!(
+            ledger.admit_at(t1, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        let facts = ledger.take_sweep_facts_at(t1, DORMANCY_STREAM);
+        assert_eq!(facts.readmitted, 1);
+        assert_eq!(
+            facts.readmissions_by_rung.get("1").copied(),
+            Some(1),
+            "the first rung is what lapsed"
+        );
+        assert_eq!(facts.dormant, 1, "row-2 is still inside its window");
+        assert_eq!(facts.longest_dormancy, Duration::from_secs(30));
+
+        // READ-AND-CLEAR: the counter is per-sweep or it double-counts.
+        let after = ledger.take_sweep_facts_at(t1, DORMANCY_STREAM);
+        assert_eq!(after.readmitted, 0);
+        assert!(after.readmissions_by_rung.is_empty());
+        assert_eq!(
+            after.dormant, 1,
+            "the dormant POPULATION is a level, not a flow — reading it does not drain it"
+        );
+    }
+
+    #[test]
+    fn the_rung_label_vocabulary_is_closed_and_names_the_ceiling() {
+        // Bounded label cardinality, and `capped` must win over the rung number
+        // so an operator can read "this id has settled onto the ceiling" off one
+        // series rather than inferring it from a rung that keeps climbing.
+        let cap = Duration::from_secs(240);
+        assert_eq!(readmission_rung_label(1, Duration::from_secs(60), cap), "1");
+        assert_eq!(
+            readmission_rung_label(2, Duration::from_secs(120), cap),
+            "2"
+        );
+        assert_eq!(readmission_rung_label(3, cap, cap), "capped");
+        assert_eq!(
+            readmission_rung_label(9, Duration::from_secs(60), cap),
+            "5+",
+            "an uncapped rung past 4 folds into one label, never its own series"
         );
     }
 
     #[test]
     fn a_resolved_id_leaves_the_ledger_with_a_clean_budget() {
         // A row that heals and later relapses must not inherit the old budget —
-        // the relapse is new work, not a continuation.
-        let mut ledger = MissLedger::new();
-        for _ in 0..MAX_RETRIES {
-            ledger.admit("rea", "row-1", "anchor-A", false);
-        }
-        ledger.resolved("rea", "row-1");
-        assert_eq!(ledger.tracked("rea"), 0);
+        // the relapse is new work, not a continuation. Extended for the ladder:
+        // it must not inherit the RUNG either, or a row that healed once and
+        // relapsed would be held back for a day on its first miss.
+        let mut ledger = MissLedger::with_schedule(test_schedule());
+        let t0 = std::time::Instant::now();
         assert_eq!(
-            ledger.admit("rea", "row-1", "anchor-A", false),
+            ledger.admit_at(t0, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
+            Admission::Retry
+        );
+        let mut t = t0;
+        for want in [60u64, 120, 240] {
+            t = assert_rung(
+                &mut ledger,
+                t,
+                "row-1",
+                DORMANCY_EVIDENCE,
+                Duration::from_secs(want),
+            );
+        }
+        ledger.resolved(DORMANCY_STREAM, "row-1");
+        assert_eq!(ledger.tracked(DORMANCY_STREAM), 0);
+        assert_eq!(
+            ledger.admit_at(t, DORMANCY_STREAM, "row-1", DORMANCY_EVIDENCE, false),
             Admission::Retry,
             "a relapsed row starts from a clean budget"
+        );
+        assert_rung(
+            &mut ledger,
+            t,
+            "row-1",
+            DORMANCY_EVIDENCE,
+            Duration::from_secs(60),
         );
     }
 

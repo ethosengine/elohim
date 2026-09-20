@@ -101,5 +101,5 @@ A change here rebuilds the storage image, so this crate is COPY'd in
 `genesis/orchestrator/storage-build-inputs.test.mjs` holds both.
 
 **Verify a settings change at runtime**, not only at the gate: `GET /admin/runtime-config` is the
-one surface where a silent default shows up — 9 `SPECS` + 1 `TEXT_SPECS` + 5 `BOOT_ONLY`, each
+one surface where a silent default shows up — 11 `SPECS` + 1 `TEXT_SPECS` + 5 `BOOT_ONLY`, each
 with its effective value, its boot value and its provenance.

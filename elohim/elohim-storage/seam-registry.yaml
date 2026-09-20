@@ -4700,3 +4700,85 @@ decisionPoints:
       their liveness is a conservative lower-bound exact match, not proof of a distinct physical machine. A legacy `agent:`-prefixed raw human token still requires that exact spelling;
       normalizing its liveness aliases needs separate evidence. Receiver-local binding verification does not establish globally complete
       supersession knowledge (C2-S7 remains separate).
+
+  - name: MissLedger::admit_at
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/p2p/projection_reconcile.rs
+      modulePath: p2p::projection_reconcile::MissLedger::admit_at
+      line: 551
+    summary: >
+      The cross-sweep admission decision for every reconcile arm (rea, content, collectives,
+      participations, humans): may this still-a-gap id be enqueued for heal this sweep, or is
+      its bounded retry budget spent against UNCHANGED peer evidence? Retry while misses <
+      MAX_RETRIES (3); on the attempt that spends the budget the id goes dormant for a
+      WALL-CLOCK window from an injected clock, and each consecutive exhaustion against the
+      same evidence DOUBLES that window up to a cap (DormancySchedule; MISS_DORMANCY_BASE_SECONDS
+      default 3600s, MISS_DORMANCY_CAP_SECONDS default 86400s, both hot via the runtime-config
+      registry and re-sourced per sweep by run_discovery). Changed evidence re-admits at once AND
+      resets the ladder to rung 1; resolved() drops the entry entirely; past MISS_LEDGER_CAP
+      (100_000) a new id is admitted WITHOUT being recorded (fail-open). Replaces the
+      sweep-counted MISS_READMIT_SWEEPS = 12, whose documented "~1h at the 300s tick" silently
+      became ~7min on the household mesh's 30s tick (2026-09-20 defect; ~133 REA commitments
+      re-read forever at ~80 conductor calls/min/node at rest).
+    concernIds:
+      - id: C3
+        status: answered
+        justification: >
+          Exhaustion is a bounded-work concession and never terminal: the ladder is CAPPED, so a
+          held-back id is still re-admitted every cap period for the life of the process, and a
+          restart clears the whole in-memory ledger. Changed peer evidence is an immediate exit
+          that does not wait for any window. Pinned by exhaustion_is_never_permanent and
+          changed_evidence_re_admits_immediately_and_resets_the_ladder.
+      - id: C4
+        status: answered
+        justification: >
+          Nothing here asserts absence. The decision is about THIS node's retry budget only; the
+          id stays tracked, stays in the divergence total, and stays published on
+          elohim_projection_reconcile_exhausted. No adjudication, tombstone or delete behaviour
+          is added, and the arms' conductor-answer adjudication is untouched.
+      - id: C6a
+        status: answered
+        justification: >
+          Pure per-id decision over an in-memory entry — no loop, no conductor call, no I/O.
+          Memory is bounded by MISS_LEDGER_CAP per stream and time by the dormancy cap;
+          DormancySchedule::window_for's doubling loop terminates within log2(cap/base) steps
+          (cap >= base > 0) with a defensive min(64). The change strictly REDUCES the paced heal
+          legs' conductor work and leaves their own budgets unchanged.
+      - id: C8
+        status: answered
+        justification: >
+          The dormant arm was silent above `debug`. Every re-admission now increments
+          elohim_projection_reconcile_miss_readmissions_total{stream,rung} under a closed
+          6-value rung vocabulary (readmission_rung_label, all pre-touched per stream), and the
+          existing per-sweep REA roll-up line carries miss_dormant / miss_readmitted /
+          miss_longest_dormancy_secs. No per-id INFO logs were added.
+      - id: C11
+        status: n-a
+        justification: >
+          No new queue, admission surface or backpressure contract; this gates enqueue onto the
+          existing per-sweep GapTracker only.
+      - id: C12
+        status: n-a
+        justification: "No permission, reach or consent boundary is read or changed."
+      - id: C13
+        status: n-a
+        justification: "No social tier, custody right or resource allocation changes."
+    contractTests:
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: dormancy_is_wall_clock_not_sweep_count, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: dormancy_doubles_on_repeated_exhaustion_and_is_capped, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: changed_evidence_re_admits_immediately_and_resets_the_ladder, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: exhaustion_is_never_permanent, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: a_resolved_id_leaves_the_ledger_with_a_clean_budget, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: the_ledger_cap_still_fails_open, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: a_zero_base_disables_dormancy_entirely, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: sweep_facts_make_the_dormant_arm_readable, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: the_rung_label_vocabulary_is_closed_and_names_the_ceiling, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: miss_ledger_makes_max_retries_real_across_sweeps, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: new_peer_evidence_re_admits_an_exhausted_id_immediately, kind: unit }
+      - { path: elohim/elohim-storage/src/p2p/projection_reconcile.rs, testName: ledger_streams_do_not_share_budgets, kind: unit }
+    gapNote: >
+      Real adjudication of an id the own conductor cannot see would need a PEER-CONFIRMED answer
+      (ask the advertisers whether they can still serve it); that is a designed follow-up and is
+      NOT implemented. Until then the schedule is what keeps the concession honest. The dormancy
+      ladder is per-process and in-memory, so a restart re-asks the whole stale set once.
