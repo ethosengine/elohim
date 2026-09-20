@@ -1146,9 +1146,12 @@ pub struct AttestationOutput {
 
 #[hdk_extern]
 pub fn init() -> ExternResult<InitCallbackResult> {
-    // Initialize healing support - check if v1 is available
-    // This never fails, always returns success
-    let _ = healing_impl::init_healing();
+    // Initialize healing support - check if v1 is available. Best-effort: DNA init
+    // must still succeed (init_flexible_orchestrator below) even if the v1 bridge
+    // probe fails, so a failure here is logged rather than propagated.
+    if let Err(e) = healing_impl::init_healing() {
+        error!("init: healing_impl::init_healing failed — {:?}", e);
+    }
 
     // Initialize flexible healing architecture
     // Register all entry type providers
@@ -7292,9 +7295,17 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
                     ))
                 })?
             } else {
-                // Newly healed entry, cache it with a new link
+                // Newly healed entry, cache it with a new link. Best-effort: a failed
+                // index link just means the next read re-runs the same healing path
+                // (see healing_integration.rs) rather than hitting the v2 cache — it
+                // does not lose the entry just created above.
                 let new_hash = create_entry(&EntryTypes::Content(content.clone()))?;
-                let _ = create_id_to_content_link(&content.id, &new_hash);
+                if let Err(e) = create_id_to_content_link(&content.id, &new_hash) {
+                    error!(
+                        "content id-to-content link failed after healing cache write for {} — {:?}",
+                        content.id, e
+                    );
+                }
                 new_hash
             };
 
@@ -13233,8 +13244,15 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         )),
     };
 
-    // Create source → target commitment
-    let _ = create_custodian_commitment(source_to_target_input);
+    // Create source → target commitment. Best-effort: this auto-commitment is derived
+    // from the relationship, and the two directions are independent — a failure here
+    // must not skip the target → source attempt below, so it is logged, not propagated.
+    if let Err(e) = create_custodian_commitment(source_to_target_input) {
+        error!(
+            "on_relationship_updated: source→target custodian commitment failed for relationship {} — {:?}",
+            relationship.id, e
+        );
+    }
 
     // Create bidirectional commitment (target → source)
     let target_to_source_input = CreateCustodianCommitmentInput {
@@ -13298,8 +13316,14 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         )),
     };
 
-    // Create target → source commitment
-    let _ = create_custodian_commitment(target_to_source_input);
+    // Create target → source commitment. Best-effort, same reasoning as the
+    // source → target attempt above: logged, not propagated.
+    if let Err(e) = create_custodian_commitment(target_to_source_input) {
+        error!(
+            "on_relationship_updated: target→source custodian commitment failed for relationship {} — {:?}",
+            relationship.id, e
+        );
+    }
 
     Ok(())
 }
@@ -13404,8 +13428,14 @@ pub fn activate_emergency_manual(
     let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
     let action_hash = create_entry(EntryTypes::CustodianCommitment(commitment.clone()))?;
 
-    // Notify emergency contacts
-    let _ = notify_emergency_contacts(&commitment, &input.reason);
+    // Notify emergency contacts — best-effort: the commitment is already activated
+    // and committed above, so a notification failure must not fail the activation.
+    if let Err(e) = notify_emergency_contacts(&commitment, &input.reason) {
+        error!(
+            "activate_emergency_manual: notify_emergency_contacts failed for commitment {} — {:?}",
+            commitment.id, e
+        );
+    }
 
     Ok(CustodianCommitmentOutput {
         action_hash,
@@ -13474,8 +13504,14 @@ pub fn activate_emergency_trusted_party(
     let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
     let action_hash = create_entry(EntryTypes::CustodianCommitment(commitment.clone()))?;
 
-    // Notify emergency contacts
-    let _ = notify_emergency_contacts(&commitment, &input.reason);
+    // Notify emergency contacts — best-effort: the commitment is already activated
+    // and committed above, so a notification failure must not fail the activation.
+    if let Err(e) = notify_emergency_contacts(&commitment, &input.reason) {
+        error!(
+            "activate_emergency_trusted_party: notify_emergency_contacts failed for commitment {} — {:?}",
+            commitment.id, e
+        );
+    }
 
     Ok(CustodianCommitmentOutput {
         action_hash,
@@ -14962,8 +14998,15 @@ fn post_commit_one(
             })?;
         }
         EntryTypes::Relationship(relationship) => {
-            // Auto-create custodian commitments when relationship reaches trusted/intimate
-            let _ = on_relationship_updated(relationship.clone());
+            // Auto-create custodian commitments when relationship reaches trusted/intimate.
+            // Best-effort: a failure here must not suppress the RelationshipCommitted /
+            // cache signals emitted below for the same entry, so it is logged, not propagated.
+            if let Err(e) = on_relationship_updated(relationship.clone()) {
+                error!(
+                    "post_commit: on_relationship_updated failed for relationship {} — {:?}",
+                    relationship.id, e
+                );
+            }
 
             // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::RelationshipCommitted {
@@ -15467,8 +15510,10 @@ pub fn register_shard_manifest(
         )?;
     }
 
-    // Emit signal for doorway cache
-    let _ = emit_signal(DoorwaySignal::new(CacheSignal {
+    // Emit signal for doorway cache — best-effort: the manifest and its links are
+    // already committed above, so a cache-signal failure must not fail registration.
+    let doc_id = input.blob_hash.clone();
+    if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal {
         signal_type: CacheSignalType::Upsert,
         doc_type: "ShardManifest".to_string(),
         doc_id: input.blob_hash,
@@ -15476,7 +15521,12 @@ pub fn register_shard_manifest(
         ttl_secs: Some(86400), // 24 hours
         public: manifest.reach == "commons",
         reach: Some(manifest.reach.clone()),
-    }));
+    })) {
+        error!(
+            "register_shard_manifest: doorway cache signal failed for {} — {:?}",
+            doc_id, e
+        );
+    }
 
     Ok(RegisterShardManifestOutput {
         action_hash,

@@ -113,6 +113,28 @@
         "stage": "Sweettest Compile Check",
         "function": null
       }
+    },
+    "dna-extern-lints": {
+      "description": "extern-fails-loud, enforced: clippy over the five coordinator crates (wasm32-unknown-unknown) denying clippy::todo, clippy::unimplemented and clippy::let_underscore_must_use. Integrity crates are out of scope. See elohim/holochain/dna/.epr-meta/manifest.md rule extern-fails-loud.",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/dna/elohim/zomes/content_store/**",
+          "elohim/holochain/dna/imagodei/zomes/imagodei/**",
+          "elohim/holochain/dna/infrastructure/zomes/infrastructure/**",
+          "elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/**",
+          "elohim/holochain/dna/mishpat/zomes/mishpat/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "DNA Extern Lints",
+        "function": null
+      }
     }
   },
   "gate": {
@@ -143,6 +165,11 @@
             "rustflags": ""
           }
         }
+      },
+      "dna-extern-lints": {
+        "dir": ".",
+        "steps": ["dna-extern-lints"],
+        "run": { "kind": "root-just", "recipe": "_gate-dna-extern-lints" }
       }
     }
   },

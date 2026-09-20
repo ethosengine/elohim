@@ -581,6 +581,19 @@ _gate-sweettest-check:
     BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I$clang_include}" OPENSSL_NO_VENDOR=1 \
       cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests
 
+# extern-fails-loud, enforced (elohim/holochain/dna/.epr-meta/manifest.md): each DNA
+# builds in its own in-tree ./target with its own justfile-exported RUSTFLAGS (the
+# documented DNA exception — no CARGO_TARGET_DIR override here), so this just calls
+# each DNA's own `lint-externs` recipe in turn rather than re-declaring RUSTFLAGS.
+_gate-dna-extern-lints:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for dna in elohim imagodei infrastructure node-registry mishpat; do
+      echo "[dna-extern-lints] $dna"
+      just --justfile "elohim/holochain/dna/$dna/justfile" \
+        --working-directory "elohim/holochain/dna/$dna" lint-externs
+    done
+
 _gate-schema-validate:
     pnpm run schema:validate
 

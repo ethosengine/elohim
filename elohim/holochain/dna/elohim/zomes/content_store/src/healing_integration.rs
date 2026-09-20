@@ -28,14 +28,20 @@ pub fn get_content_by_id_with_healing(id: &str) -> ExternResult<Option<Content>>
                     // Validation failed, mark as degraded and try healing
                     entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
 
-                    // Emit signal about degraded entry
-                    let _ = healing_impl::emit_healing_signal(
+                    // Emit signal about degraded entry — best-effort observability; the
+                    // degraded entry is returned to the caller below regardless.
+                    if let Err(e) = healing_impl::emit_healing_signal(
                         hc_rna::HealingSignal::DegradedEntryFound {
                             entry_id: id.to_string(),
                             entry_type: "Content".to_string(),
                             reason: validation_err,
                         },
-                    );
+                    ) {
+                        error!(
+                            "get_content_by_id_with_healing: DegradedEntryFound signal failed for {} — {:?}",
+                            id, e
+                        );
+                    }
 
                     // Still return the degraded entry so app doesn't crash
                     return Ok(Some(entry));
@@ -115,11 +121,13 @@ fn heal_content_from_v1(id: &str) -> ExternResult<Option<Content>> {
         }
     };
 
-    // Emit signal: healing started
-    let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingStarted {
+    // Emit signal: healing started — best-effort observability, does not block healing.
+    if let Err(e) = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingStarted {
         entry_id: id.to_string(),
         attempt: 1,
-    });
+    }) {
+        error!("heal_content_from_v1: HealingStarted signal failed for {} — {:?}", id, e);
+    }
 
     // Transform v1 to v2
     let mut healed = healing_impl::transform_content_v1_to_v2(v1_entry);
@@ -131,29 +139,36 @@ fn heal_content_from_v1(id: &str) -> ExternResult<Option<Content>> {
             healed.set_validation_status(hc_rna::ValidationStatus::Migrated);
             healed.set_healed_at(sys_time().ok().map(|t| t.as_millis() as u64).unwrap_or(0));
 
-            // Cache in v2 for next time
-            let _ = create_entry(&EntryTypes::Content(healed.clone()));
-
-            // Create index link so it's findable
+            // Cache in v2 for next time, and index it so it's findable. ONE write:
+            // this used to create the same entry twice back to back (the first
+            // result discarded) — two chain actions, two sets of DHT ops and two
+            // ContentCommitted projections per healed Content.
             let action_hash = create_entry(&EntryTypes::Content(healed.clone()))?;
-            let _ = crate::create_id_to_content_link(&healed.id, &action_hash);
+            if let Err(e) = crate::create_id_to_content_link(&healed.id, &action_hash) {
+                error!("heal_content_from_v1: id-to-content link failed for {} — {:?}", healed.id, e);
+            }
 
-            // Emit success signal
-            let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingSucceeded {
+            // Emit success signal — best-effort observability.
+            if let Err(e) = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingSucceeded {
                 entry_id: id.to_string(),
                 entry_type: "Content".to_string(),
                 was_migrated_from_v1: true,
-            });
+            }) {
+                error!("heal_content_from_v1: HealingSucceeded signal failed for {} — {:?}", id, e);
+            }
 
             Ok(Some(healed))
         }
         Err(validation_err) => {
-            // Healing failed validation
-            let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingFailed {
+            // Healing failed validation — best-effort signal; the caller gets None
+            // either way.
+            if let Err(e) = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingFailed {
                 entry_id: id.to_string(),
                 entry_type: "Content".to_string(),
                 final_error: validation_err,
-            });
+            }) {
+                error!("heal_content_from_v1: HealingFailed signal failed for {} — {:?}", id, e);
+            }
 
             // Return None - can't heal this entry
             Ok(None)
@@ -232,7 +247,11 @@ fn heal_path_from_v1(id: &str) -> ExternResult<Option<LearningPath>> {
     match healed.validate() {
         Ok(_) => {
             healed.set_validation_status(hc_rna::ValidationStatus::Migrated);
-            let _ = create_entry(&EntryTypes::LearningPath(healed.clone()));
+            // Cache in v2 for next time — best-effort: the healed value is returned to
+            // the caller below regardless (see get_path_by_id_with_healing).
+            if let Err(e) = create_entry(&EntryTypes::LearningPath(healed.clone())) {
+                error!("heal_path_from_v1: LearningPath cache write failed for {} — {:?}", id, e);
+            }
             Ok(Some(healed))
         }
         Err(_) => Ok(None),
@@ -310,7 +329,11 @@ fn heal_step_from_v1(id: &str) -> ExternResult<Option<PathStep>> {
     match healed.validate() {
         Ok(_) => {
             healed.set_validation_status(hc_rna::ValidationStatus::Migrated);
-            let _ = create_entry(&EntryTypes::PathStep(healed.clone()));
+            // Cache in v2 for next time — best-effort: the healed value is returned to
+            // the caller below regardless (see get_step_by_id_with_healing).
+            if let Err(e) = create_entry(&EntryTypes::PathStep(healed.clone())) {
+                error!("heal_step_from_v1: PathStep cache write failed for {} — {:?}", id, e);
+            }
             Ok(Some(healed))
         }
         Err(_) => Ok(None),
@@ -388,7 +411,11 @@ fn heal_mastery_from_v1(id: &str) -> ExternResult<Option<ContentMastery>> {
     match healed.validate() {
         Ok(_) => {
             healed.set_validation_status(hc_rna::ValidationStatus::Migrated);
-            let _ = create_entry(&EntryTypes::ContentMastery(healed.clone()));
+            // Cache in v2 for next time — best-effort: the healed value is returned to
+            // the caller below regardless (see get_mastery_by_id_with_healing).
+            if let Err(e) = create_entry(&EntryTypes::ContentMastery(healed.clone())) {
+                error!("heal_mastery_from_v1: ContentMastery cache write failed for {} — {:?}", id, e);
+            }
             Ok(Some(healed))
         }
         Err(_) => Ok(None),

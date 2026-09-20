@@ -52,32 +52,6 @@ rules:
       + get per carried record. Green on node_registry (tens of records) says nothing about lamad.
       Keep the digest page-independent by pinning it to the cursor, keep the close lookup bounded,
       and put the trigger numbers (elapsed vs v1_count) on the receipt. Advisory only.
-  - id: extern-fails-loud
-    class: inject
-    when:
-      write: "*.rs"
-      contains-any: ["todo!(", "unimplemented!(", "let _ = call"]
-    dedupe-of: .claude/skills/holochain-hdk-0-7/references/workflows/review-zome.md
-    retire-when: >
-      when the DNA gate runs clippy with `clippy::todo`, `clippy::unimplemented` and
-      `clippy::let_underscore_must_use` denied on the coordinator crates — the lint answers this by
-      construction and the advisory retires.
-    why: >
-      A ZOME EXTERN FAILS LOUD OR NOT AT ALL — this file now carries `todo!(`, `unimplemented!(`
-      or `let _ = call…`, and the tree-wide count of all three was driven to ZERO on 2026-09-19,
-      so you (or the edit in front of you) just reintroduced one. Two shapes, one rule. (1) A
-      `todo!()`/`unimplemented!()` inside an `#[hdk_extern]` is not a placeholder, it is a
-      guaranteed WASM panic on a publicly callable function: return
-      `Err(wasm_error!(WasmErrorInner::Guest("<fn>: not implemented — <what is unwired>".into())))`
-      instead. (2) `let _ =` on a cross-DNA bridge `call` discards the `ExternResult` — every
-      `NetworkError`, `Unauthorized` and decode failure — and the caller is told the write
-      landed. This was live in mishpat: the discards were CORRECT while the bridge was a
-      dual-write (Stage B), then the bridge became the ONLY copy (Stage C) and nobody revisited
-      them, so seven governance writes could vanish silently. Propagate with `?`. If a call
-      genuinely is best-effort, do not discard it — match the error and log it, and say in a
-      comment which other write makes this one redundant, so the next stage-flip knows to come
-      back. The Error Handling section of the cited checklist is the yardstick. Advisory only;
-      matched on the whole post-edit file, so it stays silent while the count stays zero.
 
 cites:
   - substrate-convergence-five-defect-arc
@@ -122,3 +96,23 @@ the honesty rule forbids.
 
 See: `elohim/holochain/dna/CLAUDE.md`, `elohim/holochain/dna/SCHEMA_VERSIONS.md`, and
 `genesis/docs/content/elohim-protocol/history/2026-07-12-substrate-convergence-five-defect-arc.md`.
+
+## extern-fails-loud is enforced, not advised
+
+The `extern-fails-loud` inject rule retired 2026-09-20: the `dna-extern-lints` gate project
+(`elohim/holochain/dna/build-manifest.json`, run via each DNA's own `lint-externs` justfile recipe)
+runs `cargo clippy --target wasm32-unknown-unknown` over the five coordinator crates only —
+integrity crates are out of scope — denying exactly `clippy::todo`, `clippy::unimplemented` and
+`clippy::let_underscore_must_use` with everything else allowed. A `todo!()`/`unimplemented!()`
+inside an `#[hdk_extern]` now fails the gate by construction instead of shipping a guaranteed WASM
+panic on a publicly callable function; a `let _ =` on any must-use call (not only the narrower
+`let _ = call…` bridge shape the advisory used to grep for) fails the same way.
+
+The one piece of the old advisory's teaching worth keeping: a best-effort discard must be matched
+and logged, never silently dropped. `content_store`'s `post_commit_one` is the canonical example —
+`on_relationship_updated(relationship.clone())`'s failure is caught and `error!`-logged rather than
+propagated with `?`, because propagating would also suppress the `RelationshipCommitted`/cache
+signals emitted later in the same match arm for the same entry; the outer `post_commit` extern's
+own `if let Err(e) = post_commit_one(...) { error!(...) }` wrapper is the write that makes a
+top-level propagation redundant here — post_commit is already fire-and-forget at that boundary, so
+the inner discard only needs to stop being silent, not become fatal.

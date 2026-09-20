@@ -271,13 +271,20 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             {
                 if let Ok(Some(ph)) = original_record.entry().to_app_option::<PortalHost>() {
                     let reach = format!("{:?}", ph.reach);
-                    let _ = emit_signal(RecoveryV2Signal::PortalHostRemoved {
+                    let log_action_hash = action_hash.clone();
+                    // Best-effort: the Delete action already committed above; a signal
+                    // failure must not fail post_commit for the rest of this batch.
+                    if let Err(e) = emit_signal(RecoveryV2Signal::PortalHostRemoved {
                         action_hash,
                         original_action_hash,
                         human_action_hash: ph.human_action_hash,
                         host_url: ph.host_url,
-                    });
-                    let _ = reach; // suppress unused warning
+                    }) {
+                        error!(
+                            "post_commit: PortalHostRemoved signal failed for {:?} (reach {}) — {:?}",
+                            log_action_hash, reach, e
+                        );
+                    }
                 }
             }
             continue;

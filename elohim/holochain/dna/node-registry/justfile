@@ -34,6 +34,14 @@ check:
 clippy:
     cargo clippy --target {{wasm_target}} -- -D warnings
 
+# Narrow extern-fails-loud lint (gate project dna-extern-lints): coordinator crate
+# only, everything allowed except the three lints the extern-fails-loud advisory
+# names — `todo!`/`unimplemented!` guarantee a WASM panic on a public extern, and
+# `let _ =` on a must-use call silently drops an ExternResult. See
+# elohim/holochain/dna/.epr-meta/manifest.md.
+lint-externs:
+    cargo clippy --target {{wasm_target}} -p node_registry_coordinator -- -A clippy::all -A warnings -D clippy::todo -D clippy::unimplemented -D clippy::let_underscore_must_use
+
 # Format code
 fmt:
     cargo fmt
