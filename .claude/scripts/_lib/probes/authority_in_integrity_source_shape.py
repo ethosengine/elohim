@@ -26,6 +26,10 @@ NOT hrea, which are archived/placeholder and carry no live standing):
       block (the per-entry-type dispatch a create/update validator uses) — every entry type not
       given an explicit arm validates unconditionally, silently, including future ones.
 
+WHERE THIS LIVES. `probes/`, not `__tests__/`: the pre-push hook requires every `__tests__`
+harness to be green, because those guard the governance library itself. A habit's probe is red BY
+DESIGN until the habit is kept — filed there it refuses every push that touches `.claude/scripts/`.
+
 WHAT THIS IS NOT. This is a textual probe over Rust source, normalising whitespace and tolerating
 arms split across lines — it is not a parser and does not track Rust's full grammar (macros,
 strings and nested match arms are not modelled beyond a brace-depth scan for L3's containing
@@ -40,7 +44,7 @@ validated, so it is expected to score DIFFERENTLY from the other four DNAs on L1
 `validate_create_link` still falls open (`_ => Ok(Valid)`) for every other link type — a
 declared-classification gap (D6: "open by declaration, not by fallthrough"), not the L1 shape.
 
-Run: python3 .claude/scripts/_lib/__tests__/authority_in_integrity_source_shape_test.py
+Run: python3 .claude/scripts/_lib/probes/authority_in_integrity_source_shape.py
      (exit 0 = no known-open shape found; exit 1 = at least one DNA still carries one — expected
      today, per authority-in-integrity's first_move)
      --json prints the same findings as machine-readable JSON instead of the human report.

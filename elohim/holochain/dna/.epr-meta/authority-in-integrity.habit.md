@@ -14,7 +14,7 @@ invariant: >
 status: red
 active: false
 checks:
-  - "python3 .claude/scripts/_lib/__tests__/authority_in_integrity_source_shape_test.py — textual source-shape probe over the five LIVE integrity zomes (elohim/imagodei/infrastructure/node-registry/mishpat; NOT lamad-v1, NOT hrea). Measures L1 (an unconditional `{ .. }` open link arm), L2 (`OpEntry::CreateEntry`/`UpdateEntry { app_entry, .. }` discarding `action` at the dispatch site) and L3 (a `_ => Ok(ValidateCallbackResult::Valid)` catch-all inside a `match app_entry { ... }` create/update dispatch), per DNA, exit 0 only when every DNA is clear of all three. RED today (exit 1, 24 hits across 5 DNAs) — this is the habit's `first_move` option 1, a shape-guard, not the behaviour proof (that is genesis/a2o/features/trust/counterfeit-standing-is-refused.feature, not written yet)."
+  - "python3 .claude/scripts/_lib/probes/authority_in_integrity_source_shape.py — textual source-shape probe over the five LIVE integrity zomes (elohim/imagodei/infrastructure/node-registry/mishpat; NOT lamad-v1, NOT hrea). Measures L1 (an unconditional `{ .. }` open link arm), L2 (`OpEntry::CreateEntry`/`UpdateEntry { app_entry, .. }` discarding `action` at the dispatch site) and L3 (a `_ => Ok(ValidateCallbackResult::Valid)` catch-all inside a `match app_entry { ... }` create/update dispatch), per DNA, exit 0 only when every DNA is clear of all three. RED today (exit 1, 24 hits across 5 DNAs) — this is the habit's `first_move` option 1, a shape-guard, not the behaviour proof (that is genesis/a2o/features/trust/counterfeit-standing-is-refused.feature, not written yet)."
 first_move: >
   Write the red. The runnable check this habit needs does not exist, and prose does not advance
   it (covenant rule 2). Two candidates, in order of cost: (1) a source-shape test in the DNA
@@ -70,7 +70,7 @@ retire-when: >
   not a practice under watch.
 ---
 2026-09-19 (later same day): RED WRITTEN (`unwired` -> `red`, first_move option 1 completed) —
-`.claude/scripts/_lib/__tests__/authority_in_integrity_source_shape_test.py` measures the three
+`.claude/scripts/_lib/probes/authority_in_integrity_source_shape.py` measures the three
 known-open shapes textually across the five live integrity zomes. Run today: 24 hits, all five
 DNAs fail at least one leg (exit 1). Per DNA — L1 unconditional open link arm / L2 dispatch
 discards `action` / L3 entry-type catch-all: elohim 2/2/1 (content_store_integrity:4256-4261,
