@@ -266,6 +266,20 @@ pub fn attest_health(attestation: HealthAttestation) -> ExternResult<ActionHash>
         )));
     }
 
+    // The attester is whoever is CALLING. `attester_node_id` arrives in the
+    // input, and until 2026-09-20 it was committed verbatim — so any node could
+    // publish an attestation under another node's name through this shipped,
+    // unmodified extern. This stops the honest coordinator being the forgery
+    // tool; it does not stop a modified one. The integrity-level binding
+    // (attestation → its attester's registration by ActionHash) is row 6 of
+    // arch-authority-in-integrity-backlog and rides the node-registry crossing.
+    if attestation.attester_node_id != my_node.node_id {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "attester_node_id must be the calling node ({}), not {}",
+            my_node.node_id, attestation.attester_node_id
+        ))));
+    }
+
     // Create the attestation entry
     let hash = create_entry(EntryTypes::HealthAttestation(attestation.clone()))?;
 
