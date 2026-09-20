@@ -241,3 +241,36 @@ The mint COUNT per day is the measure, not the total — the ~15 000 accumulated
   nothing about residence.
 
 **Cost to delivery, 2026-09-20 (genesis #1577, the first genesis run to reach seeding since the stall):** the seed of fixture humans failed for exactly the two conductors this item names — `Matthew … Request timed out in 60000 ms: call_zome` and `Adam … Request timed out in 60000 ms: call_zome; node+steward: not attempted (conductor unresponsive)` — and succeeded for the rest. A first-pass summary read these as a content problem; the console lines say otherwise. Until the per-call cost is bounded, genesis cannot seed the two heaviest chains, so app + genesis stay undeliverable on alpha regardless of what else is green. Separate and NOT this item's cause: Eve's seed failed with `CellDisabled(CellId(DnaHash(uhC0kRGwtzMN…AdFr), AgentPubKey(uhCAkhsVVjku…--Ks))` (×5; once for agent `uhCAkYCeIZu5…DY5v`) on `elohim-eve-alpha-conductor:4445` — a cell the conductor holds but has disabled, on the same conductor whose readiness timed out edge #1462. It needs its own read (why disabled, and whether a roll re-enables it) before it is filed as anything.
+
+## Delta 2026-09-20 — remedy 2 is written, reviewed, and waiting on a mesh proof
+
+The indexed lookup exists: `elohim/holochain-conductor` branch `perf/cap-grant-single-query`, commit
+`28fc8ad6d`, on top of the pinned `25dd2d0be`. `valid_cap_grants` is one joined statement per access class
+instead of `3N + ceil(N/500) + 1`. At matthew's measured 15 768 grants: 47 338 statements / 3 396 ms →
+2 statements / 103 ms at the SQLite layer (33×; production gains more, since sqlx pays a pool acquire and an
+async hop per statement). No schema change and no migration, so it reaches a node as a conductor image and
+nothing else — no DNA hash move, no re-key. It is still linear in LIVE grants; the flat version is an indexed
+`secret` column (measured 2.8 ms), which needs a Rust-side backfill because the secret lives only inside the
+entry blob.
+
+Two things the review changed, both worth keeping in mind when reading the code. (1) The first cut trusted
+the denormalised `Action.entry_hash` column and never decoded `action_data`, which inverted fail-closed into
+fail-open: the old path returned `Err` (deny-all) on a corrupt action, and `entry_hash` sits on the B-tree
+leaf while `action_data` spills to overflow pages, so one bad block corrupts the blob and leaves the row
+readable. Every live grant's action is decoded again, with the same decoder. (2) Revocation of an
+UNRESTRICTED grant — the class that authorises anyone with no secret — and revocation attempted by a FOREIGN
+author against a grant's public entry hash had no test anywhere; both are now pinned, and mutation-checked.
+
+**The superproject pin has NOT moved, on purpose.** Moving it is a deploy intent (the conductor image builds
+from that SHA and the edge rolls onto it). Order: build the conductor from `28fc8ad6d`, run it under the
+household mesh, confirm zome calls authorise and the `CapGrant … ORDER BY Action.seq` slow statement is gone,
+THEN move the pin. The fleet confirms; it does not discover. What the fleet should then show: the slow
+statement disappears from matthew's and adam's conductor logs, `elohim_conductor_admission_hold_ms` on both
+converges on susan's, and genesis seeds Matthew and Adam (the #1577 failure above) — that last one is the
+delivery-level proof.
+
+Filed separately, NOT caused by this change (identical before and after): on the cap-grant read a public
+`Entry` row outranks a same-hash `PrivateEntry`, and `cache_chain_ops` inserts a network-supplied
+`(hash, blob)` pair. If that hash is not re-derived from the content before insert, a peer could plant a blob
+of its choosing under a victim's grant entry hash and influence an authorisation decision without owning the
+node. Unverified; needs a bounded read of the op-integration path.
