@@ -41,9 +41,6 @@ fn test_conn() -> SqliteConnection {
             canonical_earned INTEGER,
             dht_anchor_state TEXT,
             dht_anchor_checked_at TEXT,
-            -- Story 1.4b: the carried head-record cache. Mirrors
-            -- migrations/2026-09-21-091500_content_declared_head_record.
-            declared_head_record_json TEXT,
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )

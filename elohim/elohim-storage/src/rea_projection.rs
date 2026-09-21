@@ -975,10 +975,6 @@ pub fn handle_rea_signal(
                 content_format: Some(content.content_format),
                 reach: Some(content.reach),
                 metadata_json: Some(content.metadata_json),
-                // 1.4b: the post-commit signal carries the Content ENTRY, not a
-                // signed Record — see the measure-first finding. `None`
-                // preserves; the producer fill adds the record asynchronously.
-                declared_head_record_json: None,
             };
             // HEAD-ELECTION: the async own-conductor commit signal stamps the
             // ANCHOR only — it is NOT a declaration channel.

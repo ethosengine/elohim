@@ -148,101 +148,7 @@ fn projected_fields(content: &Content) -> Vec<(&'static str, FieldVal)> {
             fields.push(("headActionHash", FieldVal::S(h.clone())));
         }
     }
-    // `headRecord` (story 1.4b) — the SIGNED DHT `Record` for the action named
-    // by `headActionHash`, base64. Same absent-not-empty rule as every field
-    // above.
-    //
-    // # Why this one field may be consumed when `headActionHash` may not
-    //
-    // REQ-N5 (see `reverse_project_content_doc`) forbids reading the
-    // `headActionHash` scalar into SQL, and that stays literally true: nothing
-    // stamps this doc's hash either. The difference is what the bytes can
-    // PROVE. `headActionHash` is a bare claim — any peer can write any string,
-    // and nothing re-derives it. These bytes are handed, unread, to the
-    // RECEIVER'S OWN CONDUCTOR, which re-derives `hash_action(record.action())`
-    // against the claimed target, verifies the author's signature, and binds
-    // the carried entry to the action's entry hash
-    // (`content_store::validate_carried_record`). Only the conductor's
-    // post-validation answer — the elected winner from
-    // `select_canonical_winner` — is ever stamped. So the doc changes WHEN the
-    // conductor is asked and WHAT evidence it holds while answering; it never
-    // changes WHAT the conductor concludes. A forged or mispaired record is
-    // refused in wasm and moves nothing.
-    if let Some(record) = head_record_for_declared(
-        content.declared_head_action_hash.as_deref(),
-        content.declared_head_record_json.as_deref(),
-    ) {
-        fields.push((HEAD_RECORD_DOC_KEY, FieldVal::S(record)));
-    }
     fields
-}
-
-/// The Automerge doc key the signed head `Record` rides under (story 1.4b).
-///
-/// ONE new top-level key, deliberately NOT a new field on the sync WIRE: the
-/// wire is positional MessagePack and cannot take a field without a two-phase
-/// rollout — pinned by
-/// `crate::p2p::sync_protocol::tests::variant_fields_are_positional_so_adding_a_field_is_wire_breaking`.
-/// A doc key costs no protocol version: Automerge merges unknown keys
-/// harmlessly, so an old peer round-trips this value without reading it, and a
-/// doc that lacks it takes the honest-absence path on a new peer.
-pub const HEAD_RECORD_DOC_KEY: &str = "headRecord";
-
-/// Hard ceiling on a carried head record, enforced on BOTH produce and consume.
-///
-/// A measured record is ~1.5 KB (≈2020 base64 chars — `stage-spa-blob.sh`'s
-/// DECLARE_ONLY line). 64 KiB is ~40× that, so it refuses nothing real while
-/// bounding what a hostile peer can make this node carry, cache, or hand to a
-/// conductor. Refused on produce so this node never publishes what it would
-/// refuse to consume (advertise/serve symmetry), and on consume so a peer
-/// running a future build cannot lift the ceiling for us.
-pub const MAX_HEAD_RECORD_B64: usize = 64 * 1024;
-
-/// Build the paired cache envelope a content row stores for its declared head.
-///
-/// `None` when either half is empty or the record exceeds
-/// [`MAX_HEAD_RECORD_B64`] — a refused record is simply never cached, which
-/// leaves the row in the honest-absence state it was already in.
-pub fn encode_head_record_envelope(head_action_hash: &str, record_b64: &str) -> Option<String> {
-    let head = head_action_hash.trim();
-    let record = record_b64.trim();
-    if head.is_empty() || record.is_empty() || record.len() > MAX_HEAD_RECORD_B64 {
-        return None;
-    }
-    serde_json::to_string(&serde_json::json!({ "head": head, "record": record })).ok()
-}
-
-/// The base64 record this row may PUBLISH for the head it currently declares —
-/// or `None`, which is the honest absence every consumer already handles.
-///
-/// PURE, and the single place the pairing rule lives. A cached record is
-/// evidence for exactly ONE action; a row whose declared head has since moved
-/// still holds the PREDECESSOR's envelope (the patch field preserves rather
-/// than clears, like every other projection field). Publishing that would put a
-/// record contradicting the doc's own `headActionHash` in front of every
-/// receiver — a permanent validation failure no writer intended. So the guard
-/// lives HERE, once, as a function of the row, rather than as a clearing
-/// obligation on every head-move write site.
-///
-/// Refuses, in order: no declared head · no envelope · unparseable envelope ·
-/// envelope paired to a DIFFERENT head · empty record · record over
-/// [`MAX_HEAD_RECORD_B64`].
-pub fn head_record_for_declared(
-    declared_head: Option<&str>,
-    envelope: Option<&str>,
-) -> Option<String> {
-    let declared = declared_head.map(str::trim).filter(|h| !h.is_empty())?;
-    let raw = envelope.map(str::trim).filter(|e| !e.is_empty())?;
-    let parsed: serde_json::Value = serde_json::from_str(raw).ok()?;
-    let cached_head = parsed.get("head")?.as_str()?.trim();
-    if cached_head != declared {
-        return None;
-    }
-    let record = parsed.get("record")?.as_str()?.trim();
-    if record.is_empty() || record.len() > MAX_HEAD_RECORD_B64 {
-        return None;
-    }
-    Some(record.to_string())
 }
 
 /// The version-DAG key for a content row's current serving version (Plan C2).
@@ -940,265 +846,11 @@ pub struct LocalChange {
 /// propagation path — exactly today's behaviour.
 pub type AnnounceTx = tokio::sync::mpsc::Sender<LocalChange>;
 
-/// Where the best-effort carried-record fill gets a signed `Record` from —
-/// THIS node's own conductor, and nowhere else (story 1.4b).
-///
-/// A trait rather than an `HcClient` parameter for the same reason
-/// [`crate::services::head_adoption::HeadRecordFetcher`] is one: the projector
-/// stays transport- and conductor-neutral, and the fill becomes exercisable
-/// without a conductor. `None` on the listener disables the fill entirely and
-/// leaves the producer exactly as it was before 1.4b — the doc simply carries
-/// no `headRecord`, which every consumer already reads as honest absence.
-#[async_trait::async_trait]
-pub trait HeadRecordSource: Send + Sync {
-    /// `Ok(None)` is an honest absence: this conductor cannot retrieve the
-    /// action. It must NOT be retried in a loop — the memo in
-    /// [`maybe_fill_head_record`] is what makes that true.
-    async fn record_for_action(&self, action_hash: &str) -> Result<Option<Vec<u8>>, StorageError>;
-}
-
-/// At most ONE carried-record fill call in flight process-wide.
-///
-/// The same discipline the head-adoption trigger's serial worker keeps, for the
-/// same reason: `HcClient::call_zome` cannot be cancelled, so the only honest
-/// bound is on how many can ever be outstanding. A deploy moves a handful of
-/// heads; a seed moves none (seeded rows declare nothing), so this queue is
-/// short by construction rather than by hope.
-static HEAD_RECORD_FILL_SLOT: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
-
-/// `(content_id, head_action_hash)` pairs this process has already spent a fill
-/// attempt on. A fill either succeeds (and the row then carries the record, so
-/// the guard below never re-asks) or fails — and a failure is TERMINAL for
-/// those bytes, never a retry loop. Capped so a long-lived node with many head
-/// moves cannot grow it without bound.
-static HEAD_RECORD_FILL_ATTEMPTED: std::sync::Mutex<Option<std::collections::HashSet<String>>> =
-    std::sync::Mutex::new(None);
-
-/// Hard ceiling on remembered fill attempts. At the cap the set is cleared
-/// rather than grown: re-asking once per 4096 head moves is a rounding error
-/// against the bound it buys.
-const HEAD_RECORD_FILL_MEMO_CAP: usize = 4096;
-
-/// Claim the one-shot fill budget for `(id, head)`. `false` = already spent.
-fn claim_head_record_fill(id: &str, head: &str) -> bool {
-    let key = format!("{id}\u{1}{head}");
-    let Ok(mut guard) = HEAD_RECORD_FILL_ATTEMPTED.lock() else {
-        // A poisoned lock must never turn into an unbounded conductor loop.
-        return false;
-    };
-    let memo = guard.get_or_insert_with(std::collections::HashSet::new);
-    if memo.len() >= HEAD_RECORD_FILL_MEMO_CAP {
-        memo.clear();
-    }
-    memo.insert(key)
-}
-
-/// Test-only reset of the fill memo.
-#[cfg(test)]
-pub(crate) fn reset_head_record_fill_memo() {
-    if let Ok(mut guard) = HEAD_RECORD_FILL_ATTEMPTED.lock() {
-        *guard = None;
-    }
-}
-
-/// Announce a just-projected content doc to connected peers (the
-/// announce-on-change doorbell). Extracted so the event path and the
-/// carried-record fill's re-projection announce through ONE implementation.
-async fn announce_projected_doc(sync: &SyncManager, announce: Option<&AnnounceTx>, id: &str) {
-    let Some(tx) = announce else {
-        return;
-    };
-    let doc_id = content_doc_id(id);
-    match sync.get_heads(PROJECTION_NAMESPACE, &doc_id).await {
-        Ok(heads) if !heads.is_empty() => {
-            // try_send, never send: the announce path must never apply
-            // backpressure to projection. A full queue drops the doorbell and
-            // the 60s round still carries the change — degraded latency, never
-            // lost data.
-            if tx
-                .try_send(LocalChange {
-                    doc_id,
-                    change_hash: heads[0].clone(),
-                })
-                .is_err()
-            {
-                tracing::debug!(%id, "projector: announce queue full, falling back to the sync round");
-            }
-        }
-        Ok(_) => {
-            tracing::warn!(%id, "projector: projected doc has no heads, cannot announce");
-        }
-        Err(e) => {
-            tracing::warn!(%id, error = %e, "projector: head read failed, cannot announce");
-        }
-    }
-}
-
-/// Does this row still owe its declared head a carried record? PURE.
-///
-/// `Some(head)` = a fill is warranted for that action. `None` = nothing to do:
-/// the row declares no head, or it already caches a record PAIRED to the head
-/// it declares (the stale-pairing case is deliberately treated as "owed", so a
-/// head move re-fills rather than publishing the predecessor's evidence).
-pub fn head_record_fill_needed(
-    declared_head: Option<&str>,
-    envelope: Option<&str>,
-) -> Option<String> {
-    let declared = declared_head.map(str::trim).filter(|h| !h.is_empty())?;
-    if head_record_for_declared(Some(declared), envelope).is_some() {
-        return None;
-    }
-    Some(declared.to_string())
-}
-
-/// Schedule the one bounded, best-effort conductor call that puts the signed
-/// head `Record` into this row — and re-project so the next doc carries it.
-///
-/// NEVER on the request path that authored the head: the deploy PATCH has
-/// already returned by the time its `ContentUpdated` event reaches this
-/// listener, and the call itself is detached from the listener too, so the
-/// event drain is never blocked by a conductor. The work is bounded BEFORE the
-/// call is made — one single-action `get_record_for_action`, one in-flight
-/// slot process-wide, one attempt per `(id, head)` — which is the form the
-/// uncancellable-call rule asks for, rather than a caller-side timeout that
-/// would abandon a conductor still running.
-///
-/// Every failure is silent-but-counted degradation: the doc keeps shipping
-/// without `headRecord` and every receiver falls back to the conductor-probe
-/// ladder exactly as it did before 1.4b.
-fn maybe_fill_head_record(
-    source: Option<&Arc<dyn HeadRecordSource>>,
-    sync: &Arc<SyncManager>,
-    pool: &DbPool,
-    announce: Option<&AnnounceTx>,
-    content: &Content,
-) {
-    let Some(source) = source else {
-        return;
-    };
-    // Reach gate first: a row that may not enter the sync plane must never cost
-    // a conductor call to enrich a doc it will never publish.
-    if !reach_is_distribution_safe(&content.reach) {
-        return;
-    }
-    let Some(head) = head_record_fill_needed(
-        content.declared_head_action_hash.as_deref(),
-        content.declared_head_record_json.as_deref(),
-    ) else {
-        return;
-    };
-    if !claim_head_record_fill(&content.id, &head) {
-        return;
-    }
-    let source = Arc::clone(source);
-    let sync = Arc::clone(sync);
-    let pool = pool.clone();
-    let announce = announce.cloned();
-    let id = content.id.clone();
-    tokio::spawn(async move {
-        let Ok(_slot) = HEAD_RECORD_FILL_SLOT.acquire().await else {
-            return;
-        };
-        let record = match source.record_for_action(&head).await {
-            Ok(Some(bytes)) if !bytes.is_empty() => bytes,
-            Ok(_) => {
-                tracing::debug!(
-                    target: "elohim_storage::head_record_fill",
-                    content_id = %id, head = %head,
-                    "carried-record fill: this conductor cannot retrieve the declared head's \
-                     record — the doc ships without it and receivers keep the probe path"
-                );
-                return;
-            }
-            Err(e) => {
-                tracing::debug!(
-                    target: "elohim_storage::head_record_fill",
-                    content_id = %id, head = %head, error = %e,
-                    "carried-record fill: conductor call failed — terminal for these bytes, \
-                     never retried in a loop"
-                );
-                return;
-            }
-        };
-        let Some(envelope) =
-            crate::services::head_adoption::carried_record_envelope(&head, &record)
-        else {
-            tracing::debug!(
-                target: "elohim_storage::head_record_fill",
-                content_id = %id, head = %head, bytes = record.len(),
-                "carried-record fill: record refused by the size cap — not cached, not published"
-            );
-            return;
-        };
-        let cached = {
-            let mut conn = match pool.get() {
-                Ok(c) => c,
-                Err(e) => {
-                    tracing::debug!(%id, error = %e, "carried-record fill: db conn unavailable");
-                    return;
-                }
-            };
-            // The write re-reads the declaration under the same connection and
-            // refuses if the head moved while the conductor was answering — so
-            // a fill can never file evidence under a head the row no longer
-            // declares.
-            content_diesel::cache_declared_head_record(
-                &mut conn,
-                &AppContext::default_lamad(),
-                &id,
-                &head,
-                &envelope,
-            )
-        };
-        match cached {
-            Ok(true) => {}
-            Ok(false) => {
-                tracing::debug!(
-                    target: "elohim_storage::head_record_fill",
-                    content_id = %id, head = %head,
-                    "carried-record fill: the row's declared head moved while the conductor \
-                     answered — evidence discarded rather than mispaired"
-                );
-                return;
-            }
-            Err(e) => {
-                tracing::debug!(%id, error = %e, "carried-record fill: cache write failed");
-                return;
-            }
-        }
-        // Re-project so the NEXT doc — and the doorbell that follows it —
-        // carries the evidence. This is the "and the next pass adds it" half of
-        // best-effort: the first doc crossed immediately without waiting on a
-        // conductor, and this one supersedes it.
-        match load_content_row(&pool, &id).await {
-            Ok(Some(row)) => match project_content_doc(&sync, &row).await {
-                Ok(true) => {
-                    tracing::info!(
-                        target: "elohim_storage::head_record_fill",
-                        content_id = %id, head = %head, record_bytes = record.len(),
-                        "carried-record fill: the declared head's signed record now rides \
-                         inside this content doc — receiving peers can adopt it without \
-                         waiting for DHT gossip"
-                    );
-                    announce_projected_doc(&sync, announce.as_ref(), &id).await;
-                }
-                Ok(false) => {}
-                Err(e) => {
-                    tracing::debug!(%id, error = %e, "carried-record fill: re-projection failed")
-                }
-            },
-            Ok(None) => {}
-            Err(e) => tracing::debug!(%id, error = %e, "carried-record fill: re-load failed"),
-        }
-    });
-}
-
 pub fn spawn_content_projection_listener(
     events: Arc<EventBus>,
     sync: Arc<SyncManager>,
     pool: DbPool,
     announce: Option<AnnounceTx>,
-    head_records: Option<Arc<dyn HeadRecordSource>>,
 ) -> tokio::task::JoinHandle<()> {
     let mut rx = events.subscribe();
     // Serialises overlapping bulk-projection tasks — see the doc comment.
@@ -1221,23 +873,36 @@ pub fn spawn_content_projection_listener(
                                 }
                                 Ok(true) => {
                                     tracing::debug!(%id, "projector: content projected to sync DocStore");
-                                    announce_projected_doc(&sync, announce.as_ref(), &content.id)
-                                        .await;
+                                    if let Some(tx) = announce.as_ref() {
+                                        let doc_id = content_doc_id(&content.id);
+                                        match sync.get_heads(PROJECTION_NAMESPACE, &doc_id).await {
+                                            Ok(heads) if !heads.is_empty() => {
+                                                // try_send, never send: the announce
+                                                // path must never apply backpressure
+                                                // to projection. A full queue drops
+                                                // the doorbell and the 60s round
+                                                // still carries the change — degraded
+                                                // latency, never lost data.
+                                                if tx
+                                                    .try_send(LocalChange {
+                                                        doc_id,
+                                                        change_hash: heads[0].clone(),
+                                                    })
+                                                    .is_err()
+                                                {
+                                                    tracing::debug!(%id, "projector: announce queue full, falling back to the sync round");
+                                                }
+                                            }
+                                            Ok(_) => {
+                                                tracing::warn!(%id, "projector: projected doc has no heads, cannot announce");
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(%id, error = %e, "projector: head read failed, cannot announce");
+                                            }
+                                        }
+                                    }
                                 }
                             }
-                            // Story 1.4b, the BEST-EFFORT half of the producer.
-                            // The doc above shipped with whatever evidence the
-                            // row already held — possibly none. This schedules
-                            // the one conductor call that fetches the signed
-                            // record for the head this row declares, OFF the
-                            // request path that authored it, and re-projects.
-                            maybe_fill_head_record(
-                                head_records.as_ref(),
-                                &sync,
-                                &pool,
-                                announce.as_ref(),
-                                &content,
-                            );
                         }
                         Ok(None) => tracing::warn!(%id, "projector: content row vanished"),
                         Err(e) => tracing::error!(%id, error = %e, "projector: load failed"),
@@ -1337,7 +1002,6 @@ mod tests {
             canonical_earned: None,
             dht_anchor_state: None,
             dht_anchor_checked_at: None,
-            declared_head_record_json: None,
         }
     }
 
@@ -2072,9 +1736,6 @@ mod tests {
             Arc::clone(&sync),
             pool.clone(),
             None,
-            // No conductor here: the carried-record fill stays dormant, so this
-            // test measures the pre-1.4b producer exactly.
-            None,
         );
 
         {
@@ -2517,216 +2178,6 @@ mod tests {
         );
     }
 
-    // ── STORY 1.4b — the head arrives with the content (producer side) ────────
-
-    /// (b) A row with no cached record projects EXACTLY today's doc: no
-    /// `headRecord` key at all. Absent-not-empty, same rule as every other
-    /// field — an empty put would enter LWW competition against a healthy peer's
-    /// real evidence and could win.
-    #[tokio::test]
-    async fn a_row_without_a_cached_record_projects_no_head_record_key() {
-        let (sync, _temp) = test_sync_manager().await;
-        let mut row = sample_content("hr-absent", "t");
-        row.declared_head_action_hash = Some("uhCkk-head-absent".to_string());
-        super::project_content_doc(&sync, &row).await.unwrap();
-        assert_eq!(
-            sync.get_doc_field("elohim", "node:hr-absent", "headActionHash")
-                .await
-                .unwrap(),
-            "uhCkk-head-absent",
-            "the hint is unchanged by 1.4b"
-        );
-        assert!(
-            sync.get_doc_field("elohim", "node:hr-absent", super::HEAD_RECORD_DOC_KEY)
-                .await
-                .is_err(),
-            "no cached record ⇒ no key ⇒ byte-for-byte today's behaviour"
-        );
-    }
-
-    /// The record rides the doc for the head it is PAIRED to — and for no other.
-    /// The pairing guard is what lets every head-move write site preserve this
-    /// column instead of remembering to clear it.
-    #[tokio::test]
-    async fn the_carried_record_rides_only_under_the_head_it_is_paired_to() {
-        let (sync, _temp) = test_sync_manager().await;
-        let envelope =
-            super::encode_head_record_envelope("uhCkk-head-B", "cmVjb3JkLUI=").expect("envelope");
-
-        let mut paired = sample_content("hr-paired", "t");
-        paired.declared_head_action_hash = Some("uhCkk-head-B".to_string());
-        paired.declared_head_record_json = Some(envelope.clone());
-        super::project_content_doc(&sync, &paired).await.unwrap();
-        assert_eq!(
-            sync.get_doc_field("elohim", "node:hr-paired", super::HEAD_RECORD_DOC_KEY)
-                .await
-                .unwrap(),
-            "cmVjb3JkLUI=",
-        );
-
-        // The SAME envelope on a row that has since moved to head C must NOT be
-        // published: it is evidence for B, and publishing it under C would make
-        // every receiver's wasm validation fail forever.
-        let mut stale = sample_content("hr-stale", "t");
-        stale.declared_head_action_hash = Some("uhCkk-head-C".to_string());
-        stale.declared_head_record_json = Some(envelope);
-        super::project_content_doc(&sync, &stale).await.unwrap();
-        assert!(
-            sync.get_doc_field("elohim", "node:hr-stale", super::HEAD_RECORD_DOC_KEY)
-                .await
-                .is_err(),
-            "a stale pairing is an honest absence, never a mispublished record"
-        );
-
-        // And a row declaring nothing publishes nothing, whatever it caches.
-        let mut undeclared = sample_content("hr-undeclared", "t");
-        undeclared.declared_head_record_json =
-            super::encode_head_record_envelope("uhCkk-head-B", "cmVjb3JkLUI=");
-        super::project_content_doc(&sync, &undeclared)
-            .await
-            .unwrap();
-        assert!(sync
-            .get_doc_field("elohim", "node:hr-undeclared", super::HEAD_RECORD_DOC_KEY)
-            .await
-            .is_err());
-    }
-
-    /// The size cap is enforced on PRODUCE as well as on consume — a node never
-    /// publishes what it would refuse to accept (advertise/serve symmetry).
-    #[tokio::test]
-    async fn an_oversized_head_record_is_refused_on_produce() {
-        let (sync, _temp) = test_sync_manager().await;
-        let huge = "A".repeat(super::MAX_HEAD_RECORD_B64 + 1);
-        assert_eq!(
-            super::encode_head_record_envelope("uhCkk-head-D", &huge),
-            None,
-            "an oversized record is never even cached"
-        );
-        // Hand-built envelope (as a hostile or future peer might): still refused
-        // on the way out.
-        let smuggled = serde_json::json!({ "head": "uhCkk-head-D", "record": huge }).to_string();
-        assert_eq!(
-            super::head_record_for_declared(Some("uhCkk-head-D"), Some(&smuggled)),
-            None
-        );
-        let mut row = sample_content("hr-huge", "t");
-        row.declared_head_action_hash = Some("uhCkk-head-D".to_string());
-        row.declared_head_record_json = Some(smuggled);
-        super::project_content_doc(&sync, &row).await.unwrap();
-        assert!(sync
-            .get_doc_field("elohim", "node:hr-huge", super::HEAD_RECORD_DOC_KEY)
-            .await
-            .is_err());
-        // A malformed envelope is an absence too, never a panic.
-        assert_eq!(
-            super::head_record_for_declared(Some("uhCkk-head-D"), Some("not json")),
-            None
-        );
-        assert_eq!(
-            super::head_record_for_declared(Some("uhCkk-head-D"), Some("{}")),
-            None
-        );
-    }
-
-    /// (f) An OLD-format peer round-trips the key without corrupting it.
-    ///
-    /// Pinning Automerge's unknown-key preservation is the whole backward-
-    /// compatibility argument for choosing a doc key over a sync-wire field: a
-    /// peer that does not know `headRecord` merges the doc, re-asserts only the
-    /// keys ITS build projects, and hands back a doc whose `headRecord` is
-    /// untouched. If that ever stopped being true, carrying the record in the
-    /// doc would silently corrupt on every mixed-version round.
-    #[tokio::test]
-    async fn an_old_format_peer_round_trips_the_head_record_without_corrupting_it() {
-        use automerge::transaction::Transactable;
-        let (sync, _temp) = test_sync_manager().await;
-        let envelope =
-            super::encode_head_record_envelope("uhCkk-head-E", "b2xkLXBlZXI=").expect("envelope");
-        let mut row = sample_content("hr-oldpeer", "t");
-        row.declared_head_action_hash = Some("uhCkk-head-E".to_string());
-        row.declared_head_record_json = Some(envelope);
-        row.blob_hash = Some("sha256-new".to_string());
-        super::project_content_doc(&sync, &row).await.unwrap();
-
-        // The OLD peer: it knows nothing of `headRecord`, so it writes only the
-        // pre-1.4b key set — then its changes come back to us.
-        let ours = sync
-            .get_or_create_doc("elohim", "node:hr-oldpeer")
-            .await
-            .unwrap();
-        let mut theirs = automerge::Automerge::new();
-        theirs.merge(&mut ours.clone()).expect("old peer merges");
-        theirs
-            .transact::<_, _, automerge::AutomergeError>(|tx| {
-                tx.put(automerge::ROOT, "title", "renamed by an old peer")?;
-                tx.put(automerge::ROOT, "blobHash", "sha256-new")?;
-                Ok(())
-            })
-            .expect("old peer writes its own key set");
-        sync.apply_changes("elohim", "node:hr-oldpeer", vec![theirs.save()])
-            .await
-            .unwrap();
-
-        assert_eq!(
-            sync.get_doc_field("elohim", "node:hr-oldpeer", super::HEAD_RECORD_DOC_KEY)
-                .await
-                .unwrap(),
-            "b2xkLXBlZXI=",
-            "an old peer must not be able to drop or corrupt the carried record"
-        );
-        assert_eq!(
-            sync.get_doc_field("elohim", "node:hr-oldpeer", "title")
-                .await
-                .unwrap(),
-            "renamed by an old peer",
-            "and its own write must still land — no protocol version was bumped"
-        );
-    }
-
-    /// The fill predicate: owed until the pair MATCHES, then never again. This
-    /// is what bounds the one conductor call story 1.4b's producer adds — the
-    /// second projection of a filled row asks for nothing.
-    #[test]
-    fn a_head_record_fill_is_owed_only_until_the_pair_matches() {
-        let paired = super::encode_head_record_envelope("uhCkk-head-F", "Zg==").expect("envelope");
-        // Undeclared row: nothing to fetch.
-        assert_eq!(super::head_record_fill_needed(None, None), None);
-        assert_eq!(super::head_record_fill_needed(Some("  "), None), None);
-        // Declared, nothing cached: owed.
-        assert_eq!(
-            super::head_record_fill_needed(Some("uhCkk-head-F"), None).as_deref(),
-            Some("uhCkk-head-F")
-        );
-        // Declared, paired: settled.
-        assert_eq!(
-            super::head_record_fill_needed(Some("uhCkk-head-F"), Some(&paired)),
-            None
-        );
-        // Declared, cached for a DIFFERENT head: owed again — a head move
-        // re-fills rather than publishing the predecessor's evidence.
-        assert_eq!(
-            super::head_record_fill_needed(Some("uhCkk-head-G"), Some(&paired)).as_deref(),
-            Some("uhCkk-head-G")
-        );
-    }
-
-    /// The fill's one-shot budget: a failed attempt is TERMINAL for those bytes,
-    /// never a retry loop against an uncancellable conductor call.
-    #[test]
-    fn a_head_record_fill_is_attempted_at_most_once_per_id_and_head() {
-        super::reset_head_record_fill_memo();
-        assert!(super::claim_head_record_fill("hr-budget", "uhCkk-1"));
-        assert!(
-            !super::claim_head_record_fill("hr-budget", "uhCkk-1"),
-            "a second attempt for the same (id, head) is refused"
-        );
-        assert!(
-            super::claim_head_record_fill("hr-budget", "uhCkk-2"),
-            "a NEW head is a new fact and earns its own single attempt"
-        );
-        super::reset_head_record_fill_memo();
-    }
-
     /// The declared-head hint scalar follows the absent-not-empty rule exactly
     /// like blobHash: a set `declared_head_action_hash` projects as
     /// `headActionHash`; None (and empty-string) project as ABSENCE — an empty
@@ -3110,7 +2561,6 @@ mod tests {
             pool.clone(),
             // This test covers bulk projection, which never announces (bulk
             // uses reconcile semantics, not local authorship).
-            None,
             None,
         );
 

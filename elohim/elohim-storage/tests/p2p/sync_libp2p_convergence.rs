@@ -638,9 +638,6 @@ fn sample_content(id: &str, title: &str) -> Content {
         canonical_earned: None,
         dht_anchor_state: None,
         dht_anchor_checked_at: None,
-        // Story 1.4b: no declared head here, so no carried record to publish —
-        // the doc these tests converge carries no `headRecord` key at all.
-        declared_head_record_json: None,
     }
 }
 

@@ -92,7 +92,6 @@ diesel::table! {
         canonical_earned -> Nullable<Integer>,
         dht_anchor_state -> Nullable<Text>,
         dht_anchor_checked_at -> Nullable<Text>,
-        declared_head_record_json -> Nullable<Text>,
     }
 }
 

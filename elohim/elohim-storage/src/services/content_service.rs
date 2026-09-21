@@ -495,10 +495,6 @@ impl ContentService {
             content_format: Some(oc.content_format.clone()),
             reach: Some(oc.reach.clone()),
             metadata_json: Some(oc.metadata_json.clone()),
-            // 1.4b: an own-conductor write carries no signed Record (the zome
-            // returns the entry, not the Record). The best-effort producer
-            // fill supplies it a beat later, off this request path.
-            declared_head_record_json: None,
         };
         {
             let mut conn = self.conn()?;
@@ -602,10 +598,6 @@ impl ContentService {
             content_format: Some(oc.content_format.clone()),
             reach: Some(oc.reach.clone()),
             metadata_json: Some(oc.metadata_json.clone()),
-            // 1.4b: an own-conductor write carries no signed Record (the zome
-            // returns the entry, not the Record). The best-effort producer
-            // fill supplies it a beat later, off this request path.
-            declared_head_record_json: None,
         };
         {
             let mut conn = self.conn()?;

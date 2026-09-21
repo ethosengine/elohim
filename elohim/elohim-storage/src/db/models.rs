@@ -181,33 +181,6 @@ pub struct Content {
     #[serde(skip)]
     #[ts(skip)]
     pub dht_anchor_checked_at: Option<String>,
-    /// CACHE of the signed DHT `Record` for [`Self::declared_head_action_hash`],
-    /// stored as the paired envelope `{"head": "<ActionHash>", "record":
-    /// "<base64>"}` — story 1.4b, "the head arrives with the content".
-    ///
-    /// The pairing is INSIDE the value on purpose. A bare base64 column would
-    /// outlive the head it belongs to on any head MOVE that carries no fresh
-    /// record, and the projector would then publish evidence contradicting the
-    /// doc's own `headActionHash` — a validation failure on every receiver, for
-    /// a reason no writer intended. Paired, the projector refuses a stale
-    /// pairing as a pure function of the row
-    /// ([`crate::sync::projector::head_record_for_declared`]) and no write site
-    /// has to remember to clear this column.
-    ///
-    /// NEVER authority. These bytes are EVIDENCE: a receiving peer hands them to
-    /// its OWN conductor, which re-derives the action hash, verifies the author
-    /// signature and binds the entry (`content_store::validate_carried_record`);
-    /// only the conductor's post-validation answer is ever stamped. NULL is an
-    /// honest absence — the receiver falls back to the conductor-probe ladder
-    /// exactly as it did before 1.4b.
-    ///
-    /// Internal-only — `serde(skip)`/`ts(skip)` keep the HTTP wire and generated
-    /// TS byte-identical (a ~1.5 KB record has no business on a content read).
-    /// Classification: C (operational cache of `get_record_for_action`; safe to
-    /// drop — the DHT is the source of truth).
-    #[serde(skip)]
-    #[ts(skip)]
-    pub declared_head_record_json: Option<String>,
 }
 
 /// Content with tags attached (API response)

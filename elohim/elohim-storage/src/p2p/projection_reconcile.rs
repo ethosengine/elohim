@@ -6573,8 +6573,6 @@ pub(crate) fn project_authenticated_content_head(
         content_format: Some(c.content_format.clone()),
         reach: reach_patch,
         metadata_json: Some(c.metadata_json.clone()),
-        // 1.4b: the heal leg reads a ContentHeadWire, which carries no Record.
-        declared_head_record_json: None,
     };
     // Canonical-aware stamp mode: a CANONICAL answer (the conductor verified
     // the cross-root canonical record) may fill an undeclared row, refresh the
