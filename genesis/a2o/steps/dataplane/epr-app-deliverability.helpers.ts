@@ -273,13 +273,21 @@ export class NonRetryableStageError extends Error {
 }
 
 /**
- * Classify one storage HTTP response exactly the way stage-spa-blob.sh's
- * stage_once PATCH leg does (scripts/ci/stage-spa-blob.sh ~419-439):
- * 503/429 is backpressure (retryable, honoring an advertised Retry-After);
- * a "not retrievable" 4xx is the pre-existing DHT-publish-lag class (also
- * retryable, no hint); any OTHER 4xx is a structural, non-retryable answer;
- * anything else non-2xx (5xx, transport-adjacent) is a generic retryable
- * failure, matching the shell's bare `*)` arm.
+ * Classify one storage HTTP response the way stage-spa-blob.sh's stage_once
+ * PATCH leg does: 503/429 is backpressure (retryable, honoring an advertised
+ * Retry-After); a "not retrievable" 4xx is the pre-existing DHT-publish-lag
+ * class (also retryable, no hint); any OTHER 4xx is a structural,
+ * non-retryable answer; anything else non-2xx (5xx, transport-adjacent) is a
+ * generic retryable failure, matching the shell's bare `*)` arm.
+ *
+ * One class the shell carries and this does not: a `CellDisabled` body says an
+ * installed cell is not among the conductor's running cells, which measurement
+ * says usually clears on its own (2026-09-21 — up to ~11min after a
+ * local-household start, 0-4min after a fleet conductor's "Conductor ready."
+ * line). The shell waits it out on a SEPARATE per-doorway-host budget and, if
+ * that budget runs out, reports "still unavailable after Ns" rather than a
+ * cause. Here it stays plainly retryable, which is the same direction and the
+ * right one for a scenario's own bounded retry.
  */
 export function classifyStorageResponse(
   status: number,

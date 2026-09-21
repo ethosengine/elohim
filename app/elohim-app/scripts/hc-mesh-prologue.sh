@@ -66,6 +66,23 @@ STAGE_BLOB_SCRIPT="$REPO_ROOT/scripts/ci/stage-spa-blob.sh"
 SEEDER_DIR="$REPO_ROOT/genesis/seeder"
 FIXTURE_PATH="$MESH_DIR/household-fixture.json"
 
+# ONE cell-readiness clock per prologue RUN, shared by every stage-blob leg
+# below and by nothing else. stage-spa-blob.sh waits out a conductor whose cells
+# are not running yet (CellDisabled) on a per-doorway-host budget it persists;
+# scoping that file to this run is what keeps an earlier prologue's exhausted
+# record from making THIS run's first CellDisabled fail instantly instead of
+# waiting out a conductor that just started. (The 6h age guard in that script is
+# the backstop, not the scoping.) Removed on exit, whatever the exit code.
+STAGE_CELL_READY_STATE_DIR="$(mktemp -d "${MESH_DIR:-${TMPDIR:-/tmp}}/.stage-cell-ready-XXXXXX" 2>/dev/null)" \
+  || STAGE_CELL_READY_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/.stage-cell-ready-XXXXXX" 2>/dev/null)" \
+  || STAGE_CELL_READY_STATE_DIR=""
+if [ -n "$STAGE_CELL_READY_STATE_DIR" ]; then
+  export STAGE_CELL_READY_STATE_DIR
+  trap 'rm -rf "$STAGE_CELL_READY_STATE_DIR"' EXIT
+else
+  echo "prologue: WARN could not create a run-scoped cell-readiness state dir — stage-spa-blob.sh falls back to its shared default" >&2
+fi
+
 banner() { printf '\n=== prologue: %s ===\n' "$1"; }
 say()    { printf 'prologue[%s]: %s\n' "$(date -u +%H:%M:%SZ)" "$1"; }
 

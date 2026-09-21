@@ -22,6 +22,7 @@
           "elohim/sdk/**",
           "VERSION",
           "scripts/ci/stage-spa-blob.sh",
+          "scripts/ci/stage-spa-blob.test.sh",
           "app/elohim-app/build-manifest.json",
           "pnpm-lock.yaml",
           "package.json"
@@ -109,6 +110,7 @@
           "sources": [
             "elohim/sdk/scripts/**",
             "scripts/ci/stage-spa-blob.sh",
+            "scripts/ci/stage-spa-blob.test.sh",
             "app/scripts/lint-ssr-entry.mjs"
           ],
           "buildProcess": ["justfile"]

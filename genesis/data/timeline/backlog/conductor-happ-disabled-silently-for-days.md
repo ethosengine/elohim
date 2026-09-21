@@ -48,8 +48,18 @@ attributed to conductor saturation (the per-call capability-grant scan) and to a
 real and separately recorded, but neither is why no head could be authored: the cell was disabled. The lesson is the
 one this item's cure encodes — read the error text before the status code.
 
-**Cures.** (1) LANDED 2026-09-20: `stage-spa-blob.sh` treats `CellDisabled` as a structural answer and fails in
-seconds with a named cause. (2) IN FLIGHT: storage sees a disabled app (probe reads the status; `CellDisabled`
+**Cures.** (1) LANDED 2026-09-20, CORRECTED 2026-09-21: `stage-spa-blob.sh` stopped reading `CellDisabled` as a
+transient shed — but calling it *structural* was wrong in the other direction. Measured 2026-09-21: a local-household
+conductor accepts interface calls before cell initialisation finishes and answers `CellDisabled` for up to ~11 min
+after start, then succeeds untouched (`enable_app` is a no-op for an already-enabled app); and on this fleet, across
+three restarts in 72 h of Loki, matthew's and adam's OWN-cell `CellDisabled` lines stop within 0–4 min of that
+conductor's "Conductor ready." line and have not recurred in the 13–19 h since. App #1714 started seconds after edge
+#1470 finished rolling the fleet and spent its whole budget inside that window, as #1709 and #1712 had. So the script
+now WAITS on a separate per-doorway-host readiness budget (`STAGE_CELL_READY_BUDGET_SECS`, default 2700 s = 45 min)
+shared across every leg of one pipeline run, and once that budget is spent reports the measurement it actually has —
+"still unavailable after N s", pointing at the conductor's own app/cell state — rather than a diagnosis it cannot
+see from the far side of a doorway (`CellDisabled` means only that an installed cell is absent from `running_cells`,
+conductor.rs:1663). That keeps #1712's 63-minute per-leg re-spend cured without losing the post-roll readiness race. (2) IN FLIGHT: storage sees a disabled app (probe reads the status; `CellDisabled`
 classifies as not-live; gauge + reason logged once per transition), heals it (`enable_app` at boot and from the
 supervisor when there is no structural drift, backed off 60 s → 1 h, never a reinstall, never across a closed-chain
 fence), and says so (503 with a named cause and no `retryAfter`). (3) OPEN: find what disabled the apps on

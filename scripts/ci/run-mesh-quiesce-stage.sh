@@ -445,11 +445,32 @@ mkdir -p "$SYNTH_DIST"
 printf '<!doctype html><title>mesh-quiesce fixture</title><p>%s</p>\n' "${GIT_COMMIT_HASH}" \
     > "$SYNTH_DIST/index.html"
 
+# The stage script waits out a conductor whose cells are not running yet on a
+# 45-min budget by default (2026-09-21). That is right for a deploy and wrong
+# here: this step reserved 120 s, and the fast-fail intent STAGE_BLOB_ATTEMPTS
+# states for the transport ladder applies to the readiness one too. CLAMP, do
+# not default — an inherited 2700 from the surrounding environment must not win
+# over this step's own reservation; a caller asking for LESS than 120 s still
+# gets what it asked for.
+CELL_READY_CAP=120
+CELL_READY_BUDGET="${STAGE_CELL_READY_BUDGET_SECS:-$CELL_READY_CAP}"
+if ! [ "$CELL_READY_BUDGET" -ge 0 ] 2>/dev/null || [ "$CELL_READY_BUDGET" -gt "$CELL_READY_CAP" ]; then
+    CELL_READY_BUDGET="$CELL_READY_CAP"
+fi
+# One readiness clock for this stage's own run — never a record another run left
+# behind (the script's 6h age guard is the backstop, not the scoping). Removed
+# on the line after the call rather than in a trap: `trap teardown EXIT` above
+# owns the exit path, and a second EXIT trap would silently replace it.
+CELL_READY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/.stage-cell-ready-quiesce-XXXXXX" 2>/dev/null)" || CELL_READY_DIR=""
+
 DO_PATCH=1 \
 STORAGE_API_KEY_ADMIN="${STORAGE_API_KEY_ADMIN:-}" \
 STAGE_BLOB_ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-3}" \
+STAGE_CELL_READY_BUDGET_SECS="$CELL_READY_BUDGET" \
+STAGE_CELL_READY_STATE_DIR="${CELL_READY_DIR:-${TMPDIR:-/tmp}/.stage-cell-ready}" \
     bash "$STAGE_BLOB_SCRIPT" "$SYNTH_DIST" "$CONTENT_ID" "$DOORWAY_A_URL" browser
 blob_rc=$?
+[ -n "$CELL_READY_DIR" ] && rm -rf "$CELL_READY_DIR"
 [ "$blob_rc" -eq 0 ] || fail "landing blob staging exited ${blob_rc} — no notarized head to converge"
 
 # ---------------------------------------------------------------------------

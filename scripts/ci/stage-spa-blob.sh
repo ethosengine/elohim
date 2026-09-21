@@ -24,6 +24,25 @@
 #                               caller that wants the old fast-fail
 #                               count-only behaviour can still pass a low
 #                               value, e.g. STAGE_BLOB_ATTEMPTS=3.
+#        STAGE_CELL_READY_BUDGET_SECS
+#                               SEPARATE wall-clock budget for the
+#                               cell-readiness window (a CellDisabled answer),
+#                               default 2700s = 45min, shared PER DOORWAY HOST
+#                               across every invocation of this script in one
+#                               pipeline run. 0 restores the old
+#                               immediately-structural behaviour. See the
+#                               cell_ready_wait block below for the two
+#                               measurements that justify the number.
+#        STAGE_CELL_READY_POLL_SECS
+#                               poll cadence inside that window (default 60s).
+#        STAGE_CELL_READY_STATE_DIR
+#                               where the per-host readiness clock is kept
+#                               (default ${WORKSPACE:-${TMPDIR:-/tmp}}/.stage-cell-ready,
+#                               plus /${BUILD_TAG} when Jenkins sets one). The
+#                               clock is shared by the legs of ONE run and by
+#                               nothing else, so a caller that orchestrates
+#                               several legs outside Jenkins MUST pass a fresh
+#                               dir per run.
 set -euo pipefail
 
 DIST_DIR="$1"
@@ -36,6 +55,153 @@ STAGE_BUDGET_SECS="${STAGE_BLOB_BUDGET_SECS:-360}"
 # Set by stage_once's PATCH leg when the peer's shed envelope advertises a
 # retryAfter (seconds) — read and cleared by the outer retry loop below.
 RETRY_AFTER_HINT=""
+# Set by stage_once when a write answered CellDisabled, so the outer loop can
+# name the last answer in the readiness log without re-issuing the call.
+CELL_STATUS=""
+CELL_BODY=""
+
+# CELL-READINESS WINDOW (corrected 2026-09-21).
+#
+# `CellDisabled` is what the conductor answers when an installed cell is not in
+# its `running_cells` map (holochain conductor.rs:1663). That names a STATE, not
+# a cause and not a cure: it does not say why the cell is absent, and it does
+# not say whether it will come back. Two measurements taken 2026-09-21 say it
+# frequently does, on its own:
+#   - local household: a conductor's interfaces accept calls before its cells
+#     are running; zome calls answered CellDisabled for up to ~11min after
+#     start and then succeeded with no intervention.
+#   - live fleet (Loki, 72h, three separate restarts): matthew's and adam's
+#     OWN-cell CellDisabled lines stopped within 0-4min of that conductor's
+#     "Conductor ready." line (matthew ready 2026-09-20T12:49:32Z, adam
+#     13:11:40Z; one later matthew reconnect cleared after ~35min) and had not
+#     recurred in the 13-19h since — both cells publishing ops.
+# App builds #1709/#1712/#1714 each ran INSIDE that post-roll window and spent
+# their whole 360s transport budget there, so the pipeline was losing a race
+# against a state that clears, not meeting a permanent answer.
+#
+# So we WAIT for it — on its own budget, separate from the transport/shed
+# budget, and SHARED PER DOORWAY HOST across every invocation of this script in
+# one pipeline run (each slug x kind x leg is a separate invocation). That
+# sharing is what keeps the 63-minute pathology cured: the FIRST leg against a
+# host waits, and once that host's budget is spent every later leg against it
+# fails in milliseconds instead of re-spending the budget eight times over.
+# Exhausting the budget is a MEASUREMENT ("still unavailable after Ns"), not a
+# diagnosis — what it licenses is reading the conductor's app/cell state, which
+# this script cannot see from the far side of a doorway.
+CELL_READY_BUDGET_SECS="${STAGE_CELL_READY_BUDGET_SECS:-2700}"
+CELL_READY_POLL_SECS="${STAGE_CELL_READY_POLL_SECS:-60}"
+# The clock is shared by the legs of ONE run and by nothing else. Under Jenkins
+# BUILD_TAG makes that scoping automatic; a caller that orchestrates several
+# legs outside Jenkins (hc-mesh-prologue.sh, run-mesh-quiesce-stage.sh) creates
+# one fresh dir per run and exports it. The 6h age guard below is the backstop
+# for anything that still slips through, never the primary scoping.
+CELL_READY_STATE_DIR="${STAGE_CELL_READY_STATE_DIR:-${WORKSPACE:-${TMPDIR:-/tmp}}/.stage-cell-ready}"
+if [ -z "${STAGE_CELL_READY_STATE_DIR:-}" ] && [ -n "${BUILD_TAG:-}" ]; then
+    CELL_READY_STATE_DIR="${CELL_READY_STATE_DIR}/$(printf '%s' "${BUILD_TAG}" | tr -c 'A-Za-z0-9._-' '_')"
+fi
+CELL_READY_STATE_MAX_AGE_SECS=21600
+CELL_WAIT_ENTERED=0   # this invocation has already logged the entering line
+CELL_READY_FIRST_SEEN=""
+
+cell_ready_stamp() {
+    date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf 'epoch %s' "$1"
+}
+
+cell_ready_state_file() {
+    printf '%s/%s' "${CELL_READY_STATE_DIR}" \
+        "$(printf '%s' "${DOORWAY_EPR_URL}" | tr -c 'A-Za-z0-9._-' '_')"
+}
+
+cell_ready_mark_exhausted() {
+    local f
+    f="$(cell_ready_state_file)"
+    [ -f "${f}" ] && printf 'exhausted=%s\n' "$(date +%s)" >> "${f}" 2>/dev/null
+    return 0
+}
+
+# The cell answered a write successfully after a wait: this host's window is
+# OVER, so the clock is dropped. A later CellDisabled against the same host is
+# a NEW window and gets a full budget — inheriting a spent one would make the
+# next leg fail on a condition this leg just watched clear.
+cell_ready_clear() {
+    rm -f "$(cell_ready_state_file)" 2>/dev/null || true
+    CELL_READY_FIRST_SEEN=""
+    return 0
+}
+
+# Called with the CellDisabled answer a write just received. Returns
+#   0 -> waited; the caller must RE-OFFER the same idempotent,
+#        content-addressed call (no attempt and no transport budget consumed).
+#   1 -> this host's readiness budget is spent (or waiting is switched off):
+#        the caller fails the leg.
+# $1 = leg label for the log, $2 = HTTP status, $3 = response body.
+cell_ready_wait() {
+    local label="$1" status="$2" body="$3"
+    local now f first_seen exhausted elapsed remaining nap
+    now="$(date +%s)"
+
+    if [ "${CELL_READY_BUDGET_SECS}" -le 0 ]; then
+        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — the cell is not running on the conductor behind this doorway (HTTP ${status}): ${body}" >&2
+        echo "    STAGE_CELL_READY_BUDGET_SECS=0 — the caller switched readiness waiting off, so this is reported without waiting. Host left STALE." >&2
+        return 1
+    fi
+
+    f="$(cell_ready_state_file)"
+    first_seen="${CELL_READY_FIRST_SEEN}"
+    exhausted=0
+    if [ -z "${first_seen}" ] && [ -f "${f}" ]; then
+        first_seen="$(sed -n 's/^first_seen=\([0-9][0-9]*\)$/\1/p' "${f}" 2>/dev/null | head -1)"
+        if [ -n "${first_seen}" ] && [ "$(( now - first_seen ))" -gt "${CELL_READY_STATE_MAX_AGE_SECS}" ]; then
+            echo "  · [${SLUG}] ignoring a cell-readiness record for ${DOORWAY_EPR_URL} older than ${CELL_READY_STATE_MAX_AGE_SECS}s (left by an earlier run sharing this state dir) — starting a fresh clock" >&2
+            first_seen=""
+            rm -f "${f}" 2>/dev/null || true
+        elif [ -n "${first_seen}" ] && grep -q '^exhausted=' "${f}" 2>/dev/null; then
+            exhausted=1
+        fi
+    fi
+    if [ -z "${first_seen}" ]; then
+        first_seen="${now}"
+        if mkdir -p "${CELL_READY_STATE_DIR}" 2>/dev/null; then
+            printf 'first_seen=%s\n' "${first_seen}" > "${f}" 2>/dev/null || true
+        else
+            echo "  ⊘ WARN: cell-readiness state dir '${CELL_READY_STATE_DIR}' is not writable — this host's budget cannot be shared with the other legs of this run" >&2
+        fi
+    fi
+    CELL_READY_FIRST_SEEN="${first_seen}"
+
+    elapsed=$(( now - first_seen ))
+    remaining=$(( CELL_READY_BUDGET_SECS - elapsed ))
+
+    if [ "${exhausted}" -eq 1 ]; then
+        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — this host's ${CELL_READY_BUDGET_SECS}s readiness budget was already spent earlier in this run (first CellDisabled $(cell_ready_stamp "${first_seen}"), ${elapsed}s ago) and the cell was still unavailable then." >&2
+        echo "    Failing immediately rather than re-spending that budget on this leg — the per-leg re-spend is what cost app #1712 63 minutes. Host left STALE." >&2
+        return 1
+    fi
+
+    # The budget is a DEADLINE: no re-offer is started past it, and no nap ever
+    # runs beyond it (a poll interval longer than what is left would otherwise
+    # spend more than the caller allowed — budget 1 / poll 60 must end at 1s).
+    if [ "${remaining}" -le 0 ]; then
+        cell_ready_mark_exhausted
+        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — readiness budget exhausted: the cell was still unavailable after ${elapsed}s (budget ${CELL_READY_BUDGET_SECS}s, first CellDisabled $(cell_ready_stamp "${first_seen}"); last answer HTTP ${status}: ${body})." >&2
+        echo "    That is a measurement, not a diagnosis — CellDisabled says only that the cell is not among the conductor's running cells. Read that conductor's app/cell state to learn why. Host left STALE." >&2
+        return 1
+    fi
+
+    if [ "${CELL_WAIT_ENTERED}" -eq 0 ]; then
+        CELL_WAIT_ENTERED=1
+        echo "  ⏳ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — the cell this write must go through is not running on the conductor behind this doorway (HTTP ${status}): ${body}" >&2
+        echo "    Treating it as the post-restart readiness window rather than a final answer, on this measurement (2026-09-21): a local-household conductor answered CellDisabled for up to ~11min after start and then succeeded untouched, and on the live fleet (Loki, 72h, three restarts) own-cell CellDisabled stopped 0-4min after that conductor's 'Conductor ready.' line." >&2
+        echo "    Waiting up to ${CELL_READY_BUDGET_SECS}s for it (poll ${CELL_READY_POLL_SECS}s), on a budget SHARED by every leg against ${DOORWAY_EPR_URL} and separate from the ${STAGE_BUDGET_SECS}s transport budget." >&2
+    fi
+    nap="${CELL_READY_POLL_SECS}"
+    if [ "${nap}" -gt "${remaining}" ]; then
+        nap="${remaining}"
+    fi
+    echo "  … [${SLUG}] cell still not running on ${DOORWAY_EPR_URL} — ${elapsed}s waited, ${remaining}s left of ${CELL_READY_BUDGET_SECS}s; re-offering the same content-addressed ${label} in ${nap}s" >&2
+    sleep "${nap}"
+    return 0
+}
 
 # DECLARE-ONLY mode (canonical-head propagation). Cross-peer DHT gossip of the
 # canonical link can lag or degrade (the F-T19 outbound class), leaving the
@@ -156,9 +322,27 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
         }
         declare_status="${declare_raw##*$'\n'}"
         declare_body="${declare_raw%$'\n'*}"
+        # Fourth class, and the reason it is handled ahead of the case: a
+        # CellDisabled answer CAN reach this ladder — storage answers it 503
+        # through `conductor_write_error` (so it would ride the shed arm's
+        # 12x30s ≈ 6min ladder) and a host still on a pre-fix binary answers it
+        # 502 with the marker in the body (so it would fall through to
+        # "structural" and stop). It is neither: it is the cell-readiness
+        # window, and it takes the SAME per-host budget the head PATCH uses
+        # below rather than this ladder's own attempt counter.
+        if [ "${declare_status#2}" = "${declare_status}" ] \
+           && printf '%s' "${declare_body}" | grep -q "CellDisabled"; then
+            if cell_ready_wait "canonical-head declare" "${declare_status}" "${declare_body}"; then
+                attempt=$(( attempt - 1 ))
+                continue
+            fi
+            echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} never finished initialising the cell within its readiness budget (see above) — peer keeps its own head until gossip/heal converges" >&2
+            break
+        fi
         case "${declare_status}" in
             2??)
                 echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier, attempt ${attempt})"
+                [ "${CELL_WAIT_ENTERED}" -eq 1 ] && cell_ready_clear
                 declare_ok=1
                 break
                 ;;
@@ -382,10 +566,12 @@ stage_once() {
         # catching-up envelope carries both), that hint rides back to the
         # caller via RETRY_AFTER_HINT instead of the caller guessing with a
         # fixed 5/10s backoff. A "not retrievable" body is the pre-existing
-        # DHT-publish-lag class and stays retryable. Any OTHER 4xx (not 429,
-        # not "not retrievable") is a structural answer — return 3 so the
-        # outer loop fails fast instead of burning the time budget on a
-        # question the peer has already answered.
+        # DHT-publish-lag class and stays retryable. A CellDisabled body is the
+        # cell-readiness class — return 4 so the outer loop waits on the
+        # separate per-host readiness budget. Any OTHER 4xx (not 429, not "not
+        # retrievable") is a structural answer — return 3 so the outer loop
+        # fails fast instead of burning the time budget on a question the peer
+        # has already answered.
         local patch_headers_file
         patch_headers_file="$(mktemp)"
         local patch_raw patch_status patch_body
@@ -416,19 +602,23 @@ stage_once() {
             fi
             rm -f "${patch_headers_file}"
 
+            # CellDisabled is neither backpressure nor a structural answer: it
+            # is the conductor's cell-readiness window (see the cell_ready_wait
+            # block at the top of this file for the two 2026-09-21
+            # measurements). Classified ahead of the status case because it
+            # reaches the wire as 503 through storage's `conductor_write_error`
+            # AND as 502 from a host still running a pre-fix binary — the class
+            # is the body, not the code. Return 4: the outer loop waits on the
+            # per-host readiness budget, charging neither an attempt nor a
+            # second of the transport budget.
+            if printf '%s' "${patch_body}" | grep -q "CellDisabled"; then
+                CELL_STATUS="${patch_status}"
+                CELL_BODY="${patch_body}"
+                return 4
+            fi
+
             case "${patch_status}" in
                 503|429)
-                    # CellDisabled rides a 503 but is NOT backpressure: the conductor
-                    # holds the cell and has disabled it, so no amount of waiting
-                    # clears it. 2026-09-18→20 every write through both doorways
-                    # answered this way and the ladder spent its full budget on each
-                    # of eight combinations — 63 minutes to report what the first
-                    # response already said. A real answer, not a shed: structural.
-                    if printf '%s' "${patch_body}" | grep -q "CellDisabled"; then
-                        echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} — the conductor behind this doorway has DISABLED the cell it was asked to write through (HTTP ${patch_status}): ${patch_body}" >&2
-                        echo "    Not transient: nothing can be authored through ${DOORWAY_EPR_URL} until that app is enabled again on its conductor. Waiting will not help." >&2
-                        return 3
-                    fi
                     if [ -n "${retry_after}" ]; then
                         RETRY_AFTER_HINT="${retry_after}"
                     fi
@@ -587,8 +777,15 @@ attempt=1
 start_ts=$(date +%s)
 while true; do
     rc=0
+    # Stamped BEFORE the attempt so an attempt that turns out to be a readiness
+    # probe can have its WHOLE duration refunded, not just the nap after it.
+    attempt_start_ts=$(date +%s)
     stage_once || rc=$?
     if [ "${rc}" -eq 0 ]; then
+        if [ "${CELL_WAIT_ENTERED}" -eq 1 ]; then
+            echo "  ✓ [${SLUG}] the cell behind ${DOORWAY_EPR_URL} started running after $(( $(date +%s) - CELL_READY_FIRST_SEEN ))s of CellDisabled — the same content-addressed offer went through, no intervention needed"
+            cell_ready_clear
+        fi
         break
     fi
     # A deterministic peer VERDICT (broken bundle, or NOT-JUDGED under strict
@@ -604,6 +801,21 @@ while true; do
     # HTTP status/body above).
     if [ "${rc}" -eq 3 ]; then
         echo "ERROR: [${SLUG}] structural failure against ${DOORWAY_EPR_URL} (see above) — not retrying — host left STALE" >&2
+        exit 1
+    fi
+    # A cell that is not running yet is a WAIT, on its own per-host budget: the
+    # retried operation is this same idempotent, content-addressed PATCH via
+    # stage_once, and neither the attempt counter nor the transport budget is
+    # charged for it. The refund covers the WHOLE attempt (re-PUT, deliverability
+    # check, the CellDisabled PATCH itself) plus the nap — charging just the nap
+    # still let a slow readiness probe eat the transport budget it was supposed
+    # to be separate from.
+    if [ "${rc}" -eq 4 ]; then
+        if cell_ready_wait "${HASH_FIELD} PATCH" "${CELL_STATUS}" "${CELL_BODY}"; then
+            start_ts=$(( start_ts + $(date +%s) - attempt_start_ts ))
+            continue
+        fi
+        echo "ERROR: [${SLUG}] the cell behind ${DOORWAY_EPR_URL} never became ready (see above) — host left STALE" >&2
         exit 1
     fi
 

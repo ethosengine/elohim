@@ -646,7 +646,9 @@ _gate-pipeline-list-fresh:
     node genesis/orchestrator/scripts/generate-pipeline-list.mjs
     git diff --exit-code -- genesis/orchestrator/pipeline-list.json
 
-# SDK archive checks shared by local EPR-app packaging and CI staging.
+# SDK archive checks shared by local EPR-app packaging and CI staging, plus the
+# staging ladder's own classification tests (fake curl/node, no network).
 [private]
 _gate-epr-app-package:
     node --test "{{ root }}/elohim/sdk/scripts/package-app.test.mjs"
+    bash "{{ root }}/scripts/ci/stage-spa-blob.test.sh"
