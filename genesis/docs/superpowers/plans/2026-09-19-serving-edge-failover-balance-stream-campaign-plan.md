@@ -161,6 +161,14 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   vocabulary, shared with `ContentView`, is left alone) and seam 6 reads the head record's `blob_cid`.
   **1.4d (new, unscheduled):** 1.4a prevents new tears and heals none — no candidate query selects a row because
   it is torn; a torn row classifies `InSync` (`projection_reconcile.rs:4454-4476`).
+  *Household reading 2026-09-20* (fresh recast, storage `3ec3614dd` build, reports `sprint-report-household-20260920T22{3158,3619,3958}Z-3ec3614d`):
+  T-1 landed (`77cf2ba48`) and the pair converges — by the final read all five endpoints served one head and one
+  blob, and seam 6's head-record probe read `OK` on both doorways. But "A current governed version crosses
+  withdrawal and recovery" is 0/3, as it has been since 2026-09-18 (habit DELTA 09-18a): its load-bearing step is a
+  single read taken immediately after publish, which a ~1 s adoption cannot satisfy. **That scenario is 1.4b's
+  acceptance, not 1.4a's** — the design pass named it for T-1 in error, and T-1 was never going to flip it. T-1's
+  proof is its red-first unit test and the absence of a torn row on the converged pair; T-2 proceeds as its own
+  commit on that basis.
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is
