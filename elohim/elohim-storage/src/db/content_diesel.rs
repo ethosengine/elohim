@@ -1543,6 +1543,17 @@ pub enum StampMode {
     /// while a delayed signal cannot move a head already backed by an ordered
     /// canonical election. The request path remains the deliberate `Declare`;
     /// modern cross-root signals carry ordering and use `HealCanonical`.
+    ///
+    /// Also declines to MOVE an already-declared row when the stamp carries no
+    /// patch at all (`StaleReason::PointerAbsent` — story 1.4a T-2, the
+    /// backstop for T-1 `77cf2ba48`). A declined move is dropped, not queued,
+    /// at this call site (the conductor signal is consumed and nothing retries
+    /// it); it is re-driven by a pointer-bearing channel instead — fast, by the
+    /// event-driven head-adoption trigger's 1/2/4/8/15/30 s retry ladder (which
+    /// calls `adopt_local`, pointer-bearing after T-1), with the
+    /// projection-reconcile sweep's 300 s cadence as backstop. See
+    /// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`
+    /// §(c).
     LegacySignal,
     /// Heal stamp for a CANONICAL conductor answer (projection-reconcile with
     /// `ContentHeadWire.canonical == true`): fills an undeclared row,
@@ -1555,6 +1566,15 @@ pub enum StampMode {
     /// #1187's seam-smoke, healed back to the superseded head by #1188).
     /// Unknown ordering (either side NULL) refuses the move: heal converges
     /// rows forward; deliberate channels do everything else.
+    ///
+    /// Also declines to MOVE an already-declared row (after the ordering
+    /// verdict above has already ALLOWED the move) when the stamp carries no
+    /// patch at all (`StaleReason::PointerAbsent` — story 1.4a T-2). Same
+    /// re-drive as `LegacySignal` above: the declined move is not queued at
+    /// this call site, and converges via the pointer-bearing 1/2/4/8/15/30 s
+    /// event-driven trigger ladder or the 300 s reconcile-sweep backstop. See
+    /// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`
+    /// §(c).
     HealCanonical,
     /// Heal stamp for a FALLBACK conductor answer (root-author election on a
     /// cold conductor while the canonical link is not yet retrievable): fills
@@ -1629,6 +1649,29 @@ pub enum StaleReason {
     /// Incoming is STAGING; the row holds an EARNED declaration. Earned is never
     /// displaced by the scaffold tier.
     Tier,
+    /// The stamp would MOVE an already-declared row but carries no patch at all
+    /// (`patch.is_none()`) — a bare declaration with no content evidence behind
+    /// it (story 1.4a T-2, the backstop for T-1 `77cf2ba48`).
+    ///
+    /// THE RULE IS PATCH-PRESENCE, NEVER `patch.blob_cid.is_some()`: 3 770 of
+    /// 3 770 sampled corpus items carry no blob pointer, and on
+    /// `ContentProjectionPatch`, `blob_cid: None` means "preserve the existing
+    /// column" — not "no blob exists" (see that struct's doc comment above). A
+    /// guard keyed on `blob_cid.is_some()` would therefore refuse the head move
+    /// for ~100% of the corpus and permanently freeze convergence for every
+    /// concept, path and assessment. Distinguished from `StoredNull` (which
+    /// fires when the row itself has an election with nothing to compare
+    /// against) so the two stuck states are never conflated on the metric that
+    /// exists to tell them apart — see [`StampOutcome::Refreshed`]'s doc for the
+    /// 2026-07-26 false-`HEALED` history this discipline protects.
+    ///
+    /// `LegacySignal` and `HealCanonical` only. `Declare` is the deliberate
+    /// authority channel and is exempt (its one production caller always
+    /// carries a full patch); `GapFill` never reaches this check because it
+    /// already refuses every move before the patch is consulted. Full design:
+    /// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`
+    /// §(b) R1/R4, §(f) Task 2.
+    PointerAbsent,
 }
 
 impl StaleReason {
@@ -1637,6 +1680,7 @@ impl StaleReason {
             StaleReason::StoredNull => "stored_null",
             StaleReason::NotNewer => "not_newer",
             StaleReason::Tier => "tier",
+            StaleReason::PointerAbsent => "pointer_absent",
         }
     }
 }
@@ -1713,6 +1757,20 @@ pub fn canonical_move_verdict(
 /// back their notarized link timestamp. It is consulted ONLY by
 /// [`StampMode::HealCanonical`]; the other modes ignore it for the move decision
 /// but still PERSIST it when present, so the column backfills.
+///
+/// `patch` gates a second, independent refusal (story 1.4a T-2): in
+/// `LegacySignal` and `HealCanonical`, a MOVE of an already-declared row that
+/// carries no patch at all (`patch.is_none()`) is declined as
+/// `StampOutcome::SkippedStale` with reason `StaleReason::PointerAbsent`,
+/// rather than crowning a new head while continuing to serve the previous
+/// occupant's bytes under its name. `Declare` is exempt (the deliberate
+/// authority channel); `GapFill` never reaches this check (it already refuses
+/// every move). A declined move is dropped at the call site, not queued — it
+/// converges via a different, pointer-bearing channel instead: the
+/// event-driven head-adoption trigger's 1/2/4/8/15/30 s retry ladder (fast
+/// path, `adopt_local` after T-1 `77cf2ba48`), with the projection-reconcile
+/// sweep's 300 s cadence as backstop. Full design:
+/// `genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md`.
 ///
 /// Eight parameters, one over the clippy threshold. Deliberately NOT bundled
 /// into a params struct: every call site names these arguments explicitly, and
@@ -1805,6 +1863,17 @@ fn stamp_declared_head_mode_transaction(
                 crate::metrics::inc_projection_refused_stale(StaleReason::StoredNull.label());
                 return Ok(StampOutcome::SkippedStale);
             }
+            // T-2 (story 1.4a): decline a MOVE that carries no patch at all — a
+            // bare declaration with no content evidence behind it. THE RULE IS
+            // PATCH-PRESENCE, NEVER `patch.blob_cid.is_some()`: 3 770 of 3 770
+            // sampled corpus items carry no blob pointer and `blob_cid: None`
+            // means "preserve the column" — a blob-keyed guard would freeze
+            // head convergence for the whole corpus. See
+            // `StaleReason::PointerAbsent`.
+            if moving_declared_row && patch.is_none() {
+                crate::metrics::inc_projection_refused_stale(StaleReason::PointerAbsent.label());
+                return Ok(StampOutcome::SkippedStale);
+            }
         }
         StampMode::GapFill => {
             if moving_declared_row {
@@ -1822,6 +1891,16 @@ fn stamp_declared_head_mode_transaction(
                 // clock comparison) stop being indistinguishable.
                 if let Err(reason) = canonical_move_verdict(canonical_ordering, stored_ordering) {
                     crate::metrics::inc_projection_refused_stale(reason.label());
+                    return Ok(StampOutcome::SkippedStale);
+                }
+                // T-2 (story 1.4a): the ordering verdict just ALLOWED this move,
+                // but a move that carries no patch at all is still declined —
+                // same rule and same rationale as the LegacySignal arm above
+                // (PATCH-PRESENCE, never `blob_cid.is_some()`).
+                if patch.is_none() {
+                    crate::metrics::inc_projection_refused_stale(
+                        StaleReason::PointerAbsent.label(),
+                    );
                     return Ok(StampOutcome::SkippedStale);
                 }
             } else if same_declared_head {
@@ -4933,14 +5012,21 @@ mod tests {
         assert_eq!(same, StampOutcome::Refreshed);
 
         // A newer election moves the row forward — exactly how a peer converges
-        // once the winning declaration link gossips in.
+        // once the winning declaration link gossips in. The patch here is
+        // incidental to what this test pins (the election-clock ordering);
+        // since story 1.4a T-2 a canonical move carries its content evidence,
+        // as every production HealCanonical caller does — see
+        // genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md.
         let forward = stamp_declared_head_mode(
             &mut conn,
             &ctx,
             "cid-mono",
             "uhCkk-newest",
             Some(3_000),
-            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".to_string()),
+                ..Default::default()
+            }),
             StampMode::HealCanonical,
             Some((3_000, false)),
         )
@@ -4955,14 +5041,21 @@ mod tests {
         );
 
         // TIER precedence: an EARNED election beats a staging one outright, even
-        // with an OLDER clock — mirrors `select_canonical_winner` rule 1.
+        // with an OLDER clock — mirrors `select_canonical_winner` rule 1. The
+        // patch here is incidental to what this test pins (tier precedence);
+        // since story 1.4a T-2 a canonical move carries its content evidence,
+        // as every production HealCanonical caller does — see
+        // genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md.
         let earned = stamp_declared_head_mode(
             &mut conn,
             &ctx,
             "cid-mono",
             "uhCkk-earned",
             Some(500),
-            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".to_string()),
+                ..Default::default()
+            }),
             StampMode::HealCanonical,
             Some((500, true)),
         )
@@ -5179,14 +5272,21 @@ mod tests {
             "precondition: the declare channel records no election"
         );
 
-        // A canonical answer carrying a real election now moves it.
+        // A canonical answer carrying a real election now moves it. The patch
+        // here is incidental to what this test pins (the two-way-declared
+        // election cure); since story 1.4a T-2 a canonical move carries its
+        // content evidence, as every production HealCanonical caller does —
+        // see genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md.
         let moved = stamp_declared_head_mode(
             &mut conn,
             &ctx,
             "cid-unelected",
             "uhCkk-elected",
             Some(42),
-            None,
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".to_string()),
+                ..Default::default()
+            }),
             StampMode::HealCanonical,
             Some((7_000, false)),
         )
@@ -5277,8 +5377,19 @@ mod tests {
         assert_eq!(row.dht_anchor_hash.as_deref(), Some("uhCkk-browser-b"));
         assert_eq!(row.canonical_declared_at, Some(2_000));
 
-        // Backward compatibility: before a row has an election clock, its
-        // own legacy signal remains a deliberate declaration channel.
+        // OVERTURNED 2026-09-21 (story 1.4a T-2, backstop for T-1 `77cf2ba48`).
+        // This block used to be named "backward compatibility" and asserted
+        // that, before a row has an election clock, its own legacy signal
+        // could move the head with NO content behind it — it literally
+        // constructed a torn row (declared head B, `blob_hash` still from A)
+        // and pinned that as correct. `stamp_declared_head_mode_transaction`
+        // now declines a `LegacySignal`/`HealCanonical` MOVE that carries no
+        // patch at all (`StaleReason::PointerAbsent`); the deliberate
+        // `Declare` channel is unaffected and still moves without a patch
+        // (`a_deliberate_declare_still_moves_without_a_patch`). See
+        // genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md
+        // §(b) R4, and `a_contentless_legacy_signal_declines_to_move_a_declared_row`
+        // for the dedicated pin.
         let mut legacy = mk_plain("cid-legacy-signal");
         legacy.blob_hash = Some("sha256-browser-a".into());
         create_content(&mut conn, &ctx, legacy).unwrap();
@@ -5303,7 +5414,354 @@ mod tests {
                 None,
             )
             .unwrap(),
-            StampOutcome::Stamped
+            StampOutcome::SkippedStale
+        );
+        let legacy_row = get_content(&mut conn, &ctx, "cid-legacy-signal", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            legacy_row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-browser-a"),
+            "a pointerless legacy signal must not move the head it cannot back"
+        );
+        assert_eq!(
+            legacy_row.blob_hash.as_deref(),
+            Some("sha256-browser-a"),
+            "a declined move must not disturb the existing pointer either"
+        );
+    }
+
+    /// Story 1.4a T-2 (the backstop for T-1 `77cf2ba48`) — dedicated pin for
+    /// the overturn above. A `LegacySignal` MOVE that carries no patch at all
+    /// must be declined, the row's head AND `blob_hash` must be untouched, and
+    /// the refusal must be counted under its own reason
+    /// (`StaleReason::PointerAbsent`). Design:
+    /// genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md
+    /// §(f) Task 0 row 2.
+    #[test]
+    fn a_contentless_legacy_signal_declines_to_move_a_declared_row() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        let mut legacy = mk_plain("cid-pointerless-signal");
+        legacy.blob_hash = Some("sha256-browser-a".into());
+        create_content(&mut conn, &ctx, legacy).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-pointerless-signal",
+            "uhCkk-browser-a",
+            None,
+            None,
+        )
+        .unwrap();
+
+        let pointer_absent_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+
+        let outcome = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-pointerless-signal",
+            "uhCkk-browser-b",
+            None,
+            None,
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            outcome,
+            StampOutcome::SkippedStale,
+            "a naked LegacySignal move must decline — the row's own conductor \
+             or the reconcile sweep is what carries the pointer"
+        );
+
+        let pointer_absent_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+        assert!(
+            pointer_absent_after >= pointer_absent_before + 1,
+            "the refusal must be counted under StaleReason::PointerAbsent"
+        );
+
+        let row = get_content(
+            &mut conn,
+            &ctx,
+            "cid-pointerless-signal",
+            MinTrust::Invisible,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-browser-a"),
+            "head must not move without its pointer"
+        );
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-browser-a"),
+            "blob_hash must not be disturbed by a declined move"
+        );
+    }
+
+    /// T-2 guards MOVES only. An UNDECLARED row (`moving_declared_row ==
+    /// false`) is still filled by a contentless `LegacySignal`, unchanged from
+    /// before this story — no existing test pinned this shape for
+    /// `LegacySignal` specifically (the sibling `HealCanonical` fill is
+    /// already pinned by `heal_canonical_stamp_is_monotonic`'s first
+    /// assertion).
+    #[test]
+    fn a_contentless_legacy_signal_still_fills_an_undeclared_row() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-legacy-fill")).unwrap();
+
+        let filled = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-legacy-fill",
+            "uhCkk-first-head",
+            None,
+            None,
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            filled,
+            StampOutcome::Stamped,
+            "a FILL (undeclared row) with no patch is unaffected by the T-2 guard"
+        );
+
+        let row = get_content(&mut conn, &ctx, "cid-legacy-fill", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some("uhCkk-first-head")
+        );
+    }
+
+    /// `Declare` is the deliberate authority channel and is exempt from the
+    /// T-2 guard — guards the exemption named in
+    /// story-1.4a-design.md §(b) R4, and keeps
+    /// `gapfill_stamp_never_resurrects_over_a_declared_head`'s final assertion
+    /// (a `Declare`-mode pointerless move as `Stamped`) honest rather than
+    /// accidentally green.
+    #[test]
+    fn a_deliberate_declare_still_moves_without_a_patch() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-declare-no-patch")).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-declare-no-patch",
+            "uhCkk-A",
+            None,
+            None,
+        )
+        .unwrap();
+
+        let moved = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-declare-no-patch",
+            "uhCkk-B",
+            None,
+            None,
+            StampMode::Declare,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            moved,
+            StampOutcome::Stamped,
+            "Declare is the deliberate authority channel; T-2 must not reach it"
+        );
+
+        let row = get_content(&mut conn, &ctx, "cid-declare-no-patch", MinTrust::Invisible)
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some("uhCkk-B"));
+    }
+
+    /// THE CORPUS GUARD (story-1.4a-design.md §(f) Task 0 row 5, §(g) R1). A
+    /// patch that is `Some(..)` but whose `blob_cid` is `None` — the shape of
+    /// 3 770 of 3 770 sampled corpus items — must still MOVE the head in both
+    /// `LegacySignal` and `HealCanonical`. Fails loudly if this guard is ever
+    /// "tightened" from `patch.is_none()` to `patch.blob_cid.is_none()`, which
+    /// would freeze head convergence for essentially the whole corpus.
+    #[test]
+    fn a_content_row_with_no_blob_still_converges_its_head() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // LegacySignal: patch present, blob_cid absent.
+        create_content(&mut conn, &ctx, mk_plain("cid-corpus-legacy")).unwrap();
+        stamp_declared_head(&mut conn, &ctx, "cid-corpus-legacy", "uhCkk-A", None, None).unwrap();
+        let moved = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-corpus-legacy",
+            "uhCkk-B",
+            None,
+            Some(ContentProjectionPatch {
+                title: Some("still-converges".into()),
+                ..Default::default()
+            }),
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            moved,
+            StampOutcome::Stamped,
+            "the rule is PATCH-PRESENCE, never blob_cid-presence — a patch with \
+             no blob pointer is the corpus norm, not a signal to refuse"
+        );
+
+        // HealCanonical: same shape, moving forward under an election.
+        create_content(&mut conn, &ctx, mk_plain("cid-corpus-heal")).unwrap();
+        stamp_declared_head(&mut conn, &ctx, "cid-corpus-heal", "uhCkk-A", None, None).unwrap();
+        let moved_heal = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-corpus-heal",
+            "uhCkk-B",
+            Some(1_000),
+            Some(ContentProjectionPatch {
+                metadata_json: Some("{}".into()),
+                ..Default::default()
+            }),
+            StampMode::HealCanonical,
+            Some((1_000, false)),
+        )
+        .unwrap();
+        assert_eq!(
+            moved_heal,
+            StampOutcome::Stamped,
+            "HealCanonical must also converge a blob-less content row's head"
+        );
+    }
+
+    /// R3 (2026-07-26, 1 578 false `HEALED` lines): a pointerless refusal must
+    /// be counted under its OWN reason, never conflated with `stored_null` —
+    /// those are two categorically different stuck states. Design:
+    /// story-1.4a-design.md §(f) Task 0 row 6.
+    #[test]
+    fn a_pointerless_refusal_is_counted_under_its_own_reason() {
+        assert_eq!(StaleReason::PointerAbsent.label(), "pointer_absent");
+
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-reason-isolation")).unwrap();
+        stamp_declared_head(
+            &mut conn,
+            &ctx,
+            "cid-reason-isolation",
+            "uhCkk-A",
+            None,
+            None,
+        )
+        .unwrap();
+
+        let pointer_absent_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+        let stored_null_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::StoredNull.label()])
+            .get();
+
+        let outcome = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-reason-isolation",
+            "uhCkk-B",
+            None,
+            None,
+            StampMode::LegacySignal,
+            None,
+        )
+        .unwrap();
+        assert_eq!(outcome, StampOutcome::SkippedStale);
+
+        let pointer_absent_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+        let stored_null_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::StoredNull.label()])
+            .get();
+
+        assert!(
+            pointer_absent_after >= pointer_absent_before + 1,
+            "a pointerless move must be counted under its own reason"
+        );
+        assert_eq!(
+            stored_null_after, stored_null_before,
+            "must not be conflated with StoredNull — the 1 578-false-HEALED class"
+        );
+    }
+
+    /// A non-canonical answer (`head.canonical == false`, `adopt_local`'s
+    /// `verified_patch: None` fallback shape) never reaches the T-2 pointer
+    /// guard at all: it carries no election, and `canonical_move_verdict`
+    /// already refuses ANY incoming ordering of `None` — `(None, Some(_))`
+    /// and `(None, None)` are both `Err` — before the patch is ever consulted.
+    /// This is the reasoning that lets `heal_canonical_stamp_is_monotonic`'s
+    /// and `an_elected_answer_moves_a_row_whose_declaration_has_no_election`'s
+    /// REFUSED calls keep `patch: None` unchanged: only their MOVE-and-expect-
+    /// `Stamped` calls needed a patch. Coordinator ruling on story 1.4a T-2,
+    /// genesis/a2o/reports/recovery/serving-edge-20260919/story-1.4a-design.md.
+    #[test]
+    fn a_non_canonical_answer_never_reaches_the_pointer_guard() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(&mut conn, &ctx, mk_plain("cid-non-canonical")).unwrap();
+        stamp_declared_head(&mut conn, &ctx, "cid-non-canonical", "uhCkk-A", None, None).unwrap();
+
+        let pointer_absent_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+        let stored_null_before = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::StoredNull.label()])
+            .get();
+
+        let outcome = stamp_declared_head_mode(
+            &mut conn,
+            &ctx,
+            "cid-non-canonical",
+            "uhCkk-B",
+            None,
+            None,
+            StampMode::HealCanonical,
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            outcome,
+            StampOutcome::SkippedStale,
+            "a non-canonical answer carries no election and is refused by the \
+             verdict before the patch is ever looked at"
+        );
+
+        let pointer_absent_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::PointerAbsent.label()])
+            .get();
+        let stored_null_after = crate::metrics::PROJECTION_REFUSED_STALE_REASONS
+            .with_label_values(&[StaleReason::StoredNull.label()])
+            .get();
+
+        assert_eq!(
+            pointer_absent_after, pointer_absent_before,
+            "the pointer guard must be unreachable once the ordering verdict \
+             has already refused the move"
+        );
+        assert!(
+            stored_null_after >= stored_null_before + 1,
+            "the refusal must be counted under the verdict's own reason, not the \
+             pointer guard's"
         );
     }
 
