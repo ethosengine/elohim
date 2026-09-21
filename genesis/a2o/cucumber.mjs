@@ -35,7 +35,12 @@ const htmlReportPath = process.env.CUCUMBER_HTML_REPORT || 'reports/cucumber-rep
 
 const base = {
   requireModule: ['tsx'],
-  require: ['steps/**/*.ts'],
+  // Step, hook and helper files live at `steps/*.ts` and `steps/<domain>/*.ts`. The glob is
+  // deliberately NOT `steps/**/*.ts`: that also loads `steps/<domain>/__tests__/*.test.ts`, whose
+  // `node:test` cases then RUN inside the cucumber process and patch `globalThis.fetch` while they
+  // do — any scenario whose first fetch lands in that window fails with "unexpected fetch in test".
+  // Unit tests run through `pnpm test:unit`, never through cucumber.
+  require: ['steps/*.ts', 'steps/*/*.ts'],
   format: ['progress-bar', ['html', htmlReportPath], ['json', jsonReportPath]],
   formatOptions: { snippetInterface: 'async-await' },
 };
