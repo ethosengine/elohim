@@ -23,6 +23,19 @@ itself, and the envelope includes two fields that are each peer's LOCAL view rat
 therefore serve different envelope bytes, a different `cid`, and — since story 6.1 (`1103207e4`) derives the
 validator from the exact body — a different `ETag`.
 
+**Corrected by the design pass, 2026-09-21** (`genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md`):
+the paragraph above fuses two causes. `distribution` is NOT inside the `cid` — `http.rs:13166-13168` computes the
+cid from `encode_epr_head(&head)` before `:13208` attaches distribution, and `EprHead` (`elohim/epr/src/head.rs:106-130`)
+has no such field. The SOLE cid offender is `updated` = `content.updated_at`, a local row mtime bumped by every
+stamp including no-ops (`content_diesel.rs:1601-1609` records one such incident). `replicaCount` moves only the BODY,
+hence the `ETag`. Two symptoms, two cures — decided as Option A: `updated` takes `declared_head_at` (the declaration
+act's own timestamp; NULL → omitted), and `distribution` leaves the head body for the `summary` arm of the existing
+`/api/v1/blob/{hash}/distribution/details` route. The doorway is not edited: story 6.1's validator was correct and
+was measuring a body that lied. No stored value migrates (zero persisted head CIDs; one consumer, which only asserts
+existence); every head is re-addressed once. Found on the way and filed separately: the head envelope had no view
+schema at all; `derive_epr_head` has two call sites with opposite `enrich_pillars`; three docs describe a persisted
+"EprHead CID" that no writer mints.
+
 **Evidence.** Household, 2026-09-21 ~02:15Z, fresh cast on storage `210cb2c1…` / doorway `691e13e5…`, both doorways
 converged on one head and one blob for `elohim-host-landing` (`sprint-report-household-20260921T021222Z-6b85560c`).
 `GET localhost:8888/epr-head/elohim-host-landing` and the same on `:8889`, both 989 bytes, identical except:

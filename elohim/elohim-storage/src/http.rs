@@ -1055,31 +1055,6 @@ fn is_spa_route_subpath(sub: &str) -> bool {
     !final_segment.contains('.')
 }
 
-/// Fetch the `blob_hash` for a content row by its stable id (slug), respecting
-/// the same provenance gate (`require_provenance = true`) that
-/// `derive_epr_head` uses for HTTP callers.
-///
-/// Returns `None` when the row is missing, fails the provenance gate, or has
-/// no `blob_hash` populated yet (pre-distribution content). Used by the EPR
-/// head handler to hydrate `DistributionSummary` (Phase 5 T34) — distribution
-/// is best-effort, so any miss collapses to `None` rather than surfacing an
-/// error onto the head response.
-fn view_blob_hash_for_id(
-    conn: &mut diesel::SqliteConnection,
-    app_ctx: &db::AppContext,
-    id: &str,
-) -> Option<String> {
-    db::content_diesel::get_content_with_tags(
-        conn,
-        app_ctx,
-        id,
-        db::content_diesel::MinTrust::Amber,
-    )
-    .ok()
-    .flatten()
-    .and_then(|cwt| cwt.content.blob_hash)
-}
-
 /// Preserve transport stats while making byte-serialized DNA hashes valid JSON keys.
 fn project_transport_stats(
     stats: &holochain_types::network::HolochainTransportStats,
@@ -13125,22 +13100,26 @@ impl HttpServer {
         // Look up EPR Head from content DB by ID
         if let Ok(mut conn) = self.get_conn() {
             let app_ctx = db::AppContext::default_lamad();
-            // External HTTP handler — gate on provenance so we never surface a
-            // row that has neither been notarized on Holochain nor published to
-            // libp2p Kad.  No pillar enrichment: shefa/qahal remain at their
-            // empty defaults for the public metadata surface.
-            let head_opt = crate::epr_head::derive_epr_head(&mut conn, &app_ctx, id, true, false)?;
 
-            if let Some(head) = head_opt {
-                // Check Accept header for content negotiation
-                let wants_cbor = req
-                    .headers()
-                    .get(header::ACCEPT)
-                    .and_then(|v| v.to_str().ok())
-                    .map(|a| a.contains("application/vnd.ipld.dag-cbor"))
-                    .unwrap_or(false);
+            // Check Accept header for content negotiation
+            let wants_cbor = req
+                .headers()
+                .get(header::ACCEPT)
+                .and_then(|v| v.to_str().ok())
+                .map(|a| a.contains("application/vnd.ipld.dag-cbor"))
+                .unwrap_or(false);
 
-                if wants_cbor {
+            if wants_cbor {
+                // External HTTP handler — gate on provenance so we never surface a
+                // row that has neither been notarized on Holochain nor published to
+                // libp2p Kad.  No pillar enrichment: shefa/qahal remain at their
+                // empty defaults for the public metadata surface. This arm encodes
+                // the canonical EprHead directly — structurally no `cid`, no
+                // `distribution` (neither is a member of EprHead; see epr_codec).
+                let head_opt =
+                    crate::epr_head::derive_epr_head(&mut conn, &app_ctx, id, true, false)?;
+
+                if let Some(head) = head_opt {
                     match crate::epr_codec::encode_epr_head(&head) {
                         Ok((cbor_bytes, _cid)) => {
                             return Ok(Response::builder()
@@ -13160,62 +13139,26 @@ impl HttpServer {
                         }
                     }
                 }
-
-                // Default: JSON response
-                let mut view: EprHeadView = head.clone().into();
-                if let Ok((_bytes, cid)) = crate::epr_codec::encode_epr_head(&head) {
-                    view.cid = Some(cid.to_string());
+            } else {
+                // Default: JSON response. The body is a function of the declared
+                // head alone (epr-head-envelope-design.md, Option A) — no
+                // `distribution` field. Per-peer distribution facts moved to
+                // GET /api/v1/blob/{hash}/distribution/summary (api/blob.rs),
+                // which genuinely — and correctly — differs between honest
+                // peers. `compose_head_view` is the single pure
+                // derive+encode+stamp path (same provenance gate, no pillar
+                // enrichment) this branch has always run.
+                if let Some(view) =
+                    crate::epr_head::compose_head_view(&mut conn, &app_ctx, id, true)?
+                {
+                    return Ok(Response::builder()
+                        .status(StatusCode::OK)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            serde_json::to_string(&view).unwrap(),
+                        )))
+                        .unwrap());
                 }
-
-                // Phase 5 T34: best-effort distribution-summary hydration.
-                // Distribution is purely operational (Category C) — it must
-                // never contaminate the canonical CBOR-encoded EprHead, so it
-                // lives on the JSON view only. Visitor vs Steward branching
-                // mirrors api/blob.rs::handle_distribution_details: if the
-                // caller resolves to an agent_cid AND has active peer
-                // bindings, hydrate as Steward; otherwise as Visitor.
-                if let (Some(pool), Some(blob_hash)) = (
-                    self.db_pool.as_ref(),
-                    view_blob_hash_for_id(&mut conn, &app_ctx, id),
-                ) {
-                    let agent_cid_opt = crate::api::account::extract_agent_cid(&req, &mut conn)
-                        .ok()
-                        .flatten();
-                    let bindings = if let Some(ref cid) = agent_cid_opt {
-                        let now_iso = chrono::Utc::now().to_rfc3339();
-                        crate::db::peer_identity_bindings::list_active_for_agent(
-                            &mut conn, cid, &now_iso,
-                        )
-                        .unwrap_or_default()
-                    } else {
-                        Vec::new()
-                    };
-                    let dist_ctx = match (&agent_cid_opt, bindings.is_empty()) {
-                        (Some(cid), false) => {
-                            crate::services::distribution_view::DistributionContext::Steward {
-                                agent_cid: cid.as_str(),
-                                bindings: &bindings,
-                            }
-                        }
-                        _ => crate::services::distribution_view::DistributionContext::Visitor,
-                    };
-                    if let Ok(summary) =
-                        crate::services::distribution_view::compose_distribution_summary(
-                            pool, &blob_hash, dist_ctx,
-                        )
-                        .await
-                    {
-                        view.distribution = Some(summary);
-                    }
-                }
-
-                return Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Full::new(Bytes::from(
-                        serde_json::to_string(&view).unwrap(),
-                    )))
-                    .unwrap());
             }
         }
 
@@ -17630,6 +17573,19 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .rate_limit(60)
                 .build(),
         )
+        .route(
+            // epr-head-envelope design (Option A): the per-peer distribution
+            // facts that used to ride inline on GET /epr-head/{id} now live
+            // here exclusively. Same Visitor/Steward branch, same visibility
+            // as /details — this design SHRINKS the anonymous topology-census
+            // exposure (the head no longer leaks it), it does not widen this
+            // route's own consent gradient.
+            Route::get("/api/v1/blob/{hash}/distribution/summary")
+                .handler("get_blob_distribution_summary")
+                .cache_ttl(5)
+                .rate_limit(60)
+                .build(),
+        )
         // =====================================================================
         // /api/v1/cluster — Federated agent-scoped cluster view (Phase 5 T30)
         // =====================================================================
@@ -18280,6 +18236,10 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/blob/{hash}/distribution/details"),
             "missing /api/v1/blob/{{hash}}/distribution/details (T29)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/blob/{hash}/distribution/summary"),
+            "missing /api/v1/blob/{{hash}}/distribution/summary (epr-head-envelope design, Option A)"
         );
         assert!(
             paths.contains(&"/api/v1/cluster"),

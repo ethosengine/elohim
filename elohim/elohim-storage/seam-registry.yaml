@@ -4924,3 +4924,128 @@ decisionPoints:
       close-scan) closes both. The supervisor's enable path is not unit-testable without a
       conductor: its fence gate and backoff gate are asserted separately (closed_chain_fence and
       enable_app_backoff), and the composition is covered only by the a2o dataplane lane.
+
+  - name: compose_epr_head_view
+    kind: boundary-answer-type
+    sourceLocation:
+      file: src/epr_head.rs
+      modulePath: epr_head::compose_head_view
+    summary: >
+      The GET /epr-head/{id} JSON response body — a function of the DECLARED HEAD alone.
+      epr-head-envelope-design.md (Option A, 2026-09-21) cured a finding that two peers agreeing
+      on a content's declared head served different `cid`s and different bytes: `updated` sourced
+      from `content.updated_at` (a local row mtime bumped by every stamp, including no-ops) and
+      `distribution` (per-peer topology) rode inline in the body. `updated` now sources from
+      `content.declared_head_at` (the DHT declaration act's own Timestamp — identical on every
+      peer holding that action; NULL omits the field, never a substitute). `distribution` moved
+      off the envelope entirely, to the sibling `DistributionSummary` boundary-answer-type at
+      GET /api/v1/blob/{hash}/distribution/summary. No entry type, no coordinator function, no
+      DNA-hash change — this is a read projection of an already-projected column
+      (content.declared_head_at), never a new truth.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          The plane-location defect this design names: two Category-C operational facts
+          (updated_at row mtime, distribution) sat inside a Category-A projection's content
+          address. The cure places each fact on its plane — the head-fact (declared_head_at) in
+          the addressed body, the peer-view fact (distribution) on its own operational route.
+      - id: C1
+        status: n-a
+        justification: >
+          No peer election happens here. The envelope projects declared_head_action_hash /
+          declared_head_at, written only by own-conductor-witnessed commits and
+          conductor-verified reconcile stamps; this boundary type has no write path.
+      - id: C2
+        status: answered
+        justification: >
+          The clock is named: declared_head_at, the same monotonicity key StampMode::HealCanonical
+          already refuses to move backwards on. This design adopts that clock rather than
+          inventing a second one.
+      - id: C4
+        status: answered
+        justification: >
+          declared_head_at NULL omits `updated` entirely — never the row mtime, never an epoch-0
+          string. Pinned by epr_head_updated_is_absent_when_no_declared_head.
+      - id: C5
+        status: answered
+        justification: >
+          The envelope's authority is the DHT declaration act; sourcing `updated` from
+          declared_head_at moves it CLOSER to that authority (away from a local reconcile-sweep
+          value). distribution — locally-observed evidence, not authority — moved out of a
+          document whose address implies authority.
+      - id: C6a
+        status: answered
+        justification: >
+          Per-request work strictly decreases: the JSON arm no longer runs a peer_blob_inventory
+          scan, a projection_events scan, a peer_identity_bindings scan, or extract_agent_cid —
+          compose_head_view is DB-only, no Request, one content-row read.
+      - id: C6b
+        status: answered
+        justification: >
+          The property under repair. Two identical GETs — on one peer or on two agreeing peers —
+          must produce one body and one cid. Pinned by
+          epr_head_cid_is_invariant_to_local_row_mtime and
+          epr_head_body_is_byte_identical_across_peers_differing_only_in_local_state.
+      - id: C7
+        status: partial
+        justification: >
+          The JSON arm and the dag-cbor arm agree on every addressed field after this slice
+          (epr_head_json_and_cbor_agree_on_every_addressed_field). NOT closed by this slice: the
+          HTTP call site (enrich_pillars=false) and the P2P call site
+          (services::epr_service::resolve_epr_head_locally, enrich_pillars=true plus graph
+          enrichment) derive different documents for one id — named as follow-up F1, deliberately
+          out of scope here.
+      - id: C9
+        status: answered
+        justification: >
+          The envelope stops carrying a locally-authored timestamp and starts carrying the
+          declaration act's own — lineage read from the action, not from whichever peer answered.
+      - id: C10
+        status: partial
+        justification: >
+          The envelope shipped with NO view schema at all before this slice;
+          elohim/sdk/schemas/v1/views/epr-head-view.schema.json is the contract that never
+          existed, pinned by epr_head_view_matches_schema. Named gap NOT closed here: three
+          shipped schemas (republish-epr, acknowledges-reach-change, reach-escalation-pending)
+          describe persisted fields as holding an "EprHead CID" that no writer ever mints
+          (follow-up F6, out of scope).
+      - id: C12
+        status: partial
+        justification: >
+          /epr-head/{id} applies a provenance gate (MinTrust::Amber) and no reach gate — the
+          pre-existing http-reach-enforcement-gap. This design does not close it; it SHRINKS what
+          an unconsented caller receives (the census fields no longer ride the head) and
+          consolidates the caller-branching surface onto the distribution route, which already
+          resolves identity, so a future reach gate has one place to land instead of two.
+      - id: C13
+        status: answered
+        justification: >
+          The Visitor/Steward gradient the head used to duplicate inline now lives only at
+          api/blob.rs's distribution routes, factored into one shared
+          resolve_distribution_identity / distribution_context_from pair — one gradient, one
+          home, shared by /details and /summary.
+      - id: C14
+        status: answered
+        justification: >
+          The residual is named here rather than discovered later: a one-time re-addressing of
+          every head at rollout (zero persisted head cids found in-tree; one consumer, which
+          checks only non-emptiness), and the enrich-split (F1) is recorded as a follow-up rather
+          than silently left for a future reader to rediscover.
+    contractTests:
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_cid_is_invariant_to_local_row_mtime, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_cid_moves_when_the_declared_head_moves, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_updated_is_absent_when_no_declared_head, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_updated_renders_declared_head_at_in_rfc3339_seconds, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_body_is_byte_identical_across_peers_differing_only_in_local_state, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_json_body_carries_no_distribution, kind: integration }
+      - { path: elohim/elohim-storage/tests/epr/epr_head_centralization.rs, testName: epr_head_json_and_cbor_agree_on_every_addressed_field, kind: integration }
+      - { path: elohim/elohim-storage/tests/schema_contract.rs, testName: epr_head_view_matches_schema, kind: integration }
+      - { path: elohim/elohim-storage/src/api/blob.rs, testName: path_shape_matches_distribution_summary, kind: unit }
+      - { path: elohim/elohim-storage/src/http.rs, testName: test_manifest_builds, kind: unit }
+    gapNote: >
+      F1 (the enrich_pillars HTTP/P2P split), F2 (EprHeadView's ts-rs home — it lives in
+      views_convert, not elohim-views, and has no #[derive(TS)]; the JSON schema gives the
+      boundary its contract without needing ts-rs), and F6 (the three schemas' stale "EprHead
+      CID" prose) are deliberately out of scope for this slice — see
+      genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md §7.

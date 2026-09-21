@@ -6401,3 +6401,88 @@ fn db_collective_view_projects_collective_cid() {
         "collectiveCid must be null (present) pre-coherence"
     );
 }
+
+// ── EPR Head envelope (epr-head-envelope design, Option A, 2026-09-21) ──
+
+/// Test 8 — the contract that never existed. Pins the JSON Schema against the
+/// Rust `EprHeadView`, in a full variant (every optional populated) and a
+/// minimal variant (nothing declared yet), and pins that `distribution` is
+/// gone for good.
+#[test]
+fn epr_head_view_matches_schema() {
+    use elohim_storage::epr_codec::{
+        EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
+    };
+    use elohim_storage::views_convert::epr::EprHeadView;
+
+    // Full variant — every optional populated.
+    let full = EprHeadView {
+        version: 1,
+        id: "elohim-host-landing".to_string(),
+        content: "bafkreitest000000000000000000000000000000000000000000001".to_string(),
+        lamad: EprLamadContext {
+            title: "Elohim Host Landing".to_string(),
+            content_type: "concept".to_string(),
+            description: Some("The landing EPR".to_string()),
+            content_format: Some("markdown".to_string()),
+            tags: vec!["protocol".to_string()],
+        },
+        shefa: EprShefaContext {
+            stewards: vec!["presence-steward-01".to_string()],
+            allocations: vec![0.75],
+        },
+        qahal: EprQahalContext {
+            reach: Some("commons".to_string()),
+            layer: None,
+            attestation_requirements: vec!["prerequisite-mastery:calculus-101".to_string()],
+        },
+        relationships: vec![EprRelationship {
+            rel_type: "TEACHES".to_string(),
+            target: "related-concept".to_string(),
+            target_cid: Some("bafkreirelated00000000000000000000000000000000000000001".to_string()),
+        }],
+        author: Some("did:key:z6Mk".to_string()),
+        updated: Some("2026-09-20T02:00:30Z".to_string()),
+        cid: Some("bafyreifnahxlgzodfqcjfrkc3ipiaqka3w67i2duf3nzlmc5gzjn3ylfxa".to_string()),
+    };
+    let json = serde_json::to_value(&full).unwrap();
+    validate_against_schema("views/epr-head-view.schema.json", &json);
+    assert!(
+        json.get("distribution").is_none(),
+        "EprHeadView must never carry a distribution key: {json}"
+    );
+
+    // Minimal variant — no declared head yet, no enrichment, no relationships.
+    let minimal = EprHeadView {
+        version: 1,
+        id: "content-minimal".to_string(),
+        content: "bafkreiminimal00000000000000000000000000000000000000001".to_string(),
+        lamad: EprLamadContext {
+            title: "Minimal".to_string(),
+            content_type: "concept".to_string(),
+            description: None,
+            content_format: None,
+            tags: vec![],
+        },
+        shefa: EprShefaContext {
+            stewards: vec![],
+            allocations: vec![],
+        },
+        qahal: EprQahalContext {
+            reach: None,
+            layer: None,
+            attestation_requirements: vec![],
+        },
+        relationships: vec![],
+        author: None,
+        updated: None,
+        cid: None,
+    };
+    let json = serde_json::to_value(&minimal).unwrap();
+    validate_against_schema("views/epr-head-view.schema.json", &json);
+
+    assert_source_of_truth_declared(
+        &load_schema("views/epr-head-view.schema.json"),
+        "epr-head-view.schema.json",
+    );
+}

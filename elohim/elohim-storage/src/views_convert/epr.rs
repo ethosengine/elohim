@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use crate::epr_codec::{
     EprHead, EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
 };
-use elohim_views::infrastructure::DistributionSummary;
 
 // ============================================================================
 // EPR Head Input Views (TypeScript → EprHead)
@@ -126,12 +125,25 @@ impl From<EprHeadInputView> for EprHead {
 
 /// EPR Head response — camelCase output for TypeScript clients.
 ///
-/// **Note on distribution**: this is a *response wrapper*, not the canonical
-/// EPR Head. The canonical [`EprHead`] (in `epr_codec`) is the deterministic
-/// IPLD document whose CID is derived from its bytes — operational fields
-/// like `distribution` MUST NOT contaminate it. The DAG-CBOR encoding path in
-/// `handle_get_epr_head` serializes the canonical struct, so distribution is
-/// only ever surfaced via this JSON view.
+/// **The body is a function of the declared head alone.** This wrapper adds
+/// exactly one field beyond the canonical [`EprHead`] (in `epr_codec`): `cid`,
+/// the address of that head's dag-cbor bytes. It carries no operational
+/// (Category C) fields — no per-peer distribution/replica facts, no local row
+/// mtime. Two peers that agree on the declared head therefore serve
+/// byte-identical bodies and mint identical `cid`s, regardless of local state
+/// (row mtime, gossip-observed inventory). Per-peer distribution facts
+/// (replica counts, projector counts, diversity, caller role) live at the
+/// sibling route `GET /api/v1/blob/{hash}/distribution/summary`
+/// (`api/blob.rs`), which genuinely — and correctly — differs between honest
+/// peers; a view whose whole point is to be the same everywhere must never
+/// carry a fact two honest peers can honestly disagree on.
+/// See `genesis/a2o/reports/recovery/serving-edge-20260920/epr-head-envelope-design.md`
+/// (Option A) for the full design and the census that found zero in-tree
+/// consumers of the removed `distribution` field.
+///
+/// The DAG-CBOR encoding path in `handle_get_epr_head` serializes the
+/// canonical [`EprHead`] struct directly (no `cid`, structurally no
+/// `distribution`); this JSON view is the only place `cid` is surfaced.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EprHeadView {
@@ -149,13 +161,6 @@ pub struct EprHeadView {
     /// CID of the DAG-CBOR encoded head (set after encoding)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cid: Option<String>,
-    /// Inline distribution summary (Phase 5 T34). Hydrated by the HTTP handler
-    /// from `compose_distribution_summary` over the content's blob_hash.
-    /// `None` when the content row has no blob_hash yet (pre-distribution),
-    /// or when summary composition failed (best-effort hydration — distribution
-    /// surfacing must never break the head response).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub distribution: Option<DistributionSummary>,
 }
 
 impl From<EprHead> for EprHeadView {
@@ -171,7 +176,6 @@ impl From<EprHead> for EprHeadView {
             author: h.author,
             updated: h.updated,
             cid: None,
-            distribution: None,
         }
     }
 }

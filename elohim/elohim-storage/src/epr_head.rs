@@ -55,6 +55,7 @@ use diesel::prelude::*;
 use crate::db;
 use crate::epr_codec::{EprHead, EprLamadContext, EprQahalContext, EprShefaContext};
 use crate::error::StorageError;
+use crate::views_convert::epr::EprHeadView;
 
 /// Derive an [`EprHead`] from the local SQLite read projection for the given
 /// content `id`.
@@ -154,6 +155,62 @@ pub fn derive_epr_head(
         qahal,
         relationships: vec![],
         author: content.created_by.clone(),
-        updated: Some(content.updated_at.clone()),
+        // `updated` is `declared_head_at` — the DHT declaration act's own
+        // Timestamp — NEVER `content.updated_at`, the local row mtime bumped
+        // by every stamp including no-ops (the live incident recorded at
+        // `content_diesel.rs`'s `StampOutcome::Refreshed` doc comment:
+        // `updated_at` advanced 05:33:54 → 05:49:00 on an unchanged head).
+        // A head whose address includes the mtime names a peer's moment, not
+        // the head. NULL declared_head_at omits the field entirely (C4
+        // honest absence) rather than substituting any local time.
+        // See epr-head-envelope-design.md §4–5 (Option A).
+        updated: content.declared_head_at.and_then(render_declared_head_at),
     }))
+}
+
+/// Render `declared_head_at` (microseconds since the Unix epoch — the zome
+/// `Timestamp` of the declaration act behind `declared_head_action_hash`) as
+/// RFC3339 UTC, seconds precision. Mirrors the rendering
+/// `Envelope::canonical_bytes` already uses for `issuedAt`
+/// (`elohim/epr/src/envelope.rs`).
+///
+/// Returns `None` only if the microsecond value is outside chrono's
+/// representable range — defensive; no real DHT-carried Timestamp should
+/// ever hit this, and a `None` here composes into the same honest-absence
+/// path as a NULL `declared_head_at`.
+fn render_declared_head_at(declared_head_at_micros: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp_micros(declared_head_at_micros)
+        .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+}
+
+/// Derive an [`EprHead`], encode it, and stamp the resulting `cid` onto the
+/// JSON response wrapper [`EprHeadView`] — the single pure (DB-only, no
+/// `Request`) path for composing the HTTP JSON body. Never enriches pillars
+/// (matches the HTTP handler's historical `enrich_pillars=false`) and never
+/// touches `distribution` — that is purely operational (Category C) and is
+/// served separately at `GET /api/v1/blob/{hash}/distribution/summary`
+/// (epr-head-envelope-design.md, Option A).
+///
+/// Returns `Ok(None)` when the content row does not exist (or fails the
+/// provenance gate), mirroring [`derive_epr_head`]. Encoding failure (should
+/// not occur for any row that derived successfully) collapses to an absent
+/// `cid` rather than an error — the canonical bytes are still correct, only
+/// the convenience field is missing.
+pub fn compose_head_view(
+    conn: &mut SqliteConnection,
+    app_ctx: &db::AppContext,
+    id: &str,
+    gate_provenance: bool,
+) -> Result<Option<EprHeadView>, StorageError> {
+    let head = match derive_epr_head(conn, app_ctx, id, gate_provenance, false)? {
+        Some(h) => h,
+        None => return Ok(None),
+    };
+
+    let mut view: EprHeadView = head.clone().into();
+    if let Ok((_bytes, cid)) = crate::epr_codec::encode_epr_head(&head) {
+        view.cid = Some(cid.to_string());
+    }
+
+    Ok(Some(view))
 }

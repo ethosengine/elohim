@@ -108,6 +108,7 @@ export * from './views/elohim-capability-profile';
 export * from './views/elohim-reputation-profile-view';
 export * from './views/entry-link-view';
 export * from './views/epr-envelope-view';
+export * from './views/epr-head-view';
 export * from './views/epr-list-view';
 export * from './views/epr-nav-context-view';
 export * from './views/epr-projection-view';

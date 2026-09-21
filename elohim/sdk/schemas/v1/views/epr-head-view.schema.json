@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:epr-head-view",
+  "title": "EprHeadView",
+  "description": "Source of truth: DHT (Notarized HEAD projection, Category A) — a read projection of `content.declared_head_action_hash` / `declared_head_at`. The envelope's cid is a function of the declared head alone: `version`, `id`, `content`, `lamad`, `shefa`, `qahal`, `relationships`, `author` and `updated` are exactly the canonical dag-cbor bytes served verbatim at the `Accept: application/vnd.ipld.dag-cbor` arm of GET /epr-head/{id}; `cid` is that address (CIDv1, codec 0x71), minted per request over those same bytes — two peers agreeing on the declared head mint identical bytes and therefore identical cid, regardless of local row mtime. `updated` is rendered from `content.declared_head_at` (the DHT declaration act's own Timestamp) — NEVER the row's `updated_at` mtime, which is bumped by every stamp including no-ops and cannot be a fact about the content. `updated` is OMITTED (never a substitute value) when `declared_head_at` is NULL — honest absence, per Rule 11's single-provenance case (this row has not recorded a declaration timestamp), not the answer-envelope pattern. Per-peer operational facts (replica counts, projector counts, diversity, caller role) are NOT carried here — a document whose whole point is to be the same everywhere must not embed a fact two honest peers can honestly disagree on. Those are served separately at GET /api/v1/blob/{hash}/distribution/summary, which genuinely differs between honest peers and is intentionally NOT peer-invariant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "content", "lamad", "shefa", "qahal", "relationships"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Schema version for forward compatibility."
+    },
+    "id": {
+      "type": "string",
+      "description": "Stable content ID (slug) — a lookup key, not an address. Deliberately not the same identifier class as `cid`."
+    },
+    "content": {
+      "type": "string",
+      "description": "CID of the current content bytes (IPLD link to Tier 3), from content.blob_cid."
+    },
+    "lamad": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "contentType"],
+      "description": "Knowledge pillar context — A-projected from the content row.",
+      "properties": {
+        "title": { "type": "string" },
+        "contentType": { "type": "string" },
+        "description": { "type": "string" },
+        "contentFormat": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Omitted when empty. Projected via a Category C join table (content_tags); can lag in steady state."
+        }
+      }
+    },
+    "shefa": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Value pillar context. Always empty on this HTTP arm (derived with enrich_pillars=false). Classified A2 but never anchored — no create_stewardship_allocation zome function exists to notarize it.",
+      "properties": {
+        "stewards": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Omitted when empty."
+        },
+        "allocations": {
+          "type": "array",
+          "items": { "type": "number" },
+          "description": "Omitted when empty."
+        }
+      }
+    },
+    "qahal": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Governance pillar context.",
+      "properties": {
+        "reach": {
+          "$ref": "../enums/reach.schema.json",
+          "description": "content.reach passed through verbatim (Category A). Omitted only if the underlying column value fails to parse as a known reach class."
+        },
+        "layer": {
+          "type": "string",
+          "description": "Always absent today — a dead field, never populated (named follow-up F4; not addressed by this envelope's cid-invariance fix)."
+        },
+        "attestationRequirements": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Always empty (omitted) on this HTTP arm. The P2P enrich=true caller populates it downstream from content-graph PREREQUISITE edges; format 'prerequisite-mastery:{prereq_id}'."
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Typed relationships to other content. Always present (serializes as `[]` when empty, unlike the omit-when-empty fields above). Always empty on this HTTP arm.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "target"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Relationship type: PREREQUISITE, TEACHES, CONTAINS, REFERENCES, etc."
+          },
+          "target": { "type": "string", "description": "Target content ID." },
+          "targetCid": { "type": "string", "description": "Target content address (CID). Omitted when unknown." }
+        }
+      }
+    },
+    "author": {
+      "type": "string",
+      "description": "Author DID/agent identifier, from content.created_by. Omitted when unset."
+    },
+    "updated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "RFC3339 UTC, seconds precision, rendered from content.declared_head_at (microseconds since the Unix epoch) — the DHT declaration act's own Timestamp. NEVER content.updated_at (a local row mtime bumped by every stamp, including no-ops). Omitted — never a substitute value — when declared_head_at is NULL."
+    },
+    "cid": {
+      "type": "string",
+      "description": "CIDv1 dag-cbor (codec 0x71, Sha2_256) address of this envelope's canonical bytes: version, id, content, lamad, shefa, qahal, relationships, author, updated — nothing else. Recomputed per request; a function of the declared head alone. Omitted only on the (should-not-occur) internal encoding failure that also collapses distribution-free bytes to nothing servable via the dag-cbor arm."
+    }
+  }
+}

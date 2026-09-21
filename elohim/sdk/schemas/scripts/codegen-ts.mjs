@@ -104,6 +104,11 @@ const INTERFACE_FILES = [
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },
   { src: 'views/recovery-witness.ts', dest: 'recovery-witness.ts' },
+  // epr-head-envelope design (2026-09-21) — the head's contract, which never had
+  // one before. Distinct dest name from the hand-written epr-head.model.ts
+  // (storage-client-ts and app/elohim-app both carry it); reconciling the two
+  // is F2, out of scope for this slice.
+  { src: 'views/epr-head-view.ts', dest: 'epr-head-view.ts' },
   // P2P protocol wire contracts (Category C operational — internal to libp2p protocols)
   { src: 'p2p/identity-handshake.ts', dest: 'identity-handshake.ts' },
   // Phase 3.5 Trust-Compute Gradient substrate — B2 agent-scoped with attestation
