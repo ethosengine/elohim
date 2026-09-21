@@ -64,6 +64,39 @@
 //! overstates it), and the ladder is cleared exclusively by
 //! [`record_role_success`], which only a real zome call reaches.
 
+//! ## RESPONSIVE is not SERVED (corrected 2026-09-21)
+//!
+//! Two facts wore one name, and that is the second half of the same defect.
+//!
+//! * **Responsive** — the conductor answered. A `ZomeNotFound`, a wasm guest
+//!   error, a validation refusal: bytes crossed the websocket and something on
+//!   the far side composed a reply. That is evidence the TRANSPORT is alive, and
+//!   it is evidence of nothing else.
+//! * **Served** — a zome call on this role's cell RETURNED. That, and only
+//!   that, proves the cell is in the conductor's `running_cells` and this node
+//!   can write truth through it.
+//!
+//! Before this correction every unrecognised error string took
+//! [`ZomeObservation::PathResponsive`] (then spelled `PathLive`) straight into
+//! `record_success`, which ended the not-running episode, so:
+//!
+//! * a role whose cells were refusing calls could be flipped to `Live` by a
+//!   FAILED call, while `elohim_conductor_app_enabled{role}` — set only by the
+//!   real transition — stayed `0`; and
+//! * the next genuine success then read `before.status == Live` and skipped
+//!   clearing the enable ladder, so a LATER outage inherited the previous
+//!   outage's backoff and was met at the 1h cap instead of at 60s.
+//!
+//! Now [`BridgeHealth::record_responsive_at`] clears a `Dead` verdict (the
+//! transport is demonstrably back) and REFUSES to touch an `AppDisabled` one — a
+//! domain error from a cell that will not serve is not that cell serving. It
+//! touches neither the episode clock, the diagnosis latch, the disabled reason,
+//! the gauge, nor the ladder. All five belong to the ONE transition,
+//! [`record_role_success`], which is reached from a zome call that returned and
+//! from nowhere else — including the supervisor's read-only cell probe
+//! ([`crate::services::cell_probe`]), which is a zome call and therefore uses
+//! the same single path rather than a second one.
+
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -114,8 +147,18 @@ impl ZomePathStatus {
 /// What one zome-call error proves about the path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ZomeObservation {
-    /// The conductor answered (even if it answered "no") — the path is live.
-    PathLive,
+    /// The conductor answered (even if it answered "no") — the TRANSPORT is
+    /// responsive.
+    ///
+    /// NAMED FOR WHAT IT PROVES, after being named `PathLive` cost a false
+    /// recovery. A `ZomeNotFound`, a wasm guest error or a validation refusal
+    /// says the websocket carried bytes and the far side replied. It does NOT
+    /// say this role's cell served the call — a cell absent from the
+    /// conductor's `running_cells` is perfectly capable of producing a domain
+    /// error, and reading that as recovery is how a failed call flipped a role
+    /// green while its gauge stayed at zero. See the module doc's
+    /// "RESPONSIVE is not SERVED".
+    PathResponsive,
     /// The websocket is gone — the path is dead.
     PathDead,
     /// The conductor answered, and its answer was that the cell is DISABLED.
@@ -367,6 +410,37 @@ impl BridgeHealth {
             .is_ok()
     }
 
+    /// Record evidence the conductor ANSWERED — the transport is responsive.
+    /// NOT evidence that this role's cell served the call.
+    ///
+    /// Returns `true` when the observation was folded, `false` when it was
+    /// REFUSED because the role is in a not-running episode. That refusal is the
+    /// whole point: a cell absent from `running_cells` still answers domain
+    /// errors, and folding one as a success is what let a FAILED call end an
+    /// episode, raise no gauge, and strand the enable ladder for the next outage.
+    ///
+    /// Clears a `Dead` verdict (the websocket is demonstrably back) and the
+    /// failure streak. Deliberately touches NONE of: `episode_started_ms`,
+    /// `diagnosis_said`, `disabled_reason`, the
+    /// `elohim_conductor_app_enabled` gauge, the enable ladder. Those five
+    /// belong to [`Self::record_success_at`] / [`record_role_success`] — the one
+    /// transition.
+    pub fn record_responsive_at(&self, at_ms: u64) -> bool {
+        if self.status() == ZomePathStatus::AppDisabled {
+            return false;
+        }
+        let seq = self.next_seq();
+        self.last_success_ms.store(at_ms, Ordering::Relaxed);
+        self.last_success_seq.store(seq, Ordering::SeqCst);
+        self.consecutive_failures.store(0, Ordering::Relaxed);
+        true
+    }
+
+    /// [`Self::record_responsive_at`] against the wall clock.
+    pub fn record_responsive(&self) -> bool {
+        self.record_responsive_at(now_ms())
+    }
+
     /// Record evidence the path is dead, stamped at `at_ms`.
     pub fn record_failure_at(&self, at_ms: u64) {
         let seq = self.next_seq();
@@ -435,9 +509,16 @@ impl BridgeHealth {
     }
 
     /// Fold a zome-call error into this observer, classifying it first.
+    ///
+    /// An ERROR can never end a not-running episode: the responsive arm goes to
+    /// [`Self::record_responsive`], which refuses while the role is
+    /// `AppDisabled`. Only a zome call that RETURNED reaches
+    /// [`Self::record_success_at`].
     pub fn observe_zome_error(&self, msg: &str) {
         match classify_zome_error(msg) {
-            ZomeObservation::PathLive => self.record_success(),
+            ZomeObservation::PathResponsive => {
+                self.record_responsive();
+            }
             ZomeObservation::PathDead => self.record_failure(),
             ZomeObservation::AppDisabled => {
                 self.record_app_disabled(msg);
@@ -585,12 +666,17 @@ impl RoleBridgeHealth {
         let observer = self.for_role(role);
         let before = observer.snapshot_at(at_ms);
         observer.record_success_at(at_ms);
-        // Both reads below are taken only on the NOT-live→live edge, so the
-        // steady-state zome-call path (already live, calls succeeding) adds no
-        // lock and no map lookup to a hot path measured in thousands per minute.
-        let mut enable_attempts = 0;
-        if before.status != ZomePathStatus::Live {
-            enable_attempts = ledger.attempts(role);
+        // ONE ledger read on the steady-state path, and a WRITE only when there
+        // is something to clear. Keying the clear on `before.status != Live`
+        // ALONE was the stranded-backoff half of the 2026-09-20 defect: an
+        // episode could climb the ladder, a transport failure could then read
+        // `Dead`, a responsive domain error could read `Live`, and this branch
+        // would never fire again — so the ladder the episode built outlived it
+        // and the NEXT outage was met at the 1h cap. A ladder with attempts on
+        // it is cleared by a call that landed, whatever the node believed a
+        // millisecond earlier.
+        let enable_attempts = ledger.attempts(role);
+        if enable_attempts > 0 || before.status != ZomePathStatus::Live {
             ledger.note_running(role);
         }
         RecoveryOutcome {
@@ -627,8 +713,10 @@ pub struct RecoveryOutcome {
     /// How long the role was not running, in whole seconds. `0` when this was
     /// not a recovery.
     pub not_running_secs: u64,
-    /// How many `enable_app` attempts were made during the episode that just
-    /// ended. `0` when this was not a recovery.
+    /// How many ladder rungs were spent on this role since it last served a
+    /// call — an `enable_app` attempt for a role that has one, and the
+    /// read-only cell probe that rides the same rung. `0` when the ladder was
+    /// already clear, which is the steady-state answer.
     pub enable_attempts: u32,
 }
 
@@ -655,7 +743,11 @@ pub fn role_bridge_health() -> &'static RoleBridgeHealth {
 /// singleton untouched (no evidence yet is not itself an observation).
 fn resync_aggregate() {
     let roles = role_bridge_health();
-    let supervised = &crate::hc_client_registry::SUPERVISED_ROLES;
+    // OBSERVED, not SUPERVISED. `SUPERVISED_ROLES` is the set with a swappable
+    // registry slot; `mishpat` is reached cross-cell through another role's
+    // client and has no slot, but its cells refuse calls on exactly the same
+    // startup window, so its verdict belongs in the aggregate.
+    let supervised = &crate::hc_client_registry::OBSERVED_ROLES;
     match roles.derive_supervised_status(supervised) {
         ZomePathStatus::Live => bridge_health().record_success(),
         ZomePathStatus::Dead => bridge_health().record_failure(),
@@ -674,6 +766,11 @@ fn resync_aggregate() {
 /// classifying it first, then re-sync the process-wide aggregate. Call this
 /// instead of `bridge_health().observe_zome_error(..)` directly from any
 /// `HcClient` call site — the aggregate updates itself.
+/// `role` here is the role that owns the CELL the call targeted, never the
+/// calling client's configured role — see
+/// [`crate::hc_client::target_role_for_cell`]. A mishpat `CellDisabled`
+/// recorded against lamad marked the wrong role disabled AND let an ordinary
+/// lamad success clear an episode that belonged to mishpat.
 pub fn observe_role_zome_error(role: &str, msg: &str) {
     let observer = role_bridge_health().for_role(role);
     if classify_zome_error(msg) == ZomeObservation::AppDisabled {
@@ -687,13 +784,37 @@ pub fn observe_role_zome_error(role: &str, msg: &str) {
     resync_aggregate();
 }
 
+/// Fold "the conductor answered" for ROLE without claiming its cell served the
+/// call, then re-sync the aggregate.
+///
+/// Exposed for the probe and for tests; the ordinary path reaches it through
+/// [`observe_role_zome_error`]. Returns what
+/// [`BridgeHealth::record_responsive_at`] returned: `false` means the role is in
+/// a not-running episode and the observation was refused.
+pub fn record_role_responsive(role: &str) -> bool {
+    let folded = role_bridge_health().for_role(role).record_responsive();
+    resync_aggregate();
+    folded
+}
+
 /// Record PROVEN evidence ROLE's path is live — a zome call on this role
 /// SUCCEEDED — then re-sync the process-wide aggregate. Call this instead of
 /// `bridge_health().record_success()` directly from any `HcClient` call site.
 ///
-/// THE recovery transition, and the only one. It is reached from the three
-/// `HcClient` zome-call paths and from nowhere else: not from the supervisor's
-/// `app_info` probe, and not from an accepted `enable_app`.
+/// THE recovery transition, and the only one. Every path that ends a
+/// not-running episode, raises the gauge, or clears the enable ladder comes
+/// through HERE.
+///
+/// It is reached from the three `HcClient` zome-call paths — and from nothing
+/// else. Not from the supervisor's `app_info` probe, not from an accepted
+/// `enable_app`, and not from a FAILED call however the conductor phrased its
+/// refusal ([`record_role_responsive`] is where those land). The supervisor's
+/// read-only cell probe ([`crate::services::cell_probe`]) is not a second path:
+/// it is an ordinary zome call, so a probe that returns arrives here exactly as
+/// organic traffic does.
+///
+/// `role` is the role that owns the CELL the call landed on, never the calling
+/// client's configured role.
 pub fn record_role_success(role: &str) {
     let outcome = role_bridge_health().record_success_on(role, enable_ledger(), now_ms());
     // The gauge is a LEVEL and this is the only place entitled to raise it:
@@ -838,6 +959,14 @@ pub fn is_cell_disabled(msg: &str) -> bool {
 /// message that somehow named both would keep its older, more urgent verdict.
 /// The observed `CellDisabled` text carries no transport marker, so it lands in
 /// the arm that exists for it.
+///
+/// The fall-through is [`ZomeObservation::PathResponsive`] and NOT a claim of
+/// recovery. That distinction is enforced downstream rather than here, on
+/// purpose: adding a `ZomeNotFound`/`FunctionNotFound` marker list would be a
+/// second closed string vocabulary to keep in sync, and it would still leave
+/// every unrecognised phrasing able to end an episode. Making the whole
+/// responsive CLASS unable to end one closes the hole for strings nobody has
+/// seen yet — including a probe pointed at a function the DNA does not have.
 pub fn classify_zome_error(msg: &str) -> ZomeObservation {
     if msg.contains(crate::conductor_admission::ADMISSION_SHED_MARKER) {
         return ZomeObservation::NoEvidence;
@@ -848,7 +977,7 @@ pub fn classify_zome_error(msg: &str) -> ZomeObservation {
     if is_cell_disabled(msg) {
         return ZomeObservation::AppDisabled;
     }
-    ZomeObservation::PathLive
+    ZomeObservation::PathResponsive
 }
 
 /// The wire shape of one role's entry in the `perRole` map — same field
@@ -997,10 +1126,13 @@ mod tests {
         assert_eq!(classify_zome_error(msg), ZomeObservation::PathDead);
     }
 
+    /// RENAMED WITH ITS SUBJECT (2026-09-21): a domain error proves the path is
+    /// RESPONSIVE, which is all it ever proved. Treating it as death would flap
+    /// the node red on ordinary refusals; treating it as recovery is the other
+    /// error, and `a_zome_not_found_answer_does_not_end_an_episode` below is
+    /// where that half is pinned.
     #[test]
-    fn a_domain_error_proves_the_path_is_live() {
-        // The conductor ANSWERED — the bytes crossed the websocket. Treating
-        // this as death would flap the node red on ordinary refusals.
+    fn a_domain_error_proves_the_path_is_responsive() {
         for msg in [
             "Zome call failed: ZomeNotFound: mishpat",
             "Zome call failed: Wasm error while working with Ribosome: Guest(\"no record\")",
@@ -1010,7 +1142,11 @@ mod tests {
                 !is_transport_dead(msg),
                 "{msg} must not read as transport-dead"
             );
-            assert_eq!(classify_zome_error(msg), ZomeObservation::PathLive, "{msg}");
+            assert_eq!(
+                classify_zome_error(msg),
+                ZomeObservation::PathResponsive,
+                "{msg}"
+            );
         }
     }
 
@@ -1038,7 +1174,7 @@ mod tests {
         );
         assert_ne!(
             classify_zome_error(msg),
-            ZomeObservation::PathLive,
+            ZomeObservation::PathResponsive,
             "EVIDENCE THE PATH WORKS is exactly the lie that cost two days"
         );
 
@@ -1577,6 +1713,372 @@ mod tests {
             "a live role is not 'not running for N seconds'"
         );
         assert!(role_status_json(&recovered)["notRunningSecs"].is_null());
+    }
+
+    // ---- responsive is not served (F7, corrected 2026-09-21) --------------
+
+    /// A wrong zome or function name answers `ZomeNotFound` / `FunctionNotFound`.
+    /// That is the conductor ANSWERING, and before this correction every such
+    /// answer took the `PathLive` arm straight into `record_success` — which
+    /// ended the episode. It is also the reason `3ec3614dd` deliberately shipped
+    /// NO probe: a probe aimed at a name the DNA lacks would have manufactured
+    /// recovery out of its own misconfiguration. Closing this is what makes a
+    /// probe safe to add at all.
+    #[test]
+    fn a_zome_not_found_answer_does_not_end_an_episode() {
+        let h = BridgeHealth::new();
+        h.record_app_disabled_at(T0, CELL_DISABLED);
+        assert_eq!(h.snapshot_at(T0).status, ZomePathStatus::AppDisabled);
+
+        for msg in [
+            "Zome call failed: ZomeNotFound: mishpat",
+            "Zome call failed: FunctionNotFound(\"is_bootstrap_steward\")",
+            "Zome call failed: Wasm error while working with Ribosome: Guest(\"no record\")",
+            "Zome call failed: something nobody has ever seen before",
+        ] {
+            assert_eq!(
+                classify_zome_error(msg),
+                ZomeObservation::PathResponsive,
+                "{msg} is the conductor answering — that much is true"
+            );
+            h.observe_zome_error(msg);
+            assert_eq!(
+                h.snapshot_at(T0 + 1_000).status,
+                ZomePathStatus::AppDisabled,
+                "...but a FAILED call must never end a not-running episode: {msg}"
+            );
+            assert!(
+                !h.snapshot_at(T0 + 1_000).serving_ok(),
+                "and /health/serving must stay red through it: {msg}"
+            );
+        }
+
+        // The episode clock is untouched too — a recovery line that reported the
+        // age of the last domain error instead of the length of the outage would
+        // tell an operator to wait when they should intervene.
+        assert_eq!(h.snapshot_at(T0 + 660_000).not_running_secs, Some(660));
+        assert!(h.snapshot_at(T0).app_disabled_reason.is_some());
+    }
+
+    /// The other half: a responsive observation IS worth something — it clears a
+    /// DEAD verdict, because a conductor that answers has a live websocket. The
+    /// asymmetry is the whole design: responsive beats dead, served beats
+    /// disabled, and nothing else moves.
+    #[test]
+    fn a_responsive_answer_clears_a_dead_verdict_but_never_a_disabled_one() {
+        let dead = BridgeHealth::new();
+        dead.record_failure_at(T0);
+        assert_eq!(dead.snapshot_at(T0).status, ZomePathStatus::Dead);
+        assert!(dead.record_responsive_at(T0 + 1_000), "folded");
+        assert_eq!(dead.snapshot_at(T0 + 1_000).status, ZomePathStatus::Live);
+        assert_eq!(dead.snapshot_at(T0 + 1_000).consecutive_failures, 0);
+
+        let disabled = BridgeHealth::new();
+        disabled.record_app_disabled_at(T0, CELL_DISABLED);
+        assert!(
+            !disabled.record_responsive_at(T0 + 1_000),
+            "REFUSED: a cell that will not serve still answers domain errors"
+        );
+        assert_eq!(
+            disabled.snapshot_at(T0 + 1_000).status,
+            ZomePathStatus::AppDisabled
+        );
+    }
+
+    /// Through the PRODUCTION free functions, with the real gauge and the real
+    /// ledger: an unrecognised error is recorded as responsive and changes
+    /// nothing else. Under the pre-correction wiring the first gauge assertion
+    /// fails — that gauge staying at 0 beside a `live` verdict was the
+    /// observable shape of the defect.
+    #[test]
+    fn an_unrecognised_error_is_responsive_but_not_recovered() {
+        const ROLE: &str = "test-responsive-not-recovered";
+        let ledger = crate::services::enable_app_backoff::enable_ledger();
+        let gauge = crate::metrics::CONDUCTOR_APP_ENABLED.with_label_values(&[ROLE]);
+
+        record_role_app_disabled(ROLE, CELL_DISABLED);
+        assert_eq!(gauge.get(), 0, "the episode lowered the level");
+        ledger.note_attempt(ROLE);
+        ledger.note_attempt(ROLE);
+        assert_eq!(ledger.attempts(ROLE), 2);
+
+        for tick in 1..=5 {
+            observe_role_zome_error(ROLE, "Zome call failed: ZomeNotFound: content_store");
+            assert!(
+                role_is_not_running(ROLE),
+                "answer {tick}: the episode stands"
+            );
+            assert_eq!(
+                gauge.get(),
+                0,
+                "answer {tick}: the gauge is raised by the ONE transition and nothing else"
+            );
+            assert_eq!(
+                ledger.attempts(ROLE),
+                2,
+                "answer {tick}: the ladder is untouched"
+            );
+        }
+
+        // And the real recovery still works, from the same state.
+        record_role_success(ROLE);
+        assert!(!role_is_not_running(ROLE));
+        assert_eq!(gauge.get(), 1);
+        assert_eq!(ledger.attempts(ROLE), 0);
+    }
+
+    /// THE STRANDED BACKOFF, as the sequence that produced it. A responsive
+    /// answer used to be able to park the role at `Live` while the ladder still
+    /// carried an episode's worth of attempts; the next genuine success then
+    /// read `before.status == Live`, skipped `note_running`, and the NEXT outage
+    /// was met at the hour cap instead of at 60s.
+    ///
+    /// Driven through BOTH orderings, including the transport-failure detour that
+    /// a status-only guard cannot see.
+    #[test]
+    fn a_second_outage_starts_a_fresh_ladder_after_any_recovery_path() {
+        for detour in ["plain", "through-a-dead-websocket"] {
+            let roles = RoleBridgeHealth::new();
+            let ledger = EnableLedger::new();
+            let t0 = Instant::now();
+
+            // Episode one climbs to the cap.
+            roles.record_app_disabled_on("lamad", CELL_DISABLED, T0);
+            for step in 0..7 {
+                ledger.note_attempt_at("lamad", t0 + Duration::from_secs(step * 4_000));
+            }
+            assert_eq!(
+                enable_backoff(ledger.attempts("lamad")),
+                Duration::from_secs(3_600),
+                "{detour}: the ladder is at the hour cap"
+            );
+
+            // The path that used to strand it: a transport failure, then a
+            // responsive domain error. With the episode still open the fold is
+            // refused; after a Dead it is permitted and parks the role at Live
+            // with the ladder still standing — which is exactly the state a
+            // status-only guard cannot distinguish from a healthy steady state.
+            let detoured = detour == "through-a-dead-websocket";
+            if detoured {
+                roles.for_role("lamad").record_failure_at(T0 + 1_000);
+            }
+            let folded = roles.for_role("lamad").record_responsive_at(T0 + 2_000);
+            assert_eq!(
+                folded, detoured,
+                "{detour}: a responsive answer is refused inside an episode and accepted after a \
+                 dead websocket"
+            );
+            if detoured {
+                assert_eq!(
+                    roles.for_role("lamad").status(),
+                    ZomePathStatus::Live,
+                    "{detour}: parked at Live with an hour-deep ladder still on the books"
+                );
+            }
+
+            // A call lands. Whatever the node believed a millisecond earlier, a
+            // ladder with attempts on it is cleared by a call that landed.
+            let outcome = roles.record_success_on("lamad", &ledger, T0 + 10_000);
+            assert_eq!(
+                ledger.attempts("lamad"),
+                0,
+                "{detour}: proven recovery clears the ladder"
+            );
+            assert!(
+                outcome.enable_attempts >= 7,
+                "{detour}: and reports what the episode cost"
+            );
+
+            // The relapse is met at the FIRST rung.
+            let relapse = t0 + Duration::from_secs(40_000);
+            roles.record_app_disabled_on("lamad", CELL_DISABLED, T0 + 40_000_000);
+            assert!(
+                ledger.should_attempt_at("lamad", relapse),
+                "{detour}: met immediately"
+            );
+            ledger.note_attempt_at("lamad", relapse);
+            assert_eq!(
+                enable_backoff(ledger.attempts("lamad")),
+                Duration::from_secs(60),
+                "{detour}: back to 60s — a later outage must not inherit an earlier one's backoff"
+            );
+        }
+    }
+
+    /// F4 at the health layer, composed with the attribution decision the three
+    /// `HcClient` paths now share. The existing `one_role_recovering_does_not_
+    /// mark_another_running` pins the FOLD with hand-written role keys; this
+    /// derives the keys the way production does, so restoring `role_key()` at
+    /// the call sites fails here too.
+    #[test]
+    fn a_lamad_success_does_not_end_a_mishpat_episode() {
+        use holochain_types::prelude::{AgentPubKey, CellId, DnaHash};
+
+        let cell = |tag: u8| {
+            CellId::new(
+                DnaHash::from_raw_32(vec![tag; 32]),
+                AgentPubKey::from_raw_32(vec![0xAA; 32]),
+            )
+        };
+        let lamad_cell = cell(1);
+        let mishpat_cell = cell(2);
+        // The production shape: ONE client, configured `lamad`, holding the
+        // mishpat cell for cross-cell calls.
+        let role_of = |target: &CellId| {
+            crate::hc_client::target_role_for_cell("lamad", Some(&mishpat_cell), None, target)
+        };
+        assert_eq!(role_of(&lamad_cell), "lamad");
+        assert_eq!(role_of(&mishpat_cell), "mishpat");
+
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+
+        // A governance call answers CellDisabled. It is MISHPAT's episode.
+        roles.record_app_disabled_on(role_of(&mishpat_cell), CELL_DISABLED, T0);
+        ledger.note_attempt_at(role_of(&mishpat_cell), t0);
+        assert_eq!(
+            roles.for_role("lamad").status(),
+            ZomePathStatus::Unknown,
+            "lamad has not been slandered: nothing was observed about its cell"
+        );
+
+        // An ordinary content read succeeds on the lamad cell.
+        roles.record_success_on(role_of(&lamad_cell), &ledger, T0 + 5_000);
+
+        assert_eq!(roles.for_role("lamad").status(), ZomePathStatus::Live);
+        assert_eq!(
+            roles.for_role("mishpat").status(),
+            ZomePathStatus::AppDisabled,
+            "a call landing on the lamad cell proves nothing about the mishpat cell"
+        );
+        assert_eq!(
+            ledger.attempts("mishpat"),
+            1,
+            "nor may it clear mishpat's ladder"
+        );
+        assert_eq!(
+            roles.derive_supervised_status(&crate::hc_client_registry::OBSERVED_ROLES),
+            ZomePathStatus::AppDisabled,
+            "and mishpat is OBSERVED, so its refusal reaches /health/serving instead of hiding"
+        );
+    }
+
+    /// A quiet role — one with no organic traffic to prove recovery with — is
+    /// carried to green by the probe alone, and by the SAME transition organic
+    /// traffic uses.
+    ///
+    /// The probe's conductor round-trip is not constructible offline, so what is
+    /// driven here is everything either side of it: the admission gates decide
+    /// the probe may ask, and the return is folded by the one function the
+    /// `HcClient` path calls. The absence of a second transition inside the probe
+    /// is pinned by `cell_probe::the_probe_declares_no_recovery_of_its_own`.
+    #[test]
+    fn a_quiet_role_recovers_through_the_probe_without_organic_traffic() {
+        const ROLE: &str = "node_registry";
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let t0 = Instant::now();
+
+        // The restart episode every node now gets: cells absent from
+        // `running_cells`, answering CellDisabled.
+        roles.record_app_disabled_on(ROLE, CELL_DISABLED, T0);
+        assert!(!roles.for_role(ROLE).snapshot_at(T0).serving_ok());
+
+        // This role's only organic caller is upload shard assignment, and no
+        // upload happens. Three ladder rungs pass with nothing to prove recovery
+        // with — which before the probe was the end of the story, forever.
+        for step in 0..3 {
+            ledger.note_attempt_at(ROLE, t0 + Duration::from_secs(step * 60));
+            assert_eq!(
+                roles.for_role(ROLE).status(),
+                ZomePathStatus::AppDisabled,
+                "rung {step}: nothing else can end this"
+            );
+        }
+
+        // The role HAS a probe — without one it could never clear.
+        let probe = crate::services::cell_probe::probe_for(ROLE)
+            .expect("a quiet role must have a probe or its episode is permanent");
+        assert!(
+            crate::chain_write_gate::is_read_fn(probe.fn_name),
+            "and it must be a classified read, or it would queue behind writers on a call nothing \
+             can cancel"
+        );
+
+        // The conductor finishes starting; the probe's call RETURNS. That return
+        // is an ordinary zome-call success, so it arrives here.
+        let outcome = roles.record_success_on(ROLE, &ledger, T0 + 240_000);
+
+        assert!(outcome.recovered_from_not_running);
+        assert_eq!(outcome.not_running_secs, 240);
+        assert_eq!(outcome.enable_attempts, 3);
+        assert_eq!(roles.for_role(ROLE).status(), ZomePathStatus::Live);
+        assert!(roles.for_role(ROLE).snapshot_at(T0 + 240_000).serving_ok());
+        assert_eq!(ledger.attempts(ROLE), 0);
+        // The probe stopping once the role is healthy is
+        // `cell_probe::the_probe_never_runs_while_the_role_is_healthy`, which
+        // drives the admission gate directly rather than through this registry.
+    }
+
+    /// The consumer contract F6 turns on, pinned at the function both surfaces
+    /// render through.
+    ///
+    /// Established by tracing it: `GET /health/serving` on storage answers 503 +
+    /// `Retry-After: 20` from `snap.serving_ok()`, and the doorway performs one
+    /// bounded 2s GET of it per request with NO cache, maps any non-2xx to
+    /// `refused`, and answers its own `/health/serving` 503. Neither service's
+    /// `/health`, `/ready` or `/health/startup` moves, no Kubernetes probe reads
+    /// it, the doorway's upstream breaker treats a 503 as neutral, and no CI gate
+    /// consumes it — so the cost of a stuck-red role is a permanently dishonest
+    /// signal on two endpoints, not an outage. Which is precisely why it must not
+    /// be able to stick: an endpoint that cries wolf trains its readers to ignore
+    /// it, and that is the failure this endpoint was created to prevent.
+    #[test]
+    fn health_serving_is_red_through_an_episode_and_green_once_the_probe_proves_recovery() {
+        let roles = RoleBridgeHealth::new();
+        let ledger = EnableLedger::new();
+        let observed = &crate::hc_client_registry::OBSERVED_ROLES;
+
+        // Four of five roles serving; the quiet one refusing.
+        for role in ["infrastructure", "imagodei", "lamad", "mishpat"] {
+            roles.for_role(role).record_success_at(T0);
+        }
+        roles.record_app_disabled_on("node_registry", CELL_DISABLED, T0);
+
+        let derived = roles.derive_supervised_status(observed);
+        assert_eq!(
+            derived,
+            ZomePathStatus::AppDisabled,
+            "ONE refusing role sinks the aggregate — deliberately pessimistic"
+        );
+        assert_eq!(derived.as_str(), "app-disabled");
+        let reason = roles
+            .supervised_disabled_reason(observed)
+            .expect("the aggregate carries a diagnosis, not a bare verdict");
+        assert!(
+            reason.starts_with("node_registry:"),
+            "and it NAMES the role, so an operator does not have to guess: {reason}"
+        );
+
+        // While red, the body says how long — the one field that distinguishes a
+        // conductor still starting from one that is stuck.
+        let block = per_role_block(&roles);
+        assert_eq!(block["node_registry"]["zomePath"], "app-disabled");
+        assert_eq!(block["lamad"]["zomePath"], "live");
+
+        // The probe's call returns. Nothing else about the node changed.
+        roles.record_success_on("node_registry", &ledger, T0 + 240_000);
+        assert_eq!(
+            roles.derive_supervised_status(observed),
+            ZomePathStatus::Live,
+            "probe-proven recovery is the whole of what turns /health/serving back to 200"
+        );
+        assert!(roles
+            .for_role("node_registry")
+            .snapshot_at(T0 + 240_000)
+            .serving_ok());
+        assert_eq!(roles.supervised_disabled_reason(observed), None);
     }
 
     #[test]

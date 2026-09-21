@@ -344,6 +344,22 @@ const CRATE_READ_FNS: &[&str] = &[
     // --- infrastructure ----------------------------------------------------
     "find_publishers",
     "get_latest_peer_status_for_agent",
+    // `get_doorway_attestations` is the `infrastructure` role's cell probe
+    // (`services::cell_probe`). Source-verified write-free: it is a
+    // `TODO(Stage-F)` stub returning `Ok(Vec::new())` and reads nothing —
+    // infrastructure/zomes/infrastructure/src/lib.rs:889.
+    "get_doorway_attestations",
+    // --- the cell probe, in four coordinators ------------------------------
+    // `is_bootstrap_steward` exists in content_store, imagodei, mishpat and
+    // node_registry_coordinator with the same body: `am_i_bootstrap_steward()`
+    // = `dna_info()` (DNA modifiers) + `agent_info()`. No commit, no
+    // `get_links`, no DHT access, no DB scan — which is exactly why it is the
+    // probe. See elohim/zomes/content_store/src/bootstrap_steward.rs:90-107.
+    //
+    // It must be classified READ here or the probe would take the cell's write
+    // lock and queue behind real writers — an unbounded wait on a call that
+    // cannot be cancelled, which is the opposite of what a bounded probe is for.
+    "is_bootstrap_steward",
 ];
 
 /// The ONE read table: this crate's verified reads ∪ the closed-chain fence's

@@ -2546,7 +2546,7 @@ pub fn register_all() {
         // Pre-touch every supervised role at 1, so a pod that has never probed
         // publishes a series rather than an absence. Absence is unalertable;
         // the 2026-09-18 incident was two days of exactly that.
-        for role in crate::hc_client_registry::SUPERVISED_ROLES {
+        for role in crate::hc_client_registry::OBSERVED_ROLES {
             CONDUCTOR_APP_ENABLED.with_label_values(&[role]).set(1);
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));

@@ -302,14 +302,164 @@ async fn admit(
     Ok(permit)
 }
 
+/// The `imagodei` role's name, as the installed hApp spells it.
+pub const IMAGODEI_ROLE: &str = "imagodei";
+
+/// The `mishpat` role's name, as the installed hApp spells it.
+pub const MISHPAT_ROLE: &str = "mishpat";
+
+/// Which ROLE a zome call against `target` is an observation ABOUT.
+///
+/// THE WHOLE OF F4's FIX, as a pure function. Every observation — a success, a
+/// `CellDisabled`, any other failure — must be filed against the role that owns
+/// the cell the call TARGETED, never against the calling client's configured
+/// role. Filing by the client's role produced two symmetrical lies:
+///
+/// * a mishpat `CellDisabled` marked **lamad** not-running, so `/health` named
+///   the wrong role and `enable_app` laddered against a role that was fine; and
+/// * an ordinary **lamad** success then cleared that episode and its ladder,
+///   while the mishpat cell was still refusing every call — which defeats the
+///   per-role isolation the whole registry exists for, in both directions.
+///
+/// `mishpat` is checked before `imagodei` only because the two are disjoint
+/// cells and an order had to be chosen. A client whose OWN cell is the imagodei
+/// cell resolves to the same `"imagodei"` either way, which is why the answer is
+/// consistent no matter which client asks.
+pub(crate) fn target_role_for_cell<'a>(
+    configured_role: &'a str,
+    mishpat_cell_id: Option<&CellId>,
+    imagodei_cell_id: Option<&CellId>,
+    target: &CellId,
+) -> &'a str {
+    if mishpat_cell_id == Some(target) {
+        return MISHPAT_ROLE;
+    }
+    if imagodei_cell_id == Some(target) {
+        return IMAGODEI_ROLE;
+    }
+    configured_role
+}
+
+/// F4 — the attribution decision, tested at the seam every call path shares.
+///
+/// The reviewer's note is the reason this module exists: the isolated-role test
+/// in `conductor_bridge_health` pins the FOLDS but does not exercise this
+/// WIRING, and the wiring is where the bug was. The three `HcClient` methods
+/// cannot be driven without a conductor, so the decision they all share is
+/// lifted into [`target_role_for_cell`] and driven directly, with synthetic
+/// `CellId`s standing in for the three cells `connect` resolves.
+#[cfg(test)]
+mod target_attribution_tests {
+    use super::*;
+    use holochain_types::prelude::{AgentPubKey, DnaHash};
+
+    /// A distinct, valid `CellId` per `tag`. The DNA hash is what distinguishes
+    /// the cells in production (one agent, five DNAs), so only it varies.
+    fn cell(tag: u8) -> CellId {
+        CellId::new(
+            DnaHash::from_raw_32(vec![tag; 32]),
+            AgentPubKey::from_raw_32(vec![0xAA; 32]),
+        )
+    }
+
+    #[test]
+    fn a_mishpat_failure_is_recorded_against_mishpat_not_the_client_role() {
+        // THE DEFECT. The production client is configured `lamad` and reaches
+        // the mishpat cell through `call_zome_mishpat`. Every observation about
+        // that call — `CellDisabled` above all — used to be filed under
+        // `lamad`, so `/health` named a role that was fine and the enable
+        // ladder climbed against it.
+        let lamad = cell(1);
+        let mishpat = cell(2);
+        let imagodei = cell(3);
+
+        assert_eq!(
+            target_role_for_cell("lamad", Some(&mishpat), Some(&imagodei), &mishpat),
+            MISHPAT_ROLE,
+            "a call that targeted the mishpat cell is an observation about mishpat"
+        );
+        assert_eq!(
+            target_role_for_cell("lamad", Some(&mishpat), Some(&imagodei), &imagodei),
+            IMAGODEI_ROLE,
+            "and a call that targeted the imagodei cell is an observation about imagodei"
+        );
+        assert_eq!(
+            target_role_for_cell("lamad", Some(&mishpat), Some(&imagodei), &lamad),
+            "lamad",
+            "the client's own cell is the one case where the configured role IS the target"
+        );
+    }
+
+    #[test]
+    fn a_client_that_provisions_no_cross_cell_role_attributes_to_itself() {
+        // A minimal local-dev bundle resolves neither cross-cell CellId, so
+        // every call this client can make targets its own cell.
+        let own = cell(1);
+        assert_eq!(
+            target_role_for_cell("infrastructure", None, None, &own),
+            "infrastructure"
+        );
+        // ...and an unrelated cell it somehow met is NOT silently claimed by a
+        // cross-cell role it does not hold.
+        assert_eq!(
+            target_role_for_cell("infrastructure", None, None, &cell(9)),
+            "infrastructure"
+        );
+    }
+
+    #[test]
+    fn the_imagodei_clients_own_cell_resolves_consistently_from_either_direction() {
+        // Two clients can reach the imagodei cell: the `imagodei`-role client
+        // through `call_zome`, and any other role's client through
+        // `call_zome_imagodei`. Both must file under the SAME key or the two
+        // routes would keep two half-episodes for one cell.
+        let imagodei = cell(3);
+        assert_eq!(
+            target_role_for_cell(IMAGODEI_ROLE, None, Some(&imagodei), &imagodei),
+            IMAGODEI_ROLE
+        );
+        assert_eq!(
+            target_role_for_cell("lamad", None, Some(&imagodei), &imagodei),
+            IMAGODEI_ROLE
+        );
+    }
+
+    /// Every role this function can name must be a role the health layer
+    /// observes, or an episode would be opened against a key nothing aggregates,
+    /// probes, or renders — a fold into a black hole.
+    #[test]
+    fn every_attributable_cross_cell_role_is_observed() {
+        for role in [MISHPAT_ROLE, IMAGODEI_ROLE] {
+            assert!(
+                crate::hc_client_registry::OBSERVED_ROLES.contains(&role),
+                "'{role}' can receive an observation but is not observed"
+            );
+        }
+    }
+}
+
 impl HcClient {
     /// This client's configured role, for keying the per-role zome-path
     /// observer (see [`crate::conductor_bridge_health::RoleBridgeHealth`]).
     /// Falls back to `"default"` for a client with no role configured (none
     /// of today's production call sites leave `role` unset, but the fallback
     /// keeps this total rather than panicking on a hypothetical one).
-    fn role_key(&self) -> &str {
+    ///
+    /// This is the role of the client's OWN cell. It is the right key ONLY for
+    /// a call that targeted that cell; a cross-cell call must key on
+    /// [`target_role_for_cell`] instead.
+    pub(crate) fn role_key(&self) -> &str {
         self.config.role.as_deref().unwrap_or("default")
+    }
+
+    /// Which role owns `target` on this client. See [`target_role_for_cell`].
+    fn target_role_of(&self, target: &CellId) -> &str {
+        target_role_for_cell(
+            self.role_key(),
+            self.mishpat_cell_id.as_ref(),
+            self.imagodei_cell_id.as_ref(),
+            target,
+        )
     }
 
     /// Map a `holochain_client` zome-call failure onto a [`StorageError`] AND
@@ -330,10 +480,15 @@ impl HcClient {
 
     /// [`Self::zome_call_failed`] for a call that targeted a cell OTHER than the
     /// configured role's (the mishpat and imagodei arms), so the credential heal
-    /// below blames the right chain.
+    /// below blames the right chain — AND so the health observation does.
+    ///
+    /// The role is derived from `cell_id` rather than taken from the caller,
+    /// deliberately: every call path already hands this the cell it targeted, so
+    /// deriving here means no call site can forget to name the target and none
+    /// of them has to change to get the attribution right.
     fn zome_call_failed_on(&self, cell_id: &CellId, e: impl std::fmt::Display) -> StorageError {
         let msg = format!("Zome call failed: {}", e);
-        observe_role_zome_error(self.role_key(), &msg);
+        observe_role_zome_error(self.target_role_of(cell_id), &msg);
         heal_stale_signing_credentials(cell_id, &msg);
         StorageError::Conductor(msg)
     }
@@ -591,7 +746,12 @@ impl HcClient {
                 }
             })
             .await?;
-        record_role_success(self.role_key());
+        // THE TARGET's role, not this client's. A call that landed on the
+        // imagodei cell proves the imagodei cell is serving and proves NOTHING
+        // about the cell this client is configured for — filing it under
+        // `role_key()` let an imagodei success clear a lamad episode, and
+        // vice versa.
+        record_role_success(IMAGODEI_ROLE);
         Ok(result.into_vec())
     }
 
@@ -649,7 +809,12 @@ impl HcClient {
                 }
             })
             .await?;
-        record_role_success(self.role_key());
+        // THE TARGET's role — see `call_zome_imagodei`. A mishpat call that
+        // landed says the mishpat cell is serving, and `mishpat` is now an
+        // OBSERVED role in its own right
+        // (`hc_client_registry::OBSERVED_ROLES`), so its episodes begin and end
+        // on its own evidence instead of being charged to lamad.
+        record_role_success(MISHPAT_ROLE);
         Ok(result.into_vec())
     }
 
@@ -792,6 +957,10 @@ impl HcClient {
                 return Err(error);
             }
         };
+        // THE TARGET's role, which on this path IS the configured role: this
+        // method dispatches against `self.cell_id`, and `connect` resolves that
+        // from `app_info.cell_info[role]`. The cross-cell methods above are the
+        // two paths where target and configuration differ.
         record_role_success(self.role_key());
 
         let timing = ZomeCallTiming {

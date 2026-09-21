@@ -101,7 +101,53 @@ pub struct HcClientRegistry {
 /// The roles the supervisor keeps alive. Ordered coldest-first, matching the
 /// boot ramp: `infrastructure` is the role most likely to be `None`-stamped on
 /// a slow conductor boot.
+///
+/// This is the set with a SWAPPABLE REGISTRY SLOT — a role here has an
+/// `HcClient` of its own that the supervisor can clear and re-mint. It is NOT
+/// the set of roles whose cell health this node observes; see
+/// [`OBSERVED_ROLES`].
 pub const SUPERVISED_ROLES: [&str; 4] = ["infrastructure", "imagodei", "lamad", "node_registry"];
+
+/// Roles this node can reach a CELL of, and whose not-running episodes
+/// therefore belong in `/health`'s `perRole` map and in the aggregate
+/// `zomePath` verdict.
+///
+/// WHY THIS IS NOT `SUPERVISED_ROLES`. `mishpat` is a cell of the same installed
+/// app, reached through [`crate::hc_client::HcClient::call_zome_mishpat`] on
+/// ANOTHER role's client, so it has no slot of its own and cannot be re-minted
+/// independently — but its cells are absent from the conductor's `running_cells`
+/// during exactly the same startup window as every other role's, and a mishpat
+/// `CellDisabled` is exactly as much a refusal to write truth. Before
+/// 2026-09-21 its observations were filed under the CALLING client's role
+/// (normally lamad), which both slandered lamad and let an ordinary lamad
+/// success clear an episode that belonged to mishpat.
+///
+/// Conflating the two sets is what the extra constant prevents: adding
+/// `mishpat` to `SUPERVISED_ROLES` would spawn a supervisor task for a role with
+/// no slot, hand `LineageRoles` a role it never authors under, and break
+/// `every_supervised_role_has_a_swappable_slot` — which is that constant telling
+/// the truth about itself.
+pub const OBSERVED_ROLES: [&str; 5] = [
+    "infrastructure",
+    "imagodei",
+    "lamad",
+    "node_registry",
+    "mishpat",
+];
+
+/// Observed roles with no registry slot of their own, and therefore no
+/// supervisor task: they are tended by the task of the role whose client
+/// carries their `CellId`.
+pub const CROSS_CELL_ROLES: [&str; 1] = [crate::hc_client::MISHPAT_ROLE];
+
+/// The supervised role whose client tends [`CROSS_CELL_ROLES`].
+///
+/// Every `HcClient` resolves `mishpat_cell_id` from `app_info`, so any of them
+/// could drive the probe; naming ONE keeps the cadence deterministic (a single
+/// task, a single ladder) rather than four tasks racing for the same rung. The
+/// in-flight gate in [`crate::services::cell_probe`] is the belt under this
+/// brace and holds even if this ever becomes more than one driver.
+pub const CROSS_CELL_DRIVER_ROLE: &str = "lamad";
 
 /// Connection inputs. Mirrors the relevant CLI args without depending on
 /// the Args struct directly (cleaner test surface).
@@ -430,6 +476,23 @@ impl HcClientRegistry {
     /// healthy. And deliberately does not treat its OWN answer as an outcome —
     /// an enable that lands and an enable that was a no-op both answer `Ok`.
     /// The episode ends when a zome call on the role succeeds, and not before.
+    ///
+    /// ## The rung also buys a read-only PROBE (2026-09-21)
+    ///
+    /// `3ec3614dd` left a stated gap: a role with no continuing organic traffic
+    /// has nothing to prove recovery with, so its episode — and with it
+    /// `/health/serving`'s 503 — never ends. On this conductor every restart
+    /// opens such an episode on every role called early, so the gap fires
+    /// routinely rather than exceptionally.
+    ///
+    /// So one ladder rung now buys TWO things, in this order: ask the conductor
+    /// to enable the app (for a role that has one), then ask the role's own cell
+    /// ONE read-only question. The probe is not a second recovery path — it is a
+    /// zome call, so it reaches `record_role_success` through the same single
+    /// transition organic traffic uses, and a probe that FAILS cannot end the
+    /// episode. Every bound on it is in [`crate::services::cell_probe`]; the
+    /// pacing authority stays exactly where it was — this ladder.
+    ///
     async fn try_enable_disabled_app(
         inputs: &HcRegistryInputs,
         role: &str,
@@ -457,6 +520,34 @@ impl HcClientRegistry {
         }
         ledger.note_attempt(role);
         let attempt = ledger.attempts(role);
+
+        // A cross-cell role (mishpat) is a CELL of the same installed app, so
+        // there is no app of its own to enable — the enable its siblings make is
+        // already the whole of that cure. Its rung buys the probe only.
+        if !CROSS_CELL_ROLES.contains(&role) {
+            Self::ask_the_conductor_to_enable(inputs, role, hc, reason, attempt).await;
+        }
+
+        // THEN one read-only question to the role's own cell, on this same rung.
+        // Awaited inline, so this task makes exactly one and cannot start a
+        // second before the first answers; the gate in `cell_probe` holds the
+        // same invariant against any other driver.
+        let _ = crate::services::cell_probe::probe_cell(
+            role,
+            hc,
+            crate::services::cell_probe::probe_gate(),
+        )
+        .await;
+    }
+
+    /// One `enable_app` attempt, already paced by the caller's ladder rung.
+    async fn ask_the_conductor_to_enable(
+        inputs: &HcRegistryInputs,
+        role: &str,
+        hc: &Arc<HcClient>,
+        reason: &str,
+        attempt: u32,
+    ) {
         let app_id = inputs.lineage.app_id_for(role);
 
         info!(
@@ -530,6 +621,28 @@ impl HcClientRegistry {
                     let Some(hc) = registry.client(role) else {
                         continue;
                     };
+
+                    // ADOPT THE ROLES WITH NO TASK OF THEIR OWN. `mishpat` is a
+                    // cell of the same installed app reached through this
+                    // client, so it has no slot and no supervisor loop — and
+                    // before this it therefore had no cure at all: its episodes
+                    // could only be ended by commitment traffic that a household
+                    // may never generate. One driver, so the cadence is one
+                    // ladder rather than four tasks racing for the same rung.
+                    if role == CROSS_CELL_DRIVER_ROLE {
+                        for cross in CROSS_CELL_ROLES {
+                            if crate::conductor_bridge_health::role_is_not_running(cross) {
+                                Self::try_enable_disabled_app(
+                                    &inputs,
+                                    cross,
+                                    &hc,
+                                    "this cell refuses zome calls and has no bridge of its own — \
+                                     tended by the driver role's supervisor",
+                                )
+                                .await;
+                            }
+                        }
+                    }
 
                     // `ping` crosses the authenticated APP websocket used by
                     // zome calls (not merely the independently-live admin
@@ -667,6 +780,50 @@ mod supervised_slot_tests {
                 "supervised role '{role}' has no swappable slot"
             );
         }
+    }
+
+    /// The two role sets say two different things, and the difference is the
+    /// whole of F4's second half: `SUPERVISED_ROLES` is "has a swappable
+    /// bridge", `OBSERVED_ROLES` is "this node can reach a cell of it, so its
+    /// refusals belong in the health verdict". A role can be the second without
+    /// being the first; nothing may be the first without being the second.
+    #[test]
+    fn every_supervised_role_is_observed_and_every_cross_cell_role_is_observed_without_a_slot() {
+        let reg = HcClientRegistry::empty();
+        for role in SUPERVISED_ROLES {
+            assert!(
+                OBSERVED_ROLES.contains(&role),
+                "supervised role '{role}' is not observed — its CellDisabled would never reach \
+                 /health/serving"
+            );
+        }
+        for role in CROSS_CELL_ROLES {
+            assert!(
+                OBSERVED_ROLES.contains(&role),
+                "cross-cell role '{role}' must be observed: it refuses calls on the same startup \
+                 window as every other cell"
+            );
+            assert!(
+                reg.slot(role).is_none(),
+                "'{role}' has a registry slot, so it is not a cross-cell role — move it to \
+                 SUPERVISED_ROLES instead of tending it from another role's task"
+            );
+            assert!(
+                !SUPERVISED_ROLES.contains(&role),
+                "'{role}' cannot be both supervised and cross-cell"
+            );
+        }
+        assert_eq!(
+            OBSERVED_ROLES.len(),
+            SUPERVISED_ROLES.len() + CROSS_CELL_ROLES.len(),
+            "every observed role is either supervised or cross-cell — an observed role that is \
+             neither has no path to a probe and would sink the aggregate forever"
+        );
+        assert!(
+            SUPERVISED_ROLES.contains(&CROSS_CELL_DRIVER_ROLE),
+            "the cross-cell driver must itself be a supervised role, or nothing spawns the task \
+             that tends mishpat"
+        );
     }
 
     #[test]
