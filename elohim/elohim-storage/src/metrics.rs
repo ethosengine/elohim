@@ -477,10 +477,16 @@ lazy_static! {
     ///   strictly newer. The honest, converged steady state.
     /// - `tier` — incoming is STAGING and the row already holds an EARNED
     ///   declaration. Correct refusal; earned is not displaced by scaffold.
+    /// - `pointer_absent` — the stamp would MOVE an already-declared row but
+    ///   carries no patch at all, i.e. no content evidence behind the
+    ///   declaration (a `LegacySignal` from `ContentHeadDeclared`, or a
+    ///   patchless `HealCanonical`). Distinct from `stored_null`, which is about
+    ///   the ROW carrying no election; see `StaleReason::PointerAbsent`. The
+    ///   rule is patch presence, never blob presence.
     pub static ref PROJECTION_REFUSED_STALE_REASONS: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_projection_heal_refused_stale_total",
-            "HealCanonical stamps that kept the adopted head, by refusal reason.",
+            "Head stamps (HealCanonical, LegacySignal) that kept the adopted head, by refusal reason.",
         ),
         &["reason"],
     )
@@ -2483,8 +2489,8 @@ lazy_static! {
     /// caught — and it is set on every observation (not only on the edge), so a
     /// pod that boots already-disabled publishes a `0` on its first probe.
     ///
-    /// Cardinality is the supervised role roster (4), which is fixed at compile
-    /// time in `hc_client_registry::SUPERVISED_ROLES`.
+    /// Cardinality is the observed role roster (5 — the four supervised roles
+    /// plus mishpat), fixed at compile time in `hc_client_registry::OBSERVED_ROLES`.
     pub static ref CONDUCTOR_APP_ENABLED: IntGaugeVec = IntGaugeVec::new(
         Opts::new(
             "elohim_conductor_app_enabled",
@@ -2648,7 +2654,7 @@ pub fn register_all() {
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(PROJECTION_REFUSED_STALE_REASONS.clone()));
-        for reason in ["stored_null", "not_newer", "tier"] {
+        for reason in ["stored_null", "not_newer", "tier", "pointer_absent"] {
             PROJECTION_REFUSED_STALE_REASONS
                 .with_label_values(&[reason])
                 .inc_by(0);
