@@ -13,7 +13,7 @@ tags: [open-question, legacy-web-projection, bridge, external-format, embed, pri
 cites:
   - bridges/CLAUDE.md
   - doorway/CLAUDE.md
-  - genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
   - app/elohim-app/src/app/components/hero/hero.component.html
   - genesis/a2o/steps/dataplane/apex-transition.steps.ts
   - genesis/a2o/src/framework/dataplane/real-app-network.ts
@@ -126,9 +126,51 @@ Evidence: `app/elohim-app` vitest (32 tests across the component + hero), `ng bu
 development` (AOT + strict templates), and a `pnpm look` render of the built bundle in both schemes
 showing zero requests to any youtube/ytimg/google host on load.
 
+## Regression observed 2026-09-20/21 — raw iframe requests recurred despite slice 1
+
+The scenario "The apex name survives its doorway's shed" (`features/dataplane/doorway-apex-transition.feature:119`)
+failed the same assertion class again on three consecutive household runs the night of 2026-09-20
+(`F8-apex-transition-run2.log`, `F8-apex-transition-run3.log`, `G3-apex-transition-run.log`;
+sprint reports `sprint-report-household-20260920T223619Z-3ec3614d.md` and
+`…T232300Z-3ec3614d.md`) — this time on literal `net::ERR_ABORTED` requests to the raw embed URLs
+themselves (`https://www.youtube.com/embed/6g6v7ZMEAxk`, `.../sVXwZ087ffA`), fired on page load with
+no click, at `apex-transition.steps.ts:1391` (assertion at `:1403`).
+
+**What is proven.** Current source (`hero.component.ts`/`.html`, read 2026-09-21) still uses
+`ExternalEmbedComponent` with the click-to-load facade for both slots, same two video ids — the fix
+was not reverted in-tree. A facade-rendered page issues zero network requests to any youtube host
+before a click; the failure logs show real requests to the raw embed path at load time, so the SERVED
+page — not the current source — lacked the facade. All three failing runs (22:35–23:27Z) predate the
+household's next full `ng build --configuration development` (`J2-build.log`, timestamped 23:51Z, the
+build accompanying commit `4dce6642f`'s server-bundle-feedback-loop fix) — so the dist these runs
+served was staged before that rebuild.
+
+**What is the strongest candidate cause, not fully proven.** `FINDING-server-bundle-feedback-loop.md`
+(found ~23:30Z, i.e. between the F8/G3 failures and the J2 rebuild) documents the household's SSR
+bundle path materializing INTO the source dist across every cast, so a prologue could package and
+serve an old `.reconcile/<slug>/<hash16>/` generation's `main.server.mjs` instead of the freshest one —
+five generations coexisted that day. An old generation predating this facade (or predating any build
+with `ExternalEmbedComponent` wired into `hero.component`) being reconciler-selected is consistent with
+every observed fact, but this pass did not read the served HTML byte-for-byte or diff the specific
+`.reconcile` generation hash against the facade's landing commit, so the mechanism is corroborated by
+timing and by the bundle-pollution finding, not directly confirmed.
+
+**What is ruled out.** The `ng build --configuration development` flag itself is not implicated — that
+configuration is the one the household prologue is required to stage for hosted-steward scenarios
+generally (`project_mesh_browser_lane_needs_dev_config_dist`); nothing found ties it to stripping or
+bypassing `ExternalEmbedComponent`.
+
+**On scoping the assertion to first-party origins:** the step's own comment (`apex-transition.steps.ts:1394-1398`)
+already records this as an open, deliberate non-decision — "the declaration belongs to the view and the
+protocol, not the harness... Do not allowlist it here." This backlog entry does not reopen that call;
+it reports a regression in what the harness observed, not a request to rescope the harness.
+
 ## Current decision
 
-Captured, direction 4 partially landed (slice 1 above). No owner for the remaining directions;
-blocks nothing. The narrow harness question (whether the sibling-browser capture at
-`apex-transition.steps.ts:1135` may be scoped to household origins) is the operator's call and is
-tracked in the shift journal, not here — settle it without foreclosing direction 6.
+Captured, direction 4 partially landed (slice 1 above), and reconfirmed regressed on a stale/polluted
+served bundle 2026-09-20/21 rather than a source reversion. No owner for the remaining directions;
+blocks nothing beyond the one scenario. The narrow harness question (whether the sibling-browser
+capture may be scoped to household origins) remains the operator's call, tracked in the shift journal,
+not here — settle it without foreclosing direction 6. Next action before re-litigating the design: get
+one apex-transition run against a freshly staged dist (post-`4dce6642f`) and confirm the assertion
+passes clean, which would close the regression as bundle-staleness rather than a code regression.
