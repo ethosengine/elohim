@@ -128,6 +128,10 @@ const DEFAULT_REJOIN_BOUND_MS = 20_000;
 const DEFAULT_RECOVERY_BOUND_MS = 60_000;
 /** How often a membership poll re-reads the document. */
 const MEMBERSHIP_POLL_MS = 500;
+// relay-addr-beacon's `--shared-refresh-secs` default, which the household
+// launcher leaves alone: how old a serving leg lets its OWN stamp get before
+// it re-stamps it.
+const MEMBERSHIP_REFRESH_SECS = Number(process.env['BEACON_SHARED_REFRESH_SECS'] ?? 300);
 
 /**
  * Resolving the public name tries each advertised origin in turn, so the worst
@@ -950,11 +954,33 @@ Then(
     // The sibling's entry is compared WHOLE, freshness stamp included: a leg
     // that rewrote a sibling's record — even to the same value — would not be
     // doing exact-owner writes, and this is the assertion that can see it.
+    //
+    // One stamp change is the sibling's OWN: a serving leg re-stamps its own
+    // `updated_at` once that stamp is at least the freshness interval old
+    // (relay-addr-beacon `--shared-refresh-secs`). A withdrawal window that
+    // straddles that tick sees the stamp advance by a whole interval or more.
+    // A foreign rewrite stamps at the withdrawal moment instead, which lands
+    // INSIDE the interval — the owner would already have refreshed otherwise —
+    // so an advance shorter than the interval is still refused.
+    const siblingBefore = state.siblingEntryBeforeFault;
+    const siblingAfter = memberFor(doc, state.siblingOwner as string);
+    assert.ok(siblingBefore, 'the sibling entry was never captured before the fault');
+    const advancedMs =
+      siblingAfter === undefined
+        ? Number.NaN
+        : Date.parse(siblingAfter.updated_at) - Date.parse(siblingBefore.updated_at);
+    const ownFreshnessRestamp = advancedMs >= MEMBERSHIP_REFRESH_SECS * 1000;
     assert.deepEqual(
-      memberFor(doc, state.siblingOwner as string),
-      state.siblingEntryBeforeFault,
+      ownFreshnessRestamp
+        ? { ...siblingAfter, updated_at: siblingBefore.updated_at }
+        : siblingAfter,
+      siblingBefore,
       `the sibling "${state.siblingOwner}" entry changed across the withdrawal; each doorway owns ` +
-        'only the records it contributes'
+        'only the records it contributes' +
+        (Number.isFinite(advancedMs) && advancedMs !== 0
+          ? ` (its freshness stamp moved ${advancedMs}ms; the sibling's own re-stamp moves it at ` +
+            `least ${MEMBERSHIP_REFRESH_SECS * 1000}ms)`
+          : '')
     );
 
     // The exclusive diagnostic name is the address that reaches ONLY that
