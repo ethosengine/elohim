@@ -16,7 +16,30 @@
  * are never exercised during a server-side render — Angular just needs to
  * construct the DI tree and render HTML. The shims are intentional no-ops.
  *
- * This script is run after `ng build` via the `postbuild` hook in package.json.
+ * SUPERSEDED 2026-09-21 — UNWIRED, DO NOT RE-ADD THE `postbuild` HOOK.
+ *
+ * elohim-render now owns builtin shimming at the RUNTIME layer: its
+ * NodeShimLoader intercepts bare and `node:`-prefixed builtin specifiers and
+ * serves link-safe synthetic modules whose members are loud stubs unless a
+ * render path proves otherwise (elohim/elohim-render/src/shim/loader.rs +
+ * node_builtins.rs). That is the contract app/CLAUDE.md states: "Node
+ * built-ins are shimmed by the runtime (no postbuild shimming)."
+ *
+ * This script fought that contract in two ways, and a `pnpm run build` (which
+ * fires lifecycle hooks) diverged from CI's `pnpm exec ng build` (which does
+ * not) from the SAME commit:
+ *   - it rewrote every builtin import to ./node-shims/*.mjs, so the runtime
+ *     loader never saw a builtin and its shims were dead code; and
+ *   - its preamble (ssr-globals-preamble.mjs) claimed `globalThis.require`
+ *     BEFORE Angular's own `globalThis['require'] ??= createRequire(…)`
+ *     banner could, and that require's `util` has no `types` — so
+ *     `ws/lib/sender.js`'s `var { types: { isUint8Array } } =
+ *     __require("util")` threw and every SSR render of `/` fell back to CSR.
+ *
+ * `app/scripts/lint-ssr-entry.mjs` rule (4) now refuses a `postbuild` hook on
+ * an SSR-declaring app. Kept on disk only because a backlog doc cites it.
+ *
+ * This script WAS run after `ng build` via the `postbuild` hook in package.json.
  */
 
 import { readdir, readFile, writeFile, mkdir } from 'node:fs/promises';

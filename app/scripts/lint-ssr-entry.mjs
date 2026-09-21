@@ -16,6 +16,21 @@
 //   3. NO custom-element register side-effect imports (`…/register`) in the
 //      server entry — element upgrade is client-side after hydration; browser
 //      -only code must stay out of the V8 render path.
+//   4. NO npm build lifecycle hook that post-processes the server bundle.
+//      Node built-ins are shimmed by the RUNTIME (elohim-render's
+//      NodeShimLoader + the synthetic builtin modules in
+//      src/shim/node_builtins.rs) — "no postbuild shimming", app/CLAUDE.md
+//      §Adding SSR to an EPR app. A `postbuild` that rewrites dist/<app>/server
+//      makes `pnpm run build` and `pnpm exec ng build` (what CI runs) emit
+//      DIFFERENT bundles from one commit, and the rewritten one bypasses the
+//      runtime shim entirely. Measured 2026-09-21: the stale May-2026
+//      ssr-shim-node.mjs hook rewrote every `node:*` import to ./node-shims/*
+//      and prepended a preamble that claimed `globalThis.require` before
+//      Angular's own `globalThis['require'] ??= createRequire(…)` banner could
+//      — its `util` shim has no `types`, so `ws/lib/sender.js`'s
+//      `var { types: { isUint8Array } } = __require("util")` threw and every
+//      household `/` render fell back to CSR, while the fleet (built with
+//      `pnpm exec ng build`, no lifecycle hook) rendered fine.
 //
 // Apps with NO server entry declared pass silently — the rail fires only when
 // SSR is claimed. Framework note: this rail is Angular-shaped because the
@@ -119,6 +134,29 @@ for (const [projName, proj] of Object.entries(angularJson.projects ?? {})) {
       fail(
         `${projName}: SSR document base href '${serverBase}' differs from browser '${browserBase}' — mounted routes must resolve identically`,
       );
+    }
+  }
+
+  // (4) no build lifecycle hook post-processing the server bundle — the
+  // runtime owns builtin shimming, and a hook makes `pnpm run build` diverge
+  // from CI's `pnpm exec ng build` from the same commit.
+  const pkgPath = join(appDir, "package.json");
+  if (existsSync(pkgPath)) {
+    const scripts = JSON.parse(readFileSync(pkgPath, "utf8")).scripts ?? {};
+    // `prebuild` is fine — it prepares INPUTS (sophia UMD, fonts, the SW,
+    // wasm) and CI replicates those steps explicitly. Only `postbuild` can
+    // rewrite the emitted server bundle after `ng build` wrote it.
+    for (const hook of ["postbuild"]) {
+      if (scripts[hook]) {
+        fail(
+          `${projName}: package.json declares a '${hook}' lifecycle hook ` +
+            `(${scripts[hook]}) — an SSR app's server bundle is shimmed by the ` +
+            `peer runtime (elohim-render), not by a post-build rewrite. A hook ` +
+            `only fires for \`pnpm run build\`, so CI's \`pnpm exec ng build\` ` +
+            `ships a different bundle from the same commit. Remove it; see ` +
+            `app/CLAUDE.md §Adding SSR to an EPR app.`,
+        );
+      }
     }
   }
 
