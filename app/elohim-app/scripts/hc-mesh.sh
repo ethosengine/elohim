@@ -75,6 +75,11 @@
 #                   Peers not named inherit MESH_TRANSPORT_BACKEND.
 #   MESH_DOORWAYS    0 skips mongod and both doorways; storage peers launch
 #                   without ELOHIM_DOORWAY_URL (default: 1).
+#   MESH_DOORWAY_GAMMA  0 skips the third doorway, "gamma" — story 3.1's second
+#                   name holder (garden's siblings are alpha and gamma; beta only
+#                   relays). No third conductor, no third storage peer: it rides
+#                   james's already-running conductor+storage (default: 1;
+#                   measured ~45MB RSS, the same order as A/B).
 #   DOORWAY_PORT    Doorway HTTP port (default: 8888)
 #   MESH_PORTAL     0 skips the doorway sign-in portal (default: 1). The doorway proxies
 #                   /threshold/* to THRESHOLD_URL as-is; without something listening there
@@ -83,8 +88,9 @@
 #                   real login before anything is pushed.
 #   THRESHOLD_PORT  Port the portal listens on (default: 8081 — the doorway's own
 #                   THRESHOLD_URL default, so both doorways proxy to one portal).
-#   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT  health-watchdog listener ports (default 8079 / 8089;
-#                   alpha runs 8079 — spawn_health_listener serves /health,/ready,/health/serving from
+#   DOORWAY_A_HEALTH_PORT / DOORWAY_B_HEALTH_PORT / DOORWAY_C_HEALTH_PORT  health-watchdog
+#                   listener ports (default 8079 / 8089 / 8099; alpha runs 8079 —
+#                   spawn_health_listener serves /health,/ready,/health/serving from
 #                   its own OS-thread runtime; unset ⇒ liveness rides the MAIN listener and the watchdog
 #                   a2o scenarios are unconstructible)
 #   STORAGE_BIN     elohim-storage binary (default: the mesh's own copy at
@@ -296,11 +302,17 @@ DOORWAY_PORT="${DOORWAY_PORT:-8888}"
 MESH_PORTAL="${MESH_PORTAL:-1}"
 THRESHOLD_PORT="${THRESHOLD_PORT:-8081}"
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
+# Gamma: story 3.1's second name holder for "garden" (alpha and gamma both host
+# it; beta only relays). No third conductor/storage peer — see the launch block
+# below for which existing peer it rides and why.
+MESH_DOORWAY_GAMMA="${MESH_DOORWAY_GAMMA:-1}"
+DOORWAY_C_PORT="${DOORWAY_C_PORT:-8890}"
 # The local iroh-relay every 0.7 conductor homes to (see MESH_FORK_RELAY_URL).
 MESH_RELAY_PORT="${MESH_RELAY_PORT:-3340}"
 MESH_RELAY_BIN="${MESH_RELAY_BIN:-$(command -v iroh-relay 2>/dev/null || true)}"
 DOORWAY_A_HEALTH_PORT="${DOORWAY_A_HEALTH_PORT:-8079}"
 DOORWAY_B_HEALTH_PORT="${DOORWAY_B_HEALTH_PORT:-8089}"
+DOORWAY_C_HEALTH_PORT="${DOORWAY_C_HEALTH_PORT:-8099}"
 # The household's public-name membership authority (see MESH_MEMBERSHIP above).
 # Off is a deliberate shape, not a fallback: with no legs staged, the document
 # never exists and the apex-transition scenarios fail naming the absence rather
@@ -968,11 +980,11 @@ reset_household_state() {
   rm -f "$ARCHIVE_MODE_FILE"
   # The doorways are not in $PEERS, so their node identities are removed by name:
   # a recast household must not keep the signing keys of the one it replaces.
-  rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key"
+  rm -f "$MESH_DIR/doorway-a-node.key" "$MESH_DIR/doorway-b-node.key" "$MESH_DIR/doorway-c-node.key"
   # Per-doorway SSR materialize scratch (see SSR_BUNDLE_PATH above) — pure
   # cache re-fetched from the substrate on next boot, but a stale reconcile
   # generation from a retired mesh has no reason to survive a recast.
-  rm -rf "$MESH_DIR/doorway-a/ssr" "$MESH_DIR/doorway-b/ssr"
+  rm -rf "$MESH_DIR/doorway-a/ssr" "$MESH_DIR/doorway-b/ssr" "$MESH_DIR/doorway-c/ssr"
   rm -f "$MESH_DIR/household-fixture.json" "$MESH_DIR/prologue-hosted-humans.json"
   echo "mesh reset authorized: conductor, storage, and doorway-account state will be recast together"
 }
@@ -1271,8 +1283,9 @@ record_listener_pid() { # <role> <name> <port>
 mesh_owned_ports() {
   # Doorway/mongo ports remain owned even when the NEXT requested shape has
   # MESH_DOORWAYS=0; stop must still reap a previously doorway-backed shape.
-  printf '%s\n' "$DOORWAY_PORT" "$DOORWAY_B_PORT" \
-    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$MONGO_PORT" "$THRESHOLD_PORT" \
+  printf '%s\n' "$DOORWAY_PORT" "$DOORWAY_B_PORT" "$DOORWAY_C_PORT" \
+    "$DOORWAY_A_HEALTH_PORT" "$DOORWAY_B_HEALTH_PORT" "$DOORWAY_C_HEALTH_PORT" \
+    "$MONGO_PORT" "$THRESHOLD_PORT" \
     "$MESH_RELAY_PORT"
   local i=0
   for _ in "${PEERS[@]}"; do
@@ -1286,6 +1299,7 @@ refresh_mesh_pidfiles() {
   local i=0 name
   record_listener_pid doorway a "$DOORWAY_PORT" || true
   record_listener_pid doorway b "$DOORWAY_B_PORT" || true
+  record_listener_pid doorway c "$DOORWAY_C_PORT" || true
   record_listener_pid mongod mesh "$MONGO_PORT" || true
   record_listener_pid portal mesh "$THRESHOLD_PORT" || true
   for name in "${PEERS[@]}"; do
@@ -2562,7 +2576,8 @@ fallback_pattern_pids() {
         done < <(mesh_owned_ports) ;;
       doorway)
         [[ "$args" == *"--listen 0.0.0.0:$DOORWAY_PORT"* || \
-           "$args" == *"--listen 0.0.0.0:$DOORWAY_B_PORT"* ]] && owned=1 ;;
+           "$args" == *"--listen 0.0.0.0:$DOORWAY_B_PORT"* || \
+           "$args" == *"--listen 0.0.0.0:$DOORWAY_C_PORT"* ]] && owned=1 ;;
       mongod) [[ "$args" == *"--dbpath $MONGO_DIR"* ]] && owned=1 ;;
       iroh-relay) [[ "$args" == *"$MESH_DIR/iroh-relay.toml"* ]] && owned=1 ;;
       relay-addr-beacon) [[ "$args" == *"--membership-file $MESH_DIR/membership/"* ]] && owned=1 ;;
@@ -2668,6 +2683,12 @@ status_all() {
     curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null && echo UP || echo down
     printf "doorwayB :%s " "${DOORWAY_B_PORT:-8889}"
     curl -s -m 2 "http://localhost:${DOORWAY_B_PORT:-8889}/health" >/dev/null && echo UP || echo down
+    if [ "$MESH_DOORWAY_GAMMA" = "1" ]; then
+      printf "doorwayC :%s " "${DOORWAY_C_PORT:-8890}"
+      curl -s -m 2 "http://localhost:${DOORWAY_C_PORT:-8890}/health" >/dev/null && echo UP || echo down
+    else
+      echo "doorwayC :disabled (MESH_DOORWAY_GAMMA=0)"
+    fi
     printf "portal   :%s " "$THRESHOLD_PORT"
     if curl -s -m 2 -o /dev/null "http://localhost:$DOORWAY_PORT/threshold/login"; then
       case "$(curl -s -m 2 -o /dev/null -w '%{http_code}' "http://localhost:$DOORWAY_PORT/threshold/login")" in
@@ -4265,7 +4286,7 @@ wait_all() { # [--timeout N]
       fi
     fi
 
-    local mongo_ok=1 relay_ok=1 doorway_a_ok=1 doorway_b_ok=1
+    local mongo_ok=1 relay_ok=1 doorway_a_ok=1 doorway_b_ok=1 doorway_c_ok=1
     if [ -n "$MONGOD_BIN" ] && [ -x "$MONGOD_BIN" ]; then
       (exec 3<>"/dev/tcp/127.0.0.1/$MONGO_PORT") 2>/dev/null || mongo_ok=0
     fi
@@ -4273,6 +4294,9 @@ wait_all() { # [--timeout N]
     if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
       curl -s -m 2 "http://localhost:$DOORWAY_PORT/health" >/dev/null || doorway_a_ok=0
       curl -s -m 2 "http://localhost:$DOORWAY_B_PORT/health" >/dev/null || doorway_b_ok=0
+      if [ "$MESH_DOORWAY_GAMMA" = "1" ]; then
+        curl -s -m 2 "http://localhost:$DOORWAY_C_PORT/health" >/dev/null || doorway_c_ok=0
+      fi
     fi
     local portal_ok=1
     if [ "$MESH_PORTAL" = "1" ]; then
@@ -4290,14 +4314,14 @@ wait_all() { # [--timeout N]
     done
 
     if [ "$mongo_ok" = 1 ] && [ "$relay_ok" = 1 ] && [ "$doorway_a_ok" = 1 ] \
-      && [ "$doorway_b_ok" = 1 ] && [ "$portal_ok" = 1 ] && [ "$conductors_ok" = 1 ] \
-      && [ "$storage_ok" = 1 ]; then
+      && [ "$doorway_b_ok" = 1 ] && [ "$doorway_c_ok" = 1 ] && [ "$portal_ok" = 1 ] \
+      && [ "$conductors_ok" = 1 ] && [ "$storage_ok" = 1 ]; then
       echo "ready in ${elapsed}s"
       return 0
     fi
 
     if [ "$elapsed" -ge "$timeout" ]; then
-      echo "wait: timed out after ${elapsed}s (mongo=$mongo_ok relay=$relay_ok doorwayA=$doorway_a_ok doorwayB=$doorway_b_ok portal=$portal_ok conductors=$conductors_ok storage=$storage_ok)" >&2
+      echo "wait: timed out after ${elapsed}s (mongo=$mongo_ok relay=$relay_ok doorwayA=$doorway_a_ok doorwayB=$doorway_b_ok doorwayC=$doorway_c_ok portal=$portal_ok conductors=$conductors_ok storage=$storage_ok)" >&2
       return 1
     fi
     sleep 2
@@ -4608,6 +4632,69 @@ EOF
   else
     record_listener_pid doorway b "$DOORWAY_B_PORT" || true
     echo "doorway B already up on :$DOORWAY_B_PORT"
+  fi
+
+  # 1b2. Doorway C ("gamma"): story 3.1's second holder of "garden" (alpha and
+  # gamma both host it; beta only relays — see genesis/a2o/features/federation/
+  # name-routing.feature scenario 5, and the design at genesis/a2o/reports/
+  # recovery/serving-edge-20260919/story-3.1-design.md §9.4-9.5). A name holder
+  # is a projection contract (an EprRouter mount + a project-epr commitment on
+  # ITS OWN storage-url), not a substrate role — so gamma needs NO third
+  # conductor and NO third storage peer. It rides james (peer index 2), the one
+  # household peer that today backs no doorway of its own (matthew backs A,
+  # jessica backs B) — a clean one-doorway-per-peer topology instead of doubling
+  # load onto jessica's storage/conductor. Federation discovery needs no new
+  # wiring beyond gw_c below: DOORWAY_URL is what lets FederationConfig::from_args
+  # succeed, which is what makes THIS doorway self-register in the DHT and run
+  # the periodic peer-discovery/coherence-probe loop that seeds from
+  # `get_all_doorways` ("the registry IS the DHT" — services/federation.rs) —
+  # exactly the mechanism A and B already rely on with no FEDERATION_PEERS set.
+  # No membership-beacon leg: scenario 5 never asks for one (see
+  # start_membership_beacons above — its legs stay alpha/apex only).
+  # MESH_DOORWAY_GAMMA=0 opts out (measured cost: ~45MB RSS, same order as A/B —
+  # see mesh_footprint's "footprint doorway" lines in a recent start.log).
+  if [ "$MESH_DOORWAY_GAMMA" = "1" ]; then
+  if ! curl -s -m 2 "http://localhost:$DOORWAY_C_PORT/health" >/dev/null; then
+    local gw_c=()
+    [ "$MESH_DOORWAY_GATEWAY_SCOPING" = "1" ] && gw_c=("DOORWAY_URL=http://localhost:$DOORWAY_C_PORT")
+    # See doorway A's block above for why this is a per-doorway $MESH_DIR
+    # directory rather than the source dist.
+    mkdir -p "$MESH_DIR/doorway-c/ssr"
+    env "${gw_c[@]}" \
+    DOORWAY_ID="${DOORWAY_C_ID:-gamma-elohim-host}" \
+    DOORWAY_HEALTH_PORT="$DOORWAY_C_HEALTH_PORT" \
+    DOORWAY_NODE_KEY_FILE="$MESH_DIR/doorway-c-node.key" \
+    MONGODB_URI="mongodb://127.0.0.1:$MONGO_PORT" MONGODB_DB="doorway-c" \
+    ELOHIM_NETWORK_STAKES="$ELOHIM_NETWORK_STAKES" \
+    API_KEY_ADMIN="${MESH_API_KEY_ADMIN:-mesh-admin-dev-key}" \
+    DOORWAY_MEMBRANE_SHAPE_THRESHOLD="${DOORWAY_MEMBRANE_SHAPE_THRESHOLD:-100000}" \
+    DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD="${DOORWAY_MEMBRANE_CHALLENGE_THRESHOLD:-200000}" \
+    DOORWAY_MEMBRANE_BAN_THRESHOLD="${DOORWAY_MEMBRANE_BAN_THRESHOLD:-400000}" \
+    SSR_STORAGE_URL="http://127.0.0.1:$(http_port 2)" \
+    SSR_BUNDLE_PATH="${SSR_BUNDLE_PATH:-$MESH_DIR/doorway-c/ssr/main.server.mjs}" \
+    SSR_BUNDLE_SLUG="${SSR_BUNDLE_SLUG:-elohim-host-landing}" \
+    SSR_BUNDLE_SLUGS="${SSR_BUNDLE_SLUGS:-elohim-host-landing,lamad-spa}" \
+    DOORWAY_MANIFEST_BOARD_ENABLED="${DOORWAY_MANIFEST_BOARD_ENABLED:-true}" \
+    HAPP_BUNDLE_PATH="$HAPP_PATH" \
+    POOL_COMPUTE_URL="http://127.0.0.1:$(http_port 2)" \
+    POOL_COMPUTE_TOKEN="$MESH_COMPUTE_LOCAL_TOKEN" \
+    POOL_COMPUTE_PERFORMER="$(peer_agent_key 2 "${PEERS[2]}")" \
+    DOORWAY_MAX_AGENTS_PER_CONDUCTOR="${MESH_DOORWAY_MAX_AGENTS:-25}" \
+    nohup "$DOORWAY_BIN" --dev-mode --dev-signal-subscriber --listen "0.0.0.0:$DOORWAY_C_PORT" \
+      --conductor-url "ws://localhost:$(admin_port 2)" \
+      --app-port-min "$(app_port 2)" \
+      --storage-url "http://127.0.0.1:$(http_port 2)" \
+      --storage-urls "http://127.0.0.1:$(http_port 0),http://127.0.0.1:$(http_port 1)" \
+      > "$LOGDIR/doorway-c.log" 2>&1 &
+    record_mesh_pid doorway c "$!" || true
+    for _ in $(seq 1 20); do
+      curl -s -m 2 "http://localhost:$DOORWAY_C_PORT/health" >/dev/null && break; sleep 1
+    done
+    echo "doorway C up on :$DOORWAY_C_PORT (gamma, james-primary, story 3.1 name holder)"
+  else
+    record_listener_pid doorway c "$DOORWAY_C_PORT" || true
+    echo "doorway C already up on :$DOORWAY_C_PORT"
+  fi
   fi
 
   # 1c. The doorway sign-in portal (doorway-app). The doorway forwards /threshold/*
@@ -5015,9 +5102,9 @@ restart_portal() {
   return 1
 }
 
-restart_doorway() { # <a|b> [extra SSR slug]
+restart_doorway() { # <a|b|c> [extra SSR slug]
   local name="$1" slug="${2:-}" pid next
-  case "$name" in a|b) ;; *) echo 'REFUSED: doorway must be a or b' >&2; return 1 ;; esac
+  case "$name" in a|b|c) ;; *) echo 'REFUSED: doorway must be a, b, or c' >&2; return 1 ;; esac
   pid="$(live_recorded_pid doorway "$name")" || { echo "REFUSED: no owned doorway $name" >&2; return 1; }
   next="$(python3 - "$pid" "$slug" "$LOGDIR/doorway-restart-$name.log" <<'PYRESTART'
 import os, signal, subprocess, sys, time

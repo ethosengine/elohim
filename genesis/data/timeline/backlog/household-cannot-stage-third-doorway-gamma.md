@@ -49,3 +49,19 @@ cost of the extra doorway when sizing the household mesh.
 `genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md` story
 3.1. Habit: `doorway/doorway-service/.epr-meta/served-under-standing.habit.md`. Scenario:
 `genesis/a2o/features/federation/name-routing.feature` scenario 5 (`a07134562`, `@wip`).
+
+**2026-09-21 — landed, awaiting first household run.** `app/elohim-app/scripts/hc-mesh.sh` gained the
+`gamma` doorway (`MESH_DOORWAY_GAMMA`, default on; `DOORWAY_C_PORT`/`DOORWAY_C_HEALTH_PORT`), riding
+james's already-running conductor+storage — no third conductor, no third storage peer, confirmed by
+`just mesh preflight` enumerating its ports as `free`. `hc-mesh-prologue.sh` fills the fixture's
+`doorways.gamma` slot from a soft health check (or keeps the honest `absentReason` when gamma is off),
+and exports `E2E_DOORWAY_GAMMA` only when reachable; `just test mesh` (justfile) mirrors that export.
+The shed fixture (`PUT /admin/dev/shed`, `bd1446d88`) was already built and is unchanged here; the a2o
+glue (`name-routing.steps.ts`) already called it correctly and now also names a `403 FIXTURE_ONLY`
+refusal explicitly rather than folding it into a generic assertion. `household-mesh.ts` needed no
+change — its `alpha|beta|apex|gamma` loop and absence-throwing were already generic and are covered by
+the existing `__tests__/household-mesh.test.ts` gamma cases. Status stays `open`: nobody has yet run
+the scenario against a live gamma doorway. Next: an operator runs the sequence in the session's final
+report (source `environment.sh`, re-export `STORAGE_BIN`/`DOORWAY_BIN` to HEAD binaries, `just mesh
+start`, `just mesh wait`, `just mesh prologue`, then the scoped `@wip` cucumber run) and records the
+first result here.

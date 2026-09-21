@@ -54,6 +54,12 @@ mesh_seed_env                     # CONDUCTOR_URLS, DOORWAY_URL(=A), STORAGE_URL
 DOORWAY_B_PORT="${DOORWAY_B_PORT:-8889}"
 DOORWAY_A_URL="$DOORWAY_URL"
 DOORWAY_B_URL="http://localhost:$DOORWAY_B_PORT"
+# Gamma (story 3.1's second "garden" holder) is OPTIONAL here — MESH_DOORWAY_GAMMA
+# and DOORWAY_C_PORT are inherited from the sourced hc-mesh.sh above. Whether it
+# actually answers is checked in the preflight block below (GAMMA_REACHABLE),
+# never assumed from the flag alone: a flag can be 1 while the process is still
+# warming up or was never launched by this mesh at all.
+DOORWAY_C_URL="http://localhost:$DOORWAY_C_PORT"
 STORAGE_B_URL="http://localhost:$(http_port 1)"
 CONDUCTOR_B_ADMIN_URL="ws://localhost:$(admin_port 1)"
 STAGE_BLOB_SCRIPT="$REPO_ROOT/scripts/ci/stage-spa-blob.sh"
@@ -119,6 +125,20 @@ for pair in "A|$DOORWAY_A_URL" "B|$DOORWAY_B_URL"; do
   fi
 done
 say "doorway A ($DOORWAY_A_URL) and doorway B ($DOORWAY_B_URL) both healthy"
+
+# Gamma is a SOFT precondition — story 3.1's scenario 5 is the only consumer,
+# it stays @wip until the household proves it, and Act I's other four
+# scenarios never mention gamma at all (see the feature's own preamble). A
+# household running without it is a fully honest, fully supported shape, so
+# this never FATALs the way the A/B check above does; it only decides what the
+# fixture manifest and the a2o env block say about doorway "gamma" below.
+GAMMA_REACHABLE=0
+if [ "$MESH_DOORWAY_GAMMA" = "1" ] && curl -s -m 3 "$DOORWAY_C_URL/health" >/dev/null; then
+  GAMMA_REACHABLE=1
+  say "doorway C / gamma ($DOORWAY_C_URL) healthy — story 3.1 scenario 5 can stage it"
+else
+  say "doorway C / gamma is not up (MESH_DOORWAY_GAMMA=$MESH_DOORWAY_GAMMA) — household fixture will declare it absent, honestly"
+fi
 
 LANDING_BROWSER_DIST="$REPO_ROOT/app/elohim-app/dist/elohim-app/browser"
 LANDING_SERVER_DIST="$REPO_ROOT/app/elohim-app/dist/elohim-app/server"
@@ -520,6 +540,8 @@ export PROLOGUE_PEERS_TSV="$PEERS_TSV"
 export PROLOGUE_MESH_DIR="$MESH_DIR"
 export PROLOGUE_DOORWAY_A_PORT="$DOORWAY_PORT"
 export PROLOGUE_DOORWAY_B_PORT="$DOORWAY_B_PORT"
+export PROLOGUE_DOORWAY_C_PORT="$DOORWAY_C_PORT"
+export PROLOGUE_GAMMA_REACHABLE="$GAMMA_REACHABLE"
 export PROLOGUE_LOGDIR="$LOGDIR"
 # The household's public-name membership authority, declared by hc-mesh.sh at
 # the moment it staged the beacon legs (start_membership_beacons). Copied in
@@ -535,6 +557,8 @@ import json, os, sys
 peers_raw = os.environ.get("PROLOGUE_PEERS_TSV", "")
 doorway_a_port = os.environ["PROLOGUE_DOORWAY_A_PORT"]
 doorway_b_port = os.environ["PROLOGUE_DOORWAY_B_PORT"]
+doorway_c_port = os.environ.get("PROLOGUE_DOORWAY_C_PORT", "")
+gamma_reachable = os.environ.get("PROLOGUE_GAMMA_REACHABLE", "0") == "1"
 logdir = os.environ["PROLOGUE_LOGDIR"]
 
 storage_peers = {}
@@ -552,6 +576,10 @@ for line in peers_raw.splitlines():
 
 primary_a = pool_urls[0] if pool_urls else None
 primary_b = pool_urls[1] if len(pool_urls) > 1 else primary_a
+# gamma rides james (peer index 2) — the household peer that backs no OTHER
+# doorway's own primary — same choice hc-mesh.sh's launch block makes and
+# justifies (no third conductor/storage peer needed).
+primary_c = pool_urls[2] if len(pool_urls) > 2 else primary_b
 
 fixture = {
     "$comment": "Emitted by hc-mesh-prologue.sh (just mesh prologue). Act I mesh owns its substrate.",
@@ -577,9 +605,23 @@ fixture = {
             "url": f"http://localhost:{doorway_b_port}",
             "primaryStorageUrl": primary_b,
         },
-        "gamma": {
-            "absentReason": "Act I mesh stages two doorways (A/alpha and B/beta=apex); a scenario naming a third must say which act it needs",
-        },
+        "gamma": (
+            {
+                "url": f"http://localhost:{doorway_c_port}",
+                "primaryStorageUrl": primary_c,
+                "poolStorageUrls": pool_urls,
+                "logPath": f"{logdir}/doorway-c.log",
+            }
+            if gamma_reachable
+            else {
+                "absentReason": (
+                    "story 3.1's second 'garden' holder — not up on this mesh "
+                    "(MESH_DOORWAY_GAMMA=0, or `just mesh start` ran before gamma "
+                    "was wired). `MESH_DOORWAY_GAMMA=1 just mesh start` then "
+                    "`just mesh prologue` again to fill this slot."
+                ),
+            }
+        ),
     },
     "storagePeers": storage_peers,
 }
@@ -625,6 +667,15 @@ POOL_CSV="$(peer_url_csv)"
 echo "export E2E_DOORWAY_ALPHA=\"$DOORWAY_A_URL\""
 echo "export E2E_DOORWAY_B=\"$DOORWAY_B_URL\""
 echo "export E2E_DOORWAY_BETA=\"$DOORWAY_B_URL\""
+# Only printed when gamma actually answered /health above (GAMMA_REACHABLE):
+# an env override always wins over the fixture manifest
+# (household-mesh.ts::applyDoorwayEnvironment), so exporting a URL for a
+# gamma that isn't running would hide the manifest's honest absentReason
+# behind a connection-refused instead. Unset here, scenario 5's first step
+# throws that named absence — exactly the degrade the design doc calls for.
+if [ "$GAMMA_REACHABLE" = "1" ]; then
+  echo "export E2E_DOORWAY_GAMMA=\"$DOORWAY_C_URL\""
+fi
 echo "export E2E_STORAGE_URL=\"$STORAGE_URL\""
 i=0
 for name in "${PEERS[@]}"; do

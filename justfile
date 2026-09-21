@@ -62,6 +62,17 @@ test target="changed" scope="":
         export E2E_DOORWAY_ALPHA="$DOORWAY_URL"
         export E2E_DOORWAY_B="http://localhost:$DOORWAY_B_PORT"
         export E2E_DOORWAY_BETA="$E2E_DOORWAY_B"
+        # Gamma (story 3.1's second "garden" holder, name-routing.feature scenario 5,
+        # still @wip) is OPTIONAL — only export when it is actually up, mirroring
+        # hc-mesh-prologue.sh's "a2o env" block exactly. An unconditional export here
+        # would out-rank the household fixture's honest absentReason
+        # (household-mesh.ts::applyDoorwayEnvironment: an env var always wins over the
+        # manifest) and turn a clear named absence into a bare connection-refused.
+        if [[ "${MESH_DOORWAY_GAMMA:-1}" = "1" ]] && curl -s -m 2 "http://localhost:$DOORWAY_C_PORT/health" >/dev/null; then
+          export E2E_DOORWAY_GAMMA="http://localhost:$DOORWAY_C_PORT"
+        else
+          unset E2E_DOORWAY_GAMMA
+        fi
         export E2E_STORAGE_URL="$STORAGE_URL"
         i=0
         for peer in "${PEERS[@]}"; do

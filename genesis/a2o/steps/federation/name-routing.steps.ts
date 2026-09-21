@@ -663,6 +663,34 @@ function shedRouteMissing(res: ShedResponse): boolean {
 }
 
 /**
+ * `403 FIXTURE_ONLY` — the route IS built (unlike `shedRouteMissing`, which means "not
+ * built yet"), but this doorway/caller does not satisfy `fixture_surface_gate`
+ * (`doorway/doorway-service/src/routes/admin_dev.rs`): the doorway must have declared
+ * `ELOHIM_NETWORK_STAKES=simulacra` at boot AND the caller must be loopback. Distinguished
+ * from a missing route on purpose — this is a real misconfiguration (a doorway launched
+ * without the stakes declaration, or a request that somehow left loopback) that deserves a
+ * named explanation, never a silent `pending` (which would misreport "not built yet") and
+ * never a bare "expected HTTP 200, got 403" buried in a generic assertion.
+ */
+function shedRouteForbidden(res: ShedResponse): boolean {
+  return res.status === 403;
+}
+
+/** Throws a message naming exactly what opens `PUT /admin/dev/shed` — see
+ * `shedRouteForbidden`'s doc. Every caller of `putShedOverride` in this file checks this
+ * before trusting anything else about the response. */
+function explainShedForbidden(doorwayId: string, doorwayUrl: string, res: ShedResponse): never {
+  throw new Error(
+    `PUT ${doorwayUrl}/admin/dev/shed refused HTTP 403 for doorway "${doorwayId}": ` +
+      `${res.text.slice(0, 300)} — this fixture-only surface opens only when the doorway ` +
+      'declares ELOHIM_NETWORK_STAKES=simulacra at boot AND the caller reaches it over ' +
+      'loopback (fixture_surface_gate, doorway-service/src/routes/admin_dev.rs). Check ' +
+      `hc-mesh.sh's ELOHIM_NETWORK_STAKES wiring for doorway "${doorwayId}" and that this ` +
+      'request was not proxied through something that changed its peer address.'
+  );
+}
+
+/**
  * Marks the calling step PENDING (yellow — never a false green, never an opaque red)
  * with a message naming exactly which route is missing, mirroring this file's other
  * `this.attach?.(...)` + `return 'pending'` degrades (see `federation-epr.steps.ts` for
@@ -2352,6 +2380,7 @@ When(
 
     const declared = await putShedOverride(doorway.url, BUSY_WINDOW_SECS);
     if (shedRouteMissing(declared)) return pendingShedRoute(this, doorwayId, declared);
+    if (shedRouteForbidden(declared)) explainShedForbidden(doorwayId, doorway.url, declared);
     assert.equal(
       declared.status,
       200,
@@ -2462,6 +2491,7 @@ When(
 
     const cleared = await putShedOverride(doorway.url, 0);
     if (shedRouteMissing(cleared)) return pendingShedRoute(this, doorwayId, cleared);
+    if (shedRouteForbidden(cleared)) explainShedForbidden(doorwayId, doorway.url, cleared);
     assert.equal(
       cleared.status,
       200,
