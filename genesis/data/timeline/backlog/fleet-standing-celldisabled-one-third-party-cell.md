@@ -3,17 +3,52 @@ id: "backlog-fleet-standing-celldisabled-one-third-party-cell"
 kind: "backlog"
 contentType: "backlog-item"
 contentFormat: "markdown"
-title: "One third-party cell on the alpha fleet has answered CellDisabled continuously since 2026-09-18 — background sweeps on four pods retry against it every minute, and it is NOT the class that broke app delivery"
+title: "Fleet cells answer CellDisabled for hours after every conductor restart (first recovery ~108 min) and eve's own lamad cell has been disabled since 2026-09-18 — reads serve, writes 503, and this IS what fails app delivery"
 slug: "fleet-standing-celldisabled-one-third-party-cell"
 written: "2026-09-21"
 author: "serving-edge failover-balance-stream campaign, 2026-09-21 pre-push fleet read"
 status: "open"
-priority: "medium"
+priority: "high"
 jobs: [elohim-edge]
 tags: [fleet, conductor, cell-disabled, projection-reconcile, feedback-projector, alpha]
 ---
 
-**The fact.** Two different things on the alpha fleet answer `CellDisabled`, and a raw grep conflates them.
+**CORRECTED 2026-09-21 evening, after the first roll this item's own batch went through (edge #1472). Three
+claims below were wrong; they are left in place and corrected here, because the wrong version already steered a
+decision.**
+
+- *"A third-party cell."* `uhCAkhsVVjkuw1D8…` is **eve's own agent** (`genesis bootstrap identity heal …
+  human-eve-firstwoman`), and it appears on no storage pod but eve's. The four pods' sweeps were retrying against
+  eve's cell, which makes it third-party to *them* — but the standing fact is "eve's own lamad cell has been
+  disabled since 2026-09-18", not an unknown agent's.
+- *"A holder's own cell heals 0–4 minutes after `Conductor ready.`"* That was one roll's reading of one role. Per
+  role and per pod the window is far longer and it is NOT new: the `infrastructure` role answers own-agent
+  `CellDisabled` at exactly the heartbeat rate (1/min, `record_peer_status`) in multi-hour episodes on every storage
+  pod on 09-18, 09-19, 09-20 (susan: 8.5 h continuous on the OLD code) and 09-21 before the roll. After edge
+  #1472 every pod entered it within minutes of its OWN conductor restart (sequential, 16:21Z→17:24Z); the first
+  recovery in the fleet was susan/infrastructure at 18:09:47Z, **~108 minutes** after her conductor restarted.
+  Conductor logs show no `enable_app`/`disable_app`/`update_coordinators`/reinstall on either roll, and the batch
+  changed nothing under `elohim/holochain` — the condition pre-dates it and was invisible because the old error
+  classifier counted a disabled cell as proof the path was live (82d06d902).
+- *"Serving is unaffected, so medium."* Reads are unaffected (the public landing and `/lamad/` were 200 on every
+  2-minute sample through the whole roll). WRITES are not: every write on a role in this state answers
+  `503 {"error": …CellDisabled…, "cause": "conductor-app-disabled"}`, which is what has failed every app delivery
+  since #1707. Priority raised to high.
+
+**What would settle it.** Whether the cells converge by themselves in restart order (jessica, james, gertrude, eve,
+adam, matthew after susan) or need a second conductor restart — read
+`{namespace="elohim-alpha"} |= "conductor app is RUNNING again"` and `elohim_conductor_app_enabled` per pod/role.
+If they converge: the cost driver to chase is the conductor's cold start (each conductor crash-loops once on
+`AddrInUse`, then rebuilds the `CompiledWasm` cache) and the 10-minute sequential spacing of the conductor roll.
+If they do not: `enable_app` is accepted and ineffective from storage (ladder at attempt 6+, "waiting on the
+conductor"), so the only lever is operator-owned — restart the conductor pods, not storage.
+
+**Also found:** `not_running_secs: 98` on susan's recovery line understates a ~108-minute episode — the episode
+clock resets on repeated observations, so the field misleads exactly the triage it exists for.
+
+---
+
+**The fact (as first written, 2026-09-21 morning).** Two different things on the alpha fleet answer `CellDisabled`, and a raw grep conflates them.
 
 1. *A holder's OWN cell during its own restart.* Bounded and self-healing: over three restarts in 72 h, matthew's
    and adam's own-cell `CellDisabled` lines stop within 0–4 minutes of that conductor's `Conductor ready.` line
