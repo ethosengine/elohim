@@ -329,6 +329,10 @@ HAPP_WORKDIR="$REPO_ROOT/elohim/holochain/dna/elohim/workdir"
 # Deserialize (get_record_for_action input shape moved) that the probe below mislabelled
 # as a stale token.
 HAPP_PATH="${MESH_HAPP_PATH:-$HAPP_WORKDIR/elohim.happ}"
+# Set only when the caller passed MESH_HAPP_PATH explicitly — an operator's deliberate
+# choice (see happ_bundle_freshness): never repacked, never refused for staleness.
+HAPP_PATH_EXPLICIT=0
+[ -n "${MESH_HAPP_PATH:-}" ] && HAPP_PATH_EXPLICIT=1
 # The node-local compute capability shared by a storage peer and the doorway whose
 # pool it backs. Storage refuses /api/v1/compute/* unless ELOHIM_COMPUTE_LOCAL_API=1
 # AND the bearer matches ELOHIM_COMPUTE_LOCAL_TOKEN (compute_tasks.rs local_token_
@@ -1459,6 +1463,176 @@ assert_binary_newer_than_source() { # <binary> <src-path…>
   [ "$bin_ts" -ge "$src_ts" ] && return 0
   echo "built $(date -u -d "@$bin_ts" +%Y-%m-%dT%H:%M:%SZ), newest tracked source file under $* was modified $(date -u -d "@$src_ts" +%Y-%m-%dT%H:%M:%SZ) (HEAD $(git -C "$REPO_ROOT" log -1 --format=%h -- "$@"))" >&2
   return 1
+}
+
+# ---------------------------------------------------------------------------
+# hApp coordinator bundle freshness: WASM -> DNA -> HAPP, cascaded.
+#
+# The prior repack guard here compared only *.dna mtime against elohim.happ —
+# a rebuilt zome wasm with no repacked .dna could never make the bundle look
+# stale. A `MESH_RESET=1 just mesh start` with no MESH_HAPP_PATH installed a
+# content_store coordinator ~2.5h older than the canonical-election-ordering
+# cure it needed, silently, for a week: lamad.dna (02:49) stayed "newer" than
+# elohim.happ (02:51) while content_store.wasm moved on to 09-19 22:08. See
+# genesis/a2o/reports/recovery/serving-edge-20260920/FINDING-election-ordering-503.md.
+# The old guard also only scanned HAPP_WORKDIR for `*.dna`, which never held
+# node-registry.dna (packed to elohim/holochain/dna/node-registry/node-registry.dna,
+# referenced by happ.yaml via a `../../` relative path) — a stale
+# node-registry coordinator could never trigger a happ repack either.
+#
+# One row per DNA elohim.happ packs (elohim/holochain/dna/elohim/workdir/happ.yaml
+# roles; each DNA's own dna.yaml names its integrity+coordinator zomes):
+#   name | zomes source dir (freshness reference) | built wasm basenames |
+#   DNA source dir (where `hc dna pack .` runs, per that DNA's justfile's
+#   `pack` recipe) | the packed .dna file's path (repo-root-relative).
+# Every DNA crate's target/ is a symlink to the one shared
+# elohim/holochain/target (verified via `readlink elohim/holochain/dna/*/target`),
+# so one canonical wasm-output dir serves every row.
+HAPP_WASM_RELEASE_DIR="$REPO_ROOT/elohim/holochain/target/wasm32-unknown-unknown/release"
+HAPP_DNA_TABLE=(
+  "lamad|elohim/holochain/dna/elohim/zomes|content_store_integrity.wasm content_store.wasm|elohim/holochain/dna/elohim|elohim/holochain/dna/elohim/workdir/lamad.dna"
+  "imagodei|elohim/holochain/dna/imagodei/zomes|imagodei_integrity.wasm imagodei.wasm|elohim/holochain/dna/imagodei|elohim/holochain/dna/elohim/workdir/imagodei.dna"
+  "infrastructure|elohim/holochain/dna/infrastructure/zomes|infrastructure_integrity.wasm infrastructure.wasm|elohim/holochain/dna/infrastructure|elohim/holochain/dna/elohim/workdir/infrastructure.dna"
+  "mishpat|elohim/holochain/dna/mishpat/zomes|mishpat_integrity.wasm mishpat.wasm|elohim/holochain/dna/mishpat|elohim/holochain/dna/elohim/workdir/mishpat.dna"
+  "node_registry|elohim/holochain/dna/node-registry/zomes|node_registry_integrity.wasm node_registry_coordinator.wasm|elohim/holochain/dna/node-registry|elohim/holochain/dna/node-registry/node-registry.dna"
+)
+
+# newest mtime among tracked files under <reldir> that are byte-identical to HEAD (same
+# rule as assert_binary_newer_than_source above: untracked/ignored files never count, and
+# an uncommitted edit — WIP, a cargo fmt touch — must not manufacture a false staleness).
+# Empty stdout when nothing qualifies.
+_happ_newest_tracked_mtime() { # <reldir>
+  comm -23 <(git -C "$REPO_ROOT" ls-files -- "$1" 2>/dev/null | sort) \
+           <(git -C "$REPO_ROOT" diff --name-only HEAD -- "$1" 2>/dev/null | sort) \
+    | (cd "$REPO_ROOT" && xargs -r stat -c %Y 2>/dev/null) | sort -n | tail -1
+}
+
+# max mtime among the given files that exist. Empty stdout when none exist.
+_happ_max_mtime() { # <path...>
+  local p m best=""
+  for p in "$@"; do
+    [ -f "$p" ] || continue
+    m="$(stat -c %Y "$p")"
+    [ -z "$best" ] && best="$m"
+    [ "$m" -gt "$best" ] && best="$m"
+  done
+  [ -n "$best" ] && echo "$best"
+}
+
+_happ_fmt_ts() { date -u -d "@$1" +%Y-%m-%dT%H:%M:%SZ; } # <epoch>
+
+# mode="report" (preflight — pure inspection, never touches disk) or mode="apply"
+# (start_all — cascades a stale .dna/.happ repack; NEVER builds wasm, only packs).
+# Returns 0 when the default bundle is fine to install as-is, when
+# MESH_ALLOW_STALE_HAPP=1 overrides a wasm staleness on purpose, or when an explicit
+# MESH_HAPP_PATH is in play (never judged for staleness); 1 when a coordinator wasm is
+# stale against its own tracked source and nothing overrides it.
+happ_bundle_freshness() { # <mode>
+  local mode="$1" any_refused=0 row name zdir wasms dnadir dnafile
+
+  if [ "$HAPP_PATH_EXPLICIT" = "1" ]; then
+    local happ_mtime="" newest_wasm=""
+    [ -f "$HAPP_PATH" ] && happ_mtime="$(stat -c %Y "$HAPP_PATH")"
+    for row in "${HAPP_DNA_TABLE[@]}"; do
+      IFS='|' read -r name zdir wasms dnadir dnafile <<<"$row"
+      local w paths=()
+      for w in $wasms; do paths+=("$HAPP_WASM_RELEASE_DIR/$w"); done
+      local m; m="$(_happ_max_mtime "${paths[@]}")"
+      if [ -n "$m" ] && { [ -z "$newest_wasm" ] || [ "$m" -gt "$newest_wasm" ]; }; then newest_wasm="$m"; fi
+    done
+    echo "hApp bundle: $HAPP_PATH (explicit MESH_HAPP_PATH — never repacked or refused)$([ -n "$happ_mtime" ] && printf ', built %s' "$(_happ_fmt_ts "$happ_mtime")")"
+    if [ -n "$happ_mtime" ] && [ -n "$newest_wasm" ] && [ "$happ_mtime" -lt "$newest_wasm" ]; then
+      echo "WARN hApp bundle $HAPP_PATH (built $(_happ_fmt_ts "$happ_mtime")) is older than the default workdir's newest built coordinator wasm ($(_happ_fmt_ts "$newest_wasm")) — an explicit MESH_HAPP_PATH is an operator's deliberate choice and is never repacked or refused; this is a heads-up in case it is stale by accident"
+    fi
+    return 0
+  fi
+
+  local any_dna_would_repack=0
+  for row in "${HAPP_DNA_TABLE[@]}"; do
+    IFS='|' read -r name zdir wasms dnadir dnafile <<<"$row"
+    local src_ts; src_ts="$(_happ_newest_tracked_mtime "$zdir")"
+    local w paths=()
+    for w in $wasms; do paths+=("$HAPP_WASM_RELEASE_DIR/$w"); done
+
+    # (a) wasm vs source — mirrors assert_binary_newer_than_source's shape,
+    # messages and override style, one level down the pipeline (coordinator
+    # wasm rather than the storage/doorway --bin artifact).
+    local stale_w="" stale_ts=""
+    if [ -n "$src_ts" ]; then
+      for w in "${paths[@]}"; do
+        [ -f "$w" ] || continue
+        local wts; wts="$(stat -c %Y "$w")"
+        if [ "$wts" -lt "$src_ts" ] && { [ -z "$stale_ts" ] || [ "$wts" -lt "$stale_ts" ]; }; then
+          stale_w="$(basename "$w")"; stale_ts="$wts"
+        fi
+      done
+    fi
+    if [ -n "$stale_w" ]; then
+      local head_h; head_h="$(git -C "$REPO_ROOT" log -1 --format=%h -- "$REPO_ROOT/$zdir" 2>/dev/null)"
+      local detail="$name coordinator wasm ($stale_w) is STALE: built $(_happ_fmt_ts "$stale_ts"), newest tracked source under $zdir was modified $(_happ_fmt_ts "$src_ts") (HEAD ${head_h:-?})"
+      if [ "${MESH_ALLOW_STALE_HAPP:-0}" = "1" ]; then
+        echo "WARN hApp bundle: $detail — MESH_ALLOW_STALE_HAPP=1, proceeding with the stale coordinator on purpose"
+      else
+        echo "REFUSED hApp bundle: $detail — rebuild it (\`cd $dnadir && just build\`) or set MESH_ALLOW_STALE_HAPP=1 to measure the older coordinator on purpose"
+        any_refused=1
+      fi
+    else
+      echo "ok $name coordinator wasm is not older than $zdir"
+    fi
+
+    # (b) dna vs wasm — cascades independently of (a): a repack from a
+    # deliberately-stale wasm (MESH_ALLOW_STALE_HAPP=1) is still the correct
+    # pack of what is actually on disk.
+    local wasm_newest; wasm_newest="$(_happ_max_mtime "${paths[@]}")"
+    local dna_path="$REPO_ROOT/$dnafile" dna_ts=""
+    [ -f "$dna_path" ] && dna_ts="$(stat -c %Y "$dna_path")"
+    if [ -n "$wasm_newest" ] && { [ -z "$dna_ts" ] || [ "$wasm_newest" -gt "$dna_ts" ]; }; then
+      any_dna_would_repack=1
+      if [ "$mode" = apply ]; then
+        echo "repacking $dnafile (coordinator wasm newer than the packed .dna)"
+        (cd "$REPO_ROOT/$dnadir" && hc dna pack . -o "$dna_path") || return 1
+      else
+        echo "would repack: $dnafile (coordinator wasm newer than the packed .dna)"
+      fi
+    fi
+  done
+
+  # (c) happ vs every .dna it packs — every row, not just HAPP_WORKDIR (the
+  # node-registry.dna blind spot named above).
+  local happ_stale=0 dna_path
+  for row in "${HAPP_DNA_TABLE[@]}"; do
+    IFS='|' read -r name zdir wasms dnadir dnafile <<<"$row"
+    dna_path="$REPO_ROOT/$dnafile"
+    [ -f "$dna_path" ] || continue
+    local dna_ts; dna_ts="$(stat -c %Y "$dna_path")"
+    local happ_ts=""
+    [ -f "$HAPP_PATH" ] && happ_ts="$(stat -c %Y "$HAPP_PATH")"
+    if [ -z "$happ_ts" ] || [ "$dna_ts" -gt "$happ_ts" ]; then happ_stale=1; fi
+  done
+  # A dna that WOULD repack (report mode) or WAS repacked (apply mode — disk
+  # already reflects it by the time this loop stat()s) always outruns the
+  # happ's current mtime; don't leave report mode one cascade step behind
+  # just because the speculative repack has not actually happened.
+  [ "$any_dna_would_repack" = "1" ] && happ_stale=1
+  if [ "$happ_stale" = "1" ]; then
+    if [ "$mode" = apply ]; then
+      echo "repacking elohim.happ (a packed DNA is newer than the bundle)"
+      (cd "$HAPP_WORKDIR" && hc app pack . -o elohim.happ) || return 1
+    else
+      echo "would repack: elohim.happ (a packed DNA is newer than the bundle)"
+    fi
+  fi
+
+  # SAY WHICH BUNDLE — one line naming the path, its mtime, and whether this run
+  # repacked it (2026-09-20 incident: nothing on screen said a 09-14 bundle was
+  # going in).
+  local happ_mtime=""
+  [ -f "$HAPP_PATH" ] && happ_mtime="$(stat -c %Y "$HAPP_PATH")"
+  local repacked_note=""
+  [ "$mode" = apply ] && [ "$happ_stale" = "1" ] && repacked_note=" (repacked this run)"
+  echo "hApp bundle: $HAPP_PATH$([ -n "$happ_mtime" ] && printf ', built %s' "$(_happ_fmt_ts "$happ_mtime")")${repacked_note}"
+
+  [ "$any_refused" = "0" ]
 }
 
 assert_storage_transport_capability() { # <binary> <mode>
@@ -3930,7 +4104,13 @@ preflight() {
     rm -f "$tmp"
   fi
 
-  # 5c. relay-addr-beacon binary, only when this shape stages the household's
+  # 5c. hApp coordinator bundle freshness — same class of check as 5b, one
+  #     layer down (the packed Holochain bundle rather than a --bin
+  #     artifact): WASM -> DNA -> HAPP cascade, see happ_bundle_freshness.
+  #     Pure inspection here (mode=report) — never repacks; `start` does that.
+  happ_bundle_freshness report || fail=1
+
+  # 5d. relay-addr-beacon binary, only when this shape stages the household's
   #     public-name membership authority. A missing binary is REFUSED, not
   #     warned: without it the apex-transition feature has no routing apparatus
   #     to exercise and the lane reads as a doorway defect instead of an
@@ -4224,12 +4404,14 @@ EOF
     assert_storage_transport_capability "$STORAGE_BIN" "$(peer_transport "$name")" || exit 1
   done
 
-  # Repack the happ when any DNA is newer than the bundle (stale-bundle trap:
-  # elohim.happ predated lamad.dna by 3 months on 2026-08-16).
-  if [ ! -f "$HAPP_PATH" ] || [ -n "$(find "$HAPP_WORKDIR" -name '*.dna' -newer "$HAPP_PATH" 2>/dev/null)" ]; then
-    echo "repacking elohim.happ (DNA newer than bundle)"
-    (cd "$HAPP_WORKDIR" && hc app pack . -o elohim.happ) || exit 1
-  fi
+  # hApp coordinator bundle freshness — WASM -> DNA -> HAPP cascade (see
+  # happ_bundle_freshness). Replaces a DNA-vs-HAPP-only guard that could
+  # never see a rebuilt zome wasm with no repacked .dna, nor
+  # node-registry.dna (the old `find "$HAPP_WORKDIR" -name '*.dna'` never
+  # scanned it — see genesis/a2o/reports/recovery/serving-edge-20260920/
+  # FINDING-election-ordering-503.md). apply mode also prints the bundle
+  # actually being installed, its mtime, and whether it was repacked this run.
+  happ_bundle_freshness apply || exit 1
 
   if [ "$MESH_DOORWAYS_EFFECTIVE" = "1" ]; then
   # 0. mongod — the doorways' projection archive. Must be listening BEFORE a
