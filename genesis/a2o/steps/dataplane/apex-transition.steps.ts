@@ -1506,6 +1506,111 @@ Given(
   }
 );
 
+/**
+ * THE STATION between "the author publishes" and the exact-match reading.
+ *
+ * The finish-line step below reads the surviving doorway ONCE, and nothing
+ * honest can satisfy that read at zero delay: the author's publication has to
+ * cross the network and be checked by the receiving doorway before its own
+ * answer can move. So the waiting belongs to its own station — this one — and
+ * the exact reading stays a single uninterrupted pass immediately after it.
+ *
+ * The bound is the Gherkin's, not the harness's: the step reads the number the
+ * story states. This ceiling only sizes the step's own budget, and refuses a
+ * story bound it could not honour — a 120s bound inside a 70s step would die as
+ * cucumber's opaque "function timed out", losing every diagnostic below.
+ */
+const SIBLING_ADOPTION_BOUND_CEILING_MS = 10_000;
+/** A one-second poll cannot resolve a ~1s adoption; this one can. */
+const SIBLING_ADOPTION_POLL_MS = 250;
+
+Then(
+  'within {int} seconds doorway {string} answers a visitor with the version the author has just published, and nobody restarted or re-staged that doorway to get there',
+  { timeout: SIBLING_ADOPTION_BOUND_CEILING_MS + 2 * RAW_FETCH_TIMEOUT_MS },
+  async function (this: E2EWorld, seconds: number, survivingDoorway: string): Promise<void> {
+    const state = getState(this);
+    const boundMs = seconds * 1000;
+    assert.ok(
+      boundMs <= SIBLING_ADOPTION_BOUND_CEILING_MS,
+      `the story states a ${seconds}s adoption bound, but this step's budget is sized for ` +
+        `${SIBLING_ADOPTION_BOUND_CEILING_MS / 1000}s — widen SIBLING_ADOPTION_BOUND_CEILING_MS ` +
+        'deliberately, together with the comment in the scenario that defends the bound'
+    );
+    assert.equal(survivingDoorway, APEX_DOORWAY_ID, 'the governed survivor must be elohim.host');
+    assert.ok(state.authorityA, 'authority A was not recorded before withdrawal');
+    assert.ok(
+      state.siblingOrigin && state.siblingOwner,
+      'the withdrawal named no surviving doorway'
+    );
+    // The author's own receipt, read before any serving-path observation — the
+    // same receipt the exact-match step below reads, so the station and the
+    // finish line can never disagree about which version is "the version".
+    const published = chaosAuthorReceipt(this);
+    assert.notEqual(
+      published.authority.actionHash,
+      state.authorityA.authority.actionHash,
+      'the author published nothing new: the governed action still names the version recorded ' +
+        'before the withdrawal, so there is no adoption to measure'
+    );
+    const publishedAt = Date.parse(published.authoredAt);
+    const deadlineAt = publishedAt + boundMs;
+    // Nobody restarts or re-stages this doorway to make it answer: the process
+    // that served before the publication is the one that answers after it, and
+    // no step hands it the new bytes. A recycled PID or a swapped executable
+    // would be a different doorway wearing the same name.
+    const incarnationBefore = await ownedDoorwayProcess(state.siblingOwner);
+    const convergence = await waitForStrictAuthorityConvergence(
+      [state.siblingOrigin],
+      deadlineAt,
+      async (origin, remainingMs) =>
+        await lightweightAuthorityMismatch(origin, published.authority, remainingMs),
+      { intervalMs: SIBLING_ADOPTION_POLL_MS }
+    );
+    const elapsedMs = Date.now() - publishedAt;
+    const observed = Object.keys(convergence.lastMismatches).length
+      ? JSON.stringify(convergence.lastMismatches)
+      : 'nothing — the bound elapsed before one complete reading';
+    // The measurement, not a pass/fail echo: how long a visitor's doorway took
+    // to answer with a version published elsewhere. Carried-record adoption is
+    // judged by this number (genesis/data/timeline/backlog/
+    // head-authority-carried-with-content-sync-unit.md).
+    this.attach(
+      JSON.stringify({
+        schema: 'doorway-sibling-adoption-measure/v1',
+        concern: 'doorway-failover',
+        doorway: survivingDoorway,
+        owner: state.siblingOwner,
+        origin: state.siblingOrigin,
+        publicName: state.authority.publicName,
+        probe: "the surviving doorway's own governed head, blob and addressed version",
+        publishedAt: published.authoredAt,
+        expectedGovernedAction: published.authority.actionHash,
+        previousGovernedAction: state.authorityA.authority.actionHash,
+        boundMs,
+        pollIntervalMs: SIBLING_ADOPTION_POLL_MS,
+        adopted: convergence.converged,
+        timeToAdoptMs: convergence.converged ? elapsedMs : null,
+        elapsedMs,
+        lastMismatches: convergence.lastMismatches,
+      }),
+      'application/json'
+    );
+    assert.ok(
+      convergence.converged,
+      `doorway "${survivingDoorway}" (owner "${state.siblingOwner}" at ${state.siblingOrigin}) did ` +
+        `not answer with the author's published version within ${seconds}s: expected governed ` +
+        `action ${published.authority.actionHash}, observed ${observed}, ${elapsedMs}ms after the ` +
+        `author published (bound ${boundMs}ms)`
+    );
+    assert.deepEqual(
+      await ownedDoorwayProcess(state.siblingOwner),
+      incarnationBefore,
+      `doorway "${survivingDoorway}" did not carry the new version across in the process that was ` +
+        'already serving: its PID, start ticks or executable changed while it adopted'
+    );
+  }
+);
+
 Then(
   "doorway {string} serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap",
   { timeout: EXACT_AUTHORITY_TIMEOUT_MS + 10_000 },

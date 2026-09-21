@@ -83,6 +83,51 @@ decision needs no re-probe ladder because the head arrived pre-verified with the
 adoption latency collapses to sync latency (no 1/2/4/8/15/30s stepping), measured against the
 47.7s/58.8s baseline above. State: **not built** — item 1 above is exactly this node.
 
+## 2026-09-21 — item 1 attempted and held back; the scenario gained the station it was missing
+
+Story 1.4b — open item 1 above, carried-record adoption — was attempted as `c0393c448` ("the head
+arrives with the content — the signed head record rides in the doc") and **reverted off `dev` as
+`c3b2583e8`** after an independent second-model review found it unsafe to ship: the receiver declared
+on receipt; a replay could roll a head backwards; and adoption could land before the blob bytes,
+taking a working page down. It is preserved for redesign on branch `hold/1.4b-carried-head-record`;
+the review is at `genesis/a2o/reports/recovery/serving-edge-20260920/codex-review-1.4b.result.md`.
+
+The redesign has to hold four shapes the attempt did not: verification on receipt is **read-only**;
+the original election's ordering is **preserved, never re-minted** by the receiver; the work is
+**bounded and memoised**; and the **previous verified version keeps being served until the new bytes
+are local**.
+
+So item 1 stays OPEN, and the household still adopts the slow way: 47–59 s on a loaded household
+(measured 2026-09-18 and 2026-09-20), sometimes never.
+
+The scenario that pins this destination was missing a node regardless, and the finish-line step was
+silently absorbing it:
+
+```
+chain: doorway-apex-transition / "A current governed version crosses withdrawal and recovery"
+between: A "the canonical source author publishes authority B through its storage peer"
+      -> C "doorway elohim.host serves authority B's exact head, blob, addressed version,
+            HTML entry, and browser bootstrap"
+missing node B: the surviving doorway has RECEIVED AND ADOPTED the author's publication —
+  assertion: within a small stated bound, doorway "elohim.host" answers a visitor with the
+  version the author just published, in the process that was already serving;
+  probe: a bounded poll of that doorway's own governed head/blob/addressed version against the
+  author's receipt, attaching the observed time-to-adopt
+  (`doorway-sibling-adoption-measure/v1`, `apex-transition.steps.ts`)
+current state: MINTED 2026-09-21 as one station step before C, bound 10 s — a visitor's tolerance
+  for waiting on a page, NOT a floor any shipped path meets today. RED, on purpose: the household
+  takes 47–59 s, so the scenario now stops at the station with a measured wait instead of at C with
+  an opaque "governed action diverged". C is byte-for-byte unchanged and still reads exactly once,
+  immediately after the station: the waiting is the station's, the exactness is C's.
+```
+
+**Owed: the first household reading of this scenario with the station in place.** Until `just test
+mesh` runs it, the expected red is reasoned, not measured, and the attached `timeToAdoptMs` is the
+number the redesigned cure will be judged by. The attachment's mismatch trail names which conjunct
+was late (governed action, blob, or addressed version), so a reading that is dominated by blob
+propagation rather than head adoption says so instead of being read as adoption latency. Revise the
+bound only from that evidence — never to make today's behaviour pass.
+
 ## Current decision
 
 **Captured, not started** beyond the shipped conservative slice. Owner: next dataplane/head-

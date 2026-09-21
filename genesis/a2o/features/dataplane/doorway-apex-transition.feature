@@ -84,6 +84,18 @@ Feature: A visitor's public name continues to reach the site through a doorway's
   The fifth proves it at the level a person actually experiences: a visitor
   walking the real app's pages, before, during and after the fault.
 
+  A doorway that was never told about a new version still finds it in the end:
+  it goes looking for it on its own, and that search costs tens of seconds —
+  47 to 59 of them on a loaded household, and sometimes it does not finish. A
+  visitor has no tens of seconds to give. Ten is about as long as a person waits
+  on a page before deciding the site is broken, so ten seconds is what the
+  fourth scenario allows the surviving doorway: the visitor's tolerance, not the
+  machinery's convenience. That bound is not met today, and the scenario is
+  expected to stop there — which is the point of making it a step of its own. A
+  run that fails on it has measured how long the survivor actually took to offer
+  the new version, instead of merely reporting that the two doorways disagreed
+  about which version is current.
+
   Every scenario is tagged with the capability it depends on: a substrate
   this run owns. On a run that owns none — a deployed fleet nobody here may
   fault on purpose — they are HELD (skipped), never failed, because a
@@ -134,6 +146,15 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     # A static shell cannot pass: action A must move to an authored B, B's exact
     # blob and addressed version must arrive through the survivor, and the
     # recovered doorway must then answer the same B tuple.
+    #
+    # The ten-second bound and the wait it replaces are explained in the
+    # preamble above; the household's own figures were measured 2026-09-18 and
+    # 2026-09-20. The ten seconds is the whole of a visitor's wait: the author
+    # publishes on one machine, and the doorway a visitor actually reaches has to
+    # receive that publication, satisfy itself that it is genuine, and start
+    # offering it. All of the waiting belongs to that one step, so that the exact
+    # reading of every part of the version — the step after it — stays a single
+    # uninterrupted pass and never absorbs a wait it cannot measure.
     Given a coherent EPR app bundle this run just built
     And an EPR record this run owns for it
     When each doorway is handed the bundle's bytes
@@ -146,6 +167,7 @@ Feature: A visitor's public name continues to reach the site through a doorway's
     Then only doorway "alpha-A"'s owner records leave shared membership while doorway "elohim.host" survives
     When this run builds a next coherent browser version
     And the canonical source author publishes authority B through its storage peer
+    Then within 10 seconds doorway "elohim.host" answers a visitor with the version the author has just published, and nobody restarted or re-staged that doorway to get there
     Then doorway "elohim.host" serves authority B's exact head, blob, addressed version, HTML entry, and browser bootstrap
     When doorway "alpha-A" reports serving for two consecutive probes
     Then doorway "alpha-A"'s owner records rejoin shared membership without duplicating doorway "elohim.host"
