@@ -1,25 +1,38 @@
 #!/bin/bash
-# stage-spa-blob.test.sh — regression coverage for the head-PATCH ladder's
-# classification of a CellDisabled answer (2026-09-21).
+# stage-spa-blob.test.sh — regression coverage for the NOT-READY class (three
+# faces), the ONE run-level readiness deadline, and the fail-closed blob-forward
+# evidence rule (2026-09-21).
 #
 # run: bash scripts/ci/stage-spa-blob.test.sh
 #
-# Fake `curl`, `node` and `sleep` on PATH stand in for the doorway, the SDK
-# packaging step, and the clock, so no network, no dist, and no deployed host
-# are required. The fake `sleep` RECORDS each call and then performs it for
-# real: budgets here are 1-3s, so the file sleeps only a few seconds total, and
-# every timing assertion reads the recorded calls rather than wall-clock
-# (a loaded runner must not be able to flake this file).
+# DETERMINISM. Fake `curl`, `node`, `date` and `sleep` on PATH stand in for the
+# doorway, the SDK packaging step and the clock. The clock is a FILE: fake `date`
+# reads it, fake `sleep` records its argument and ADVANCES it without sleeping,
+# and fake `curl` may advance it per call (FAKE_CURL_SECS). Nothing in this file
+# reads wall-clock time, so a loaded runner cannot flake it and the whole suite
+# runs in well under a second.
 #
-# KIND=server is used throughout so the deliverability gate (browser-only) is
+# The JSON classifier deliberately runs against a REAL node (STAGE_JSON_NODE),
+# because the parsing is the thing under test; only the packaging `node` is fake.
+#
+# KIND=server is used for most cases so the deliverability gate (browser-only) is
 # skipped — the leg under test is the serverBlobHash PATCH, which takes the
-# identical ladder.
+# identical ladder. Case (j) runs one browser leg against a gate shim to prove
+# the gate is still invoked exactly as it was.
 set -uo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
 # STAGE_SPA_BLOB_SCRIPT lets a red-first run point the same cases at a
 # pre-fix copy of the script; unset, the checked-in one is under test.
 script="${STAGE_SPA_BLOB_SCRIPT:-${here}/stage-spa-blob.sh}"
+
+# The REAL node, resolved BEFORE the fake one is put on PATH.
+REAL_NODE="$(command -v node 2>/dev/null)"
+if [ -z "${REAL_NODE}" ]; then
+  echo "FATAL: no node on PATH — the JSON classifier under test needs a real one" >&2
+  exit 1
+fi
+export STAGE_JSON_NODE="${REAL_NODE}"
 
 # Fixture setup is fail-closed: an empty or non-directory root would make the
 # fixture destinations /bin/curl, /bin/node and /app, which a privileged runner
@@ -32,13 +45,19 @@ fi
 case "${root}" in
   /|/bin|/usr|/etc|/sbin) echo "FATAL: refusing to use '${root}' as a fixture root" >&2; exit 1 ;;
 esac
-trap 'rm -rf "${root}"' EXIT
+# STAGE_TEST_KEEP=1 leaves the fixture root (and every case's log) behind.
+if [ -z "${STAGE_TEST_KEEP:-}" ]; then
+  trap 'rm -rf "${root}"' EXIT
+else
+  echo "fixture root: ${root}"
+fi
 
 bin="${root}/bin"
 dist="${root}/app/pkg/dist/server"
-mkdir -p "${bin}" "${dist}" || { echo "FATAL: could not create fixture dirs under ${root}" >&2; exit 1; }
-# Every fixture path must resolve INSIDE the root before anything is written.
-for p in "${bin}/curl" "${bin}/node" "${bin}/sleep"; do
+dist_browser="${root}/app/pkg/dist/browser"
+mkdir -p "${bin}" "${dist}" "${dist_browser}" \
+  || { echo "FATAL: could not create fixture dirs under ${root}" >&2; exit 1; }
+for p in "${bin}/curl" "${bin}/node" "${bin}/sleep" "${bin}/date"; do
   case "${p}" in
     "${root}"/*) : ;;
     *) echo "FATAL: fixture path '${p}' escapes the test root '${root}'" >&2; exit 1 ;;
@@ -46,115 +65,153 @@ for p in "${bin}/curl" "${bin}/node" "${bin}/sleep"; do
 done
 
 # --- fake curl -------------------------------------------------------------
-# Answers the calls this script makes: the blob PUT, the head PATCH, the
-# read-back GET, the advisory head GET, and the canonical-head POST. The PATCH
-# answer is driven by FAKE_PATCH_MODE + FAKE_CELL_TIMES and counted in
-# FAKE_STATE. FAKE_PATCH_DELAY makes an attempt take real time (the transport
-# budget must not be charged for a readiness attempt, however slow it is); it
-# calls the REAL sleep so it never pollutes the recorded retry cadence.
+# Every leg is driven by a SCRIPTED SEQUENCE: FAKE_PUT_SEQ, FAKE_PROBE_SEQ,
+# FAKE_PATCH_SEQ, FAKE_DECLARE_SEQ — newline-separated records of
+#     status|body|curl-exit|Retry-After-header
+# consumed one per call, the LAST record repeating forever. An empty status means
+# "this curl did not honour -w", so nothing is written to stdout for it. The fake
+# honours `-o <file>` (and `-o -`), because the script under test now depends on
+# it: response bodies must reach the classifier as their ORIGINAL BYTES.
+#
+# Body tokens, all of which need bytes a shell variable cannot carry:
+#   @@BIG@@      >1 MiB catching-up envelope (over the limit in BOTH chars and bytes)
+#   @@UTF8BIG@@  600k `é` = 1,200,041 BYTES in 600k CHARACTERS, plus a true forward
+#   @@NUL@@      `{"forwarded_to_storage":tr<NUL>ue}` — invalid JSON on the wire
+#   @@BADUTF8@@  a valid-looking object carrying bytes that are not UTF-8
 cat > "${bin}/curl" <<'FAKE'
 #!/bin/bash
 method=GET
 url=""
 headers_out=""
+out=""
+wfmt=""
 data=""
+databin="unset"
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -X) method="$2"; shift 2 ;;
     -D) headers_out="$2"; shift 2 ;;
     -d) data="$2"; shift 2 ;;
-    -H|-w|-o|--data-binary|--max-time) shift 2 ;;
+    -o) out="$2"; shift 2 ;;
+    -w) wfmt="$2"; shift 2 ;;
+    --data-binary) databin="$2"; shift 2 ;;
+    -H|--max-time) shift 2 ;;
     -*) shift ;;
     *) url="$1"; shift ;;
   esac
 done
 
-real_sleep() { [ -x /bin/sleep ] && /bin/sleep "$1" || /usr/bin/sleep "$1"; }
+# The ONLY wall-clock delay in this harness, used by the one real-time case (x):
+# a signal cannot be delivered on a fake clock.
+[ -n "${FAKE_CURL_REAL_SLEEP:-}" ] && /bin/sleep "${FAKE_CURL_REAL_SLEEP}"
+
+clock_now() { local n=0; [ -f "${FAKE_CLOCK}" ] && n="$(cat "${FAKE_CLOCK}")"; printf '%s' "${n}"; }
+advance() {
+  local by="${FAKE_CURL_SECS:-0}"
+  [ "${by}" -gt 0 ] 2>/dev/null || return 0
+  printf '%s' "$(( $(clock_now) + by ))" > "${FAKE_CLOCK}"
+}
+bump() {
+  local f="${FAKE_STATE}/$1" n=1
+  [ -f "${f}" ] && n=$(( $(cat "${f}") + 1 ))
+  printf '%s' "${n}" > "${f}"
+  printf '%s' "${n}"
+}
+pick() {
+  local seq="$1" want="$2" n=0 line last=""
+  while IFS= read -r line; do
+    [ -n "${line}" ] || continue
+    n=$(( n + 1 ))
+    last="${line}"
+    if [ "${n}" -eq "${want}" ]; then printf '%s' "${line}"; return 0; fi
+  done <<< "${seq}"
+  printf '%s' "${last}"
+}
+emit() {
+  local rec="$1" st body rc ra tmp
+  IFS='|' read -r st body rc ra <<< "${rec}"
+  tmp="$(mktemp)"
+  case "${body}" in
+    @@BIG@@)
+      { printf '{"status":"catching-up","pad":"'
+        head -c 1100000 /dev/zero | tr '\0' 'x'
+        printf '"}'; } > "${tmp}" ;;
+    @@UTF8BIG@@)
+      { printf '{"forwarded_to_storage":true,"pad":"'
+        yes 'é' | head -n 600000 | tr -d '\n'
+        printf '"}'; } > "${tmp}" ;;
+    @@LONGCELL@@)
+      { printf '{"error":"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(uhC0kFAKE))"}'
+        printf '\n'
+        head -c 300000 /dev/zero | tr '\0' 'z'; } > "${tmp}" ;;
+    @@NUL@@)
+      { printf '{"forwarded_to_storage":tr'; printf '\000'; printf 'ue}'; } > "${tmp}" ;;
+    @@BADUTF8@@)
+      { printf '{"forwarded_to_storage":true,"x":"'; printf '\377\376'; printf '"}'; } > "${tmp}" ;;
+    *)
+      printf '%s' "${body}" > "${tmp}" ;;
+  esac
+  if [ -n "${ra}" ] && [ -n "${headers_out}" ]; then
+    printf 'HTTP/1.1 %s\r\nRetry-After: %s\r\n\r\n' "${st:-503}" "${ra}" > "${headers_out}"
+  fi
+  if [ -n "${out}" ] && [ "${out}" != "-" ]; then cat "${tmp}" > "${out}"; else cat "${tmp}"; fi
+  rm -f "${tmp}"
+  # An empty scripted status models a curl that did not honour -w.
+  if [ -n "${wfmt}" ] && [ -n "${st}" ]; then
+    printf '%b' "$(printf '%s' "${wfmt}" | sed "s/%{http_code}/${st}/")"
+  fi
+  exit "${rc:-0}"
+}
+
+advance
+
+# Defaults live in variables, never inline in ${VAR:-...}: a `}` inside the
+# default text would close the expansion and silently truncate the body.
+DEF_PUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":true,"size":13}|0|'
+DEF_PROBE='200|{"success":true,"hash":"x","already_cached":true,"forwarded_to_storage":true,"size":13}|0|'
+DEF_PATCH='200|{"dhtAnchorHash":"uhCkkFAKEANCHOR"}|0|'
+DEF_DECLARE='200|{"ok":true}|0|'
 
 case "${url}" in
   */admin/seed/blob)
-    printf '{"ok":true,"forwarded_to_storage":true}'
-    exit 0
+    if [ -z "${databin}" ]; then
+      printf 'EMPTY-BODY-PUT\n' >> "${FAKE_STATE}/probes"
+      emit "$(pick "${FAKE_PROBE_SEQ:-$DEF_PROBE}" "$(bump probe_calls)")"
+    fi
+    printf '%s\n' "$(clock_now)" >> "${FAKE_STATE}/put_times"
+    emit "$(pick "${FAKE_PUT_SEQ:-$DEF_PUT}" "$(bump put_calls)")"
     ;;
   */head-record)
     exit 22
     ;;
   */head)
-    # Advisory canonical-head leg: unless a case asks for a resolvable head,
-    # answer "no route" so the stage logs a warning and returns, keeping the
-    # test to the leg under test.
     [ "${FAKE_HEAD_MODE:-missing}" = "resolvable" ] || exit 22
     printf '{"headActionHash":"uhCkkFAKEHEAD"}'
     exit 0
     ;;
   */canonical-head)
-    if [ "${FAKE_DECLARE_MODE:-ok}" = "cell-forever" ]; then
-      printf '{"error":"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(uhC0kFAKE))"}\n503'
-    else
-      printf '{"ok":true}\n200'
-    fi
-    exit 0
+    emit "$(pick "${FAKE_DECLARE_SEQ:-$DEF_DECLARE}" "$(bump declare_calls)")"
     ;;
 esac
 
 if [ "${method}" = "PATCH" ]; then
-  count=1
-  if [ -f "${FAKE_STATE}/patches" ]; then
-    count=$(( $(cat "${FAKE_STATE}/patches") + 1 ))
-  fi
-  printf '%s' "${count}" > "${FAKE_STATE}/patches"
+  printf '%s\n' "$(clock_now)" >> "${FAKE_STATE}/patch_times"
   printf '%s' "${data}" | sed -n 's/.*:"\([^"]*\)".*/\1/p' > "${FAKE_STATE}/hash"
-
-  disabled='{"error":"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(uhC0kFAKE))"}'
-  shed_body='{"status":"catching-up","retryAfter":1}'
-  shed_headers='HTTP/1.1 503\r\nRetry-After: 1\r\n\r\n'
-  case "${FAKE_PATCH_MODE}" in
-    cell-then-ok)
-      if [ "${count}" -le "${FAKE_CELL_TIMES}" ]; then
-        [ -n "${FAKE_PATCH_DELAY:-}" ] && real_sleep "${FAKE_PATCH_DELAY}"
-        printf '%s\n503' "${disabled}"
-      else
-        printf '{"dhtAnchorHash":"uhCkkFAKEANCHOR"}\n200'
-      fi
-      ;;
-    cell-then-shed-then-ok)
-      # The reviewer's mixed case: slow readiness answers, then ONE ordinary
-      # shed (which DOES spend the transport budget), then success.
-      if [ "${count}" -le "${FAKE_CELL_TIMES}" ]; then
-        [ -n "${FAKE_PATCH_DELAY:-}" ] && real_sleep "${FAKE_PATCH_DELAY}"
-        printf '%s\n503' "${disabled}"
-      elif [ "${count}" -eq $(( FAKE_CELL_TIMES + 1 )) ]; then
-        [ -n "${headers_out}" ] && printf "${shed_headers}" > "${headers_out}"
-        printf '%s\n503' "${shed_body}"
-      else
-        printf '{"dhtAnchorHash":"uhCkkFAKEANCHOR"}\n200'
-      fi
-      ;;
-    cell-forever)
-      printf '%s\n503' "${disabled}"
-      ;;
-    shed)
-      [ -n "${headers_out}" ] && printf "${shed_headers}" > "${headers_out}"
-      printf '%s\n503' "${shed_body}"
-      ;;
-    structural)
-      printf '{"error":"content row conflict"}\n409'
-      ;;
-  esac
-  exit 0
+  emit "$(pick "${FAKE_PATCH_SEQ:-$DEF_PATCH}" "$(bump patch_calls)")"
 fi
 
 # Read-back of the row the PATCH just wrote.
 case "${url}" in
   */db/content/*)
-    printf '{"serverBlobHash":"%s"}' "$(cat "${FAKE_STATE}/hash" 2>/dev/null)"
+    printf '{"serverBlobHash":"%s","blobHash":"%s"}' \
+      "$(cat "${FAKE_STATE}/hash" 2>/dev/null)" "$(cat "${FAKE_STATE}/hash" 2>/dev/null)"
     exit 0
     ;;
 esac
 exit 22
 FAKE
 
-# --- fake node (SDK packaging) --------------------------------------------
+# --- fake node (SDK packaging only) ----------------------------------------
 cat > "${bin}/node" <<'FAKE'
 #!/bin/bash
 out=""
@@ -171,22 +228,40 @@ printf 'fake-package' > "${out}/${kind}.zip"
 exit 0
 FAKE
 
-# --- fake sleep (records, then really sleeps) ------------------------------
-# Recording is what the timing assertions read. The sleep still happens, so the
-# script's own wall-clock budgets behave exactly as in production.
-cat > "${bin}/sleep" <<'FAKE'
+# --- fake date (reads the clock file) --------------------------------------
+cat > "${bin}/date" <<'FAKE'
 #!/bin/bash
-printf '%s\n' "${1:-0}" >> "${FAKE_STATE}/sleeps" 2>/dev/null
-[ -x /bin/sleep ] && exec /bin/sleep "$@"
-exec /usr/bin/sleep "$@"
+now=0
+[ -f "${FAKE_CLOCK}" ] && now="$(cat "${FAKE_CLOCK}")"
+want=""
+prev=""
+for a in "$@"; do
+  [ "${prev}" = "-d" ] && want="${a}"
+  prev="${a}"
+done
+if [ -n "${want}" ]; then printf 'T+%s\n' "${want#@}"; exit 0; fi
+printf '%s\n' "${now}"
 FAKE
 
-chmod +x "${bin}/curl" "${bin}/node" "${bin}/sleep" \
+# --- fake sleep (records, then ADVANCES the clock; never really sleeps) -----
+cat > "${bin}/sleep" <<'FAKE'
+#!/bin/bash
+n="${1:-0}"
+printf '%s\n' "${n}" >> "${FAKE_STATE}/sleeps" 2>/dev/null
+now=0
+[ -f "${FAKE_CLOCK}" ] && now="$(cat "${FAKE_CLOCK}")"
+if [ "${n}" -ge 0 ] 2>/dev/null; then printf '%s' "$(( now + n ))" > "${FAKE_CLOCK}"; fi
+exit 0
+FAKE
+
+chmod +x "${bin}/curl" "${bin}/node" "${bin}/sleep" "${bin}/date" \
   || { echo "FATAL: could not make the fixtures executable" >&2; exit 1; }
 export PATH="${bin}:${PATH}"
 
 fail=0
+checks=0
 check() {
+  checks=$(( checks + 1 ))
   if eval "$2"; then
     echo "ok   $1"
   else
@@ -195,199 +270,663 @@ check() {
   fi
 }
 
-# Recorded-sleep helpers — every timing claim in this file reads these.
 naps() { cat "${1}/sleeps" 2>/dev/null; }
 no_naps() { [ ! -s "${1}/sleeps" ]; }
 nap_count() { naps "$1" | grep -c . ; }
 longest_nap() { naps "$1" | sort -n | tail -1; }
+call_count() { cat "${1}/$2" 2>/dev/null || printf '0'; }
+clock_base=1000000
 
-# Run one stage against a doorway URL. Echoes the exit status; the log lands in
-# $log. Every case is DO_PATCH=1 (the authoring leg) and KIND=server.
+# Start a fresh case: its own FAKE_STATE, its own clock, its own log.
+new_case() {
+  state="${root}/$1"; log="${root}/$1.log"
+  mkdir -p "${state}"
+  printf '%s' "${clock_base}" > "${state}/clock"
+}
+
+# Run one stage. Echoes the exit status; the log lands in $log.
 run_stage() {
-  local url="$1" log="$2"
+  local url="$1" kind="${2:-server}" d="${dist}"
   shift 2
+  [ "${kind}" = "browser" ] && d="${dist_browser}"
   FAKE_STATE="${state}" \
-  DO_PATCH=1 \
+  FAKE_CLOCK="${state}/clock" \
+  DO_PATCH="${DO_PATCH_OVERRIDE:-1}" \
   STORAGE_API_KEY_ADMIN=test-key \
   STAGE_CELL_READY_STATE_DIR="${cell_state}" \
-  STAGE_CELL_READY_POLL_SECS=1 \
-  env "$@" bash "${script}" "${dist}" "test-slug" "${url}" server > "${log}" 2>&1
+  STAGE_CELL_READY_POLL_SECS=10 \
+  STAGE_HARD_TIMEOUT_SECS="${STAGE_HARD_TIMEOUT_OVERRIDE:-0}" \
+  env "$@" bash "${stage_script:-${script}}" "${d}" "test-slug" "${url}" "${kind}" \
+    > "${log}" 2>&1
   printf '%s' "$?"
 }
 
-# --- (a) CellDisabled x3 then 200 -----------------------------------------
+OK_PUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":true,"size":13}|0|'
+OK_PATCH='200|{"dhtAnchorHash":"uhCkkFAKEANCHOR"}|0|'
+CELL_BODY='{"error":"Conductor returned an error while using a ConductorApi: CellDisabled(CellId(uhC0kFAKE))"}'
+SHED_CATCHUP='503|{"status":"catching-up","retryAfter":30,"cause":"upstream","circuit":"closed","errorStreak":1}|0|'
+FWD_TIMEOUT='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/sha256-abc): operation timed out"}|0|'
+
+# --- (a) catching-up x3 then 200 on the PATCH leg --------------------------
 # STAGE_BLOB_ATTEMPTS=1 and a 2s transport budget are the proof that the
-# readiness wait charges neither: three 1s polls would blow both if it did.
-state="${root}/a"; cell_state="${root}/a-cells"; mkdir -p "${state}"
-log="${root}/a.log"
-status="$(run_stage "http://doorway-a" "${log}" \
-  FAKE_PATCH_MODE=cell-then-ok FAKE_CELL_TIMES=3 \
-  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=2)"
-check "(a) CellDisabled x3 then 200 exits 0" "[ '${status}' = '0' ]"
-check "(a) prints the recovery line" "grep -q 'started running after' '${log}'"
+# readiness wait charges neither: three polls would blow both if it did.
+new_case a; cell_state="${root}/a-cells"
+status="$(run_stage "http://doorway-a" server \
+  FAKE_PATCH_SEQ="${SHED_CATCHUP}
+${SHED_CATCHUP}
+${SHED_CATCHUP}
+${OK_PATCH}" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=2)"
+check "(a) catching-up x3 then 200 exits 0" "[ '${status}' = '0' ]"
+check "(a) it is classified catching-up, not a transport shed" \
+  "grep -q 'face=catching-up' '${log}'"
 check "(a) the transport attempt counter is not consumed" "! grep -q 'stage failed after' '${log}'"
-check "(a) names the readiness window, not a permanent answer" \
-  "grep -q 'post-restart readiness window' '${log}'"
-check "(a) the waiting was the readiness cadence, three polls" \
-  "[ \"\$(nap_count '${state}')\" = '3' ]"
+check "(a) exactly three readiness naps" "[ \"\$(nap_count '${state}')\" = '3' ]"
+check "(a) four PATCHes: the three shed ones and the one that landed" \
+  "[ \"\$(call_count '${state}' patch_calls)\" = '4' ]"
 
-# --- (g) mixed: slow readiness answers, then an ordinary shed, then 200 ----
-# The reviewer's regression. Each CellDisabled attempt takes ~1s of real time;
-# only the SHED attempt and its advertised 1s wait may be charged to the 2s
-# transport budget. Charging the readiness attempts too (the first cut of this
-# fix) exhausted the budget at "1 attempt" despite an attempt cap of 5.
-state="${root}/g"; cell_state="${root}/g-cells"; mkdir -p "${state}"
-log="${root}/g.log"
-status="$(run_stage "http://doorway-g" "${log}" \
-  FAKE_PATCH_MODE=cell-then-shed-then-ok FAKE_CELL_TIMES=3 FAKE_PATCH_DELAY=1 \
-  STAGE_CELL_READY_BUDGET_SECS=60 STAGE_BLOB_ATTEMPTS=5 STAGE_BLOB_BUDGET_SECS=2)"
-check "(g) slow readiness attempts do not spend the transport budget" \
-  "[ '${status}' = '0' ] && ! grep -q 'stage failed after' '${log}'"
-check "(g) the ordinary shed still rode the transport ladder" \
-  "grep -q 'retryAfter=1s' '${log}'"
+# --- (b) catching-up on the PUT leg ---------------------------------------
+# curl -f used to discard this body entirely, so the leg spent its transport
+# budget on a readiness condition (#1715).
+new_case b; cell_state="${root}/b-cells"
+status="$(run_stage "http://doorway-b" server \
+  FAKE_PUT_SEQ="${SHED_CATCHUP}
+${SHED_CATCHUP}
+${OK_PUT}" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=2)"
+check "(b) a catching-up shed on the PUT leg waits and then succeeds" \
+  "[ '${status}' = '0' ] && grep -q 'face=catching-up' '${log}'"
+check "(b) it did not spend the transport ladder" "! grep -q 'stage failed after' '${log}'"
 
-# --- (h) a recovered wait clears this host's clock -------------------------
-state="${root}/h1"; cell_state="${root}/h-cells"; mkdir -p "${state}"
-log="${root}/h1.log"
-status="$(run_stage "http://doorway-h" "${log}" \
-  FAKE_PATCH_MODE=cell-then-ok FAKE_CELL_TIMES=2 \
-  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=30)"
-check "(h) the recovering run exits 0" "[ '${status}' = '0' ]"
-check "(h) recovery removes this host's readiness record" \
-  "[ ! -f '${cell_state}/http___doorway-h' ]"
-# A LATER CellDisabled against the same host is a NEW window: it must get a
-# full budget, not inherit the one this run just watched clear.
-state="${root}/h2"; mkdir -p "${state}"
-log="${root}/h2.log"
-status="$(run_stage "http://doorway-h" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=2)"
-check "(h) the next CellDisabled gets a fresh full budget" \
-  "[ '${status}' = '1' ] && ! grep -q 'already spent' '${log}' && grep -q 'post-restart readiness window' '${log}'"
+# --- (c) the storage-forward-timeout face, and its two near-misses ---------
+new_case c1; cell_state="${root}/c1-cells"
+status="$(run_stage "http://doorway-c1" server \
+  FAKE_PUT_SEQ="${FWD_TIMEOUT}
+${FWD_TIMEOUT}
+${OK_PUT}" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=2)"
+check "(c) a forward that timed out x2 then confirmed exits 0" \
+  "[ '${status}' = '0' ] && grep -q 'face=storage-forward-timeout' '${log}'"
+check "(c) it is described as availability-unknown, never as storage being up" \
+  "grep -q 'availability unknown' '${log}' && ! grep -qi 'storage is up' '${log}'"
 
-# --- (b) CellDisabled forever, shared per-host budget ----------------------
-state="${root}/b"; cell_state="${root}/b-cells"; mkdir -p "${state}"
-log="${root}/b1.log"
-status="$(run_stage "http://doorway-b" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=3)"
-check "(b) an exhausted readiness budget exits 1" "[ '${status}' = '1' ]"
-check "(b) reports the measurement, not a diagnosis" \
-  "grep -q 'readiness budget exhausted: the cell was still unavailable after' '${log}'"
-check "(b) points at the conductor's own state instead of prescribing a cure" \
-  "grep -q \"Read that conductor's app/cell state\" '${log}' && ! grep -qi 'genuinely disabled' '${log}'"
-check "(b) leaves the host STALE by name" "grep -q 'Host left STALE' '${log}'"
+new_case c2; cell_state="${root}/c2-cells"
+status="$(run_stage "http://doorway-c2" server \
+  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://elohim-matthew-alpha:8090/blob/sha256-abc): tcp connect error: Connection refused (os error 111)"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
+check "(c) connection-refused rides the transport ladder, never readiness" \
+  "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}' && grep -q 'stage failed after 2 attempt' '${log}'"
 
-# A SECOND invocation against the SAME host inherits the spent clock and must
-# fail without a single retry — this is what keeps the 63-minute per-leg
-# re-spend cured.
-state="${root}/b2"; mkdir -p "${state}"
-log="${root}/b2.log"
-status="$(run_stage "http://doorway-b" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=3)"
-check "(b) a second leg against the same host exits 1" "[ '${status}' = '1' ]"
-check "(b) it never waits — no retry storm" "no_naps '${state}'"
-check "(b) it names when the wait began and what was spent" \
-  "grep -q 'readiness budget was already spent earlier in this run' '${log}'"
+new_case c3; cell_state="${root}/c3-cells"
+status="$(run_stage "http://doorway-c3" server \
+  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":false,"forwarded_to_storage":false,"size":13,"error":"could not reach storage to forward the blob: error sending request for url (http://timeout-storage:8090/blob/sha256-abc): dns error: failed to lookup address information: Name or service not known"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
+check "(c) a DNS failure against a host NAMED timeout-storage is not the timeout face" \
+  "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
 
-# A DIFFERENT host is unaffected: its own clock starts fresh and it waits.
-state="${root}/b3"; mkdir -p "${state}"
-log="${root}/b3.log"
-status="$(run_stage "http://doorway-other" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=1)"
-check "(b) a different host is unaffected — it waits on its own clock" \
-  "grep -q 'post-restart readiness window' '${log}' && ! grep -q 'already spent' '${log}'"
+# --- (d) two faces, ONE deadline ------------------------------------------
+new_case d; cell_state="${root}/d-cells"
+status="$(run_stage "http://doorway-d" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|
+503|${CELL_BODY}|0|
+503|{\"status\":\"catching-up\"}|0|
+503|{\"status\":\"catching-up\"}|0|
+${OK_PATCH}" \
+  STAGE_CELL_READY_BUDGET_SECS=100 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=2)"
+check "(d) a run that meets both faces still exits 0" "[ '${status}' = '0' ]"
+check "(d) both faces are named" \
+  "grep -q 'face=cell-not-running' '${log}' && grep -q 'face=catching-up' '${log}'"
+check "(d) the persisted stamp is the run's FIRST not-ready answer, unchanged" \
+  "grep -qx 'first_not_ready=${clock_base}' '${cell_state}/run-deadline'"
+check "(d) the logged remaining is strictly decreasing across the face change" \
+  "[ \"\$(grep -o '[0-9]*s left of' '${log}' | tr -dc '0-9\n' | tr '\n' ' ')\" = '100 90 80 70 ' ]"
 
-# --- (i) the budget is an enforced deadline --------------------------------
-# A poll interval longer than what is left must be capped to the remainder:
-# budget 1 / poll 3 ends at ~1s, and the ONE recorded nap is 1, never 3.
-state="${root}/i"; cell_state="${root}/i-cells"; mkdir -p "${state}"
-log="${root}/i.log"
-status="$(run_stage "http://doorway-i" "${log}" \
-  FAKE_PATCH_MODE=cell-forever \
-  STAGE_CELL_READY_BUDGET_SECS=1 STAGE_CELL_READY_POLL_SECS=3)"
-check "(i) a poll longer than the remaining budget is capped to it" \
-  "[ '${status}' = '1' ] && [ \"\$(longest_nap '${state}')\" = '1' ]"
+# --- (e) a recovery does NOT replenish the deadline ------------------------
+new_case e; cell_state="${root}/e-cells"
+status="$(run_stage "http://doorway-e" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|
+503|${CELL_BODY}|0|
+${OK_PATCH}" \
+  STAGE_CELL_READY_BUDGET_SECS=100 STAGE_BLOB_BUDGET_SECS=30)"
+check "(e) the recovering leg exits 0" "[ '${status}' = '0' ]"
+check "(e) recovery KEEPS the run deadline — the record is not removed" \
+  "[ -f '${cell_state}/run-deadline' ] && grep -qx 'first_not_ready=${clock_base}' '${cell_state}/run-deadline'"
+check "(e) and it says how much of the run's deadline is left" \
+  "grep -q \"of this run's readiness deadline left\" '${log}'"
+# A SECOND window later in the same run inherits what is left (20s were spent).
+state2="${root}/e2"; log2="${root}/e2.log"; mkdir -p "${state2}"
+cp "${state}/clock" "${state2}/clock"
+FAKE_STATE="${state2}" FAKE_CLOCK="${state2}/clock" DO_PATCH=1 \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+STAGE_HARD_TIMEOUT_SECS=0 \
+STAGE_CELL_READY_POLL_SECS=10 \
+FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+STAGE_CELL_READY_BUDGET_SECS=100 STAGE_BLOB_BUDGET_SECS=30 \
+  bash "${script}" "${dist}" "test-slug" "http://doorway-e" server > "${log2}" 2>&1
+status=$?
+check "(e) a second window in the same run inherits the deadline (80s, not 100s)" \
+  "[ '${status}' = '1' ] && grep -q '20s waited, 80s left of 100s' '${log2}'"
+check "(e) and the whole run still stops at the one deadline" \
+  "grep -q 'still not ready after 100s' '${log2}'"
+# A different BUILD_TAG is a different run and gets its own deadline.
+ws="${root}/e-ws"; mkdir -p "${ws}"
+for tag in build-1 build-2; do
+  st="${root}/e-${tag}"; mkdir -p "${st}"
+  printf '%s' "${clock_base}" > "${st}/clock"
+  FAKE_STATE="${st}" FAKE_CLOCK="${st}/clock" DO_PATCH=1 \
+  STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_POLL_SECS=10 STAGE_HARD_TIMEOUT_SECS=0 \
+  WORKSPACE="${ws}" BUILD_TAG="${tag}" \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" STAGE_CELL_READY_BUDGET_SECS=10 \
+    bash "${script}" "${dist}" "test-slug" "http://doorway-e2" server \
+    > "${root}/e-${tag}.log" 2>&1
+done
+check "(e) each BUILD_TAG files its own run-deadline" \
+  "[ -f '${ws}/.stage-cell-ready/build-1/run-deadline' ] && [ -f '${ws}/.stage-cell-ready/build-2/run-deadline' ]"
+check "(e) the second build does not inherit the first build's spent deadline" \
+  "grep -q '0s waited, 10s left of 10s' '${root}/e-build-2.log'"
 
-# --- (c) budget 0 restores the old immediate-structural behaviour ----------
-state="${root}/c"; cell_state="${root}/c-cells"; mkdir -p "${state}"
-log="${root}/c.log"
-status="$(run_stage "http://doorway-c" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=0)"
-check "(c) STAGE_CELL_READY_BUDGET_SECS=0 exits 1" "[ '${status}' = '1' ]"
-check "(c) it does not wait" "no_naps '${state}'"
-check "(c) it names the switch that disabled waiting" \
-  "grep -q 'STAGE_CELL_READY_BUDGET_SECS=0' '${log}'"
+# --- (f) forever not-ready: the deadline governs when a RE-OFFER may start --
+# budget 30, poll 10 -> PATCHes at +0, +10, +20 and NOTHING at or after +30.
+new_case f; cell_state="${root}/f-cells"
+status="$(run_stage "http://doorway-f" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_CELL_READY_POLL_SECS_UNUSED=1 \
+  STAGE_BLOB_BUDGET_SECS=600)"
+check "(f) a deadline that runs out exits 1" "[ '${status}' = '1' ]"
+check "(f) exactly three PATCHes were dispatched" \
+  "[ \"\$(call_count '${state}' patch_calls)\" = '3' ]"
+check "(f) none of them started at or after expiry" \
+  "[ \"\$(sort -n '${state}/patch_times' | tail -1)\" -lt \"\$(( clock_base + 30 ))\" ]"
+check "(f) the exhaustion line is a measurement with the last face" \
+  "grep -q 'readiness deadline reached; the holder was still not ready after 30s (last face=cell-not-running' '${log}'"
+check "(f) it admits an attempt in flight may outlive the deadline" \
+  "grep -q 'an attempt in flight may have finished past it' '${log}'"
+check "(f) it points at the doorway and the storage peer, not at a cause" \
+  "grep -q \"read the doorway's /health/serving and the storage peer's state\" '${log}'"
+# WHICH gate stopped it is observable, and both gates matter: the nap here ends
+# exactly at expiry, so the post-nap check inside cell_ready_wait is what should
+# refuse — the loop-top gate is the backstop for the ORDINARY-sleep path and
+# prints a different line. Without this the post-nap check is untested, because
+# the backstop silently covers for it.
+check "(f) the post-nap check refuses, not the loop-top backstop" \
+  "grep -q 'never became ready (see above)' '${log}' \
+   && ! grep -q 'before another attempt could be offered' '${log}'"
+# A SECOND invocation of the SAME run fails at once, with no nap at all.
+state2="${root}/f2"; log2="${root}/f2.log"; mkdir -p "${state2}"
+cp "${state}/clock" "${state2}/clock"
+FAKE_STATE="${state2}" FAKE_CLOCK="${state2}/clock" DO_PATCH=1 \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+STAGE_HARD_TIMEOUT_SECS=0 \
+FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" STAGE_CELL_READY_BUDGET_SECS=30 \
+  bash "${script}" "${dist}" "test-slug" "http://doorway-f" server > "${log2}" 2>&1
+status=$?
+check "(f) a later leg of the same run fails at once, with no nap" \
+  "[ '${status}' = '1' ] && no_naps '${state2}' && grep -q 'readiness deadline reached' '${log2}'"
 
-# --- (d) no regression for the ordinary shed / structural classes ----------
-state="${root}/d1"; cell_state="${root}/d1-cells"; mkdir -p "${state}"
-log="${root}/d1.log"
-status="$(run_stage "http://doorway-d1" "${log}" \
-  FAKE_PATCH_MODE=shed STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
-check "(d) an ordinary 503 shed still spends the TRANSPORT budget" \
+# --- (g) advertised retryAfter, normalised ONCE ----------------------------
+new_case g1; cell_state="${root}/g1-cells"
+status="$(run_stage "http://doorway-g1" server \
+  FAKE_PATCH_SEQ='503|{"status":"catching-up","retryAfter":0}|0|
+503|{"status":"catching-up","retryAfter":0}|0|
+200|{"dhtAnchorHash":"uhCkkFAKEANCHOR"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_CELL_READY_POLL_SECS=60 \
+  STAGE_BLOB_BUDGET_SECS=30)"
+check "(g) retryAfter=0 naps the 5s floor, not zero and not the full poll" \
+  "[ '${status}' = '0' ] && [ \"\$(naps '${state}' | sort -u | tr '\n' ' ')\" = '5 ' ]"
+
+new_case g2; cell_state="${root}/g2-cells"
+status="$(run_stage "http://doorway-g2" server \
+  FAKE_PATCH_SEQ="503|{\"status\":\"catching-up\"}|0|999999999999999999999999999999999999999" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_CELL_READY_POLL_SECS=10 \
+  STAGE_BLOB_BUDGET_SECS=600)"
+check "(g) a 39-digit Retry-After is ignored by the READINESS nap (poll wins)" \
+  "[ '${status}' = '1' ] && [ \"\$(longest_nap '${state}')\" = '10' ]"
+
+new_case g3; cell_state="${root}/g3-cells"
+status="$(run_stage "http://doorway-g3" server \
+  FAKE_PATCH_SEQ="503|{\"error\":\"shedding\"}|0|999999999999999999999999999999999999999" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=600)"
+check "(g) a 39-digit Retry-After is ignored by the TRANSPORT sleep too" \
+  "[ '${status}' = '1' ] && [ \"\$(naps '${state}' | tr '\n' ' ')\" = '5 ' ]"
+
+new_case g4; cell_state="${root}/g4-cells"
+status="$(run_stage "http://doorway-g4" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=3 STAGE_CELL_READY_POLL_SECS=10 \
+  STAGE_BLOB_BUDGET_SECS=600)"
+check "(g) with 3s left the nap is 3s — the floor never overruns the deadline" \
+  "[ '${status}' = '1' ] && [ \"\$(naps '${state}' | tr '\n' ' ')\" = '3 ' ]"
+
+# --- (h) JSON negatives: none of these may classify or confirm -------------
+h_case() {
+  local name="$1" body="$2"
+  new_case "${name}"; cell_state="${root}/${name}-cells"
+  status="$(run_stage "http://doorway-${name}" server \
+    FAKE_PATCH_SEQ="503|${body}|0|" \
+    STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+  check "(h) ${name} does not classify as not-ready" \
+    "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
+}
+h_case h-nested '{"error":{"status":"catching-up"}}'
+h_case h-array '[{"status":"catching-up"}]'
+h_case h-nonstring '{"status":123}'
+h_case h-missing '{"error":"something else"}'
+h_case h-invalid 'catching-up'
+h_case h-oversize '@@BIG@@'
+
+new_case h-fwd-string; cell_state="${root}/h-fwd-string-cells"
+status="$(run_stage "http://doorway-h-fwd-string" server \
+  FAKE_PUT_SEQ='200|{"forwarded_to_storage":"true"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(h) the STRING \"true\" never confirms a storage forward" \
+  "[ '${status}' = '1' ] && grep -q 'did NOT confirm the storage forward' '${log}'"
+
+new_case h-fwd-spaced; cell_state="${root}/h-fwd-spaced-cells"
+status="$(run_stage "http://doorway-h-fwd-spaced" server \
+  FAKE_PUT_SEQ='200|{"forwarded_to_storage": false, "error":"could not reach storage to forward the blob: error sending request for url (http://s:8090/b): tcp connect error: Connection refused (os error 111)"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(h) a SPACED forwarded_to_storage:false with connection-refused never exits 0" \
+  "[ '${status}' != '0' ] && ! grep -q 'face=' '${log}'"
+
+new_case h-fwd-missing; cell_state="${root}/h-fwd-missing-cells"
+status="$(run_stage "http://doorway-h-fwd-missing" server \
+  FAKE_PUT_SEQ='200|{}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(h) a missing forwarded_to_storage is a contract violation, not a success" \
+  "[ '${status}' = '1' ] && grep -q 'did NOT confirm the storage forward' '${log}'"
+
+# --- (i) curl 55/56: affirmative storage evidence only ---------------------
+new_case i1; cell_state="${root}/i1-cells"
+status="$(run_stage "http://doorway-i1" server \
+  FAKE_PUT_SEQ='200|{"success":true,"hash":"x","already_cached":true,"forwarded_to_storage":true,"size":13}|55|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(i) a broken PUT whose captured body confirms the forward is done" \
+  "[ '${status}' = '0' ] && [ ! -f '${state}/probes' ]"
+
+new_case i2; cell_state="${root}/i2-cells"
+status="$(run_stage "http://doorway-i2" server \
+  FAKE_PUT_SEQ='|not-json|56|' \
+  FAKE_PROBE_SEQ='200|{"success":true,"hash":"x","already_cached":true,"forwarded_to_storage":true,"size":13}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(i) an unparsable broken PUT sends a ZERO-BYTE confirmation probe" \
+  "grep -qx 'EMPTY-BODY-PUT' '${state}/probes'"
+check "(i) and the probe's answer decides it" "[ '${status}' = '0' ]"
+
+new_case i3; cell_state="${root}/i3-cells"
+status="$(run_stage "http://doorway-i3" server \
+  FAKE_PUT_SEQ='|not-json|56|' \
+  FAKE_PROBE_SEQ='200|{"success":true,"hash":"x","already_cached":true,"forwarded_to_storage":false,"size":13,"error":"storage did not answer"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(i) cache-only evidence never exits 0" \
+  "[ '${status}' != '0' ] && grep -q 'a doorway cache hit is not that proof' '${log}'"
+
+# --- (j) with NO window open, behaviour equals HEAD's ----------------------
+new_case j1; cell_state="${root}/j1-cells"
+status="$(run_stage "http://doorway-j1" server \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_BUDGET_SECS=30)"
+check "(j) an ordinary success exits 0 with no readiness machinery at all" \
+  "[ '${status}' = '0' ] && no_naps '${state}' && ! grep -q 'face=' '${log}' \
+   && ! grep -q 'not-ready window' '${log}' && [ ! -f '${cell_state}/run-deadline' ]"
+check "(j) it verifies the row it just wrote" "grep -q 'verified test-slug' '${log}'"
+
+new_case j2; cell_state="${root}/j2-cells"
+status="$(run_stage "http://doorway-j2" server \
+  FAKE_PATCH_SEQ='503|{"error":"shedding"}|0|1' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=2 STAGE_BLOB_BUDGET_SECS=30)"
+check "(j) an ordinary shed still spends the TRANSPORT budget" \
   "[ '${status}' = '1' ] && grep -q 'stage failed after 2 attempt(s)' '${log}'"
-check "(d) it honours the advertised retryAfter" \
-  "grep -q 'retryAfter=1s' '${log}' && [ \"\$(longest_nap '${state}')\" = '1' ]"
-check "(d) a shed never enters the readiness wait" \
-  "! grep -q 'readiness window' '${log}'"
+check "(j) and still honours its advertised Retry-After" \
+  "grep -q 'retryAfter=1s' '${log}' && [ \"\$(naps '${state}' | tr '\n' ' ')\" = '1 ' ]"
 
-state="${root}/d2"; cell_state="${root}/d2-cells"; mkdir -p "${state}"
-log="${root}/d2.log"
-status="$(run_stage "http://doorway-d2" "${log}" \
-  FAKE_PATCH_MODE=structural STAGE_BLOB_ATTEMPTS=5 STAGE_BLOB_BUDGET_SECS=30)"
-check "(d) a structural 4xx is still immediate" \
+new_case j3; cell_state="${root}/j3-cells"
+status="$(run_stage "http://doorway-j3" server \
+  FAKE_PATCH_SEQ='409|{"error":"content row conflict"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=5 STAGE_BLOB_BUDGET_SECS=30)"
+check "(j) a structural 4xx is still immediate" \
   "[ '${status}' = '1' ] && no_naps '${state}' && grep -q 'failed structurally (HTTP 409)' '${log}'"
 
-# --- (e) a state file older than 6h is ignored -----------------------------
-state="${root}/e"; cell_state="${root}/e-cells"; mkdir -p "${state}" "${cell_state}"
-printf 'first_seen=%s\nexhausted=%s\n' "$(( $(date +%s) - 25000 ))" "$(( $(date +%s) - 24000 ))" \
-  > "${cell_state}/http___doorway-e"
-log="${root}/e.log"
-status="$(run_stage "http://doorway-e" "${log}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=1)"
-check "(e) a stale record is ignored, not inherited" \
-  "grep -q 'ignoring a cell-readiness record' '${log}' && ! grep -q 'already spent' '${log}'"
-check "(e) and the fresh clock is actually used" \
-  "[ '${status}' = '1' ] && grep -q 'post-restart readiness window' '${log}'"
+# The deliverability gate must still be invoked exactly as it was: once per
+# attempt, with its two arguments and no wrapper of any kind.
+shim="${root}/shim"; mkdir -p "${shim}"
+cp "${script}" "${shim}/stage-spa-blob.sh"
+cat > "${shim}/deliverability-gate.sh" <<'GATE'
+#!/bin/bash
+printf '%s\n' "$*" >> "${FAKE_STATE}/gate-calls"
+exit 0
+GATE
+chmod +x "${shim}/deliverability-gate.sh"
+new_case j4; cell_state="${root}/j4-cells"
+stage_script="${shim}/stage-spa-blob.sh"
+status="$(run_stage "http://doorway-j4" browser \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_BUDGET_SECS=30)"
+stage_script=""
+check "(j) a browser leg still invokes the deliverability gate, once, unwrapped" \
+  "[ '${status}' = '0' ] && [ \"\$(grep -c . '${state}/gate-calls')\" = '1' ] \
+   && grep -qx 'http://doorway-j4 sha256-.*' '${state}/gate-calls'"
 
-# --- (f) the DECLARE_ONLY ladder shares the same per-host clock ------------
-# A CellDisabled answer reaches that ladder too (503 from storage's
-# conductor_write_error, 502 from a pre-fix binary). DECLARE_MAX_ATTEMPTS=1
-# proves the wait does not consume that ladder's own attempt counter either.
-state="${root}/f"; cell_state="${root}/f-cells"; mkdir -p "${state}"
-log="${root}/f.log"
-FAKE_STATE="${state}" \
-STORAGE_API_KEY_ADMIN=test-key \
-STAGE_CELL_READY_STATE_DIR="${cell_state}" \
-STAGE_CELL_READY_POLL_SECS=1 \
-FAKE_HEAD_MODE=resolvable FAKE_DECLARE_MODE=cell-forever \
-DECLARE_ONLY=1 DECLARE_MAX_ATTEMPTS=1 SOURCE_DOORWAY_URL=http://doorway-src \
-STAGE_CELL_READY_BUDGET_SECS=2 \
-  bash "${script}" "-" "test-slug" "http://doorway-f" server > "${log}" 2>&1
+# --- (k) an unusable deadline record degrades to THIS invocation -----------
+# The state dir is a regular FILE, so mkdir -p cannot create it (root included).
+new_case k1
+cell_state="${root}/k1-not-a-dir"; printf 'x' > "${cell_state}"
+status="$(run_stage "http://doorway-k1" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+check "(k) an unwritable state dir still enforces the budget in this invocation" \
+  "[ '${status}' = '1' ] && grep -q 'still not ready after 30s' '${log}'"
+check "(k) and says so exactly once" \
+  "[ \"\$(grep -c '⊘ WARN' '${log}')\" = '1' ]"
+
+new_case k2; cell_state="${root}/k2-cells"; mkdir -p "${cell_state}"
+printf 'this is not a stamp\n' > "${cell_state}/run-deadline"
+status="$(run_stage "http://doorway-k2" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+check "(k) a garbage record is LEFT ALONE, warned about once, and the budget holds" \
+  "[ '${status}' = '1' ] && grep -q 'still not ready after 30s' '${log}' \
+   && [ \"\$(grep -c '⊘ WARN' '${log}')\" = '1' ] \
+   && grep -qx 'this is not a stamp' '${cell_state}/run-deadline'"
+
+# --- (l) budget 0, and the age guard's one legitimate home -----------------
+new_case l1; cell_state="${root}/l1-cells"
+status="$(run_stage "http://doorway-l1" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=0 STAGE_BLOB_BUDGET_SECS=600)"
+check "(l) STAGE_CELL_READY_BUDGET_SECS=0 reports without waiting" \
+  "[ '${status}' = '1' ] && no_naps '${state}' && grep -q 'STAGE_CELL_READY_BUDGET_SECS=0' '${log}'"
+
+# A 7h-old record in a SCOPED dir belongs to this run and is honoured.
+new_case l2; cell_state="${root}/l2-cells"; mkdir -p "${cell_state}"
+printf 'first_not_ready=%s\n' "$(( clock_base - 25200 ))" > "${cell_state}/run-deadline"
+status="$(run_stage "http://doorway-l2" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+check "(l) in a SCOPED dir a 7h-old record is honoured, not aged out" \
+  "[ '${status}' = '1' ] && no_naps '${state}' && ! grep -q 'ignoring a run-deadline record' '${log}'"
+
+# The same record in the UNSCOPED fallback dir (no BUILD_TAG, no explicit dir)
+# is another run's and is ignored.
+state="${root}/l3"; log="${root}/l3.log"; mkdir -p "${state}"
+printf '%s' "${clock_base}" > "${state}/clock"
+ws3="${root}/l3-ws"; mkdir -p "${ws3}/.stage-cell-ready"
+printf 'first_not_ready=%s\n' "$(( clock_base - 25200 ))" > "${ws3}/.stage-cell-ready/run-deadline"
+FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" DO_PATCH=1 \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_POLL_SECS=10 WORKSPACE="${ws3}" STAGE_HARD_TIMEOUT_SECS=0 \
+FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" STAGE_CELL_READY_BUDGET_SECS=30 \
+  bash "${script}" "${dist}" "test-slug" "http://doorway-l3" server > "${log}" 2>&1
 status=$?
-check "(f) DECLARE_ONLY waits on the readiness budget, then exits 1" \
-  "[ '${status}' = '1' ] && grep -q 'post-restart readiness window' '${log}'"
-check "(f) the declare ladder's own attempt counter is not consumed" \
-  "grep -q 'readiness budget exhausted' '${log}'"
+check "(l) in the UNSCOPED fallback dir a 7h-old record is ignored" \
+  "[ '${status}' = '1' ] && grep -q 'ignoring a run-deadline record' '${log}' \
+   && grep -q '0s waited, 30s left of 30s' '${log}'"
 
-# --- (j) BUILD_TAG scopes the default state dir to one build ---------------
-# Without an explicit STAGE_CELL_READY_STATE_DIR, two builds sharing a
-# workspace must not share a clock: build 2 gets its own budget.
-ws="${root}/j-ws"; mkdir -p "${ws}"
-for tag in build-1 build-2; do
-  state="${root}/j-${tag}"; mkdir -p "${state}"
-  log="${root}/j-${tag}.log"
-  FAKE_STATE="${state}" \
-  DO_PATCH=1 \
-  STORAGE_API_KEY_ADMIN=test-key \
-  STAGE_CELL_READY_POLL_SECS=1 \
-  WORKSPACE="${ws}" BUILD_TAG="${tag}" \
-  FAKE_PATCH_MODE=cell-forever STAGE_CELL_READY_BUDGET_SECS=1 \
-    bash "${script}" "${dist}" "test-slug" "http://doorway-j" server > "${log}" 2>&1
+# --- (m) DECLARE_ONLY takes the same classifier and the same deadline ------
+new_case m; cell_state="${root}/m-cells"
+FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+STAGE_HARD_TIMEOUT_SECS=0 \
+STAGE_CELL_READY_POLL_SECS=10 \
+FAKE_HEAD_MODE=resolvable FAKE_DECLARE_SEQ="503|{\"status\":\"catching-up\"}|0|" \
+DECLARE_ONLY=1 DECLARE_MAX_ATTEMPTS=1 SOURCE_DOORWAY_URL=http://doorway-src \
+STAGE_CELL_READY_BUDGET_SECS=30 \
+  bash "${script}" "-" "test-slug" "http://doorway-m" server > "${log}" 2>&1
+status=$?
+check "(m) DECLARE_ONLY waits on the run deadline, then exits 1" \
+  "[ '${status}' = '1' ] && grep -q 'face=catching-up' '${log}' && grep -q 'readiness deadline reached' '${log}'"
+check "(m) the declare ladder's own attempt counter is not consumed" \
+  "[ \"\$(call_count '${state}' declare_calls)\" = '3' ]"
+
+# --- (n) NO NEW ATTEMPT STARTS AT OR AFTER THE DEADLINE, BY ANY PATH -------
+# The reviewer's fixture: an open window, then an ORDINARY transport shed whose
+# own ladder sleeps past the deadline. Before the pre-attempt gate this
+# dispatched at 0, 10 and 40s and returned 0.
+new_case n1; cell_state="${root}/n1-cells"
+status="$(run_stage "http://doorway-n1" server \
+  FAKE_PATCH_SEQ='503|{"status":"catching-up"}|0|
+503|{"error":"shedding"}|0|30
+200|{"dhtAnchorHash":"uhCkkFAKEANCHOR"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=12 STAGE_BLOB_BUDGET_SECS=600)"
+check "(n) catching-up then an ordinary shed cannot reach a third dispatch" \
+  "[ '${status}' = '1' ] && [ \"\$(call_count '${state}' patch_calls)\" = '2' ]"
+check "(n) both dispatches started strictly before the deadline" \
+  "[ \"\$(sort -n '${state}/patch_times' | tail -1)\" -lt \"\$(( clock_base + 12 ))\" ]"
+check "(n) the ordinary retry sleep was capped by the remaining deadline" \
+  "[ \"\$(naps '${state}' | tr '\n' ' ')\" = '10 2 ' ]"
+check "(n) and it stops with the readiness-deadline line, not a transport one" \
+  "grep -q 'readiness deadline reached' '${log}' && grep -q 'before another attempt could be offered' '${log}'"
+
+# The same shape on the DECLARE_ONLY ladder: it dispatched at 0, 10 and 12.
+new_case n2; cell_state="${root}/n2-cells"
+FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+STAGE_HARD_TIMEOUT_SECS=0 STAGE_CELL_READY_POLL_SECS=10 \
+FAKE_HEAD_MODE=resolvable \
+FAKE_DECLARE_SEQ='503|{"status":"catching-up"}|0|
+503|{"error":"shedding"}|0|' \
+DECLARE_ONLY=1 DECLARE_MAX_ATTEMPTS=12 SOURCE_DOORWAY_URL=http://doorway-src \
+STAGE_CELL_READY_BUDGET_SECS=12 \
+  bash "${script}" "-" "test-slug" "http://doorway-n2" server > "${log}" 2>&1
+status=$?
+check "(n) DECLARE_ONLY cannot POST at the deadline either" \
+  "[ '${status}' = '1' ] && [ \"\$(call_count '${state}' declare_calls)\" = '2' ]"
+check "(n) its capped ladder sleep stops short of the deadline" \
+  "[ \"\$(naps '${state}' | tr '\n' ' ')\" = '10 2 ' ] && grep -q 'readiness deadline was reached before another declare' '${log}'"
+
+# --- (o) the ORIGINAL BYTES are what gets parsed ---------------------------
+o_put_case() {
+  local name="$1" body="$2" desc="$3"
+  new_case "${name}"; cell_state="${root}/${name}-cells"
+  status="$(run_stage "http://doorway-${name}" server \
+    FAKE_PUT_SEQ="200|${body}|0|" \
+    STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+  check "(o) ${desc}" \
+    "[ '${status}' != '0' ] && grep -q 'did NOT confirm the storage forward' '${log}'"
+}
+o_put_case o-nul '@@NUL@@' 'a NUL inside the literal true is invalid JSON and confirms nothing'
+o_put_case o-badutf8 '@@BADUTF8@@' 'a body that is not valid UTF-8 confirms nothing'
+o_put_case o-utf8big '@@UTF8BIG@@' '1.2 MB in 600k characters is over the BYTE limit and confirms nothing'
+
+new_case o-nl; cell_state="${root}/o-nl-cells"
+status="$(run_stage "http://doorway-o-nl" server \
+  FAKE_PATCH_SEQ='503|{"status":"catching-up\n"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(o) a status of \"catching-up\\n\" is not \"catching-up\"" \
+  "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
+
+new_case o-nulstr; cell_state="${root}/o-nulstr-cells"
+status="$(run_stage "http://doorway-o-nulstr" server \
+  FAKE_PATCH_SEQ='503|{"status":"catching-\u0000up"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(o) a status carrying an escaped NUL is not \"catching-up\" either" \
+  "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
+
+# --- (p) an unusable deadline stamp takes the declared fallback ------------
+p_stamp_case() {
+  local name="$1" stamp="$2" desc="$3"
+  new_case "${name}"; cell_state="${root}/${name}-cells"; mkdir -p "${cell_state}"
+  printf 'first_not_ready=%s\n' "${stamp}" > "${cell_state}/run-deadline"
+  status="$(run_stage "http://doorway-${name}" server \
+    FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+    STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+  check "(p) ${desc}" \
+    "[ '${status}' = '1' ] && grep -q 'still not ready after 30s' '${log}' \
+     && [ \"\$(grep -c '⊘ WARN' '${log}')\" = '1' ]"
+}
+p_stamp_case p-huge '99999999999999999999' 'a 20-digit stamp is garbage, not 7.7e18 seconds of budget'
+p_stamp_case p-future "$(( clock_base + 1000 ))" 'a future stamp does not extend the budget'
+
+# --- (q) the first stamp is created atomically and the winner is adopted ---
+# A record that appears between this leg's look and its write must be ADOPTED,
+# never overwritten — otherwise two first-observers keep two different deadlines.
+new_case q; cell_state="${root}/q-cells"; mkdir -p "${cell_state}"
+printf 'first_not_ready=%s\n' "$(( clock_base - 20 ))" > "${cell_state}/run-deadline"
+status="$(run_stage "http://doorway-q" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+check "(q) an existing valid record is adopted, not overwritten" \
+  "grep -qx 'first_not_ready=$(( clock_base - 20 ))' '${cell_state}/run-deadline' \
+   && grep -q '20s waited, 10s left of 30s' '${log}'"
+
+# --- (r) a long body after the CellDisabled line still classifies ----------
+# `grep -q` exits at the first match, the producer takes SIGPIPE, and under
+# pipefail the whole pipeline failed — so a long body made the face vanish.
+new_case r; cell_state="${root}/r-cells"
+status="$(run_stage "http://doorway-r" server \
+  FAKE_PATCH_SEQ='503|@@LONGCELL@@|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=10 STAGE_BLOB_BUDGET_SECS=600)"
+check "(r) CellDisabled followed by 300k characters still classifies" \
+  "[ '${status}' = '1' ] && grep -q 'face=cell-not-running' '${log}'"
+
+# --- (s) nested parentheses do not smuggle the word timeout through --------
+new_case s; cell_state="${root}/s-cells"
+status="$(run_stage "http://doorway-s" server \
+  FAKE_PUT_SEQ='200|{"forwarded_to_storage":false,"error":"could not reach storage to forward the blob: connect error (timeout diagnostic (retry disabled)): connection refused"}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(s) a refused connection described inside nested parens is not the timeout face" \
+  "[ '${status}' = '1' ] && ! grep -q 'face=' '${log}'"
+
+# --- (t) the HARD per-invocation bound is applied, and can be switched off --
+# A fake `timeout` on its OWN PATH entry records the arguments and then runs the
+# real command, so the wrapper is exercised rather than merely asserted.
+tbin="${root}/tbin"; mkdir -p "${tbin}"
+cat > "${tbin}/timeout" <<'FAKET'
+#!/bin/bash
+printf '%s\n' "$*" >> "${FAKE_STATE}/timeout-calls" 2>/dev/null
+while [ "$#" -gt 0 ]; do
+  case "$1" in --kill-after=*) shift ;; *) break ;; esac
 done
-check "(j) a second BUILD_TAG does not inherit the first build's spent clock" \
-  "! grep -q 'already spent' '${root}/j-build-2.log' && grep -q 'post-restart readiness window' '${root}/j-build-2.log'"
-check "(j) each build's clock is filed under its own tag" \
-  "[ -f '${ws}/.stage-cell-ready/build-1/http___doorway-j' ] && [ -f '${ws}/.stage-cell-ready/build-2/http___doorway-j' ]"
+shift
+exec "$@"
+FAKET
+chmod +x "${tbin}/timeout"
 
+# Run in a SUBSHELL so the fake `timeout` reaches only these two cases, and
+# leave STAGE_HARD_TIMEOUT_SECS unset so the script computes its own default.
+new_case t1; cell_state="${root}/t1-cells"
+(
+  PATH="${tbin}:${PATH}"
+  FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" DO_PATCH=1 \
+  STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+  STAGE_CELL_READY_POLL_SECS=10 STAGE_CELL_READY_BUDGET_SECS=300 \
+  STAGE_BLOB_BUDGET_SECS=30 \
+    bash "${script}" "${dist}" "test-slug" "http://doorway-t1" server > "${log}" 2>&1
+)
+status=$?
+check "(t) the stage wraps itself in the hard bound exactly once" \
+  "[ '${status}' = '0' ] && [ \"\$(grep -cF '${script}' '${state}/timeout-calls')\" = '1' ]"
+check "(t) with the computed default = readiness + transport + 1500" \
+  "grep -q -- '--kill-after=30 1830 ' '${state}/timeout-calls'"
+
+new_case t2; cell_state="${root}/t2-cells"
+(
+  PATH="${tbin}:${PATH}"
+  FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" DO_PATCH=1 \
+  STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+  STAGE_CELL_READY_POLL_SECS=10 STAGE_CELL_READY_BUDGET_SECS=300 \
+  STAGE_BLOB_BUDGET_SECS=30 STAGE_HARD_TIMEOUT_SECS=0 \
+    bash "${script}" "${dist}" "test-slug" "http://doorway-t2" server > "${log}" 2>&1
+)
+status=$?
+check "(t) STAGE_HARD_TIMEOUT_SECS=0 disables the wrapper" \
+  "[ '${status}' = '0' ] && ! grep -qF '${script}' '${state}/timeout-calls'"
+
+# --- (u) a runner WITHOUT `timeout` must still deliver a healthy upload ----
+# One availability decision serves the wrapper and the parser; when it is absent
+# both run unbounded under one WARN, rather than the parser failing every check.
+# A complete PATH with exactly one thing missing — anything less would test the
+# absence of coreutils, not the absence of `timeout`.
+nobin="${root}/no-timeout-bin"; mkdir -p "${nobin}"
+for d in /usr/local/bin /usr/bin /bin /usr/sbin /sbin; do
+  [ -d "${d}" ] || continue
+  for f in "${d}"/*; do
+    b="$(basename "${f}")"
+    [ "${b}" = "timeout" ] && continue
+    [ -e "${nobin}/${b}" ] || ln -s "${f}" "${nobin}/${b}" 2>/dev/null
+  done
+done
+for c in curl node date sleep; do ln -sf "${bin}/${c}" "${nobin}/${c}"; done
+new_case u1; cell_state="${root}/u1-cells"
+(
+  PATH="${nobin}"
+  command -v timeout >/dev/null 2>&1 && { echo "SETUP: timeout still on PATH" >&2; exit 99; }
+  FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" DO_PATCH=1 \
+  STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+  STAGE_CELL_READY_POLL_SECS=10 STAGE_CELL_READY_BUDGET_SECS=300 \
+  STAGE_BLOB_BUDGET_SECS=30 STAGE_JSON_NODE="${REAL_NODE}" \
+    bash "${script}" "${dist}" "test-slug" "http://doorway-u1" server > "${log}" 2>&1
+)
+status=$?
+check "(u) with no 'timeout' on PATH a healthy 200 + forwarded:true still exits 0" \
+  "[ '${status}' = '0' ] && grep -q 'storage forward CONFIRMED' '${log}'"
+check "(u) and it says so exactly once, as a WARN, not per parse" \
+  "[ \"\$(grep -c 'is not on PATH' '${log}')\" = '1' ]"
+
+# --- (v) a parser that could not RUN is named, not silently negative -------
+vbin="${root}/v-bin"; mkdir -p "${vbin}"
+# What `timeout` leaves behind when it kills the parser: 124, no output.
+printf '#!/bin/bash\nexit 124\n' > "${vbin}/killed-node"
+# What node itself leaves behind when it crashes: exit 1 — the SAME code as a
+# clean negative. Only the missing liveness token separates them.
+printf '#!/bin/bash\nexit 1\n' > "${vbin}/crashed-node"
+chmod +x "${vbin}/killed-node" "${vbin}/crashed-node"
+
+new_case v1; cell_state="${root}/v1-cells"
+status="$(run_stage "http://doorway-v1" server \
+  STAGE_JSON_NODE="${vbin}/killed-node" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(v) a parser killed at its timeout is diagnosed as a runner problem" \
+  "[ '${status}' != '0' ] && grep -q 'the local JSON parser did not complete (exit 124)' '${log}' \
+   && grep -q 'not the doorway' '${log}'"
+
+new_case v1b; cell_state="${root}/v1b-cells"
+status="$(run_stage "http://doorway-v1b" server \
+  STAGE_JSON_NODE="${vbin}/crashed-node" \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(v) a node that crashes with exit 1 is NOT read as a clean negative" \
+  "[ '${status}' != '0' ] && grep -q 'the local JSON parser did not complete (exit 1)' '${log}'"
+
+new_case v2; cell_state="${root}/v2-cells"
+status="$(run_stage "http://doorway-v2" server \
+  FAKE_PUT_SEQ='200|{"forwarded_to_storage":false}|0|' \
+  STAGE_CELL_READY_BUDGET_SECS=300 STAGE_BLOB_ATTEMPTS=1 STAGE_BLOB_BUDGET_SECS=600)"
+check "(v) a CLEAN negative carries no parser diagnostic" \
+  "[ '${status}' = '1' ] && grep -q 'did NOT confirm the storage forward' '${log}' \
+   && ! grep -q 'the local JSON parser did not complete' '${log}'"
+
+# --- (w) an incomplete record published by an overlapping writer ------------
+# An EMPTY run-deadline is exactly what `set -C` + printf exposed between create
+# and fill. It must NOT be replaced by this leg's later stamp.
+new_case w; cell_state="${root}/w-cells"; mkdir -p "${cell_state}"
+: > "${cell_state}/run-deadline"
+status="$(run_stage "http://doorway-w" server \
+  FAKE_PATCH_SEQ="503|${CELL_BODY}|0|" \
+  STAGE_CELL_READY_BUDGET_SECS=30 STAGE_BLOB_BUDGET_SECS=600)"
+check "(w) an empty record is never overwritten with a later stamp" \
+  "[ ! -s '${cell_state}/run-deadline' ]"
+check "(w) and the invocation falls back in-process, warning once" \
+  "[ '${status}' = '1' ] && grep -q 'still not ready after 30s' '${log}' \
+   && [ \"\$(grep -c '⊘ WARN' '${log}')\" = '1' ]"
+check "(w) no half-written temp record is left behind" \
+  "[ -z \"\$(ls -A '${cell_state}' | grep -v '^run-deadline$')\" ]"
+
+# --- (x) REAL-TIME test (~3s): TERM on the launched PID stops the staging ---
+# MARKED: this is the one case in this file that uses wall-clock sleeps. Signal
+# delivery cannot be simulated on the fake clock, and the defect is precisely
+# that the wrapped inner script outlived the PID the caller signalled.
+new_case x; cell_state="${root}/x-cells"
+FAKE_STATE="${state}" FAKE_CLOCK="${state}/clock" DO_PATCH=1 \
+FAKE_CURL_REAL_SLEEP=2 \
+STORAGE_API_KEY_ADMIN=test-key STAGE_CELL_READY_STATE_DIR="${cell_state}" \
+STAGE_CELL_READY_POLL_SECS=10 STAGE_CELL_READY_BUDGET_SECS=300 \
+STAGE_BLOB_BUDGET_SECS=30 \
+  bash "${script}" "${dist}" "test-slug" "http://doorway-x" server > "${log}" 2>&1 &
+outer=$!
+/bin/sleep 0.5
+kill -TERM "${outer}" 2>/dev/null
+wait "${outer}" 2>/dev/null
+/bin/sleep 2.5
+check "(x) TERM on the launched PID stops the run before the head PATCH" \
+  "[ ! -f '${state}/patch_calls' ]"
+
+echo "--- ${checks} checks"
 if [ "${fail}" -eq 0 ]; then
   echo "ALL PASS"
 fi

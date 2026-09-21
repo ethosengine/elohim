@@ -445,20 +445,25 @@ mkdir -p "$SYNTH_DIST"
 printf '<!doctype html><title>mesh-quiesce fixture</title><p>%s</p>\n' "${GIT_COMMIT_HASH}" \
     > "$SYNTH_DIST/index.html"
 
-# The stage script waits out a conductor whose cells are not running yet on a
-# 45-min budget by default (2026-09-21). That is right for a deploy and wrong
-# here: this step reserved 120 s, and the fast-fail intent STAGE_BLOB_ATTEMPTS
-# states for the transport ladder applies to the readiness one too. CLAMP, do
-# not default — an inherited 2700 from the surrounding environment must not win
-# over this step's own reservation; a caller asking for LESS than 120 s still
-# gets what it asked for.
+# The stage script waits out a holder that is not ready yet — a disabled cell, a
+# catching-up doorway, a storage forward that timed out — on ONE run-level
+# deadline, 2 h by default (2026-09-21). That is right for a deploy and wrong
+# here: this step reserved 120 s. STAGE_BLOB_ATTEMPTS below does NOT bound this:
+# it caps the NUMBER of transport attempts, never the duration of one, and it
+# never applied to the readiness path at all. This clamp is the only thing that
+# keeps the readiness wait inside the reservation. CLAMP, do not default — an
+# inherited 7200 from the surrounding environment must not win over this step's
+# own reservation; a caller asking for LESS than 120 s still gets what it asked
+# for. Note what the clamp buys and what it does not: a re-offer never STARTS
+# past the 120 s mark, but an attempt already in flight may finish after it.
 CELL_READY_CAP=120
 CELL_READY_BUDGET="${STAGE_CELL_READY_BUDGET_SECS:-$CELL_READY_CAP}"
 if ! [ "$CELL_READY_BUDGET" -ge 0 ] 2>/dev/null || [ "$CELL_READY_BUDGET" -gt "$CELL_READY_CAP" ]; then
     CELL_READY_BUDGET="$CELL_READY_CAP"
 fi
-# One readiness clock for this stage's own run — never a record another run left
-# behind (the script's 6h age guard is the backstop, not the scoping). Removed
+# One readiness deadline for this stage's own run — never a record another run
+# left behind. This dir is EXPLICIT, so the script treats its record as belonging
+# to this run and never ages it out. Removed
 # on the line after the call rather than in a trap: `trap teardown EXIT` above
 # owns the exit path, and a second EXIT trap would silently replace it.
 CELL_READY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/.stage-cell-ready-quiesce-XXXXXX" 2>/dev/null)" || CELL_READY_DIR=""

@@ -25,24 +25,39 @@
 #                               count-only behaviour can still pass a low
 #                               value, e.g. STAGE_BLOB_ATTEMPTS=3.
 #        STAGE_CELL_READY_BUDGET_SECS
-#                               SEPARATE wall-clock budget for the
-#                               cell-readiness window (a CellDisabled answer),
-#                               default 2700s = 45min, shared PER DOORWAY HOST
-#                               across every invocation of this script in one
-#                               pipeline run. 0 restores the old
-#                               immediately-structural behaviour. See the
-#                               cell_ready_wait block below for the two
-#                               measurements that justify the number.
+#                               SEPARATE wall-clock budget for the NOT-READY
+#                               window (see the three faces below), default
+#                               7200s = 2h. It is ONE DEADLINE FOR THE WHOLE
+#                               RUN, stamped by the first not-ready answer from
+#                               any host on any leg and never reset — not a
+#                               per-host, per-leg or per-window budget. 0
+#                               restores the old immediately-structural
+#                               behaviour. See the not-ready block below for
+#                               the two dated measurements that justify it.
 #        STAGE_CELL_READY_POLL_SECS
 #                               poll cadence inside that window (default 60s).
 #        STAGE_CELL_READY_STATE_DIR
-#                               where the per-host readiness clock is kept
-#                               (default ${WORKSPACE:-${TMPDIR:-/tmp}}/.stage-cell-ready,
+#                               where that ONE run-level deadline is kept, in a
+#                               single `run-deadline` file (default
+#                               ${WORKSPACE:-${TMPDIR:-/tmp}}/.stage-cell-ready,
 #                               plus /${BUILD_TAG} when Jenkins sets one). The
-#                               clock is shared by the legs of ONE run and by
+#                               deadline is shared by the legs of ONE run and by
 #                               nothing else, so a caller that orchestrates
 #                               several legs outside Jenkins MUST pass a fresh
 #                               dir per run.
+#        STAGE_JSON_NODE        interpreter used to answer ONE question about a
+#                               response body (default `node`, which this script
+#                               already needs for the SDK packaging step). With
+#                               no interpreter nothing JSON-based classifies and
+#                               no blob forward is confirmed — the raw-text
+#                               CellDisabled face still works.
+#        STAGE_HARD_TIMEOUT_SECS
+#                               THE COMPLETION BOUND for this invocation, in
+#                               seconds (default readiness deadline + transport
+#                               budget + 1500). The readiness deadline below is
+#                               a RETRY-START cutoff and bounds no request; this
+#                               does, by re-execing the script under coreutils
+#                               `timeout`. 0 disables it.
 set -euo pipefail
 
 DIST_DIR="$1"
@@ -52,154 +67,626 @@ KIND="${4:-browser}"
 DO_PATCH="${DO_PATCH:-0}"
 ATTEMPTS="${STAGE_BLOB_ATTEMPTS:-60}"
 STAGE_BUDGET_SECS="${STAGE_BLOB_BUDGET_SECS:-360}"
-# Set by stage_once's PATCH leg when the peer's shed envelope advertises a
-# retryAfter (seconds) — read and cleared by the outer retry loop below.
+# Set by stage_once when a shed envelope advertises a retryAfter (seconds),
+# NORMALISED where it is read — see normalize_retry_after. Read and cleared by
+# the outer retry loop below.
 RETRY_AFTER_HINT=""
-# Set by stage_once when a write answered CellDisabled, so the outer loop can
-# name the last answer in the readiness log without re-issuing the call.
+# Set by stage_once when a write met one of the not-ready faces, so the outer
+# loop can name the last answer in the readiness log without re-issuing the
+# call.
 CELL_STATUS=""
 CELL_BODY=""
+CELL_FACE=""
+CELL_RETRY_AFTER=""
 
-# CELL-READINESS WINDOW (corrected 2026-09-21).
+# THE NOT-READY WINDOW — three faces, ONE run-level deadline (2026-09-21).
 #
-# `CellDisabled` is what the conductor answers when an installed cell is not in
-# its `running_cells` map (holochain conductor.rs:1663). That names a STATE, not
-# a cause and not a cure: it does not say why the cell is absent, and it does
-# not say whether it will come back. Two measurements taken 2026-09-21 say it
-# frequently does, on its own:
-#   - local household: a conductor's interfaces accept calls before its cells
-#     are running; zome calls answered CellDisabled for up to ~11min after
-#     start and then succeeded with no intervention.
-#   - live fleet (Loki, 72h, three separate restarts): matthew's and adam's
-#     OWN-cell CellDisabled lines stopped within 0-4min of that conductor's
-#     "Conductor ready." line (matthew ready 2026-09-20T12:49:32Z, adam
-#     13:11:40Z; one later matthew reconnect cleared after ~35min) and had not
-#     recurred in the 13-19h since — both cells publishing ops.
-# App builds #1709/#1712/#1714 each ran INSIDE that post-roll window and spent
-# their whole 360s transport budget there, so the pipeline was losing a race
-# against a state that clears, not meeting a permanent answer.
+# HISTORY, because the shape of the bound is the whole lesson.
+#   1. PER-LEG. Every leg met the post-roll window alone and spent its own 360s
+#      transport budget on it. App #1712 burned 63 minutes across eight
+#      combinations and authored no head.
+#   2. PER-HOST-WITH-CLEARING (a6b44de0f). A separate readiness budget, shared
+#      per doorway host, cleared on recovery. Better, but a recovery replenished
+#      the whole budget, so a run could spend 2h per host, twice, and the
+#      "45 min" in the header bounded nothing a caller could reason about.
+#   3. RUN-LEVEL DEADLINE (here). ONE stamp for the whole run, written by the
+#      first not-ready answer from any host on any leg and NEVER reset. A second
+#      window in the same run inherits what is left. That is the only shape in
+#      which the number in STAGE_CELL_READY_BUDGET_SECS is the run's ceiling on
+#      waiting rather than a per-something multiplier.
 #
-# So we WAIT for it — on its own budget, separate from the transport/shed
-# budget, and SHARED PER DOORWAY HOST across every invocation of this script in
-# one pipeline run (each slug x kind x leg is a separate invocation). That
-# sharing is what keeps the 63-minute pathology cured: the FIRST leg against a
-# host waits, and once that host's budget is spent every later leg against it
-# fails in milliseconds instead of re-spending the budget eight times over.
-# Exhausting the budget is a MEASUREMENT ("still unavailable after Ns"), not a
-# diagnosis — what it licenses is reading the conductor's app/cell state, which
+# THREE FACES, because "not ready" reached the wire three different ways and
+# only the first was ever classified:
+#   - cell-not-running: the body carries `CellDisabled` — an installed cell is
+#     not in the conductor's `running_cells` map (conductor.rs:1663). A STATE,
+#     not a cause and not a cure.
+#   - catching-up: HTTP 503 whose top-level JSON `status` is "catching-up" —
+#     the doorway declaring ITSELF shedding writes. Not 429, and not a 503
+#     without that field: those stay on the transport ladder exactly as before.
+#   - storage-forward-timeout: a blob PUT answered 200 with
+#     `forwarded_to_storage` not true and a top-level `error` that starts
+#     "could not reach storage to forward the blob" whose transport CAUSE names
+#     a timeout. That is a forward that timed out — availability unknown; it is
+#     retried on the readiness deadline, never read as "storage is up".
+#
+# THE TWO DATED MEASUREMENTS behind the 7200s default:
+#   - 2026-09-21 (own-cell CellDisabled): a local-household conductor answered
+#     CellDisabled for up to ~11min after start and then succeeded untouched;
+#     on the live fleet (Loki, 72h, three restarts) matthew's and adam's
+#     own-cell CellDisabled lines stopped 0-4min after that conductor's
+#     "Conductor ready." line, and "Conductor ready." itself lands ~20-45min
+#     after a roll.
+#   - 2026-09-21 (app #1715, started right after a fleet roll): ZERO
+#     CellDisabled. Instead every blob PUT answered 200 with
+#     `"forwarded_to_storage":false` and a storage-forward TIMEOUT, and every
+#     head PATCH was shed 503 {"status":"catching-up","retryAfter":30,...}. The
+#     build ran 103 minutes and deployed nothing. Two hours after the roll both
+#     doorways reported shedding:false.
+# So the post-roll not-ready window has three faces and lasts ~100-120min, and
+# 7200s is the first round number that covers the measured worst case.
+#
+# Exhausting the deadline is a MEASUREMENT, not a diagnosis — what it licenses
+# is reading the doorway's /health/serving and the storage peer's state, which
 # this script cannot see from the far side of a doorway.
-CELL_READY_BUDGET_SECS="${STAGE_CELL_READY_BUDGET_SECS:-2700}"
+CELL_READY_BUDGET_SECS="${STAGE_CELL_READY_BUDGET_SECS:-7200}"
 CELL_READY_POLL_SECS="${STAGE_CELL_READY_POLL_SECS:-60}"
-# The clock is shared by the legs of ONE run and by nothing else. Under Jenkins
-# BUILD_TAG makes that scoping automatic; a caller that orchestrates several
-# legs outside Jenkins (hc-mesh-prologue.sh, run-mesh-quiesce-stage.sh) creates
-# one fresh dir per run and exports it. The 6h age guard below is the backstop
-# for anything that still slips through, never the primary scoping.
+
+# THE COMPLETION BOUND — and it is NOT the readiness deadline (2026-09-21).
+#
+# Everything else in this file is a RETRY-START cutoff: it decides whether a new
+# offer may BEGIN, and says nothing about when one ENDS. This script issues its
+# requests without a per-request timeout (deliberately — a per-operation
+# `--max-time` weave was tried and reviewed off), so one stalled connection, or a
+# stalled deliverability gate, can outlive every budget here. A CI delivery stage
+# needs an independently enforced bound, and it has to live in THIS file: the
+# root Jenkinsfile is at its CPS bytecode ceiling and must not grow a wrapper per
+# call site.
+#
+# So the script bounds ITSELF: it re-execs once under coreutils `timeout`,
+# SIGTERM at the bound and SIGKILL 30s later. Honest worst cases:
+#   per invocation: STAGE_HARD_TIMEOUT_SECS. Hard, enforced by signal.
+#   per run of N legs: N x that in theory. Realistically one readiness deadline
+#   B plus the sum of the per-leg transport budgets, because B is stamped once
+#   for the whole run and every later leg inherits only what is left of it.
+# The default is B + transport + 1500s — the browser deliverability gate's ~925s
+# six-attempt ladder plus slack. No `timeout` on PATH is a WARN, not a refusal:
+# running unbounded is what every version before this one did.
+#
+# ONE decision about `timeout`, made here and shared by the wrapper below AND by
+# the JSON parser helpers further down. They used to ask separately, so a runner
+# without `timeout` warned that it would continue unbounded and then failed every
+# healthy upload, because the parser still invoked `timeout` unconditionally.
+STAGE_TIMEOUT_OK=0
+if command -v timeout >/dev/null 2>&1; then
+    STAGE_TIMEOUT_OK=1
+else
+    echo "  ⊘ WARN: coreutils 'timeout' is not on PATH — this invocation runs with NO completion bound (only the retry-start cutoffs below) and the JSON parser runs unbounded. Both are what every version before this one did." >&2
+fi
+
+if [ "${STAGE_HARD_TIMEOUT_ACTIVE:-0}" != "1" ] && [ "${STAGE_TIMEOUT_OK}" -eq 1 ]; then
+    STAGE_HARD_TIMEOUT_SECS="${STAGE_HARD_TIMEOUT_SECS:-$(( CELL_READY_BUDGET_SECS + STAGE_BUDGET_SECS + 1500 ))}"
+    if [ "${STAGE_HARD_TIMEOUT_SECS}" -gt 0 ] 2>/dev/null; then
+        # Resolve OUR path: this script is normally invoked as
+        # `bash scripts/ci/stage-spa-blob.sh …`, so $0 is a relative path and
+        # the re-exec must not depend on the child's working directory.
+        stage_self="$0"
+        case "${stage_self}" in
+            /*) : ;;
+            *) stage_self="$(cd "$(dirname "${stage_self}")" && pwd)/$(basename "${stage_self}")" ;;
+        esac
+        export STAGE_HARD_TIMEOUT_ACTIVE=1
+        export STAGE_HARD_TIMEOUT_SECS
+        # BACKGROUND + FORWARD. A caller that sends SIGTERM to the PID it
+        # launched must actually stop the staging work; with a foreground
+        # supervisor this shell died and `timeout`'s child kept uploading and
+        # PATCHing. `<&0` keeps stdin inherited (bash otherwise points an async
+        # command at /dev/null); stdout and stderr are inherited as usual.
+        timeout --kill-after=30 "${STAGE_HARD_TIMEOUT_SECS}" \
+            bash "${stage_self}" "$@" <&0 &
+        hard_pid=$!
+        trap 'kill -TERM "${hard_pid}" 2>/dev/null || true' TERM
+        trap 'kill -INT "${hard_pid}" 2>/dev/null || true' INT
+        trap 'kill -HUP "${hard_pid}" 2>/dev/null || true' HUP
+        # `wait` returns 128+n when a trap fires rather than when the child
+        # exits, so loop until the child is really gone or its status is real.
+        hard_rc=0
+        while :; do
+            hard_rc=0
+            wait "${hard_pid}" || hard_rc=$?
+            if [ "${hard_rc}" -gt 128 ] && kill -0 "${hard_pid}" 2>/dev/null; then
+                continue
+            fi
+            break
+        done
+        trap - TERM INT HUP
+        if [ "${hard_rc}" -eq 124 ] || [ "${hard_rc}" -eq 137 ]; then
+            echo "ERROR: [${SLUG}] hard per-invocation bound of ${STAGE_HARD_TIMEOUT_SECS}s reached — a request or the deliverability gate stalled past every budget in this script; host left STALE" >&2
+            exit 1
+        fi
+        exit "${hard_rc}"
+    fi
+fi
+
+# ONE temp dir for every response body this invocation captures, and ONE exit
+# trap that owns it. Response bodies are written to FILES and parsed from those
+# ORIGINAL BYTES: a body copied through a shell variable has already lost its
+# NULs and its trailing newlines, and `{"forwarded_to_storage":tr<NUL>ue}` —
+# invalid JSON on the wire — was read as a confirmed forward once that happened.
+# The shell copies below are kept for LOGGING only.
+STAGE_TMP_DIR="$(mktemp -d 2>/dev/null)" || STAGE_TMP_DIR=""
+if [ -z "${STAGE_TMP_DIR}" ] || [ ! -d "${STAGE_TMP_DIR}" ]; then
+    echo "ERROR: [${SLUG}] could not create a temporary directory for response bodies" >&2
+    exit 2
+fi
+# package_dir is filled in further down; naming it here keeps ONE exit trap for
+# the whole script (a second `trap … EXIT` would silently replace this one).
+package_dir=""
+trap 'rm -rf "${STAGE_TMP_DIR}" ${package_dir:+"${package_dir}"}' EXIT
+# The deadline is shared by the legs of ONE run and by nothing else. Under
+# Jenkins BUILD_TAG makes that scoping automatic; a caller that orchestrates
+# several legs outside Jenkins (hc-mesh-prologue.sh, run-mesh-quiesce-stage.sh)
+# creates one fresh dir per run and exports it. CELL_READY_DIR_SCOPED records
+# which of those we got: the age guard below applies ONLY to the unscoped
+# fallback, because in a scoped dir an "old" record still belongs to this run.
 CELL_READY_STATE_DIR="${STAGE_CELL_READY_STATE_DIR:-${WORKSPACE:-${TMPDIR:-/tmp}}/.stage-cell-ready}"
-if [ -z "${STAGE_CELL_READY_STATE_DIR:-}" ] && [ -n "${BUILD_TAG:-}" ]; then
-    CELL_READY_STATE_DIR="${CELL_READY_STATE_DIR}/$(printf '%s' "${BUILD_TAG}" | tr -c 'A-Za-z0-9._-' '_')"
+CELL_READY_DIR_SCOPED=1
+if [ -z "${STAGE_CELL_READY_STATE_DIR:-}" ]; then
+    if [ -n "${BUILD_TAG:-}" ]; then
+        CELL_READY_STATE_DIR="${CELL_READY_STATE_DIR}/$(printf '%s' "${BUILD_TAG}" | tr -c 'A-Za-z0-9._-' '_')"
+    else
+        CELL_READY_DIR_SCOPED=0
+    fi
 fi
 CELL_READY_STATE_MAX_AGE_SECS=21600
 CELL_WAIT_ENTERED=0   # this invocation has already logged the entering line
+# The run's first-not-ready stamp, held in THIS shell as well as on disk. It is
+# assigned by cell_ready_stamp_deadline, which the loop-owning shell calls
+# directly — never inside a command substitution, whose subshell assignment
+# would be lost and would let the next answer restamp the deadline.
 CELL_READY_FIRST_SEEN=""
+CELL_READY_WARNED=0
 
 cell_ready_stamp() {
     date -u -d "@$1" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || printf 'epoch %s' "$1"
 }
 
+# ONE QUESTION ABOUT THE ORIGINAL RESPONSE BYTES (2026-09-21).
+#
+# The classes above turn on JSON facts, and neither a grep nor a shell variable
+# can carry them. A grep cannot see string boundaries or nesting, so
+# `{"error":{"status":"catching-up"}}` and `[{"status":"catching-up"}]` would
+# read as top-level declarations. A shell variable is worse: command substitution
+# silently drops NUL bytes and trailing newlines, so `{"forwarded_to_storage":
+# tr<NUL>ue}` — invalid JSON on the wire — reached the parser as valid `true` and
+# a byte-seed reported "storage forward CONFIRMED". Each is a wrong routing
+# decision worth up to two hours, or a head declared against bytes nobody holds.
+#
+# So: curl writes the body to a FILE, and this reads THAT FILE as a Buffer. It
+# rejects, in order, more than 1 MiB of BYTES (not characters — 600k `é` is
+# 1.2 MB in 600k characters), any NUL byte, anything that is not valid UTF-8,
+# anything that is not JSON, any root that is not an object, and any field that
+# is not an OWN property. Then it answers the ONE question asked and returns a
+# fixed token or a fixed exit status — every comparison happens inside node, so
+# no compared value ever passes through the shell.
+#
+# node, not jq and not python: jq is not in the checked-in CI-builder image and
+# python is not on the deploy path (scripts/ci/.epr-meta), while node IS both —
+# this script already shells out to it for the SDK packaging step, and the two
+# non-Jenkins callers (hc-mesh-prologue.sh, run-mesh-quiesce-stage.sh) run in a
+# dev workspace and that same image. STAGE_JSON_NODE names the interpreter so a
+# harness can point it at a real node while faking the packaging one.
+#
+# Arguments ride after `--` so a field named `--version` cannot be read as a node
+# option.
+JSON_NODE="${STAGE_JSON_NODE:-node}"
+JSON_PARSER_OK=0
+if command -v "${JSON_NODE}" >/dev/null 2>&1; then
+    JSON_PARSER_OK=1
+else
+    # FAIL CLOSED: with no parser, no answer is classified catching-up or
+    # storage-forward-timeout (so a leg reds on the transport ladder rather than
+    # waiting out an unread body) and no blob forward is ever confirmed (so a
+    # byte-seed can never report success it cannot prove). The raw-text
+    # CellDisabled face is unaffected — it is a substring match, not a field.
+    echo "  ⊘ WARN: '${JSON_NODE}' is not executable — response bodies cannot be parsed. Only the raw-text CellDisabled face can be recognised, no catching-up or storage-forward-timeout answer will be waited out, and no blob forward can be confirmed; this leg fails closed." >&2
+fi
+
+# A PARSER THAT DID NOT RUN IS NOT A NEGATIVE ANSWER. The program answers with
+# BOTH a one-character liveness token on stdout and a distinct exit code:
+#   `Y` + exit 0  — yes; for the print ops the value follows the Y.
+#   `N` + exit 1  — a clean negative ABOUT THE BODY: field absent, wrong type,
+#                   value mismatch, or bytes that are not parsable JSON (over
+#                   1 MiB, a NUL, not UTF-8, not an object root).
+#   anything else — the parser could not run: `timeout` killed it (124), node
+#                   crashed, the interpreter is missing. The token is what makes
+#                   that distinguishable, because node's own crash exit is 1 too.
+# Either way the caller FAILS CLOSED; the difference is that a could-not-run gets
+# one explicit diagnostic naming it a runner problem, so an operator does not
+# read it as the doorway's answer.
+JSON_PROGRAM='
+const fs = require("fs");
+const LIMIT = 1048576;
+const no = () => { process.stdout.write("N"); process.exit(1); };
+const [file, op, field, operand] = process.argv.slice(1);
+let buf;
+try { buf = fs.readFileSync(file); } catch (e) { no(); }
+if (buf.length > LIMIT) no();
+if (buf.includes(0)) no();
+let text;
+try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch (e) { no(); }
+let o;
+try { o = JSON.parse(text); } catch (e) { no(); }
+if (o === null || typeof o !== "object" || Array.isArray(o)) no();
+if (!Object.prototype.hasOwnProperty.call(o, field)) no();
+const v = o[field];
+const yes = (s) => { process.stdout.write("Y" + (s === undefined ? "" : s)); process.exit(0); };
+if (op === "is_true") { if (v === true) yes(); no(); }
+if (op === "str_eq") { if (typeof v === "string" && v === operand) yes(); no(); }
+if (op === "str_prefix") { if (typeof v === "string" && v.startsWith(operand)) yes(); no(); }
+if (op === "print_str") { if (typeof v === "string") yes(v); no(); }
+if (op === "print_uint") {
+  let s = null;
+  if (typeof v === "number" && Number.isInteger(v) && v >= 0) s = String(v);
+  else if (typeof v === "string") s = v;
+  if (s !== null && /^[0-9]{1,6}$/.test(s)) yes(s);
+  no();
+}
+no();
+'
+
+# 30s, not 10: the body is at most 1 MiB, so the only way to exceed this is a
+# runner so loaded that ten seconds was a coin flip — which is exactly how a
+# healthy upload started reporting an unconfirmed forward.
+JSON_TIMEOUT_SECS=30
+
+# Prints the program's raw answer (token + value); returns its exit code.
+# Runs unbounded when `timeout` is absent, under the single WARN printed above.
+json_run() {
+    if [ "${STAGE_TIMEOUT_OK}" -eq 1 ]; then
+        timeout "${JSON_TIMEOUT_SECS}" "${JSON_NODE}" -e "${JSON_PROGRAM}" -- "$@"
+    else
+        "${JSON_NODE}" -e "${JSON_PROGRAM}" -- "$@"
+    fi
+}
+
+json_could_not_run() {
+    echo "  ⊘ [${SLUG}] the local JSON parser did not complete (exit $1) while checking '$2' — treating the answer as unconfirmed; this is a runner problem, not the doorway's answer" >&2
+    return 0
+}
+
+# Exit 0 only on a definite YES. Any other answer — a clean negative, a missing
+# file, no parser, or a parser that could not run — is NO.
+json_check() {
+    local file="$1" rc=0 out=""
+    shift
+    [ "${JSON_PARSER_OK}" -eq 1 ] || return 1
+    [ -f "${file}" ] || return 1
+    out="$(json_run "${file}" "$@" 2>/dev/null)" || rc=$?
+    case "${out}" in
+        Y*) [ "${rc}" -eq 0 ] && return 0 ;;
+        N)  [ "${rc}" -eq 1 ] && return 1 ;;
+    esac
+    json_could_not_run "${rc}" "$1"
+    return 1
+}
+
+# Print a value node vouched for, or nothing. The printed text is used only for
+# the cause heuristic and for a seconds count, never for a classification gate.
+json_print() {
+    local file="$1" rc=0 out=""
+    shift
+    [ "${JSON_PARSER_OK}" -eq 1 ] || return 0
+    [ -f "${file}" ] || return 0
+    out="$(json_run "${file}" "$@" 2>/dev/null)" || rc=$?
+    if [ "${rc}" -eq 0 ]; then
+        case "${out}" in
+            Y*) printf '%s' "${out#Y}"; return 0 ;;
+        esac
+    elif [ "${rc}" -eq 1 ] && [ "${out}" = "N" ]; then
+        return 0
+    fi
+    json_could_not_run "${rc}" "$1"
+    return 0
+}
+
+# Exactly the contract the header promises: a blob PUT counts as delivered only
+# on an own top-level boolean `true`. The string "true", a spaced `false`, an
+# absent field, a NUL-corrupted body and a malformed body all fail.
+forward_confirmed() {
+    json_check "$1" is_true forwarded_to_storage
+}
+
+# The SINGLE place a Retry-After value is normalised, so the same rule governs
+# the readiness nap and the ordinary transport sleep. At most 6 digits: bash
+# cannot compare more, and a 39-digit value once reached `sleep` verbatim past
+# every cap.
+normalize_retry_after() {
+    local v="$1"
+    case "${v}" in ''|*[!0-9]*) return 0 ;; esac
+    [ "${#v}" -le 6 ] || return 0
+    printf '%s' "${v}"
+}
+
+# Header first (the doorway's shed envelope carries both), body second.
+read_retry_after() {
+    local headers_file="$1" body_file="$2" v=""
+    v=$(grep -i '^Retry-After:' "${headers_file}" 2>/dev/null \
+        | tail -1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//') || v=""
+    v="$(normalize_retry_after "${v}")"
+    [ -n "${v}" ] || v="$(json_print "${body_file}" print_uint retryAfter)"
+    printf '%s' "${v}"
+}
+
+# Remove BALANCED parenthetical segments, innermost first, until none is left.
+# One pass of `s/([^()]*)//g` removes only the innermost pair, so
+# `connect error (timeout diagnostic (retry disabled)): connection refused`
+# still carried the word "timeout" into the match and classified a refused
+# connection as a timeout. The loop is bounded; whatever survives 32 passes is
+# left alone and simply read as-is.
+strip_balanced_parens() {
+    local s="$1" prev i=0
+    while [ "${i}" -lt 32 ]; do
+        prev="${s}"
+        s="$(printf '%s' "${s}" | sed 's/([^()]*)//g')"
+        [ "${s}" = "${prev}" ] && break
+        i=$(( i + 1 ))
+    done
+    printf '%s' "${s}"
+}
+
+# Which face of "not ready yet" is this answer, if any? Prints the face name, or
+# nothing when the answer belongs to another class.
+# $1 = HTTP status (may be empty when the leg could not read one),
+# $2 = response BODY FILE (the original bytes), $3 = the same body as text, for
+# the one raw-text match.
+not_ready_face() {
+    local status="$1" body_file="$2" body="$3" err
+    # CellDisabled arrives inside a free-text conductor error, so it is matched
+    # in the raw body on purpose — a substring of a message, not a field. Bash's
+    # own substring test, not `grep -q`: grep exits at the first match and the
+    # producer then takes SIGPIPE, which under `pipefail` made the whole pipeline
+    # fail and the face vanish whenever the body ran past the matching line.
+    if [[ "${body}" == *CellDisabled* ]]; then
+        printf 'cell-not-running'
+        return 0
+    fi
+    if [ "${status}" = "503" ] && json_check "${body_file}" str_eq status catching-up; then
+        printf 'catching-up'
+        return 0
+    fi
+    # Deliberately narrow. `forwarded_to_storage:false` alone is not enough, and
+    # neither is the word "timeout" anywhere in the body: the doorway renders the
+    # whole transport chain INCLUDING THE URL into that error (seed.rs
+    # `transport_reason`), so a host named `timeout-storage`, or a DNS failure
+    # against one, would otherwise buy a two-hour wait. The gate — field absent
+    # or not `true`, plus an exact string prefix — is decided inside node;
+    # balanced parentheses and http(s) tokens are then deleted and only what is
+    # left is read for the cause. Connection-refused, "no storage_url is
+    # configured" and every other named cause stay on the transport ladder, where
+    # a persistent failure reds the leg in 360s.
+    if ! forward_confirmed "${body_file}" \
+       && json_check "${body_file}" str_prefix error 'could not reach storage to forward the blob'; then
+        err="$(json_print "${body_file}" print_str error)"
+        err="$(strip_balanced_parens "${err}")"
+        if printf '%s' "${err}" \
+            | sed 's#https\{0,1\}://[^[:space:]]*##g' \
+            | grep -qi 'timed out\|timeout'; then
+            printf 'storage-forward-timeout'
+            return 0
+        fi
+    fi
+    return 0
+}
+
+# The one-line human reading of a face, for the log.
+not_ready_phrase() {
+    case "$1" in
+        cell-not-running)
+            printf 'the cell this write must go through is not running on the conductor behind this doorway' ;;
+        catching-up)
+            printf 'the doorway declares itself catching up and is shedding writes' ;;
+        storage-forward-timeout)
+            printf 'the forward of the bytes to storage timed out — availability unknown; retried on the readiness deadline' ;;
+        *)
+            printf 'the holder behind this doorway is not ready to take a write' ;;
+    esac
+}
+
+# ONE record for the whole run — not one per host, and never deleted by a
+# recovery.
 cell_ready_state_file() {
-    printf '%s/%s' "${CELL_READY_STATE_DIR}" \
-        "$(printf '%s' "${DOORWAY_EPR_URL}" | tr -c 'A-Za-z0-9._-' '_')"
+    printf '%s/run-deadline' "${CELL_READY_STATE_DIR}"
 }
 
-cell_ready_mark_exhausted() {
-    local f
+cell_ready_warn() {
+    [ "${CELL_READY_WARNED}" -eq 0 ] || return 0
+    CELL_READY_WARNED=1
+    echo "  ⊘ WARN: $1" >&2
+    return 0
+}
+
+# A stamp this script is willing to do arithmetic on: 1-11 decimal digits (11
+# covers epoch seconds well past year 5000 and stays inside bash's signed
+# range), and not in the future beyond 5s of clock skew. `99999999999999999999`
+# passed the old digits-only read and produced 7.7e18 seconds "remaining"; a
+# future stamp simply extended the configured budget. Both are garbage, and
+# garbage takes the declared per-invocation fallback.
+cell_ready_valid_stamp() {
+    local v="$1" now="$2"
+    case "${v}" in ''|*[!0-9]*) return 1 ;; esac
+    [ "${#v}" -le 11 ] || return 1
+    [ "${v}" -le "$(( now + 5 ))" ] || return 1
+    return 0
+}
+
+cell_ready_read_stamp() {
+    sed -n 's/^first_not_ready=\([0-9][0-9]*\)$/\1/p' "$1" 2>/dev/null | head -1
+}
+
+# Establish this RUN's first-not-ready stamp, once. Assigns CELL_READY_FIRST_SEEN
+# in the caller's shell, so an unwritable dir or an unusable record degrades to a
+# per-invocation budget with one loud WARN — never to a restamp on every answer.
+# $1 = now (epoch).
+cell_ready_stamp_deadline() {
+    local now="$1" f persisted="" unusable=0 winner="" tmp=""
+    [ -z "${CELL_READY_FIRST_SEEN}" ] || return 0
     f="$(cell_ready_state_file)"
-    [ -f "${f}" ] && printf 'exhausted=%s\n' "$(date +%s)" >> "${f}" 2>/dev/null
+    if [ -f "${f}" ]; then
+        persisted="$(cell_ready_read_stamp "${f}")"
+        if ! cell_ready_valid_stamp "${persisted}" "${now}"; then
+            # Unusable bytes in THIS run's record. Not removed and not replaced:
+            # that delete-and-replace is exactly the race that loses a first
+            # stamp. Declared per-invocation fallback, one WARN.
+            persisted=""
+            unusable=1
+            cell_ready_warn "the run-deadline record in '${CELL_READY_STATE_DIR}' holds no usable first_not_ready stamp — this run's deadline is held in THIS invocation only, so a later leg may start a fresh ${CELL_READY_BUDGET_SECS}s instead of inheriting what is left"
+        elif [ "${CELL_READY_DIR_SCOPED}" -eq 0 ] \
+           && [ "$(( now - persisted ))" -gt "${CELL_READY_STATE_MAX_AGE_SECS}" ]; then
+            # A COMPLETE record from an earlier run, in the shared fallback dir.
+            # Nothing in this run can be racing for it, so removing it and
+            # publishing fresh is safe — and is the only way a later run in that
+            # dir ever gets a clock.
+            echo "  · [${SLUG}] ignoring a run-deadline record older than ${CELL_READY_STATE_MAX_AGE_SECS}s in the UNSCOPED fallback dir '${CELL_READY_STATE_DIR}' (left by an earlier run) — starting this run's deadline now" >&2
+            persisted=""
+            rm -f "${f}" 2>/dev/null || true
+        fi
+    fi
+    if [ -n "${persisted}" ]; then
+        CELL_READY_FIRST_SEEN="${persisted}"
+        return 0
+    fi
+    CELL_READY_FIRST_SEEN="${now}"
+    if [ "${unusable}" -eq 0 ] && mkdir -p "${CELL_READY_STATE_DIR}" 2>/dev/null; then
+        # PUBLISH A COMPLETE RECORD, ATOMICALLY, then ADOPT THE WINNER.
+        # `set -C` + printf was not atomic: it CREATED the file and only then
+        # filled it, so another leg could read an empty record, call it garbage,
+        # remove it and publish a later stamp — the first stamp lost. Writing the
+        # whole record to a temp file in the SAME directory and hard-linking it
+        # into place publishes only complete bytes, and `ln` fails rather than
+        # overwriting a winner. Losing the link is the common case under a
+        # parallel caller and costs nothing: we re-read either way.
+        #
+        # An UNUSABLE existing record is deliberately NOT deleted and replaced —
+        # that delete-and-replace IS the race. It takes the declared
+        # per-invocation fallback with the single WARN instead.
+        tmp="${CELL_READY_STATE_DIR}/.run-deadline.$$"
+        if printf 'first_not_ready=%s\n' "${now}" > "${tmp}" 2>/dev/null; then
+            ln "${tmp}" "${f}" 2>/dev/null || true
+        fi
+        rm -f "${tmp}" 2>/dev/null || true
+        winner="$(cell_ready_read_stamp "${f}")"
+        if cell_ready_valid_stamp "${winner}" "${now}"; then
+            CELL_READY_FIRST_SEEN="${winner}"
+            return 0
+        fi
+    fi
+    cell_ready_warn "could not record this run's readiness deadline in '${CELL_READY_STATE_DIR}' — it is held in THIS invocation only, so a later leg of the same run starts a fresh ${CELL_READY_BUDGET_SECS}s instead of inheriting what is left"
     return 0
 }
 
-# The cell answered a write successfully after a wait: this host's window is
-# OVER, so the clock is dropped. A later CellDisabled against the same host is
-# a NEW window and gets a full budget — inheriting a spent one would make the
-# next leg fail on a condition this leg just watched clear.
-cell_ready_clear() {
-    rm -f "$(cell_ready_state_file)" 2>/dev/null || true
-    CELL_READY_FIRST_SEEN=""
-    return 0
+# Seconds left of the run deadline. Only meaningful once it has been stamped.
+cell_ready_remaining() {
+    printf '%s' "$(( CELL_READY_BUDGET_SECS - ( $(date +%s) - CELL_READY_FIRST_SEEN ) ))"
 }
 
-# Called with the CellDisabled answer a write just received. Returns
+# Cap an ordinary ladder sleep by what is left of an OPEN readiness window. With
+# no window open the value is returned unchanged, so behaviour outside a window
+# is exactly what it was.
+cell_ready_cap_sleep() {
+    local want="$1" left
+    [ -n "${CELL_READY_FIRST_SEEN}" ] || { printf '%s' "${want}"; return 0; }
+    left="$(cell_ready_remaining)"
+    [ "${left}" -lt 0 ] && left=0
+    [ "${want}" -gt "${left}" ] && want="${left}"
+    printf '%s' "${want}"
+}
+
+# ONCE A WINDOW IS OPEN, NO NEW ATTEMPT MAY START AT OR AFTER THE DEADLINE — by
+# ANY path. The readiness nap is not the only way time passes inside an open
+# window: an ORDINARY transport shed sleeps on its own ladder, and the
+# DECLARE_ONLY ladder sleeps on a third. Measured before this gate existed, a
+# 12s budget meeting `catching-up -> ordinary 503 -> success` dispatched attempts
+# at 0, 10 and 40s and returned 0. So every loop that can begin an attempt asks
+# here first. With NO window open this is always true and nothing changes.
+readiness_may_start() {
+    [ -n "${CELL_READY_FIRST_SEEN}" ] || return 0
+    [ "$(cell_ready_remaining)" -gt 0 ]
+}
+
+# Called with the not-ready answer a write just received. Returns
 #   0 -> waited; the caller must RE-OFFER the same idempotent,
 #        content-addressed call (no attempt and no transport budget consumed).
-#   1 -> this host's readiness budget is spent (or waiting is switched off):
+#   1 -> this RUN's readiness deadline is spent (or waiting is switched off):
 #        the caller fails the leg.
-# $1 = leg label for the log, $2 = HTTP status, $3 = response body.
+#
+# DEADLINE SEMANTICS, stated exactly as implemented: the deadline governs when a
+# readiness RE-OFFER may START. It is checked before every attempt
+# (readiness_may_start), immediately before each nap and again immediately after,
+# and no attempt is ever started at or after expiry. An attempt already in flight
+# may finish after the deadline — nothing here bounds a single request; the hard
+# per-invocation timeout at the top of this file is what bounds completion.
+#
+# $1 = leg label, $2 = HTTP status, $3 = body, $4 = face, $5 = advertised
+# retryAfter (already normalised, may be empty).
 cell_ready_wait() {
-    local label="$1" status="$2" body="$3"
-    local now f first_seen exhausted elapsed remaining nap
-    now="$(date +%s)"
+    local label="$1" status="$2" body="$3" face="$4" advertised="$5"
+    local now elapsed remaining nap
 
     if [ "${CELL_READY_BUDGET_SECS}" -le 0 ]; then
-        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — the cell is not running on the conductor behind this doorway (HTTP ${status}): ${body}" >&2
+        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — $(not_ready_phrase "${face}") (face=${face}, HTTP ${status}): ${body}" >&2
         echo "    STAGE_CELL_READY_BUDGET_SECS=0 — the caller switched readiness waiting off, so this is reported without waiting. Host left STALE." >&2
         return 1
     fi
 
-    f="$(cell_ready_state_file)"
-    first_seen="${CELL_READY_FIRST_SEEN}"
-    exhausted=0
-    if [ -z "${first_seen}" ] && [ -f "${f}" ]; then
-        first_seen="$(sed -n 's/^first_seen=\([0-9][0-9]*\)$/\1/p' "${f}" 2>/dev/null | head -1)"
-        if [ -n "${first_seen}" ] && [ "$(( now - first_seen ))" -gt "${CELL_READY_STATE_MAX_AGE_SECS}" ]; then
-            echo "  · [${SLUG}] ignoring a cell-readiness record for ${DOORWAY_EPR_URL} older than ${CELL_READY_STATE_MAX_AGE_SECS}s (left by an earlier run sharing this state dir) — starting a fresh clock" >&2
-            first_seen=""
-            rm -f "${f}" 2>/dev/null || true
-        elif [ -n "${first_seen}" ] && grep -q '^exhausted=' "${f}" 2>/dev/null; then
-            exhausted=1
-        fi
-    fi
-    if [ -z "${first_seen}" ]; then
-        first_seen="${now}"
-        if mkdir -p "${CELL_READY_STATE_DIR}" 2>/dev/null; then
-            printf 'first_seen=%s\n' "${first_seen}" > "${f}" 2>/dev/null || true
-        else
-            echo "  ⊘ WARN: cell-readiness state dir '${CELL_READY_STATE_DIR}' is not writable — this host's budget cannot be shared with the other legs of this run" >&2
-        fi
-    fi
-    CELL_READY_FIRST_SEEN="${first_seen}"
-
-    elapsed=$(( now - first_seen ))
+    now="$(date +%s)"
+    cell_ready_stamp_deadline "${now}"
+    elapsed=$(( now - CELL_READY_FIRST_SEEN ))
     remaining=$(( CELL_READY_BUDGET_SECS - elapsed ))
 
-    if [ "${exhausted}" -eq 1 ]; then
-        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — this host's ${CELL_READY_BUDGET_SECS}s readiness budget was already spent earlier in this run (first CellDisabled $(cell_ready_stamp "${first_seen}"), ${elapsed}s ago) and the cell was still unavailable then." >&2
-        echo "    Failing immediately rather than re-spending that budget on this leg — the per-leg re-spend is what cost app #1712 63 minutes. Host left STALE." >&2
-        return 1
-    fi
-
-    # The budget is a DEADLINE: no re-offer is started past it, and no nap ever
-    # runs beyond it (a poll interval longer than what is left would otherwise
-    # spend more than the caller allowed — budget 1 / poll 60 must end at 1s).
     if [ "${remaining}" -le 0 ]; then
-        cell_ready_mark_exhausted
-        echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — readiness budget exhausted: the cell was still unavailable after ${elapsed}s (budget ${CELL_READY_BUDGET_SECS}s, first CellDisabled $(cell_ready_stamp "${first_seen}"); last answer HTTP ${status}: ${body})." >&2
-        echo "    That is a measurement, not a diagnosis — CellDisabled says only that the cell is not among the conductor's running cells. Read that conductor's app/cell state to learn why. Host left STALE." >&2
+        cell_ready_exhausted "${label}" "${status}" "${body}" "${face}" "${elapsed}"
         return 1
     fi
 
     if [ "${CELL_WAIT_ENTERED}" -eq 0 ]; then
         CELL_WAIT_ENTERED=1
-        echo "  ⏳ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — the cell this write must go through is not running on the conductor behind this doorway (HTTP ${status}): ${body}" >&2
-        echo "    Treating it as the post-restart readiness window rather than a final answer, on this measurement (2026-09-21): a local-household conductor answered CellDisabled for up to ~11min after start and then succeeded untouched, and on the live fleet (Loki, 72h, three restarts) own-cell CellDisabled stopped 0-4min after that conductor's 'Conductor ready.' line." >&2
-        echo "    Waiting up to ${CELL_READY_BUDGET_SECS}s for it (poll ${CELL_READY_POLL_SECS}s), on a budget SHARED by every leg against ${DOORWAY_EPR_URL} and separate from the ${STAGE_BUDGET_SECS}s transport budget." >&2
+        echo "  ⏳ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — $(not_ready_phrase "${face}") (face=${face}, HTTP ${status}): ${body}" >&2
+        echo "    Treating it as the post-roll not-ready window rather than a final answer, on two dated measurements: 2026-09-20 own-cell CellDisabled ends 0-4min after a conductor's 'Conductor ready.' line and ready lands ~20-45min after a roll; 2026-09-21 (app #1715) catching-up and storage-forward timeouts persisted ~100-120min after a roll." >&2
+        echo "    Waiting until this RUN's readiness deadline (${CELL_READY_BUDGET_SECS}s from the first not-ready answer at $(cell_ready_stamp "${CELL_READY_FIRST_SEEN}"), poll ${CELL_READY_POLL_SECS}s), shared by every leg and every host of this run and separate from the ${STAGE_BUDGET_SECS}s transport budget. The deadline governs when a re-offer may START; an attempt already in flight may finish past it." >&2
     fi
+
+    # nap = min(poll, advertised retryAfter, remaining), with a 5s floor applied
+    # only while there is more than 5s left (a retryAfter of 0 must not become a
+    # hot loop, and must not become a full poll interval either).
     nap="${CELL_READY_POLL_SECS}"
+    if [ -n "${advertised}" ] && [ "${advertised}" -lt "${nap}" ]; then
+        nap="${advertised}"
+    fi
     if [ "${nap}" -gt "${remaining}" ]; then
         nap="${remaining}"
     fi
-    echo "  … [${SLUG}] cell still not running on ${DOORWAY_EPR_URL} — ${elapsed}s waited, ${remaining}s left of ${CELL_READY_BUDGET_SECS}s; re-offering the same content-addressed ${label} in ${nap}s" >&2
+    if [ "${remaining}" -gt 5 ]; then
+        [ "${nap}" -lt 5 ] && nap=5
+    else
+        nap="${remaining}"
+    fi
+    echo "  … [${SLUG}] still not ready on ${DOORWAY_EPR_URL} (face=${face}${advertised:+, advertised retryAfter=${advertised}s}) — ${elapsed}s waited, ${remaining}s left of ${CELL_READY_BUDGET_SECS}s; re-offering the same content-addressed ${label} in ${nap}s" >&2
     sleep "${nap}"
+
+    # Check again after the nap: a re-offer must not START at or after expiry.
+    now="$(date +%s)"
+    elapsed=$(( now - CELL_READY_FIRST_SEEN ))
+    if [ "$(( CELL_READY_BUDGET_SECS - elapsed ))" -le 0 ]; then
+        cell_ready_exhausted "${label}" "${status}" "${body}" "${face}" "${elapsed}"
+        return 1
+    fi
+    return 0
+}
+
+cell_ready_exhausted() {
+    local label="$1" status="$2" body="$3" face="$4" elapsed="$5"
+    echo "  ✗ [${SLUG}] ${label} via ${DOORWAY_EPR_URL} — readiness deadline reached; the holder was still not ready after ${elapsed}s (last face=${face:-none}, budget ${CELL_READY_BUDGET_SECS}s, first not-ready answer of this run $(cell_ready_stamp "${CELL_READY_FIRST_SEEN}"); last answer HTTP ${status}: ${body}); an attempt in flight may have finished past it." >&2
+    echo "    That is a measurement, not a diagnosis — read the doorway's /health/serving and the storage peer's state. Host left STALE." >&2
     return 0
 }
 
@@ -281,8 +768,10 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     # Build the declare body in a file: a multi-KB base64 payload must not ride
     # in argv (length limits) and must not be re-quoted by the shell. The body
     # is byte-identical to the pre-sprint-3 one when there is no carried record.
-    declare_body_file="$(mktemp)"
-    trap 'rm -f "${declare_body_file}"' EXIT
+    # Lives in the ONE temp dir the single exit trap at the top already owns — a
+    # second `trap … EXIT` here would silently replace that one.
+    declare_body_file="${STAGE_TMP_DIR}/declare-request"
+    declare_answer_file="${STAGE_TMP_DIR}/declare-answer"
     if [ -n "${record_b64}" ]; then
         printf '{"headActionHash":"%s","record":"%s"}' "${head_hash}" "${record_b64}" \
             > "${declare_body_file}"
@@ -310,56 +799,82 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
     attempt=0
     max_attempts="${DECLARE_MAX_ATTEMPTS:-12}"
     declare_ok=0
+    declare_nap=0
+    declare_face=""
+    declare_status=""
+    declare_body=""
     while :; do
+        # The pre-dispatch gate. Reached after this ladder's OWN capped sleeps as
+        # well as after a readiness nap, which is the path that used to dispatch
+        # a POST at exactly the deadline (measured: 0, 10, 12 on a 12s budget).
+        if ! readiness_may_start; then
+            cell_ready_exhausted "canonical-head declare" "${declare_status}" \
+                "${declare_body}" "${declare_face}" \
+                "$(( $(date +%s) - CELL_READY_FIRST_SEEN ))"
+            echo "  ⚠ DECLARE_ONLY: this run's readiness deadline was reached before another declare could be offered to ${DOORWAY_EPR_URL} — peer keeps its own head until gossip/heal converges" >&2
+            break
+        fi
         attempt=$((attempt + 1))
-        declare_raw=$(curl -sS -o - -w '\n%{http_code}' -X POST \
+        declare_err=""
+        declare_status="$(curl -sS -o "${declare_answer_file}" -w '%{http_code}' -X POST \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN}" \
             --data-binary "@${declare_body_file}" \
-            "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" 2>&1) || {
-            echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_raw} — peer keeps its own head until gossip/heal converges" >&2
+            "${DOORWAY_EPR_URL}/db/content/${SLUG}/canonical-head" \
+            2>"${STAGE_TMP_DIR}/declare-stderr")" || {
+            declare_err="$(cat "${STAGE_TMP_DIR}/declare-stderr" 2>/dev/null)"
+            echo "  ⚠ DECLARE_ONLY: curl error POSTing canonical-head to ${DOORWAY_EPR_URL}: ${declare_err} — peer keeps its own head until gossip/heal converges" >&2
             exit 1
         }
-        declare_status="${declare_raw##*$'\n'}"
-        declare_body="${declare_raw%$'\n'*}"
+        # The body stays in its FILE for every classification; this copy is for
+        # the log lines only.
+        declare_body="$(cat "${declare_answer_file}" 2>/dev/null)"
         # Fourth class, and the reason it is handled ahead of the case: a
-        # CellDisabled answer CAN reach this ladder — storage answers it 503
-        # through `conductor_write_error` (so it would ride the shed arm's
-        # 12x30s ≈ 6min ladder) and a host still on a pre-fix binary answers it
-        # 502 with the marker in the body (so it would fall through to
-        # "structural" and stop). It is neither: it is the cell-readiness
-        # window, and it takes the SAME per-host budget the head PATCH uses
-        # below rather than this ladder's own attempt counter.
-        if [ "${declare_status#2}" = "${declare_status}" ] \
-           && printf '%s' "${declare_body}" | grep -q "CellDisabled"; then
-            if cell_ready_wait "canonical-head declare" "${declare_status}" "${declare_body}"; then
-                attempt=$(( attempt - 1 ))
-                continue
+        # not-ready answer CAN reach this ladder — storage answers CellDisabled
+        # 503 through `conductor_write_error` (so it would ride the shed arm's
+        # 12x30s ≈ 6min ladder), a host still on a pre-fix binary answers it 502
+        # with the marker in the body (so it would fall through to "structural"
+        # and stop), and a doorway that is catching up sheds this route with the
+        # same envelope the head PATCH meets. None of those is this ladder's
+        # business: they take the SAME run-level readiness deadline.
+        if [ "${declare_status#2}" = "${declare_status}" ]; then
+            declare_face="$(not_ready_face "${declare_status}" "${declare_answer_file}" "${declare_body}")"
+            if [ -n "${declare_face}" ]; then
+                if cell_ready_wait "canonical-head declare" "${declare_status}" \
+                    "${declare_body}" "${declare_face}" \
+                    "$(read_retry_after /dev/null "${declare_answer_file}")"; then
+                    attempt=$(( attempt - 1 ))
+                    continue
+                fi
+                echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} was still not ready when this run's readiness deadline was reached (see above) — peer keeps its own head until gossip/heal converges" >&2
+                break
             fi
-            echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} never finished initialising the cell within its readiness budget (see above) — peer keeps its own head until gossip/heal converges" >&2
-            break
         fi
         case "${declare_status}" in
             2??)
                 echo "  ✓ canonical head propagated to ${DOORWAY_EPR_URL}: ${head_hash} (staging tier, attempt ${attempt})"
-                [ "${CELL_WAIT_ENTERED}" -eq 1 ] && cell_ready_clear
                 declare_ok=1
                 break
                 ;;
             503|429)
-                if [ "${attempt}" -lt "${max_attempts}" ]; then
-                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shedding writes (HTTP ${declare_status}: ${declare_body}) — retrying in 30s" >&2
-                    sleep 30
+                # Capped by what is left of an OPEN readiness window, so this
+                # ladder cannot sleep past the run deadline; unchanged when no
+                # window is open.
+                declare_nap="$(cell_ready_cap_sleep 30)"
+                if [ "${attempt}" -lt "${max_attempts}" ] && [ "${declare_nap}" -gt 0 ]; then
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shedding writes (HTTP ${declare_status}: ${declare_body}) — retrying in ${declare_nap}s" >&2
+                    sleep "${declare_nap}"
                     continue
                 fi
                 echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} still shedding after ${attempt} attempts (HTTP ${declare_status}: ${declare_body}) — peer keeps its own head until gossip/heal converges" >&2
                 break
                 ;;
             *)
-                if [ "${attempt}" -lt "${max_attempts}" ] && \
+                declare_nap="$(cell_ready_cap_sleep 90)"
+                if [ "${attempt}" -lt "${max_attempts}" ] && [ "${declare_nap}" -gt 0 ] && \
                    printf '%s' "${declare_body}" | grep -q "not retrievable"; then
-                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: target not retrievable yet on ${DOORWAY_EPR_URL} (DHT publish lag) — retrying in 90s" >&2
-                    sleep 90
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: target not retrievable yet on ${DOORWAY_EPR_URL} (DHT publish lag) — retrying in ${declare_nap}s" >&2
+                    sleep "${declare_nap}"
                     continue
                 fi
                 # Third retryable class, and the reason it did not ride the
@@ -373,10 +888,11 @@ if [ "${DECLARE_ONLY:-0}" = "1" ]; then
                 # `conductor_write_error`) so it lands on the arm above; this
                 # match keeps the ladder correct against any host still running
                 # a pre-fix binary, and costs nothing once none are.
-                if [ "${attempt}" -lt "${max_attempts}" ] && \
+                declare_nap="$(cell_ready_cap_sleep 30)"
+                if [ "${attempt}" -lt "${max_attempts}" ] && [ "${declare_nap}" -gt 0 ] && \
                    printf '%s' "${declare_body}" | grep -q "conductor admission: shed"; then
-                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shed the call at the conductor-admission gate (HTTP ${declare_status}: ${declare_body}) — nothing was dispatched, retrying in 30s" >&2
-                    sleep 30
+                    echo "  … DECLARE_ONLY attempt ${attempt}/${max_attempts}: ${DOORWAY_EPR_URL} shed the call at the conductor-admission gate (HTTP ${declare_status}: ${declare_body}) — nothing was dispatched, retrying in ${declare_nap}s" >&2
+                    sleep "${declare_nap}"
                     continue
                 fi
                 echo "  ⚠ DECLARE_ONLY: ${DOORWAY_EPR_URL} returned HTTP ${declare_status}: ${declare_body} — peer keeps its own head until gossip/heal converges" >&2
@@ -397,8 +913,9 @@ fi
 # Package locally through the SDK's checked archive operation. The source dist
 # is immutable; every retry uploads the exact same checked archive bytes.
 SDK_PACKAGE="$(cd "$(dirname "$0")/../.." && pwd)/elohim/sdk/scripts/package-app.mjs"
+# No trap here: the ONE exit trap at the top of this file already names
+# package_dir, and a second `trap … EXIT` would silently replace it.
 package_dir=$(mktemp -d)
-trap 'rm -rf "$package_dir"' EXIT
 app_dir=$(cd "$DIST_DIR/../../.." && pwd)
 package_args=(--adapter "$(dirname "$SDK_PACKAGE")/package-angular.mjs" --dist "$DIST_DIR" --kind "$KIND" --out "$package_dir" --app-dir "$app_dir")
 # Server/browser artifacts are published separately, but their build context is
@@ -502,35 +1019,136 @@ stage_once() {
     # failed anyway, burning the whole retry ladder on a no-op re-stage. Treat
     # those two exits as "verify by content address" rather than as failure;
     # every other exit still fails the attempt.
-    local put_rc=0
-    local put_response=""
-    put_response="$(curl -fSs -X PUT \
+    #
+    # NO `-f` (2026-09-21): curl's fail-fast discards the response BODY, and the
+    # doorway's global admission gate can shed this very route with
+    # 503 {"status":"catching-up",...} before it is ever routed (server/http.rs).
+    # Under -f that body never reached the classifier and the leg spent its
+    # transport budget on a readiness condition (#1715). Capture status, headers
+    # and the body's ORIGINAL BYTES (to a file, never through a shell variable —
+    # see the JSON block above), then classify.
+    local put_rc=0 put_response="" put_status="" put_retry_after=""
+    local put_headers_file="${STAGE_TMP_DIR}/put-headers"
+    local put_body_file="${STAGE_TMP_DIR}/put-body"
+    : > "${put_body_file}"
+    : > "${put_headers_file}"
+    put_status="$(curl -sS -D "${put_headers_file}" -o "${put_body_file}" -w '%{http_code}' -X PUT \
         -H 'Content-Type: application/zip' \
         -H "X-Blob-Hash: ${SPA_HASH}" \
         -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
         --data-binary "@$SPA_ARCHIVE" \
-        "${DOORWAY_EPR_URL}/admin/seed/blob")" || put_rc=$?
+        "${DOORWAY_EPR_URL}/admin/seed/blob" 2>/dev/null)" || put_rc=$?
+    # ONLY three digits is a status. A curl that did not honour -w leaves
+    # something else (elohim/sdk/scripts/package-app.test.mjs drives this script
+    # with such a stub), and that must never be mistaken for one.
+    case "${put_status}" in
+        [0-9][0-9][0-9]) : ;;
+        *) put_status="" ;;
+    esac
+    # For the LOG and for the one raw-text (CellDisabled) match only. Every
+    # classification below reads "${put_body_file}".
+    put_response="$(cat "${put_body_file}" 2>/dev/null)"
+    put_retry_after="$(read_retry_after "${put_headers_file}" "${put_body_file}")"
     [ -n "${put_response}" ] && echo "${put_response}"
+
+    local put_face=""
+    if [ "${put_rc}" -eq 0 ] && [ -n "${put_status}" ] \
+       && [ "${put_status#2}" = "${put_status}" ]; then
+        # A non-2xx answer to the PUT: a catching-up shed here is the same
+        # not-ready window the PATCH leg meets, one leg earlier.
+        put_face="$(not_ready_face "${put_status}" "${put_body_file}" "${put_response}")"
+        if [ -n "${put_face}" ]; then
+            CELL_STATUS="${put_status}"; CELL_BODY="${put_response}"
+            CELL_FACE="${put_face}"; CELL_RETRY_AFTER="${put_retry_after}"
+            return 4
+        fi
+        echo "  ✗ [${SLUG}] blob PUT via ${DOORWAY_EPR_URL} refused (HTTP ${put_status}): ${put_response}" >&2
+        return 1
+    fi
+
     if [ "${put_rc}" -eq 0 ]; then
-        # A 200 with forwarded_to_storage:false means the bytes reached ONLY the
-        # doorway's 1h write-through cache — storage (the authoritative store)
-        # never durably accepted them. Declaring a head against those bytes
-        # mints a declared-vs-available divergence (2026-08-22 local mesh: a
-        # 69MB bundle hit a storage-side shard-verify drop; the leg stamped ✓
-        # and every peer declared a bundle nobody could materialize). The
-        # retry ladder is the right response: the doorway re-forwards from its
-        # cache on each already_cached re-PUT, so a transient boot-pressure
-        # failure heals on retry, and a persistent one reds the stage honestly.
-        if printf '%s' "${put_response}" | grep -q '"forwarded_to_storage":false'; then
-            echo "  ✗ [${SLUG}] doorway cached the blob but storage forwarding FAILED (forwarded_to_storage:false) — refusing to call this staged" >&2
+        # SUCCESS IS AFFIRMED, NEVER ASSUMED. A 2xx alone says the doorway
+        # answered; only a parsed top-level `forwarded_to_storage:true` says
+        # storage took the bytes. The old whitespace-exact negative grep missed
+        # `"forwarded_to_storage": false` and read a missing or malformed body as
+        # success — a byte-seed could report ✓ having proved only that the
+        # doorway's 1h write-through cache remembers what we just sent it, and a
+        # head declared against those bytes is the declared-vs-available
+        # divergence of 2026-08-22 (a 69MB bundle hit a storage-side shard-verify
+        # drop; the leg stamped ✓ and every peer declared a bundle nobody could
+        # materialize).
+        if ! forward_confirmed "${put_body_file}"; then
+            # A forward that TIMED OUT is the storage peer not ready yet (#1715:
+            # 13 blob legs, all 200 + forwarded_to_storage:false, ~87min summed on
+            # a condition that cleared by itself). Every other forward failure —
+            # connection refused, DNS, no storage_url — names an absent or
+            # misrouted peer, which waiting does not answer, so it stays on the
+            # transport ladder.
+            put_face="$(not_ready_face "${put_status}" "${put_body_file}" "${put_response}")"
+            if [ -n "${put_face}" ]; then
+                CELL_STATUS="${put_status:-200}"; CELL_BODY="${put_response}"
+                CELL_FACE="${put_face}"; CELL_RETRY_AFTER="${put_retry_after}"
+                return 4
+            fi
+            echo "  ✗ [${SLUG}] blob PUT via ${DOORWAY_EPR_URL} answered HTTP ${put_status:-2xx} but did NOT confirm the storage forward (needs top-level forwarded_to_storage:true) — refusing to call this staged: ${put_response}" >&2
             return 1
         fi
-        echo "  ✓ [${SLUG}] blob uploaded (via /admin/seed/blob)"
+        echo "  ✓ [${SLUG}] blob uploaded and storage forward CONFIRMED (via /admin/seed/blob)"
     elif [ "${put_rc}" -eq 55 ] || [ "${put_rc}" -eq 56 ]; then
-        if curl -fsS -o /dev/null --max-time 60 "${DOORWAY_EPR_URL}/blob/${SPA_HASH}"; then
-            echo "  ✓ [${SLUG}] blob already stored (re-PUT short-circuited by cache; verified by content address ${SPA_HASH})"
+        # AFFIRMATIVE STORAGE EVIDENCE ONLY (2026-09-21). This arm used to accept
+        # a successful `GET /blob/{hash}` as proof the bytes were stored. They are
+        # not the same claim: that GET is cache-first (routes/blob.rs tries
+        # `ctx.cache` before ever asking storage), so the doorway's own cache
+        # answers it. The only affirmative evidence reachable from CI is the
+        # doorway's own `forwarded_to_storage`.
+        #   1. If the broken PUT still captured a parsable answer, use it.
+        #   2. Otherwise re-ask with a ZERO-BYTE body. On the already-cached path
+        #      the doorway answers before reading the body — the very behaviour
+        #      that breaks the big upload — so the empty probe cannot break the
+        #      same way, and it re-runs the forward and reports it. If the doorway
+        #      does NOT hold the bytes, the empty body fails the hash check and
+        #      answers 409 BEFORE anything is cached (seed.rs checks the hash
+        #      before `cache.set`), so the probe is side-effect-free.
+        #   3. Anything else re-offers. Never exit 0 on cache-only evidence.
+        if ! forward_confirmed "${put_body_file}"; then
+            local probe_rc=0 probe_status=""
+            local probe_body_file="${STAGE_TMP_DIR}/probe-body"
+            : > "${probe_body_file}"
+            probe_status="$(curl -sS -o "${probe_body_file}" -w '%{http_code}' -X PUT \
+                -H 'Content-Type: application/zip' \
+                -H "X-Blob-Hash: ${SPA_HASH}" \
+                -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
+                --data-binary '' \
+                "${DOORWAY_EPR_URL}/admin/seed/blob" 2>/dev/null)" || probe_rc=$?
+            case "${probe_status}" in
+                [0-9][0-9][0-9]) : ;;
+                *) probe_status="" ;;
+            esac
+            if [ "${probe_rc}" -eq 0 ]; then
+                # The probe's ORIGINAL BYTES replace the broken PUT's as the
+                # evidence file for everything below.
+                put_body_file="${probe_body_file}"
+                put_status="${probe_status}"
+                put_response="$(cat "${put_body_file}" 2>/dev/null)"
+                echo "  · [${SLUG}] PUT broke (curl ${put_rc}); zero-byte confirmation probe answered HTTP ${put_status:-<none>}: ${put_response}"
+            else
+                : > "${probe_body_file}"
+                put_body_file="${probe_body_file}"
+                put_status=""
+                put_response=""
+                echo "  · [${SLUG}] PUT broke (curl ${put_rc}); the zero-byte confirmation probe also failed (curl ${probe_rc})" >&2
+            fi
+        fi
+        if forward_confirmed "${put_body_file}"; then
+            echo "  ✓ [${SLUG}] blob stored (re-PUT short-circuited by the doorway cache; storage forward CONFIRMED for ${SPA_HASH})"
         else
-            echo "  ✗ [${SLUG}] PUT broke (curl ${put_rc}) and ${SPA_HASH} is NOT retrievable — real upload failure" >&2
+            put_face="$(not_ready_face "${put_status}" "${put_body_file}" "${put_response}")"
+            if [ -n "${put_face}" ]; then
+                CELL_STATUS="${put_status:-200}"; CELL_BODY="${put_response}"
+                CELL_FACE="${put_face}"; CELL_RETRY_AFTER=""
+                return 4
+            fi
+            echo "  ✗ [${SLUG}] PUT broke (curl ${put_rc}) and no answer CONFIRMS storage accepted ${SPA_HASH} — a doorway cache hit is not that proof; re-offering" >&2
             return 1
         fi
     else
@@ -572,48 +1190,50 @@ stage_once() {
         # retrievable") is a structural answer — return 3 so the outer loop
         # fails fast instead of burning the time budget on a question the peer
         # has already answered.
-        local patch_headers_file
-        patch_headers_file="$(mktemp)"
-        local patch_raw patch_status patch_body
-        if ! patch_raw=$(curl -sS -D "${patch_headers_file}" -o - -w '\n%{http_code}' -X PATCH \
+        local patch_headers_file="${STAGE_TMP_DIR}/patch-headers"
+        local patch_body_file="${STAGE_TMP_DIR}/patch-body"
+        local patch_status patch_body
+        : > "${patch_body_file}"
+        : > "${patch_headers_file}"
+        if ! patch_status=$(curl -sS -D "${patch_headers_file}" -o "${patch_body_file}" -w '%{http_code}' -X PATCH \
             -H 'Content-Type: application/json' \
             -H "X-API-Key: ${STORAGE_API_KEY_ADMIN:-}" \
             -d "{\"${HASH_FIELD}\":\"${SPA_HASH}\"}" \
-            "${DOORWAY_EPR_URL}${PATCH_PATH}" 2>&1); then
-            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} curl error: ${patch_raw}" >&2
-            rm -f "${patch_headers_file}"
+            "${DOORWAY_EPR_URL}${PATCH_PATH}" 2>"${STAGE_TMP_DIR}/patch-stderr"); then
+            echo "  ✗ [${SLUG}] ${HASH_FIELD} PATCH via ${DOORWAY_EPR_URL} curl error: $(cat "${STAGE_TMP_DIR}/patch-stderr" 2>/dev/null)" >&2
             return 1
         fi
-        patch_status="${patch_raw##*$'\n'}"
-        patch_body="${patch_raw%$'\n'*}"
+        case "${patch_status}" in
+            [0-9][0-9][0-9]) : ;;
+            *) patch_status="" ;;
+        esac
+        # For the LOG and the one raw-text match only; the file holds the bytes.
+        patch_body="$(cat "${patch_body_file}" 2>/dev/null)"
 
-        if [ "${patch_status#2}" != "${patch_status}" ]; then
-            rm -f "${patch_headers_file}"
+        if [ -n "${patch_status}" ] && [ "${patch_status#2}" != "${patch_status}" ]; then
+            :
         else
+            # Normalised ONCE, here, from header then body — the same value
+            # feeds the readiness nap and the ordinary transport sleep below.
             local retry_after=""
-            # grep exits 1 when the header is absent (the common case) — under
-            # pipefail that would abort the whole script via set -e without
-            # this guard, same trap the head_hash extraction above avoids.
-            retry_after=$(grep -i '^Retry-After:' "${patch_headers_file}" 2>/dev/null \
-                | tail -1 | tr -d '\r' | sed 's/^[^:]*:[[:space:]]*//') || retry_after=""
-            if [ -z "${retry_after}" ]; then
-                retry_after=$(printf '%s' "${patch_body}" \
-                    | sed -n 's/.*"retryAfter"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
-            fi
-            rm -f "${patch_headers_file}"
+            retry_after="$(read_retry_after "${patch_headers_file}" "${patch_body_file}")"
 
-            # CellDisabled is neither backpressure nor a structural answer: it
-            # is the conductor's cell-readiness window (see the cell_ready_wait
-            # block at the top of this file for the two 2026-09-21
-            # measurements). Classified ahead of the status case because it
-            # reaches the wire as 503 through storage's `conductor_write_error`
-            # AND as 502 from a host still running a pre-fix binary — the class
-            # is the body, not the code. Return 4: the outer loop waits on the
-            # per-host readiness budget, charging neither an attempt nor a
-            # second of the transport budget.
-            if printf '%s' "${patch_body}" | grep -q "CellDisabled"; then
+            # A not-ready answer is neither backpressure nor a structural
+            # answer: it is the post-roll window (see the not-ready block at the
+            # top of this file for the three faces and the two dated
+            # measurements). Classified ahead of the status case because the
+            # class is the BODY, not the code — CellDisabled reaches the wire as
+            # 503 through storage's `conductor_write_error` and as 502 from a
+            # host still running a pre-fix binary. Return 4: the outer loop waits
+            # on the run-level readiness deadline, charging neither an attempt
+            # nor a second of the transport budget.
+            local patch_face
+            patch_face="$(not_ready_face "${patch_status}" "${patch_body_file}" "${patch_body}")"
+            if [ -n "${patch_face}" ]; then
                 CELL_STATUS="${patch_status}"
                 CELL_BODY="${patch_body}"
+                CELL_FACE="${patch_face}"
+                CELL_RETRY_AFTER="${retry_after}"
                 return 4
             fi
 
@@ -776,6 +1396,17 @@ MAX_WAIT_SECS=60
 attempt=1
 start_ts=$(date +%s)
 while true; do
+    # THE PRE-ATTEMPT GATE. Reached after an ORDINARY transport sleep as well as
+    # after a readiness nap — and the ordinary ladder is exactly how a 12s budget
+    # still managed to dispatch at 0, 10 and 40s. With no window open this is
+    # always true and this loop behaves exactly as it did.
+    if ! readiness_may_start; then
+        cell_ready_exhausted "${CELL_FACE:-not-ready} re-offer (${HASH_FIELD} leg)" \
+            "${CELL_STATUS}" "${CELL_BODY}" "${CELL_FACE}" \
+            "$(( $(date +%s) - CELL_READY_FIRST_SEEN ))"
+        echo "ERROR: [${SLUG}] this run's readiness deadline was reached before another attempt could be offered to ${DOORWAY_EPR_URL} — host left STALE" >&2
+        exit 1
+    fi
     rc=0
     # Stamped BEFORE the attempt so an attempt that turns out to be a readiness
     # probe can have its WHOLE duration refunded, not just the nap after it.
@@ -783,8 +1414,11 @@ while true; do
     stage_once || rc=$?
     if [ "${rc}" -eq 0 ]; then
         if [ "${CELL_WAIT_ENTERED}" -eq 1 ]; then
-            echo "  ✓ [${SLUG}] the cell behind ${DOORWAY_EPR_URL} started running after $(( $(date +%s) - CELL_READY_FIRST_SEEN ))s of CellDisabled — the same content-addressed offer went through, no intervention needed"
-            cell_ready_clear
+            # The run deadline is NOT dropped here. A recovery ends this window,
+            # not the run's ceiling on waiting: a second window later in the same
+            # run inherits what is left, which is the only way the configured
+            # number bounds the run rather than each window in it.
+            echo "  ✓ [${SLUG}] ${DOORWAY_EPR_URL} took the write after $(( $(date +%s) - CELL_READY_FIRST_SEEN ))s of not-ready answers (last face=${CELL_FACE:-none}) — the same content-addressed offer went through, no intervention needed; $(cell_ready_remaining)s of this run's readiness deadline left for a later window"
         fi
         break
     fi
@@ -803,19 +1437,20 @@ while true; do
         echo "ERROR: [${SLUG}] structural failure against ${DOORWAY_EPR_URL} (see above) — not retrying — host left STALE" >&2
         exit 1
     fi
-    # A cell that is not running yet is a WAIT, on its own per-host budget: the
-    # retried operation is this same idempotent, content-addressed PATCH via
-    # stage_once, and neither the attempt counter nor the transport budget is
-    # charged for it. The refund covers the WHOLE attempt (re-PUT, deliverability
-    # check, the CellDisabled PATCH itself) plus the nap — charging just the nap
-    # still let a slow readiness probe eat the transport budget it was supposed
-    # to be separate from.
+    # A holder that is not ready yet is a WAIT, on the run-level readiness
+    # deadline: the retried operation is this same idempotent, content-addressed
+    # offer via stage_once, and neither the attempt counter nor the transport
+    # budget is charged for it. The refund covers the WHOLE attempt (the PUT, the
+    # deliverability check, the PATCH itself) plus the nap — charging just the
+    # nap still let a slow readiness probe eat the transport budget it was
+    # supposed to be separate from.
     if [ "${rc}" -eq 4 ]; then
-        if cell_ready_wait "${HASH_FIELD} PATCH" "${CELL_STATUS}" "${CELL_BODY}"; then
+        if cell_ready_wait "${CELL_FACE:-not-ready} re-offer (${HASH_FIELD} leg)" \
+            "${CELL_STATUS}" "${CELL_BODY}" "${CELL_FACE}" "${CELL_RETRY_AFTER}"; then
             start_ts=$(( start_ts + $(date +%s) - attempt_start_ts ))
             continue
         fi
-        echo "ERROR: [${SLUG}] the cell behind ${DOORWAY_EPR_URL} never became ready (see above) — host left STALE" >&2
+        echo "ERROR: [${SLUG}] the holder behind ${DOORWAY_EPR_URL} never became ready (see above) — host left STALE" >&2
         exit 1
     fi
 
@@ -840,6 +1475,11 @@ while true; do
         fi
         echo "  ⚠ [${SLUG}] attempt ${attempt}/${ATTEMPTS} against ${DOORWAY_EPR_URL} failed — retrying in ${wait_s}s (elapsed ${elapsed}s, ${remaining}s left of ${STAGE_BUDGET_SECS}s budget)" >&2
     fi
+    # Inside an OPEN readiness window this ordinary sleep is capped by what is
+    # left of the run deadline — otherwise it sleeps straight past it and the
+    # gate at the top of the loop, which does refuse, refuses far too late.
+    # Outside a window the value is returned unchanged.
+    wait_s="$(cell_ready_cap_sleep "${wait_s}")"
     RETRY_AFTER_HINT=""
     attempt=$(( attempt + 1 ))
     sleep "${wait_s}"

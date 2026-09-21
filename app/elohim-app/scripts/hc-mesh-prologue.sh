@@ -66,13 +66,14 @@ STAGE_BLOB_SCRIPT="$REPO_ROOT/scripts/ci/stage-spa-blob.sh"
 SEEDER_DIR="$REPO_ROOT/genesis/seeder"
 FIXTURE_PATH="$MESH_DIR/household-fixture.json"
 
-# ONE cell-readiness clock per prologue RUN, shared by every stage-blob leg
-# below and by nothing else. stage-spa-blob.sh waits out a conductor whose cells
-# are not running yet (CellDisabled) on a per-doorway-host budget it persists;
-# scoping that file to this run is what keeps an earlier prologue's exhausted
-# record from making THIS run's first CellDisabled fail instantly instead of
-# waiting out a conductor that just started. (The 6h age guard in that script is
-# the backstop, not the scoping.) Removed on exit, whatever the exit code.
+# ONE readiness deadline per prologue RUN, shared by every stage-blob leg below
+# and by nothing else. stage-spa-blob.sh waits out a holder that is not ready yet
+# — a disabled cell, a catching-up doorway, a storage forward that timed out — on
+# a single run-level deadline it persists; scoping that file to this run is what
+# keeps an earlier prologue's SPENT deadline from making THIS run's first
+# not-ready answer fail instantly instead of waiting out a conductor that just
+# started. Because the dir is explicit, that script never ages the record out —
+# the scoping IS the isolation. Removed on exit, whatever the exit code.
 STAGE_CELL_READY_STATE_DIR="$(mktemp -d "${MESH_DIR:-${TMPDIR:-/tmp}}/.stage-cell-ready-XXXXXX" 2>/dev/null)" \
   || STAGE_CELL_READY_STATE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/.stage-cell-ready-XXXXXX" 2>/dev/null)" \
   || STAGE_CELL_READY_STATE_DIR=""
@@ -80,8 +81,14 @@ if [ -n "$STAGE_CELL_READY_STATE_DIR" ]; then
   export STAGE_CELL_READY_STATE_DIR
   trap 'rm -rf "$STAGE_CELL_READY_STATE_DIR"' EXIT
 else
-  echo "prologue: WARN could not create a run-scoped cell-readiness state dir — stage-spa-blob.sh falls back to its shared default" >&2
+  echo "prologue: WARN could not create a run-scoped readiness state dir — stage-spa-blob.sh falls back to its shared default" >&2
 fi
+# A household prologue is not a fleet deploy: the conductors it stages against
+# were started minutes ago by this same run, so the 2h default (sized for a fleet
+# roll) is far more than this loop should ever spend waiting. 15 min covers the
+# measured ~11 min local-household CellDisabled window with headroom. An explicit
+# caller value still wins.
+export STAGE_CELL_READY_BUDGET_SECS="${STAGE_CELL_READY_BUDGET_SECS:-900}"
 
 banner() { printf '\n=== prologue: %s ===\n' "$1"; }
 say()    { printf 'prologue[%s]: %s\n' "$(date -u +%H:%M:%SZ)" "$1"; }

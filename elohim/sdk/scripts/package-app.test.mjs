@@ -192,7 +192,14 @@ test("stage script uploads the exact SDK-checked archive and preserves input", (
   const curl = join(bin, "curl");
   writeFileSync(
     curl,
-    '#!/bin/bash\nfor value in "$@"; do case "$value" in @*) cat "${value#@}" > "$CAPTURE_UPLOAD";; esac; done\nprintf "{}\\n"\n',
+    // The body mirrors doorway's BlobUploadResponse (routes/seed.rs): the stage
+    // script refuses to call a blob staged without an affirmative top-level
+    // `forwarded_to_storage:true`, so a stub that answers `{}` is no longer a
+    // legitimate success shape. It also honours `-o <file>` — the script reads
+    // the response from a file so it parses the ORIGINAL BYTES, not a
+    // NUL-stripped shell copy. It still prints no `-w` status, which is the
+    // other half of the contract this test pins.
+    '#!/bin/bash\nout=""\nprev=""\nfor value in "$@"; do\n  case "$prev" in -o) out="$value";; esac\n  case "$value" in @*) cat "${value#@}" > "$CAPTURE_UPLOAD";; esac\n  prev="$value"\ndone\nbody=\'{"success":true,"hash":"stub","already_cached":false,"forwarded_to_storage":true,"size":1}\'\nif [ -n "$out" ] && [ "$out" != "-" ]; then printf \'%s\\n\' "$body" > "$out"; else printf \'%s\\n\' "$body"; fi\n',
   );
   chmodSync(curl, 0o755);
   const captured = join(f.dir, "uploaded.zip");

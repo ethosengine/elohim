@@ -280,14 +280,19 @@ export class NonRetryableStageError extends Error {
  * non-retryable answer; anything else non-2xx (5xx, transport-adjacent) is a
  * generic retryable failure, matching the shell's bare `*)` arm.
  *
- * One class the shell carries and this does not: a `CellDisabled` body says an
- * installed cell is not among the conductor's running cells, which measurement
- * says usually clears on its own (2026-09-21 — up to ~11min after a
- * local-household start, 0-4min after a fleet conductor's "Conductor ready."
- * line). The shell waits it out on a SEPARATE per-doorway-host budget and, if
- * that budget runs out, reports "still unavailable after Ns" rather than a
- * cause. Here it stays plainly retryable, which is the same direction and the
- * right one for a scenario's own bounded retry.
+ * One class the shell carries and this does not: the NOT-READY window, which has
+ * three faces — a `CellDisabled` body (an installed cell is not among the
+ * conductor's running cells), a 503 whose top-level `status` is `catching-up`
+ * (the doorway declaring itself shedding), and a blob PUT answering 200 with
+ * `forwarded_to_storage` not true because the forward to storage timed out.
+ * Measurement says all three clear on their own after a roll (2026-09-20: own-cell
+ * CellDisabled ends 0-4min after a conductor's "Conductor ready." line, itself
+ * ~20-45min after a roll; 2026-09-21 app #1715: catching-up and forward timeouts
+ * persisted ~100-120min). The shell waits them out on ONE run-level deadline
+ * (default 2h, never reset by a recovery) and, when it runs out, reports "still
+ * not ready after Ns" rather than a cause. Here every one of those stays plainly
+ * retryable, which is the same direction and the right one for a scenario's own
+ * bounded retry.
  */
 export function classifyStorageResponse(
   status: number,

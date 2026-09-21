@@ -55,11 +55,27 @@ after start, then succeeds untouched (`enable_app` is a no-op for an already-ena
 three restarts in 72 h of Loki, matthew's and adam's OWN-cell `CellDisabled` lines stop within 0–4 min of that
 conductor's "Conductor ready." line and have not recurred in the 13–19 h since. App #1714 started seconds after edge
 #1470 finished rolling the fleet and spent its whole budget inside that window, as #1709 and #1712 had. So the script
-now WAITS on a separate per-doorway-host readiness budget (`STAGE_CELL_READY_BUDGET_SECS`, default 2700 s = 45 min)
-shared across every leg of one pipeline run, and once that budget is spent reports the measurement it actually has —
-"still unavailable after N s", pointing at the conductor's own app/cell state — rather than a diagnosis it cannot
-see from the far side of a doorway (`CellDisabled` means only that an installed cell is absent from `running_cells`,
-conductor.rs:1663). That keeps #1712's 63-minute per-leg re-spend cured without losing the post-roll readiness race. (2) IN FLIGHT: storage sees a disabled app (probe reads the status; `CellDisabled`
+now WAITS on a separate readiness budget (`STAGE_CELL_READY_BUDGET_SECS`) rather than spending the transport one.
+CORRECTED AGAIN 2026-09-21 (app #1715, which started right after a fleet roll, ran 103 min and deployed nothing):
+`CellDisabled` is only ONE FACE of the post-roll not-ready window, and #1715 met ZERO of it. Instead every blob PUT
+answered 200 with `"forwarded_to_storage":false` and a storage-forward TIMEOUT, and every head PATCH was shed
+`503 {"status":"catching-up","retryAfter":30,...}`; two hours after the roll both doorways reported
+`shedding:false`. So the script now classifies THREE faces — `cell-not-running`, `catching-up` (503 plus a parsed
+top-level `status`, never a nested or free-text one) and `storage-forward-timeout` (a forward whose transport cause
+names a timeout, availability unknown) — and waits them out on ONE RUN-LEVEL DEADLINE stamped by the first
+not-ready answer from any host on any leg and never reset by a recovery, default 7200 s = 2 h, sized to the
+measured ~100-120 min window. The per-host-with-clearing budget it replaces could be replenished by a recovery, so
+"45 min" bounded nothing a caller could reason about. The deadline governs when a re-offer may START — no new attempt is dispatched at or after it by any path,
+including after an ordinary transport sleep — but it bounds no single request, so the script also re-execs itself
+once under coreutils `timeout` (`STAGE_HARD_TIMEOUT_SECS`, default deadline + transport budget + 1500 s) as the
+actual per-invocation completion bound. Once the deadline is reached the script reports the measurement it actually has —
+"still not ready after N s", pointing at the doorway's `/health/serving` and the storage peer's state — rather than
+a diagnosis it cannot see from the far side of a doorway (`CellDisabled` means only that an installed cell is
+absent from `running_cells`, conductor.rs:1663). That keeps #1712's 63-minute per-leg re-spend cured without losing
+the post-roll readiness race. The same pass made blob delivery fail-closed: a PUT counts as delivered only on a
+parsed top-level `forwarded_to_storage:true`, and a doorway `GET /blob/{hash}` is no longer accepted as proof
+because it is cache-first — see [blob-forward-confirmation-status-only-no-body-check](epr:blob-forward-confirmation-status-only-no-body-check)
+for the limit of the evidence that replaced it. (2) IN FLIGHT: storage sees a disabled app (probe reads the status; `CellDisabled`
 classifies as not-live; gauge + reason logged once per transition), heals it (`enable_app` at boot and from the
 supervisor when there is no structural drift, backed off 60 s → 1 h, never a reinstall, never across a closed-chain
 fence), and says so (503 with a named cause and no `retryAfter`). (3) OPEN: find what disabled the apps on
