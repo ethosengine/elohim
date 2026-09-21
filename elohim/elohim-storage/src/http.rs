@@ -8855,6 +8855,10 @@ impl HttpServer {
             content_format: Some(content.content_format),
             reach: Some(content.reach),
             metadata_json: Some(content.metadata_json),
+            // 1.4b: these declare routes hold no signed Record — `None`
+            // PRESERVES the cache, and the projector's pairing guard refuses
+            // to publish it once the head moves past it.
+            declared_head_record_json: None,
         };
         let stamp = match stamp_policy {
             HeadDeclareStampPolicy::Canonical(ordering) => {
@@ -9083,6 +9087,10 @@ impl HttpServer {
             content_format: Some(content.content_format),
             reach: Some(content.reach),
             metadata_json: Some(content.metadata_json),
+            // 1.4b: these declare routes hold no signed Record — `None`
+            // PRESERVES the cache, and the projector's pairing guard refuses
+            // to publish it once the head moves past it.
+            declared_head_record_json: None,
         };
         let stamp = db::content_diesel::stamp_declared_head_mode(
             &mut conn,
@@ -20726,6 +20734,7 @@ mod c3_serve_head_preference_tests {
             canonical_earned: None,
             dht_anchor_state: None,
             dht_anchor_checked_at: None,
+            declared_head_record_json: None,
         }
     }
 

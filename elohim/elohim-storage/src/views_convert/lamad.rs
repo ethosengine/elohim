@@ -373,6 +373,7 @@ mod trust_label_tests {
             canonical_earned: None,
             dht_anchor_state: None,
             dht_anchor_checked_at: None,
+            declared_head_record_json: None,
         }
     }
 

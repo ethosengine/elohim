@@ -1,0 +1,26 @@
+-- Source of truth: Holochain DHT (this column is a CACHE of
+-- `content_store::get_record_for_action` for the row's declared head; safe to
+-- drop at any time — a NULL simply means "this peer cannot carry the evidence
+-- yet", which is an honest absence the consumer already handles).
+--
+-- Story 1.4b, "the head arrives with the content": the signed head `Record` for
+-- `declared_head_action_hash` travels inside the Automerge content doc (one new
+-- key, `headRecord`) so a receiving peer can hand it to its OWN conductor and
+-- adopt the declared head WITHOUT waiting for DHT gossip to deliver the action.
+--
+-- WHY A PAIRED JSON ENVELOPE AND NOT A BARE BASE64 COLUMN. The cached record is
+-- only meaningful for ONE action. A bare column would silently outlive the head
+-- it belongs to on every head MOVE that does not carry a fresh record, and the
+-- projector would then publish a record that contradicts the doc's
+-- `headActionHash` — every receiver would fail validation, forever, for a
+-- reason no writer intended. Storing `{"head": "<ActionHash>", "record":
+-- "<base64>"}` makes the pairing part of the value, so the projector can refuse
+-- a stale pairing as a PURE function of the row (see
+-- `sync::projector::head_record_for_declared`) instead of every head-move write
+-- site having to remember to clear this column.
+--
+-- Classification: C (Operational). NOT notarized, NEVER authority: the bytes are
+-- evidence the receiver's conductor re-derives and verifies
+-- (`content_store::validate_carried_record`); only the conductor's
+-- post-validation answer is ever stamped.
+ALTER TABLE content ADD COLUMN declared_head_record_json TEXT;

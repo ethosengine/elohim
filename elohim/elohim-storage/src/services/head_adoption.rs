@@ -2452,6 +2452,9 @@ async fn try_obey_visible_election(
         content_format: Some(c.content_format.clone()),
         reach: Some(c.reach.clone()),
         metadata_json: Some(c.metadata_json.clone()),
+        // 1.4b: the election-obey arm carries an election LINK record, not the
+        // head's own Record — so it has nothing to cache here.
+        declared_head_record_json: None,
     };
     match content_diesel::stamp_declared_head_mode(
         &mut conn,
@@ -3448,6 +3451,128 @@ pub async fn finish_author_then_adopt(
     }
 }
 
+/// Pair a just-validated `Record`'s bytes to the head they prove, in the shape
+/// the content row caches and the projector republishes (story 1.4b).
+///
+/// Base64 here and nowhere else in this module: the record is OPAQUE to storage
+/// — it is relayed, never interpreted — and base64 is only the transport form
+/// the Automerge doc (a text-scalar store) and the HTTP `/head-record` route
+/// already agree on.
+pub(crate) fn carried_record_envelope(head_action_hash: &str, record: &[u8]) -> Option<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    crate::sync::projector::encode_head_record_envelope(head_action_hash, &STANDARD.encode(record))
+}
+
+/// Why a doc-carried head record was not turned into a declare. Every arm is a
+/// metric label, so "the carried path did nothing" is never indistinguishable
+/// from "the carried path was never wired" (C8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CarriedRecordRefusal {
+    /// The doc names a head but carries no record — a pre-1.4b peer, or a peer
+    /// whose own conductor could not retrieve one. Honest absence.
+    Absent,
+    /// The doc carries a record but names no head for it to prove. Nothing to
+    /// claim, so nothing to validate against.
+    NoClaim,
+    /// Over [`crate::sync::projector::MAX_HEAD_RECORD_B64`]. Refused before a
+    /// byte is decoded or a conductor is asked.
+    Oversize,
+    /// The doc's value is not decodable base64. Dropped and counted; a peer
+    /// cannot spend our conductor on garbage.
+    Undecodable,
+}
+
+impl CarriedRecordRefusal {
+    /// Closed metric-label vocabulary.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Absent => "carried_absent",
+            Self::NoClaim => "carried_no_claim",
+            Self::Oversize => "carried_oversize",
+            Self::Undecodable => "carried_undecodable",
+        }
+    }
+}
+
+/// Decode a doc-carried head record into the bytes a declare may hand the own
+/// conductor — or say exactly why not.
+///
+/// PURE and total: every refusal is named, nothing is inferred, and no
+/// conductor is reachable from here. This is the whole pre-flight, and it is
+/// what makes "can remote input cause a zome call?" answerable by reading one
+/// function.
+///
+/// The head hash is the peer's CLAIM, never its authority: it is handed to the
+/// conductor as the declare target, and `content_store::validate_carried_record`
+/// re-derives `hash_action(record.action())` against it in wasm. A record paired
+/// to a head it does not hash to is refused THERE, by the only party entitled to
+/// decide — which is why this function does not (and must not) try to re-derive
+/// the hash itself. One verifier, in wasm, once.
+pub fn decode_carried_head_record(
+    doc_head_hint: Option<&str>,
+    doc_head_record: Option<&str>,
+) -> Result<(String, Vec<u8>), CarriedRecordRefusal> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let record = doc_head_record
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+        .ok_or(CarriedRecordRefusal::Absent)?;
+    let head = doc_head_hint
+        .map(str::trim)
+        .filter(|h| !h.is_empty())
+        .ok_or(CarriedRecordRefusal::NoClaim)?;
+    if record.len() > crate::sync::projector::MAX_HEAD_RECORD_B64 {
+        return Err(CarriedRecordRefusal::Oversize);
+    }
+    let bytes = STANDARD
+        .decode(record)
+        .map_err(|_| CarriedRecordRefusal::Undecodable)?;
+    if bytes.is_empty() {
+        return Err(CarriedRecordRefusal::Undecodable);
+    }
+    Ok((head.to_string(), bytes))
+}
+
+/// Story 1.4b — adopt a head whose signed `Record` ARRIVED WITH THE CONTENT.
+///
+/// The one thing this adds to the crate is a new SOURCE of carried bytes (the
+/// content doc, instead of a view-federation fetch). Everything downstream is
+/// the existing, reviewed path: [`declare_peer_head`] hands the bytes to THIS
+/// node's own conductor, the wasm validator re-derives and verifies them, the
+/// coordinator's election names the actual winner, and the winner is stamped
+/// through `stamp_declared_head_mode` with a `blob_cid`-bearing patch in ONE
+/// transaction. There is deliberately no second adoption implementation here.
+///
+/// # Why this is a canonical channel and a bare doc field is not
+///
+/// A bare doc scalar (`headActionHash`) is an unauthenticated claim: nothing
+/// re-derives it, so consuming it would launder gossip into notarization
+/// provenance — REQ-N5, and it stays forbidden. A carried RECORD is different
+/// in kind. Its bytes prove their own address: the receiver's conductor
+/// re-computes the action hash, checks the author's signature over that action,
+/// and binds the carried entry to the action's entry hash. The DECLARATION is
+/// then made by the conductor itself, and what lands in SQL is the conductor's
+/// answer — never the doc's. So the doc accelerates an existing canonical act;
+/// it cannot author one. An unverifiable or non-validating record is refused in
+/// wasm and moves nothing: it may be dropped and counted, and nothing more.
+///
+/// Returns the ordinary [`AdoptOutcome`]. Anything other than
+/// [`AdoptOutcome::Adopted`] leaves the caller free to fall through to the
+/// conductor-probe path it would have taken before 1.4b existed — the carried
+/// path only ever ADDS a chance to adopt sooner.
+pub async fn adopt_carried_head_record(
+    hc: &Arc<HcClient>,
+    pool: &DbPool,
+    ctx: &AppContext,
+    id: &str,
+    head_action_hash: &str,
+    record: Vec<u8>,
+    peer_id: &str,
+) -> AdoptOutcome {
+    let hint = PeerHeadHint::sole(head_action_hash.to_string(), None, peer_id.to_string());
+    declare_peer_head(hc, pool, ctx, id, head_action_hash, Some(record), &hint).await
+}
+
 /// Shared declare + stamp for both peer-adopt entrypoints.
 ///
 /// DECLARE-STORM GATE: the declare is skipped outright when it would not MOVE
@@ -3626,6 +3751,20 @@ async fn declare_peer_head(
                 content_format: Some(c.content_format.clone()),
                 reach: Some(c.reach.clone()),
                 metadata_json: Some(c.metadata_json.clone()),
+                // Story 1.4b, the FREE half of the producer: these bytes were
+                // just validated in wasm by THIS node's own conductor, for the
+                // head this stamp is about to declare. Caching them costs no
+                // conductor call at all, and it is what makes the carry
+                // transitive — a peer that adopted by carried record can pass
+                // the same evidence on to the next peer in its own content doc.
+                //
+                // Paired to the ELECTED winner, not to the head we asked about:
+                // the coordinator returns the actual winner after incorporating
+                // the link it just authored, so evidence for a losing candidate
+                // must never be filed under the winner's name.
+                declared_head_record_json: carried_record.as_deref().and_then(|bytes| {
+                    carried_record_envelope(declared.head_action_hash.as_str(), bytes)
+                }),
             };
             let stamped = pool.get().map_err(|e| e.to_string()).and_then(|mut conn| {
                 content_diesel::stamp_declared_head_mode(
@@ -4073,6 +4212,350 @@ mod tests {
             row.content_size_bytes,
             Some(4096),
             "T-1: the pointer and its length move together in the same call"
+        );
+    }
+
+    // ── STORY 1.4b — the head arrives with the content ────────────────────────
+    //
+    // Layered as acts of ONE story: the pre-flight refuses what must never
+    // reach a conductor (decode_*), the envelope pairs evidence to the head it
+    // proves (carried_record_envelope), and the stamp moves head + anchor +
+    // pointer + evidence together or not at all (stamp_declared_head_mode).
+    // The wasm validator is deliberately NOT re-implemented here: the seam is
+    // the conductor's ANSWER (`ContentHeadWire`), exactly as
+    // `an_adopted_move_carries_the_head_s_own_blob_pointer` above uses it.
+
+    /// (c) A record that cannot even be decoded never costs a conductor call,
+    /// and every refusal is NAMED — so "the carried path did nothing" can never
+    /// be confused with "the carried path was never wired".
+    #[test]
+    fn a_carried_record_that_fails_pre_flight_never_reaches_a_conductor() {
+        // Honest absence: a pre-1.4b peer's doc names a head and carries no
+        // record. This is the overwhelmingly common arm and must be free.
+        assert_eq!(
+            decode_carried_head_record(Some("uhCkkHead"), None),
+            Err(CarriedRecordRefusal::Absent)
+        );
+        assert_eq!(
+            decode_carried_head_record(Some("uhCkkHead"), Some("   ")),
+            Err(CarriedRecordRefusal::Absent)
+        );
+        // A record with no head to claim proves nothing: there is no target for
+        // `validate_carried_record` to re-derive against.
+        assert_eq!(
+            decode_carried_head_record(None, Some("YWJj")),
+            Err(CarriedRecordRefusal::NoClaim)
+        );
+        // Not base64 — dropped and counted. A peer cannot spend our conductor on
+        // garbage.
+        assert_eq!(
+            decode_carried_head_record(Some("uhCkkHead"), Some("!!!not base64!!!")),
+            Err(CarriedRecordRefusal::Undecodable)
+        );
+        // Decodes, but to nothing.
+        assert_eq!(
+            decode_carried_head_record(Some("uhCkkHead"), Some("")),
+            Err(CarriedRecordRefusal::Absent)
+        );
+        // Over the cap — refused BEFORE a byte is decoded.
+        let huge = "A".repeat(crate::sync::projector::MAX_HEAD_RECORD_B64 + 4);
+        assert_eq!(
+            decode_carried_head_record(Some("uhCkkHead"), Some(&huge)),
+            Err(CarriedRecordRefusal::Oversize)
+        );
+        // And the happy path: the head is carried through as the CLAIM the
+        // conductor will re-derive against, never as authority.
+        let (head, bytes) =
+            decode_carried_head_record(Some(" uhCkkHead "), Some(" YWJj ")).expect("carriable");
+        assert_eq!(head, "uhCkkHead");
+        assert_eq!(bytes, b"abc".to_vec());
+    }
+
+    /// The envelope pairs bytes to the head they prove, and the projector's
+    /// guard is the same function on the way out — so a record can only ever be
+    /// published under the head it was cached for.
+    #[test]
+    fn a_carried_record_envelope_pairs_bytes_to_the_head_they_prove() {
+        use crate::sync::projector::head_record_for_declared;
+        let envelope = carried_record_envelope("uhCkkHeadB", b"signed-record-bytes")
+            .expect("a normal record is cacheable");
+        assert_eq!(
+            head_record_for_declared(Some("uhCkkHeadB"), Some(&envelope)).as_deref(),
+            Some("c2lnbmVkLXJlY29yZC1ieXRlcw=="),
+            "the paired head publishes its own evidence"
+        );
+        assert_eq!(
+            head_record_for_declared(Some("uhCkkHeadA"), Some(&envelope)),
+            None,
+            "evidence for B must never be published under head A"
+        );
+        // Empty halves are never cached at all.
+        assert_eq!(carried_record_envelope("", b"bytes"), None);
+        assert_eq!(carried_record_envelope("uhCkkHeadB", b""), None);
+    }
+
+    /// (a) A record the conductor validated for a NEW head stamps the head, the
+    /// anchor, the blob pointer AND the evidence in ONE transaction — which is
+    /// what makes the doc's arrival, not DHT gossip, the thing adoption waits
+    /// on. The conductor's answer is the seam (no wasm in a unit test); the
+    /// patch is byte-identical to the one `declare_peer_head` builds.
+    #[test]
+    fn a_validated_carried_record_stamps_head_anchor_pointer_and_evidence_together() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "carried-new-head", "{}");
+
+        let old_head = "uhCkkCarriedOldHead0000000000000000000000".to_string();
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-new-head",
+                &old_head,
+                Some(1),
+                None,
+                StampMode::Declare,
+                Some((1, false)),
+            )
+            .expect("seed declaration");
+        }
+
+        // What the own conductor answers after `validate_carried_record` proved
+        // the carried bytes in wasm: the elected winner, canonical, with the
+        // complete notarized Content entry.
+        let new_head = "uhCkkCarriedNewHead0000000000000000000000";
+        let envelope =
+            carried_record_envelope(new_head, b"the-signed-record").expect("cacheable envelope");
+        let patch = content_diesel::ContentProjectionPatch {
+            blob_cid: Some("sha256-carried-bytes".to_string()),
+            content_size_bytes: Some(2048),
+            metadata_json: Some("{}".to_string()),
+            declared_head_record_json: Some(envelope.clone()),
+            ..Default::default()
+        };
+        let outcome = {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-new-head",
+                new_head,
+                Some(2),
+                Some(patch),
+                StampMode::HealCanonical,
+                Some((2, false)),
+            )
+            .expect("stamp")
+        };
+        assert_eq!(
+            outcome,
+            content_diesel::StampOutcome::Stamped,
+            "a provably-forward canonical answer must converge the row"
+        );
+
+        let mut conn = pool.get().expect("connection");
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "carried-new-head",
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read")
+        .expect("row");
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some(new_head));
+        assert_eq!(row.dht_anchor_hash.as_deref(), Some(new_head));
+        assert_eq!(row.blob_hash.as_deref(), Some("sha256-carried-bytes"));
+        assert_eq!(row.content_size_bytes, Some(2048));
+        assert_eq!(
+            row.declared_head_record_json.as_deref(),
+            Some(envelope.as_str()),
+            "1.4b: the evidence is cached in the SAME transaction that declared \
+             the head, so it can be carried on to the next peer"
+        );
+        // And the projector will publish it, because the pair agrees.
+        assert!(crate::sync::projector::head_record_for_declared(
+            row.declared_head_action_hash.as_deref(),
+            row.declared_head_record_json.as_deref()
+        )
+        .is_some());
+    }
+
+    /// (d) A carried record for an OLDER head is refused by the EXISTING
+    /// ordering verdict — `canonical_move_verdict` inside
+    /// `stamp_declared_head_mode`, under the unchanged `HealCanonical` mode.
+    /// 1.4b adds NO ordering logic of its own; carrying evidence changes how
+    /// EARLY the conductor can answer, never which answer wins.
+    #[test]
+    fn a_carried_record_for_an_older_head_is_refused_by_the_existing_ordering_verdict() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "carried-backwards", "{}");
+
+        let standing_head = "uhCkkCarriedStanding000000000000000000000";
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-backwards",
+                standing_head,
+                Some(9),
+                None,
+                StampMode::HealCanonical,
+                Some((9, false)),
+            )
+            .expect("seed standing canonical declaration");
+        }
+
+        let older_head = "uhCkkCarriedOlder00000000000000000000000";
+        let outcome = {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-backwards",
+                older_head,
+                Some(3),
+                Some(content_diesel::ContentProjectionPatch {
+                    blob_cid: Some("sha256-older-bytes".to_string()),
+                    content_size_bytes: Some(11),
+                    declared_head_record_json: carried_record_envelope(older_head, b"older-record"),
+                    ..Default::default()
+                }),
+                StampMode::HealCanonical,
+                Some((3, false)),
+            )
+            .expect("stamp")
+        };
+        assert_eq!(
+            outcome,
+            content_diesel::StampOutcome::SkippedStale,
+            "heal fills-never-moves: a backwards canonical answer converges nothing"
+        );
+
+        let mut conn = pool.get().expect("connection");
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "carried-backwards",
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read")
+        .expect("row");
+        assert_eq!(
+            row.declared_head_action_hash.as_deref(),
+            Some(standing_head),
+            "the standing head must not move backwards"
+        );
+        assert_eq!(
+            row.blob_hash.as_deref(),
+            Some("sha256-browser"),
+            "a refused move writes NO field — not the pointer, not the evidence"
+        );
+        assert_eq!(row.declared_head_record_json, None);
+    }
+
+    /// (e) The Rust-side refusal for "this record does not belong to the head
+    /// the row declares": the cache write re-reads the declaration in its own
+    /// `WHERE` clause, so evidence produced while the head was moving is
+    /// DISCARDED rather than mispaired. (The complementary check — the record's
+    /// action hash must re-derive to the claimed target — is the wasm
+    /// validator's, and is deliberately not re-implemented here.)
+    #[test]
+    fn evidence_for_a_head_the_row_no_longer_declares_is_discarded_not_mispaired() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "carried-toctou", "{}");
+
+        let head_b = "uhCkkCarriedTocB000000000000000000000000";
+        {
+            let mut conn = pool.get().expect("connection");
+            content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-toctou",
+                head_b,
+                Some(5),
+                None,
+                StampMode::Declare,
+                Some((5, false)),
+            )
+            .expect("declare B");
+        }
+        let stale_envelope =
+            carried_record_envelope("uhCkkCarriedTocA000000000000000000000000", b"a-record")
+                .expect("envelope");
+        let mut conn = pool.get().expect("connection");
+        assert!(
+            !content_diesel::cache_declared_head_record(
+                &mut conn,
+                &ctx,
+                "carried-toctou",
+                "uhCkkCarriedTocA000000000000000000000000",
+                &stale_envelope,
+            )
+            .expect("cache write"),
+            "a fill whose head moved while the conductor answered writes nothing"
+        );
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "carried-toctou",
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read")
+        .expect("row");
+        assert_eq!(row.declared_head_record_json, None);
+    }
+
+    /// (h) Replay/idempotence: the same validated record twice is a no-op
+    /// refresh, not a second declaration and not a second head move.
+    #[test]
+    fn the_same_carried_record_twice_is_a_no_op_refresh() {
+        let pool = adoption_test_pool();
+        let ctx = AppContext::default_lamad();
+        seed_adoption_content(&pool, "carried-replay", "{}");
+
+        let head = "uhCkkCarriedReplay0000000000000000000000";
+        let envelope = carried_record_envelope(head, b"same-record").expect("envelope");
+        let patch = || content_diesel::ContentProjectionPatch {
+            blob_cid: Some("sha256-replay".to_string()),
+            content_size_bytes: Some(7),
+            declared_head_record_json: Some(envelope.clone()),
+            ..Default::default()
+        };
+        let stamp = |expected: content_diesel::StampOutcome| {
+            let mut conn = pool.get().expect("connection");
+            let got = content_diesel::stamp_declared_head_mode(
+                &mut conn,
+                &ctx,
+                "carried-replay",
+                head,
+                Some(4),
+                Some(patch()),
+                StampMode::HealCanonical,
+                Some((4, false)),
+            )
+            .expect("stamp");
+            assert_eq!(got, expected);
+        };
+        stamp(content_diesel::StampOutcome::Stamped);
+        stamp(content_diesel::StampOutcome::Refreshed);
+
+        let mut conn = pool.get().expect("connection");
+        let row = content_diesel::get_content(
+            &mut conn,
+            &ctx,
+            "carried-replay",
+            content_diesel::MinTrust::Invisible,
+        )
+        .expect("read")
+        .expect("row");
+        assert_eq!(row.declared_head_action_hash.as_deref(), Some(head));
+        assert_eq!(
+            row.declared_head_record_json.as_deref(),
+            Some(envelope.as_str())
         );
     }
 

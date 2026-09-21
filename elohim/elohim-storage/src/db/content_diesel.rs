@@ -935,6 +935,14 @@ pub struct ContentProjectionPatch {
     pub content_format: Option<String>,
     pub reach: Option<String>,
     pub metadata_json: Option<String>,
+    /// Story 1.4b — the paired carried-record envelope
+    /// (`{"head":"<ActionHash>","record":"<base64>"}`) to cache for the head
+    /// this same write declares. `None` preserves the existing column, exactly
+    /// like every other field here; the projector's pairing guard
+    /// ([`crate::sync::projector::head_record_for_declared`]) is what makes a
+    /// preserved-but-stale envelope harmless, so no write site has to remember
+    /// to clear it.
+    pub declared_head_record_json: Option<String>,
 }
 
 /// Derive only from conductor-verified Content metadata. An absent key clears
@@ -1014,6 +1022,23 @@ fn apply_content_patch_fields(
         ))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Update metadata failed: {}", e)))?;
+    }
+    // Story 1.4b: the carried-record envelope rides the SAME patch, so it lands
+    // in the SAME transaction as the head it belongs to. That is the whole
+    // atomicity claim — a row can never be observed declaring head H while
+    // caching evidence for H's predecessor with no transaction boundary
+    // between the two writes.
+    if let Some(ref v) = patch.declared_head_record_json {
+        diesel::update(
+            content::table
+                .filter(content::h_app_id.eq(&ctx.h_app_id))
+                .filter(content::id.eq(id)),
+        )
+        .set(content::declared_head_record_json.eq(v))
+        .execute(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("Update declared_head_record_json failed: {}", e))
+        })?;
     }
     Ok(())
 }
@@ -1416,6 +1441,38 @@ pub fn declared_head_for_existing_row(
             election.is_some(),
         )
     }))
+}
+
+/// Cache the signed `Record` envelope for the head this row DECLARES — the
+/// write half of story 1.4b's best-effort producer fill.
+///
+/// Returns `Ok(false)` — and writes nothing — when the row's declared head is
+/// no longer `expected_head`. That check is the whole point: the conductor call
+/// that produced these bytes is uncancellable and may have taken seconds, in
+/// which case the row may have moved on. Filing the evidence anyway would
+/// publish a record contradicting the doc's own `headActionHash`.
+///
+/// This writes ONLY the cache column. It touches no declaration, no anchor and
+/// no serving field, so it can never be a channel by which a head moves — the
+/// `UPDATE`'s own `WHERE` clause is what makes that structural rather than
+/// careful.
+pub fn cache_declared_head_record(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    id: &str,
+    expected_head: &str,
+    envelope: &str,
+) -> Result<bool, StorageError> {
+    let rows = diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(id))
+            .filter(content::declared_head_action_hash.eq(expected_head)),
+    )
+    .set(content::declared_head_record_json.eq(envelope))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("cache_declared_head_record failed: {e}")))?;
+    Ok(rows > 0)
 }
 
 pub fn declared_head_with_election(
@@ -2713,6 +2770,9 @@ mod tests {
                 canonical_earned INTEGER,
                 dht_anchor_state TEXT,
                 dht_anchor_checked_at TEXT,
+                -- Story 1.4b: the carried head-record cache. Mirrors
+                -- migrations/2026-09-21-091500_content_declared_head_record.
+                declared_head_record_json TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )

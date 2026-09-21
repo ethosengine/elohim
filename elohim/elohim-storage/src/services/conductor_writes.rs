@@ -1490,6 +1490,28 @@ pub async fn call_get_record_for_action(
     hc: &Arc<HcClient>,
     action_hash: &str,
 ) -> Result<Option<CarriedRecordWire>, StorageError> {
+    // `call_zome` is `call_zome_timed(.., Interactive)`. Preserved verbatim for
+    // the HTTP and view-federation responders, which ARE a caller's read.
+    call_get_record_for_action_classed(hc, action_hash, AdmissionClass::Interactive).await
+}
+
+/// [`call_get_record_for_action`] with the caller's admission class.
+///
+/// Exists for story 1.4b's best-effort producer fill, which passes
+/// [`AdmissionClass::Background`]: nobody is waiting on it, it has a cheap
+/// deferral path (the doc simply ships without `headRecord` and receivers keep
+/// the probe ladder), and its rate is set by local head moves. Standing in the
+/// Interactive lane for that would put deploy-cadence background work in front
+/// of a person's read.
+///
+/// Bounded work by construction: ONE action, no fan-out, no in-wasm iteration —
+/// so there is nothing for a caller-side timeout to improve on, and none is
+/// bolted here.
+pub async fn call_get_record_for_action_classed(
+    hc: &Arc<HcClient>,
+    action_hash: &str,
+    class: AdmissionClass,
+) -> Result<Option<CarriedRecordWire>, StorageError> {
     let input = GetRecordForActionInput {
         action_hash: action_hash.to_string(),
     };
@@ -1498,8 +1520,8 @@ pub async fn call_get_record_for_action(
             "conductor_writes: encode GetRecordForActionInput: {e}"
         ))
     })?;
-    let bytes = hc
-        .call_zome(ZOME_NAME, "get_record_for_action", payload)
+    let (bytes, _timing) = hc
+        .call_zome_timed(ZOME_NAME, "get_record_for_action", payload, class)
         .await?;
     let out: Option<CarriedRecordWire> = rmp_serde::from_slice(&bytes).map_err(|e| {
         StorageError::Serialization(format!(
@@ -1507,6 +1529,35 @@ pub async fn call_get_record_for_action(
         ))
     })?;
     Ok(out)
+}
+
+/// The production [`crate::sync::projector::HeadRecordSource`] — this node's own
+/// conductor, reached lazily through the registry so a bridge that connects
+/// LATE is still picked up (the same interior-mutable idiom
+/// `head_adoption_trigger::ConductorSource` relies on).
+///
+/// No bridge yet ⇒ `Ok(None)`: an honest absence, never an error, because "this
+/// node cannot carry the evidence" is exactly what a `NULL` cache column means.
+pub struct ConductorHeadRecordSource {
+    pub registry: Arc<crate::hc_client_registry::HcClientRegistry>,
+}
+
+#[async_trait::async_trait]
+impl crate::sync::projector::HeadRecordSource for ConductorHeadRecordSource {
+    async fn record_for_action(&self, action_hash: &str) -> Result<Option<Vec<u8>>, StorageError> {
+        let Some(hc) = self.registry.lamad_client() else {
+            return Ok(None);
+        };
+        let served =
+            call_get_record_for_action_classed(&hc, action_hash, AdmissionClass::Background)
+                .await?;
+        // The responder answers for the action it was ASKED about; a mismatch
+        // means this conductor answered about something else, which is evidence
+        // for a different head and must never be filed under this one.
+        Ok(served
+            .filter(|carried| carried.action_hash.trim() == action_hash.trim())
+            .map(|carried| carried.record))
+    }
 }
 
 /// Coordinator zome name (the mishpat zome, hosted in the mishpat role cell —

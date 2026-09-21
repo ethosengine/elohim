@@ -247,6 +247,25 @@ struct Args {
     peer_policy_path: Option<PathBuf>,
 }
 
+/// Story 1.4b — the content-projection producer's carried-record source.
+///
+/// `None` without a conductor bridge, which is the honest posture: a node that
+/// cannot ask its own conductor for a signed `Record` simply publishes docs
+/// without `headRecord`, and every receiver falls back to the conductor-probe
+/// ladder exactly as it did before 1.4b.
+#[cfg(feature = "p2p")]
+fn head_record_source(
+    registry: &Option<Arc<elohim_storage::hc_client_registry::HcClientRegistry>>,
+) -> Option<Arc<dyn elohim_storage::sync::projector::HeadRecordSource>> {
+    registry.as_ref().map(|registry| {
+        Arc::new(
+            elohim_storage::services::conductor_writes::ConductorHeadRecordSource {
+                registry: registry.clone(),
+            },
+        ) as Arc<dyn elohim_storage::sync::projector::HeadRecordSource>
+    })
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initialize tracing BEFORE creating runtimes.
     // JSON output so Grafana Loki can `| json`-extract message/level/target/fields.
@@ -4405,6 +4424,10 @@ async fn async_main(
                     node.sync_manager().clone(),
                     pool.clone(),
                     Some(announce_tx),
+                    // Story 1.4b: the best-effort carried-record fill. `None`
+                    // without a conductor bridge, which simply leaves the doc
+                    // carrying no `headRecord` — the pre-1.4b producer exactly.
+                    head_record_source(&hc_registry_for_http),
                 );
                 info!("Content-projection producer spawned — Automerge content-sync plane lit, announce-on-change wired");
 
@@ -4556,6 +4579,10 @@ async fn async_main(
                         iroh_sync.clone(),
                         pool.clone(),
                         iroh_announce_tx,
+                        // Story 1.4b — same fill on the iroh transport: the
+                        // carried record rides INSIDE the doc, so it is opaque
+                        // to whichever stack moves the bytes.
+                        head_record_source(&hc_registry_for_http),
                     );
                     info!(
                         "Content-projection producer spawned on iroh transport — \
