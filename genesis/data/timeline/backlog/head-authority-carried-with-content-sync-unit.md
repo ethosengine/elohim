@@ -128,6 +128,73 @@ was late (governed action, blob, or addressed version), so a reading that is dom
 propagation rather than head adoption says so instead of being read as adoption latency. Revise the
 bound only from that evidence — never to make today's behaviour pass.
 
+## The review's blockers, precisely (2026-09-21, `codex-review-1.4b.result.md`)
+
+Read against `c0393c448` before the revert. Each is verified against the current (post-revert) tree; line
+numbers below are the current tree's, which drifted slightly from the review's own citations because the
+reviewed commit added lines since removed.
+
+1. **A signed Content record is treated as authority to nominate a head, with no membership/standing check.**
+   `validate_carried_record` (`elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs:5606-5661`) binds the
+   carried bytes to the target action hash, the author's signature, and the entry hash — three checks, all
+   present and correct. It does **not** check DNA/cell membership, source-chain validity, author standing, or
+   permitted reach; a separate TARGET-ID gate (`:5808-5814`) checks only that the content id matches. The
+   declarer-authorization seam is a labeled, documented stand-in:
+   `authorize_canonical_head_declarer` (`:3985-3988`) is `fn(_declarer: &AgentPubKey) -> ExternResult<()> { Ok(()) }`,
+   commented "DEV-TIME SCAFFOLD... this gate is OPEN: any agent may declare" (`:3968-3976`). A same-id record
+   correctly signed by a different DNA or an unrelated author's independent root passes every check this path
+   runs.
+
+2. **Replay renews the election timestamp, defeating rollback protection.** `declare_canonical_head` creates a
+   NEW canonical-head link before electing (`content_store/src/lib.rs:5822-5826`, calling
+   `create_canonical_head_link`, `:2974-3004`); that link's timestamp is `agent_info().chain_head`'s timestamp at
+   the moment of THIS write (`:2990-2996`) — never the original action's own clock. A peer replaying a valid
+   predecessor record therefore mints a fresh, newer election for the OLD content, which can win against a
+   currently-served newer version. `canonical_move_verdict`'s ordering table
+   (`elohim-storage/src/db/content_diesel.rs:1783-1809`) orders **declarations**, not content versions, so no
+   later stage catches this.
+
+3. **Serving a doc's own unverified blob under a verified head** — see the sibling standalone entry
+   [declared-head-blob-serves-unauthenticated-content-under-verified-head](epr:declared-head-blob-serves-unauthenticated-content-under-verified-head)
+   (`sync/mod.rs:253-266`, `http.rs:10773-10807`).
+
+4. **Peer-triggered declarations can monopolize the source-chain writer and accumulate permanent links, with no
+   rejected-record memo.** `head_adoption_trigger.rs` has no memo for a record already proven invalid — the
+   4096-entry memo belongs exclusively to the producer path, so retries re-enter the carried branch and
+   re-attempt the same rejected record. `chain_write_gate.rs::write_serialized` acquires the cell's writer mutex
+   (`:656`, `lock_for`) and holds it across `call().await` (`:673-683`, guard held from lock acquisition through
+   the call's return) — the module's own doc names the wasm body "uncancellable" (`:206`). A caller timeout
+   around this does not free the lock any sooner.
+
+5. **The cache can pair submitted bytes with the wrong winner's hash.** `head_adoption.rs:3765` (pre-revert
+   numbering) stores the SUBMITTED bytes under the RETURNED winner's hash — the two need not match when a
+   staging candidate loses to an earned winner, or when local retrieval succeeds while the carrier supplied
+   garbage.
+
+6. **Adoption before the blob bytes can take a working page down.** Installing a new pointer with no
+   availability check or scheduled fetch lets the read path's cold-serve arm answer 503 (healing in progress) or
+   404 (no peer supplies the bytes) — `http.rs:10480-10498` (the `BlobHealOutcome::NotFound`/`FinalizeFailed`
+   arms), forwarded verbatim by the doorway's status passthrough
+   (`doorway/doorway-service/src/routes/apps.rs:459-460`,
+   `StatusCode::from_u16(status.as_u16())`). There is no "serve the previous verified version until the new
+   bytes are local" guarantee anywhere in this path today.
+
+8. **A stale record survives its own head moving.** `projector.rs:171` omits a mismatched record from what it
+   projects, but `:378` only WRITES present fields — a doc whose head moves from B to C without C's record
+   filling successfully in time keeps record B in the doc indefinitely, silently, because nothing clears it.
+
+11. **Whole-record broadcast discloses fields the projection omits.** `projector.rs:359` gates disclosure on the
+    SQL row's reach, not the carried entry's own reach; the full `Content` DNA entry carries fields the
+    projection deliberately drops (`source_path`, `author_id`, tags, related ids —
+    `content_store_integrity/src/lib.rs:490-525`), so a whole-record broadcast can leak them even when the
+    projection was built to withhold them.
+
+**The redesign has to hold four shapes** (unchanged from the prior read of this review, now cross-referenced to
+the numbered blockers above): verification on receipt is **read-only** (closes 1, 2); the original election's
+ordering is **preserved, never re-minted** by the receiver (closes 2); the work is **bounded and memoised**
+(closes 4); and the **previous verified version keeps being served until the new bytes are local** (closes 6).
+Items 3, 5, 8, 11 are independent fixes at their own sites, not resolved by those four shapes alone.
+
 ## Current decision
 
 **Captured, not started** beyond the shipped conservative slice. Owner: next dataplane/head-
