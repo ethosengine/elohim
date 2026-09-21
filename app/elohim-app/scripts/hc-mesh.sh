@@ -1540,9 +1540,9 @@ happ_bundle_freshness() { # <mode>
       local m; m="$(_happ_max_mtime "${paths[@]}")"
       if [ -n "$m" ] && { [ -z "$newest_wasm" ] || [ "$m" -gt "$newest_wasm" ]; }; then newest_wasm="$m"; fi
     done
-    echo "hApp bundle: $HAPP_PATH (explicit MESH_HAPP_PATH — never repacked or refused)$([ -n "$happ_mtime" ] && printf ', built %s' "$(_happ_fmt_ts "$happ_mtime")")"
+    echo "hApp bundle: $HAPP_PATH (explicit MESH_HAPP_PATH — installed as given, not repacked)$([ -n "$happ_mtime" ] && printf ', built %s' "$(_happ_fmt_ts "$happ_mtime")")"
     if [ -n "$happ_mtime" ] && [ -n "$newest_wasm" ] && [ "$happ_mtime" -lt "$newest_wasm" ]; then
-      echo "WARN hApp bundle $HAPP_PATH (built $(_happ_fmt_ts "$happ_mtime")) is older than the default workdir's newest built coordinator wasm ($(_happ_fmt_ts "$newest_wasm")) — an explicit MESH_HAPP_PATH is an operator's deliberate choice and is never repacked or refused; this is a heads-up in case it is stale by accident"
+      echo "WARN hApp bundle $HAPP_PATH (built $(_happ_fmt_ts "$happ_mtime")) is older than the default workdir's newest built coordinator wasm ($(_happ_fmt_ts "$newest_wasm")) — an explicit MESH_HAPP_PATH is an operator's deliberate choice and is installed as given; this is a heads-up in case it is stale by accident"
     fi
     return 0
   fi

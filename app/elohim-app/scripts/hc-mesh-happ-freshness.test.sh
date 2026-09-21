@@ -157,7 +157,7 @@ HAPP_PATH="$EXPLICIT"
 HAPP_PATH_EXPLICIT=1
 out="$(happ_bundle_freshness apply)"; rc=$?
 if [ "$rc" -eq 0 ] \
-  && grep -q "^hApp bundle: $EXPLICIT (explicit MESH_HAPP_PATH — never repacked or refused)" <<<"$out" \
+  && grep -q "^hApp bundle: $EXPLICIT (explicit MESH_HAPP_PATH — installed as given, not repacked)" <<<"$out" \
   && grep -q "is older than the default workdir's newest built coordinator wasm" <<<"$out" \
   && [ "$(stat -c %Y "$EXPLICIT")" = "$(date -d 2026-01-01T00:00:00 +%s)" ] \
   && [ "$(stat -c %Y "$DNA")" = "$BEFORE_DNA_TS" ]; then
