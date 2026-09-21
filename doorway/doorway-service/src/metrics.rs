@@ -415,10 +415,13 @@ lazy_static! {
     // `prune_shed_and_log`.
 
     /// Times a holder DECLARED backpressure on a relay and was demoted behind
-    /// its siblings for the window it named. Label `reason`: `retry_after`
-    /// (the holder named a window) or `declared` (429 / permits, default
-    /// window). Incremented only when a NEW window is opened, never on every
-    /// fold read — otherwise the series measures traffic, not sheds.
+    /// its siblings for the window it named. Label `reason` is the CLOSED set
+    /// `ShedReason::as_label()` emits: `retry_after` (the holder named a
+    /// window this doorway could read) or `no_window_named` (the holder's
+    /// `Retry-After` was present — a genuine shed declaration — but its value
+    /// did not parse as delta-seconds, so `SHED_WINDOW_DEFAULT_SECS` applies).
+    /// Incremented only when a NEW window is opened, never on every fold
+    /// read — otherwise the series measures traffic, not sheds.
     pub static ref NAME_ROUTE_HOLDER_DEMOTED_TOTAL: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "doorway_name_route_holder_demoted_total",
@@ -749,9 +752,15 @@ pub fn register_all() {
         // demoted_total` would be absent from a doorway that has never yet
         // seen a sibling shed, exactly the `doorway_conductor_close_code_
         // total` trap this file has already paid for once.
-        for reason in ["retry_after", "declared"] {
+        // Driven off `ShedReason::ALL`, never string literals: the literals
+        // drifted once (`declared` outlived the rename to `no_window_named`
+        // in BOTH this pre-touch and its test, so the doorway published a
+        // ghost series no producer could ever increment while the real label
+        // stayed absent until the first live shed). One home for the closed
+        // set makes that shape impossible.
+        for reason in crate::services::name_routing::ShedReason::ALL {
             NAME_ROUTE_HOLDER_DEMOTED_TOTAL
-                .with_label_values(&[reason])
+                .with_label_values(&[reason.as_label()])
                 .inc_by(0);
         }
         let _ = REGISTRY.register(Box::new(NAME_ROUTE_HOLDERS_DEMOTED.clone()));
@@ -1032,7 +1041,7 @@ pub fn inc_elohim_session_established() {
 
 /// Name-route `Weight`: a holder declared backpressure and a NEW demotion
 /// window was opened. `reason` is `ShedReason::as_label()` — `retry_after` or
-/// `declared`, never a hand-written string.
+/// `no_window_named`, never a hand-written string.
 pub fn inc_holder_demoted(reason: &str) {
     NAME_ROUTE_HOLDER_DEMOTED_TOTAL
         .with_label_values(&[reason])
@@ -1282,9 +1291,47 @@ mod tests {
         );
         assert!(text.contains(r#"reason="retry_after""#), "{text}");
         assert!(
-            text.contains(r#"reason="declared""#),
+            text.contains(r#"reason="no_window_named""#),
             "the closed `reason` vocabulary must be pre-touched, both labels:\n{text}"
         );
+    }
+
+    /// The pre-touched label set IS `ShedReason::as_label()`'s closed set —
+    /// neither wider nor narrower.
+    ///
+    /// Pins the half-done-rename defect directly: the pre-touch and this
+    /// file's own assertion both still said `declared` long after
+    /// `ShedReason::as_label()` emitted `no_window_named`, so the doorway
+    /// published `reason="declared"` (a series no producer can ever
+    /// increment) and published NO `no_window_named` series until a live
+    /// holder shed with an unparseable `Retry-After`. A literal-free check
+    /// is the only one that cannot drift with the next rename.
+    #[test]
+    fn the_pretouched_reason_labels_are_exactly_the_closed_shed_vocabulary() {
+        use crate::services::name_routing::ShedReason;
+        register_all();
+        let text = gather_text();
+        let emitted: Vec<&str> = text
+            .lines()
+            .filter(|line| line.starts_with("doorway_name_route_holder_demoted_total{"))
+            .collect();
+        for reason in ShedReason::ALL {
+            let label = format!(r#"reason="{}""#, reason.as_label());
+            assert!(
+                emitted.iter().any(|line| line.contains(&label)),
+                "`{}` is a live ShedReason but was never pre-touched:\n{text}",
+                reason.as_label()
+            );
+        }
+        for line in &emitted {
+            assert!(
+                ShedReason::ALL
+                    .iter()
+                    .any(|r| line.contains(&format!(r#"reason="{}""#, r.as_label()))),
+                "series carries a `reason` label outside ShedReason::as_label()'s closed set \
+                 (a ghost left behind by a half-done rename): {line}"
+            );
+        }
     }
 
     // T6.2 (`the_gauge_tracks_live_windows_across_a_demotion_and_a_promotion`)

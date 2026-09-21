@@ -1689,28 +1689,34 @@ async fn async_main(worker_threads: usize) -> anyhow::Result<()> {
         let fed_config_clone = fed_config.clone();
 
         if let Some(zome_caller) = zome_caller {
-            // Spawn registration with 5s delay (conductor readiness)
-            let zc = Arc::clone(&zome_caller);
-            let fc = fed_config.clone();
-            tokio::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-                info!(
-                    "Federation: registering doorway '{}' in DHT...",
-                    fc.doorway_id
-                );
-
-                let mut capabilities = vec!["gateway".to_string()];
-                if !fc.doorway_url.is_empty() {
-                    capabilities.push("bootstrap".to_string());
-                    capabilities.push("signal".to_string());
-                }
-
-                if let Err(e) =
-                    services::federation::register_doorway_in_dht(&fc, &zc, capabilities).await
-                {
-                    warn!("Federation registration failed (non-fatal): {}", e);
-                }
-            });
+            // Registration: 5s delay for conductor readiness, then a BOUNDED
+            // background retry — the same courtesy the steward-peer
+            // registration above already extends to a storage peer that is
+            // not up yet.
+            //
+            // Why it is not boot-once any more: the conductor's interfaces
+            // accept calls for minutes before its cells finish initialising,
+            // and the call then fails `CellDisabled`. Measured on the
+            // household mesh 2026-09-21T03:22:42Z — gamma's single attempt hit
+            // exactly that window, logged its WARN, and `gamma-elohim-host`
+            // was absent from EVERY doorway's
+            // `/api/v1/federation/doorways` for the whole life of the
+            // process. "The registry IS the DHT" (2026-09-12 ruling), so a
+            // doorway missing from that set is invisible to every sibling's
+            // coherence probe and can never be a holder in anyone's
+            // name-route fold. See
+            // `services::federation::drive_registration_with_retry`.
+            let mut capabilities = vec!["gateway".to_string()];
+            if !fed_config.doorway_url.is_empty() {
+                capabilities.push("bootstrap".to_string());
+                capabilities.push("signal".to_string());
+            }
+            let _registration = services::federation::spawn_doorway_registration_task(
+                fed_config.clone(),
+                Arc::clone(&zome_caller),
+                capabilities,
+                std::time::Duration::from_secs(5),
+            );
 
             // T2.2 live wiring: refresh the peer JWKS cache off the DHT
             // doorway registry — NOT the gossip-populated `PeerCache`, which

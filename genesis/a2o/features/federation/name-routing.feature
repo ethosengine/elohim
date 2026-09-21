@@ -162,7 +162,6 @@ Feature: Jessica reaches a hosted site through a doorway and gets a bounded 404 
   # Recovery here is the passing of the time alpha named, not a health check:
   # the scenario also observes that nothing asked alpha for garden while it was
   # set aside.
-  @wip
   Scenario: A busy holder is set aside until the time it named has passed
     Given doorway "gamma" at "E2E_DOORWAY_GAMMA"
     And the household stages the root "garden" as hosted by doorway "alpha" and doorway "gamma"

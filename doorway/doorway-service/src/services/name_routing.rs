@@ -654,6 +654,16 @@ pub enum ShedReason {
 }
 
 impl ShedReason {
+    /// Every variant, so the CLOSED label vocabulary has exactly one home.
+    /// `crate::metrics::register_all` pre-touches the counter from THIS array
+    /// rather than from hand-written string literals: a half-done rename
+    /// (`declared` lived on in the pre-touch and its test for a while after
+    /// `as_label()` had already moved to `no_window_named`) then cannot
+    /// happen — a new variant is pre-touched automatically, and a renamed one
+    /// cannot leave a ghost series behind that no producer can ever
+    /// increment.
+    pub const ALL: [ShedReason; 2] = [ShedReason::RetryAfter, ShedReason::NoWindowNamed];
+
     pub fn as_label(self) -> &'static str {
         match self {
             ShedReason::RetryAfter => "retry_after",

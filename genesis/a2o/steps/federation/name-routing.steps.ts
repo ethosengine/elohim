@@ -192,8 +192,31 @@ const NEXT_REFRESH_TICK_BUDGET_MS = 150_000;
  * substitute for the real elapsed-time assertion that follows it. */
 const BUSY_WINDOW_SETTLE_MARGIN_MS = 2_000;
 
-/** Fixture doorway id -> hc-mesh.sh's own PID-ledger letter (apex-transition.steps.ts convention). */
-const MESH_LETTER: Readonly<Record<string, 'a' | 'b'>> = { alpha: 'a', beta: 'b' };
+/** Fixture doorway id -> hc-mesh.sh's own PID-ledger letter (apex-transition.steps.ts convention).
+ * `gamma` joined when the balance scenario gave "garden" a second holder — it is a real
+ * owned mesh process with its own `doorway-c.log`, so every log/`/proc` helper here can
+ * reach it exactly as it reaches its two siblings. */
+const MESH_LETTER: Readonly<Record<string, 'a' | 'b' | 'c'>> = {
+  alpha: 'a',
+  beta: 'b',
+  gamma: 'c',
+};
+
+/** Every fixture doorway this feature knows how to reach that this scenario has actually
+ * declared (a `Given doorway "X" at "..."` ran) and that is NOT one of `holderIds`.
+ * These are the doorways that can be ASKED for a name they do not hold — i.e. the ones
+ * whose own registry has to have learned the holders before the ask means anything. */
+function declaredNonHolders(world: E2EWorld, holderIds: readonly string[]): string[] {
+  return Object.keys(MESH_LETTER).filter(id => {
+    if (holderIds.includes(id)) return false;
+    try {
+      world.getDoorway(id);
+      return true;
+    } catch {
+      return false; // this scenario never declared it
+    }
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Small pure helpers
@@ -986,6 +1009,51 @@ async function assertNoLocalContract(
  * i.e. a real, un-forced GET comes back relayed (`x-elohim-served-by` names the holder). See
  * the file header: on the current mesh this never converges (federation-peer discovery was
  * never started for either doorway process), and the thrown message names that exact gap. */
+/** The multi-holder form: poll until `fromDoorwayUrl` relays `path` to ANY ONE of
+ * `holderUrls`. A name with two holders is served by one of them per request, and WHICH one
+ * is precisely what the balance scenario asserts — so this precondition proves only that the
+ * relay path resolves at all, never which holder wins. See the two-holder staging step's doc
+ * for how "both holders are known" is established alongside this. */
+async function waitForRegistryToKnowAHolder(
+  fromDoorwayUrl: string,
+  fromLabel: string,
+  path: string,
+  holderUrls: readonly string[],
+  budgetMs: number
+): Promise<RawResponse> {
+  const deadline = Date.now() + budgetMs;
+  let last: RawResponse | undefined;
+  for (;;) {
+    try {
+      last = await rawGet(`${fromDoorwayUrl}${path}`);
+      const servedBy = last.headers['x-elohim-served-by'];
+      if (
+        last.status === 200 &&
+        servedBy &&
+        holderUrls.some(holderUrl => originsEqual(servedBy, holderUrl))
+      ) {
+        return last;
+      }
+    } catch (error) {
+      last = { status: -1, text: String(error), headers: {} };
+    }
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `doorway "${fromLabel}"'s registry never relayed ${path} to any staged holder ` +
+          `(${holderUrls.join(', ')}) within ${budgetMs}ms (last observed HTTP ${last?.status}` +
+          (last?.headers['x-elohim-served-by']
+            ? `, served-by ${last.headers['x-elohim-served-by']}`
+            : ', no x-elohim-served-by — nothing relayed, so this doorway answered from its ' +
+              'own local dispatch') +
+          `). The fold is built from the holders' coherence manifests, read once per ` +
+          `federation discovery tick (~60s); this step already waited for a tick strictly ` +
+          `after both contracts went live and both peers were registered.`
+      );
+    }
+    await delay(REGISTRY_POLL_INTERVAL_MS);
+  }
+}
+
 async function waitForRegistryToKnowHolder(
   fromDoorwayUrl: string,
   fromLabel: string,
@@ -1159,7 +1227,7 @@ function requestLineHits(lines: LogLineFields[], path: string): number {
   return count;
 }
 
-async function doorwayLogPath(letter: 'a' | 'b', label: string): Promise<string> {
+async function doorwayLogPath(letter: 'a' | 'b' | 'c', label: string): Promise<string> {
   const handle = await resolveOwnedMeshProcess('doorway', letter, label);
   return readlink(`/proc/${handle.pid}/fd/1`);
 }
@@ -1364,6 +1432,26 @@ interface NameRoutingState {
    * captured once at the earliest point this file's own scenario-5 glue controls. */
   adminWritesByDoorwayId: Set<string>;
   startTicksByDoorwayId: Map<string, string>;
+  /** The fixture id MEASURED as first in the fold's owner order (see the
+   * "is the first holder in owner order" Given), when a non-holder was available to ask. */
+  ownerOrderFirst?: string;
+}
+
+/** The fixture ids of the holders this scenario staged, resolved back from the staged
+ * contracts' own doorway URLs — so a step that needs "who are the holders" does not have to
+ * be handed them again by its Gherkin. */
+function holderFixtureIds(world: E2EWorld, state: NameRoutingState): string[] {
+  const ids: string[] = [];
+  for (const id of Object.keys(MESH_LETTER)) {
+    let url: string;
+    try {
+      url = world.getDoorway(id).url;
+    } catch {
+      continue; // this scenario never declared it
+    }
+    if (state.staged.some(contract => originsEqual(contract.doorwayUrl, url))) ids.push(id);
+  }
+  return ids;
 }
 
 const states = new WeakMap<E2EWorld, NameRoutingState>();
@@ -1539,17 +1627,93 @@ Given(
   }
 );
 
+/**
+ * Two holders. Stages on both, then — for any OTHER declared doorway, i.e. one that can be
+ * ASKED for this name without holding it — arranges and PROVES that doorway's own registry
+ * has learned both holders before the scenario asks it anything.
+ *
+ * WHY THE SECOND HALF EXISTS (measured 2026-09-21, run N5/P3): this step was written for the
+ * alpha+beta shape, where the doorway Jessica asks is itself a holder and serves locally — so
+ * no registry knowledge is needed and none was arranged. The balance scenario reuses it with
+ * alpha+gamma, where the asked doorway (beta) holds nothing and MUST relay. Without the wait,
+ * beta was asked 30s after staging while its own federation tick had last fired ~58s earlier
+ * (doorway-b.log: tick at 03:46:40, staging 03:47:08, ask 03:47:38, next tick 03:47:40) — so
+ * beta's name-route fold had ZERO holders for the staged path, logged no relay line at all,
+ * never observed alpha's shed (zero `name_route_shed` lines, both demotion counters 0), and
+ * answered from its own local dispatch: HTTP 200 carrying beta's real "/" landing page. The
+ * marker check in "Jessica is served ..." caught it correctly, but the premise the scenario
+ * measures was never actually staged.
+ *
+ * The single-holder sibling step above has always done this (`waitForRegistryToKnowHolder`);
+ * this is the same arrangement for the two-holder shape, and for the alpha+beta scenarios it
+ * is a no-op (no declared non-holder exists, so the loop body never runs).
+ *
+ * WHAT IS PROVEN, precisely — there is no admin surface exposing "who does your fold think
+ * holds this name", so knowledge is established from the three inputs the fold is built from
+ * plus one end-to-end confirmation:
+ *   1. each holder ADVERTISES the mount on its own coherence manifest (the exact source
+ *      `install_name_routes` reads),
+ *   2. the asked doorway has each holder as a federation peer (the probe set), mutually —
+ *      the same real product ARRANGE step the Background performs for alpha/beta,
+ *   3. a discovery tick fires STRICTLY AFTER 1 and 2 were both true, so that tick's fold read
+ *      both live contracts (`refresh_peer_cache` logs the tick and calls `refresh_coherence`
+ *      in the same iteration with no intervening sleep — see `TICK_LOG_MESSAGE`),
+ *   4. a real, un-forced GET to the asked doorway comes back RELAYED and names one of the
+ *      holders as its origin.
+ * Step 4 alone cannot name BOTH holders (one request is served by one of them, and which one
+ * is exactly what the scenario's own assertions are about), which is why steps 1-3 carry the
+ * "both" claim and step 4 confirms the path end to end.
+ */
 Given(
   'the household stages the root {string} as hosted by doorway {string} and doorway {string}',
-  { timeout: 60_000 },
+  { timeout: REGISTRY_FILL_BUDGET_MS + NEXT_REFRESH_TICK_BUDGET_MS + 60_000 },
   async function (this: E2EWorld, root: string, firstId: string, secondId: string): Promise<void> {
     const state = beginScenario(this, root);
+    const holders: { id: string; url: string }[] = [];
     for (const id of [firstId, secondId]) {
       const doorway = this.getDoorway(id);
       const doorwayId = await resolvedDoorwayId(this, id, doorway.url);
       const staged = await stageRoot(doorway.url, doorwayId, state.mount, root);
       state.staged.push(staged);
       await waitForLocalMount(doorway.url, id, state.path, root);
+      holders.push({ id, url: doorway.url });
+    }
+
+    for (const askedId of declaredNonHolders(this, [firstId, secondId])) {
+      const asked = this.getDoorway(askedId);
+
+      // (1) Both holders advertise the mount on the manifest the fold reads.
+      for (const holder of holders) {
+        const manifest = await coherenceManifest(holder.url);
+        assert.ok(
+          manifest.heads.some(head => head.urlPath === state.mount),
+          `doorway "${holder.id}" serves the staged mount ${state.mount} locally but does not ` +
+            `advertise it on its coherence manifest — that manifest is the ONLY source ` +
+            `install_name_routes folds into doorway "${askedId}"'s name-route table, so no ` +
+            `relay to "${holder.id}" for this name could ever resolve. Advertised: ` +
+            `${manifest.heads.map(head => head.urlPath).join(', ') || '(none)'}`
+        );
+      }
+
+      // (2) Mutual federation peering, so the asked doorway probes both holders.
+      for (const holder of holders) {
+        await registerFederationPeer(asked.url, holder.url, askedId);
+        await registerFederationPeer(holder.url, asked.url, holder.id);
+      }
+
+      // (3) A tick strictly after (1) and (2) — that fold read both live contracts.
+      const logPath = await doorwayLogPath(MESH_LETTER[askedId], `doorway ${askedId}`);
+      const baseline = await lastTickAt(logPath);
+      await waitForNextTick(logPath, baseline, NEXT_REFRESH_TICK_BUDGET_MS);
+
+      // (4) End-to-end: a real ask relays and names one of the holders.
+      await waitForRegistryToKnowAHolder(
+        asked.url,
+        askedId,
+        state.path,
+        holders.map(holder => holder.url),
+        REGISTRY_FILL_BUDGET_MS
+      );
     }
   }
 );
@@ -1742,31 +1906,74 @@ Given(
   }
 );
 
+/**
+ * Owner order is the registry fold's own final tiebreak among equally-live holders
+ * (`selector_rank`'s last element; first-appearance order of same-key contracts in
+ * `fold_candidate_holders`). There is no admin surface that reads or sets it — but when a
+ * NON-holder doorway is going to be asked, the winner of a plain ask IS the first holder in
+ * owner order, so one un-forced GET measures it.
+ *
+ * WHY THIS STOPPED BEING A NO-OP (household mesh, 2026-09-21 run R1): this step used to
+ * assert only `staged.length > 0`, i.e. nothing. Beta's fold in fact put the
+ * most-recently-registered doorway FIRST (gamma), because the fold's contract order arrived
+ * from the peer cache, which is the union of what each seed's own
+ * `/api/v1/federation/doorways` returned — the DHT's link order. So with alpha declared busy,
+ * gamma served every request because it was FIRST, not because alpha had been set aside:
+ * beta logged zero `name_route_shed` lines, both demotion counters stayed 0, and the balance
+ * scenario's "set aside" claims passed for entirely the wrong reason while its recovery claim
+ * (alpha serves again once its window passes) could never be reachable. Owner order is now a
+ * stable id order in the product (`install_name_routes`), and this step MEASURES it rather
+ * than asserting it into existence.
+ *
+ * Only measurable when a declared non-holder exists to ask (the balance scenario). For the
+ * scenarios where the asked doorway holds the root itself, local-first dispatch means the
+ * fold is never consulted and there is genuinely nothing to measure — those keep the
+ * narrative-only reading, which is honest for them.
+ */
 Given(
   'doorway {string} is the first holder in owner order',
-  function (this: E2EWorld, doorwayId: string): void {
-    // Owner order is the registry fold's OWN internal preference (first-appearance
-    // order among candidate holders, `fold_candidate_holders` in name_routing.rs) —
-    // there is no admin surface exposing or controlling it directly, and this
-    // scenario's own real assertions ("served itself, taking no hop" / "alpha was
-    // never contacted") are satisfied by LOCAL-FIRST dispatch regardless of fold
-    // order (the doorway Jessica asks holds its own contract, so the fold is never
-    // even consulted — see this file's header). Declared here for narrative
-    // completeness; nothing to arrange or verify independently.
+  { timeout: REQUEST_TIMEOUT_MS + 10_000 },
+  async function (this: E2EWorld, doorwayId: string): Promise<void> {
+    const state = getState(this);
+    assert.ok(state.staged.length > 0, `doorway "${doorwayId}" has no staged contract yet`);
+    const holderIds = holderFixtureIds(this, state);
+    const askable = declaredNonHolders(this, holderIds);
+    if (askable.length === 0) return; // nothing consults the fold — narrative only
+    const asked = this.getDoorway(askable[0]);
+    const expected = this.getDoorway(doorwayId);
+    const reply = await rawGet(`${asked.url}${state.path}`);
+    const servedBy = reply.headers['x-elohim-served-by'];
     assert.ok(
-      getState(this).staged.length > 0,
-      `doorway "${doorwayId}" has no staged contract yet`
+      servedBy,
+      `doorway "${askable[0]}" answered HTTP ${reply.status} with no x-elohim-served-by for ` +
+        `${state.path} — it did not relay at all, so owner order cannot be measured`
     );
+    assert.ok(
+      originsEqual(servedBy, expected.url),
+      `doorway "${askable[0]}" relayed to "${servedBy}", so doorway "${doorwayId}" ` +
+        `(${expected.url}) is NOT the first holder in owner order. Owner order is the fold's ` +
+        `final tiebreak, a stable doorway-id order (install_name_routes in federation.rs); ` +
+        `this scenario's later claims depend on "${doorwayId}" being first.`
+    );
+    state.ownerOrderFirst = doorwayId;
   }
 );
 
 Given(
   'doorway {string} is the next holder after it',
   function (this: E2EWorld, doorwayId: string): void {
-    assert.ok(
-      getState(this).staged.length > 0,
-      `doorway "${doorwayId}" has no staged contract yet`
-    );
+    const state = getState(this);
+    assert.ok(state.staged.length > 0, `doorway "${doorwayId}" has no staged contract yet`);
+    // "next after it" = a staged holder that is not the measured first one. With exactly two
+    // holders that is fully determined, so there is nothing further to probe; the check that
+    // matters is that this step is not naming the SAME doorway the previous one measured.
+    if (state.ownerOrderFirst !== undefined) {
+      assert.notEqual(
+        doorwayId,
+        state.ownerOrderFirst,
+        `doorway "${doorwayId}" was already measured as the FIRST holder in owner order`
+      );
+    }
   }
 );
 
@@ -1999,7 +2206,13 @@ Then(
   'the reply names doorway {string} as the origin for {string}',
   function (this: E2EWorld, holderId: string, root: string): void {
     const state = getState(this);
-    const ask = requireAsk(state);
+    // The MOST RECENT ask (`requireLatestAsk`), never the first. Scenarios 1 and 2 ask once
+    // before reaching this step, so for them the two are the same reply. The balance scenario
+    // asks THREE times and names a DIFFERENT expected origin after each one (gamma while
+    // alpha is set aside, alpha again once the window it named has passed) — reading the first
+    // ask there would assert the third claim against the first reply and fail a correct
+    // product, which is exactly what the first live run of that scenario would have hit next.
+    const ask = requireLatestAsk(state);
     const holder = this.getDoorway(holderId);
     const servedBy = ask.response.headers['x-elohim-served-by'];
     assert.ok(servedBy, `the reply for "${root}" carries no x-elohim-served-by header`);

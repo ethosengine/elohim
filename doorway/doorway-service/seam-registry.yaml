@@ -4061,6 +4061,16 @@ decisionPoints:
       the same reason, and `X-Available-Permits` is not captured at all (no honest magnitude).
       `ShedReason::Declared` was renamed `NoWindowNamed` (a `Retry-After` header present but
       unparseable) now that 429/permits no longer produce a `Declared` case.
+      FIRST-LIVE-RUN FINDING (household mesh 2026-09-21): the OwnerOrder element was documented
+      as a "stable final tiebreak" but was not stable — the contract order it enumerates arrived
+      from `refresh_peer_cache`'s cache, i.e. the union of what each seed's own
+      `/api/v1/federation/doorways` returned, so the first reachable seed's DHT link order became
+      every doorway's holder priority. With two holders that put the most-recently-registered
+      doorway first, so the busy holder was never dialled and the Weight term was never exercised
+      at all (zero shed observations, both demotion counters 0) while the balance scenario's
+      "set aside" claims passed for the wrong reason. `install_name_routes` now sorts contracts by
+      doorway_id, extending the determinism rule `merge_discovery_seeds` already applies to DHT
+      registrations to the place the per-seed fan-out discarded it.
     concernIds:
       - id: C0
         status: answered
@@ -4197,4 +4207,232 @@ decisionPoints:
         kind: unit
       - path: doorway/doorway-service/src/metrics.rs
         testName: both_name_route_metrics_are_registered
+        kind: unit
+      - path: doorway/doorway-service/src/metrics.rs
+        testName: the_pretouched_reason_labels_are_exactly_the_closed_shed_vocabulary
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: owner_order_is_stable_by_doorway_id_whatever_order_the_probe_returned
+        kind: unit
+
+  # ── Bounded DHT self-registration (2026-09-21) ────────────────────────────
+  # Born from a measured liveness defect on the household mesh: registration was
+  # ONE attempt 5s after boot, and its failure (`CellDisabled` — the conductor's
+  # interfaces accept calls while its cells are still initialising) was a WARN
+  # and nothing more. `gamma-elohim-host` was then absent from every doorway's
+  # /api/v1/federation/doorways for the whole life of the process, so no sibling
+  # could discover it and it could never be a holder in anyone's name-route fold
+  # (logs/doorway-c.log, 2026-09-21T03:22:42.239908Z).
+  - name: registration_retry_delay_secs
+    kind: pure-decision-predicate
+    sourceLocation:
+      file: src/services/federation.rs
+      modulePath: services::federation::registration_retry_delay_secs
+      line: 233
+    summary: >
+      The gap before retry `attempt` (1-based; attempt 0 is the boot try) of this doorway's own
+      DHT self-registration, or `None` once the bounded budget is spent. Exponential from
+      REGISTRATION_RETRY_BASE_SECS (15) doubling to a REGISTRATION_RETRY_MAX_SECS (300) cap,
+      REGISTRATION_MAX_RETRIES (12) retries, ~42 minutes of total patience — deliberately longer
+      than this conductor line's ~11-minute cell-startup window and deliberately finite. Pure:
+      the schedule is the decision, the sleeping belongs to the caller
+      (`drive_registration_with_retry`, which injects `sleep` so the schedule is testable without
+      a 42-minute test).
+    concernIds:
+      - id: C0
+        status: answered
+        justification: >
+          Ephemeral (C). The schedule is in-process arithmetic; the only durable artifact is the
+          DoorwayRegistration entry the infrastructure zome validates, which this predicate does
+          not author — it only decides WHEN to ask.
+      - id: C1
+        status: n-a
+        justification: >
+          Nothing is elected. The doorway registers itself under its own agent key and the
+          integrity zome is the validator; a retry cannot widen what a single attempt could claim.
+      - id: C2
+        status: answered
+        justification: >
+          A retry cannot regress authority: `register_doorway_in_dht` treats "already exists" as
+          an update, so a late-succeeding retry converges the SAME id's record forward and never
+          replaces a newer one with a boot-time snapshot.
+      - id: C3
+        status: answered
+        justification: >
+          This IS the liveness cure, in the strict sense: from the reachable state
+          "conductor cells not yet initialised at T+5s" the old code had NO legal move to the
+          registered state for the rest of the process's life. registration_retries_through_the_
+          conductor_startup_window replays that exact `CellDisabled` sequence and reaches
+          Registered; the_retry_schedule_is_monotonic_capped_and_bounded proves the patience
+          outlasts the window that caused it.
+      - id: C4
+        status: answered
+        justification: >
+          Exhaustion is a NAMED verdict, never silence: RegistrationOutcome::GaveUp carries the
+          attempt count and the last error, and the caller logs it at ERROR naming the consequence
+          ("no sibling can discover it or relay a name to it"). Pinned by
+          registration_gives_up_after_the_bounded_budget.
+      - id: C5
+        status: n-a
+        justification: >
+          No evidence is weighed here. The predicate reads an attempt counter, nothing a peer said.
+      - id: C6a
+        status: answered
+        justification: >
+          Bounded on both axes: a capped per-gap delay and a finite retry count, with exactly ONE
+          call in flight (the driver awaits sequentially). registration_gives_up_after_the_bounded_
+          budget pins the count; the_retry_schedule_is_monotonic_capped_and_bounded pins the cap.
+      - id: C6b
+        status: answered
+        justification: >
+          Retrying is safe because the effect is idempotent: register_doorway_in_dht falls back to
+          update_doorway on an "already exists" error, so a retry after a call the conductor
+          actually completed (the uncancellable case) converges rather than duplicating.
+      - id: C7
+        status: partial
+        justification: >
+          GAP. A doorway that exhausted its budget still answers /health 200 and still serves
+          content while being absent from /api/v1/federation/doorways — nothing on its own surface
+          advertises "I am not registered". The ERROR log is the only signal. A registration-state
+          field on the coherence manifest or /admin/self-healing would close this.
+      - id: C8
+        status: partial
+        justification: >
+          Every attempt logs at WARN with attempt/retry_in_secs/error, and exhaustion at ERROR;
+          the three driver tests pin the decision sequence (which attempts run, which gaps are
+          slept). GAP: there is no counter or gauge for "this doorway is not in the registry", so
+          the condition is greppable but not scrapeable.
+      - id: C9
+        status: n-a
+        justification: >
+          No lineage decision. The doorway_id and agent key are fixed for the process; a retry
+          re-presents the same identity, never a successor.
+      - id: C10
+        status: n-a
+        justification: >
+          No wire contract. RegisterDoorwayInput is unchanged by this work; only the retry
+          cadence around the same call is new.
+      - id: C11
+        status: answered
+        justification: >
+          This is the externally-imposed-backpressure response. A conductor that is up but whose
+          cells are still initialising is precisely backpressure the doorway cannot influence, and
+          the answer is bounded exponential backoff with a cap — NOT a caller-side timeout around
+          the zome call, which `conductor-call-is-uncancellable` forbids (abandoning the call does
+          not stop the conductor, it only loses the answer).
+      - id: C12
+        status: n-a
+        justification: >
+          No authorization decision: the doorway is registering itself, and the infrastructure
+          zome's own validation is the gate.
+      - id: C13
+        status: n-a
+        justification: >
+          No graduated authority. Registration is a single flat declaration of existence; the
+          retry does not accrue standing.
+      - id: C14
+        status: partial
+        justification: >
+          GAP (same residual C7 names from the other side). The residual of exhaustion — an
+          undiscoverable doorway — is witnessed only in that doorway's own log, by nobody who
+          could act on it. No peer and no operator surface observes the absence.
+    contractTests:
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: the_retry_schedule_is_monotonic_capped_and_bounded
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: registration_retries_through_the_conductor_startup_window
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: registration_that_succeeds_at_boot_never_retries
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: registration_gives_up_after_the_bounded_budget
+        kind: unit
+
+  - name: RegistrationOutcome
+    kind: reason-outcome-enum
+    sourceLocation:
+      file: src/services/federation.rs
+      modulePath: services::federation::RegistrationOutcome
+      line: 246
+    summary: >
+      How a bounded DHT self-registration run ended — Registered{attempts} or
+      GaveUp{attempts,last_error}. Closed, two-member set: there is no third "still trying" member
+      because `drive_registration_with_retry` only returns once the loop is over, so an
+      in-progress run is represented by the task still running, never by a value.
+    concernIds:
+      - id: C0
+        status: answered
+        justification: Ephemeral (C) — an in-process return value, never persisted or gossiped.
+      - id: C1
+        status: n-a
+        justification: Not an election outcome.
+      - id: C2
+        status: n-a
+        justification: Carries no authority stamp and cannot move a head.
+      - id: C3
+        status: answered
+        justification: >
+          Both members are TERMINAL, which is what makes the driver's loop provably finite: every
+          run ends in one of them (registration_gives_up_after_the_bounded_budget reaches the
+          second, the two success tests reach the first).
+      - id: C4
+        status: answered
+        justification: >
+          GaveUp is the honest-absence member: failure is a value the caller must match on, not a
+          swallowed Err or a bare `bool`, so the ERROR log naming the consequence cannot be
+          forgotten by a future caller.
+      - id: C5
+        status: n-a
+        justification: Weighs no evidence.
+      - id: C6a
+        status: answered
+        justification: >
+          `attempts` on both members makes the bound observable rather than merely intended — the
+          budget test asserts it equals REGISTRATION_MAX_RETRIES + 1.
+      - id: C6b
+        status: n-a
+        justification: A verdict value has no effect to make idempotent.
+      - id: C7
+        status: partial
+        justification: >
+          GAP (shared with registration_retry_delay_secs C7). Neither member is projected onto any
+          serving surface, so what this doorway advertises about itself is silent about which
+          member it reached.
+      - id: C8
+        status: partial
+        justification: >
+          Each member has exactly one log site with distinct severity (INFO / ERROR). GAP: no
+          metric label is derived from the member, so the two outcomes are not scrapeable.
+      - id: C9
+        status: n-a
+        justification: Carries no identity or lineage.
+      - id: C10
+        status: answered
+        justification: >
+          Not a wire type — it never crosses a process boundary, so adding a member later is free
+          and cannot break a peer. Deliberately kept internal for that reason.
+      - id: C11
+        status: answered
+        justification: >
+          GaveUp is precisely "externally-imposed backpressure outlasted our bounded patience",
+          distinguished from success rather than collapsed into it.
+      - id: C12
+        status: n-a
+        justification: No authorization decision.
+      - id: C13
+        status: n-a
+        justification: No graduated authority.
+      - id: C14
+        status: partial
+        justification: >
+          GAP. GaveUp names a residual (this doorway is undiscoverable) that no peer witnesses;
+          the value is consumed locally and dropped.
+    contractTests:
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: registration_gives_up_after_the_bounded_budget
+        kind: unit
+      - path: doorway/doorway-service/src/services/federation.rs
+        testName: registration_that_succeeds_at_boot_never_retries
         kind: unit

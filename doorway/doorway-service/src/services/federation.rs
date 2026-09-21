@@ -208,6 +208,170 @@ pub async fn register_doorway_in_dht(
 }
 
 // =============================================================================
+// Registration retry (bounded)
+// =============================================================================
+
+/// First retry gap after the boot attempt fails.
+pub const REGISTRATION_RETRY_BASE_SECS: u64 = 15;
+/// Ceiling on a single gap — the same "a few discovery ticks" horizon the
+/// name-route shed window uses. Five ticks is as long as this doorway can
+/// usefully stay silent about its own existence.
+pub const REGISTRATION_RETRY_MAX_SECS: u64 = 300;
+/// Bounded, never endless. 15+30+60+120+240 then 300×7 ≈ 42 minutes of
+/// patience — comfortably past this conductor line's ~11-minute cell-startup
+/// window (interfaces accept calls while cells are still initialising and
+/// answer `CellDisabled`), and short enough that a doorway which still cannot
+/// register says so LOUDLY rather than retrying into the void.
+pub const REGISTRATION_MAX_RETRIES: u32 = 12;
+
+/// Gap before retry number `attempt` (1-based; attempt 0 is the boot try).
+/// `None` once the bounded budget is spent.
+///
+/// Pure — the crate's established clock-injection discipline (see
+/// `routes::admin_dev::apply_shed_request`): the schedule is a decision, the
+/// sleeping is the caller's.
+pub fn registration_retry_delay_secs(attempt: u32) -> Option<u64> {
+    if attempt == 0 || attempt > REGISTRATION_MAX_RETRIES {
+        return None;
+    }
+    Some(
+        REGISTRATION_RETRY_BASE_SECS
+            .saturating_mul(2u64.saturating_pow(attempt - 1))
+            .min(REGISTRATION_RETRY_MAX_SECS),
+    )
+}
+
+/// How a bounded registration run ended.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistrationOutcome {
+    /// `attempts` includes the boot try, so `1` means it worked first time.
+    Registered { attempts: u32 },
+    /// The bounded budget was spent and this doorway is NOT in the registry.
+    GaveUp { attempts: u32, last_error: String },
+}
+
+/// Drive `attempt` until it succeeds or the bounded backoff budget is spent.
+///
+/// # Why this exists
+///
+/// Registration used to be ONE try, 5s after boot, whose failure was a WARN
+/// and nothing else (`main.rs`: "Federation registration failed
+/// (non-fatal)"). Measured on the household mesh 2026-09-21T03:22:42Z: the
+/// gamma doorway's single attempt hit `CellDisabled` — the conductor's
+/// interfaces were already accepting calls while its cells were still
+/// initialising — and `gamma-elohim-host` was then absent from every
+/// doorway's `/api/v1/federation/doorways` for the whole life of the process.
+/// Since "the registry IS the DHT" (2026-09-12 ruling) and the discovery loop
+/// re-reads `get_all_doorways` every tick, a doorway missing from that set is
+/// invisible to every sibling's coherence probe and therefore can never be a
+/// holder in anyone's name-route fold — no relay to it is possible, for as
+/// long as it runs. The steward-peer registration sitting right beside it in
+/// `main.rs` already retried in the background and registered 10s later; this
+/// gives its sibling the same courtesy, bounded.
+///
+/// # Shape
+///
+/// ONE call in flight (the loop awaits sequentially), never on a request
+/// path (a background task), and NO caller-side timeout around the zome
+/// call — `conductor-call-is-uncancellable`: abandoning a call the conductor
+/// is still running does not stop it, it only loses the answer.
+///
+/// `sleep` is injected so the schedule is testable without a test that
+/// actually waits 42 minutes.
+pub async fn drive_registration_with_retry<A, AFut, S, SFut>(
+    doorway_id: &str,
+    mut attempt: A,
+    mut sleep: S,
+) -> RegistrationOutcome
+where
+    A: FnMut(u32) -> AFut,
+    AFut: std::future::Future<Output = Result<(), String>>,
+    S: FnMut(u64) -> SFut,
+    SFut: std::future::Future<Output = ()>,
+{
+    let mut attempts = 0u32;
+    loop {
+        attempts += 1;
+        match attempt(attempts).await {
+            Ok(()) => return RegistrationOutcome::Registered { attempts },
+            Err(last_error) => match registration_retry_delay_secs(attempts) {
+                Some(delay) => {
+                    warn!(
+                        doorway_id = %doorway_id,
+                        attempt = attempts,
+                        retry_in_secs = delay,
+                        error = %last_error,
+                        "Federation registration failed — retrying (this doorway is \
+                         undiscoverable to every sibling until it registers)"
+                    );
+                    sleep(delay).await;
+                }
+                None => {
+                    return RegistrationOutcome::GaveUp {
+                        attempts,
+                        last_error,
+                    }
+                }
+            },
+        }
+    }
+}
+
+/// Background task: register this doorway in the DHT, retrying on a bounded
+/// backoff. See [`drive_registration_with_retry`] for why the boot-once
+/// version was a defect.
+pub fn spawn_doorway_registration_task(
+    config: FederationConfig,
+    zome_caller: Arc<ZomeCaller>,
+    capabilities: Vec<String>,
+    initial_delay: Duration,
+) -> JoinHandle<()> {
+    tokio::spawn(async move {
+        tokio::time::sleep(initial_delay).await;
+        info!(
+            "Federation: registering doorway '{}' in DHT...",
+            config.doorway_id
+        );
+        let outcome = drive_registration_with_retry(
+            &config.doorway_id,
+            |_attempt| {
+                let config = &config;
+                let zome_caller = &zome_caller;
+                let capabilities = capabilities.clone();
+                async move { register_doorway_in_dht(config, zome_caller, capabilities).await }
+            },
+            |secs| tokio::time::sleep(Duration::from_secs(secs)),
+        )
+        .await;
+        match outcome {
+            RegistrationOutcome::Registered { attempts } => {
+                info!(
+                    doorway_id = %config.doorway_id,
+                    attempts,
+                    "Federation: doorway registration complete"
+                );
+            }
+            RegistrationOutcome::GaveUp {
+                attempts,
+                last_error,
+            } => {
+                // Loud, not a debug crumb: a doorway that is not in the
+                // registry is invisible to every sibling's fold for the rest
+                // of this process's life.
+                tracing::error!(
+                    doorway_id = %config.doorway_id,
+                    attempts,
+                    error = %last_error,
+                    "Federation: doorway NEVER registered in the DHT after the bounded retry \
+                     budget — no sibling can discover it or relay a name to it until this \
+                     process is restarted"
+                );
+            }
+        }
+    })
+}
+
+// =============================================================================
 // Heartbeat
 // =============================================================================
 
@@ -951,6 +1115,36 @@ fn install_name_routes(
         }
     }
 
+    // OwnerOrder — the selector's FINAL TIEBREAK — is the first-appearance order
+    // of same-key contracts in this vector (`fold_candidate_holders` enumerates
+    // them). `selector_rank` documents that term as a "stable final tiebreak",
+    // and until this sort it was not stable at all: the order arrived from
+    // `probed`, i.e. `refresh_peer_cache`'s cache, which is the union of what
+    // each seed's own `GET /api/v1/federation/doorways` returned — so the FIRST
+    // reachable seed's DHT link order silently became every doorway's holder
+    // priority. `merge_discovery_seeds` already sorts DHT registrations "by id
+    // for determinism"; `refresh_peer_cache`'s per-seed fan-out then threw that
+    // away, and nothing downstream restored it.
+    //
+    // Measured on the household mesh 2026-09-21 (run R1): with "garden" held by
+    // alpha and gamma, beta's fold put the MOST RECENTLY REGISTERED doorway
+    // (gamma) first, so every relay went to gamma and the busy holder alpha was
+    // never dialled at all — which made the balance scenario's first two claims
+    // pass for the wrong reason (gamma served because it was first, not because
+    // alpha was set aside: zero `name_route_shed` lines, both demotion counters
+    // 0) and its recovery claim unreachable.
+    //
+    // Sorting by doorway_id extends the module's OWN existing determinism rule
+    // to the place that discarded it. It is arbitrary-but-stable, which is
+    // exactly what a final tiebreak must be — the meaningful terms
+    // (Liveness, ReachStanding, Nearest, Weight) all rank above it.
+    contracts.sort_by(|left, right| {
+        left.doorway_id
+            .cmp(&right.doorway_id)
+            .then_with(|| left.url_path.cmp(&right.url_path))
+            .then_with(|| left.host.cmp(&right.host))
+    });
+
     debug!(
         contracts = contracts.len(),
         peers = probed.len(),
@@ -1350,6 +1544,135 @@ pub async fn get_cached_peers(cache: &PeerCache) -> Vec<PeerDoorway> {
 mod tests {
     use super::*;
     use clap::Parser;
+
+    // ── Bounded DHT self-registration retry ──────────────────────────────────
+    //
+    // The defect these pin, measured on the household mesh
+    // 2026-09-21T03:22:42Z (`logs/doorway-c.log`): gamma's ONE registration
+    // attempt hit the conductor's cell-startup window (`CellDisabled`), logged
+    // "Federation registration failed (non-fatal)", and never tried again —
+    // so `gamma-elohim-host` was absent from every doorway's
+    // `/api/v1/federation/doorways` for the life of the process and could
+    // never be a holder in a sibling's name-route fold.
+
+    /// A conductor still initialising its cells answers `CellDisabled` for
+    /// minutes; the doorway must keep asking until it is ready. This is the
+    /// exact shape of the live failure, replayed without the wait.
+    #[tokio::test]
+    async fn registration_retries_through_the_conductor_startup_window() {
+        use std::cell::RefCell;
+        let slept: RefCell<Vec<u64>> = RefCell::new(Vec::new());
+        let outcome = drive_registration_with_retry(
+            "gamma-elohim-host",
+            |attempt| async move {
+                if attempt < 4 {
+                    Err("authorize_signing_credentials failed for role 'mishpat': \
+                         CellDisabled(...)"
+                        .to_string())
+                } else {
+                    Ok(())
+                }
+            },
+            |secs| {
+                slept.borrow_mut().push(secs);
+                async {}
+            },
+        )
+        .await;
+        assert_eq!(outcome, RegistrationOutcome::Registered { attempts: 4 });
+        assert_eq!(
+            *slept.borrow(),
+            vec![15, 30, 60],
+            "one bounded backoff gap per failed attempt, none after the success"
+        );
+    }
+
+    /// Stop on success — a doorway that registers first time must not sleep
+    /// or re-register.
+    #[tokio::test]
+    async fn registration_that_succeeds_at_boot_never_retries() {
+        use std::cell::RefCell;
+        let slept: RefCell<Vec<u64>> = RefCell::new(Vec::new());
+        let outcome = drive_registration_with_retry(
+            "alpha-elohim-host",
+            |_attempt| async { Ok(()) },
+            |secs| {
+                slept.borrow_mut().push(secs);
+                async {}
+            },
+        )
+        .await;
+        assert_eq!(outcome, RegistrationOutcome::Registered { attempts: 1 });
+        assert!(
+            slept.borrow().is_empty(),
+            "no backoff after a clean boot try"
+        );
+    }
+
+    /// Bounded, never endless: a conductor that is simply never coming back
+    /// must end in a loud, terminal verdict rather than an infinite loop.
+    #[tokio::test]
+    async fn registration_gives_up_after_the_bounded_budget() {
+        use std::cell::RefCell;
+        let slept: RefCell<Vec<u64>> = RefCell::new(Vec::new());
+        let outcome = drive_registration_with_retry(
+            "gamma-elohim-host",
+            |_attempt| async { Err("conductor unreachable".to_string()) },
+            |secs| {
+                slept.borrow_mut().push(secs);
+                async {}
+            },
+        )
+        .await;
+        match outcome {
+            RegistrationOutcome::GaveUp {
+                attempts,
+                last_error,
+            } => {
+                assert_eq!(attempts, REGISTRATION_MAX_RETRIES + 1);
+                assert_eq!(last_error, "conductor unreachable");
+            }
+            other => panic!("expected GaveUp, got {other:?}"),
+        }
+        assert_eq!(slept.borrow().len(), REGISTRATION_MAX_RETRIES as usize);
+    }
+
+    /// The schedule itself: monotonic, capped, and bounded.
+    #[test]
+    fn the_retry_schedule_is_monotonic_capped_and_bounded() {
+        assert_eq!(
+            registration_retry_delay_secs(0),
+            None,
+            "attempt 0 is the boot try"
+        );
+        let mut previous = 0u64;
+        let mut total = 0u64;
+        for attempt in 1..=REGISTRATION_MAX_RETRIES {
+            let delay = registration_retry_delay_secs(attempt)
+                .unwrap_or_else(|| panic!("attempt {attempt} is inside the budget"));
+            assert!(
+                delay >= previous,
+                "gap {attempt} shrank: {previous} -> {delay}"
+            );
+            assert!(
+                delay <= REGISTRATION_RETRY_MAX_SECS,
+                "gap {attempt} exceeds the cap"
+            );
+            previous = delay;
+            total += delay;
+        }
+        assert_eq!(
+            registration_retry_delay_secs(REGISTRATION_MAX_RETRIES + 1),
+            None,
+            "the budget is bounded"
+        );
+        // The window this exists for: this conductor line can answer
+        // `CellDisabled` for ~11 minutes after its interfaces come up.
+        assert!(
+            total >= 11 * 60,
+            "the total patience ({total}s) must outlast the conductor's cell-startup window"
+        );
+    }
 
     #[test]
     fn test_federation_config_from_args_none() {
@@ -1882,6 +2205,76 @@ mod tests {
             assert_eq!(
                 holders[0].liveness,
                 crate::services::name_routing::HolderLiveness::Serving
+            );
+        }
+
+        /// OwnerOrder — `selector_rank`'s documented "stable final tiebreak" —
+        /// must not depend on the order the coherence probe happened to return.
+        ///
+        /// THE DEFECT THIS PINS (household mesh, 2026-09-21 run R1): the probe
+        /// order is `refresh_peer_cache`'s cache, which is the union of what each
+        /// seed's own `GET /api/v1/federation/doorways` returned — so the first
+        /// reachable seed's DHT link order became every doorway's holder
+        /// priority. With "garden" held by alpha and gamma, beta put the
+        /// most-recently-registered doorway (gamma) first and relayed EVERY
+        /// request to it, so the holder that had declared itself busy (alpha) was
+        /// never dialled: zero `name_route_shed` lines, both demotion counters 0,
+        /// and the balance scenario's "set aside" claims passing for the wrong
+        /// reason. `merge_discovery_seeds` already sorts registrations "by id for
+        /// determinism"; this restores that rule where the per-seed fan-out
+        /// discarded it.
+        #[test]
+        fn owner_order_is_stable_by_doorway_id_whatever_order_the_probe_returned() {
+            use crate::services::name_routing::{NameRouteTable, RouteKey};
+
+            let probed = vec![
+                (
+                    "gamma-elohim-host".to_string(),
+                    "http://localhost:8890".to_string(),
+                    true,
+                    Some(manifest_body(
+                        "gamma-elohim-host",
+                        &[("/nrt-garden", "EPR-GARDEN")],
+                    )),
+                ),
+                (
+                    "alpha-elohim-host".to_string(),
+                    "http://localhost:8888".to_string(),
+                    true,
+                    Some(manifest_body(
+                        "alpha-elohim-host",
+                        &[("/nrt-garden", "EPR-GARDEN")],
+                    )),
+                ),
+            ];
+            let expected = vec!["alpha-elohim-host", "gamma-elohim-host"];
+
+            // gamma first in the probe — the live household order.
+            let forward = NameRouteTable::new();
+            install_name_routes(&forward, &probed);
+            let forward_order: Vec<String> = forward
+                .holders_for(&RouteKey::path_only("/nrt-garden/"), "apex-elohim-host")
+                .into_iter()
+                .map(|holder| holder.doorway_id)
+                .collect();
+            assert_eq!(
+                forward_order, expected,
+                "owner order must be the stable id order, not the probe's arrival order"
+            );
+
+            // alpha first in the probe — the SAME fold must come out.
+            let reversed: Vec<_> = probed.into_iter().rev().collect();
+            let backward = NameRouteTable::new();
+            install_name_routes(&backward, &reversed);
+            let backward_order: Vec<String> = backward
+                .holders_for(&RouteKey::path_only("/nrt-garden/"), "apex-elohim-host")
+                .into_iter()
+                .map(|holder| holder.doorway_id)
+                .collect();
+            assert_eq!(
+                backward_order, forward_order,
+                "the fold changed when only the probe's arrival order changed — OwnerOrder is \
+                 not a stable tiebreak"
             );
         }
     }
