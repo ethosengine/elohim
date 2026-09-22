@@ -77,7 +77,29 @@ pub struct ServeRow {
 /// Pure fold: map `ServeRow`s → `Candidate`s, applying neutral defaults for absent signals.
 ///
 /// No I/O; no diesel. Unit-testable without a running database.
+///
+/// **RTT is withheld from the whole batch unless every candidate has a sample
+/// (2026-09-22 story 3.2 follow-up fix).** `select_serve_peers`'s callers
+/// (`p2p/mod.rs` ~4549, `http.rs` ~4569) PREPEND its result ahead of the
+/// verified `peer_blob_inventory` candidate list — they do not intersect
+/// against it. `shard_locations` rows (this function's input) can be
+/// optimistic: a peer can be listed as a holder before its bytes have
+/// actually landed. Before RTT was fed, every row's `attested_rtt_ms` was
+/// `None`, so all candidates got the same neutral rtt_factor and ranking
+/// depended only on capability/headroom/bond/delivery — a peer that merely
+/// LOOKS well-connected (has a locally-recorded RTT sample from unrelated
+/// prior traffic) never got a boost over one that had genuinely just
+/// received the push (no sample yet). Feeding a *partial* RTT picture broke
+/// that: a well-known-but-possibly-not-yet-holding peer could now win the
+/// score purely on a fast historical RTT and get tried first, costing a
+/// retry when its bytes weren't actually there — observed as blob/bundle
+/// propagation missing its SLA on the household mesh. Gating RTT on
+/// "everyone in this batch has a sample" restores the pre-3.2 ordering
+/// whenever information is incomplete (the common case for a freshly-pushed
+/// blob) while still letting RTT discriminate once the whole candidate set
+/// has been observed.
 pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
+    let all_sampled = !rows.is_empty() && rows.iter().all(|r| r.attested_rtt_ms.is_some());
     rows.iter()
         .map(|r| {
             let raw_cap = r.capability_level.unwrap_or(MIN_CAP as i32);
@@ -87,7 +109,9 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
                 agent_cid: r.agent_cid.clone(),
                 capability_level,
                 current_load: r.current_load.unwrap_or(0.0), // full headroom
-                attested_rtt_ms: r.attested_rtt_ms,          // None → neutral 0.5 in score
+                // Withheld (None) unless every candidate in this batch has a
+                // sample — see the function doc above.
+                attested_rtt_ms: if all_sampled { r.attested_rtt_ms } else { None },
                 household_id: r.household_id.clone().unwrap_or_default(), // None → "" (no false grouping)
                 bonded: r.bonded,
                 delivery_score: r.delivery_score.unwrap_or(1.0), // optimistic default
@@ -435,18 +459,76 @@ mod tests {
 
     #[test]
     fn fold_and_rank_unknown_rtt_never_demoted_below_a_known_slow_peer() {
-        // A not-yet-sampled peer (None → neutral 0.5 rtt_factor) must not
-        // rank below a peer with a measured SLOW rtt (~900ms → ~0.1 factor).
-        // Absence of data is neutral, never a penalty.
+        // A not-yet-sampled peer (None → neutral 0.5 rtt_factor once RTT is
+        // actually applied) must not rank below a peer with a measured SLOW
+        // rtt (~900ms → ~0.1 factor) purely because it lacks a sample. Under
+        // the all-sampled gate below, a mixed Some/None batch withholds RTT
+        // from BOTH candidates entirely — the safer form of "never demoted":
+        // absence of data never lets RTT demote anyone, because RTT simply
+        // does not participate in the comparison until every candidate has
+        // been observed.
         let rows = vec![
             row_with_rtt("uhCAk-slow", "h1", Some(900)),
             row_with_rtt("uhCAk-unsampled", "h2", None),
         ];
         let cands = fold_candidates(&rows);
-        let ranked = score::rank(&cands, MIN_CAP);
-        assert_eq!(
-            ranked[0].agent_cid, "uhCAk-unsampled",
-            "unknown RTT (neutral 0.5) must not be demoted below a known-slow peer"
+        assert!(
+            cands.iter().all(|c| c.attested_rtt_ms.is_none()),
+            "a mixed Some/None batch must withhold RTT from every candidate, \
+             not just the unsampled one — see fold_withholds_rtt_from_the_whole_batch..."
         );
+    }
+
+    // --- 2026-09-22 story 3.2 follow-up: withhold RTT on partial info -----
+    //
+    // Regression: select_serve_peers' callers PREPEND its result ahead of
+    // the verified peer_blob_inventory candidate list rather than
+    // intersecting against it (p2p/mod.rs ~4549, http.rs ~4569).
+    // shard_locations rows (this module's input) can be optimistic — a peer
+    // can be listed as a holder before its bytes have actually landed. Once
+    // RTT started differentiating per-row scores, a peer that merely LOOKS
+    // well-connected (a fast locally-recorded RTT sample from unrelated
+    // prior traffic) could win the score over a peer that had genuinely
+    // just received the push (no sample yet yet), get tried first, and
+    // cost a retry when its bytes weren't actually there — observed as
+    // blob/bundle propagation missing its SLA on the household mesh
+    // (epr-app-deliverability.feature ":184"/":214" timeouts). Withholding
+    // RTT from the whole batch unless every row has a sample restores the
+    // pre-3.2 ordering (capability/headroom/bond/delivery only) whenever
+    // information is incomplete — the common case right after a push.
+
+    #[test]
+    fn fold_withholds_rtt_from_the_whole_batch_unless_every_row_has_a_sample() {
+        let rows = vec![
+            row_with_rtt("uhCAk-well-known-maybe-not-holding-yet", "h1", Some(5)),
+            row_with_rtt("uhCAk-just-received-no-sample-yet", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        assert!(
+            cands.iter().all(|c| c.attested_rtt_ms.is_none()),
+            "a partial RTT picture must withhold RTT from every candidate, \
+             not just the unsampled one"
+        );
+    }
+
+    #[test]
+    fn fold_applies_rtt_once_every_candidate_in_the_batch_has_a_sample() {
+        let rows = vec![
+            row_with_rtt("uhCAk-far", "h1", Some(300)),
+            row_with_rtt("uhCAk-near", "h2", Some(10)),
+        ];
+        let cands = fold_candidates(&rows);
+        assert_eq!(cands[0].attested_rtt_ms, Some(300));
+        assert_eq!(cands[1].attested_rtt_ms, Some(10));
+    }
+
+    #[test]
+    fn fold_withholds_rtt_for_a_single_unsampled_candidate() {
+        // A lone candidate with no sample: all_sampled is false (the one row
+        // lacks a sample), so RTT is withheld — consistent with the batch
+        // rule, and harmless since there's no competing candidate anyway.
+        let rows = vec![row_with_rtt("uhCAk-solo", "h1", None)];
+        let cands = fold_candidates(&rows);
+        assert_eq!(cands[0].attested_rtt_ms, None);
     }
 }
