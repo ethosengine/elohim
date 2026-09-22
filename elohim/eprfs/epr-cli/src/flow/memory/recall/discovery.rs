@@ -1414,7 +1414,12 @@ fn atom_search_excluded(contract: &Contract) -> BTreeSet<String> {
 /// [`read_bootstrap_input`]). `None` on an exhausted budget or no match; never a refusal — a habit
 /// atom that cannot be located is supplementary evidence going missing, not the register itself
 /// failing to read (contrast [`read_bootstrap_habits`], which does refuse).
-fn find_habit_atom(root: &Path, contract: &Contract, id: &str, budget: usize) -> Option<PathBuf> {
+pub(super) fn find_habit_atom(
+    root: &Path,
+    contract: &Contract,
+    id: &str,
+    budget: usize,
+) -> Option<PathBuf> {
     let excluded = atom_search_excluded(contract);
     let target = format!("{id}.habit.md");
     let mut stack = vec![root.to_path_buf()];

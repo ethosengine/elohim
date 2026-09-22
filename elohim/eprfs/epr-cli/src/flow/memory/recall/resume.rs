@@ -4,18 +4,13 @@
 //! git queries) — never a new ledger, never a write beyond the ordinary private session state
 //! `open` already produces.
 //!
-//! Deliberately self-contained rather than reusing `discovery.rs`'s `find_habit_atom`/
-//! `atom_last_delta` (a second implementer is concurrently editing that file's focused-door
-//! functions): the register walk and atom-delta parsing are duplicated here in miniature, at the
-//! cost of ~40 lines of overlap, to keep this station's diff isolated to new files plus a small,
-//! localized dispatch in `journey.rs`.
+//! The register path and the habit-atom walk are discovery's own (`HABITS_REL`,
+//! `find_habit_atom`); this seam adds only what resuming needs beyond them — the last delta WITH
+//! its parsed date, and the bounded git reads.
 use std::path::Component;
 
+use super::discovery::{find_habit_atom, HABITS_REL};
 use super::*;
-
-/// Where the habit register is projected. Read, never written, by this executor — the same path
-/// `discovery::HABITS_REL` names, duplicated rather than imported (see the module doc).
-const HABITS_PATH: &str = "genesis/manifests/habits.yaml";
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // Bounded reads
@@ -72,23 +67,23 @@ fn read_habit_row(
     usage: &mut Value,
 ) -> FlowResult<HabitRegisterRow> {
     let budget = contract.limit_usize("habit_register_bytes");
-    let data = match read_bounded(root, HABITS_PATH, budget)? {
+    let data = match read_bounded(root, HABITS_REL, budget)? {
         Bounded::Ok(data) => data,
         Bounded::Missing => {
             return Err(refused(format!(
-                "resume cannot read the habit register: {HABITS_PATH}: absent"
+                "resume cannot read the habit register: {HABITS_REL}: absent"
             )))
         }
         Bounded::TooLarge => {
             return Err(refused(format!(
-                "resume cannot read the habit register: {HABITS_PATH}: exceeds its declared budget"
+                "resume cannot read the habit register: {HABITS_REL}: exceeds its declared budget"
             )))
         }
     };
     add_usage(usage, &json!({"habit_register_bytes": data.len()}));
     let doc: serde_yaml::Value = serde_yaml::from_slice(&data).map_err(|error| {
         refused(format!(
-            "resume cannot read the habit register: {HABITS_PATH}: {error}"
+            "resume cannot read the habit register: {HABITS_REL}: {error}"
         ))
     })?;
     let habits = doc
@@ -96,7 +91,7 @@ fn read_habit_row(
         .and_then(serde_yaml::Value::as_sequence)
         .ok_or_else(|| {
             refused(format!(
-                "resume cannot read the habit register: {HABITS_PATH}: no `habits:` sequence"
+                "resume cannot read the habit register: {HABITS_REL}: no `habits:` sequence"
             ))
         })?;
     let row = habits
@@ -104,7 +99,7 @@ fn read_habit_row(
         .find(|h| h.get("id").and_then(serde_yaml::Value::as_str) == Some(id))
         .ok_or_else(|| {
             refused(format!(
-                "no habit named `{id}` in the register ({HABITS_PATH})"
+                "no habit named `{id}` in the register ({HABITS_REL})"
             ))
         })?;
     let status = row
@@ -142,54 +137,6 @@ fn read_habit_row(
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // The habit atom — located, its newest delta and its `refs:`
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-
-/// `.epr-meta/<id>.habit.md`, found anywhere under `root` — a miniature of `discovery.rs`'s
-/// `find_habit_atom` (see the module doc for why this is a deliberate duplicate rather than a
-/// shared import).
-fn find_atom(root: &Path, contract: &Contract, id: &str, budget: usize) -> Option<PathBuf> {
-    let excluded: BTreeSet<String> = contract
-        .value
-        .pointer("/discovery/exclude_directories")
-        .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default();
-    let target = format!("{id}.habit.md");
-    let mut stack = vec![root.to_path_buf()];
-    let mut scanned_bytes = 0usize;
-    while let Some(dir) = stack.pop() {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        let mut children: Vec<_> = entries.flatten().collect();
-        children.sort_by_key(std::fs::DirEntry::file_name);
-        for entry in children {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            scanned_bytes += name.len();
-            if scanned_bytes > budget {
-                return None;
-            }
-            let Ok(meta) = entry.path().symlink_metadata() else {
-                continue;
-            };
-            if meta.file_type().is_symlink() || !meta.is_dir() || excluded.contains(&name) {
-                continue;
-            }
-            if name == ".epr-meta" {
-                let candidate = entry.path().join(&target);
-                if candidate.is_file() {
-                    return Some(candidate);
-                }
-            }
-            stack.push(entry.path());
-        }
-    }
-    None
-}
 
 /// The newest `DELTA`/`GREEN`/`RED[ WRITTEN]` paragraph's first line (clipped), its 1-based
 /// inclusive line range, and the date parsed from its own leading `KEYWORD YYYY-MM-DD` token —
@@ -565,7 +512,9 @@ pub(super) fn resume_view(
             .ok()
             .filter(|p| p.is_file())
             .map(|p| rel_to_root(root, &p)),
-        None => find_atom(root, contract, habit_id, atom_budget).map(|p| rel_to_root(root, &p)),
+        None => {
+            find_habit_atom(root, contract, habit_id, atom_budget).map(|p| rel_to_root(root, &p))
+        }
     };
 
     let mut dynamic_omissions: Vec<String> = Vec::new();

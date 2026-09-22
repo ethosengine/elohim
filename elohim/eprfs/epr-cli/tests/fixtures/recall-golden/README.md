@@ -25,8 +25,8 @@ digest, that is either a real regression (fix the split) or an intentional rende
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `62b0037d87ea035b97dc2aeebb858e0cd50714c2c6e22720c28c365e917f2e6d` |
-| Whole open | `whole_open_is_byte_identical` | `6f55d1ba8e0e0ba5b0cb13b050998435fe8053b0b51905cb5f9424d92e7d0f63` |
+| Focused open | `focused_open_is_byte_identical` | `d949a962090ef837ebdc28bd61314f63698fb03a8665d389ece7816618a59b66` |
+| Whole open | `whole_open_is_byte_identical` | `3a2c39e289280bbc0462e0908787f4b5ffbb5ab446b47db256160350b75e84f9` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -110,3 +110,12 @@ in its honesty-floor line (Task 1.2), and that CID is `Contract::method_cid()` o
 contract's raw bytes, so ANY byte in the live contract moving — not only the `lens_table` this
 fixture happens to override — moves it. `GOLDEN_FOCUSED` and `GOLDEN_WHOLE` re-baselined;
 `GOLDEN_REFUSAL` is unchanged, for the same reason as every earlier round.
+
+## 2026-09-22 — contract v13 (recall — Codex's trail sprint)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract's method CID moved
+(`bafkreia…65q4` → `bafkreih…yene`) because contract v13 declares new `discovery` keys
+(`first_screen_globs`, `short_terms`, `stemming`, `passage_window_bytes`), `limits.resume_commits`
+and two source roots. Proof that nothing else changed: substituting the v12 fixture CID back into
+each new rendering reproduces the previous pins (`62b0037d…`, `6f55d1ba…`) byte for byte. The
+refusal digest is unchanged.
