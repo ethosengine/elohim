@@ -80,6 +80,14 @@ Use these severities:
 - `MAJOR`: the main document is recoverable, but a concept, transition, section contribution, prerequisite, or proof remains materially ambiguous.
 - `MINOR`: wording or organization creates avoidable reader effort without changing the recovered meaning.
 
+Give every finding one class as well as a severity, because the author's revision loop closes on class, not on count:
+
+- `correctness`: the document asserts something its own content contradicts, or claims a proof or outcome its steps do not establish.
+- `interpretability`: a stranger cannot recover a meaning the document needs — a hidden prerequisite, a missing bridge, an unexplained term.
+- `preference`: the meaning is recoverable and consistent; you would phrase or order it differently. Preference findings are offered, never required, and are always `MINOR`.
+
+Name the class honestly. A phrasing demand dressed as interpretability makes each fresh reader reopen a story the last one could already read.
+
 ## Output
 
 Return this structure:
@@ -99,6 +107,7 @@ Return this structure:
 ## Findings
 ### BLOCKER
 1. **<short title>** — `<line, heading, or quoted phrase>`
+   - Class: correctness | interpretability | preference
    - Reader failure: ...
    - Hidden/missing context: ...
    - Why it matters: ...
@@ -118,10 +127,11 @@ Return this structure:
 
 ## Verdict
 REVISE | READY
+Classes: <n> correctness · <n> interpretability · <n> preference
 <one paragraph explaining the verdict and naming the highest-value revision>
 ```
 
-Use `None` under an empty severity; do not invent findings to fill sections. `READY` means a newcomer can recover the audience, value, central movement, and profile-specific success path without external context. Stylistic polish alone never forces `REVISE`; any BLOCKER does, as does a cluster of MAJOR findings that obscures the document's promise.
+Use `None` under an empty severity; do not invent findings to fill sections. `READY` means a newcomer can recover the audience, value, central movement, and profile-specific success path without external context. Stylistic polish alone never forces `REVISE`, and neither do `preference` findings; any BLOCKER does, as does a cluster of MAJOR findings that obscures the document's promise.
 
 ## Attribution
 

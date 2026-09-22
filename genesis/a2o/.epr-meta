@@ -19,7 +19,13 @@ rules:
       feature-file path and the `a2o-story` review profile. Do not provide the conversation, plan,
       implementation diff, incident history, or related docs. Revise from its interpretability and
       coherence findings, then repeat with a new blind reader until the story is READY or the operator
-      explicitly defers named findings. The PostToolUse signal makes this deferred review obligation
+      explicitly defers named findings.
+      Each finding carries a class (correctness | interpretability | preference); the loop closes when a
+      fresh reader returns no correctness or interpretability finding, and preference findings never
+      reopen it. Record the loop's cost where the work already reports — the commit message or the
+      owning habit delta — as rounds, per-class counts per round, and findings resolved, so review
+      efficiency is measured rather than felt. Every round still uses a new reader.
+      The PostToolUse signal makes this deferred review obligation
       visible after writes; it is one review loop per completed authoring pass, not one subagent
       dispatch per edit.
   - id: new-feature-subdir-needs-meta

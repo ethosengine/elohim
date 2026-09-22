@@ -110,6 +110,11 @@ rules:
       serves, what the thing is for, prerequisites, its mental model, a first successful path, and the
       next useful action without inheriting the author's repository context. Revise and repeat with a
       new blind reader until READY or the operator explicitly defers named findings.
+      Each finding carries a class (correctness | interpretability | preference); the loop closes when a
+      fresh reader returns no correctness or interpretability finding, and preference findings never
+      reopen it. Record the loop's cost where the work already reports — the commit message or the
+      owning habit delta — as rounds, per-class counts per round, and findings resolved, so review
+      efficiency is measured rather than felt. Every round still uses a new reader.
 ci-trigger:
   ignore:
     - .claude/
