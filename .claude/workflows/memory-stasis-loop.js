@@ -19,7 +19,9 @@ export const meta = {
 // Station six round (b), 2026-09-11: `placement-audit.py` was deleted with the kit. Its four
 // renderings are two native verbs now — the PLACEMENT report (--ledger / --coverage / --focus /
 // --stasis) and the BOUNDS headline, which is a sibling of it, not a flag on it.
-const EPR = process.env.EPR_BIN || 'epr'
+// The workflow runtime has no Node globals (`process` is undefined): the binary comes from
+// `args.eprBin` when a caller passes an object, else `epr` on PATH.
+const EPR = (args && typeof args === 'object' && args.eprBin) || 'epr'
 const AUDIT = `${EPR} flow report placement`
 const HEADLINE = `${EPR} flow report --headline`
 const ROUND_CAP = 10 // backstop only; the real stop is stasis / convergence

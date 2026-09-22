@@ -25,7 +25,9 @@ export const meta = {
 // The dry run (one tier x one question, confirming 1 FlowEvent / 1 Verdict / 5 folds) is run by
 // the controller after this script is reported, not by this workflow.
 
-const EPR = process.env.EPR_BIN || 'epr'
+// The workflow runtime has no Node globals (`process` is undefined): the binary comes from
+// `args.eprBin` when a caller passes an object, else `epr` on PATH.
+const EPR = (args && typeof args === 'object' && args.eprBin) || 'epr'
 
 // The six Intents in the bank — .epr-meta/elohim/algorithms/recall-questions.json — named
 // verbatim; the workflow never invents a question id, it only points `sample` at the bank's own.
