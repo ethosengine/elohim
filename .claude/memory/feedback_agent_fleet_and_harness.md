@@ -1,6 +1,7 @@
 ---
 name: feedback_agent_fleet_and_harness
-description: "Keep 3 agents max; delegate narrow tasks to cheaper tiers; avoid subagent read-set ∩ write-set overlap; trap: orphan cargo locks, StructuredOutput hangs."
+title: "Agent fleet + harness discipline (umbrella)"
+description: "3 agents max; cheap tiers for narrow tasks; no read/write-set overlap; orphan cargo locks, StructuredOutput hangs."
 metadata: 
   node_type: memory
   title: "Agent fleet, delegation & harness traps (umbrella)"

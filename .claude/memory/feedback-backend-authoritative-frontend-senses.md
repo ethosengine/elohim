@@ -2,7 +2,7 @@
 name: feedback-backend-authoritative-frontend-senses
 title: Backend authoritative; frontend senses/inspires
 id: feedback-backend-authoritative-frontend-senses
-description: "Backend truth-layer owns view types (view schema + app manifest); Rust conforms, codegen projects to TS; UI senses and inspires, never dictates."
+description: "Backend owns view types (view schema + manifest); Rust conforms, codegen projects to TS; the UI never dictates."
 metadata: 
   node_type: memory
   type: feedback

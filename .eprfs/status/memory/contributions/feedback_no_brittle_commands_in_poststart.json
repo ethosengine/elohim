@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback-no-brittle-commands-in-poststart",
-  "claim": "Devfile postStart failures abort whole-workspace startup — new tooling goes under commands: (on demand); only can't-fail commands auto-run.",
+  "claim": "Devfile postStart failures abort workspace startup — new tooling goes under on-demand commands.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_no_brittle_commands_in_poststart.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_no_brittle_commands_in_poststart.md",
-        "cid": "bafkreicd6d2vpghkwkqqzfvuyzbxqyqqc5bikvomqmw5dnherlm7pv2tqq"
+        "cid": "bafkreiecpeyck54q6c5xwgw7uafjejlhwbyxwn32cy7asd234m44trg6ka"
       },
       "reach": "repository"
     }

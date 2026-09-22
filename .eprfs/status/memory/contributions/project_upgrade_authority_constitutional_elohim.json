@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project-upgrade-authority-constitutional-elohim",
-  "claim": "Auto-adoption is default; a core-protocol crossing is the elohim's notarized commitment, never a consent act — bites in upgrade/migration design.",
+  "claim": "Auto-adoption is default; a core-protocol crossing is the elohim's notarized commitment, never a consent act.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_upgrade_authority_constitutional_elohim.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_upgrade_authority_constitutional_elohim.md",
-        "cid": "bafkreiakpooqjcx3u3np47n4trcvhpgf465jwinwt7zejlmfueulikp73u"
+        "cid": "bafkreie3lrsrdkw5zy4tgv4vdoyyivzftc7qd5yotkieukpburbwqtv6fq"
       },
       "reach": "repository"
     }

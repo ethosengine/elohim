@@ -2,7 +2,7 @@
 name: project_content_sync_plane
 title: Content sync / replication plane (umbrella)
 id: project-content-sync-plane
-description: "Sync-plane: metadata-only gossip, Automerge lit, iroh dual-stack, ghost heads deadlocked, local seed never DHT-anchors."
+description: "Metadata-only gossip, Automerge lit, iroh dual-stack, ghost heads, clone leaks, post_commit signals cell-local."
 metadata:
   node_type: memory
   type: project
@@ -19,6 +19,8 @@ Folds the content sync / blob-replication dataplane cluster. Members:
 - [[project_local_stack_dht_anchor_gap]] — Local bulk seed never DHT-anchors → provenance gate 404s all reads by design; dev repair = p2p_published_at backfill; real fix = import anchor step
 - [[project_iroh_dataplane_actual_state]] — Dual ENABLED in alpha manifests 2026-08-05 (deploy pending) w/ sovereign never-n0 iroh defaults; proof = "Dual: DualGossipPublisher wired into P2PNode" + irohNodeId, NOT the degraded-wrapper log.
 - [[project_dataplane_next_lens_diversity_placement]] — Diversity-aware salvage placement (1a+1b landed) is INERT in prod — household_id NULL from identity-coherence gaps, not scope reads; degrades safely to XOR.
+- [[project_clone_isolation_and_discovery_cost_findings_2026_09_07]] — folded 2026-09-22 (index: false); Mesh 2026-09-07: role-keyed sync leaks clone content into base cells; feedback discovery scans all history — group-space + convergence hazard.
+- [[project_holochain_post_commit_signals_are_cell_local]] — folded 2026-09-22 (index: false); post_commit/emit_signal fire only on the AUTHORING cell — a remote peer never gets a Committed signal via the DHT.
 
 **2026-08-23 — iroh leg was an idle listener until 972748a6d.** Every dual-mode node (alpha since Wave-2 E3, the mesh) had all iroh responders mounted and zero iroh traffic: sovereign defaults register no discovery service, so no NodeAddr was ever learned, nothing dialed, no gossip topic joined, no sync round initiated. "dual boots" / "iroh node started" log lines prove nothing — the claim is the `elohim_iroh_*` counters moving (`a2o features/dataplane/transport-dual-plane.feature`). Cure: signed `elohim/transport/manifest` gossip → `IrohPeerBook` → per-topic `join_peers` + iroh sync-round driver. Still open: pure-`iroh` mode has no bootstrap (manifest rides libp2p gossipsub first); blob heal-on-read and custody push remain libp2p-only.
 

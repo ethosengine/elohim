@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_lvi_devspace_peer_runtime",
-  "claim": "lvi = P2P Eclipse-Che-killer devspace runtime (elohim/lvi/); confluence of brit/rakia/eprfs/pod/doorway; spec+roadmap planted 2026-07-20.",
+  "claim": "lvi = P2P devspace runtime (elohim/lvi/), confluence of brit/rakia/eprfs/pod/doorway; spec+roadmap 2026-07-20.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_lvi_devspace_peer_runtime.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_lvi_devspace_peer_runtime.md",
-        "cid": "bafkreicn2apvhfg7if7z3klcg3kn6k5wu3kxiqnh2ycy7rim4dwdmlcnbu"
+        "cid": "bafkreibfg4jsjbol22v64bmbt62skty4enlwqqigbpacgk7bg2snked76q"
       },
       "reach": "repository"
     }

@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_conductor_arc_resources",
-  "claim": "Conductor incidents: sys-validation CPU spin; CPU storm starves storage reads; glibc leak cured by jemalloc; RAM ∝ corpus at full arc.",
+  "claim": "Sys-validation CPU spin; CPU storm starves storage; glibc leak → jemalloc; RAM ∝ corpus at full arc; pool admission shed.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_conductor_arc_resources.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_conductor_arc_resources.md",
-        "cid": "bafkreid7y6uhuhr33uoob64aawxnq63n6c5cutvjmv2tyxnozsrqp2ushi"
+        "cid": "bafkreihbs6dxlpnusxblp3ktq5vc5pf25zxr6423ia44ghc7lkzcte7ogq"
       },
       "reach": "repository"
     }

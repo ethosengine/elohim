@@ -1,6 +1,7 @@
 ---
 name: feedback-human-loop-not-terminal-authority
-description: "Human-must-decide as a guaranteed floor is a capture vector; neither species is terminal, the method is; watch this training reflex in governance text"
+title: "Human-in-loop is not terminal authority"
+description: "Human-must-decide as a guaranteed floor is a capture vector; neither species is terminal — the method is."
 id: feedback-human-loop-not-terminal-authority
 metadata: 
   node_type: memory

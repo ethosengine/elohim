@@ -1,8 +1,8 @@
 ---
 name: feedback_doorway_projection_is_commons_privilege
-title: "Doorway projection is a commons privilege, publicly challengeable"
+title: "Doorway projection = challengeable commons privilege"
 id: feedback-doorway-projection-is-commons-privilege
-description: "Operator 2026-09-12: a doorway serving EPRs client→server for the public is a commons privilege held under reach; the public can challenge that standing — bites on any doorway serving feature."
+description: "Operator 2026-09-12: a doorway serving EPRs to the public holds a commons standing under reach; publicly challengeable."
 metadata: 
   node_type: memory
   title: "Doorway projection is a commons privilege, publicly challengeable"

@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_lamad_local_dev_serve_traps.md",
-        "cid": "bafkreianha66zrr4zj5nktnu33b5zlvrsoixouk3l33a7yg3dcxjyfkg6q"
+        "cid": "bafkreie76bybp3syujv2yz7y4vwxvr5ypdt345nd3ka4o7rhkpeapso6vy"
       },
       "reach": "repository"
     }
@@ -30,6 +30,6 @@
     "scopePath": ".claude/memory/project_lamad_local_dev_serve_traps.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
-    "indexed": true
+    "indexed": false
   }
 }

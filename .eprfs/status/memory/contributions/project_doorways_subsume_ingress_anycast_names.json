@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-doorways-subsume-ingress-anycast-names",
+  "claim": "Doorways are host-aware and stand anycast-style behind a name's DNS records, failing over for each other; the k8s ingress goes away — bites on any serving-edge design.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_doorways_subsume_ingress_anycast_names.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_doorways_subsume_ingress_anycast_names.md",
+        "cid": "bafkreiglfcv3addl7swsfp2uiqj3accxmfnqpane43wgrldfdxjdnpewcu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorways subsume the ingress — anycast names",
+    "file": "project_doorways_subsume_ingress_anycast_names.md",
+    "scopePath": ".claude/memory/project_doorways_subsume_ingress_anycast_names.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

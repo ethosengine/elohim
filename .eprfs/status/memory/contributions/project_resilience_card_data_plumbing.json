@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_resilience_card_data_plumbing",
-  "claim": "Resilience card data plumbing: snapshot joins need substrate-owned humans (agent_pub_key); tier is content-declared floor not reach; card is data-starved.",
+  "claim": "Snapshot joins need substrate-owned humans (agent_pub_key); tier is a content-declared floor; card is data-starved.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_resilience_card_data_plumbing.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_resilience_card_data_plumbing.md",
-        "cid": "bafkreiaykddyeqmk7spgk6b6ttvtm6xbmonbpkreredxvcmo5x44xzqnfa"
+        "cid": "bafkreiesehgohuazuu2aq5aog3y5vlvgvgfbmzcy3rtqipq6zuigvhi4ti"
       },
       "reach": "repository"
     }

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-flock-lane-lock-inherited-by-daemons",
+  "claim": "`just mesh start` inside `flock lane.lock …` makes every detached daemon inherit the lock fd — the lock never releases and all later lane waiters hang silently",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_flock_lane_lock_inherited_by_daemons.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_flock_lane_lock_inherited_by_daemons.md",
+        "cid": "bafkreifav63qstff2pwvaecuq73jsg5t4qoggasw42oouxb2vwktahxwoe"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Never start mesh daemons inside a flock'd shell",
+    "file": "project_flock_lane_lock_inherited_by_daemons.md",
+    "scopePath": ".claude/memory/project_flock_lane_lock_inherited_by_daemons.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -2,7 +2,7 @@
 id: feedback-deterministic-flag-agent-canon-stasis-pattern
 name: deterministic-flag-agent-canon-stasis-pattern
 title: Flag→agent→canon→stasis automation pattern
-description: "Event→agent automation: deterministic ledger flag → background agent dispatch → cite-sealed backlog → no re-fire when blocked → stasis sweep."
+description: "Ledger flag → background agent → cite-sealed backlog → no re-fire when blocked → stasis sweep."
 metadata: 
   node_type: memory
   type: feedback

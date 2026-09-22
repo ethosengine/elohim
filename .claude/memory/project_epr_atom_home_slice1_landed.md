@@ -1,8 +1,9 @@
 ---
+index: false
 name: project_epr_atom_home_slice1_landed
 title: EPR atom home — slice 1 landed
 id: project-epr-atom-home-slice1-landed
-description: "Slice 1 landed 2026-09-02: shell-owned /epr/{id}, focal extracted count-neutral; habit RED until fleet renders it. Commons next."
+description: "Slice 1 landed 2026-09-02: shell-owned /epr/{id}; habit RED until the fleet renders it. Commons next."
 metadata:
   type: project
 ---

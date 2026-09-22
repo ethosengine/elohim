@@ -2,7 +2,7 @@
 name: feedback_overnight_mandate_upgrade_epics_fair_game
 title: Overnight mandate — upgrade epics are fair game
 id: feedback-overnight-mandate-upgrade-epics-fair-game
-description: "Overnight latitude: make Holochain hApp updates solid, p2p propagation work, dataplane convergence. Opus/Codex do legwork; integrate freely."
+description: "Overnight latitude: solid hApp updates, p2p propagation, dataplane convergence; Opus/Codex do legwork."
 metadata:
   type: feedback
 ---

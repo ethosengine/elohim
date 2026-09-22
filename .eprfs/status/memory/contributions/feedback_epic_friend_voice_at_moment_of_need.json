@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-epic-friend-voice-at-moment-of-need",
+  "claim": "At the moment of need protocol vocabulary never reaches the person; the precise form is one request away.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_epic_friend_voice_at_moment_of_need.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_epic_friend_voice_at_moment_of_need.md",
+        "cid": "bafkreiecyjkobehl62dcqh6zcoh2amypt6kk4hdpkfo26fwa7od46btshq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Epic scenes: the elohim speaks as a friend",
+    "file": "feedback_epic_friend_voice_at_moment_of_need.md",
+    "scopePath": ".claude/memory/feedback_epic_friend_voice_at_moment_of_need.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

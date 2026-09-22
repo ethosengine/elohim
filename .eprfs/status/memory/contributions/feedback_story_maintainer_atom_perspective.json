@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "story-maintainer-atom-perspective",
-  "claim": "Mid-flight seams are missing NODES between named atoms — report as chain/between/assertion/state, never prose; home = story-harvest skill.",
+  "claim": "Mid-flight seams are missing NODES between named atoms — report chain/between/assertion/state; see story-harvest.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_story_maintainer_atom_perspective.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_story_maintainer_atom_perspective.md",
-        "cid": "bafkreihsebxqrbbsyup5lv4zotnxmgxiralnytrunq2yuqb63hmnf3t56q"
+        "cid": "bafkreiayi4p3vwo2o4omipm56zcyx744j3skyh4hzbk5gmwoesgf4p5yv4"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Story-maintainer role — seams are mintable nodes",
+    "display": "Story-maintainer — seams are mintable nodes",
     "file": "feedback_story_maintainer_atom_perspective.md",
     "scopePath": ".claude/memory/feedback_story_maintainer_atom_perspective.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

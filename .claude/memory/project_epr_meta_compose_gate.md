@@ -1,8 +1,8 @@
 ---
 name: project_epr_meta_compose_gate
-title: .epr-meta compose-gate LIVE — directory-local governance
+title: ".epr-meta compose-gate — directory-local governance"
 id: project-epr-meta-compose-gate
-description: "PreToolUse hook gates Edit/Write via cascading .epr-meta manifests; new docs in governed dirs need frontmatter or are DENIED; malformed → ask."
+description: "PreToolUse gate on Edit/Write via cascading .epr-meta manifests; governed dirs need frontmatter; malformed → ask."
 metadata: 
   node_type: memory
   type: project

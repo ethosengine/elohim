@@ -1,8 +1,8 @@
 ---
 name: project_earned_reach_governance_pr_ceremony_vision
-title: Earned-reach governance = story+REA+council PR-ceremony
+title: "Earned-reach governance ladder (umbrella)"
 id: project-earned-reach-governance-pr-ceremony-vision
-description: "Earned reach for high-stakes artifacts = a story+REA governance PR-ceremony affirmed by councils of Elohim; sub-commons peers fork/merge/compete."
+description: "Repo push = reach-earned attestation at the deterministic floor; high stakes earn reach via a story+REA council PR-ceremony."
 metadata: 
   node_type: memory
   type: project
@@ -16,3 +16,7 @@ Operator's north-star (2026-07-09) for how the earned-authority / canonical-HEAD
 - **The whole thing sits on the resilient p2p blobstore (no Google/AWS datacenter)** — custody/salvage N-way replication — so "people just don't worry about it anymore." Resilience is the floor that makes the governance ceremony trustworthy.
 
 Design consequence: authority = earned attestations → reach promoted amber→green at the commons threshold → canonical HEAD elected + adopted cross-peer (verified against the notary witness). No earned attestations ⇒ the authoring stays **private/limited-reach**. See [[project_rea_compute_commitment_primitive]] (the bounded-authority-delegation primitive), [[project_weave_epic_arc]] (VSM/tier-capability seeds), [[feedback-identity-sovereignty-ontology-guard]] (community governance backstops individuals — this is that made concrete), [[feedback-justice-mishpat-not-punishment-guard]] (restored-capability framing), [[project_reach_enum_drift_reconciliation]] (the reach taxonomy that must carry the promotion lifecycle).
+
+**Folded members (memorialized 2026-09-22 — detail lives in each file):**
+
+- [[project_reach_earned_push_deterministic_floor]] — folded 2026-09-22 (index: false); The pre-push gate dogfoods the protocol — a repo push is a reach-earned attestation at the deterministic floor.

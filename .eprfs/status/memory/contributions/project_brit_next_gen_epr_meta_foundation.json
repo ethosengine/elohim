@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_brit_next_gen_epr_meta_foundation",
-  "claim": "brit epr-meta parity is READ-side only; no cite writer; devspace build is Nexus-credential-blocked (2026-09-10); cite writer goes native in epr-cli.",
+  "claim": "brit epr-meta parity is read-side only; devspace build Nexus-credential-blocked (2026-09-10); cite writer native in epr-cli.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_brit_next_gen_epr_meta_foundation.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_brit_next_gen_epr_meta_foundation.md",
-        "cid": "bafkreigk6v6j5dzi377yr4mkqydxx3tbtkwtkwspami7ddiwp6bm4o6dcu"
+        "cid": "bafkreidiwy3nzuaos6zua7pkwlkfm5ihisjvrs7ojkky6qiscjz7tmtgs4"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "brit next-gen epr-meta foundation + composition-snapshot",
+    "display": "brit next-gen epr-meta foundation",
     "file": "project_brit_next_gen_epr_meta_foundation.md",
     "scopePath": ".claude/memory/project_brit_next_gen_epr_meta_foundation.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

@@ -2,7 +2,7 @@
 name: feedback_epr_chrome_is_the_trust_signal
 title: "EPR chrome is the trust signal of a governed place"
 id: feedback-epr-chrome-is-the-trust-signal
-description: "Operator 2026-09-12: the EPR chrome around a site signals governance, fair trade, redress, feedback with owed response, and interpretable decisions — a concierge to the commons; frames every chrome/atom-home feature."
+description: "Operator 2026-09-12: chrome signals governance, fair trade, redress, owed response — a concierge to the commons."
 metadata: 
   node_type: memory
   title: EPR chrome is the trust signal of a governed place

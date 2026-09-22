@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_ratchet_spec_is_execution_scaffold",
-  "claim": "Cite the 2026-08-28 ratchet spec for moves/rungs only; design from canon; bias every plan toward the smallest slice that flips a named red",
+  "claim": "Cite the 2026-08-28 ratchet spec for moves/rungs only; design from canon; smallest slice that flips a named red.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_ratchet_spec_is_execution_scaffold.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_ratchet_spec_is_execution_scaffold.md",
-        "cid": "bafkreickyylf2b3efstcfuxs2a4wir4pxkj4hgqvzklydnttdgecmzlxde"
+        "cid": "bafkreiff5jxsbxgcvm67qrwmhpnfwowiysdu2pc4ovavk2crvhk7lkttka"
       },
       "reach": "repository"
     }

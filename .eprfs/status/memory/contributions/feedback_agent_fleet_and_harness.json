@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_agent_fleet_and_harness",
-  "claim": "Keep 3 agents max; delegate narrow tasks to cheaper tiers; avoid subagent read-set ∩ write-set overlap; trap: orphan cargo locks, StructuredOutput hangs.",
+  "claim": "3 agents max; cheap tiers for narrow tasks; no read/write-set overlap; orphan cargo locks, StructuredOutput hangs.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_agent_fleet_and_harness.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_agent_fleet_and_harness.md",
-        "cid": "bafkreih6hffkrjua42jrwrllbbsa22mhqoydvsexyugu77q2k6sopqatcu"
+        "cid": "bafkreicfyljx7zhow46s42y5zn2kjj2xtln7kgfwnfspx7nqbtoiaqthsm"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "feedback_agent_fleet_and_harness",
+    "display": "Agent fleet + harness discipline (umbrella)",
     "file": "feedback_agent_fleet_and_harness.md",
     "scopePath": ".claude/memory/feedback_agent_fleet_and_harness.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_push_branch_discipline",
-  "claim": "Commit-only; one push per batch; never during builds — a superseding run cancels roll mid-rollout. Shared worktree: path-limited; sprint/* not CI-indexed.",
+  "claim": "Commit-only; one push per batch, never mid-build; shared tree: pathspec commits, scratch index, ledgers excluded.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_push_branch_discipline.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_push_branch_discipline.md",
-        "cid": "bafkreienr2i7qf3dfkvl3bmdcce5q3uykkckchmo3r4t5e4uapp5nkidjm"
+        "cid": "bafkreifgm6lsmg3ob47lm5s7pdok2al52veua5w2s5lgkgp5ofzbififvu"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "feedback_push_branch_discipline",
+    "display": "Push, branch & shared-tree discipline (umbrella)",
     "file": "feedback_push_branch_discipline.md",
     "scopePath": ".claude/memory/feedback_push_branch_discipline.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

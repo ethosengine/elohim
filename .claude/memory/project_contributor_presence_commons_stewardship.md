@@ -1,8 +1,9 @@
 ---
+index: false
 name: project-contributor-presence-commons-stewardship
 title: Contributor-presence re-grounding — commons stewardship
 id: project-contributor-presence-commons-stewardship
-description: "Fixture humans re-ground as ContributorPresences: witnessed-by ascriptions, value stewarded by elohim-commons, settlement left to consensus."
+description: "Fixture humans re-ground as ContributorPresences: witnessed-by ascriptions, elohim-commons stewardship."
 metadata: 
   node_type: memory
   title: Contributor-presence re-grounding — commons stewardship

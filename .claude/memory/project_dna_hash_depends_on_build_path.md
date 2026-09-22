@@ -1,6 +1,7 @@
 ---
+index: false
 name: project_dna_hash_depends_on_build_path
-title: DNA hash depends on the absolute build path, not only source
+title: "DNA hash depends on the absolute build path"
 id: project-dna-hash-depends-on-build-path
 description: "Cargo metadata includes package paths: identical source in different worktrees changes DNA hashes — check before hash comparisons or coordinator hot-swap."
 metadata:

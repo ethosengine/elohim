@@ -2,7 +2,7 @@
 name: project_devspace_recovery
 title: Devspace/container recovery (umbrella)
 id: project-devspace-recovery
-description: "Devspace recovery: container restarts kill mesh + wipe /tmp/~/bin; ethosengine I/O = hard NFS deadlocks; pod swaps drop secrets — stop/start heals."
+description: "Container restarts kill mesh + wipe /tmp; ethosengine NFS deadlocks; flock'd mesh start wedges lanes; stop/start heals."
 metadata:
   node_type: memory
   type: project
@@ -15,6 +15,7 @@ Folds the devspace/container failure + recovery-drill cluster. Members:
 - [[project_container_restart_recovery_drill]] — The devworkspace container restarted twice on 2026-08-21 (~21:38, ~00:45 UTC), killing mesh + all background agents; /tmp and /home/user/bin wiped. Drill below.
 - [[project_ethosengine_wedge_nfs_hardmount]] — ethosengine wedge root cause = hard NFS4 mounts to in-cluster ClusterIP (server pod on SAME node); bites when diagnosing node hangs or rebooting ethosengine
 - [[reference_gh_cli_install]] — gh vanishes with the ephemeral container; restore the Go binary to /home/user/bin; GH_TOKEN (EthosengineBot, repo+admin:org) auths it; curl REST needs no install
+- [[project_flock_lane_lock_inherited_by_daemons]] — folded 2026-09-22 (index: false); `just mesh start` inside `flock lane.lock …` makes every detached daemon inherit the lock fd — the lock never releases and all later lane waiters hang silently
 
 **2026-08-25 restart (uptime reset mid-chain):** `/tmp` wiped (scratchpad, `$MESH_DIR`, background-task
 logs), the running background chain died silently (task notification `stopped`, no marker), and git

@@ -1,8 +1,8 @@
 ---
 name: project_cargo_pvc_disk_discipline
-title: Cargo/PVC disk + native build-env discipline (umbrella)
+title: "Cargo/PVC disk + build-env discipline (umbrella)"
 id: project-cargo-pvc-disk-discipline
-description: "Cargo disk + build-env: act at 85% PVC, cargo-pool reclaim, disk-guard hook; CARGO_TARGET_DIR per workspace, no nextest here, sweettest needs RUSTFLAGS=\"\"."
+description: "Act at 85% PVC; cargo-pool reclaim; disk-guard; CARGO_TARGET_DIR per workspace; no nextest; sweettest: empty RUSTFLAGS."
 metadata:
   type: project
 ---

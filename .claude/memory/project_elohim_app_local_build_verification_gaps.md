@@ -1,8 +1,8 @@
 ---
 id: project-elohim-app-local-build-verification-gaps
 name: project_elohim_app_local_build_verification_gaps
-title: elohim-app local build verification gaps
-description: "In-container gates miss strictTemplates AOT errors (tsc/JIT) — verify with a direct `ng build`; buffer bundle error = install-state, not code."
+title: "elohim-app/lamad local build & serve traps (umbrella)"
+description: "Gates miss strictTemplates AOT (run ng build); lamad needs --serve-path /lamad/; mesh lanes need a development dist."
 metadata: 
   node_type: memory
   type: project
@@ -20,3 +20,8 @@ In this dev container the elohim-app quality gates can't all run locally — and
 - **The `Could not resolve "buffer"` bundle errors are NOT a code bug and block ALL local rendering.** `@bitgo/blake2b-wasm` (`require('buf'+'fer')`) and `safe-buffer` (`require('buffer')`) — Holochain crypto deps pulled in at app bootstrap — fail esbuild's node-builtin polyfill resolution from inside the `.pnpm` virtual store. `buffer` IS installed (`app/elohim-app/node_modules/buffer`, added as a direct dep in `f1fe16e3e` for CI) and resolves via Node, but esbuild can't resolve it from the deep `.pnpm/@bitgo+blake2b-wasm` location in THIS container's install state. CI hoists/installs correctly so it builds there. **Consequence: eyes-first `/debug` render is infeasible locally** — Angular 19's dev-server (`pnpm start` / direct `ng serve`) uses the SAME esbuild pipeline, so it fails identically; `pnpm start:alpha` too. The buffer error is bundle-phase (AFTER ngtsc), so seeing ONLY buffer errors (no template TS errors) is positive confirmation your templates are AOT-clean. Don't chase it with `pnpm install` mid-branch (heavy, risks lockfile drift) — it's a documented container install-state gap; CI is the render path.
 
 Verification spine when these gaps apply: vitest (JIT render — `TestBed.createComponent + detectChanges` exercises templates) + `tsc --noEmit` + a direct `ng build` for AOT template-check + format via `prettier --check` (works) — and let CI run the full build + eslint. Related: [[project_container_cargo_environment_quirks]] (the cargo-side `/projects` fingerprint-ENOENT quirk → use /tmp target dirs; never pipe gate exit codes).
+
+**Folded members (memorialized 2026-09-22 — detail lives in each file):**
+
+- [[project_mesh_browser_lane_needs_dev_config_dist]] — folded 2026-09-22 (index: false); Household mesh-browser lanes need elohim-app built with --configuration development; production/alpha builds bake doorway-alpha and hosted-steward scenarios 401 there
+- [[project_lamad_local_dev_serve_traps]] — folded 2026-09-22 (index: false); Rendering app/lamad locally needs --serve-path /lamad/ and DOORWAY_TARGET=localhost:8888 (mesh doorway); anonymous alpha content reads are reach-gated.

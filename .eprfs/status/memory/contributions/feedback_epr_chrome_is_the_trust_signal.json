@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_epr_chrome_is_the_trust_signal",
-  "claim": "Operator 2026-09-12: the EPR chrome around a site signals governance, fair trade, redress, feedback with owed response, and interpretable decisions — a concierge to the commons; frames every chrome/atom-home feature.",
+  "claim": "Operator 2026-09-12: chrome signals governance, fair trade, redress, owed response — a concierge to the commons.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_epr_chrome_is_the_trust_signal.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_epr_chrome_is_the_trust_signal.md",
-        "cid": "bafkreih35kzxm2fvlcs62gcsytuhqff3m74s6jkvxrdjwrml5xhsupfpka"
+        "cid": "bafkreidxfopin3kn5ny2utmyu4kc7esbf5st7xfeq5a3ypcmueqfhq4qda"
       },
       "reach": "repository"
     }
@@ -25,10 +25,10 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "feedback_epr_chrome_is_the_trust_signal",
+    "display": "EPR chrome is the trust signal of a governed place",
     "file": "feedback_epr_chrome_is_the_trust_signal.md",
     "scopePath": ".claude/memory/feedback_epr_chrome_is_the_trust_signal.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": true
   }

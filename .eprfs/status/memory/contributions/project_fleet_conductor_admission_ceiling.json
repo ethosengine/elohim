@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-fleet-conductor-admission-ceiling",
+  "claim": "On alpha the pool conductors (matthew/adam) shed interactive content_store writes and time out heal reads; the quiesce gate and the app head PATCH both fail on that, not on storage code",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_fleet_conductor_admission_ceiling.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_fleet_conductor_admission_ceiling.md",
+        "cid": "bafkreihcywgjz72esx5775w53j46zqd7y7fz257s6dhv75emrpmomfok6y"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Fleet ceiling — pool conductors shed interactive writes",
+    "file": "project_fleet_conductor_admission_ceiling.md",
+    "scopePath": ".claude/memory/project_fleet_conductor_admission_ceiling.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

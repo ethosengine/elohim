@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_devspace_recovery",
-  "claim": "Devspace recovery: container restarts kill mesh + wipe /tmp/~/bin; ethosengine I/O = hard NFS deadlocks; pod swaps drop secrets — stop/start heals.",
+  "claim": "Container restarts kill mesh + wipe /tmp; ethosengine NFS deadlocks; flock'd mesh start wedges lanes; stop/start heals.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_devspace_recovery.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_devspace_recovery.md",
-        "cid": "bafkreifqwrkwtao3rvbvu4itnwrmwa74nggdw4ur3auvh6t5gzbwm6bciu"
+        "cid": "bafkreifbv3ddjac7uqi7lahkqzhilrxuhrmx3exoubhihncsdfp2vnmeje"
       },
       "reach": "repository"
     }

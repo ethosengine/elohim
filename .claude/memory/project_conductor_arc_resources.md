@@ -2,7 +2,7 @@
 name: project_conductor_arc_resources
 title: Conductor arc, memory & CPU incidents (umbrella)
 id: project-conductor-arc-resources
-description: "Conductor incidents: sys-validation CPU spin; CPU storm starves storage reads; glibc leak cured by jemalloc; RAM ∝ corpus at full arc."
+description: "Sys-validation CPU spin; CPU storm starves storage; glibc leak → jemalloc; RAM ∝ corpus at full arc; pool admission shed."
 metadata:
   node_type: memory
   type: project
@@ -18,6 +18,7 @@ Folds the conductor resource/arc incident cluster. Members:
 - [[project_per_node_memory_is_conductor_authority_arc]] — Per-node 2→4GB+ climb (james OOM) = conductor full-arc DHT working set; target_arc_factor defaults to 1 so RAM ∝ corpus; arc-factor<1 is the scale lever.
 - [[project_full_arc_authority_disables_network_get]] — On a full-arc fleet every zome get/get_links is local-only — a link miss means gossip failed, not that the data is absent.
 - [[project_conductor_signal_msgpack_decode_class]] — holo_hash in conductor msgpack signals = raw bytes; Value pre-pass or String mirrors silently drop the signal — decode typed HoloHashB64 (closed 2026-06-13).
+- [[project_fleet_conductor_admission_ceiling]] — folded 2026-09-22 (index: false); On alpha the pool conductors (matthew/adam) shed interactive content_store writes and time out heal reads; the quiesce gate and the app head PATCH both fail on that, not on storage code
 
 **Stock 0.7 conductors on the local mesh grow ~1 GB/h each under continuous a2o ceremonies** (measured 2026-09-04: 292 MB at restart → ~4.6 GB two hours later → ~14 GB overnight; the fork's jemalloc is why alpha does not). With three conductors the RAM guard sheds every cargo build at 80%, so a long mesh shift needs `just mesh conductors-restart` (in place under their arks) roughly every 2 h, negotiated with whoever is mid-measure — never mid-run. Filed on the arc-shrink backlog row.
 

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-doorway-thin-plural-projection-not-trusted-tier",
+  "claim": "Operator 2026-09-12: doorways hold only notarized projections under a plural contract — never a trust tier or warehouse.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_doorway_thin_plural_projection_not_trusted_tier.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_doorway_thin_plural_projection_not_trusted_tier.md",
+        "cid": "bafkreiflm3zn2aubzvc4vyv2x2y3ngwjijkzws6y7zyhsxvpuxwk3supii"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Doorway = thin plural projection",
+    "file": "feedback_doorway_thin_plural_projection_not_trusted_tier.md",
+    "scopePath": ".claude/memory/feedback_doorway_thin_plural_projection_not_trusted_tier.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

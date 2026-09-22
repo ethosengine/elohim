@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "scope-flag-beats-prose-note",
-  "claim": "The `available:` flag + scope-reconcile beat prose/stale memory on whether a cap is down; @requires:<cap> = satisfiable-when-available, not held.",
+  "claim": "The `available:` flag + scope-reconcile beat prose/memory on cap status; @requires:<cap> = satisfiable-when-available.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/scope-flag-beats-prose-note.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/scope-flag-beats-prose-note.md",
-        "cid": "bafkreietcsnty2gj234ould4x4pqwtzuez6fxmptdsvgevmpym6xrbitra"
+        "cid": "bafkreicj7j7j4w45sipaavebm73xm324db5t42k2ivj4tex56ontgz2dii"
       },
       "reach": "repository"
     }

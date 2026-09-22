@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_lamad_local_dev_serve_traps
 title: Lamad local dev-serve traps
 id: project-lamad-local-dev-serve-traps

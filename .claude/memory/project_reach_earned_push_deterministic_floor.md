@@ -1,4 +1,5 @@
 ---
+index: false
 name: project_reach_earned_push_deterministic_floor
 description: "The pre-push gate dogfoods the protocol — a repo push is a reach-earned attestation at the deterministic floor."
 title: Repo push = reach-earned attestation (deterministic floor)

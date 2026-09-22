@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_skip_brainstorm_gates_self_answer",
-  "claim": "Self-answer design questions from evidence, then present ONE recommended-design summary with defense — not gated one-question-at-a-time dialogue.",
+  "claim": "Self-answer design questions from evidence, then present ONE recommended design with its defense.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_skip_brainstorm_gates_self_answer.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_skip_brainstorm_gates_self_answer.md",
-        "cid": "bafkreibtwmwqch26zpx4ymgzioix3khmfg762ne2ed5y4lr6wrvmcojwhe"
+        "cid": "bafkreih5box3cn6cltwdzuztrwo4ei3vuh3u257cshzeyidqk3hvqa3jva"
       },
       "reach": "repository"
     }

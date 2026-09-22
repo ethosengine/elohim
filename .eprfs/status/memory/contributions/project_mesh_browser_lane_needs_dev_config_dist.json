@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "project-mesh-browser-lane-needs-dev-config-dist",
+  "claim": "Household mesh-browser lanes need elohim-app built with --configuration development; production/alpha builds bake doorway-alpha and hosted-steward scenarios 401 there",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_mesh_browser_lane_needs_dev_config_dist.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_mesh_browser_lane_needs_dev_config_dist.md",
+        "cid": "bafkreievtuwy6qh77mz45mykz7wfu4figcv5vl5b252sjj3mb5fjc3vp4m"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Mesh-browser lanes need a development-configuration dist",
+    "file": "project_mesh_browser_lane_needs_dev_config_dist.md",
+    "scopePath": ".claude/memory/project_mesh_browser_lane_needs_dev_config_dist.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": false
+  }
+}

@@ -1,8 +1,8 @@
 ---
 name: feedback_tiered_agent_capabilities_destructive_git
-title: Tiered agent capabilities — haiku/sonnet never git-reset without a team check
+title: "Destructive git needs tier or team check"
 id: feedback-tiered-agent-capabilities-destructive-git
-description: "Operator 2026-09-11 after a Haiku hard-reset of shared dev: destructive git needs a declared tier (opus+) or a team check; unknown = deny; gate = PreToolUse hook on the policies.yaml row."
+description: "After a Haiku hard-reset of dev (2026-09-11): opus+ or a team check; unknown = deny; PreToolUse policies.yaml gate."
 metadata:
   type: feedback
 ---

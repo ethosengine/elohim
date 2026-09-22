@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_valueflow_authoring_surface_landed.md",
-        "cid": "bafkreiewqrwztojguy5mlkvjq4pcezoqmysiykiz5sjfqio4yixovnmz2i"
+        "cid": "bafkreihdiymc4wmhx3dqcwjbdyneuvzan2x5txqgl2qpf2d42tvexcvl5u"
       },
       "reach": "repository"
     }
@@ -30,6 +30,6 @@
     "scopePath": ".claude/memory/project_valueflow_authoring_surface_landed.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
-    "indexed": true
+    "indexed": false
   }
 }

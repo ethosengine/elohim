@@ -1,13 +1,13 @@
 ---
 name: project_trust_as_performance_primitive
-title: "Trust: security AND performance — the compute/trust gradient"
+title: "Trust = security AND performance"
 id: project-trust-as-performance-primitive
-description: "Security and performance COMPOSE — the compute/trust gradient makes high-trust peer edges fast while commons browsing stays witnessed-safe."
+description: "Security and performance COMPOSE: trusted peer edges run fast while commons browsing stays witnessed-safe."
 metadata: 
   node_type: memory
   type: project
   originSessionId: c87b3bc9-e95e-42be-bb11-a094d8c482c6
-  modified: 2026-08-20T14:11:45.255Z
+  modified: 2026-09-17T18:12:55.492Z
 ---
 
 Operator's active design trajectory across the quiesce/dataplane work (named
@@ -80,5 +80,79 @@ knows an edge is trusted and treats failure there as *more* significant. Reachin
 tolerance is a tell that the pricing signal is missing; fix the signal first.
 **You cannot price a relationship you cannot observe** — so an error that erases which
 edge failed and how is a performance defect, not just a logging one.
+
+## Pay the cost once, up front, next to the human judgment (operator, 2026-09-17)
+
+The operator names this the **foundational architectural enablement story of the
+protocol** — something the architecture, and we, seek to *master*:
+
+- Verification cost is paid **up front, as close to the human judgment as possible**,
+  and **as few times as possible**; everything downstream relies on that minted trust
+  rather than re-deriving it. Validation is *carried as it climbs* (reach), not redone
+  per layer.
+- Leaning on the complex dimensions of trust to drive real performance **lowers cost
+  and increases reach at once**. Where trust buys performance at each layer should feel
+  like a **natural consequence of the story**, and the gradient should be something one
+  can **explore, play with and feel apply** — legible, not buried.
+
+**Why:** said while reviewing the sync-triggered head-adoption fix: the head was
+quiescing as its OWN property (content crosses by sync in <1 s, head authority trails
+through a second convergence, adoption polls for it). The operator's read — one
+verified copy from a trusted peer should settle it; compose the head when the other
+trust is minted so there is no second holon quiescence on one property.
+
+**How to apply:** a design smell checklist — (1) a property that converges separately
+from the holon it belongs to; (2) the same fact verified again at a lower layer;
+(3) retry/poll ladders standing in for a carried proof; (4) a fast path that is
+trust-blind (same cost for a household steward and a stranger). Prefer: sync unit =
+`{content, signed head record}` verified once and projected atomically; carried
+records over re-resolution; per-relationship pricing over uniform tolerance. When a
+conservative slice ships first (e.g. local-resolve + re-probe ladder), measure how
+often the ladder is needed and name the carried-proof version as the next node.
+See [[project_recall_reaches_authority_habit]], [[feedback_atomic_wins_compound_velocity]].
+
+**Horizon the operator named the same day (after "the basics are mastered"):** dev
+mode / tests inject *modeled contexts and stories* into a simulacra network; peers
+resolve them; as network inference matures, negotiation and automated moderation flow
+over many stories — and the run **proves the compute/trust correlation**: something as
+complex as bad faith shows up as an *emergent shape in the edge compute-cost curve*,
+while the network creates and protects high-fidelity, high-trust commons pools. Today's
+work is "the mechanical minimum" toward that. Design implication now: every trust
+decision on the dataplane should emit its *price* per edge (which path, how many
+verifications, what relationship) so the curve is measurable later — see the
+`peer_class` finding below. Keep the framing guards: the curve is a *cost signal that
+informs Mishpat*, never a verdict or punishment.
+
+**Operator correction (2026-09-17) to my "starved vs bad-faith look alike" caution:**
+mechanically true on the curve, but the answer is not better classification — it is
+the **deterministic floor / elohim ceiling** split. The floor prices edges
+deterministically and blindly. The ceiling is relational: a peer starved of
+relationships builds faith *through relationship with an elohim agent* (local
+inference), and in a mature network elohim accelerate trust-building among
+participants so **the community picks up the burden of a valid trust curve**. Good
+faith is what accelerates the frictionful bits; trust becomes a **positive feedback
+loop** that reaches back even to an intermittent rural peer. Only the mature network
+delivers this — do not try to make the floor solve it, and do not read a high-cost
+edge as a verdict: it is an *invitation for the ceiling to engage*. Design
+consequence: the floor must expose cost and its cause legibly enough that an elohim
+(or a neighbor) can see who is starved and extend relationship; the path OUT of the
+expensive region must always exist and be earnable.
+
+**Genesis stance (operator, same day):** right now WE are the ceiling. In genesis the
+trust that a mature network would earn can simply be **declared** (NetworkStage,
+steward relationships, declared external origins, fixture trust), and the job is to
+**watch the floor respect the declaration**. So nothing on the trust axis is a "real"
+blocker today — never park work waiting for earned trust or mature inference; declare
+it, make the declaration explicit and observable, and verify the floor prices
+accordingly. A stale or implicit declaration is the failure mode, not a missing one.
+
+**Scope line (operator, same day):** the *mechanical* symptoms a struggling peer
+causes — high CPU, noise, r/w storms — are NOT a trust or AI question. Graceful
+network behaviour (backpressure, bounded queues, reactive streams, p2p negotiation,
+peer status, admission, rate-limited refusal, honest readiness) is a set of
+**deterministic primitives we must deliver with no online AI at all**. Never defer a
+floor defect to the ceiling: a publish livelock, an unthrottled refusal storm, a
+readiness probe that lies, or a sweep that starves its own fast path is plain
+resilient-compute engineering, owed unconditionally.
 
 **Measured 2026-08-28 (household mesh, binaries with the `peer_class` label):** every outbound sync request classifies `peer_class="public"` — the ambient trust handshake is a stub (sender: libp2p peer id as agent key, empty CID lists; receiver: asserts `agent_verified: true`, ceiling `public`, never calls `verify_trust_context`, which has zero callers). The gradient's pricing input does not exist on the dataplane yet; the label makes that absence measurable. Missing node: verifiable identity + relationship CIDs in the handshake, blocked on the transport-id→agent_cid resolver (self-asserted bindings). Backlog: sync-edge-susan-timeouts-per-edge-observability.

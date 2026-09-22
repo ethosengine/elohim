@@ -1,8 +1,8 @@
 ---
 name: project_brit_next_gen_epr_meta_foundation
-title: brit next-gen epr-meta foundation + composition-snapshot
+title: "brit next-gen epr-meta foundation"
 id: project-brit-next-gen-epr-meta-foundation
-description: "brit epr-meta parity is READ-side only; no cite writer; devspace build is Nexus-credential-blocked (2026-09-10); cite writer goes native in epr-cli."
+description: "brit epr-meta parity is read-side only; devspace build Nexus-credential-blocked (2026-09-10); cite writer native in epr-cli."
 metadata: 
   node_type: memory
   type: project

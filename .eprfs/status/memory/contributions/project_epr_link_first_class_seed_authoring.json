@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_epr_link_first_class_seed_authoring",
-  "claim": "Seed slug links drift silently; the cite-gen-style seal tool is DEFERRED until docs graduate peer-native — don't build it now.",
+  "claim": "Seed slug links drift silently; a seal tool is DEFERRED until docs graduate peer-native — don't build it.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_epr_link_first_class_seed_authoring.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_epr_link_first_class_seed_authoring.md",
-        "cid": "bafkreigeebvrriw6ji6brwlhfx42rgx4yuqoqoh4nvhwjdf2pmvac5557i"
+        "cid": "bafkreiddi2tyo6yhqloy7zfrnsaddhowwhpdlgyhgb7mikjqbxonvlsoyu"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "EPR-link first-class seed authoring (deferred design)",
+    "display": "EPR-link seed authoring (deferred)",
     "file": "project_epr_link_first_class_seed_authoring.md",
     "scopePath": ".claude/memory/project_epr_link_first_class_seed_authoring.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

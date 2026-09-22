@@ -1,8 +1,8 @@
 ---
 name: project_doorway_serving_path
-title: Doorway/EPR serving path + SSR (umbrella)
+title: "Doorway/EPR serving path, SSR, atom home (umbrella)"
 id: project-doorway-serving-path
-description: "Serving: new 8080 routes need is_service_path; poisoned scope row empties EprRouter; EPR GETs divert to SSR; SSR deploy = seed then restart."
+description: "New 8080 routes need is_service_path; poisoned scope empties EprRouter; EPR GETs → SSR; /epr/{id} atom home."
 metadata:
   node_type: memory
   type: project
@@ -18,5 +18,6 @@ Folds the doorway request-serving / EPR-router / SSR cluster. Members:
 - [[project_ssr_render_trace_and_fixed_fetcher]] — elohim-render SSR core: render() uses ctx.data_fetcher; RenderTerminal splits truthful-empty vs stall; compose derives the root tag (never hardcode app-root) + typed ComposeError skip vocabulary.
 - [[project_ssr_first_deploy_seed_then_restart]] — First SSR deploy of an EPR app: App pipeline seeds serverBlobHash, THEN a doorway restart materializes it; a doorway-only push won't trigger App; edge-before-seed needs one extra edge restart.
 - [[project_prod_main_lag_vs_alpha_dev]] — A UI bug on one doorway host but not another is per-host deploy lag, not code; two catchError-swallowed legs (edge container + spa-blob) leave a host stale.
+- [[project_epr_atom_home_slice1_landed]] — folded 2026-09-22 (index: false); Slice 1 landed 2026-09-02: shell-owned /epr/{id}; habit RED until the fleet renders it. Commons next.
 
 - [[project_doorway_shell_stale_head_incident_2026_09_04]] — folded (index: false); dated incident, stale-shell cache class subsumed by this umbrella.

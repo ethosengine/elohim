@@ -2,7 +2,7 @@
 name: feedback_framing_guards
 title: Framing & ontology guards (umbrella)
 id: feedback-framing-guards
-description: "Guards: self-sovereign ≠ apex; justice = Mishpat/capability, not punishment; human-in-loop ≠ terminal; peer collectives are starved, not failing; hosted cost is anti-capture, doorways are a bridge."
+description: "Sovereign ≠ apex; Mishpat ≠ punishment; human-in-loop ≠ terminal; collectives starved, not failing; hosted cost = anti-capture."
 metadata:
   node_type: memory
   type: feedback

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "reference-codex-model-ids",
+  "claim": "gpt-5.6 only as -luna/-sol/-terra (plain rejected), plus gpt-5.5, gpt-6-astra; review vs write exec flags.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/reference_codex_model_ids.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/reference_codex_model_ids.md",
+        "cid": "bafkreic7ncwyiits2lc4ixomowqzydsvdxmgylxgacpkh2vkg2c32lpyzq"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Codex CLI model ids and exec flags",
+    "file": "reference_codex_model_ids.md",
+    "scopePath": ".claude/memory/reference_codex_model_ids.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "reference",
+    "indexed": true
+  }
+}

@@ -1,8 +1,8 @@
 ---
 name: package-first-projection-drift-direction
-title: "Projection-drift gate: read the diff before projecting"
+title: "Projection drift: read the diff first"
 id: feedback-package-first-projection-drift-direction
-description: "project --write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md; if runtime is newer, fold runtime→package first or content is lost."
+description: "--write-runtime OVERWRITES runtime CLAUDE.md/SKILL.md; if runtime is newer, fold it into the package first."
 metadata: 
   node_type: memory
   index: true

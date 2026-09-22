@@ -1,8 +1,8 @@
 ---
 name: project-epr-flow-valueflow-projection
-title: epr flow — developer valueflow projected from the repo
+title: "epr flow — repo valueflow projection + authoring (umbrella)"
 id: project-epr-flow-valueflow-projection
-description: "epr flow project/walk/status + seal/reseal/hold over recipes.yaml + .eprfs sidecars — dev valueflow projected from the filesystem; walk is seal-aware."
+description: "project/walk/status, seal/reseal/hold, claim/fulfill/context/ledger over recipes.yaml + .eprfs sidecars."
 metadata: 
   node_type: memory
   title: epr flow — developer valueflow projected from the repo
@@ -44,3 +44,7 @@ Next: slice 5 (FlowStore over diesel rails) is HARD-GATED on the REA action-voca
 reconciliation (ReaVerb ≠ storage actions ≠ schema enum — no fourth enum). a2o suite:
 genesis/a2o/features/devflow/developer-valueflow-projection.feature (6 @wip).
 Related: [[project_rea_compute_commitment_primitive]], [[project_reach_earned_push_deterministic_floor]].
+
+**Folded members (memorialized 2026-09-22 — detail lives in each file):**
+
+- [[project_valueflow_authoring_surface_landed]] — folded 2026-09-22 (index: false); Valueflow authoring landed 2026-09-05: epr flow claim/fulfill/context/ledger verbs, ruling|verdict notes, 3 valueflow-* skills — reach before SDD/epic dispatch.

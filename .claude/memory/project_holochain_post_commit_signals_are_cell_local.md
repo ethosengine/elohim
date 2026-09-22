@@ -1,6 +1,7 @@
 ---
+index: false
 name: project_holochain_post_commit_signals_are_cell_local
-title: "post_commit signals are cell-local — remote peers need re…"
+title: "post_commit signals are cell-local"
 id: project-holochain-post-commit-signals-are-cell-local
 description: "post_commit/emit_signal fire only on the AUTHORING cell — a remote peer never gets a Committed signal via the DHT."
 metadata: 

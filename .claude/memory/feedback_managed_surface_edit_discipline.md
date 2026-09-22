@@ -2,7 +2,7 @@
 id: feedback-managed-surface-edit-discipline
 name: feedback-managed-surface-edit-discipline
 title: Managed-surface edit discipline
-description: "CLAUDE.md/spec/plan edits go through the cite tooling (`epr flow cites seal|describe|stamp`); scope lives ONLY in _lib/managed_surfaces.py."
+description: "CLAUDE.md/spec/plan edits go through `epr flow cites seal|describe|stamp`; scope lives only in _lib/managed_surfaces.py."
 metadata:
   type: feedback
 cites:

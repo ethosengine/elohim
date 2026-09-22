@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
-        "cid": "bafkreics5xbbuviywh2otqf6qtol6dyg674c2fzeve4qx74xqa2rqt2xte"
+        "cid": "bafkreihppvye2nbp6lkc5mn3ycunq2i4xlyruyvkdfqkgxuhxvdsd7nqbu"
       },
       "reach": "repository"
     }
@@ -25,11 +25,11 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Clone isolation breaks at the projection plane; feedback discovery is O(N)",
+    "display": "Clone isolation breaks at the projection plane",
     "file": "project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
     "scopePath": ".claude/memory/project_clone_isolation_and_discovery_cost_findings_2026_09_07.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
-    "indexed": true
+    "indexed": false
   }
 }

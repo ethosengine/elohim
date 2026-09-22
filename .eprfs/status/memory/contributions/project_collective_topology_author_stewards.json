@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "collective-topology-author-stewards",
-  "claim": "Content→steward routing is per-corpus to real personas, never one synthetic genesis identity; adam stewards genesis, FCT the church collective.",
+  "claim": "Per-corpus steward routing to real personas (adam: genesis, FCT: church); fixture humans re-ground as ContributorPresences.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_collective_topology_author_stewards.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_collective_topology_author_stewards.md",
-        "cid": "bafkreigca5kbnqopkjhjoa7wfpun6uc7ih6ijffa5vbcrploswqlzh3ycq"
+        "cid": "bafkreiao7dbonqelf34hgrm7pbuxncavarswy6athjvmakf6y6dzfzvt2e"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Collective topology + per-corpus author-steward routing",
+    "display": "Collective topology + commons stewardship (umbrella)",
     "file": "project_collective_topology_author_stewards.md",
     "scopePath": ".claude/memory/project_collective_topology_author_stewards.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

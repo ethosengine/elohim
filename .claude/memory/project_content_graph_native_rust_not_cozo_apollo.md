@@ -2,7 +2,7 @@
 name: project_content_graph_native_rust_not_cozo_apollo
 title: Content graph = native Rust, not Cozo/Kuzu/Apollo
 id: project-content-graph-native-rust-not-cozo-apollo
-description: "Lamad relationship graph is computed in native Rust storage; Cozo/Kuzu/Apollo rejected — extend the ContentGraphResolver trait instead."
+description: "Lamad relationship graph is native Rust storage; Cozo/Kuzu/Apollo rejected — extend ContentGraphResolver."
 metadata: 
   node_type: memory
   type: project

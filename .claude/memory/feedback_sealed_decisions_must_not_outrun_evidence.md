@@ -1,6 +1,6 @@
 ---
 name: feedback_sealed_decisions_must_not_outrun_evidence
-title: "Sealed decisions must not outrun evidence; review as outs…"
+title: "Sealed decisions must not outrun evidence"
 id: feedback-sealed-decisions-must-not-outrun-evidence
 description: "Operator 2026-09-06 — read our Holochain usage as an outside skeptic; sealed decisions get a second-model read."
 metadata: 

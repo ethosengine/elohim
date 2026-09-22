@@ -1,8 +1,8 @@
 ---
 name: feedback_two_portals_only_apps_share_sso
-title: Two portals only — native + doorway; apps share them like SSO
+title: "Two portals only — native + doorway, shared like SSO"
 id: feedback-two-portals-only-apps-share-sso
-description: "Two portals only: p2p-native (stewards) and doorway (hosted). Apps are OAuth relying parties, never own portals — bites on any in-app login form."
+description: "p2p-native (stewards) and doorway (hosted); apps are OAuth relying parties, never own portals or login forms."
 metadata: 
   node_type: memory
   title: Two portals only — native + doorway; apps share them like SSO

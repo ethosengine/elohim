@@ -1,8 +1,8 @@
 ---
 name: project_holochain_evolution_epic
-title: Holochain Evolution Epic — start at the hub
+title: "Holochain Evolution Epic hub (umbrella)"
 id: project-holochain-evolution-epic
-description: "hApp-lineage migration epic: spec §11 is hub; 2026-09-05 station 6 RED with PROVEN cause; Tasks 29-33 landed; mesh needs a rebuild."
+description: "hApp-lineage migration epic: spec §11 is the hub; station 6 RED with a proven cause; 0.7.0 assessment steers it."
 metadata:
   type: project
 ---
@@ -69,3 +69,4 @@ is poisoned until rebuilt (fresh cells); Station 6 unmeasurable until then. See
 
 - [[project_alpha_dna_migration_2026_09_02]] — folded (index: false); dated incident, DNA Hash Guard shipped.
 - [[project_rea_compute_commitment_primitive]] — folded (index: false); commitment primitive detail carried by in-tree spec + this epic.
+- [[project_holochain_0_7_0_assessment]] — folded 2026-09-22 (index: false); HC 0.7.0 vs our 0.6.3 fork: tx5 gone, Action preimage changes, kitsune2 0.5; steers Wave 3.

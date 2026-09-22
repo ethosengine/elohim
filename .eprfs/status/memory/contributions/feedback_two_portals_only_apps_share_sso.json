@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "feedback_two_portals_only_apps_share_sso",
-  "claim": "Two portals only: p2p-native (stewards) and doorway (hosted). Apps are OAuth relying parties, never own portals — bites on any in-app login form.",
+  "claim": "p2p-native (stewards) and doorway (hosted); apps are OAuth relying parties, never own portals or login forms.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_two_portals_only_apps_share_sso.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_two_portals_only_apps_share_sso.md",
-        "cid": "bafkreihkmncwxnbjj3jncnsz555ipfsl6h7hgyzgyo2jbl26s3n44jj4ya"
+        "cid": "bafkreighhidfqmvoqmfe4dsi577cyfc3gktlbuq3dbq5fa5i4lrmxy7izi"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Two portals only — native + doorway; apps share them like SSO",
+    "display": "Two portals only — native + doorway, shared like SSO",
     "file": "feedback_two_portals_only_apps_share_sso.md",
     "scopePath": ".claude/memory/feedback_two_portals_only_apps_share_sso.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

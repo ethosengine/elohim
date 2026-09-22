@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_doorway_serving_path",
-  "claim": "Serving: new 8080 routes need is_service_path; poisoned scope row empties EprRouter; EPR GETs divert to SSR; SSR deploy = seed then restart.",
+  "claim": "New 8080 routes need is_service_path; poisoned scope empties EprRouter; EPR GETs → SSR; /epr/{id} atom home.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_doorway_serving_path.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_doorway_serving_path.md",
-        "cid": "bafkreifxwy5smtdbukxk3zo4u6nnnnm73ytf3ij5a7wgnwhzthogfah3lm"
+        "cid": "bafkreihimwltitvt55itmd4o5zlzlrg3tfpw64lfwcfwimy3dzhtfqkfsy"
       },
       "reach": "repository"
     }
@@ -25,7 +25,7 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "Doorway/EPR serving path + SSR (umbrella)",
+    "display": "Doorway/EPR serving path, SSR, atom home (umbrella)",
     "file": "project_doorway_serving_path.md",
     "scopePath": ".claude/memory/project_doorway_serving_path.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",

@@ -4,7 +4,7 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_dna_hash_depends_on_build_path.md",
-        "cid": "bafkreihjb27qxozbipj26dcdkjcwaiosxfjsveg22isknxywc4c6ybe33y"
+        "cid": "bafkreigsj5lpv5msa54x5xtoapt4nc2564hora3bxsr2yfbkr3es2cyxn4"
       },
       "reach": "repository"
     }
@@ -25,11 +25,11 @@
   "supersedes": [],
   "contradicts": [],
   "imported": {
-    "display": "DNA hash depends on the absolute build path, not only source",
+    "display": "DNA hash depends on the absolute build path",
     "file": "project_dna_hash_depends_on_build_path.md",
     "scopePath": ".claude/memory/project_dna_hash_depends_on_build_path.md",
     "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
-    "indexed": true
+    "indexed": false
   }
 }

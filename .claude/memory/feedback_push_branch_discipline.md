@@ -1,10 +1,10 @@
 ---
 name: feedback_push_branch_discipline
-description: "Commit-only; one push per batch; never during builds — a superseding run cancels roll mid-rollout. Shared worktree: path-limited; sprint/* not CI-indexed."
+title: "Push, branch & shared-tree discipline (umbrella)"
+description: "Commit-only; one push per batch, never mid-build; shared tree: pathspec commits, scratch index, ledgers excluded."
 metadata: 
   node_type: memory
   title: "Push, branch & worktree discipline (umbrella)"
-id: feedback-push-branch-discipline
   id: feedback-push-branch-discipline
   type: feedback
   originSessionId: 9f7bc2ea-78fe-4186-b2ab-836023d073e4
@@ -24,6 +24,8 @@ Folds the git push/branch/worktree discipline cluster — the rules governing wh
 - [[feedback_work_stays_in_operator_visible_tree]] — All work lands in /projects/elohim (the operator's VS Code mount); never create sibling worktrees like /projects/elohim-wt-land — invisible work is unreviewable.
 - [[feedback_partition_compile_and_stale_dist]] — Two integration anti-patterns from 2026-07-24 overnight — commit partitions must respect COMPILE deps, and local dist/ presence proves nothing about CI stage coverage
 - [[project_sprint_branch_not_orchestrator_indexed]] — Orchestrator indexes only {PR-*, dev}: sprint/* and claude/* pushes never trigger CI ([build:*] inert, NOT_BUILT); auto-deploy only via dev-merge.
+- [[feedback_agents_commit_ledger_files]] — folded 2026-09-22 (index: false); Worktree agents commit .claude/data/*.jsonl ledgers the hooks rewrite; the index patch lands but the working-tree sync fails — amend the ledger out, apply --exclude '.claude/*'
+- [[feedback_shared_tree_commit_and_gate_mechanics]] — folded 2026-09-22 (index: false); Backticks in a Bash heredoc trip the destructive-token hook (Write the commit msg); gate a dirty shared crate from a git-archive export OUTSIDE the repo.
 - **Never reset by relative ref in a shared worktree (2026-08-27 near-miss).** `git reset --soft HEAD~1` meant to drop MY commit removed the sibling session's newest commit instead — three of theirs had landed on top of mine in the minutes between. Recovered from the reflog within a minute, but the rule is: name the commit (`git reset --soft <sha>` / `git revert <sha>`), re-read `git log -5` immediately before any history op, and prefer a forward correction commit over rewriting when another session is live. Corollary: an inert `[build:*]` tag buried in history is harmless — the orchestrator reads `git log -1` only — so leave it and add a commit above it rather than rebase.
   - **2026-09-11 repeat, with a NAMED sha:** `git reset --soft aaf94beb4` to park my top commit dropped the sibling's 466536cb4 too, because it had landed between aaf94beb4 and mine and I named the sha from a stale `git log`. Naming a sha is not enough — name the sha of the commit DIRECTLY BELOW YOURS as printed by `git log -3` in the same command, and in a shared tree prefer `git branch <park> HEAD` plus a forward revert over any reset. Recovery: the dropped commit's content stays STAGED after `--soft`, so `git commit -c <dropped-sha> -- <its files>` recreates it (verify with `git diff <dropped-sha> HEAD -- <files>`).
   - **The pre-push hook's harnesses run on the WORKING tree and under git's hook env.** Three latent push blockers surfaced on 2026-09-11 that no shift had changed: a berth CLI shape regression (`.claude/hooks/tests`), unrouted seam registries + schema-violating rows (`_lib/__tests__/seam_matrix_test.py`), and `epr_habits_test.py` failing only because git exports `GIT_DIR` into hooks (now scrubbed with `env -u` in the loop). When a push is refused by a leg you never touched, run that harness under `GIT_DIR=$PWD/.git` to reproduce before blaming the diff.

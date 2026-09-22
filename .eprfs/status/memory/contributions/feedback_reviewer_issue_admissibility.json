@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "reviewer-issue-admissibility",
-  "claim": "Autonomous review loops deadlock on tree-unfixable complaints (history rewrites, TDD evidence) — reviewer prompts need an admissibility clause.",
+  "claim": "Review loops deadlock on tree-unfixable complaints (history rewrites, TDD evidence) — add an admissibility clause.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_reviewer_issue_admissibility.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_reviewer_issue_admissibility.md",
-        "cid": "bafkreidpib6ltxk6t5p6a66ej2fys4fkauhkqeypfeishvvi3vgaiexcxu"
+        "cid": "bafkreihumz5vvg2xi7h5qpew773xco6cmbvfkk6rna5esep7jg5fkbtzf4"
       },
       "reach": "repository"
     }

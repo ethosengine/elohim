@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "reference-node-hardware-ethosengine-shem",
+  "claim": "ethosengine = X470D4U/3900X/64G, worn QLC mirror; shem = T7610 dual E5/135G/ZFS — before storage/reboot/placement.",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/reference_node_hardware_ethosengine_shem.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/reference_node_hardware_ethosengine_shem.md",
+        "cid": "bafkreief64mbrfapvz7mw54qmycpnhezlmyyigdjpuwz473kvrzekesunm"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "Node hardware — ethosengine + shem",
+    "file": "reference_node_hardware_ethosengine_shem.md",
+    "scopePath": ".claude/memory/reference_node_hardware_ethosengine_shem.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "reference",
+    "indexed": true
+  }
+}

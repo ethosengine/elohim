@@ -2,7 +2,7 @@
 name: agent-eyes-look-live-peer-loop
 title: "Agent eyes — look + live-peer dev loop"
 id: project-agent-eyes-look-live-peer-loop
-description: "pnpm look (a2o) renders any URL to a shot.png I can Read; pnpm start:alpha runs the local UI on live alpha data with no local stack."
+description: "pnpm look renders any URL to a shot.png I can Read; pnpm start:alpha runs the local UI on live alpha data."
 metadata: 
   node_type: memory
   type: project

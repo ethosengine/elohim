@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "feedback-async-in-computed-silently-dies",
+  "claim": "Signal writes throw in computed(); an async trigger there dies at its first set() with no trace — use effect().",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/feedback_async_in_computed_silently_dies.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/feedback_async_in_computed_silently_dies.md",
+        "cid": "bafkreiebp4l2qifc4vbxjkgpxsce22on7fqkh4dezzyqkrbyt2hsrzjcji"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "void async inside computed() dies silently",
+    "file": "feedback_async_in_computed_silently_dies.md",
+    "scopePath": ".claude/memory/feedback_async_in_computed_silently_dies.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "feedback",
+    "indexed": true
+  }
+}

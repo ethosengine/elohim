@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "user_operator_resource_reality_and_thesis",
-  "claim": "One developer with a full-time day job funding tooling out of pocket — never assume institutional resources or compare us as the well-funded party.",
+  "claim": "One developer, full-time day job, out-of-pocket tooling — never assume institutional resources.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/user_operator_resource_reality_and_thesis.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/user_operator_resource_reality_and_thesis.md",
-        "cid": "bafkreigjgpe7xxso36r7yjp5wuurzvxp33swwzpbsfn6qmgcfy3dn4vtju"
+        "cid": "bafkreif6ghduj6m5vkkyc6qkyut4tfsul7oxrgi3xenkebxx2dufoyhq6u"
       },
       "reach": "repository"
     }

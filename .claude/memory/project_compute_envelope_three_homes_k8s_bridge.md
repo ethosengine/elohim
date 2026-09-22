@@ -1,8 +1,8 @@
 ---
 name: project_compute_envelope_three_homes_k8s_bridge
-title: Compute envelope has three homes — the k8s-bridge slice
+title: "Compute envelope has three homes"
 id: project-compute-envelope-three-homes-k8s-bridge
-description: "deployments.json limits, Rakia ledger, prose ratification cannot read each other — capacity ask fires on stale envelope; cure: observe+ratify."
+description: "deployments.json, Rakia ledger and prose ratification can't read each other — capacity asks fire on stale envelopes."
 metadata: 
   node_type: memory
   title: Compute envelope has three homes — the k8s-bridge slice

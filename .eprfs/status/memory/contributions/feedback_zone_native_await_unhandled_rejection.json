@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "zone-native-await-unhandled-rejection",
-  "claim": "zone.js checks uncaught rejections before native await's V8 thenable-job attaches — handled rejections false-flag; fix with sync .then/.catch.",
+  "claim": "zone.js flags handled native-await rejections as uncaught before the thenable job attaches — use sync .then/.catch.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/feedback_zone_native_await_unhandled_rejection.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_zone_native_await_unhandled_rejection.md",
-        "cid": "bafkreiazge7wlqygn2iwvduvonoxbnnxbzxnaesbgr4s2c5exzorkg4ore"
+        "cid": "bafkreidfkyjzomzuipz3ed6qlqoiavszse3vmtf5kpylzhys3r6znkvgzm"
       },
       "reach": "repository"
     }

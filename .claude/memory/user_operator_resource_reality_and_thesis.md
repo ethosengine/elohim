@@ -2,7 +2,7 @@
 name: user_operator_resource_reality_and_thesis
 title: "One dev, a day job, out-of-pocket — and that IS the proof"
 id: user-operator-resource-reality-and-thesis
-description: "One developer with a full-time day job funding tooling out of pocket — never assume institutional resources or compare us as the well-funded party."
+description: "One developer, full-time day job, out-of-pocket tooling — never assume institutional resources."
 metadata: 
   node_type: memory
   type: user

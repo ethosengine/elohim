@@ -1,8 +1,8 @@
 ---
 name: feedback_atomic_wins_compound_velocity
-title: "Careful \"how we SHOULD do it\" slices are atomic wins th…"
+title: "Atomic wins done right compound velocity"
 id: feedback-atomic-wins-compound-velocity
-description: "Operator 2026-09-06 — velocity comes from atomic wins done the right way; never trade correctness for a one-off speedup."
+description: "Operator 2026-09-06: velocity comes from atomic wins done the right way; never trade correctness for a speedup."
 metadata: 
   node_type: memory
   title: "Careful \"how we SHOULD do it\" slices are atomic wins that compound velocity"

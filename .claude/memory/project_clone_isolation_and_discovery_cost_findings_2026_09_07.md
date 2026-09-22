@@ -1,6 +1,7 @@
 ---
+index: false
 name: project_clone_isolation_and_discovery_cost_findings_2026_09_07
-title: Clone isolation breaks at the projection plane; feedback discovery is O(N)
+title: "Clone isolation breaks at the projection plane"
 id: project-clone-isolation-and-discovery-cost-findings-2026-09-07
 description: "Mesh 2026-09-07: role-keyed sync leaks clone content into base cells; feedback discovery scans all history — group-space + convergence hazard."
 metadata:

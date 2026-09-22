@@ -4,12 +4,12 @@
     "path": ".epr-meta/collective.json",
     "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
   },
-  "author": "agent:orchestrator@claude-fable-5-1",
+  "author": "agent:librarian@claude-opus-5-5",
   "steward": "repo:ethosengine/elohim",
   "scope": "repository",
   "reach": "repository",
   "concern": "project_content_graph_native_rust_not_cozo_apollo",
-  "claim": "Lamad relationship graph is computed in native Rust storage; Cozo/Kuzu/Apollo rejected — extend the ContentGraphResolver trait instead.",
+  "claim": "Lamad relationship graph is native Rust storage; Cozo/Kuzu/Apollo rejected — extend ContentGraphResolver.",
   "uncertainty": [
     "Imported verbatim from .claude/memory/project_content_graph_native_rust_not_cozo_apollo.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
   ],
@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_content_graph_native_rust_not_cozo_apollo.md",
-        "cid": "bafkreif6kmsho7ilg7djybdisf46ffmlrnufnyhisjzbdypoljivrc6ihi"
+        "cid": "bafkreifq6qache4yjxtwqzcppu5jmclhan4mp54c2ub446usfnh6kjakf4"
       },
       "reach": "repository"
     }

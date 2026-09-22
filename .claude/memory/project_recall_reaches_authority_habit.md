@@ -1,8 +1,8 @@
 ---
 name: project_recall_reaches_authority_habit
-title: recall-reaches-authority habit — bounded recall graduates from eprfs to p2p
+title: "recall-reaches-authority habit (umbrella)"
 id: project-recall-reaches-authority-habit
-description: "UMBRELLA for the 2026-09-11 recall work (folds: bootstrapping-is-a-recall-journey, governed-discovery-ontology-reuse, plan-checkbox-is-commitment-grain). Declared 2026-09-11 (born red→green): one governed recall journey serves ceremony and sprint doors; middot recall-{metered,unmetered}-bytes/mistaken-assertions/screens-to-shape; graduates to p2p when humans discover meaning in communities through the same inspectable artifact."
+description: "One governed recall journey serves ceremony and sprint doors; risk-tag recall surfaces; graduates from eprfs to p2p."
 metadata:
   type: project
 ---
@@ -42,3 +42,7 @@ standing-reader workflow, and on its first reading against main's fold history t
 (4 of 6 journeys positive). The latest-journey readers were green; the quarter was not. Station 4's work is the
 discovery gap the standing reader surfaced (short register vocabulary like "top red", area stemming, a
 reader-chosen candidate) — that, not a wider bound, is what greens it.
+
+**Folded members (memorialized 2026-09-22 — detail lives in each file):**
+
+- [[project_risk_discipline_timeline_tag]] — folded 2026-09-22 (index: false); Risks in arch-scale-risk-backlog tagged `risk`, wired into 5 recall surfaces — check before scale-sensitive design.

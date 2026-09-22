@@ -1,8 +1,8 @@
 ---
 name: feedback_reader_context_shapes_recall_defaults
-title: Reader context shapes recall defaults — a negotiated preset, never a fixed default
+title: "Reader context shapes recall defaults"
 id: feedback-reader-context-shapes-recall-defaults
-description: "Operator 2026-09-11: who is searching (agent tier haiku→fable, human capability, stated/revealed intent) must shape recall defaults via the actor sidecar ↔ recipe seam; unintentional defaults breed audience capture, filter bubbles, rabbit holes, epistemic bifurcation."
+description: "Operator 2026-09-11: searcher tier, capability and intent negotiate recall defaults; fixed defaults breed capture."
 metadata:
   type: feedback
 ---
