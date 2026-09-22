@@ -63,6 +63,7 @@ import {
   probeEprNavContext,
   probeMetrics,
   probeConductorDiagnostics,
+  diagnosticsAgentsObservable,
   probeServedBundleHead,
   agentKeyMatchesDiagnosticAgent,
   pollForGauge,
@@ -1441,9 +1442,14 @@ Then(
     }
 
     const { status: diagStatus, body: diagBody } = await probeConductorDiagnostics(url);
-    if (diagStatus !== 200) {
+    if (diagStatus !== 200 || !diagnosticsAgentsObservable(diagBody)) {
       // No embedded conductor admin connection on this peer (e.g. a doorway-only
-      // node) — live membership truth is not observable here at all.
+      // node), OR the connection exists but the conductor's peer store could not
+      // be read (a cell that has not joined its network has no kitsune space, so
+      // `agent_info` answers K2SpaceNotFound and `agents` is ABSENT, never empty).
+      // Either way live membership truth is not observable here at all — and
+      // reading an unreadable peer store as an empty one would flag every
+      // household member as a fossil.
       return;
     }
     const liveAgents = (diagBody.agents ?? [])

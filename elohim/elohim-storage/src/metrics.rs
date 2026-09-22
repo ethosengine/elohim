@@ -2571,6 +2571,107 @@ lazy_static! {
         &["role"],
     )
     .unwrap();
+
+    /// Is this role's CELL in the conductor's running-cell map? `1` yes, `0`
+    /// registered-but-absent, `-1` the `ListCellIds` read itself failed.
+    ///
+    /// The instrument `elohim_conductor_app_enabled` could not be. That gauge
+    /// answers "has a call landed on this role", which conflates two states the
+    /// cure differs between; this one answers the conductor's own membership
+    /// question — the same map zome dispatch looks in. `-1` is a real value and
+    /// not a sentinel to be filtered: a node that cannot read membership must
+    /// not publish a `0` that reads as a diagnosis.
+    ///
+    /// Alert shape: `min_over_time(elohim_conductor_cell_running[15m]) == 0`
+    /// names a role whose cell has been absent for a quarter of an hour.
+    /// Cardinality is the observed role roster (5), fixed at compile time.
+    pub static ref CONDUCTOR_CELL_RUNNING: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_conductor_cell_running",
+            "1 when this role's cell is in the conductor's running-cell map (ListCellIds), 0 when it is registered but absent, -1 when the membership read failed.",
+        ),
+        &["role"],
+    )
+    .unwrap();
+
+    /// One-hot: which joined [`crate::conductor_bridge_health::RoleCellState`]
+    /// is this role in right now?
+    ///
+    /// `elohim_conductor_cell_running` says WHETHER; this says WHY, and
+    /// therefore which cure applies. The series an operator alerts on is
+    /// `elohim_conductor_cell_state{state="installed-not-running-app-enabled"}
+    /// == 1` — the STRANDED state, where `enable_app` provably cannot help and
+    /// the conductor needs attention.
+    ///
+    /// Cardinality is 5 roles × 5 states = 25, both fixed at compile time.
+    /// Observations rejected as superseded, by observation kind.
+    pub static ref CONDUCTOR_SUPERSEDED_OBSERVATIONS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_superseded_observations_total",
+            "Observations dropped because a newer one already held the field they would overwrite.",
+        ),
+        &["kind"],
+    )
+    .unwrap();
+
+    pub static ref CONDUCTOR_CELL_STATE: IntGaugeVec = IntGaugeVec::new(
+        Opts::new(
+            "elohim_conductor_cell_state",
+            "1 for the role's CURRENT joined cell state (app status × running-cell membership), 0 for every other state.",
+        ),
+        &["role", "state"],
+    )
+    .unwrap();
+}
+
+/// Publish whether ROLE's CELL is in the conductor's running-cell map.
+///
+/// `None` publishes `-1`: the membership read failed, which is a third answer
+/// and must never be flattened into `0`.
+pub fn set_conductor_cell_running(role: &str, running: Option<bool>) {
+    CONDUCTOR_CELL_RUNNING
+        .with_label_values(&[role])
+        .set(match running {
+            Some(true) => 1,
+            Some(false) => 0,
+            None => -1,
+        });
+}
+
+/// Publish ROLE's current joined cell state as a one-hot family, so a query
+/// never has to guess which of the five the absent series meant.
+pub fn set_conductor_cell_state(role: &str, state: crate::conductor_bridge_health::RoleCellState) {
+    for candidate in crate::conductor_bridge_health::ROLE_CELL_STATES {
+        CONDUCTOR_CELL_STATE
+            .with_label_values(&[role, candidate.as_str()])
+            .set(i64::from(candidate == state));
+    }
+}
+
+/// Zero every state in ROLE's cell-state family.
+///
+/// The family answers "why is this role NOT serving"; a role that IS serving has
+/// no such reason, so every series drops to 0 rather than one of them staying at
+/// the last reason. Called from the ONE recovery transition.
+pub fn clear_conductor_cell_state(role: &str) {
+    for state in crate::conductor_bridge_health::ROLE_CELL_STATES {
+        CONDUCTOR_CELL_STATE
+            .with_label_values(&[role, state.as_str()])
+            .set(0);
+    }
+}
+
+/// Observations DROPPED because a newer one already held the field.
+///
+/// Not an error: rejecting a superseded write is the mechanism working. But a
+/// sustained stream of them means two supervisors are fighting over one role,
+/// and that cure is upstream of this module — so it has to be countable.
+/// Cardinality is the closed `Observation` variant set (6), fixed at compile
+/// time.
+pub fn note_superseded_observation(kind: &str) {
+    CONDUCTOR_SUPERSEDED_OBSERVATIONS
+        .with_label_values(&[kind])
+        .inc();
 }
 
 /// Publish whether ROLE's conductor app is running.
@@ -2627,6 +2728,24 @@ pub fn register_all() {
         // the 2026-09-18 incident was two days of exactly that.
         for role in crate::hc_client_registry::OBSERVED_ROLES {
             CONDUCTOR_APP_ENABLED.with_label_values(&[role]).set(1);
+        }
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CELL_RUNNING.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CELL_STATE.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_SUPERSEDED_OBSERVATIONS.clone()));
+        // Pre-touch the membership family at `-1` (NOT `0`, and NOT `1`): before
+        // the first `ListCellIds` lands this node genuinely does not know, and
+        // both other values would be a claim. Absence is unalertable; a
+        // fabricated answer is worse than unalertable.
+        for role in crate::hc_client_registry::OBSERVED_ROLES {
+            CONDUCTOR_CELL_RUNNING.with_label_values(&[role]).set(-1);
+            // Every role × every state at 0 — so the one-hot query
+            // `cell_state{state="installed-not-running-app-enabled"} == 1` is a
+            // measured absence on a healthy pod rather than no series at all.
+            for state in crate::conductor_bridge_health::ROLE_CELL_STATES {
+                CONDUCTOR_CELL_STATE
+                    .with_label_values(&[role, state.as_str()])
+                    .set(0);
+            }
         }
         let _ = REGISTRY.register(Box::new(IDENTITY_NAMESPACE_VIOLATIONS.clone()));
         let _ = REGISTRY.register(Box::new(APP_DELIVERABILITY_VERDICTS.clone()));

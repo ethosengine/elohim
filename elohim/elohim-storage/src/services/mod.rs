@@ -36,6 +36,7 @@ pub mod bootstrap_manifests;
 pub mod bounds_validator;
 pub mod capacity_pledge_author; // Explicit Class-A commons-capacity pledge via Mishpat conductor + eager projections
 pub mod capacity_reporter; // Periodic local capacity reporter — measures + upserts custodian_metrics, sets the cluster-capacity gauges
+pub mod cell_membership; // ListCellIds — the conductor's running-cell map, the only truthful membership read
 pub mod cell_probe; // The one read-only cell probe that lets a QUIET role prove it recovered
 pub mod cluster_view;
 pub mod commitment_fetcher;

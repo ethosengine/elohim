@@ -420,6 +420,18 @@ mod head_declare_write_admission_carveout_tests {
 }
 
 /// HTTP server state
+/// The structured `code` on `GET /db/content/{id}/head-record`'s empty answer.
+///
+/// THE ONE 404 ON THIS ROUTE THAT PROVES A ZOME CALL RETURNED. Every other 404
+/// it emits is raised BEFORE the conductor is reached — an unknown id, a
+/// scoped-tier reach answered as absence, or no notarized head declared — and
+/// all of them share the `{"error": ...}` body shape. A caller distinguishing
+/// "the app websocket answered" from "we never got that far" therefore had only
+/// the message TEXT, and a content id may legally contain any phrase, so a row
+/// named after the message could forge the proof. The code is a field of its
+/// own; compare it exactly, never by substring.
+pub const HEAD_RECORD_EMPTY_CODE: &str = "head-record-empty";
+
 pub struct HttpServer {
     blob_store: Arc<BlobStore>,
     manifests: Arc<RwLock<std::collections::HashMap<String, ShardManifest>>>,
@@ -7951,7 +7963,8 @@ impl HttpServer {
         // registry role holds an AdminWebsocket to that same conductor, and the
         // bridge supervisor keeps it fresh across conductor restarts). 503 only
         // when NEITHER exists — that is the honest "no conductor" answer, not
-        // a topology artifact.
+        // a topology artifact, and it is the answer the a2o dataplane steps read
+        // as "membership truth is not observable on this peer at all".
         let Some(admin) = self.admin_websocket.as_deref().cloned().or_else(|| {
             self.hc_registry
                 .as_ref()
@@ -7968,25 +7981,25 @@ impl HttpServer {
             .map(|q| q.split('&').any(|kv| kv == "include=metrics"))
             .unwrap_or(false);
 
-        let agent_infos = match admin.agent_info(None).await {
-            Ok(infos) => infos,
-            Err(e) => {
-                return Ok(response::service_unavailable(&format!(
-                    "conductor agent_info failed: {e}"
-                )));
-            }
-        };
-        let agents: Vec<serde_json::Value> =
-            agent_infos.iter().map(|s| project_agent_info(s)).collect();
+        // CELL MEMBERSHIP FIRST, and it is why this route no longer dies on a
+        // failed peer-store read (2026-09-22).
+        //
+        // `agent_info(None)` collects the conductor's DB-level spaces and then
+        // asks `holochain_p2p` for each one's peer store, which resolves through
+        // `space_if_exists` — a kitsune space that is only created by a cell's
+        // network JOIN. So on a conductor whose cells have not joined (the
+        // 56min–6h startup window measured on the fleet, or a stranded Enabled
+        // app) that read answers `K2SpaceNotFound` and this route used to return
+        // 503: it failed at exactly the moment an operator needed it.
+        //
+        // `ListCellIds` has no such dependency — it reads the conductor's
+        // in-memory running-cell map — so the membership/status picture is served
+        // WHATEVER the peer store does, and only the agent half degrades.
+        let membership = crate::services::cell_membership::membership();
+        let membership_outcome = membership.refresh_if_stale(&admin).await;
+        let cells_block = Self::cell_membership_block(&membership_outcome);
 
-        // Transport stats: best-effort — a failure here should not hide the
-        // peer store (the more load-bearing half of the diagnostic).
-        let transport_stats = match admin.dump_network_stats().await {
-            Ok(stats) => project_transport_stats(&stats)
-                .unwrap_or_else(|e| serde_json::json!({ "serializeError": e.to_string() })),
-            Err(e) => serde_json::json!({ "error": e.to_string() }),
-        };
-
+        let agent_read = admin.agent_info(None).await;
         let network_metrics = if include_metrics {
             match admin.dump_network_metrics(None, false).await {
                 Ok(metrics) => {
@@ -8009,15 +8022,130 @@ impl HttpServer {
             None
         };
 
+        // Transport stats: best-effort — a failure here should not hide the
+        // peer store (the more load-bearing half of the diagnostic).
+        let transport_stats = match admin.dump_network_stats().await {
+            Ok(stats) => project_transport_stats(&stats)
+                .unwrap_or_else(|e| serde_json::json!({ "serializeError": e.to_string() })),
+            Err(e) => serde_json::json!({ "error": e.to_string() }),
+        };
+
         let mut body = serde_json::json!({
-            "agentCount": agents.len(),
-            "agents": agents,
             "transportStats": transport_stats,
+            "cells": cells_block,
         });
+        match agent_read {
+            Ok(agent_infos) => {
+                let agents: Vec<serde_json::Value> =
+                    agent_infos.iter().map(|s| project_agent_info(s)).collect();
+                body["agentsObservable"] = serde_json::Value::Bool(true);
+                body["agentCount"] = serde_json::Value::from(agents.len());
+                body["agents"] = serde_json::Value::Array(agents);
+            }
+            Err(e) => {
+                // `agents` / `agentCount` are OMITTED, never emitted empty: a `0`
+                // here would be read as "this conductor holds no agents", which
+                // is a different fact from "the peer store could not be read"
+                // and is exactly the lossy-measure trap that makes a red look
+                // total. A consumer keys on `agentsObservable`.
+                body["agentsObservable"] = serde_json::Value::Bool(false);
+                // THE CONDUCTOR'S OWN WORDS FIRST, and a cause only where the
+                // words prove it. `agent_info` resolves each space's peer store
+                // through `space_if_exists`, so a cell that has not joined its
+                // network answers `K2SpaceNotFound` — but a closed socket, an
+                // auth failure or a timeout arrive on the same `Err` arm, and
+                // attaching the missing-space explanation to all of them would
+                // send a reader hunting a startup window during a socket outage.
+                let raw = e.to_string();
+                let explained = if raw.contains("K2SpaceNotFound")
+                    || raw.to_ascii_lowercase().contains("space not found")
+                {
+                    format!(
+                        "conductor agent_info failed: {raw} — that error names a MISSING KITSUNE \
+                         SPACE, which a cell creates only when it joins its network; the peer \
+                         store is unreadable until then. Read `cells` for what IS established."
+                    )
+                } else {
+                    format!(
+                        "conductor agent_info failed: {raw} — cause not established by this \
+                         error text. Read `cells` for what IS established."
+                    )
+                };
+                body["agentsError"] = serde_json::Value::from(explained);
+            }
+        }
         if let Some(metrics) = network_metrics {
             body["networkMetrics"] = metrics;
         }
         Ok(response::ok(&body))
+    }
+
+    /// The `cells` block: what this node can say about its OWN conductor's
+    /// running-cell map and each observed role's joined state.
+    ///
+    /// Built from the membership cache plus `conductor_bridge_health`, so it
+    /// needs no zome call and no kitsune space — it answers precisely when the
+    /// rest of the diagnostic cannot.
+    fn cell_membership_block(
+        outcome: &crate::services::cell_membership::RefreshOutcome,
+    ) -> serde_json::Value {
+        use crate::conductor_bridge_health as health;
+        use crate::services::cell_membership::{membership, RefreshOutcome};
+
+        let cache = membership();
+        let now = health::now_ms();
+        let (reads, failures) = cache.counts();
+
+        let mut per_role = serde_json::Map::new();
+        for role in crate::hc_client_registry::OBSERVED_ROLES {
+            let snap = health::role_bridge_health().for_role(role).snapshot_at(now);
+            per_role.insert(
+                role.to_string(),
+                serde_json::json!({
+                    "zomePath": snap.status.as_str(),
+                    // The EVIDENCE, not a boolean: `already-enabled` and
+                    // `enable-refused` are both "not enable-able" for opposite
+                    // reasons, and a boolean hid the second.
+                    "enableEvidence": health::last_enable_evidence(role).as_str(),
+                    "notRunningSecs": snap.not_running_secs,
+                    "appDisabledReason": snap.app_disabled_reason,
+                    "enableAttempts":
+                        crate::services::enable_app_backoff::enable_ledger().attempts(role),
+                }),
+            );
+        }
+
+        serde_json::json!({
+            "membership": {
+                "source": "AdminRequest::ListCellIds (the conductor's running_cell_ids map — the \
+                           same map zome dispatch looks in; app_info status is NOT this)",
+                "refreshIntervalSecs":
+                    crate::services::cell_membership::MEMBERSHIP_REFRESH_INTERVAL.as_secs(),
+                // The window in which a reading may DECIDE a cure. Past it the
+                // reading still renders here and answers `None` to every
+                // recovery question — freshness is part of the answer.
+                "authorityTtlSecs":
+                    crate::services::cell_membership::MEMBERSHIP_AUTHORITY_TTL.as_secs(),
+                "readDeadlineSecs":
+                    crate::services::cell_membership::MEMBERSHIP_READ_DEADLINE.as_secs(),
+                "authoritative": cache
+                    .is_authoritative_at(crate::services::cell_membership::ObservedAt::now()),
+                "thisRead": match outcome {
+                    RefreshOutcome::Cached => "cached",
+                    RefreshOutcome::Coalesced => "coalesced",
+                    RefreshOutcome::Read { .. } => "read",
+                    RefreshOutcome::Superseded => "superseded",
+                    RefreshOutcome::Failed { .. } => "failed",
+                },
+                "runningCount": cache.running_count(),
+                "readAgeSecs": cache.read_age_secs_at(now),
+                "reads": reads,
+                "failedReads": failures,
+                "lastError": cache.last_error(),
+                "runningCellIds": cache.cell_ids_rendered(),
+            },
+            "perRole": serde_json::Value::Object(per_role),
+        })
     }
 
     /// GET /db/identity/did/{did} — resolve a `did:elohim` identifier to its
@@ -9272,9 +9400,24 @@ impl HttpServer {
                     "record": STANDARD.encode(&carried.record),
                 })))
             }
-            None => Ok(response::not_found(
-                "this peer cannot retrieve the head action; no record to serve",
-            )),
+            None => {
+                // A STRUCTURED CODE, because this 404 means something no other
+                // 404 on this route means: the conductor was ASKED and
+                // ANSWERED, holding no record. The pre-conductor 404s above
+                // ("Content not found: {id}", "no notarized head declared")
+                // carry the same `{"error": ...}` shape, so a caller that
+                // wanted to distinguish "the zome call returned" from "we never
+                // got that far" had only the message text to match on — and a
+                // content id may legally contain any of those phrases, which
+                // makes substring matching forgeable by a row's own name.
+                Ok(response::json_response(
+                    StatusCode::NOT_FOUND,
+                    &serde_json::json!({
+                        "error": "this peer cannot retrieve the head action; no record to serve",
+                        "code": HEAD_RECORD_EMPTY_CODE,
+                    }),
+                ))
+            }
         }
     }
 
