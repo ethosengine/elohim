@@ -1,15 +1,21 @@
 //! Capability-aware peer ranking — a pure composer over operational signals.
 
 /// One candidate peer for serve-routing, composed from operational signals
-/// (NodeRegistration capability, NodeHeartbeat load, HealthAttestation RTT, Mishpat bond, delivery history).
+/// (NodeRegistration capability, NodeHeartbeat load, a locally-observed RTT, Mishpat bond, delivery history).
 #[derive(Debug, Clone)]
 pub struct Candidate {
     pub agent_cid: String,
     pub capability_level: u8,
-    pub current_load: f64,            // 0.0..=1.0 (NodeHeartbeat.current_load)
-    pub attested_rtt_ms: Option<u32>, // HealthAttestation.response_time_ms; None = not yet attested
-    pub household_id: String,         // fault-domain key
-    pub bonded: bool,                 // backed by a replicates-* / delegates-compute commitment
+    pub current_load: f64, // 0.0..=1.0 (NodeHeartbeat.current_load)
+    // As of Sprint 3 (story 3.2), `elohim-storage` feeds this from its own
+    // `p2p::transport_paths` EWMA — a locally-observed, UNSIGNED round-trip
+    // measurement (this node's asymmetric view of its RTT to the peer), not
+    // a peer-signed `HealthAttestation`. The field name is the established
+    // scoring vocabulary; no signed attestation of RTT exists yet. `None` =
+    // not yet sampled — `rank` treats that as neutral, never a penalty.
+    pub attested_rtt_ms: Option<u32>,
+    pub household_id: String, // fault-domain key
+    pub bonded: bool,         // backed by a replicates-* / delegates-compute commitment
     pub delivery_score: f64, // 0.0..=1.0 decaying delivery-success (advertise-then-drop decays it)
 }
 

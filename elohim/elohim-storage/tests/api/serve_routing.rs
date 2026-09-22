@@ -341,3 +341,135 @@ fn select_serve_peers_min_cap_zero_never_excludes_peers() {
     );
     assert_eq!(chosen[0], "uhCAk-bare-peer");
 }
+
+// ---------------------------------------------------------------------------
+// 3.2: attested_rtt_ms fed from p2p::transport_paths's local EWMA RTT store.
+// Labels are made unique to this test file to avoid cross-test interference
+// on the process-wide `transport_paths::global()` singleton.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn load_serve_rows_feeds_attested_rtt_ms_from_transport_paths() {
+    use elohim_storage::p2p::transport_paths::{self, OpClass, Transport};
+    use std::time::Duration;
+
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let blob_hash = "sha256-rtt-story-3-2-load";
+    seed_shard_manifest(
+        &mut conn,
+        "content-rtt-story-3-2-load",
+        blob_hash,
+        &["shard-rtt-3-2-a", "shard-rtt-3-2-b"],
+    );
+    let near = "uhCAk-rtt-story-3-2-near";
+    let far = "uhCAk-rtt-story-3-2-far";
+    seed_shard_location(&mut conn, "shard-rtt-3-2-a", near);
+    seed_shard_location(&mut conn, "shard-rtt-3-2-b", far);
+
+    // Record a local EWMA RTT sample for each peer under its agent_cid label
+    // (the fallback label — no resolved libp2p/iroh alias needed for this test).
+    transport_paths::global().record(
+        near,
+        Transport::Libp2p,
+        OpClass::Bulk,
+        Some(Duration::from_millis(15)),
+        true,
+        false,
+    );
+    transport_paths::global().record(
+        far,
+        Transport::Libp2p,
+        OpClass::Bulk,
+        Some(Duration::from_millis(240)),
+        true,
+        false,
+    );
+
+    let rows = load_serve_rows(&mut conn, blob_hash).expect("load_serve_rows should not fail");
+    let by_cid: std::collections::HashMap<String, _> =
+        rows.into_iter().map(|r| (r.agent_cid.clone(), r)).collect();
+
+    assert_eq!(by_cid.get(near).unwrap().attested_rtt_ms, Some(15));
+    assert_eq!(by_cid.get(far).unwrap().attested_rtt_ms, Some(240));
+}
+
+#[test]
+fn select_serve_peers_prefers_lower_rtt_when_capability_and_bond_are_equal() {
+    use elohim_storage::p2p::transport_paths::{self, OpClass, Transport};
+    use std::time::Duration;
+
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let blob_hash = "sha256-rtt-story-3-2-select";
+    seed_shard_manifest(
+        &mut conn,
+        "content-rtt-story-3-2-select",
+        blob_hash,
+        &["shard-rtt-3-2-c", "shard-rtt-3-2-d"],
+    );
+    let near = "uhCAk-rtt-story-3-2-select-near";
+    let far = "uhCAk-rtt-story-3-2-select-far";
+    seed_shard_location(&mut conn, "shard-rtt-3-2-c", near);
+    seed_shard_location(&mut conn, "shard-rtt-3-2-d", far);
+    seed_rea_provide(&mut conn, near);
+    seed_rea_provide(&mut conn, far);
+
+    transport_paths::global().record(
+        near,
+        Transport::Libp2p,
+        OpClass::Bulk,
+        Some(Duration::from_millis(10)),
+        true,
+        false,
+    );
+    transport_paths::global().record(
+        far,
+        Transport::Libp2p,
+        OpClass::Bulk,
+        Some(Duration::from_millis(280)),
+        true,
+        false,
+    );
+
+    let chosen =
+        select_serve_peers(&mut conn, blob_hash, 1).expect("select_serve_peers should not fail");
+    assert_eq!(
+        chosen,
+        vec![near.to_string()],
+        "lower-RTT peer should be preferred when capability/bond/load/delivery are equal"
+    );
+}
+
+#[test]
+fn select_serve_peers_stable_when_no_rtt_recorded_for_either_peer() {
+    // Neither peer has ever been sampled by this node — attested_rtt_ms is
+    // None for both. Selection must still succeed deterministically; absent
+    // RTT data must never block or destabilize serve-routing.
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    let blob_hash = "sha256-rtt-story-3-2-noattest";
+    seed_shard_manifest(
+        &mut conn,
+        "content-rtt-story-3-2-noattest",
+        blob_hash,
+        &["shard-rtt-3-2-e", "shard-rtt-3-2-f"],
+    );
+    let a = "uhCAk-rtt-story-3-2-noattest-a";
+    let b = "uhCAk-rtt-story-3-2-noattest-b";
+    seed_shard_location(&mut conn, "shard-rtt-3-2-e", a);
+    seed_shard_location(&mut conn, "shard-rtt-3-2-f", b);
+    seed_rea_provide(&mut conn, a);
+    seed_rea_provide(&mut conn, b);
+
+    let chosen =
+        select_serve_peers(&mut conn, blob_hash, 1).expect("select_serve_peers should not fail");
+    assert_eq!(
+        chosen.len(),
+        1,
+        "no RTT data recorded for either peer must not prevent a stable selection"
+    );
+}

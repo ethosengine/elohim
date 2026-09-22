@@ -16,15 +16,27 @@
 //!
 //! - `current_load` and `delivery_score` are neutral-defaulted (0.0, 1.0) — no source
 //!   column exists yet; follow-on projection work.
-//! - `attested_rtt_ms` is `None` — `custodian_metrics` is the eventual source but
-//!   its key namespace was unconfirmed (T0); neutral RTT → 0.5 factor in score.
-//! - Live cross-WAN RTT ordering (T7) requires `@requires:shem`; vacuous on household.
+//! - `attested_rtt_ms` is fed from `p2p::transport_paths` — the node's own EWMA of
+//!   round-trips it has actually measured to each peer (Entity class Ephemeral/C,
+//!   locally observed, in-memory, no DHT entry, no cross-peer sync). This is
+//!   deliberately **not** a signed `HealthAttestation`-style claim (no peer can
+//!   produce one yet) — the field name is inherited from `elohim_peer_fabric`'s
+//!   scoring vocabulary, but the value underneath it is an honest local
+//!   observation, not an attested one. A peer never sampled yet resolves to
+//!   `None`, which `score::rank` treats as neutral (0.5 factor) rather than a
+//!   penalty — so lacking data never demotes a peer below a known-slow one.
+//! - Live cross-WAN RTT ordering (T7) requires `@requires:shem` for a genuine
+//!   latency *spread* between candidates; vacuous on household topology where
+//!   peers are co-located. Household coverage lives in this module's unit tests
+//!   (below) and in `elohim_peer_fabric::score`'s ordering tests.
 
 use diesel::prelude::*;
 
 use crate::db::diesel_schema::{
-    humans, node_stewardship, rea_commitments, shard_locations, shard_manifests, stewarded_nodes,
+    humans, node_stewardship, peer_transport_manifest, rea_commitments, shard_locations,
+    shard_manifests, stewarded_nodes,
 };
+use crate::p2p::transport_paths;
 use crate::StorageError;
 use elohim_peer_fabric::score::{self, Candidate};
 
@@ -51,7 +63,12 @@ pub struct ServeRow {
     pub bonded: bool,
     /// Current load fraction (0.0..=1.0). Not yet projected — always `None` this wave.
     pub current_load: Option<f64>,
-    /// Attested RTT in milliseconds. Not yet projected — always `None` this wave.
+    /// This node's own locally-observed EWMA round-trip to the peer, in whole
+    /// milliseconds — read from `p2p::transport_paths` (Entity class Ephemeral/C,
+    /// in-memory, no DHT entry). `None` when this node has never sampled the
+    /// peer yet; `fold_candidates` maps that to `score::rank`'s neutral factor
+    /// (never a penalty), so an unattested peer is never demoted below a
+    /// known-slow one.
     pub attested_rtt_ms: Option<u32>,
     /// Delivery success score (0.0..=1.0). Not yet projected — always `None` this wave.
     pub delivery_score: Option<f64>,
@@ -81,7 +98,8 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
 
 /// Load serve candidates for `blob_hash` from the agent_cid-native shard tables.
 ///
-/// Join path (agent_cid-keyed throughout — no libp2p namespace crossing):
+/// Join path (agent_cid-keyed throughout — no libp2p namespace crossing in the
+/// SQL joins themselves):
 /// ```text
 /// shard_manifests (blob_hash → shard_hashes_json)
 ///   → shard_locations.shard_hash (peer_id = agent_cid)
@@ -90,8 +108,13 @@ pub fn fold_candidates(rows: &[ServeRow]) -> Vec<Candidate> {
 ///   → rea_commitments.provider (bonded = active provide/replicates-*)
 /// ```
 ///
-/// `current_load`, `attested_rtt_ms`, `delivery_score` are always `None` this wave
-/// (source columns not yet projected).
+/// `current_load` and `delivery_score` are always `None` this wave (source
+/// columns not yet projected). `attested_rtt_ms` is resolved per-peer from the
+/// in-memory `p2p::transport_paths` store: `peer_transport_manifest` is
+/// consulted read-only for the agent_cid's optional resolved libp2p/iroh
+/// aliases (never SQL-joined — only offered as candidate lookup labels, per
+/// `transport_paths`'s own cross-plane LABEL convention), since a sample may
+/// have landed under whichever label was known when it was recorded.
 pub fn load_serve_rows(
     conn: &mut SqliteConnection,
     blob_hash: &str,
@@ -194,6 +217,29 @@ pub fn load_serve_rows(
         .into_iter()
         .collect();
 
+    // Step 5.5: resolve each agent_cid's optional cross-plane transport
+    // aliases (libp2p PeerId / iroh NodeId) — read-only, never SQL-joined.
+    // These are only offered as candidate lookup LABELS into the in-memory
+    // transport_paths RTT store (Step 6): a sample for a given peer may have
+    // landed under whichever label was known when it was recorded.
+    let transport_alias_rows: Vec<(String, Option<String>, Option<String>)> =
+        peer_transport_manifest::table
+            .filter(peer_transport_manifest::agent_cid.eq_any(&location_rows))
+            .select((
+                peer_transport_manifest::agent_cid,
+                peer_transport_manifest::libp2p_peer_id,
+                peer_transport_manifest::iroh_node_id,
+            ))
+            .load::<(String, Option<String>, Option<String>)>(conn)
+            .map_err(|e| StorageError::Database(format!("load_serve_rows transport: {e}")))?;
+    let transport_aliases_by_agent: std::collections::HashMap<
+        String,
+        (Option<String>, Option<String>),
+    > = transport_alias_rows
+        .into_iter()
+        .map(|(cid, libp2p_id, iroh_id)| (cid, (libp2p_id, iroh_id)))
+        .collect();
+
     // Step 6: assemble ServeRows.
     let rows = location_rows
         .into_iter()
@@ -205,14 +251,29 @@ pub fn load_serve_rows(
                 .copied()
                 .flatten();
             let bonded = bonded_providers.contains(&agent_cid);
+
+            // attested_rtt_ms: try every known label this peer may have been
+            // recorded under locally — agent_cid always, plus any resolved
+            // libp2p/iroh alias.
+            let mut labels: Vec<&str> = vec![agent_cid.as_str()];
+            if let Some((libp2p_id, iroh_id)) = transport_aliases_by_agent.get(&agent_cid) {
+                if let Some(id) = libp2p_id {
+                    labels.push(id.as_str());
+                }
+                if let Some(id) = iroh_id {
+                    labels.push(id.as_str());
+                }
+            }
+            let attested_rtt_ms = transport_paths::global().best_known_rtt_ms(&labels);
+
             ServeRow {
                 agent_cid,
                 household_id,
                 capability_level,
                 bonded,
-                current_load: None,    // not yet projected
-                attested_rtt_ms: None, // not yet projected
-                delivery_score: None,  // not yet projected
+                current_load: None, // not yet projected
+                attested_rtt_ms,
+                delivery_score: None, // not yet projected
             }
         })
         .collect();
@@ -326,5 +387,66 @@ mod tests {
         let cands = fold_candidates(&[]);
         let chosen = score::select_diverse(&cands, MIN_CAP, 3);
         assert!(chosen.is_empty(), "no rows → caller sheds (no fanout)");
+    }
+
+    fn row_with_rtt(cid: &str, hh: &str, rtt: Option<u32>) -> ServeRow {
+        ServeRow {
+            agent_cid: cid.into(),
+            household_id: Some(hh.into()),
+            capability_level: Some(5),
+            bonded: true,
+            current_load: None,
+            attested_rtt_ms: rtt,
+            delivery_score: None,
+        }
+    }
+
+    // --- 3.2: attested_rtt_ms feeds ordering (red-first coverage) ---------
+
+    #[test]
+    fn fold_and_rank_orders_lower_rtt_first_when_otherwise_equal() {
+        let rows = vec![
+            row_with_rtt("uhCAk-far", "h1", Some(300)),
+            row_with_rtt("uhCAk-near", "h2", Some(10)),
+        ];
+        let cands = fold_candidates(&rows);
+        let ranked = score::rank(&cands, MIN_CAP);
+        assert_eq!(
+            ranked[0].agent_cid, "uhCAk-near",
+            "lower attested_rtt_ms should rank first when capability/load/bond/delivery are equal"
+        );
+    }
+
+    #[test]
+    fn fold_and_rank_stable_ordering_when_rtt_absent_for_all() {
+        // No peer has been locally sampled yet (attested_rtt_ms = None for
+        // both) — every other signal is equal, so ordering must be a stable
+        // (input-order-preserving) sort, never an arbitrary flip driven by
+        // absent data.
+        let rows = vec![
+            row_with_rtt("uhCAk-first", "h1", None),
+            row_with_rtt("uhCAk-second", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        let ranked = score::rank(&cands, MIN_CAP);
+        assert_eq!(ranked[0].agent_cid, "uhCAk-first");
+        assert_eq!(ranked[1].agent_cid, "uhCAk-second");
+    }
+
+    #[test]
+    fn fold_and_rank_unknown_rtt_never_demoted_below_a_known_slow_peer() {
+        // A not-yet-sampled peer (None → neutral 0.5 rtt_factor) must not
+        // rank below a peer with a measured SLOW rtt (~900ms → ~0.1 factor).
+        // Absence of data is neutral, never a penalty.
+        let rows = vec![
+            row_with_rtt("uhCAk-slow", "h1", Some(900)),
+            row_with_rtt("uhCAk-unsampled", "h2", None),
+        ];
+        let cands = fold_candidates(&rows);
+        let ranked = score::rank(&cands, MIN_CAP);
+        assert_eq!(
+            ranked[0].agent_cid, "uhCAk-unsampled",
+            "unknown RTT (neutral 0.5) must not be demoted below a known-slow peer"
+        );
     }
 }
