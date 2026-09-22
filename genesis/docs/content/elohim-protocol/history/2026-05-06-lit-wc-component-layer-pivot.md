@@ -47,6 +47,13 @@ substrate was validated, not speculative.
 - **Angular inverts to a consumer:** it pulls custom elements in via `CUSTOM_ELEMENTS_SCHEMA`; the existing
   Angular component shells shrink to thin wrappers over the WC and eventually disappear. The ~50 Angular
   components are migration *sources* (rewrite as Lit), not lift-and-shift targets.
+- **The schema has a cost:** `CUSTOM_ELEMENTS_SCHEMA` turns off Angular's unknown-element check for the
+  whole component. If an *Angular* component's selector is used but its class is missing from `imports`,
+  the template still compiles and the element renders nothing. `content-viewer` shipped a phantom
+  `<elohim-epr-relationships-panel>` this way until 2026-06-04 (`414bca579`). Only a render or a mount
+  spec catches it. (Harvested 2026-09-22 from the retired sprint-result
+  `2026-06-04-light-up-topology-visual-verification`, archived in
+  `/projects/.claude-config/archive/shifts-stale-2026-09-22.tar.gz`.)
 - **Storybook:** add the `@storybook/web-components` framework alongside the existing `@storybook/angular`
   in graphos.
 

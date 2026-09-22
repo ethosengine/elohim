@@ -9,7 +9,7 @@ written: "2026-07-31"
 author: "claude (Prometheus + Loki + code RCA)"
 status: "open"
 priority: "high"
-tags: [self-heal, projection-reconcile, heal-outcomes, websocket, conductor, shem, susan, heal-circuit, pacing, dataplane]
+tags: [self-heal, projection-reconcile, heal-outcomes, websocket, conductor, shem, susan, heal-circuit, pacing, dataplane, lesson]
 cites:
   - elohim/elohim-storage/src/p2p/projection_reconcile.rs
   - genesis/data/timeline/backlog/shem-conductors-signal-hairpin-suspect-dht-silent.md
@@ -421,3 +421,14 @@ corpus/arc size and moving pods just moves the problem; validation/publish
 dominating means a write-side backlog holds the read pool, which is the
 `2026-07-20-adam-slow-link-write-guard-saturation` class at fleet scale. Take that
 profile before committing to a migration.
+
+**Correction (2026-08-14): "the conductors themselves are the load" is not proven.** Conductor
+and storage run in one cgroup, so container CPU never told them apart. The first
+Pyroscope profiles (25 min, `process_cpu`) measured susan's elohim-storage at 44.86 s against
+matthew's 13.65 s, a 3.3× difference. Susan's time was dominated by `P2PNode::run` (58%), then
+`handle_behaviour_event` (49%), `try_process` (42%) and `sqlite3VdbeExec` (38%). Matthew showed
+no such P2PNode dominance. The host-placement partition evidence still stands. What changes is the
+attribution: storage's own P2P path is a major part of what fills the cgroup. This correction had
+lived only in the message of commit `c93d772a9`. It was harvested on 2026-09-22 from the retired
+sprint-result `2026-08-14T02-42-saga-leg2-drain-regressions-profiler-eyes`, archived in
+`/projects/.claude-config/archive/shifts-stale-2026-09-22.tar.gz`.

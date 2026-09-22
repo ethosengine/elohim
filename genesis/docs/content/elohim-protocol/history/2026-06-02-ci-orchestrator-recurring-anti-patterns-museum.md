@@ -50,7 +50,7 @@ bodies themselves retire to git; the durable mechanism of each pattern lives in 
 | 1 | **Orchestrator NOT_BUILT / superseded read as regression** — `abortPrevious` preempts an in-flight child; a FAILURE-count grep reads NOT_BUILT/ABORTED/UNSTABLE all as 0 (lossy). A superseded build is not a failure. **ABORTED has three shapes — superseded (ignore) · restart-orphaned (retrigger, #15) · operator manual abort (never should have been red)**; the discriminators are in "The load-bearing reading" below. | 9 | `feedback_orchestrator_abort_baseline_rollback`, `project_pre_dispatch_hard_fail_post_dispatch_unstable`; `backlog/ci-orchestrator-abort-misread-as-genesis-failure.md` |
 | 2 | **Baseline-rollback over-build** — a FAILURE/ABORT invalidates the per-pipeline baseline → reverts to the global baseline → full cascade; `lastSuccessful()` pins an ancient green. | 6 | `feedback_orchestrator_abort_baseline_rollback` |
 | 3 | **Dockerfile / build-manifest completeness** — a new Cargo target OR a new path-dep crate breaks the Docker build context but passes host pre-push; the manifest under-covers source inputs so the orchestrator under-dispatches. | 6 | `feedback_dockerfile_target_completeness`, `feedback_orchestrator_build_manifest_required` |
-| 4 | **HUSKY=0 is NON-FUNCTIONAL** — `core.hooksPath=.husky` bypasses the wrapper that honors `HUSKY=0`; the real bypass is `git push --no-verify`. (Root `CLAUDE.md` corrected 2026-06-02.) | 4 | `feedback_husky_bypass_for_ci_only_changes` |
+| 4 | **HUSKY=0 is NON-FUNCTIONAL** — `core.hooksPath=.husky` bypasses the wrapper that honors `HUSKY=0`; the real bypass is `git push --no-verify`. (Root `CLAUDE.md` corrected 2026-06-02.) **Healed 2026-09-01:** `.husky/pre-push.bash` now checks `HUSKY=0` itself, so both bypasses work. The row is kept as history. | 4 | `feedback_husky_bypass_for_ci_only_changes` |
 | 5 | **sccache / S3 cache poisons rustc output** — a `NoSuchKey`/null-byte interleaves into diagnostics → spurious "unclosed delimiter"; `RUSTC_WRAPPER=""` bypasses but the poisoned key persists (heal = `SCCACHE_RECACHE=1` / repave). | 4 | `feedback_sccache_cache_corruption_recovery`, `feedback_sccache_spawn_enoent_rca` |
 | 6 | **`#[ignore]` is a CI no-op** — the DNA sweettest stage runs `cargo nextest run --run-ignored all`; quarantine-by-`#[ignore]` still runs (and still fails) in CI, costing a full ~75-min cycle. Delete the test or change the invocation — do not annotate. | 2* | `feedback_cargo_nextest_installed` (+ the sweettest stage invocation in the DNA Jenkinsfile) |
 | 7 | **Cucumber / Gherkin parse aborts the whole E2E run** — an unescaped `/` → empty-alternation; a bare continuation line → AST reject; an empty cucumber-report → UNSTABLE with a blank body. Read the E2E log FIRST. | 4 | (a2o framework conventions; backlog: pre-push gherkin linter) |
@@ -193,6 +193,32 @@ authority is `.mjs` and the consumer is a Jenkinsfile, the binding has to be a *
 that is what now holds them together (`orchestrator-integration.test.mjs`, "ABORTED classification").
 Backlog: `backlog/ci-orchestrator-abort-misread-as-genesis-failure.md`.
 
+**A build that never entered a stage is a fourth shape, and it never tells you anything about your
+code.** Two causes produce it:
+(a) **The agent pod died pulling its image.** On 2026-06-06 an EIO on the registry volume (node
+hp-micro10) killed every CI pod at image pull. Jenkins reported `Queue task was cancelled`, which reads
+exactly like #1 supersession. Three things tell them apart: every run lasts about 75 s, none enters a
+stage, and the post-actions log `Commit: null`. Three sessions spent retrigger pushes on it. A
+retrigger cannot fix it; the registry has to heal first. The abort run #1172–#1176 recorded in
+`feedback_concurrent_push_mutual_abort` happened the same evening, so rule this shape out before
+accepting that memory's mutual-abort reading. When you check whether the registry has recovered, an
+anonymous `401` with an auth challenge only shows that its auth gate answers. Probe an authenticated
+pull.
+(b) **The Jenkinsfile does not compile.** Inside `sh """…"""`, a bare `$(` is illegal in a Groovy
+GString, because `$` must be followed by `{` or an identifier. Escape it as `\$(`. When this happens,
+every dispatch dies in about 1.3 s without entering a stage and reports FAILURE, so every "measure"
+taken in that window is stale (genesis, 2026-06-03, broken by `49bd2902d`, fixed by `1138d3af8`).
+
+**An UNSTABLE deploy stage does not mean the rollout failed.** `Deploy Edge Node - Alpha` goes
+UNSTABLE when `kubectl rollout status` reaches its 600 s deadline, even if the rollout finishes
+afterwards. Edge #1349 (2026-08-14) was UNSTABLE while `kube_pod_container_info` showed all seven pods
+on the new image digest. Read the pods' digests before you call a deploy failed. #18 is the opposite
+case, where the timeouts were real.
+*(Both paragraphs were harvested on 2026-09-22 from retired sprint-results
+`2026-06-06T19-10-honest-held-genesis-substrate-scope`, `2026-06-03T16-08-a2o-e2e-household-greenup` and
+`2026-08-14T02-42-saga-leg2-drain-regressions-profiler-eyes`, archived in
+`/projects/.claude-config/archive/shifts-stale-2026-09-22.tar.gz`.)*
+
 The second cluster (**#3/#5/#6**) is the same shape under three disguises: a check that passes on the
 host but fails in CI because the CI environment differs (Docker context, sccache wrapper, `--run-ignored
 all`). Host-green ≠ CI-green; the gap is the environment, not your code.
@@ -208,6 +234,12 @@ all`). Host-green ≠ CI-green; the gap is the environment, not your code.
   — they are resolved into backlog items, not buried in shift narration.
 - The *operator-domain* items (jenkins-deployer RBAC drift, Harbor registry SPOF, cross-ns NetworkPolicy,
   checkout reliability, cluster pressure) are operator-owned and likewise routed to backlog.
+- **Never expand a secret when you check that it exists.** `${VAR:-not set}` prints the value whenever
+  the variable is set. Use `${VAR:+set}`, or `[ -n "$VAR" ] && echo provided || echo 'not set'`. This
+  happened twice: once in a Jenkinsfile admin-key echo guard (2026-06-03), and once in a shell env check
+  that printed `JENKINS_TOKEN` to the terminal (2026-05-31). Harvested from the retired sprint-results
+  `2026-06-03T16-08-a2o-e2e-household-greenup` and `2026-05-31T03-16-doorway-routing-projection-shakeout`
+  (archive above).
 - **Fail-regime boundary (when you *do* touch the orchestrator Jenkinsfile for a real fix):** stages
   *before* dispatch (e.g. `Post Predicted Build Graph`) MAY hard-fail — a broken setup should stop
   dispatch loudly. Stages *after* dispatch are observational (`Post Actual Build Graph`, `Verify
