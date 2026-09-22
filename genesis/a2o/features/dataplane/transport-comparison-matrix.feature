@@ -53,12 +53,17 @@ Feature: Matthew can trust every supported household transport
     And every household peer completed new sync work on every selected plane
 
   @transport:staleness @transport:mixed-iroh
-  Scenario: A mixed household records iroh origin-to-projected-apply staleness
-    Matthew's device authors through peer matthew; James remains dual while Jessica receives on iroh.
+  Scenario: In a mixed household the iroh-only receiver has a new writing well inside one sync round
+    Matthew's device authors through peer matthew; James stays dual while Jessica, the receiver, runs
+    iroh only. Every peer re-syncs with every other on a 60-second round; on top of that, a dual author
+    pushes each new change straight to peers that run iroh only. So Jessica should serve the writing
+    within 10 seconds, not when the next round comes around (2026-09-22, before the direct push: 38.6s
+    on iroh against ~0.9s on libp2p). An origin-to-projected-apply sample is the age of a change, from
+    its authoring timestamp to the moment the receiving peer has applied it and serves it.
     Given Matthew and James run in "dual" mode while receiver "jessica" runs in "iroh" mode
     And the household's current transport sync counters are recorded
     And human "Matthew" is logged in on doorway "alpha" with device
     When Matthew creates content titled "Transport matrix mixed iroh" with tags "e2e,transport-matrix"
     Then the content should be created successfully
-    And every household peer serves the new document at Matthew's exact Automerge heads within 120 seconds
+    And every household peer serves the new document at Matthew's exact Automerge heads within 10 seconds
     And receiver "jessica" records new valid origin-to-projected-apply samples for the "iroh" plane

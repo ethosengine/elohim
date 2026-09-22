@@ -4365,8 +4365,42 @@ async fn async_main(
                 let (announce_tx, mut announce_rx) =
                     tokio::sync::mpsc::channel::<elohim_storage::sync::projector::LocalChange>(256);
                 let announce_cmd_tx = node.handle().command_sender();
+                // Dual mode: the same forwarder also rings iroh, scoped to book
+                // peers with no libp2p leg (a dual peer is already rung above).
+                // One projection, two announcers — no second producer races the
+                // shared SyncManager.
+                #[cfg(feature = "p2p-iroh")]
+                let dual_iroh_announce_tx: Option<
+                    tokio::sync::mpsc::Sender<elohim_storage::sync::projector::LocalChange>,
+                > = match (_iroh_node.as_ref(), iroh_peer_book.as_ref()) {
+                    (Some(iroh_n), Some(book)) => {
+                        let (tx, rx) = tokio::sync::mpsc::channel::<
+                            elohim_storage::sync::projector::LocalChange,
+                        >(256);
+                        elohim_storage::p2p_iroh::spawn_iroh_announce_bridge(
+                            elohim_storage::p2p_iroh::IrohAnnounceInputs {
+                                endpoint: iroh_n.endpoint().clone(),
+                                book: book.clone(),
+                                sync_manager: node.sync_manager().clone(),
+                                scope: elohim_storage::p2p_iroh::AnnounceScope::IrohOnlyPeers,
+                            },
+                            rx,
+                        );
+                        info!("dual announce: iroh bridge spawned for iroh-only book peers");
+                        Some(tx)
+                    }
+                    _ => None,
+                };
                 tokio::spawn(async move {
                     while let Some(change) = announce_rx.recv().await {
+                        #[cfg(feature = "p2p-iroh")]
+                        if let Some(ref iroh_tx) = dual_iroh_announce_tx {
+                            if iroh_tx.try_send(change.clone()).is_err() {
+                                tracing::debug!(
+                                    "dual announce: iroh bridge queue full, the sync round will carry the change"
+                                );
+                            }
+                        }
                         if announce_cmd_tx
                             .try_send(elohim_storage::p2p::P2PCommand::AnnounceLocalChange {
                                 doc_id: change.doc_id,
@@ -4505,12 +4539,10 @@ async fn async_main(
                     // a push that fails, times out, or lands on a peer missing the
                     // change's dependencies costs latency, never correctness.
                     //
-                    // Wired in THIS arm only — `p2p_node.is_none()` is pure-iroh.
-                    // In Dual mode the libp2p arm above owns the one producer (and
-                    // both stacks share one `Arc<SyncManager>`), so exactly one
-                    // plane rings per change and there is no redundant fan-out to
-                    // bound. See `p2p_iroh::announce_change` for the full rationale
-                    // and the iroh-only-peer trade it names.
+                    // This arm is pure-iroh (`p2p_node.is_none()`) and rings every
+                    // book peer. In Dual mode the libp2p arm above owns the one
+                    // producer and rings iroh-only peers from its own forwarder.
+                    // See `p2p_iroh::announce_change`.
                     let iroh_announce_tx = match (_iroh_node.as_ref(), iroh_peer_book.as_ref()) {
                         (Some(iroh_n), Some(book)) => {
                             let (tx, rx) = tokio::sync::mpsc::channel::<
@@ -4521,6 +4553,7 @@ async fn async_main(
                                     endpoint: iroh_n.endpoint().clone(),
                                     book: book.clone(),
                                     sync_manager: iroh_sync.clone(),
+                                    scope: elohim_storage::p2p_iroh::AnnounceScope::AllBookPeers,
                                 },
                                 rx,
                             );

@@ -49,7 +49,9 @@ pub mod sync_driver;
 pub mod view_fed;
 pub mod view_fed_backend;
 
-pub use announce_change::{announce_local_change, spawn_iroh_announce_bridge, IrohAnnounceInputs};
+pub use announce_change::{
+    announce_local_change, spawn_iroh_announce_bridge, AnnounceScope, IrohAnnounceInputs,
+};
 pub use announcer::{spawn_transport_manifest_announcer, AnnouncerInputs};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
