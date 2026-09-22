@@ -2216,6 +2216,47 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         state.args.listen, state.args.node_id
     );
 
+    // Optional TLS listener (story 5.2 — the doorway terminates its own TLS
+    // beside the plain listener above, serving the exact same router via
+    // `serve_connection`). `Args::validate()` already rejected a partial
+    // declaration at boot, so `tls_port` set here means cert_file/key_file
+    // are both `Some` too. A present-but-invalid cert/key pair aborts boot
+    // loudly — the same contract `node_identity::load_or_generate` uses for
+    // DOORWAY_NODE_KEY_FILE (story 5.1) — rather than silently degrading to
+    // plaintext-only. No cert issuance or rotation here (that's 5.3).
+    if let Some(port) = state.args.tls_port {
+        let cert_file = state
+            .args
+            .tls_cert_file
+            .as_ref()
+            .expect("Args::validate() guarantees all-or-none TLS declaration");
+        let key_file = state
+            .args
+            .tls_key_file
+            .as_ref()
+            .expect("Args::validate() guarantees all-or-none TLS declaration");
+        match crate::tls::load_server_config(cert_file, key_file) {
+            Ok(tls_config) => {
+                let mut tls_addr = state.args.listen;
+                tls_addr.set_port(port);
+                spawn_tls_listener(Arc::clone(&state), tls_addr, tls_config);
+            }
+            Err(e) => {
+                error!(
+                    cert = %cert_file.display(),
+                    key = %key_file.display(),
+                    error = %e,
+                    "Failed to load TLS certificate/key pair from DOORWAY_TLS_CERT_FILE / \
+                     DOORWAY_TLS_KEY_FILE; aborting boot rather than silently serving \
+                     plaintext-only"
+                );
+                return Err(DoorwayError::Config(format!(
+                    "TLS listener config invalid: {e}"
+                )));
+            }
+        }
+    }
+
     // Liveness watchdog (opt-in via DOORWAY_HEALTH_PORT): stamp a heartbeat from
     // the MAIN runtime and serve the liveness probe from a dedicated OS-thread
     // runtime, so a full worker-pool stall (e.g. blocking getaddrinfo during a
@@ -2345,99 +2386,158 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 let state = Arc::clone(&state);
-                tokio::spawn(async move {
-                    let io = TokioIo::new(stream);
-
-                    let service = service_fn(move |req: Request<Incoming>| {
-                        let state = Arc::clone(&state);
-                        async move {
-                            // Extract CORS context at the outermost level so every
-                            // response — including early returns — gets CORS headers.
-                            let request_origin: Option<String> = req
-                                .headers()
-                                .get(hyper::header::ORIGIN)
-                                .and_then(|v| v.to_str().ok())
-                                .map(|s| s.to_string());
-                            let cors_config = state.cors_config.clone();
-
-                            if req.method() == hyper::Method::OPTIONS {
-                                let resp: Result<Response<BoxBody>, hyper::Error> =
-                                    Ok(to_boxed(crate::cors::preflight_response(
-                                        &cors_config,
-                                        request_origin.as_deref(),
-                                    )));
-                                return resp;
-                            }
-
-                            // R1 — the Chain-R PARENT hop: whole inbound request,
-                            // entry to response. Timed HERE, at the single call
-                            // site, rather than inside `handle_request`, because
-                            // that function has many early returns and each one
-                            // would need its own timer — a shape that goes stale
-                            // the first time someone adds a return.
-                            //
-                            // `route_class` is a CLOSED set (service | epr | ws |
-                            // asset), never the raw path: a path label would make
-                            // this series unbounded in cardinality and turn the
-                            // instrument into the outage it exists to prevent.
-                            let hop_started = std::time::Instant::now();
-                            let hop_route_class =
-                                crate::metrics::classify_route(req.method(), req.uri().path());
-                            let response = handle_request(state, addr, req).await?;
-                            let hop_elapsed = hop_started.elapsed();
-                            let hop_outcome = if response.status().is_success() {
-                                "ok"
-                            } else if response.status().as_u16() == 503 {
-                                // Distinguished because a shed is the dominant
-                                // slow path on this fleet and must not be averaged
-                                // into healthy serves.
-                                "shed"
-                            } else {
-                                "err"
-                            };
-                            crate::metrics::observe_hop(
-                                crate::metrics::DoorwayHop::Serve,
-                                hop_route_class,
-                                hop_outcome,
-                                hop_elapsed,
-                            );
-                            // Self-reported elapsed, so a downstream prober can
-                            // compute (client RTT - serve) without differencing
-                            // two clocks. Container clocks here skew by hours;
-                            // a timestamp-differenced residual is poison by
-                            // construction. Joins the existing `x-ssr-*` header
-                            // convention.
-                            let mut response = response;
-                            if let Ok(v) = hyper::header::HeaderValue::from_str(&format!(
-                                "{:.3}",
-                                hop_elapsed.as_secs_f64() * 1_000.0
-                            )) {
-                                response.headers_mut().insert("x-elohim-hop-serve-ms", v);
-                            }
-                            Ok(crate::cors::apply_cors_headers(
-                                &cors_config,
-                                request_origin.as_deref(),
-                                response,
-                            ))
-                        }
-                    });
-
-                    if let Err(err) = http1::Builder::new()
-                        .preserve_header_case(true)
-                        .title_case_headers(true)
-                        .serve_connection(io, service)
-                        .with_upgrades()
-                        .await
-                    {
-                        error!("Error serving connection from {}: {:?}", addr, err);
-                    }
-                });
+                tokio::spawn(serve_connection(stream, addr, state));
             }
             Err(e) => {
                 error!("Error accepting connection: {:?}", e);
             }
         }
     }
+}
+
+/// Serve one accepted connection through the shared request pipeline — CORS,
+/// the R1 hop-timing instrument, and `handle_request` dispatch. Generic over
+/// the transport so both the plain listener above (`TcpStream`) and the TLS
+/// listener below (`tokio_rustls::server::TlsStream<TcpStream>`, story 5.2)
+/// call the exact same code: the TLS listener terminates rustls and then
+/// rejoins this one pipeline, so the two fronts can never diverge in routing
+/// behavior — it is one router with two doors, not two routers.
+async fn serve_connection<IO>(stream: IO, addr: SocketAddr, state: Arc<AppState>)
+where
+    IO: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+    let io = TokioIo::new(stream);
+
+    let service = service_fn(move |req: Request<Incoming>| {
+        let state = Arc::clone(&state);
+        async move {
+            // Extract CORS context at the outermost level so every
+            // response — including early returns — gets CORS headers.
+            let request_origin: Option<String> = req
+                .headers()
+                .get(hyper::header::ORIGIN)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let cors_config = state.cors_config.clone();
+
+            if req.method() == hyper::Method::OPTIONS {
+                let resp: Result<Response<BoxBody>, hyper::Error> = Ok(to_boxed(
+                    crate::cors::preflight_response(&cors_config, request_origin.as_deref()),
+                ));
+                return resp;
+            }
+
+            // R1 — the Chain-R PARENT hop: whole inbound request,
+            // entry to response. Timed HERE, at the single call
+            // site, rather than inside `handle_request`, because
+            // that function has many early returns and each one
+            // would need its own timer — a shape that goes stale
+            // the first time someone adds a return.
+            //
+            // `route_class` is a CLOSED set (service | epr | ws |
+            // asset), never the raw path: a path label would make
+            // this series unbounded in cardinality and turn the
+            // instrument into the outage it exists to prevent.
+            let hop_started = std::time::Instant::now();
+            let hop_route_class = crate::metrics::classify_route(req.method(), req.uri().path());
+            let response = handle_request(state, addr, req).await?;
+            let hop_elapsed = hop_started.elapsed();
+            let hop_outcome = if response.status().is_success() {
+                "ok"
+            } else if response.status().as_u16() == 503 {
+                // Distinguished because a shed is the dominant
+                // slow path on this fleet and must not be averaged
+                // into healthy serves.
+                "shed"
+            } else {
+                "err"
+            };
+            crate::metrics::observe_hop(
+                crate::metrics::DoorwayHop::Serve,
+                hop_route_class,
+                hop_outcome,
+                hop_elapsed,
+            );
+            // Self-reported elapsed, so a downstream prober can
+            // compute (client RTT - serve) without differencing
+            // two clocks. Container clocks here skew by hours;
+            // a timestamp-differenced residual is poison by
+            // construction. Joins the existing `x-ssr-*` header
+            // convention.
+            let mut response = response;
+            if let Ok(v) = hyper::header::HeaderValue::from_str(&format!(
+                "{:.3}",
+                hop_elapsed.as_secs_f64() * 1_000.0
+            )) {
+                response.headers_mut().insert("x-elohim-hop-serve-ms", v);
+            }
+            Ok(crate::cors::apply_cors_headers(
+                &cors_config,
+                request_origin.as_deref(),
+                response,
+            ))
+        }
+    });
+
+    if let Err(err) = http1::Builder::new()
+        .preserve_header_case(true)
+        .title_case_headers(true)
+        .serve_connection(io, service)
+        .with_upgrades()
+        .await
+    {
+        error!("Error serving connection from {}: {:?}", addr, err);
+    }
+}
+
+/// Spawn the optional TLS listener (story 5.2 — `DOORWAY_TLS_PORT` /
+/// `DOORWAY_TLS_CERT_FILE` / `DOORWAY_TLS_KEY_FILE`). Binds its own port and,
+/// per accepted connection, completes the rustls handshake before handing the
+/// resulting `TlsStream` to the SAME `serve_connection` pipeline the plain
+/// listener uses — a second front door onto one router, not a second
+/// gateway. A bind failure disables https for this boot without taking down
+/// the plain listener (the cert/key pair itself was already validated by the
+/// caller before this is invoked).
+fn spawn_tls_listener(
+    state: Arc<AppState>,
+    addr: SocketAddr,
+    tls_config: Arc<rustls::ServerConfig>,
+) {
+    let acceptor = tokio_rustls::TlsAcceptor::from(tls_config);
+    tokio::spawn(async move {
+        let listener = match TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                error!(
+                    "TLS listener failed to bind {}: {} — https disabled for this boot",
+                    addr, e
+                );
+                return;
+            }
+        };
+        info!("Doorway TLS listening on {}", addr);
+        loop {
+            match listener.accept().await {
+                Ok((stream, peer_addr)) => {
+                    let acceptor = acceptor.clone();
+                    let state = Arc::clone(&state);
+                    tokio::spawn(async move {
+                        match acceptor.accept(stream).await {
+                            Ok(tls_stream) => {
+                                serve_connection(tls_stream, peer_addr, state).await;
+                            }
+                            Err(e) => {
+                                debug!("TLS handshake failed from {}: {:?}", peer_addr, e);
+                            }
+                        }
+                    });
+                }
+                Err(e) => {
+                    error!("TLS listener accept error: {:?}", e);
+                }
+            }
+        }
+    });
 }
 
 /// Wisdom-as-system-auth gate check for every state-changing HTTP request.
