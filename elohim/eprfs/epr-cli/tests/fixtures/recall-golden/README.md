@@ -1,7 +1,8 @@
 # Recall golden capture — station zero
 
-Task 0.1 of the governed-discovery stations 0–3 plan
-(`.superpowers/sdd/2026-09-11-governed-discovery-stations-0-3-plan/task-0.1-brief.md`):
+Task 0.1 of the governed-discovery stations 0–3 plan (from the repository root:
+`genesis/docs/superpowers/plans/2026-09-11-governed-discovery-stations-0-3-plan.md`; the task's
+working brief was an untracked scratch file and no longer exists):
 pin today's rendering of `elohim/eprfs/epr-cli/src/flow/memory/recall.rs` by digest, before
 any function in it moves. `tests/flow_memory_recall_golden.rs` runs the shipped `epr` binary
 against the station-five fixture (`tests/common/mod.rs`'s `repo()`) and asserts the sha256 of
@@ -9,9 +10,24 @@ three renderings against the pinned constants below. When a later station's spli
 digest, that is either a real regression (fix the split) or an intentional rendering change
 (re-baseline here, in a commit that says why).
 
+**How to read this file.** It is three things in order: a reference (what is pinned and how it
+was captured), a runbook (**Re-baselining**, below the normalization note), and a dated history
+of every re-baseline. If your golden test just failed, go to **Re-baselining**. The `GOLDEN_*`
+constants in `tests/flow_memory_recall_golden.rs` are authoritative; the table here mirrors them
+and is updated in the same commit.
+
+Terms the history uses. *Stations* are the numbered steps of the plan that split the recall
+executor into smaller files; station zero pinned today's output before anything moved, and the
+fixture predates that plan — an earlier plan's fifth station built it — and lives entirely in
+`tests/common/mod.rs` (`repo()`: a small repository with two stale citation edges). The *recall entry* is `epr flow memory recall`; its *contract*
+(`recall-contract.json`) is the declared algorithm, and its content hash (CID) is printed on
+every view as the *recipe*, so any contract edit moves every digest. A *lens* is the reader's
+detail level, which bounds how much a view prints; a *floor* is a line no lens ever suppresses.
+
 ## Captured
 
-- Source commit: `f8e1aaa700c19c5eeeeeb6b3571917211bc83f43`
+- Source commit (the original station-zero capture; each later re-baseline names its own reason
+  in the newest dated entry below): `f8e1aaa700c19c5eeeeeb6b3571917211bc83f43`
 - `epr` binary (debug, `CARGO_TARGET_DIR=/tmp/eprfs-gate-target`) sha256:
   `03377c027d2f83b750c3cd70e7dfc3dd723d1fce8f6815f9a38655a0a1d6da13`
 - Capture command:
@@ -56,6 +72,11 @@ failing test — `focused_open_is_byte_identical`, `whole_open_is_byte_identical
 `refusal_is_byte_identical`, in that order when run single-threaded), paste them into the
 `GOLDEN_*` constants, and update this table plus the source commit. A re-baseline commit must
 say *why* the rendering changed.
+
+Done when `cargo test --manifest-path elohim/eprfs/Cargo.toml -p elohim-epr-cli --test
+flow_memory_recall_golden` (with the capture command's environment) reports all three tests
+passing. (`left:` is the value `assert_eq!` actually produced; `right:` is the pinned one.)
+
 
 ## 2026-09-11 — station 1 (Task 1.1)
 
