@@ -26,7 +26,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, execSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -567,14 +567,18 @@ describe('against this repository (real git, real manifests)', () => {
     assert.ok(!out.groups[BUILT].pipelines.includes('elohim-genesis'));
   });
 
-  test('elohim-sophia has no manifest here, so it can never be filtered', { skip: !have }, async () => {
+  test('a pipeline with a missing manifest cannot be filtered', { skip: !have }, async (t) => {
+    // Submodule initialization varies between developer and push checkouts.
+    // Exercise real manifest discovery against an explicitly empty fixture.
+    const manifestRoot = mkdtempSync(join(tmpdir(), 'dispatch-missing-manifest-'));
+    t.after(() => rmSync(manifestRoot, { recursive: true, force: true }));
     const out = await planNarrowGroups(
       {
         ...state,
         pipelines: ['elohim-sophia'],
         baselines: { __global__: GLOBAL, 'elohim-sophia': BUILT },
       },
-      defaultDeps(ROOT),
+      { ...defaultDeps(ROOT), provenanceOf: defaultDeps(manifestRoot).provenanceOf },
     );
     assert.deepEqual(out.groups, {});
     assert.match(out.notes['elohim-sophia'], /provenance unknown/);
