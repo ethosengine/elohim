@@ -1,12 +1,13 @@
 //! Discovery — the deterministic local traversal that is the pinned recipe's default provider
 //! (`discover`/`discover_scored`), plus the focused door that ranks it by a question's terms
-//! (`first_screen`, `matching_habits`, `focus_area`) and the outline machinery that locates a
-//! term inside a source once discovery has named it a candidate (`outline`, `best_section`).
+//! (`first_screen`, `matching_habits`, `focus_area`). Locating a term INSIDE a source once
+//! discovery has named it a candidate (`outline`, `best_section`) lives in `passage.rs`.
 //!
 //! Moved out of `mod.rs` verbatim (governed-discovery station zero, task 0.4) so `providers.rs`
 //! can wrap the traversal in the `Provider` trait without the two seams sharing one 3,700-line
 //! file. Behaviour is unchanged — only the location moved, plus two visibility widenings
 //! (`first_screen`, `outline`) so `mod.rs`'s `execute()` can still reach them.
+use super::passage::best_section;
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -24,7 +25,39 @@ pub fn discover(
     group_by: &str,
     name: &str,
 ) -> FlowResult<Value> {
-    discover_scored(root, contract, scope, query, &[], tags, group_by, name)
+    discover_scored(
+        root,
+        contract,
+        scope,
+        query,
+        &[],
+        tags,
+        group_by,
+        &[name.to_string()],
+    )
+}
+
+/// Suffixes light stemming strips, longest first (`discovery.stemming = "suffix-strip-v1"`) —
+/// tried in this order so an `"ings"`-shaped tail strips as `"ing"`, not as the plain `"s"` that
+/// would leave a spurious trailing `"g"`.
+const STEM_SUFFIXES: [&str; 4] = ["ing", "es", "ed", "s"];
+
+/// The stem of `term` when stripping the first matching [`STEM_SUFFIXES`] entry leaves at least
+/// four characters, else `term` itself. `"habits"` -> `"habit"` (kept: 5 chars); `"stamps"` ->
+/// `"stamp"` (kept: 5 chars); `"cid"` (no matching suffix) -> `"cid"` unchanged; `"mined"` ->
+/// `"min"` is BELOW the four-character floor, so it is left unstemmed rather than reduced to a
+/// fragment common enough to match nearly everything. A literal suffix strip, not a lexical
+/// dictionary — it will miss irregular inflections (`"prove"`/`"proof"`) it was never asked to
+/// know, and that is the declared, modest shape of it.
+pub(super) fn stem(term: &str) -> &str {
+    for suffix in STEM_SUFFIXES {
+        if let Some(stripped) = term.strip_suffix(suffix) {
+            if stripped.chars().count() >= 4 {
+                return stripped;
+            }
+        }
+    }
+    term
 }
 
 /// The same bounded traversal, ranked by how many of `terms` a row's declared metadata carries.
@@ -43,13 +76,20 @@ pub fn discover_scored(
     terms: &[String],
     tags: &[String],
     group_by: &str,
-    name: &str,
+    names: &[String],
 ) -> FlowResult<Value> {
     let base = contained(root, scope, &contract.source_roots())?;
     if !base.is_dir() {
         return Err(refused("discovery scope must be a directory"));
     }
-    let pattern = glob::Pattern::new(name).map_err(|_| refused("--name is not a valid glob"))?;
+    // S1 (2026-09-22): one or more declared globs, matched in the SAME single traversal and
+    // charged to the SAME scan/body-scan budget below — never a second read per glob, never a
+    // wider window. `first_screen` is the caller that passes more than one (the contract's
+    // `discovery.first_screen_globs`); every other caller still passes exactly one, unchanged.
+    let mut patterns = Vec::with_capacity(names.len());
+    for name in names {
+        patterns.push(glob::Pattern::new(name).map_err(|_| refused("--name is not a valid glob"))?);
+    }
     let excluded: BTreeSet<String> = contract
         .value
         .pointer("/discovery/exclude_directories")
@@ -151,7 +191,7 @@ pub fn discover_scored(
                 }
                 continue;
             }
-            if !pattern.matches(&file_name) || !file_name.ends_with(".md") || !meta.is_file() {
+            if !patterns.iter().any(|p| p.matches(&file_name)) || !meta.is_file() {
                 continue;
             }
             scanned_files += 1;
@@ -180,83 +220,126 @@ pub fn discover_scored(
                 unreadable.push(relative);
                 continue;
             };
-            let Some(header) = frontmatter_header(&head, head.len(), meta.len() as usize) else {
-                // A document that opens `---` and whose boundary this read could not prove is a
-                // candidate we could not read. A file with no frontmatter at all is not a candidate
-                // in the first place, and is passed over as it always was.
-                if head.starts_with("---\n") {
-                    // Only a read that actually hit its cap can be blamed on the budget; anything
-                    // shorter simply has no closing delimiter.
-                    budget_cut |= head_len >= metadata_bytes;
+            // S1 (2026-09-22): the `---` frontmatter fence is a GOVERNANCE-DOC convention — a
+            // `.md` file always carries one (or is not a candidate, unchanged from before). Every
+            // other declared glob (`.py`/`.json`/`.yaml`/`.rs`/`.feature`/…) was never expected to
+            // carry one: widening `first_screen_globs` to reach them only matters if they can
+            // become candidates AT ALL, so a non-`.md` file with no fence becomes a BARE
+            // candidate instead of being silently excluded the way the fence requirement always
+            // excluded it — title = filename, no declared tags/description/content_class, and its
+            // whole bounded read stands in for both the "declared" and "body" text a frontmatter'd
+            // `.md` splits in two.
+            let is_markdown = file_name.to_ascii_lowercase().ends_with(".md");
+            let has_fence = head.starts_with("---\n");
+            let (title, description, actual_tags, content_class, text, header_bytes);
+            if has_fence || is_markdown {
+                let Some(header) = frontmatter_header(&head, head.len(), meta.len() as usize)
+                else {
+                    // A document that opens `---` and whose boundary this read could not prove is
+                    // a candidate we could not read. A `.md` file with no frontmatter at all is
+                    // not a candidate in the first place, and is passed over as it always was.
+                    if head.starts_with("---\n") {
+                        // Only a read that actually hit its cap can be blamed on the budget;
+                        // anything shorter simply has no closing delimiter.
+                        budget_cut |= head_len >= metadata_bytes;
+                        unreadable.push(relative);
+                    }
+                    continue;
+                };
+                if truncated {
+                    partially_scanned += 1;
+                }
+                // The body window is the whole read, trimmed the same way; the header slice above
+                // is a prefix of it, so `header.len()` still indexes correctly.
+                let whole = if head_len == data.len() {
+                    head
+                } else {
+                    match trim_to_character_boundary(&data) {
+                        Some(whole) => whole,
+                        None => head,
+                    }
+                };
+                let Ok(meta_value) = serde_yaml::from_str::<serde_yaml::Value>(&header[4..]) else {
                     unreadable.push(relative);
-                }
-                continue;
-            };
-            if truncated {
-                partially_scanned += 1;
-            }
-            // The body window is the whole read, trimmed the same way; the header slice above is a
-            // prefix of it, so `header.len()` still indexes correctly.
-            let text = if head_len == data.len() {
-                head
+                    continue;
+                };
+                let Some(mapping) = meta_value.as_mapping() else {
+                    continue;
+                };
+                // Field lookup by iteration rather than `Mapping::get`, so the reader does not
+                // depend on which `Index` impls a given serde_yaml minor happens to expose.
+                let field = |key: &str| {
+                    mapping
+                        .iter()
+                        .find(|(k, _)| k.as_str() == Some(key))
+                        .map(|(_, v)| v)
+                };
+                let tags_field = match field("tags") {
+                    None => Some(Vec::new()),
+                    Some(serde_yaml::Value::Sequence(items)) => items
+                        .iter()
+                        .map(|item| item.as_str().map(str::to_string))
+                        .collect::<Option<Vec<String>>>(),
+                    Some(_) => None,
+                };
+                // A `tags:` field that is not a list of strings is not category membership; the
+                // row is skipped rather than coerced, exactly as the oracle skips it.
+                let Some(tags_field) = tags_field else {
+                    continue;
+                };
+                title = field("title")
+                    .and_then(|v| v.as_str().map(str::to_string))
+                    .unwrap_or_else(|| file_name.clone());
+                description = field("description")
+                    .and_then(|v| v.as_str().map(str::to_string))
+                    .unwrap_or_default();
+                // The content floor's own field (governed-discovery station 1.2, `render.rs`
+                // `RenderFloor::declared`'s `unfilterable`): a correction/counter-evidence/
+                // accountability/own-community candidate is read here, from declared frontmatter
+                // only, so the render layer can keep it past a narrow lens's `choice_count`
+                // without re-reading the source. Absent frontmatter is honest absence (`None`),
+                // never a guessed default — an ordinary document with no opinion on its own class
+                // is not silently classed as unfilterable.
+                content_class = field("content_class").and_then(|v| v.as_str().map(str::to_string));
+                actual_tags = tags_field;
+                header_bytes = header.as_bytes().to_vec();
+                text = whole;
             } else {
-                match trim_to_character_boundary(&data) {
-                    Some(text) => text,
-                    None => head,
+                // Bare candidate: no frontmatter to declare a title/tags/description, so the WHOLE
+                // bounded read stands in as its own "declared and body" text — a code/config
+                // file's filename is the only metadata it has.
+                if truncated {
+                    partially_scanned += 1;
                 }
-            };
-            let Ok(meta_value) = serde_yaml::from_str::<serde_yaml::Value>(&header[4..]) else {
-                unreadable.push(relative);
-                continue;
-            };
-            let Some(mapping) = meta_value.as_mapping() else {
-                continue;
-            };
-            // Field lookup by iteration rather than `Mapping::get`, so the reader does not depend
-            // on which `Index` impls a given serde_yaml minor happens to expose.
-            let field = |key: &str| {
-                mapping
-                    .iter()
-                    .find(|(k, _)| k.as_str() == Some(key))
-                    .map(|(_, v)| v)
-            };
-            let actual_tags = match field("tags") {
-                None => Some(Vec::new()),
-                Some(serde_yaml::Value::Sequence(items)) => items
-                    .iter()
-                    .map(|item| item.as_str().map(str::to_string))
-                    .collect::<Option<Vec<String>>>(),
-                Some(_) => None,
-            };
-            // A `tags:` field that is not a list of strings is not category membership; the row is
-            // skipped rather than coerced, exactly as the oracle skips it.
-            let Some(actual_tags) = actual_tags else {
-                continue;
-            };
-            let title = field("title")
-                .and_then(|v| v.as_str().map(str::to_string))
-                .unwrap_or_else(|| file_name.clone());
-            let description = field("description")
-                .and_then(|v| v.as_str().map(str::to_string))
-                .unwrap_or_default();
-            // The content floor's own field (governed-discovery station 1.2, `render.rs`
-            // `RenderFloor::declared`'s `unfilterable`): a correction/counter-evidence/
-            // accountability/own-community candidate is read here, from declared frontmatter
-            // only, so the render layer can keep it past a narrow lens's `choice_count` without
-            // re-reading the source. Absent frontmatter is honest absence (`None`), never a
-            // guessed default — an ordinary document with no opinion on its own class is not
-            // silently classed as unfilterable.
-            let content_class = field("content_class").and_then(|v| v.as_str().map(str::to_string));
+                let whole = if head_len == data.len() {
+                    head
+                } else {
+                    match trim_to_character_boundary(&data) {
+                        Some(whole) => whole,
+                        None => head,
+                    }
+                };
+                title = file_name.clone();
+                description = String::new();
+                actual_tags = Vec::new();
+                content_class = None;
+                header_bytes = Vec::new();
+                text = whole;
+            }
             // The bytes after the closing delimiter were ALREADY READ under `metadata_bytes`.
             // Matching them costs no second read and no wider budget, and it is where an agent's
             // own words actually live: a fresh reader asking "re-mine", "marker", "stamp" on
             // 2026-09-11 got zero candidates over a corpus whose bodies say all three, because
-            // discovery only ever looked at declared metadata.
-            let body_prefix = text
-                .get(header.len()..)
-                .and_then(|rest| rest.split_once('\n'))
-                .map(|(_, body)| body)
-                .unwrap_or_default();
+            // discovery only ever looked at declared metadata. A bare candidate has no header to
+            // skip past — its whole bounded read stands in as the "body" too.
+            let body_prefix = if header_bytes.is_empty() {
+                text.as_str()
+            } else {
+                text.get(header_bytes.len()..)
+                    .and_then(|rest| rest.split_once('\n'))
+                    .map(|(_, body)| body)
+                    .unwrap_or_default()
+            };
             let declared = [
                 relative.as_str(),
                 title.as_str(),
@@ -282,13 +365,18 @@ pub fn discover_scored(
             let mut matched_terms: Map<String, Value> = Map::new();
             for term in terms {
                 let needle = term.to_lowercase();
-                let in_path = relative.to_lowercase().contains(&needle);
-                let in_title = title.to_lowercase().contains(&needle);
-                let in_description = description.to_lowercase().contains(&needle);
-                let in_tag = actual_tags
-                    .iter()
-                    .any(|t| t.to_lowercase().contains(&needle));
-                let in_body = body.contains(&needle);
+                // S1 (2026-09-22, `discovery.stemming`): a term also matches via its STEM (see
+                // `stem` below this function) — a candidate carrying only the base form of an
+                // inflected term the reader typed (`habits` -> `habit`) is not a miss.
+                let stemmed = stem(&needle);
+                let hits = |haystack: &str| {
+                    haystack.contains(&needle) || (stemmed != needle && haystack.contains(stemmed))
+                };
+                let in_path = hits(&relative.to_lowercase());
+                let in_title = hits(&title.to_lowercase());
+                let in_description = hits(&description.to_lowercase());
+                let in_tag = actual_tags.iter().any(|t| hits(&t.to_lowercase()));
+                let in_body = hits(&body);
                 if in_path {
                     kinds.insert("path");
                 }
@@ -306,8 +394,14 @@ pub fn discover_scored(
                 }
                 // How OFTEN, not merely whether: a document that names the concern once in
                 // passing and one that is about it are not equal evidence, and the occurrences are
-                // already inside the bytes this read covered.
-                let occurrences = declared.matches(&needle).count() + body.matches(&needle).count();
+                // already inside the bytes this read covered. The exact needle is counted first;
+                // its stem is counted only when the exact needle never occurred at all, so a
+                // literal hit is never inflated by also counting its own stem's substrings.
+                let mut occurrences =
+                    declared.matches(&needle).count() + body.matches(&needle).count();
+                if occurrences == 0 && stemmed != needle {
+                    occurrences = declared.matches(stemmed).count() + body.matches(stemmed).count();
+                }
                 if in_path || in_title || in_description || in_tag {
                     declared_hits += 1;
                     matched_terms.insert(
@@ -325,6 +419,15 @@ pub fn discover_scored(
             if !terms.is_empty() && declared_hits + body_only_hits == 0 {
                 continue;
             }
+            // Fingerprint the same bytes the ORIGINAL frontmatter-only reader always did — its
+            // declared header — and, for a bare candidate with no header at all, its whole bounded
+            // read stands in (never a slice at an arbitrary byte offset, which risks landing
+            // mid-character in a string this function did not itself prove a boundary for).
+            let fingerprint_bytes: Vec<u8> = if header_bytes.is_empty() {
+                text.as_bytes().to_vec()
+            } else {
+                header_bytes.clone()
+            };
             candidates.push(json!({
                 "path": relative,
                 "title": title,
@@ -336,7 +439,7 @@ pub fn discover_scored(
                 "matched_terms": matched_terms,
                 "match_scope": "declared frontmatter and the bounded body prefix this read already \
                                 covered; a body hit beyond the metadata budget is not visible here",
-                "metadata_fingerprint": hex(&Sha256::digest(header.as_bytes())),
+                "metadata_fingerprint": hex(&Sha256::digest(&fingerprint_bytes)),
             }));
             if candidates.len() >= collect_cap {
                 frontier.push("result window reached; remaining corpus not inspected".into());
@@ -487,28 +590,82 @@ pub fn discover_scored(
 pub const HABITS_REL: &str = "genesis/manifests/habits.yaml";
 
 /// Words that carry no area, so they never select a habit or a source.
-const STOPWORDS: [&str; 40] = [
+const STOPWORDS: [&str; 49] = [
     "about", "after", "again", "against", "because", "before", "being", "between", "could", "does",
-    "doing", "down", "from", "does", "have", "here", "how", "into", "just", "like", "make", "more",
-    "most", "much", "must", "only", "other", "over", "same", "should", "some", "such", "than",
-    "that", "them", "then", "there", "this", "were", "what",
+    "doing", "down", "from", "have", "here", "how", "into", "just", "like", "make", "more", "most",
+    "much", "must", "only", "other", "over", "same", "should", "some", "such", "than", "that",
+    "their", "them", "then", "there", "they", "this", "were", "what", "when", "where", "which",
+    "while", "will", "with", "would", "your",
 ];
 
+/// The contract's declared vocabulary of short (<4 char) tokens worth keeping as terms
+/// (`discovery.short_terms`) — undeclared short tokens stay noise (a bare `ci` or `pr` loose in
+/// ordinary prose would otherwise flood matching). Absent on an older contract reads as empty, so
+/// a pre-S1 contract keeps today's "drop every short token" behaviour exactly.
+fn short_terms(contract: &Contract) -> BTreeSet<String> {
+    contract
+        .value
+        .pointer("/discovery/short_terms")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_ascii_lowercase)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
 /// The question's distinctive terms: what an area match is made of.
-fn question_terms(need: &str) -> Vec<String> {
+///
+/// A token under four characters is kept only when the contract's `discovery.short_terms`
+/// declares it (`fn short_terms`) — that is what lets `top`/`red` survive tokenizing "Which habit
+/// is top red right now" without every three-letter word in ordinary prose becoming a term. Two
+/// ADJACENT declared-short tokens in the source text (`top red`) also mint the two-word phrase as
+/// an additional term, matched as a phrase by the ordinary substring matching every other term
+/// already uses — no separate phrase-matching code path.
+pub(super) fn question_terms(contract: &Contract, need: &str) -> Vec<String> {
+    let allowed_short = short_terms(contract);
+    let is_kept_short = |term: &str| -> bool {
+        !term.is_empty()
+            && term.len() < 4
+            && allowed_short.contains(term)
+            && !STOPWORDS.contains(&term)
+    };
+    let raw_tokens: Vec<String> = need
+        .split(|c: char| {
+            !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/' || c == '.')
+        })
+        .map(|raw| {
+            raw.trim_matches(|c| c == '.' || c == '/')
+                .to_ascii_lowercase()
+        })
+        .collect();
+
     let mut seen: Vec<String> = Vec::new();
-    for raw in need.split(|c: char| {
-        !(c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '/' || c == '.')
-    }) {
-        let term = raw
-            .trim_matches(|c| c == '.' || c == '/')
-            .to_ascii_lowercase();
-        if term.len() < 4 || STOPWORDS.contains(&term.as_str()) || seen.contains(&term) {
+    for (index, term) in raw_tokens.iter().enumerate() {
+        if term.is_empty() || STOPWORDS.contains(&term.as_str()) || seen.contains(term) {
             continue;
         }
-        seen.push(term);
-        if seen.len() >= 12 {
-            break;
+        let keep = term.len() >= 4 || allowed_short.contains(term.as_str());
+        if keep {
+            seen.push(term.clone());
+            if seen.len() >= 12 {
+                break;
+            }
+        }
+        if is_kept_short(term) {
+            if let Some(next) = raw_tokens.get(index + 1) {
+                if is_kept_short(next) {
+                    let phrase = format!("{term} {next}");
+                    if !seen.contains(&phrase) {
+                        seen.push(phrase);
+                        if seen.len() >= 12 {
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     seen
@@ -676,6 +833,24 @@ fn focus_area(root: &Path, contract: &Contract, scope: &str, terms: &[String]) -
 ///
 /// Whole-scope opens get `None` — the convergence question is answered by the grouped stale-edge
 /// view, and putting a ranked source list in front of it would answer a question nobody asked.
+/// The declared globs `first_screen` discovers across (`discovery.first_screen_globs`) — falls
+/// back to `["*.md"]`, today's only glob, for an older contract that does not declare the key, so
+/// the key is purely additive and never silently widens an unaware caller.
+fn first_screen_globs(contract: &Contract) -> Vec<String> {
+    contract
+        .value
+        .pointer("/discovery/first_screen_globs")
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .filter(|globs| !globs.is_empty())
+        .unwrap_or_else(|| vec!["*.md".to_string()])
+}
+
 pub(super) fn first_screen(
     args: &Args,
     contract: &Contract,
@@ -685,19 +860,34 @@ pub(super) fn first_screen(
     if !args.need_explicit {
         return Ok(None);
     }
-    let terms = question_terms(args.need.trim());
+    let terms = question_terms(contract, args.need.trim());
     if terms.is_empty() {
         return Ok(None);
     }
     let scope = state["scope"].as_str().unwrap_or(".");
     let (habits, mut unresolved) = matching_habits(&args.root, contract, &terms, usage)?;
     let area = focus_area(&args.root, contract, scope, &terms);
+
+    // S1 (2026-09-22): a whole-tree focused question with no directory-shaped area gets a
+    // METADATA-FIRST screen from the AUTHORITY SET — root `CLAUDE.md` plus each matched habit's
+    // own atom and the existing repo paths its `checks:`/`refs:` entries name — before any
+    // repository body scan. Gated on `scope == "."` specifically (not merely `area.is_none()`,
+    // which a non-root scope that simply matched nothing also produces) — a scoped-but-unmatched
+    // question is unaffected. Falls through when the set is empty or answers nothing, so the
+    // whole-scope ceremony door still renders exactly as it did before this station.
+    if area.is_none() && scope == "." {
+        if let Some(screen) = root_authority_screen(args, contract, &terms, &habits, usage)? {
+            return Ok(Some(screen));
+        }
+    }
+
     if area.is_none() && habits.is_empty() {
         return Ok(None);
     }
     let mut candidates: Vec<Value> = Vec::new();
     let mut omissions: Vec<String> = Vec::new();
     let mut ranking = Value::Null;
+    let mut continuation = Value::Null;
     if let Some(area) = &area {
         // A term that names the area itself matches every file under it, so it ranks nothing. The
         // discriminating terms are the ones the area does NOT already carry.
@@ -715,11 +905,15 @@ pub(super) fn first_screen(
             &ranking_terms,
             &[],
             "directory",
-            "*.md",
+            &first_screen_globs(contract),
         )?;
         let charged = found["usage"].take();
         add_usage(usage, &charged);
         candidates = found["candidates"].as_array().cloned().unwrap_or_default();
+        // The habit register is a GENERATED projection (never an authority to edit or cite) and its
+        // rows already render as this screen's habits block; once the globs admit YAML it would
+        // otherwise compete as a source with the atoms it is projected from.
+        candidates.retain(|candidate| candidate["path"].as_str() != Some(HABITS_REL));
         // Each candidate is located, not merely named: the section its terms land in, and a read
         // range bounded to one excerpt. The outline scan is charged to the scan counters.
         for candidate in candidates.iter_mut() {
@@ -736,12 +930,48 @@ pub(super) fn first_screen(
                 });
             }
         }
+        // Proximity: a candidate whose ONE passage carries more of the question's distinct terms
+        // together is nearer the authority than one that merely mentions them all somewhere.
+        // Distinct terms (not the per-file weighted score) is the cross-file comparable measure;
+        // discovery's own order breaks ties, so the sort is stable.
+        let together = |candidate: &Value| {
+            candidate["best_section"]["hits"]
+                .as_object()
+                .map_or(0, |hits| hits.len())
+        };
+        candidates.sort_by_key(|candidate| std::cmp::Reverse(together(candidate)));
         ranking = found["selection"].take();
+        if let Some(selection) = ranking.as_str() {
+            ranking = json!(format!(
+                "{selection}; then re-ranked by the distinct question terms one located passage carries together"
+            ));
+        }
         for message in found["omissions"].as_array().cloned().unwrap_or_default() {
             omissions.push(message.as_str().unwrap_or_default().to_string());
         }
+        // S1 (2026-09-22): a budget cut is never left as a dead end. When the traversal's own
+        // exhaustion line fires, the view names a CONCRETE narrowed continuation — the densest
+        // subdirectory this window actually reached — rather than raising any budget.
+        const EXHAUSTED: &str =
+            "discovery budget exhausted; narrow the scope or continue with a named question";
         for message in found["unresolved"].as_array().cloned().unwrap_or_default() {
-            unresolved.push(message.as_str().unwrap_or_default().to_string());
+            let text = message.as_str().unwrap_or_default().to_string();
+            if text == EXHAUSTED {
+                if let Some(dir) = densest_subdir(&found["groups"]) {
+                    unresolved.push(format!(
+                        "{text}; the densest subdirectory this window reached was {dir} — \
+                         continue narrowed there"
+                    ));
+                    continuation = action(
+                        args,
+                        &format!("Continue narrowed in {dir}"),
+                        "open",
+                        &[("scope", json!(dir)), ("need", json!(args.need.clone()))],
+                    );
+                    continue;
+                }
+            }
+            unresolved.push(text);
         }
     } else {
         unresolved.push(
@@ -749,7 +979,7 @@ pub(super) fn first_screen(
                 .into(),
         );
     }
-    Ok(Some(json!({
+    let mut screen = json!({
         "area": area.clone().unwrap_or_else(|| scope.to_string()),
         "terms": terms,
         "habits": habits,
@@ -760,7 +990,206 @@ pub(super) fn first_screen(
                       neither authority nor currency; read the passage.",
         "omissions": omissions,
         "unresolved": unresolved,
+    });
+    if !continuation.is_null() {
+        screen["continuation"] = continuation;
+    }
+    Ok(Some(screen))
+}
+
+/// The root-scope AUTHORITY SET a whole-tree focused question is screened against BEFORE any
+/// repository body scan: the root gospel `CLAUDE.md`, plus — for each matched habit — its own
+/// atom and the first existing repo path named in each of its `checks:`/`refs:` frontmatter
+/// entries. Ranked by where the question's terms land inside each document's own outline (the
+/// same per-section scoring [`best_section`] already does for an area's candidates) rather than
+/// by walking a directory. `Ok(None)` when the set is empty or none of its documents' outlines
+/// carry a hit, so the caller falls through to the whole-scope ceremony door exactly as before
+/// this station.
+fn root_authority_screen(
+    args: &Args,
+    contract: &Contract,
+    terms: &[String],
+    habits: &[Value],
+    usage: &mut Value,
+) -> FlowResult<Option<Value>> {
+    let mut paths: Vec<String> = Vec::new();
+    let roots = contract.source_roots();
+    let mut push_if_file = |candidate: String| {
+        if paths.contains(&candidate) {
+            return;
+        }
+        // Every authority-set path passes the same declared-scope gate a question's read does:
+        // a candidate the reader could not then `read` would be a choice the entry cannot keep.
+        // Root `CLAUDE.md` and the root `.epr-meta/` governance home are DECLARED source roots
+        // (contract v13) rather than fixed inputs read around the gate.
+        if contained(&args.root, &candidate, &roots)
+            .ok()
+            .filter(|p| p.is_file())
+            .is_some()
+        {
+            paths.push(candidate);
+        }
+    };
+    push_if_file("CLAUDE.md".to_string());
+
+    let atom_budget = contract.limit_usize("habit_register_bytes");
+    for habit in habits {
+        let Some(id) = habit["id"].as_str() else {
+            continue;
+        };
+        let Some(atom) = find_habit_atom(&args.root, contract, id, atom_budget) else {
+            continue;
+        };
+        let rel = rel_to_root(&args.root, &atom);
+        push_if_file(rel);
+        let mut data = Vec::new();
+        if File::open(&atom)
+            .and_then(|f| {
+                f.take(atom_budget as u64 + 1)
+                    .read_to_end(&mut data)
+                    .map(|_| ())
+            })
+            .is_err()
+            || data.len() > atom_budget
+        {
+            continue;
+        }
+        add_usage(usage, &json!({"habit_atom_bytes": data.len()}));
+        let text = String::from_utf8_lossy(&data).into_owned();
+        let Some(front) = frontmatter_value(&text) else {
+            continue;
+        };
+        for key in ["checks", "refs"] {
+            for entry in yaml_string_list(&front, key) {
+                if let Some(token) = first_path_token(&entry) {
+                    // Arbitrary NAMED repo evidence (feature files, scripts, plans) goes through
+                    // the declared `source_roots` gate like any other question evidence — unlike
+                    // `CLAUDE.md` and the atom itself, these are not this executor's own
+                    // well-known cross-cutting inputs.
+                    push_if_file(token);
+                }
+            }
+        }
+    }
+    if paths.is_empty() {
+        return Ok(None);
+    }
+    let mut candidates: Vec<Value> = Vec::new();
+    for path in &paths {
+        if let Some(section) = best_section(args, contract, path, terms) {
+            add_usage(usage, &section["usage"]);
+            let title = Path::new(path)
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| path.clone());
+            candidates.push(json!({
+                "path": path,
+                "title": title,
+                "term_hits": section["hit_total"],
+                "best_section": {
+                    "title": section["title"],
+                    "lines": section["read_lines"],
+                    "hits": section["hits"],
+                    "window_complete": section["window_complete"],
+                },
+            }));
+        }
+    }
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+    candidates.sort_by(|a, b| {
+        b["term_hits"]
+            .as_u64()
+            .cmp(&a["term_hits"].as_u64())
+            .then_with(|| a["path"].as_str().cmp(&b["path"].as_str()))
+    });
+    Ok(Some(json!({
+        "area": ".",
+        "terms": terms,
+        "habits": habits,
+        "candidates": candidates,
+        "provider": "local",
+        "ranking": "authority set (metadata-first), no repository body scan",
+        "authority": "Candidate discovery over declared metadata. Membership and rank establish \
+                      neither authority nor currency; read the passage.",
+        "omissions": Vec::<String>::new(),
+        "unresolved": Vec::<String>::new(),
     })))
+}
+
+/// The count each grouped directory reached inside a `discover_scored` view — used only to name
+/// the densest subdirectory a budget-cut traversal actually reached, never to imply anything
+/// about the corpus outside it. `None` when there is no narrower group to offer (an empty set, or
+/// the traversal never left the scope's own root).
+fn densest_subdir(groups: &Value) -> Option<String> {
+    let map = groups.as_object()?;
+    map.iter()
+        .filter(|(key, _)| key.as_str() != ".")
+        .max_by(|a, b| {
+            a.1.as_u64()
+                .unwrap_or(0)
+                .cmp(&b.1.as_u64().unwrap_or(0))
+                .then_with(|| b.0.cmp(a.0))
+        })
+        .map(|(key, _)| key.clone())
+}
+
+/// The full YAML frontmatter of a document, or `None` when it has no closed `---` fence. Unlike
+/// [`frontmatter_header`]'s bounded-read boundary proof, this runs once against a whole (already
+/// small, already budget-read) habit atom, because a `checks:`/`refs:` list can run to any length
+/// before the caller knows which entry names a path.
+fn frontmatter_value(text: &str) -> Option<serde_yaml::Value> {
+    let mut lines = text.lines();
+    if lines.next()?.trim() != "---" {
+        return None;
+    }
+    let mut buffer = String::new();
+    for line in lines {
+        if line.trim() == "---" {
+            return serde_yaml::from_str(&buffer).ok();
+        }
+        buffer.push_str(line);
+        buffer.push('\n');
+    }
+    None
+}
+
+/// The string sequence at `key` in a parsed frontmatter value, or empty when absent, not a
+/// sequence, or not made entirely of strings.
+fn yaml_string_list(value: &serde_yaml::Value, key: &str) -> Vec<String> {
+    value
+        .get(key)
+        .and_then(serde_yaml::Value::as_sequence)
+        .map(|seq| {
+            seq.iter()
+                .filter_map(|item| item.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The first token in `text` that LOOKS like a repository path — contains a `/` once surrounding
+/// punctuation is trimmed, and is not a bare `@concern:` tag or a lone separator. A candidate,
+/// never a proof: [`root_authority_screen`] still confirms it exists under the declared source
+/// scope before trusting it — a token like `sample/judge` (prose, not a path) is filtered there by
+/// that existence check, not by this lexical scan.
+fn first_path_token(text: &str) -> Option<String> {
+    for raw in text.split_whitespace() {
+        let opened = raw.trim_start_matches(['(', '"', '\'']);
+        let cleaned = opened.trim_end_matches(|c: char| {
+            matches!(c, ')' | ',' | ':' | ';' | '"' | '\'' | '.' | '—')
+        });
+        if cleaned.is_empty()
+            || cleaned == "/"
+            || cleaned.starts_with('@')
+            || !cleaned.contains('/')
+        {
+            continue;
+        }
+        return Some(cleaned.to_string());
+    }
+    None
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -1221,138 +1650,4 @@ fn find_close(body: &str) -> Option<(usize, usize)> {
         }
         position = line_end + 1;
     }
-}
-
-/// Bounded table of contents, so the agent chooses a passage before loading it.
-/// One section of an outline, with where the question's terms actually land inside it.
-///
-/// Naming a document is half an answer. A reader that opens a 24,000-byte skill and is handed six
-/// headings, none of which mentions its question, closes the file — which is exactly what happened
-/// on 2026-09-11: the answer was under "Phase 4 — verify the experience, reconcile and retain
-/// learning", a heading that says nothing about re-mining an index.
-pub(super) fn outline(args: &Args, contract: &Contract, path: &str) -> FlowResult<Value> {
-    outline_with_terms(args, contract, path, &question_terms(args.need.trim()))
-}
-
-fn outline_with_terms(
-    args: &Args,
-    contract: &Contract,
-    path: &str,
-    terms: &[String],
-) -> FlowResult<Value> {
-    let source = contained(&args.root, path, &contract.source_roots())?;
-    let bound = contract.limit_usize("scan_bytes");
-    let mut raw = Vec::new();
-    File::open(&source)
-        .and_then(|f| f.take(bound as u64 + 1).read_to_end(&mut raw).map(|_| ()))
-        .map_err(|error| FlowError::Read {
-            path: source.clone(),
-            source: error,
-        })?;
-    let complete = raw.len() <= bound;
-    let text = String::from_utf8_lossy(&raw[..raw.len().min(bound)]).to_string();
-    let lines: Vec<&str> = text.lines().collect();
-    let is_code = source.extension().and_then(|e| e.to_str()) == Some("py");
-    let mut headings: Vec<Value> = Vec::new();
-    for (index, line) in lines.iter().enumerate() {
-        if line.starts_with('#')
-            || (is_code && (line.starts_with("def ") || line.starts_with("class ")))
-        {
-            headings.push(json!({
-                "line": index + 1,
-                "title": line.trim_start_matches('#').trim(),
-            }));
-        }
-    }
-    for index in 0..headings.len() {
-        let end = if index + 1 < headings.len() {
-            headings[index + 1]["line"].as_u64().unwrap_or(1) - 1
-        } else {
-            lines.len() as u64
-        };
-        headings[index]["end_line"] = json!(end);
-    }
-    // Where the question's terms land, section by section, plus a read range bounded to what one
-    // excerpt may return. The bytes counted here are scan bytes; only `read` charges source_bytes.
-    let source_bytes = contract.limit_usize("source_bytes");
-    let mut oversized_sections = 0usize;
-    for heading in headings.iter_mut() {
-        let start = heading["line"].as_u64().unwrap_or(1) as usize;
-        let end = (heading["end_line"].as_u64().unwrap_or(1) as usize).max(start);
-        let section: String = lines[start.saturating_sub(1)..end.min(lines.len())]
-            .join("\n")
-            .to_lowercase();
-        let mut hits: Map<String, Value> = Map::new();
-        let mut total = 0usize;
-        for term in terms {
-            let count = section.matches(&term.to_lowercase()).count();
-            if count > 0 {
-                hits.insert(term.clone(), json!(count));
-                total += count;
-            }
-        }
-        // The emitted range never promises more than one excerpt can carry: lines are taken from
-        // the section's start until the byte budget is spent, and a section that does not fit says
-        // so rather than handing over a range `read` would refuse.
-        let (mut window_end, mut bytes) = (start, 0usize);
-        for (offset, line) in lines[start.saturating_sub(1)..end.min(lines.len())]
-            .iter()
-            .enumerate()
-        {
-            let next = bytes + line.len() + 1;
-            if next > source_bytes && window_end > start {
-                break;
-            }
-            bytes = next;
-            window_end = start + offset;
-        }
-        heading["hits"] = json!(hits);
-        heading["hit_total"] = json!(total);
-        heading["read_lines"] = json!(format!("{start}:{window_end}"));
-        heading["window_complete"] = json!(window_end >= end);
-        if window_end < end {
-            oversized_sections += 1;
-        }
-    }
-    let truncated = !complete || headings.len() > 40;
-    headings.truncate(40);
-    let mut omissions: Vec<Value> = Vec::new();
-    if truncated {
-        omissions.push(json!("outline incomplete; use an explicit range"));
-    }
-    if oversized_sections > 0 {
-        omissions.push(json!(format!(
-            "{oversized_sections} section(s) exceed the per-excerpt byte budget; the offered range \
-             is the first window of each — continue with an explicit later range"
-        )));
-    }
-    Ok(json!({
-        "path": path,
-        "headings": headings,
-        "line_count": lines.len(),
-        "terms": terms,
-        "hit_scope": "term occurrences inside each section of this outline; scan bytes, not evidence",
-        "omissions": omissions,
-        "usage": {"scan_bytes": raw.len(), "scanned_files": 1},
-    }))
-}
-
-/// The section of `path` whose text carries most of the question's terms, if any does.
-fn best_section(args: &Args, contract: &Contract, path: &str, terms: &[String]) -> Option<Value> {
-    let outline = outline_with_terms(args, contract, path, terms).ok()?;
-    let mut best: Option<Value> = None;
-    for heading in outline["headings"].as_array()? {
-        if heading["hit_total"].as_u64().unwrap_or(0) == 0 {
-            continue;
-        }
-        let better = best
-            .as_ref()
-            .is_none_or(|current| heading["hit_total"].as_u64() > current["hit_total"].as_u64());
-        if better {
-            best = Some(heading.clone());
-        }
-    }
-    let mut section = best?;
-    section["usage"] = outline["usage"].clone();
-    Some(section)
 }

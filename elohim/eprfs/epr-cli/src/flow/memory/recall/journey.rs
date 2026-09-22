@@ -952,6 +952,12 @@ pub(super) fn execute(
                                 ),
                             }
                         }
+                        // S1 (2026-09-22): a budget-cut area traversal's own concrete narrowed
+                        // continuation (`open --scope <densest subdir>`), when the screen carried
+                        // one — never raising any budget, only naming where to continue.
+                        if !screen["continuation"].is_null() {
+                            push_action(&mut view, screen["continuation"].clone());
+                        }
                         view["first_screen"] = screen;
                     }
                 }

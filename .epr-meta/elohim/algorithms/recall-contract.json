@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 12,
+  "version": 13,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -25,6 +25,8 @@
     "habit_register_bytes": 1048576
   },
   "source_roots": [
+    "CLAUDE.md",
+    ".epr-meta/",
     ".claude/",
     "genesis/",
     "elohim/",
@@ -179,7 +181,15 @@
     "boundary_cut_is_not_a_parse_failure": "A bounded read routinely ends mid-character. The tail is trimmed back to the last complete UTF-8 boundary before parsing; the frontmatter header itself is still exact bytes, and a trim landing before the closing delimiter reports an unproven boundary rather than a malformed document. Condemning a file because the budget cut a multibyte character is a fault of the reader, not the document.",
     "semantic_provider": "mempalace",
     "semantic_output": "unverified provider text; exact tag filtering requires source metadata",
-    "group_scope": "returned candidate window"
+    "group_scope": "returned candidate window",
+    "first_screen_globs": ["*.md", "*.py", "*.json", "*.yaml", "*.yml", "*.rs", "*.ts", "*.feature", "*.sh"],
+    "first_screen_globs_rule": "S1 (2026-09-22): the focused first screen (`first_screen`) discovers across EVERY declared glob in one shared traversal, charged to the SAME body-scan budget a single-glob call always used — never a second read, never a wider window. An older contract that does not declare this key falls back to `[\"*.md\"]`, today's only glob, so this key is additive and never silently widens an unaware caller.",
+    "short_terms": ["red", "top", "cid", "dna", "hdk", "epr", "ci", "wasm", "pr", "api"],
+    "short_terms_rule": "S1 (2026-09-22): `question_terms` drops every token under four characters UNLESS it is declared here — undeclared short tokens stay noise (a bare 'ci' or 'pr' in ordinary prose would otherwise flood matching). Two adjacent declared-short terms in the question text (e.g. `top red`) also mint the two-word PHRASE as an additional term, matched as a phrase rather than as two independent hits.",
+    "stemming": "suffix-strip-v1",
+    "passage_window_bytes": 4096,
+    "_passage_window_rule": "Sections of markdown and Python are scored by the same measure. First-screen candidates are then re-ranked by how many distinct question terms their one best passage carries together (proximity), discovery order breaking ties. A located source with no author-declared sections (anything but markdown and Python: JSON, YAML, Rust, shell) is read at its term-densest line window of at most passage_window_bytes; the window starts on a line carrying a question term and is chosen by the highest rarity-weighted score: each present term counts ln((lines+1)/(1+lines carrying it)) \u00d7 (1 + ln occurrences), so a window carrying several rare terms outranks one repeating a common word. A term counts only where it begins a word, so an inflection matches and a fragment inside another word does not. Scan bytes only; the read that follows is the receipt.",
+    "stemming_rule": "S1 (2026-09-22): a term also matches a candidate's text via its STEM — the longest of `ing`/`es`/`ed`/`s` stripped from its tail, kept only when the remaining stem is at least four characters (so `habits`→`habit` and `stamps`→`stamp` stem, but `mined`→`min` does not — three characters is below the floor and stays unstemmed). This is intentionally modest: a literal suffix strip, not a lexical dictionary, so it will miss irregular inflections it was never asked to know."
   },
   "ceremony": {
     "version": 3,

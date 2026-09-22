@@ -37,7 +37,7 @@ rules:
       selected, never a source of authority. LENS (`lens.rs`, station 1): the `role@model ->
       LensLevel` table and lens resolution — not yet split out; a function shaping that table
       belongs there once it exists. RENDER (`render.rs`): turning a view into the human screen —
-      `render`, `render_first_screen`, `render_outline`, `render_hits`. REFUSAL (`refusal.rs`): the
+      `render`, `render_first_screen`, `render_outline`, `render_hits`. PASSAGE (`passage.rs`): where inside an already-named candidate the question's terms land — `outline`, `best_section`, and the term-density window for unsectioned structured files. REFUSAL (`refusal.rs`): the
       one refusal envelope — what went wrong, which session, what to do. MEASURE (`measure.rs`):
       the paired deterministic footprint lens and the `measure` op. RECEIPTS (`receipts.rs`):
       bounded reads and receipt adoption — the only code that touches source bytes on a reader's

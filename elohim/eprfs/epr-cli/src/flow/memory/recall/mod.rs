@@ -65,8 +65,11 @@ mod measure;
 use measure::measure;
 
 mod discovery;
-use discovery::{bootstrap_projection, first_feature_path, first_screen, outline};
+use discovery::{bootstrap_projection, first_feature_path, first_screen};
+// Where inside a located source the terms land — outline, best section, density window.
+mod passage;
 pub use discovery::{discover, discover_scored};
+use passage::outline;
 
 mod providers;
 pub use providers::bounded_process;
