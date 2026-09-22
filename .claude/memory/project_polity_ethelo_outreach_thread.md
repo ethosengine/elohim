@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5708b386-3421-4347-8ec0-0aa90dec1db5
+cites:
+  - genesis/data/presences/public-engagement-and-online-decision-making-ethelo.md
 ---
 
 Warm intro (via Victoria) 2026-06-21 from **John Richardson** — founder/CEO/chief-architect of **Ethelo** (2011; patented multivariate fair-consensus algorithm built w/ U Waterloo; 150+ cities, 250k+ participants; B-Corp "Best for the World" governance; Ashoka Fellow; also founded Pivot Legal Society, invented SeaBrick kelp carbon blocks; **Solarpunk Summit** speaker). Ethelo is evolving into **Polity Cooperative** (polity.coop), a collectively-governed **data cooperative** + digital-democracy platform. Intro call **2026-06-23 2pm**.

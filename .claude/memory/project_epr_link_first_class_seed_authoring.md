@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 80b79077-9d75-43ad-819d-8856d18dbd6e
+cites:
+  - .claude/skills/elohim-import/SKILL.md
 ---
 
 When regenerating lamad seed JSON from source markdown (elohim-import pipeline), content relationships — `children[]`, `relatedNodeIds[]`, `relationships[]`, `contributors[].presenceId`, prose cross-refs — are authored as bare slug strings with NO verify step, so they drift silently: dangling children, stale `richMedia.bibleVerseCount`, ESV/NIV/NRSVue mismatch on `fct-bible-*` verse nodes, contributor presenceIds with no matching presence.

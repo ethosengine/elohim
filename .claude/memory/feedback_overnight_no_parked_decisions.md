@@ -5,6 +5,8 @@ id: feedback-overnight-no-parked-decisions
 description: "Operator 2026-09-06: in a granted overnight arc, reversible fleet flips are the shift's call — never park them for morning."
 metadata:
   type: feedback
+cites:
+  - .claude/skills/delivery-stasis/SKILL.md
 ---
 
 **What the operator said (2026-09-06, 02:41 their time):** "why don't you canary flip James, and keep working on this..

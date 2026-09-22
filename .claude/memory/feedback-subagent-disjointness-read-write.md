@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 32ed30bb-9c4a-4a71-9026-524a934f5f9e
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 When parallelizing implementer subagents, two tasks are disjoint **only if neither's READ-set intersects the other's WRITE-set** — NOT merely "they write different crates."

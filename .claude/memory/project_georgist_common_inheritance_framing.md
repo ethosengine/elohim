@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: 2437c985-9e3a-4918-af90-61da254d98d6
   modified: 2026-07-24T17:21:46.291Z
+cites:
+  - "values-forward | values-forward | sha256:80a6f4eeeefa1ffd | path: genesis/docs/content/elohim-protocol/values-forward.md"
+  - "glossary | glossary | sha256:faeef215b3a16143 | path: genesis/docs/content/elohim-protocol/glossary.md"
 ---
 
 Operator-directed framing (2026-07-24) for all corpus economic-stance work. Canonical home: values-forward Stance I.4 + glossary ("the common inheritance", "Jubilee / naḥalah", "self-sealing").

@@ -8,6 +8,8 @@ metadata:
   type: project
   originSessionId: dd92ea53-45bb-4dba-bf69-b4b5b86362dd
   modified: 2026-08-06T18:27:20.864Z
+cites:
+  - "contributor-presence-bootstrap-whoswho-design | Contributor-Presence Bootstrap & the Who's-Who Knowledge Graph | sha256:0b72f9cec8821810 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
 ---
 
 # Outreach threads (umbrella)

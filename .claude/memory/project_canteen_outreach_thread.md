@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ccd90cc8-bafe-4d92-b7b6-2f55b64f63eb
+cites:
+  - genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md
+  - "contributor-presence-bootstrap-whoswho-design | Contributor-Presence Bootstrap & the Who's-Who Knowledge Graph | sha256:0b72f9cec8821810 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
 ---
 
 Stephen Lewis <stephen@syntrosignalmentor.com> (Canteen, thecanteenapp.com, Flatiron NYC) cold-emailed 2026-06-06/07 inviting Matthew to an invite-only creator-payments hackathon (2026-06-15 → 06-29, luma.com/5xcrazms, passphrase LEPTONx1313) and asked for perspective on his RFS post (thecanteenapp.com/analysis/2026/05/28/distribution-bootstrap-payments-founders.html — thesis: x402/sub-cent settlement drops the fee floor, so payment layers can attach permissionlessly to open-source creator infra; "attribution metadata becomes settlement logic").

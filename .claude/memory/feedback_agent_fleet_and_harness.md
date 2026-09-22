@@ -1,6 +1,7 @@
 ---
 name: feedback_agent_fleet_and_harness
 title: "Agent fleet + harness discipline (umbrella)"
+id: feedback-agent-fleet-and-harness
 description: "3 agents max; cheap tiers for narrow tasks; no read/write-set overlap; orphan cargo locks, StructuredOutput hangs."
 metadata: 
   node_type: memory
@@ -9,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-11T22:54:40.933Z
+cites:
+  - .claude/skills/orchestrate/SKILL.md
+  - .claude/workflows/
 ---
 
 # Agent fleet, delegation & harness traps (umbrella)

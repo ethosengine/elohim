@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: ec566588-36bb-4cb6-a181-0caedd86b2a0
+cites:
+  - .husky/pre-push.bash
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 When the operator hands off autonomous work (e.g. "carry on until done, I'm going to bed" — 2026-06-04), the expected terminal state is **committed on the shift branch, NOT pushed**. An integrator (operator-side process) picks up local commits and handles the push/merge.

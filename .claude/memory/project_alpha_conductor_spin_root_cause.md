@@ -6,6 +6,8 @@ id: project-alpha-conductor-spin-root-cause
 description: "2026-08-21: Alpha pods pegged CPU — sys-validation on unfetchable deps. Root: unbounded local re-lookup."
 metadata:
   type: project
+cites:
+  - genesis/data/timeline/backlog/alpha-conductor-sys-validation-spin-unfetchable-deps.md
 ---
 
 Symptom: `container_cpu_usage` == quota on every `elohim-node` pod regardless of limit (2/3/4/8 cores), CFS

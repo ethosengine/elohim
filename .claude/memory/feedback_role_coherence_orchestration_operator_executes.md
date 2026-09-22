@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: 11713646-4f3a-47c8-b19d-aa263641d5b1
   modified: 2026-09-01T18:40:34.955Z
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 Operator role-set 2026-09-01: my role is primarily **coherence, designing,

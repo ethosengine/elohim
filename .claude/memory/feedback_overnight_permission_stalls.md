@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 6bd0f758-fe18-46cf-b0d0-8848acafeca0
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 
 During the 2026-06-04 overnight integration, Sprint A (portal-handoff) stalled for ~1h mid-task on a permission prompt while writing a spec for an auth component (`threshold-login.component.spec.ts`). The session looked dead (idle transcript, no commits) but was actually blocked awaiting approval. The operator: "I've got to keep in mind what gets touched in an overnight shakeout."

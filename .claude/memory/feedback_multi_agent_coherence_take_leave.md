@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: c0e48b05-291d-4d51-9b7b-b1c616c500dd
+cites:
+  - .claude/skills/atlas-grounding/SKILL.md
 ---
 
 When integrating another agent's contribution (a Codex/Gemini branch, an imported design) the **task is coherence, not defense**. The operator corrected this framing twice: multi-agent collaboration (Fable orchestrating / integrating Codex + Gemini) is *how you learn from each other and converge on one coherent system* — it is not primarily a hedge against being rate-limited or vendor-locked. "It's not the problem, it's the task."

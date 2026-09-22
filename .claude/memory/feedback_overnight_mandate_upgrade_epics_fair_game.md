@@ -5,6 +5,8 @@ id: feedback-overnight-mandate-upgrade-epics-fair-game
 description: "Overnight latitude: solid hApp updates, p2p propagation, dataplane convergence; Opus/Codex do legwork."
 metadata:
   type: feedback
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 
 The revert/upgrade epics are critical because they let development accelerate without waiting

@@ -10,6 +10,10 @@ metadata:
   type: project
   originSessionId: 3df467aa-5567-4c95-aaae-afaf9021f230
   modified: 2026-07-25T00:47:47.040Z
+cites:
+  - elohim/holochain/Jenkinsfile
+  - elohim/holochain/build-manifest.json
+  - genesis/orchestrator/build-graph.groovy
 ---
 
 The edge pipeline (`elohim/holochain/Jenkinsfile`) does not build DNA — it `oras pull`s `harbor.ethosengine.com/ethosengine/elohim-happ:dev-latest`, which the DNA pipeline (elohim-holochain) publishes at the END of its run. `elohim/holochain/build-manifest.json` declares `dependsOn: ["elohim-holochain"]`, but on 2026-07-24 orchestrator #1521 dispatched both in the same wave (identical start timestamps): edge #1226 fetched dev-latest ~50 min before DNA #1370 published the new one, so the image shipped the previous happ. Symptom signature: pods log `No coordinator-zome drift` (bundle == installed == old) while consumers WARN `Attempted to call a zome function that doesn't exist` — a green deploy that silently misses a zome change.

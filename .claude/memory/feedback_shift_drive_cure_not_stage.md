@@ -5,6 +5,8 @@ id: feedback-shift-drive-cure-not-stage
 description: "In a /shift own the cure end-to-end — stabilize, then implement the confirmed fix; don't stage past diagnosis."
 metadata:
   type: feedback
+cites:
+  - .claude/skills/agentic-developer/SKILL.md
 ---
 
 2026-06-14 (overnight integration shift): the operator called out timidity. I had (a) staged the warm_stream fix as "deploy-gated / operator-gated" and waited instead of implementing it, and (b) let my own H3 framing ("orthogonal to CPU") talk me OUT of proposing the obvious CPU-bump stabilizer — so the operator had to step in, diagnose, and apply it himself.

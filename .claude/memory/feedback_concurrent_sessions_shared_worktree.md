@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: 52e75242-0c09-464a-9a0d-613667fc14e0
   modified: 2026-08-07T14:17:11.693Z
+cites:
+  - .claude/hooks/capability-tier-gate.py
 ---
 
 Multiple Claude sessions can be active in /projects/elohim simultaneously, co-committing on the same shift/* branch (observed 2026-06-04: this session + a URL-Routing-Contract session interleaving commits on shift/a2o-greenup; their in-flight edits appeared as unexplained working-tree modifications, including a 146-file cosmetic lint sweep and `/lamad/path`→`/path` route renames).

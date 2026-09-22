@@ -1,9 +1,12 @@
 ---
 name: feedback-epic-friend-voice-at-moment-of-need
 title: "Epic scenes: the elohim speaks as a friend"
+id: feedback-epic-friend-voice-at-moment-of-need
 description: "At the moment of need protocol vocabulary never reaches the person; the precise form is one request away."
 metadata:
   type: feedback
+cites:
+  - "search-epic | Found, Not Crawled | sha256:7ca54d18d954aae4 | path: genesis/docs/content/elohim-protocol/search/epic.md"
 ---
 
 Operator, 2026-09-11, on the search epic: a printed line like "two rings not walked, no endorsers between you and them, walking them costs standing" is the design talking, not a friend, and "it's not something our human should be thinking about when they have a sick child." Rewritten as the elohim speaking: *"That's what your family has, what Ilse has, and what the district's clinicians say. I didn't go asking strangers. I can, if you want — but I'd be asking on your name."*

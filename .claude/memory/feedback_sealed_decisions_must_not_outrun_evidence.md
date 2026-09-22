@@ -9,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 62953c2b-d161-4b7d-8ec3-88beb0ae56de
   modified: 2026-09-06T19:13:35.177Z
+cites:
+  - "holons-are-spaces-how-we-use-holochain | Holons, Spaces, and Holochain | sha256:1f287db69f8d8a10 | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md"
+  - "ai-stewarded-commons-reimplementation-plan | A Commons That Keeps Its Promises | sha256:0d5f1300b5d615dc | path: genesis/docs/content/elohim-protocol/architecture/2026-09-06-ai-stewarded-commons-reimplementation-plan.md"
 ---
 
 **What happened (2026-09-06, holons/reimplementation second-opinion):** I sealed D1 ("retire holons-are-spaces")

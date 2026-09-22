@@ -6,6 +6,9 @@ id: project-monty-lynn-outreach-thread
 description: Three-audience pitch (theology/business/CS) to ACU prof; Observer (local AI→REA ledger) + Beer freedom-machine + Stargate hooks; sent ~2026-06-18.
 metadata:
   type: project
+cites:
+  - "confession | confession | sha256:dff3a6835bfa3802 | path: genesis/docs/content/elohim-protocol/confession.md"
+  - "theology | theology | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
 ---
 
 Outreach email to **Dr. Monty Lynn** (Abilene Christian University professor; had Matthew in Business 101 freshman year). Matthew = ACU BBA Mgmt '10. Met in person at "the Bean" (campus coffee shop); this email is the promised "longer version" follow-up, sent ~2026-06-18 (mtime). Hook: with **Stargate** (the AI datacenter) going up near Abilene, "what do we do with all this AI?" is a live local question.

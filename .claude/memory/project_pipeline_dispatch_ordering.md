@@ -6,6 +6,9 @@ description: "Live-target gates deadlock; same-wave bakes PREVIOUS happ; coordin
 metadata:
   node_type: memory
   type: project
+cites:
+  - genesis/orchestrator/build-graph.groovy
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 # Pipeline dispatch & deploy ordering (umbrella)

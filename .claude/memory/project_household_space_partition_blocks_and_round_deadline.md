@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: bf90213f-876c-4014-807d-504fb20fefd3
   modified: 2026-09-05T12:20:40.965Z
+cites:
+  - elohim/elohim-storage/src/closed_chain_fence.rs
 ---
 
 **Symptom shape (2026-09-05, household mesh, node-registry space only):** `dumpNetworkMetrics`

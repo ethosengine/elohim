@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: dd92ea53-45bb-4dba-bf69-b4b5b86362dd
+cites:
+  - genesis/data/presences/andy-crouch.md
 ---
 
 # Andy Crouch / Praxis outreach thread

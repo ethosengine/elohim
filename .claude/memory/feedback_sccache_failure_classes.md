@@ -9,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: fd355744-897d-4e84-ba71-b1962e798f4c
   modified: 2026-08-27T22:34:35.508Z
+cites:
+  - elohim/holochain/dna/elohim/flake.nix
+  - genesis/data/timeline/backlog/sccache-garage-harden.md
 ---
 
 # sccache failure classes (umbrella)

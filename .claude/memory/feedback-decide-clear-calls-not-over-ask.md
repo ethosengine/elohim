@@ -8,6 +8,8 @@ metadata:
   type: feedback
   originSessionId: 32ed30bb-9c4a-4a71-9026-524a934f5f9e
   modified: 2026-08-13T13:26:38.473Z
+cites:
+  - .claude/skills/memory-ceremony/SKILL.md
 ---
 
 When a choice has a conventional default, or you've already reasoned to a clear answer (and especially if you've already *recommended* it), **decide and proceed** — do not ask the user to rubber-stamp it.

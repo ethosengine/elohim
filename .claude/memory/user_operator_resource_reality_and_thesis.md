@@ -8,6 +8,8 @@ metadata:
   type: user
   originSessionId: aaee4a8a-c291-4f19-ae5b-cb16a9fa706a
   modified: 2026-08-05T14:54:29.636Z
+cites:
+  - genesis/research/playnet-free-association-cross-pollination-2026-08-05.md
 ---
 
 Stated by the operator 2026-08-05 (Playnet survey), correcting me after I wrote that we'd had

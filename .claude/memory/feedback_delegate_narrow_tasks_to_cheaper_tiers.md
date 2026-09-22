@@ -7,6 +7,8 @@ description: "Delegate narrow, crisply-defined tasks to Opus/Sonnet; keep top-ti
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 **Why:** a 100-agent reconcile + a 6-dimension review running verify fan-outs on the session's

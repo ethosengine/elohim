@@ -7,6 +7,8 @@ id: project-andrew-root-outreach-thread
 metadata:
   node_type: memory
   type: project
+cites:
+  - "theology | theology | sha256:8f0d807e135521ee | path: genesis/docs/content/elohim-protocol/theology.md"
 ---
 
 # Andrew Root / Derek Tronsgard outreach thread

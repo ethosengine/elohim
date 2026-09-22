@@ -10,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: 77071821-7182-463a-ae84-0c496dd5f84e
   modified: 2026-08-22T04:38:31.043Z
+cites:
+  - genesis/agentic/pool-policy.json
+  - genesis/agentic/bin/ram-guard
 ---
 
 Operator directive (2026-08-22): keep **three agents active at all times** — more than that risks crashing the dev workspace (it has restarted twice under load). The orchestrator's job while the fleet runs: watch what comes back, look for opportunities to accelerate development, improve the test suite, enhance the valueflow, pursue design and performance improvements, help anything that escalates, and supply design input when an implementing agent needs it to finish coherently.

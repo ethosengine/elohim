@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: bb6233b0-21d0-494c-8768-a211d858c47c
+cites:
+  - .claude/skills/brainstorm.md
+  - .claude/commands/brainstorm.md
 ---
 
 For design/brainstorming work, the operator does NOT want the typical interactive brainstorming flow (one question at a time, per-section approval gates). Instead: **develop the clarifying questions, answer them yourself from evidence, then present ONLY the summary of the recommended design with a short defense of the choices.** (Stated 2026-06-13 during the self-healing debug-view design.)

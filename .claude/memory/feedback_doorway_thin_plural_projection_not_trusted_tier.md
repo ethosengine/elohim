@@ -1,6 +1,7 @@
 ---
 name: feedback-doorway-thin-plural-projection-not-trusted-tier
 title: "Doorway = thin plural projection"
+id: feedback-doorway-thin-plural-projection-not-trusted-tier
 description: "Operator 2026-09-12: doorways hold only notarized projections under a plural contract — never a trust tier or warehouse."
 metadata: 
   node_type: memory
@@ -8,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 2299131b-7b0d-45f5-b76e-362109f418b4
   modified: 2026-09-12T13:20:47.245Z
+cites:
+  - "memory-search-scale-three-seams-design | Memory, search and scale | sha256:c119695543a2854f | path: genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md"
+  - genesis/research/local-first-to-council-memory-search-seams-2026-09-12.md
 ---
 
 Operator correction 2026-09-12, during the local-first-to-council memory research: I had written the doorway as "the trusted hosted tier that can read" and floated its MongoDB as a place for pool-scale indexes. Both framings are wrong.

@@ -6,6 +6,8 @@ id: feedback-partition-compile-and-stale-dist
 description: "Commit partitions must respect COMPILE deps; local dist/ presence doesn't prove CI coverage."
 metadata:
   type: feedback
+cites:
+  - ./Jenkinsfile
 ---
 
 Two CI-break classes from one overnight integration (2026-07-24):

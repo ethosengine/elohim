@@ -8,6 +8,8 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-13T04:46:35.344Z
+cites:
+  - app/elohim-app/src/app/imagodei/services/agency.service.ts
 ---
 
 `void someAsyncFn()` called from inside an Angular `computed()` body silently eats a signal-write violation: signal writes throw in that reactive context, an `async` body runs synchronously to its first `await`, so the first `signal.set(...)` throws and `void` discards the rejected promise. There is no observable: no HTTP request, no error signal, no console entry, in-flight flags reset themselves. Found 2026-09-13 in `agency.service.ts` (the hosting account was never fetched, so "Hosted Steward" was unreachable for months) — cost two investigation rounds.

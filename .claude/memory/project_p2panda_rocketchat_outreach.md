@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: a6494031-71da-4712-88b3-4e865071b407
   modified: 2026-08-06T18:27:56.854Z
+cites:
+  - genesis/research/p2panda-cross-pollination-2026-08-04.md
 ---
 
 Posted 2026-08-06 to the **p2panda Rocket.Chat** (found via the Local-First Conf panels). First outreach in this register: a **public developer community channel**, not a cold email to a named person — so it is discoverable, archived, and read by strangers evaluating the project on the code, not the pitch.

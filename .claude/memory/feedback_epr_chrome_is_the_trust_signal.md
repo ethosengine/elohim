@@ -10,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-12T18:07:13.510Z
+cites:
+  - app/elohim-app/.epr-meta/epr-atom-home.habit.md
+  - "epr-atom-home-shell-component | EPR Atom Home | sha256:97bcb3c9d81b741a | path: genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md"
 ---
 
 The EPR "chrome" the doorway adds around Elohim Protocol sites is **the trust signal to the

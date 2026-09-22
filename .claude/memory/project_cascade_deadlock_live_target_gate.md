@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c6f7bba6-ed57-449a-a6d9-29bc56445abe
+cites:
+  - ./Jenkinsfile
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 The orchestrator cascade deadlocked on 2026-06-13 (orchestrator #1240): a down/flapping alpha blocked the deploy that would FIX alpha. Mechanism — `elohim-app` is the ONLY non-`longRunning` (waited-on) Level-0 pipeline; its `E2E Testing - Alpha Validation` stage opens with `timeout 60s curl alpha.elohim.host`, so a down alpha → app build FAILURE → orchestrator level-fail abort (`error "Build(s) failed: elohim - Aborting"`, Execute Builds ~1807) → `elohim-edge` (Level 1+, the ONLY `kubectl apply` pipeline) **never dispatched** → self-healing/arc code never reached the cluster. The DNA/holochain pipeline has no deploy stage; edge deploys. `longRunning` pipelines (storybook, holochain) dispatch fire-and-forget so their failures are invisible to the abort — only the waited-on app could trip it.

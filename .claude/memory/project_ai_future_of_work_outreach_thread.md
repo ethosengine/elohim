@@ -6,6 +6,8 @@ id: project-ai-future-of-work-outreach-thread
 description: "Outreach to Mattei/Woodcock/Gent/Dwarkasing (2026-06-24): freedom-machine + peer-witness care pitch for crypto-allergic scholars."
 metadata:
   type: project
+cites:
+  - genesis/research/beer-designing-freedom-elohim-critique-2026-06-04.md
 ---
 
 Cold **mass-cc outreach** (NOT a warm intro) Matthew sent 2026-06-24, subject `RE: FREE Interview - AI and the Future of Work`, to four academics at once — the **critical labour-studies / heterodox political-economy** audience (the academic-left critique-of-work intelligentsia). A new audience class vs prior threads (creator-payments builders / ACU theology-business-CS / data-coop digital-democracy).

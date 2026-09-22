@@ -8,6 +8,9 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-13T13:27:30.462Z
+cites:
+  - genesis/orchestrator/data/.epr-meta
+  - genesis/orchestrator/data/deployments.json
 ---
 
 **What the operator said (2026-09-13, morning after the pipeline-e2e shift):** "do those cpu limits seem a bit high

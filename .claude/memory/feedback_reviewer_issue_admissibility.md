@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: ec566588-36bb-4cb6-a181-0caedd86b2a0
+cites:
+  - .claude/skills/valueflow-reviewer/SKILL.md
 ---
 
 In autonomous implement→review→fix loops (SDD workflows), spec reviewers will deadlock the loop by raising **process-historical** issues no fixer can resolve: "commit X staged an extra file" (history is append-only on shared branches — see [[concurrent-sessions-shared-worktree]]), or "RED-state evidence not preserved in git" (TDD transients never leave git artifacts). Both sides behave correctly and the loop never converges (observed 2026-06-04, quilt-policy SDD run: 2 full fix rounds burned on two unfixable complaints while the code was substantively compliant).

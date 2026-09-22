@@ -9,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 967e63e3-bb69-46c6-9db5-cbe6aea765dd
   modified: 2026-07-23T18:24:04.788Z
+cites:
+  - elohim/eprfs/epr-cli/src/repository_validators.rs
+  - .claude/scripts/_lib/epr_meta.py
 ---
 
 Operator correction (2026-07-23, discipline-1 slice): I framed the escalation-ladder charter as awaiting "the operator's ceiling act" — a solo stamp. Wrong shape. **The act is reserved for US**: until p2p distributes the fabric, the deliberating community is operator+agents working the tree, and the working conversation IS the deliberation chamber.

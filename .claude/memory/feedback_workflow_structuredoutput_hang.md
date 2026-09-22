@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 9c897e0b-7586-45e5-8a21-c5a69a149b03
+cites:
+  - .claude/workflows/
 ---
 
 In this container's `Workflow` tool, agents given a `schema:` option (which forces a `StructuredOutput` tool call) can get stuck emitting `StructuredOutput` with an empty `{}` payload and retry indefinitely — observed 48 then **481** calls in one agent, no cap, hanging the whole run at a `parallel()`/phase barrier. The completion notification NEVER fires (the agent stays "alive," just looping), so a hung run is indistinguishable from a slow one.

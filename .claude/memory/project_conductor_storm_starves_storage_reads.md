@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: cb148cf7-2cdc-4c91-a807-6ea4d81cdbc9
   modified: 2026-08-17T21:12:09.638Z
+cites:
+  - elohim/elohim-storage/src/conductor/process_manager.rs
 ---
 
 Triage order for "every A-side dataplane probe red at once" (ch02/03/05/07 + identity-coherence, edge #1360 2026-08-17): it was NOT data — rows were correct. Chain: kitsune2 single-op fetch storm (relay peer catch-up) → elohim-node container 100% CFS-throttled at its CPU limit for hours → storage HTTP (same cgroup) never answers → doorway breaker OPEN (`doorway_upstream_breaker_open_total`, `backpressure_honored` stays 0) → all /db reads shed 503 catching-up (retryAfter 30 = breaker cooldown; storage's own admission shed is retryAfter 2).

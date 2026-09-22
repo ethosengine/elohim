@@ -8,6 +8,8 @@ metadata:
   type: reference
   originSessionId: 19a11573-749b-4c03-98f6-ce6c246c5400
   modified: 2026-09-20T22:09:27.602Z
+cites:
+  - genesis/manifests/cluster-state.yaml
 ---
 
 Measured 2026-09-18 from inside the workspace (/sys, /proc) and Prometheus node-exporter. Re-probe before relying on it after any purchase.

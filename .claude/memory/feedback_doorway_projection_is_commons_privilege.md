@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-12T18:04:09.338Z
+cites:
+  - doorway/doorway-service/.epr-meta/served-under-standing.habit.md
 ---
 
 A doorway projecting EPRs in classic client→server shape for public consumption is a

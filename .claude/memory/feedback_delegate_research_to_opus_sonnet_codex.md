@@ -10,6 +10,8 @@ metadata:
   type: feedback
   originSessionId: bf90213f-876c-4014-807d-504fb20fefd3
   modified: 2026-09-03T22:48:34.021Z
+cites:
+  - .claude/skills/orchestrate/SKILL.md
 ---
 
 When a design pass needs grounding or research, fan it out: Sonnet for code

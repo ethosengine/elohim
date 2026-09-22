@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: aaee4a8a-c291-4f19-ae5b-cb16a9fa706a
   modified: 2026-08-05T14:50:34.677Z
+cites:
+  - genesis/research/playnet-free-association-cross-pollination-2026-08-05.md
 ---
 
 Operator correction, twice (2026-08-05, Playnet survey). I framed Playnet's OpenCollective numbers

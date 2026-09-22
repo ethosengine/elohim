@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: 62953c2b-d161-4b7d-8ec3-88beb0ae56de
   modified: 2026-09-06T22:29:40.574Z
+cites:
+  - "accountable-correction-contract | Accountable correction | sha256:691e8b89f394214c | path: genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md"
 ---
 
 **What the operator said (2026-09-06, after asking whether the accountable-correction plan helps wall-clock
