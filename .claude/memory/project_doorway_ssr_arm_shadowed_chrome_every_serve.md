@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 4a08a7cc-d02d-48dc-b1ef-639a7844a195
+cites:
+  - genesis/a2o/features/protocol/protocol-omnibar-chrome.feature
+  - "doorway-ssr-runtime | Doorway SSR Runtime | sha256:7f75b3027ae4f9d4 | path: genesis/docs/content/elohim-protocol/architecture/2026-06-02-doorway-ssr-runtime.md"
 ---
 
 The doorway's EPR router intercepts non-service GETs BEFORE `classify_dispatch`, so all four

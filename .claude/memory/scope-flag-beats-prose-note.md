@@ -6,6 +6,9 @@ description: "The `available:` flag + scope-reconcile beat prose/memory on cap s
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - genesis/manifests/cluster-state.yaml
+  - elohim/eprfs/epr-cli/src/flow/scope.rs
 ---
 
 A stale prose `note: "offline … OUT OF SCOPE … held"` on `shem` in `cluster-state.yaml` contradicted its

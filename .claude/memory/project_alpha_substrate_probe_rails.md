@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ff42f03d-630b-4a73-9282-9b8ad2b78e57
+cites:
+  - doorway/doorway-service/tools/sbd-cross-relay-probe.py
 ---
 
 Read-only probe rails against live alpha from the dev session (verified 2026-06-11, EPR-arc Phase 0):

@@ -10,6 +10,10 @@ metadata:
   type: project
   originSessionId: 9e9e69ab-dae2-42a4-8cb8-cc022008f6ee
   modified: 2026-08-02T19:56:55.737Z
+cites:
+  - .claude/epr-meta/concerns.yaml
+  - crates/seam-contracts/
+  - .claude/scripts/seam-audit.py
 ---
 
 The seam-concern-contract architecture plan (genesis/docs/superpowers/plans/2026-08-02-seam-concern-contract-architecture-plan.md, status Active) was implemented P0–P4 on 2026-08-02 in 13 commits (573e134e4..93ef3da04 on feat/angular22-node24, committed NOT pushed — integrator pushes). What now exists and where:

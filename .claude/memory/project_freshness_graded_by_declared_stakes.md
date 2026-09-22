@@ -6,6 +6,8 @@ id: project-freshness-graded-by-declared-stakes
 description: "Freshness graded by declared stakes; staleness is a measure axis; reach vocabulary has canonical spec."
 metadata:
   type: project
+cites:
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
 ---
 
 Decided 2026-08-21 (operator, during the doorway-failover / resiliency-saga work): the doorway's

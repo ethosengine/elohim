@@ -6,6 +6,9 @@ description: "Metadata-only gossip, Automerge lit, iroh dual-stack, ghost heads,
 metadata:
   node_type: memory
   type: project
+cites:
+  - elohim/elohim-storage/src/sync/
+  - "sync-state-contract | The sync-state contract | sha256:cea95b17140d2fd6 | path: genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md"
 ---
 
 # Content sync / replication plane (umbrella)

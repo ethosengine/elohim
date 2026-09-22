@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: fb007ca7-2e24-46d8-bded-e3284050d0e1
+cites:
+  - .husky/pre-push.bash
+  - genesis/agentic/pool-policy.json
 ---
 
 When the volume sits above the 85% hard ceiling for long stretches (the container

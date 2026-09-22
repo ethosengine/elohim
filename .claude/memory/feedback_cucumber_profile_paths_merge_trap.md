@@ -5,6 +5,8 @@ id: feedback-cucumber-profile-paths-merge-trap
 description: "`cucumber-js -p local <files>` runs the whole suite; scope via `--config <empty>` or `--name`."
 metadata:
   type: feedback
+cites:
+  - genesis/a2o/cucumber.mjs
 ---
 
 Three agents and the orchestrator each burned 15+ min on 2026-08-21 running "two feature files" that were

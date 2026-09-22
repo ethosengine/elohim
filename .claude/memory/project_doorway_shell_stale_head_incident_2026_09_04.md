@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: ea648d6c-d8fd-4f39-b661-1d4473759d02
   modified: 2026-09-04T14:50:05.501Z
+cites:
+  - genesis/a2o/features/dataplane/served-shell-boots.feature
+  - doorway/doorway-service/.epr-meta/doorway-failover.habit.md
 ---
 
 **Incident (2026-09-04, ~04:23Z → afternoon):** alpha.elohim.host and elohim.host both answered 200 at `/` with an

@@ -9,6 +9,9 @@ metadata:
   type: reference
   originSessionId: 0a373f14-82a7-46f3-9198-a252328c16b5
   modified: 2026-08-13T13:26:21.351Z
+cites:
+  - genesis/docs/analysis/horizon-scans/
+  - .claude/horizon-scan-sources.md
 ---
 
 Pointer: `genesis/docs/analysis/horizon-scans/` — scans via the `mem-horizon-scan` skill

@@ -5,6 +5,9 @@ id: project-recall-reaches-authority-habit
 description: "One governed recall journey serves ceremony and sprint doors; risk-tag recall surfaces; graduates from eprfs to p2p."
 metadata:
   type: project
+cites:
+  - .epr-meta/recall-reaches-authority.habit.md
+  - .epr-meta/elohim/algorithms/recall-contract.json
 ---
 
 **Declared 2026-09-11** at `.epr-meta/recall-reaches-authority.habit.md`, born red, by the sprint plan

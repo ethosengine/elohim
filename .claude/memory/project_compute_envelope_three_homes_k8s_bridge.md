@@ -9,6 +9,10 @@ metadata:
   type: project
   originSessionId: f84d8f67-f26c-4b08-8a6f-6cfd7e6cf12d
   modified: 2026-09-05T19:34:33.546Z
+cites:
+  - "k8s-bridge-runtime-envelope-render | k8s bridge | sha256:19a549514529da13 | path: genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md"
+  - bridges/k8s/
+  - genesis/orchestrator/data/deployments.json
 ---
 
 **The trap (bit the 2026-09-05 integration push, 331 commits refused).** The `.epr-meta`

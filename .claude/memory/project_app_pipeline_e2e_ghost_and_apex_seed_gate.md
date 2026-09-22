@@ -6,6 +6,8 @@ id: project-app-pipeline-e2e-ghost-and-apex-seed-gate
 description: "E2E stage is Cypress ghost; @act:i held on fleet. Since 2026-08-25 doorway-B refuses app byte-seed with 403."
 metadata:
   type: project
+cites:
+  - ./Jenkinsfile
 ---
 
 State as of 2026-08-25 (EPR-card navigation incident):

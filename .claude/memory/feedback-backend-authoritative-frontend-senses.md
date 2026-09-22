@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: e0e33c02-4c73-4e11-a457-fc723a8c374c
+cites:
+  - elohim/sdk/schemas/v1/views/
+  - elohim/sdk/domains/lamad/manifest.json
 ---
 
 The **backend is authoritative.** The frontend **senses, responds to, and inspires** the backend — it surfaces what is useful and what composes well — but it **does not dictate** the final design. When designing the Rust→TS view boundary, author the authoritative view types from the backend truth-layer (domain model, folds, DHT/projection shapes); a front-end design/sensing pass is an INPUT/inspiration to that, never the spec that defines it.

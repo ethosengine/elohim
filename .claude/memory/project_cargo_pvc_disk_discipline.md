@@ -5,6 +5,10 @@ id: project-cargo-pvc-disk-discipline
 description: "Act at 85% PVC; cargo-pool reclaim; disk-guard; CARGO_TARGET_DIR per workspace; no nextest; sweettest: empty RUSTFLAGS."
 metadata:
   type: project
+cites:
+  - genesis/agentic/pool-policy.json
+  - .claude/hooks/cargo-disk-guard.py
+  - elohim/holochain/tests/sweettest/
 ---
 
 # Cargo / PVC disk-pressure discipline (umbrella)

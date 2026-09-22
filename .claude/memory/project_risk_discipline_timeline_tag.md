@@ -6,6 +6,9 @@ id: project-risk-discipline-timeline-tag
 description: "Risks in arch-scale-risk-backlog tagged `risk`, wired into 5 recall surfaces — check before scale-sensitive design."
 metadata:
   type: project
+cites:
+  - genesis/data/timeline/CONVENTIONS.md
+  - genesis/data/timeline/backlog/arch-scale-risk-backlog.md
 ---
 
 Established 2026-09-04 (operator-directed): a project risk is a `backlog` cluster row with the tag `risk`,

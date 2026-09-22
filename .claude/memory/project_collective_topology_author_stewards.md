@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: da9eca9d-9d7f-4a87-83f4-1f4197e6beba
+cites:
+  - "init-authoring-native-seeding-design | 2026-06-12-init-authoring-native-seeding-design | sha256:72d25ac5be945870 | path: genesis/docs/superpowers/specs/2026-06-12-init-authoring-native-seeding-design.md"
+  - genesis/data/presences/
 ---
 
 Operator-declared (2026-06-12, gates the init-authoring seeding design): content→steward routing is **per-corpus to real personas**, never one synthetic genesis identity. adam = author-steward of the genesis corpus (a live alpha conductor on shem — his authored content is immediately custody-eligible by the dowell mesh). matthew authored: the Dowell family collective (`family-dowell`, with jessica+james), the EthosEngine collective (`org-ethosengine`), and the church collective (`community-local-church`, M/J/J + a fourth member — fixtures suggest `pete-pastor`, UNCONFIRMED). The adam–eve couple collective exists (`couple-adam-eve`). gertrude belongs to an EXTENDED-family collective with M/J/J + a Seattle-area couple — closest fixture `neighborhood-extended`/`household-extended`, mapping UNCONFIRMED; its Seattle members are the first honest cross-region set for the D5 regional-distribution dimension. The **FCT corpus** (`paths/foundations-christian-technology`) routes WITH the church collective, matthew-authored.

@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 9e9e69ab-dae2-42a4-8cb8-cc022008f6ee
   modified: 2026-08-03T10:26:56.483Z
+cites:
+  - genesis/data/timeline/backlog/adopt-before-author-evidence-starvation.md
 ---
 
 ENACTED 2026-08-03: operator approved the flip; declared the genesis-native way (d9e8d9e76 → dev) — env in `_edgenode-consolidated.template.yaml` + `deployHumanManifest` per-env rendering (non-prod=true, prod=false) + adam's hand-rendered literal, NOT kubectl. Deployed edge #1299, 7/7 boot WARNs confirmed. The triple-home edit spawned backlog `manifest-config-archetype-cascade.md` (archetype-derived config cascade, operator directive).

@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c24e8f16-ba80-4a07-90b6-9bf68242bcd9
+cites:
+  - elohim/sdk/domains/lamad/manifest/graph.json
 ---
 
 The lamad content **relationship graph** (content↔content edges) is deliberately computed in the **lower-level Rust storage services**, NOT delegated to an external/embedded graph engine. Operator rationale (2026-06-08, not derivable from code): *"pushed hard for lower-level graph coherence in the rust-side services because we want mission-critical graph performance."*

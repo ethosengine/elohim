@@ -6,6 +6,10 @@ id: project-valueflow-authoring-surface-landed
 description: "Valueflow authoring landed 2026-09-05: epr flow claim/fulfill/context/ledger verbs, ruling|verdict notes, 3 valueflow-* skills — reach before SDD/epic dispatch."
 metadata:
   type: project
+cites:
+  - .claude/hooks/valueflow-observer.py
+  - elohim/eprfs/epr-cli/src/flow/claim.rs
+  - elohim/eprfs/epr-cli/src/flow/fulfill.rs
 ---
 
 Landed on dev 2026-09-05 (spec genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md,

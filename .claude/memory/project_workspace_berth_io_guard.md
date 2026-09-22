@@ -10,6 +10,10 @@ metadata:
   type: project
   originSessionId: 0b015666-05d9-4a1d-bf90-6e1e121f70b3
   modified: 2026-09-03T16:22:24.434Z
+cites:
+  - "workspace-berth-carrying-capacity-design | The workspace is a berth | sha256:589932493289a667 | path: genesis/docs/superpowers/specs/2026-09-03-workspace-berth-carrying-capacity-design.md"
+  - genesis/agentic/bin/berth
+  - genesis/agentic/bin/io-guard
 ---
 
 **Operator ruling 2026-09-03:** sessions coordinating the mesh, the cargo slot and the disk by chat

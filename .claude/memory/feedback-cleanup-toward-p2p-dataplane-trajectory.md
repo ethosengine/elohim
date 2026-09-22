@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 32ed30bb-9c4a-4a71-9026-524a934f5f9e
+cites:
+  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
 ---
 
 The two-host model (alpha.elohim.host + elohim.host as separate storage backends, each PATCHed per-host) and per-row deploy artifacts (e.g. the separate `elohim-host-landing-ssr` content row holding the server bundle's blob pointer) are **MVP conveniences on the way to a fully-synchronized P2P dataplane** — content-addressed byte replication; substrate-replication trajectory home `genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md` + the 2026-06-14 dataplane plan arc. Blobs do NOT auto-replicate yet (gossip carries inventory/who-has-what, not bytes — `Jenkinsfile:328-331`), so the slug→blobHash pointer is a per-host mutable write. That is a known temporary scaffold the user is actively building past, NOT the target architecture.

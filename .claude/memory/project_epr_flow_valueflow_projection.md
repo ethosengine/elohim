@@ -9,6 +9,9 @@ metadata:
   type: project
   originSessionId: 89a16d25-7c1e-4c41-ab07-855e74cd03df
   modified: 2026-07-21T14:39:11.765Z
+cites:
+  - .claude/epr-meta/recipes.yaml
+  - elohim/eprfs/epr-cli/src/flow/
 ---
 
 The developer valueflow is projectable from the repository itself (landed 2026-07-18,

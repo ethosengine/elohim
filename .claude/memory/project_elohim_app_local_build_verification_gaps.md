@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: bb6233b0-21d0-494c-8768-a211d858c47c
+cites:
+  - app/elohim-app/package.json
+  - app/elohim-app/tsconfig.json
 ---
 
 In this dev container the elohim-app quality gates can't all run locally — and the gaps hide a real CI-blocking error class:

@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5415d4ae-087b-4aa6-97ab-613211946a18
+cites:
+  - genesis/a2o/scripts/look.ts
 ---
 
 Agent eyes in Eclipse Che are LANDED and verified (2026-06-10). Two primitives:

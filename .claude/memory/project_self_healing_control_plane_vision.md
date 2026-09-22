@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: 07f6a581-cb81-4bc1-bcdf-6cbc304abfda
   modified: 2026-07-25T15:48:40.824Z
+cites:
+  - "actuatable-self-healing-control-plane-design | Actuatable Self-Healing Control Plane | sha256:3813e34470d5df1d | path: genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md"
 ---
 
 Operator vision articulated 2026-06-13 (feat/frontend-eyes-sprint), provoked by the live doorway-alpha freeze + storage-node memory climb. The self-healing surface is NOT a dashboard — it is an **actuatable control plane** that is OBSERVABLE (every reliability primitive readable as a projection) and ACTUATABLE (tune/pause/resume/run-now/reset/quarantine/re-derive via typed contract), serving THREE consumers: a human operator, a future "controls" UI, and the real target — an **AI agent self-debugging FOR the agent runtime on the user's own device**.

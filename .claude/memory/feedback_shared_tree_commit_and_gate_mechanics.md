@@ -2,6 +2,7 @@
 index: false
 name: feedback-shared-tree-commit-and-gate-mechanics
 title: "Shared-tree commit and gate mechanics"
+id: feedback-shared-tree-commit-and-gate-mechanics
 description: Backticks in a Bash heredoc trip the destructive-token hook (Write the commit msg); gate a dirty shared crate from a git-archive export OUTSIDE the repo.
 metadata: 
   node_type: memory
@@ -9,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: 81f8cba7-09d3-4cc0-83a9-af45293320fd
   modified: 2026-09-21T00:24:24.131Z
+cites:
+  - genesis/manifests/habits.yaml
+  - .claude/epr-meta/policies.yaml
 ---
 
 Three mechanics for working in the shared `/projects/elohim` tree alongside other live sessions:

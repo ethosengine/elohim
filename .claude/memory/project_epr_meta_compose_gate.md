@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: da119ac8-d62b-4bca-83df-818d9e4fd563
+cites:
+  - .claude/hooks/epr-meta-resolver.py
 ---
 
 The **`.epr-meta` compose-gate** (the "dev substrate IS the protocol" arc, **P1a**) is LIVE as of 2026-06-25: a registered PreToolUse hook (`.claude/hooks/epr-meta-resolver.py` + `_lib/epr_meta.py`) gating `Edit|Write` against cascading directory-local `.epr-meta` manifests. **Operational effect to remember:** authoring a NEW `.md` under `genesis/docs/superpowers/**` now requires frontmatter (root: `[id, status, cites]`; `specs/` → 7 fields) or it's DENIED; editing existing files is NOT gated (`new: true`). A malformed manifest is **strict-but-recoverable** (architect call): subtree downgrades `deny→ask`, the `.epr-meta` itself is always editable — because unvalidated governance is Private-reach intent that hasn't earned cross-machine DHT notarization (*proposed* `ask`, not *binding* `deny`).

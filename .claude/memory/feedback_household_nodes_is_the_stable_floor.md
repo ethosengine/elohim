@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5202e82d-a14d-4ad3-b13a-966c13b597d3
+cites:
+  - genesis/manifests/cluster-state.yaml
 ---
 
 When classifying a2o reds as BLOCKED-BY-ENV, do NOT conflate "`alpha-cluster-6peer` degraded / `shem` offline" with "this work is blocked." `cluster-state.yaml` declares `household-nodes` (Matthew/Jessica/James) `available: true`, and a 3-node household is itself a **live multi-peer P2P mesh** — it satisfies the publish drain's `≥1 connected peer` gate, runs conductor→storage signals, and forms collectives. Verified 2026-06-08: `curl https://doorway-alpha.elohim.host/health` → `"p2p":{"peerCount":2}`, conductor 4/4, `discoveryComplete:true`.

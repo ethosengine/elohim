@@ -5,6 +5,9 @@ id: feedback-stale-record-feeds-memory-ceremony
 description: "Record stale gospel/memory claims via `epr flow note --kind correction`; ceremony Phase 0 reads them."
 metadata:
   type: feedback
+cites:
+  - .claude/skills/memory-ceremony/SKILL.md
+  - elohim/eprfs/epr-cli/src/flow/note.rs
 ---
 
 When a session finds a stale claim in a gospel surface (CLAUDE.md, a skill, an agent doc), a

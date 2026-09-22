@@ -7,6 +7,10 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: e5328acc-ec5f-4701-8d4f-17dc78dd9c5b
+cites:
+  - .claude/skills/looking-at-frontend/SKILL.md
+  - genesis/a2o/scripts/look.ts
+  - genesis/a2o/scripts/graphos.ts
 ---
 
 **GRADUATED 2026-06-11 → `.claude/skills/looking-at-frontend/SKILL.md`** (TDD'd, committed d8f324d78). The skill is the canonical home; invoke it rather than relying on this note. Two rails live ONLY here + the skill's dispatch section: (1) subagents do NOT self-discover skills — any visual-review dispatch prompt must carry the eyes rail explicitly; (2) the agent registry snapshots at session start — agent-body edits (REQUIRED EYES pointers in component-architect/graphos-designer) only reach dispatches in FRESH sessions.

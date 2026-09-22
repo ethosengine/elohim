@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5708b386-3421-4347-8ec0-0aa90dec1db5
+cites:
+  - "justice-manifesto | justice-manifesto | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
 ---
 
 Architect stance (Matthew, 2026-06-23), now FOUNDATIONAL CANON: `genesis/docs/architecture/justice-manifesto.md` (**Mishpat: The Justice That Sees**) + spec `genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md` (**Justice That Sees at Scale**). AI agents will re-leak two framings the protocol REJECTS — guard at metaphor/definition time:

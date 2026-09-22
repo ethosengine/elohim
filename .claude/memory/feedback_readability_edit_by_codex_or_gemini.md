@@ -5,6 +5,8 @@ id: feedback-readability-edit-by-codex-or-gemini
 description: "Operator 2026-09-06: long explainer docs get a blind-reader pass, then a readability EDIT by Codex or Gemini."
 metadata:
   type: feedback
+cites:
+  - .epr-meta/elohim/packages/agents/blind-reader.json
 ---
 
 **What the operator said (2026-09-06, on the Holons-Are-Spaces explainer):** "make sure you dispatch a blind reader,

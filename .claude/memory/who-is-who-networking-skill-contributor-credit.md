@@ -9,6 +9,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ca4a672a-d664-44dd-b21f-64d780015b5d
+cites:
+  - "contributor-presence-bootstrap-whoswho-design | Contributor-Presence Bootstrap & the Who's-Who Knowledge Graph | sha256:0b72f9cec8821810 | path: genesis/docs/superpowers/specs/2026-06-21-contributor-presence-bootstrap-whoswho-design.md"
+  - genesis/data/presences/
 ---
 
 A planned **"networking / who's-who" skill** — a *social/attribution* lens, distinct from the builder trio ([[atlas-grounding]] · concept-mapping · app-port) and the evaluator lenses (product/VC/philanthropist). It consults the contributor network to know **who inspired this work** — the real people and open-source libraries behind it.

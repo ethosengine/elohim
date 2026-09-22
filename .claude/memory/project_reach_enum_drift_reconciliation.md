@@ -8,14 +8,14 @@ metadata:
   node_type: memory
   id: project-reach-enum-drift-reconciliation
   title: "Reach reconciliation — canonical spec EXISTS, plan against it"
-  cites:
-    - genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md
-    - genesis/research/ontology-systems-survey-reach-reconciliation-2026-07-22.md
-    - genesis/research/letter-to-rea-practitioners-observed-presence-2026-07-22.md
-    - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
   type: project
   originSessionId: 8c91e512-7e3f-4704-8595-8a9333cfc24b
   modified: 2026-07-22T15:56:03.215Z
+cites:
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
+  - genesis/research/ontology-systems-survey-reach-reconciliation-2026-07-22.md
+  - genesis/research/letter-to-rea-practitioners-observed-presence-2026-07-22.md
+  - genesis/data/timeline/backlog/reach-vocabulary-frontend-strand.md
 ---
 
 **The reconciliation is now SPECED — do not re-derive.** The 2026-07-22 session (ontology-systems deep-research survey, adversarially verified + operator-adjudicated thesis) produced the canonical spec `2026-07-22-reach-ontology-vocabulary-split-spec.md`. Its §7 is the sprint Definition of Done. Companion artifacts: the research survey and the REA-practitioner letter in `genesis/research/`.

@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ca4a672a-d664-44dd-b21f-64d780015b5d
+cites:
+  - app/elohim-library/.storybook/
+  - genesis/data/timeline/backlog/ci-storybook-smoke-test-timeout-flake.md
 ---
 
 The `elohim-storybook` pipeline runs a **Smoke-Test Stories** stage that loads every story with a per-story timeout (~30s) under a marginal total budget. A fat per-element story matrix — many `lens×theme×state` exports, or heavy-DOM full-fixture stories, or stories with NO `play` function that stall the runner — tips the cumulative budget and fails the **entire** build (UNSTABLE/FAILURE), not one story.

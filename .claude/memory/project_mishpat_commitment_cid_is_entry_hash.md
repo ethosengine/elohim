@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: dae47f08-130c-420b-b02f-7a704dea71d8
+cites:
+  - elohim/holochain/dna/mishpat/
 ---
 
 In the Mishpat→`mishpat_commitments` storage projection, a commitment row's `cid`

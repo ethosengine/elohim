@@ -6,6 +6,8 @@ id: project-doorway-ab-edge-islanding
 description: Two independent doorway edges over matthew/adam with no cross-edge coherence or divergence detection; e0352a7/8a2c65e glyphs were buildIds, not content CIDs.
 metadata:
   type: project
+cites:
+  - genesis/orchestrator/manifests/doorway/
 ---
 
 Two doorways, **NOT load-balanced**: `doorway-alpha.elohim.host` → doorway-alpha → **matthew** conductor (on-prem household, genesis peer), MongoDB `doorway-alpha`, doorwayId `alpha-elohim-host`; `elohim.host` (apex) → doorway-alpha-b → **adam** conductor (shem/remote, genesis peer), MongoDB `doorway-alpha-b`, doorwayId `apex-elohim-host`. nginx ingress uses `upstream-hash-by $binary_remote_addr` (client-IP sticky), **no LB, no CDN, no shared cache**; the apex has no fallback to matthew.

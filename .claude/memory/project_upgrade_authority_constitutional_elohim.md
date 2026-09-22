@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 11713646-4f3a-47c8-b19d-aa263641d5b1
   modified: 2026-09-01T17:54:21.536Z
+cites:
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
 ---
 
 Operator course-set 2026-09-01 (rung-5 upgrade-propagation design): the protocol

@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: c1280948-357d-4a93-9b91-d8d8273c0e3e
   modified: 2026-08-15T12:33:04.772Z
+cites:
+  - .epr-meta/elohim/packages/agents/blind-reader.json
 ---
 
 Operator observation (2026-08-15, corroborated by others): Opus 5 understands complexity well but is **not as accessible a writer**. For agents whose job is judging legibility — `blind-reader` above all — the `opus` alias is wrong: it floats to the newest Opus and silently re-calibrates the reviewer's prose taste.

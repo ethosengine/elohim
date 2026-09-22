@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 814f0995-0478-402e-89e7-00813f34980d
+cites:
+  - "tiered-quilt-stewardship-design | Tiered Quilt Stewardship | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md"
 ---
 
 If asked to "unblock the tiered quilt": the big 4-DNA **attestation consolidation** (wave-0 Stage A — collapse 18+ attestation-shaped entry types across imagodei/elohim/infrastructure/mishpat into one `Content content_type:"attestation:<subtype>"` primitive) **ALREADY SHIPPED** — Phase-2a sprint, commit `34fcf1070` (Stage A→G: coordinator fns, unified `attestations`/`governance_actions` projection + tally, legacy-table drop, Shamir transport, unified routes). History: `2026-06-02-attestation-consolidation-phase2a-dedup.md`. **Do NOT re-plan/re-dispatch the consolidation** (the wave-0 plan + design were stale, presenting it as to-do + awaiting-sign-off; corrected 2026-06-20, commit 9f84c0003 — design `status: Implemented`, wave-0 has a LANDED banner).

@@ -7,6 +7,10 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a0632634-fa0a-4b7a-8546-a7e1a5d6f0ab
+cites:
+  - "che-keyless-peer-client-slice1-governance-spine-plan | Che keyless peer-client | sha256:f49a28709387179a | path: genesis/docs/superpowers/plans/2026-06-26-che-keyless-peer-client-slice1-governance-spine-plan.md"
+  - genesis/a2o/features/resilience/governed-distribution.feature
+  - doorway/doorway-service/src/config.rs
 ---
 
 The **Che keyless peer-client Slice-1 op-gate** governance spine — plan

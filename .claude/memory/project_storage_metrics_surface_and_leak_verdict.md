@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 78b2961c-1c56-4ebb-9ef7-ba3641a14acf
+cites:
+  - "conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:baaeb07c717b0261 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md"
+  - genesis/orchestrator/manifests/infra/alpha-edgenode-podmonitor.yaml
 ---
 
 ✅ **CURED 2026-06-19 by the jemalloc allocator swap** (the "allocator IS the fix" outcome): the `b8481f090` jemalloc-prof conductor went fleet-wide and the monotonic-to-OOM climb stopped (matthew/james flat ~2.7GB, 0 restarts, 10.5h vs glibc 8GB→OOM/~5h). NEXT: ship a jemalloc-PRODUCTION `:latest` (allocator on, prof off) — NOT a revert to glibc `:latest`. Everything below is the investigation trail.

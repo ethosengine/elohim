@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: c1280948-357d-4a93-9b91-d8d8273c0e3e
   modified: 2026-08-15T13:09:45.538Z
+cites:
+  - .epr-meta/elohim/packages/agents/scribe.json
 ---
 
 **The workflow (operator directive 2026-08-15, first run complete same day):** for prose deliverables, `scribe` (planted eprfs agent, pinned `claude-opus-4-6`, tools Read/Write/Edit) is the PRIMARY writer; the dispatching session supplies the technical spec and reviews rounds for technical coherence only — it does not rewrite prose. A fresh context-isolated [[pin-reader-agents-to-older-opus|blind-reader]] then audits legibility (path + profile only; it cannot be scoped to a diff, it cold-reads the whole document).

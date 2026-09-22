@@ -5,6 +5,8 @@ id: feedback-onpush-implicit-default-harness-blindness
 description: "Angular 22 OnPush default freezes callback field mutation; test harnesses hide it — verify with an Eager host, eyes-on."
 metadata:
   type: feedback
+cites:
+  - genesis/data/timeline/backlog/onpush-eager-debt-inventory.md
 ---
 
 Angular 22 made OnPush the implicit default. A component with NO `changeDetection` that flips

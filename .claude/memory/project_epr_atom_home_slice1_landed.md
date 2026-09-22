@@ -6,6 +6,10 @@ id: project-epr-atom-home-slice1-landed
 description: "Slice 1 landed 2026-09-02: shell-owned /epr/{id}; habit RED until the fleet renders it. Commons next."
 metadata:
   type: project
+cites:
+  - app/elohim-app/src/app/elohim/components/epr-home/
+  - genesis/a2o/features/content/epr-atom-home.feature
+  - app/elohim-app/.epr-meta/epr-atom-home.habit.md
 ---
 
 # EPR atom home — Slice 1 landed (2026-09-02)

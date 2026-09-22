@@ -6,6 +6,8 @@ id: project-clone-isolation-and-discovery-cost-findings-2026-09-07
 description: "Mesh 2026-09-07: role-keyed sync leaks clone content into base cells; feedback discovery scans all history — group-space + convergence hazard."
 metadata:
   type: project
+cites:
+  - elohim/elohim-storage/src/services/feedback_projector.rs
 ---
 
 **Two substrate facts from the 2026-09-07 overnight shift (both have backlog atoms with receipts):**

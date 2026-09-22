@@ -7,6 +7,10 @@ metadata:
   type: feedback
   originSessionId: 08dda108-5eac-4580-8178-d1bade78f0ab
   modified: 2026-09-02T18:42:00.412Z
+cites:
+  - elohim/epr-rea/
+  - elohim/epr/
+  - elohim/elohim-compute/
 ---
 
 Operator direction (2026-09-02, during the ark S0 build): be mindful to inherit the substrate's

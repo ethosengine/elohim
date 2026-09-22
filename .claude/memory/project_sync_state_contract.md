@@ -6,6 +6,8 @@ id: project-sync-state-contract
 description: "Sync-plane state durable: inventory gossip, Automerge gossip, DHT entries. Canonical channels alone move heads."
 metadata:
   type: project
+cites:
+  - "sync-state-contract | The sync-state contract | sha256:cea95b17140d2fd6 | path: genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md"
 ---
 
 Spec: `genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md`; code: `elohim-storage/src/p2p/sync_state.rs` (registry row `SyncStreamState::caught_up`). Born from four 2026-08-29 defects that were one defect (implicit position, no epoch, guessed caught-up): inventory 9 % view, tail loss, publisher-restart collapse, half rows.

@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 3770615f-abc2-41d9-b005-cbf326b6db5f
+cites:
+  - .husky/pre-push.bash
 ---
 
 Whether a push from a **linked git worktree** runs the husky pre-push gate depends on

@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: db7d45b4-df8b-4301-bd3d-cc8c88366c63
   modified: 2026-07-21T16:58:50.822Z
+cites:
+  - genesis/data/presences/
 ---
 
 # Contributor-presence re-grounding — commons stewardship (design agreed 2026-07-21)

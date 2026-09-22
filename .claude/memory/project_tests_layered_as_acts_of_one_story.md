@@ -7,6 +7,8 @@ id: project-tests-layered-as-acts-of-one-story
 description: "Tests: Act Prologue (cast + fixture), Act I (household baseline), Act II (federation), Act III (adoption)."
 metadata:
   type: project
+cites:
+  - genesis/a2o/features/
 ---
 
 Operator direction (2026-08-21, during the local-mesh layering work): the a2o suite is not "micro vs

@@ -10,6 +10,9 @@ metadata:
   type: reference
   originSessionId: 08dda108-5eac-4580-8178-d1bade78f0ab
   modified: 2026-09-03T16:18:44.658Z
+cites:
+  - genesis/agentic/bin/io-guard
+  - genesis/agentic/bin/berth
 ---
 
 Two operator-requested rails landed on local dev 2026-09-03 (elohim-0d), in `genesis/agentic/bin/`:

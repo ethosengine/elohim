@@ -5,6 +5,8 @@ id: project-monetary-posture-currency-is-information
 description: "Currency is the information moving in an exchange — REA is full of it; 'the protocol never issues' was retired."
 metadata:
   type: project
+cites:
+  - genesis/research/monetary-posture-internal-currencies-external-fiat-2026-08-23.md
 ---
 
 The corpus's monetary position (2026-08-24, `genesis/research/monetary-posture-internal-currencies-external-fiat-2026-08-23.md` §2.9 + `succession.md`):

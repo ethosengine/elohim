@@ -10,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: 77071821-7182-463a-ae84-0c496dd5f84e
   modified: 2026-08-22T06:26:26.804Z
+cites:
+  - .epr-meta/elohim/packages/
+  - elohim/sdk/domains/elohim-agent/scripts/package-projections.mjs
 ---
 
 The elohim-agent package gate (pre-push, `package-projections.mjs`) treats `.epr-meta/elohim/packages/` as canonical for package-first surfaces (CLAUDE.md via the `elohim-root-gospel` agentdoc, `.claude/skills/*/SKILL.md`, agents, .codex). Sessions habitually edit the RUNTIME side directly, so at push time the gate reds with "projection drift".

@@ -9,6 +9,8 @@ metadata:
   title: Track-4 projected-head coherence arc
   type: project
   originSessionId: fa5ce6f4-de74-4690-b832-4cb9191e4cc8
+cites:
+  - scripts/ci/verify-projected-head.sh
 ---
 
 # Track-4 projected-artifact coherence (2026-07-22 arc)

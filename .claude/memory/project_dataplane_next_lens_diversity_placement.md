@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: a0632634-fa0a-4b7a-8546-a7e1a5d6f0ab
   modified: 2026-07-21T14:01:02.280Z
+cites:
+  - elohim/elohim-storage/src/reconcile/placement.rs
 ---
 
 After the Che op-gate (governed distribution) landed, an 11-agent grounding workflow

@@ -2,6 +2,7 @@
 index: false
 name: feedback-agents-commit-ledger-files
 title: "Agent commits drag in hook-maintained ledgers"
+id: feedback-agents-commit-ledger-files
 description: "Worktree agents commit .claude/data/*.jsonl ledgers the hooks rewrite; the index patch lands but the working-tree sync fails — amend the ledger out, apply --exclude '.claude/*'"
 metadata: 
   node_type: memory
@@ -9,6 +10,8 @@ metadata:
   type: feedback
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-13T05:40:38.428Z
+cites:
+  - .claude/data/
 ---
 
 Twice on 2026-09-13 an agent's worktree commit (`git add -A`-style) carried `.claude/data/governance-findings.jsonl`, a hook-maintained ledger that is always dirty in the shared tree. The index-patch landing succeeds (`git apply --cached` sees a clean index), but the working-tree sync fails on that file, so the source files silently stay behind HEAD in the shared checkout — and a build from the shared tree ships the OLD code.

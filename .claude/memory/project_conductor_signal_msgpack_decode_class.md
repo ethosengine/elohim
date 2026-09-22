@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: da9eca9d-9d7f-4a87-83f4-1f4197e6beba
+cites:
+  - elohim/elohim-storage/src/signals.rs
 ---
 
 Conductor app signals are MessagePack (`ExternIO` = `rmp_serde::to_vec_named`); `AgentPubKey`/`ActionHash` serialize as raw 39-byte arrays, NOT base64 strings (base64 is only their Display/JSON form). Two failure modes, both silent-at-debug: (1) decoding via `rmp_serde::from_slice::<serde_json::Value>` fails outright (Value can't represent bytes — same class as the DNA CLAUDE.md serde_json::Value-at-zome-boundary trap); (2) a storage mirror declaring those fields `String` fails the typed parse. Either way the signal drops and the projection goes dark while emit-side succeeds (this hid the empty `peer_statuses` for the whole EPR durability arc).

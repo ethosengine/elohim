@@ -6,6 +6,9 @@ description: "Gospel surfaces describe stable architecture — no 'as of', 'in f
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - .epr-meta/elohim/lenses/CLAUDE.md
+  - .epr-meta/elohim/lenses/gospel/substrate-currency-audit.py
 ---
 
 **Why:** a gospel-tier surface (agent prompt, SKILL.md, CLAUDE.md, spec) is read for months; any

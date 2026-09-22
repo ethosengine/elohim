@@ -6,6 +6,8 @@ id: feedback-mesh-is-the-proving-ground
 description: "Drive design on the local mesh (`just mesh`, Act I) and prove there; fleet CONFIRMS delivery, never discovers. Land valueflow chain locally first."
 metadata:
   type: feedback
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 "This is the place we want to really drive development — prove here that it's going to work on delivery,

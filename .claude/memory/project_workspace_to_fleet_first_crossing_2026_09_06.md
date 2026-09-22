@@ -6,6 +6,8 @@ id: project-workspace-to-fleet-first-crossing-2026-09-06
 description: "Rung 5 left the house 2026-09-06: three releases applied by the alpha canary by election; single-role candidates only; T3 peer bring-up recipe + traps — read before any fleet rung-5 measure"
 metadata:
   type: project
+cites:
+  - elohim/elohim-storage/src/services/release_adoption/
 ---
 
 **What happened (2026-09-06 04:39–07:1xZ):** `workspace-to-fleet-release.feature` Stations 1–5 passed 5/5 four times on

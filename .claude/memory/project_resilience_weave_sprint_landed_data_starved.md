@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: a0632634-fa0a-4b7a-8546-a7e1a5d6f0ab
+cites:
+  - elohim/elohim-storage/src/services/household_resilience.rs
 ---
 
 The resiliency-card + P2P-weave sprint (`2026-06-21-resiliency-card-p2p-weave-sprint-plan`, Waves 0–5) **all landed on `dev` 2026-06-22** (`498acb00a`→`637ea8f6d`). **All FIVE facings/lenses now have live routes** — resiliency `/api/v1/resilience/{cid}`, operational-weave `/api/v1/weave` (`c6805597d`, lit + CoverageRollup descent `1e7bc2d89`), REA `/api/v1/commitments/facing/rea` (`ea31e0bf7`), reach/projection `/api/v1/peer-topology`, EPR `/api/v1/epr/{cid}/{raw,envelope}`. The 2026-06-21 plan's "operational-weave route 0%" was **stale when written**.

@@ -6,6 +6,8 @@ id: project-local-pair-failover-validation-rail
 description: "Failover validation rail: homo-iroh warm recovery PASS 258s; MESH_PEER_TRANSPORTS for hc-mesh.sh."
 metadata:
   type: project
+cites:
+  - app/elohim-app/scripts/hc-mesh-recovery.sh
 ---
 
 `just mesh start` = doorway A :8888 (matthew-primary, id `alpha-elohim-host`) + doorway B :8889 (jessica-primary,

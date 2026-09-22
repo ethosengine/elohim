@@ -6,6 +6,9 @@ description: "MEMORY.md index, memory/*.md entries, MemPalace (per-subagent), CL
 metadata:
   node_type: memory
   type: reference
+cites:
+  - .claude/memory/.epr-meta
+  - .epr-meta/elohim/lenses/CLAUDE.md
 ---
 
 # Memory-system references (umbrella)

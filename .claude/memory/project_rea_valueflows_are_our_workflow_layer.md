@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 0a373f14-82a7-46f3-9198-a252328c16b5
   modified: 2026-08-13T13:44:04.096Z
+cites:
+  - .claude/epr-meta/recipes.yaml
 ---
 
 Operator framing, 2026-08-13. Every team publishing on long-horizon agent runs improvised a

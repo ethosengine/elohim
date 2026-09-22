@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: bd61680f-6873-4e7f-8ed3-3a85294dc882
+cites:
+  - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
 ---
 
 [Holepunch](https://github.com/holepunchto) (the Hypercore stack + Pear runtime; Tether-backed) is the closest external mirror of the protocol's **p2p SUBSTRATE** — data plane (§3.10), NAT/transport, confidentiality (§3.13). NOT the doorway/federation seam ([[feedback_p2p_vs_federation_layer_vocabulary]]). Full org-wide, gate-adjudicated, seam-routed survey: `genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md` (advances PAST the single-primitive note `steward/node/research/hypercore-holepunch-prior-art.md` + the fediverse-lens [[project_prod_main_lag_vs_alpha_dev]]-adjacent Distributed Press survey). Read the doc for detail; this is the re-loadable residue.

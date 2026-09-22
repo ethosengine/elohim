@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: 13b4bc62-ff46-41bb-8974-10317419acad
   modified: 2026-07-19T06:56:30.770Z
+cites:
+  - scripts/ci/stage-spa-blob.sh
 ---
 
 Getting a new SSR-capable EPR app (e.g. `lamad-spa`) actually SERVING SSR on alpha is a two-pipeline dance, and the ordering bites (verified 2026-07-19 landing lamad-spa SSR):

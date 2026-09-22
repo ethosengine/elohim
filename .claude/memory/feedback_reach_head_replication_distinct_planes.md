@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: def7446b-f76b-492e-8464-1dfb0da18ef6
+cites:
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
 ---
 
 Operator ontology-guard (2026-07-09), given while refocusing C3. AI agents (me) reached for "content_head election" to explain the `elohim-host-landing` divergence and let the head-declaration signal lean on reach/attestation — fusing two independent concepts. Keep three planes strictly separate:

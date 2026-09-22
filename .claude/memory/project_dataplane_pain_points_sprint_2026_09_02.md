@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: e316e847-8c4b-4da1-bea6-84b2dcf29a75
   modified: 2026-09-02T00:44:02.005Z
+cites:
+  - "dataplane-pain-points-sprint-plan | Dataplane pain-points sprint | sha256:5c77703d703039af | path: genesis/docs/superpowers/plans/2026-09-02-dataplane-pain-points-sprint-plan.md"
 ---
 
 Plan: `genesis/docs/superpowers/plans/2026-09-02-dataplane-pain-points-sprint-plan.md` (habit `dataplane-convergence`).

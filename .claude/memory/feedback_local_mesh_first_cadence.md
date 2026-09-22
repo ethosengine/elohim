@@ -6,6 +6,8 @@ description: "Household mesh proves first; fleet confirms, never discovers. Batc
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 # Local-mesh-first cadence & verification (umbrella)

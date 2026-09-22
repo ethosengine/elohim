@@ -6,6 +6,9 @@ id: project-dna-hash-depends-on-build-path
 description: "Cargo metadata includes package paths: identical source in different worktrees changes DNA hashes — check before hash comparisons or coordinator hot-swap."
 metadata:
   type: project
+cites:
+  - scripts/ci/dna-hash-guard.sh
+  - elohim/holochain/dna/dna-hashes.baseline
 ---
 
 **Verified 2026-09-06 (slice 1 of accountable-correction):** identical integrity source, identical `dna.yaml`, identical

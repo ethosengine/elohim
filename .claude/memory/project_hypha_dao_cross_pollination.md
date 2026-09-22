@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 89f7bc8d-a468-43cf-a34f-99fe587ab209
+cites:
+  - genesis/research/hypha-dao-autonomous-collectives-cross-pollination-2026-06-24.md
 ---
 
 [Hypha DAO](https://github.com/hypha-dao) (the **DHO** = "Decentralised Human Organisation" toolkit; Telos/EOSIO → EVM) is the closest external mirror of the protocol's **autonomous-entity & collective** work (recursive-Qahal `Collective`/`Membership`/`CollabAgreement`). Full survey + green/red-team: `genesis/research/hypha-dao-autonomous-collectives-cross-pollination-2026-06-24.md` (module note: `elohim/elohim-token/research/hypha-dao-governance-token-prior-art.md`; 4 repos pinned in `research-manifest.json`). Read the doc for detail; this is the re-loadable residue.

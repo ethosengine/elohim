@@ -6,6 +6,9 @@ description: "Container restarts kill mesh + wipe /tmp; ethosengine NFS deadlock
 metadata:
   node_type: memory
   type: project
+cites:
+  - che-devworkspaces/containers/udi-plus/Dockerfile
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 # Devspace/container recovery (umbrella)

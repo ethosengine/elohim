@@ -9,6 +9,9 @@ metadata:
   type: feedback
   originSessionId: 1e20b084-3df6-41bb-98c2-98477eff8411
   modified: 2026-08-31T16:19:10.618Z
+cites:
+  - genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md
+  - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
 ---
 
 **Operator correction (2026-08-31, mid carried-election shift).** When asked to guess his arising priorities, the agent ranked: (1) cure-vs-bypass of the conductor DHT plane, (2) making election authority real, (3) steward-operable runtime surface. He named 1–3 **biased mistakes**: with proper contextual understanding and *modeled test-fixtures* — the system deploying and driving a **simulacra without an agent embedded in the runtime** — those concerns are holdable/resolvable in stride. (4) living membership plane: valid. (5) dev-loop wall-clock: the real one, but structurally, not as mesh tweaks.

@@ -6,6 +6,9 @@ id: project-pure-iroh-parity-and-mesh-traps
 description: "Homo-iroh warm recovery PASS 258 s (2026-08-28); export MESH_PEER_TRANSPORTS for hc-mesh.sh; never start mesh processes inside a background tool task."
 metadata:
   type: project
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
+  - app/elohim-app/scripts/hc-mesh-recovery.sh
 ---
 
 Pure-iroh mode (`MESH_PEER_TRANSPORTS=matthew=iroh,jessica=iroh,james=iroh`) reached libp2p parity on the pull leg on 2026-08-28 (`b9c9ad477`): `p2p_iroh::pull_core` hosts replication gaps + pin acquisition + `/p2p/status.pull` without a `P2PNode`; heal-on-read races the iroh book; the shard responder serves iroh-staged blobs by alias; `GetManifest`/`Manifest` give the iroh leg the composite pivot. Warm recovery jessica←matthew: 901 s FAIL (P0 only) → 258 s PASS P0–P4 the same evening; durable record in `genesis/a2o/reports/recovery/recovery-timeline.jsonl`.

@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9d34ac8f-8455-4a08-8ccd-166c8171e257
+cites:
+  - genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md
 ---
 
 Alpha storage agents (the `elohim-node` container = `elohim-storage` Rust process + an embedded Holochain 0.6/kitsune2 conductor child sharing **one cgroup**) show load-correlated memory growth: loaded nodes (matthew=doorway read/proxy target, jessica, james=largest corpus 3654 docs) climb monotonically ~2→4GB+ with retained ~0.5–1.7GB step-jumps every ~3–5 min; the quiet bootstrap node (adam) plateaus ~2.2GB. james OOM-crashlooped every ~9 min at a 3Gi limit; bumping it to 8Gi only moved the ceiling (it climbed back to 3.3GB and kept going).

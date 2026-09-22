@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: e4e91b9c-ca18-4881-89e5-0bc36a68ce54
   modified: 2026-08-20T22:39:46.347Z
+cites:
+  - genesis/data/timeline/backlog/agent-peer-binding-signing.md
 ---
 
 Landed 2026-08-18 (`8c739a723`, habit `identity-cross-signed` unwired→red): the

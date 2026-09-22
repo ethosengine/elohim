@@ -8,6 +8,11 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5202e82d-a14d-4ad3-b13a-966c13b597d3
+cites:
+  - elohim/holochain/dna/Jenkinsfile
+  - ./Jenkinsfile
+  - elohim/holochain/Jenkinsfile
+  - genesis/Jenkinsfile
 ---
 
 CI tooling pod templates (`ci-builder`/`ci-playwright`/`ci-builder-nix:latest` in the five Jenkinsfiles) run `imagePullPolicy: Always` by operator decision (2026-06-07, commit b23c86c26): "prevent successful deployments that bury the drift." The 2026-06-06 `IfNotPresent` Harbor-outage mitigation was deliberately reverted once hp-micro10 was repaired.

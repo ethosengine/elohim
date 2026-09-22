@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 865f6e0d-8432-40e2-a8a2-350e7d2e7e01
+cites:
+  - app/elohim-library/projects/graphos/
 ---
 
 2026-06-11 frontend-eyes sprint found SIX distinct mechanical causes of dead/ghost token bindings across Library B (every one invisible to source review, all caught by rendering):

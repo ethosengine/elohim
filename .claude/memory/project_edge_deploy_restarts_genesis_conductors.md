@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9976da73-b166-447f-a5fa-ac2fa59103b6
+cites:
+  - elohim/holochain/Jenkinsfile
 ---
 
 **DELTA 2026-07-10:** since `9f9c4aec4` the genesis pair (adam/matthew) SKIPS the rollout restart when `kubectl apply` reports the STS "unchanged" (saturation-surge guard); commit `aa2651892` closes that guard's floating-happ-tag hole by stamping the resolved happ content digest into the pod template, so a DNA-pipeline tag move still reads "configured" → restart proceeds. Non-genesis peers always restart. The below remains true for non-genesis and for any real change.

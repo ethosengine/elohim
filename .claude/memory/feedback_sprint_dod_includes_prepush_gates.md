@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: e5328acc-ec5f-4701-8d4f-17dc78dd9c5b
+cites:
+  - .husky/pre-push.bash
+  - genesis/orchestrator/gate-runner.mjs
 ---
 
 When a sprint touches a lint-gated tree (any project the `.husky/pre-push` graph covers), every task's definition-of-done — and the final review — must run that project's actual gate clauses (`pnpm run lint && pnpm run format:check && pnpm run typecheck`), not only the unit suite.

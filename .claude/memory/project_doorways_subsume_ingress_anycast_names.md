@@ -2,6 +2,7 @@
 index: false
 name: project-doorways-subsume-ingress-anycast-names
 title: "Doorways subsume the ingress — anycast names"
+id: project-doorways-subsume-ingress-anycast-names
 description: "Doorways are host-aware and stand anycast-style behind a name's DNS records, failing over for each other; the k8s ingress goes away — bites on any serving-edge design."
 metadata: 
   node_type: memory
@@ -9,6 +10,8 @@ metadata:
   type: project
   originSessionId: e3b37899-a842-43df-9853-12981fc438ed
   modified: 2026-09-19T14:39:55.019Z
+cites:
+  - genesis/orchestrator/manifests/doorway/
 ---
 
 Operator direction, 2026-09-19 (pipeline-shakeout shift, after I described the alpha doorway pair as "the ingress pins each name to one doorway"):

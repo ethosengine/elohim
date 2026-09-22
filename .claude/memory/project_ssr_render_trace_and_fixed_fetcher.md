@@ -9,6 +9,9 @@ metadata:
   type: project
   originSessionId: a83484a6-6492-4e83-8c53-5b01785aa065
   modified: 2026-07-18T17:51:25.983Z
+cites:
+  - elohim/elohim-render/
+  - genesis/data/timeline/backlog/ssr-multi-app-renderer-enablement.md
 ---
 
 The SSR core is **`elohim/elohim-render/`** — a framework-agnostic V8/deno_core runtime (`Renderer` trait; AngularRenderer/EchoRenderer plug in), consumed by BOTH doorway AND elohim-storage (`src/ssr.rs` in each). SSR is p2p-native: a capable storage peer renders its own content, doorway is just the web2 edge. Instrument SSR concerns in the core crate, not in doorway.

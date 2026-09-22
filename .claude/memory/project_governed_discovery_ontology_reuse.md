@@ -6,6 +6,9 @@ id: project-governed-discovery-ontology-reuse
 description: "Design 2026-09-11: search/recall roles map to existing primitives — ProcessSpec/Manifest (recipe), Intent (need), AttentionTending (lens: TTL, tended, private), FlowEvent+Verdict+Observation (sample), ProjectionRequest/Feedback/FeedbackSignal (view+dispute), EpistemicStanding; social-reach five-constraint filter + anti-bubble floor govern lenses."
 metadata:
   type: project
+cites:
+  - "governed-discovery-journey-lens-graduation-design | Governed discovery | sha256:77030654da24c3e0 | path: genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md"
+  - elohim/epr-rea/src/model.rs
 ---
 
 **Spec:** `genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md`

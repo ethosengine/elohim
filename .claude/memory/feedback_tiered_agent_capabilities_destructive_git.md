@@ -5,6 +5,9 @@ id: feedback-tiered-agent-capabilities-destructive-git
 description: "After a Haiku hard-reset of dev (2026-09-11): opus+ or a team check; unknown = deny; PreToolUse policies.yaml gate."
 metadata:
   type: feedback
+cites:
+  - .claude/hooks/capability-tier-gate.py
+  - .claude/epr-meta/policies.yaml
 ---
 
 **What happened (2026-09-11 22:34Z):** a Haiku subagent of another session ran `git reset --hard 466536cb4`

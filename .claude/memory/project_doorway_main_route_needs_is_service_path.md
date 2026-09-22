@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 43157925-f031-4663-a48e-e8b292dd8fa2
+cites:
+  - doorway/doorway-service/src/server/http.rs
 ---
 
 Adding a new explicit GET route to doorway's main listener (`doorway-service/src/server/http.rs`)

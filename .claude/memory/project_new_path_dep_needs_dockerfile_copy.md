@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: ca4a672a-d664-44dd-b21f-64d780015b5d
+cites:
+  - elohim/elohim-storage/Dockerfile
+  - doorway/doorway-service/Dockerfile
 ---
 
 The edge image build flattens the workspace into a build context, so each path-dep crate referenced by `doorway/doorway-service/Cargo.toml` or `elohim/elohim-storage/Cargo.toml` needs TWO things in the respective Dockerfile: (1) a `COPY <crate-path> ./<flattened-path>` line, and (2) a `sed -i 's|path = "../../<crate>"|path = "<crate>"|' Cargo.toml` path-rewrite. The two Dockerfiles use DIFFERENT relative prefixes — `doorway/doorway-service/Dockerfile` rewrites `../../…`, `elohim/elohim-storage/Dockerfile` rewrites a single `../`.

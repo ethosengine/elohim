@@ -6,6 +6,9 @@ description: "ci-playwright on ci-builder; cache PVCs node-pinned; devspace node
 metadata:
   node_type: memory
   type: project
+cites:
+  - .cargo/config.toml
+  - elohim/holochain/dna/Jenkinsfile
 ---
 
 # CI build infra — images, caches, registries (umbrella)

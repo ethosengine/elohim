@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: e8b573fe-62bd-4248-bb8b-d7d407266dca
+cites:
+  - .claude/hooks/cargo-disk-guard.py
+  - genesis/agentic/pool-policy.json
 ---
 
 `.claude/hooks/cargo-disk-guard.py` DENIES heavy cargo (`build`/`test`/`clippy`/…) when `/projects` df ≥ `volume_hard_pct` (85%, from `genesis/agentic/pool-policy.json`). **`FORCE_HEAVY_GATES=1` does NOT override this** — that env var only overrides the *pre-push* gate deferral, not the PreToolUse deny (the hook never reads it; verified 2026-06-19). The hook also has no other env bypass.

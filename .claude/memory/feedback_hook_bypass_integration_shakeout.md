@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: da9eca9d-9d7f-4a87-83f4-1f4197e6beba
+cites:
+  - .husky/pre-push.bash
 ---
 
 Operator's general rule for `git push --no-verify` to dev: if you are the agent working on the CI/CD pipeline itself — your work already passed the hooks (gates run and documented), and the push is an **integration shakeout** — you effectively own the pipeline and may use CI as your verification surface, leaving local compute to the other agents. It is not a license for unverified code: the precondition is gates-already-green.

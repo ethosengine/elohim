@@ -2,6 +2,7 @@
 index: false
 name: project-flock-lane-lock-inherited-by-daemons
 title: "Never start mesh daemons inside a flock'd shell"
+id: project-flock-lane-lock-inherited-by-daemons
 description: "`just mesh start` inside `flock lane.lock …` makes every detached daemon inherit the lock fd — the lock never releases and all later lane waiters hang silently"
 metadata: 
   node_type: memory
@@ -9,6 +10,8 @@ metadata:
   type: project
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-13T08:34:06.626Z
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 On 2026-09-13 a cold household restart was run as `flock /tmp/elohim-local-mesh/lane.lock bash mesh-cold-remeasure.sh`; `just mesh start` detaches conductors, storage peers, doorways, beacons and the portal, and every one of them inherited the open lock file descriptor. When the chain exited, the daemons still held the lock, so every later `flock lane.lock just test …` blocked forever with an empty log and no child process (`fuser lane.lock` lists the daemons; the waiter shows no descendants).

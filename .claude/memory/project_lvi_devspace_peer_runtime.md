@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 211ded97-7961-428a-8ec6-6754edca6092
   modified: 2026-07-21T00:19:00.039Z
+cites:
+  - elohim/lvi/
 ---
 
 **lvi** (льви — "lions"; Lviv — homage to Eclipse Che's Ukrainian engineering) = the Elohim

@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: b43fc98d-a01d-42eb-a935-abbc1f66659f
+cites:
+  - "plan-automerge-content-sync-plane-lighting | Light the Automerge content-sync plane | sha256:ec480d0db34fa492 | path: genesis/docs/superpowers/plans/2026-06-27-automerge-content-sync-plane-lighting-plan.md"
+  - elohim/elohim-storage/src/sync/
 ---
 
 The `/elohim/storage-sync/1.0.0` Automerge engine in `elohim/elohim-storage` was fully wired

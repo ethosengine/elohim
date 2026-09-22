@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 9d34ac8f-8455-4a08-8ccd-166c8171e257
+cites:
+  - elohim/elohim-storage/src/p2p/mod.rs
+  - genesis/seeder/src/wait-for-drain.ts
 ---
 
 The "absorb a bulk batch at a safe pace, never blow a hard deadline" primitive has been derived **twice** in this repo; the reusable closed-loop kernel is LIVE today. Don't re-derive it a third (now fourth) time.

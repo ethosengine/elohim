@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 73728c2e-2397-427f-b5b0-9718f01568dd
   modified: 2026-09-12T00:23:50.977Z
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 The household mesh (`just mesh start`) runs elohim-storage from

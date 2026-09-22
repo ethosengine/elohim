@@ -6,6 +6,9 @@ description: "Sovereign ≠ apex; Mishpat ≠ punishment; human-in-loop ≠ term
 metadata:
   node_type: memory
   type: feedback
+cites:
+  - "stewardship-over-sovereignty | stewardship-over-sovereignty | sha256:995eb2079924ea2e | path: genesis/docs/architecture/stewardship-over-sovereignty.md"
+  - "justice-manifesto | justice-manifesto | sha256:6080173b0d21848c | path: genesis/docs/architecture/justice-manifesto.md"
 ---
 
 # Framing & ontology guards (umbrella)

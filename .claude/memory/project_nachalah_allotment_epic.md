@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: bf90213f-876c-4014-807d-504fb20fefd3
   modified: 2026-09-05T13:09:37.231Z
+cites:
+  - "nachalah-allotment-epic | Nachalah | sha256:210aba054878c407 | path: genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md"
 ---
 
 Hub: `genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md` (id

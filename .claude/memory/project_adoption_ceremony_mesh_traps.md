@@ -6,6 +6,8 @@ id: project-adoption-ceremony-mesh-traps
 description: "Rung-5 adoption ceremony (local mesh 2026-09-02): preconditions, candidate shape, typed-refusal map. Use before release/election measures."
 metadata:
   type: project
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 First full §10 receipt passed on the local mesh 2026-09-02 00:43Z (transcript

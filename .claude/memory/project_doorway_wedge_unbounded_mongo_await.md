@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8374a407-e107-43ab-b772-2b91e8417354
+cites:
+  - doorway/doorway-service/src/conductor/mod.rs
 ---
 
 The doorway-alpha residual under-load wedge (all threads `futex_wait`, zero error logs, pre-fix `cpu:1`) was root-caused 2026-06-14: warm_stream re-streams the WHOLE corpus on every (re)connect/DHT-signal (~14k upserts/2min over ~3.6k docs, `store.rs`); cold-start hot cache is EMPTY so the idempotency guard misses → every doc takes a full `upsert_to_mongo().await`; Mongo ops had NO per-op timeout. **CURE APPLIED & DEPLOYED** (4dc862748, live in image `c6243f34`): `WARMUP_PACE_MS` (8ms/64-entry real sleep) + `DOORWAY_MONGO_OP_TIMEOUT_MS` (2s) + 75s total warm budget. warm_stream is conductor-DECOUPLED — it does `GET {storage_url}/api/v1/cache/stream` over HTTP then Mongo upsert; zero conductor refs (`warm_stream.rs:255-409`); the only kitsune2 client is `subscriber.rs:374` (background signal stream, single-flight-guarded on reconnect).

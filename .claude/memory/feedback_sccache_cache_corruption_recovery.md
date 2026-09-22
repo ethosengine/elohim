@@ -7,10 +7,10 @@ description: "sccache 'unclosed delimiter'/null-byte = .sccache_check 404 leaked
 metadata: 
   node_type: memory
   id: feedback-sccache-cache-corruption-recovery
-  cites: 
-    - genesis/orchestrator/Jenkinsfile
   type: feedback
   originSessionId: a07b86ac-7fd6-475e-ad7f-c2939da2ce69
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 When sccache surfaces cache corruption — symptoms include `error: unknown start of token: \u{0}` from rustc, clippy errors of the form `error: this file contains an unclosed delimiter` pointing at cached source positions, or build failures that disappear when `RUSTC_WRAPPER=""` is set — the corrupted cache entries need to be cleared. This memory captures only the verified recovery steps. The deeper question of *why* the cache became corrupted in the first place, or why some downstream invocation paths surface it differently, is **not isolated** as of this writing.

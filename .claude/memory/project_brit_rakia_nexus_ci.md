@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 4ae8aa4f-4ae1-4f6e-a6da-9a193f5a7f33
+cites:
+  - .cargo/config.toml
+  - elohim/epr/Jenkinsfile
 ---
 
 brit's standalone GitHub CI was red since April because `brit-cli` (the `rakia`

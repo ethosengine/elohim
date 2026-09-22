@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: 8c38d17a-1437-45fd-93ff-ae4300ae7bb1
   modified: 2026-07-30T14:54:32.031Z
+cites:
+  - che-devworkspaces/containers/udi-plus/Dockerfile
 ---
 
 `che-devworkspaces/containers/udi-plus/Dockerfile` provisions node with an

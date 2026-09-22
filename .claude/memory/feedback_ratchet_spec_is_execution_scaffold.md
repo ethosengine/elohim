@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: e316e847-8c4b-4da1-bea6-84b2dcf29a75
   modified: 2026-09-01T23:58:21.759Z
+cites:
+  - "ratchet-to-delivery-dataplane-sdk-lanes | Ratchet to delivery | sha256:162f2cde07f0de8e | path: genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md"
 ---
 
 Operator (2026-09-01): "the ratchet spec is just an execution principle because we've been struggling to finish/complete the feature.. we're close... but whatever we need to do to finish."

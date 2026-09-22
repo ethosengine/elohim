@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: cf766280-b0c4-495e-8e66-6e752749f7f2
   modified: 2026-08-04T14:15:59.836Z
+cites:
+  - elohim/elohim-storage/src/p2p_iroh/
 ---
 
 The iroh parallel stack (`elohim/elohim-storage/src/p2p_iroh/`, feature `p2p-iroh`) is ~85% finished — trust the tree, not the docs. Verified 2026-06-15 by 9-reader synthesis (`/tmp/iroh-synthesis/*.md`) + direct main.rs read.

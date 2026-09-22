@@ -6,6 +6,8 @@ description: "Reach (audience) ≠ head (version) ≠ replication (custody); hea
 metadata:
   node_type: memory
   type: project
+cites:
+  - "reach-ontology-vocabulary-split-spec | Reach Ontology/Vocabulary Split | sha256:2a1ef52c1ced3c48 | path: genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md"
 ---
 
 # Reach / head / freshness semantics (umbrella)

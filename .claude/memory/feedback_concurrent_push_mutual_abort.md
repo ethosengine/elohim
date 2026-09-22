@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 2c7ad11d-dd51-41df-8b9b-eea659f95321
+cites:
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 Observed 2026-06-06 evening: five consecutive `elohim-orchestrator/dev` ABORTED runs (#1172–#1176, "Queue task was cancelled") and two push events that never spawned a run at all. Two causes layered:

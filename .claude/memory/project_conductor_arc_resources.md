@@ -6,6 +6,9 @@ description: "Sys-validation CPU spin; CPU storm starves storage; glibc leak →
 metadata:
   node_type: memory
   type: project
+cites:
+  - elohim/elohim-storage/src/conductor_admission.rs
+  - genesis/data/timeline/backlog/fleet-full-arc-conductor-saturation-and-coordinated-warmup-2026-09-11.md
 ---
 
 # Conductor arc, memory & CPU incidents (umbrella)

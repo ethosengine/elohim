@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: a2dc3dac-b9f3-429b-89b0-d00f39aa1e9d
   modified: 2026-07-23T13:32:20.185Z
+cites:
+  - elohim/elohim-storage/src/services/household_resilience.rs
 ---
 
 # Resilience-card data plumbing (umbrella)

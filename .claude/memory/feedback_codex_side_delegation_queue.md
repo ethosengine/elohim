@@ -10,6 +10,8 @@ metadata:
   type: feedback
   originSessionId: d9dfc541-741f-46d8-b268-23888610876f
   modified: 2026-07-29T13:01:35.736Z
+cites:
+  - genesis/data/timeline/backlog/
 ---
 
 Operator direction (2026-07-29): maintaining delegable side-tasks is general backlog discipline, not a per-runtime queue. The ideal pattern is a repo-canonical backlog any arriving agent can claim from — expanding sprint capacity across Claude, Codex, Gemini, etc.

@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: f84d8f67-f26c-4b08-8a6f-6cfd7e6cf12d
   modified: 2026-09-05T20:35:17.227Z
+cites:
+  - elohim/elohim-storage/.cargo/config.toml
+  - genesis/agentic/bin/cargo-jobs-flag
 ---
 
 **Trap (2026-09-04 overnight):** with the 3-peer 0.7 mesh running, every plain `cargo build --features "p2p p2p-iroh"`

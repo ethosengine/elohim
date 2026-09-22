@@ -9,6 +9,9 @@ metadata:
   type: project
   originSessionId: 9caa25ac-e730-4203-a14b-f55feef01c40
   modified: 2026-07-28T21:37:34.961Z
+cites:
+  - genesis/orchestrator/manifests/infra/alpha-coturn-shem.yaml
+  - genesis/orchestrator/manifests/infra/alpha-coturn-operations.yaml
 ---
 
 Since 2026-07-28 the elohim.host zone models the two premises: apex `elohim.host` A = shem WAN (adam's doorway-B; owned by the shem coturn beacon), `alpha.elohim.host` A = operations WAN (matthew; owned by the ops coturn beacon). Adam-side CNAMEs (`doorway`, `signal`, `signal.doorway`) follow the apex; matthew-side names (`doorway-alpha`, `storybook`, `staging`, `signal.alpha`, `signal.doorway-*`) CNAME to `alpha.elohim.host`. Matthew's signal is `signal.alpha.elohim.host`; adam's stays `signal.elohim.host`. ICE URLs are role-named: `turn:alpha.elohim.host:3478` (ops leg) / `turn:elohim.host:3478` (shem leg).

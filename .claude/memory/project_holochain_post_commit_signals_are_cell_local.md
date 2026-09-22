@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: 62953c2b-d161-4b7d-8ec3-88beb0ae56de
   modified: 2026-09-06T19:13:19.990Z
+cites:
+  - elohim/elohim-storage/src/signals.rs
 ---
 
 **The trap (caught in plan review 2026-09-06):** I planned a storage consumer for `FeedbackSignalCommitted`

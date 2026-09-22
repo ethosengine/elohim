@@ -9,6 +9,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 814f0995-0478-402e-89e7-00813f34980d
+cites:
+  - "weave-epic-arc-design | The Weave Epic | sha256:69966fdcc15dd7ba | path: genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md"
+  - elohim/elohim-storage/src/recursion.rs
 ---
 
 The operational-weave facing lens (`genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md`, domain D5, the per-cluster capacity *eyes*) seeds an epic of FOUR downstream subsystems. The arc index is `genesis/docs/superpowers/specs/2026-06-20-weave-epic-arc-design.md` (committed 8d51715f9); the Wave-A lens plan is `genesis/docs/superpowers/plans/2026-06-20-operational-weave-lens-plan.md` (35aaa6fbd, 17 task-items, Slice 1 = DB-free `placement_gap_count` proof gate).

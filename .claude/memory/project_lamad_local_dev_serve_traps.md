@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: 4a1e973b-6af5-4b35-87da-4d48c835b86d
   modified: 2026-09-02T04:12:22.157Z
+cites:
+  - app/lamad/proxy.conf.alpha.mjs
 ---
 
 Rendering the lamad step player locally (verified 2026-09-02):

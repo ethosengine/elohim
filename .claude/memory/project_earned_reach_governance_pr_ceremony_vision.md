@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6267f18d-a5f8-42b9-9703-372bf56bcea2
+cites:
+  - .husky/pre-push.bash
+  - genesis/seeder/src/cid-artifact.ts
 ---
 
 Operator's north-star (2026-07-09) for how the earned-authority / canonical-HEAD model plays out in the live network — the vision the [[project_versioned_entity_head_is_declared_dependency]] + notary-authority work is bootstrapping toward. Not in the repo; design-shaping.

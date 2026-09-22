@@ -5,6 +5,9 @@ id: project-ram-guard-oom-group-kill
 description: "memory.oom.group=1: one hot rustc restarts the workspace; ram-guard sheds builds first (signal 15)."
 metadata:
   type: project
+cites:
+  - genesis/agentic/bin/ram-guard
+  - .claude/hooks/ram-guard.py
 ---
 
 The devworkspace container cgroup ships with `memory.oom.group=1` (kubelet cgroup-v2 default), so

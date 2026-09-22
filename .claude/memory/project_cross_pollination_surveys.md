@@ -5,6 +5,10 @@ id: project-cross-pollination-surveys
 description: "Holepunch/Hypercore transport, Hypha DAO holonics, p2panda crate-discipline; borrow mechanics, reject truth-chain."
 metadata:
   type: project
+cites:
+  - genesis/research/holepunch-p2p-dataplane-cross-pollination-2026-06-24.md
+  - genesis/research/hypha-dao-autonomous-collectives-cross-pollination-2026-06-24.md
+  - genesis/research/p2panda-cross-pollination-2026-08-04.md
 ---
 
 # Cross-pollination surveys (umbrella)

@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 22183d22-e97a-41cd-b6ae-863ea1b29ce9
+cites:
+  - scripts/ci/fleet-coordswap.sh
+  - elohim/holochain/Jenkinsfile
 ---
 
 A Holochain **DNA hash covers only integrity zomes + modifiers** (network seed, properties). Coordinator zomes are explicitly excluded (`DnaDef.coordinator_zomes` doc: "zomes that do not affect the DnaHash"). Consequences (root-caused 2026-06-11, attestation-fix delivery stall):

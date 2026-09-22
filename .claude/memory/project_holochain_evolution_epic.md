@@ -5,6 +5,9 @@ id: project-holochain-evolution-epic
 description: "hApp-lineage migration epic: spec §11 is the hub; station 6 RED with a proven cause; 0.7.0 assessment steers it."
 metadata:
   type: project
+cites:
+  - "holochain-evolution-epic | Holochain Evolution Epic | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
 ---
 
 **Where to start:** `genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md` **§11**

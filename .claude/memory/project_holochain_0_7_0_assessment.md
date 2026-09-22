@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: 0b015666-05d9-4a1d-bf90-6e1e121f70b3
   modified: 2026-09-02T21:19:13.485Z
+cites:
+  - elohim/holochain-conductor/
+  - elohim/holochain/.epr-meta/happ-lineage-migration.habit.md
 ---
 
 Holochain 0.7.0 released 2026-07-30 (tag `holochain-0.7.0` = 84cdce7d4, already fetched in the

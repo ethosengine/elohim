@@ -5,6 +5,9 @@ id: feedback-valueflow-authorship-is-the-process
 description: "Authoring/connecting REA valueflows IS the process; verbs are designed friction, the rest frictionless."
 metadata:
   type: feedback
+cites:
+  - .claude/epr-meta/recipes.yaml
+  - elohim/eprfs/epr-cli/src/flow/claim.rs
 ---
 
 The operator's meta note (2026-09-05, mid-epic): the REA valueflow authorship loop —

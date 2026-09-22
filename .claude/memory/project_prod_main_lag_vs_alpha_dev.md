@@ -8,6 +8,8 @@ metadata:
   type: project
   node_type: memory
   originSessionId: b265419a-8b6b-4814-acc3-9bb106b13095
+cites:
+  - elohim/holochain/Jenkinsfile
 ---
 
 The doorway hosts deploy from DIFFERENT branches/legs (edge pipeline `elohim/holochain/Jenkinsfile`, stages `Deploy Edge Node - {Alpha,Staging,Prod}`):

@@ -6,6 +6,8 @@ id: feedback-bootstrapping-is-a-recall-journey
 description: "Operator 2026-09-11: session bootstrapping and the memory ceremony are one journey through one algorithm (recall-contract.json) with shared mishpat/middot; fold your own bootstrapping sample; two doors — whole-system review vs focused sprint."
 metadata:
   type: feedback
+cites:
+  - .epr-meta/elohim/algorithms/recall-contract.json
 ---
 
 **What the operator said (2026-09-11):** "the bootstrapping concern should intersect naturally with

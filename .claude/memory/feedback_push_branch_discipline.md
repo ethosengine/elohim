@@ -1,6 +1,7 @@
 ---
 name: feedback_push_branch_discipline
 title: "Push, branch & shared-tree discipline (umbrella)"
+id: feedback-push-branch-discipline
 description: "Commit-only; one push per batch, never mid-build; shared tree: pathspec commits, scratch index, ledgers excluded."
 metadata: 
   node_type: memory
@@ -9,6 +10,9 @@ metadata:
   type: feedback
   originSessionId: 9f7bc2ea-78fe-4186-b2ab-836023d073e4
   modified: 2026-09-11T13:52:23.714Z
+cites:
+  - .husky/pre-push.bash
+  - genesis/orchestrator/Jenkinsfile
 ---
 
 # Push, branch & worktree discipline (umbrella)

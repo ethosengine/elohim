@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 8e95c106-8653-4c93-904c-845e7c85b0d7
+cites:
+  - genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md
+  - elohim/elohim-storage/src/services/household_resilience.rs
 ---
 
 Operator architecture (2026-06-14): content must **express its own resilience floor** — the durability tier it signals it needs. A will / mortgage / wedding photos / medical records / bridged fiat-bank-statement data express a HIGH (vault) tier; a map that populates a dropdown is EPHEMERAL/cache tier (regenerable, holds only a reference into a commons archive). "What something is should have self-awareness as to where it thinks it should be."

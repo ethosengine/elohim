@@ -7,6 +7,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 0e51e175-a51c-4846-a3cd-f9961dedf905
+cites:
+  - elohim/brit/docs/specs/2026-06-29-canonical-epr-meta-git-bridge-design.md
 ---
 
 The `brit` submodule (`elohim/brit`, a gitoxide fork = "covenantal VCS") is the greenfield for a **next-generation, content-addressed `epr-meta`** meant to **supersede** the parent's Python discipline (`epr_meta.py`/`cite_graph.py`/`placement-audit`) — "master in brit, bring back to the whole." Branch **`brit-dev`** (foundation + composition-snapshot slice now **INTEGRATED to brit `main` 2026-06-30** — see dated update at end; legacy plan was: operator owns brit-dev→brit main + the monorepo submodule-pointer bump).

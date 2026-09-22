@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 89b2cfb3-8192-4899-ad63-aac5d7e04cf3
+cites:
+  - "elohim-seam-map-concern-routing | The Elohim Seam Map | sha256:fd5ced9f996ff5af | path: genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md"
+  - genesis/data/timeline/backlog/wan-nat-federation-dataplane-discovery-gap-2026-06-23.md
 ---
 
 The architect names the stack as two layers; use these terms precisely (2026-06-23):

@@ -6,6 +6,8 @@ id: feedback-sprint-cadence-local-batch-then-jenkins
 description: Cadence target 2026-08-21 — sprint of 10 verified on the local mesh, then ONE Jenkins pass; Jenkins confirms a batch, it never discovers.
 metadata:
   type: feedback
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
 ---
 
 Before: sprint(1h) → Jenkins verify (2h) → sprint(1h) → Jenkins (2h) = **6 h for n=2** (3 h/item).

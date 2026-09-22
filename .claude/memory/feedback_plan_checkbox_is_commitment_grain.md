@@ -6,6 +6,9 @@ id: feedback-plan-checkbox-is-commitment-grain
 description: "epr flow project mints one gap-item/intent per `- [ ]` line in a plan; the writing-plans skill's per-step checkboxes minted 47 intents for a 17-task plan (2026-09-11). Put the checkbox on the task heading, number the steps."
 metadata:
   type: feedback
+cites:
+  - elohim/eprfs/epr-cli/src/flow/project.rs
+  - elohim/eprfs/epr-cli/src/flow/gaps.rs
 ---
 
 **What happened (2026-09-11):** the governed-discovery stations 0–3 plan followed the writing-plans

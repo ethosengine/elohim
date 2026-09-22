@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: 88cc5b6b-b8f7-4748-9355-792108825b4c
   modified: 2026-08-10T16:06:45.844Z
+cites:
+  - genesis/data/timeline/backlog/2026-08-10-ghost-decay-deploy-verification-runbook.md
+  - elohim/elohim-storage/src/services/head_adoption.rs
 ---
 
 Diagnosed live 2026-08-10 (branch feat/angular22-node24). The batch-3 residual

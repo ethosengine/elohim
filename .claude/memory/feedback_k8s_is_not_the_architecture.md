@@ -7,6 +7,9 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: dda22ff0-818e-4f87-8398-38ed1ef4e174
+cites:
+  - genesis/manifests/cluster-state.yaml
+  - genesis/data/rakia/compute-capacity.json
 ---
 
 Operator gotcha (2026-06-04, qahal household design session): it is a **common anti-pattern to confuse our k8s for our actual architecture**. Short-to-medium term, k8s (deployments.json, cluster-state.yaml, nodeTypes, pod placement, Jenkins deploy-render) only helps model compute/hardware/network. At full protocol maturity it **goes away completely**, subsumed into peer-native modeling and development empowered by EPR compute contracts (**brit/rakia** vocabulary; cf. genesis/data/rakia/compute-capacity.json and [[project_rea_compute_commitment_primitive]]).

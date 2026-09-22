@@ -2,6 +2,7 @@
 index: false
 name: project-mesh-browser-lane-needs-dev-config-dist
 title: "Mesh-browser lanes need a development-configuration dist"
+id: project-mesh-browser-lane-needs-dev-config-dist
 description: Household mesh-browser lanes need elohim-app built with --configuration development; production/alpha builds bake doorway-alpha and hosted-steward scenarios 401 there
 metadata: 
   node_type: memory
@@ -9,6 +10,9 @@ metadata:
   type: project
   originSessionId: dcddc033-024b-4dfa-8d13-39fa5f75b9ef
   modified: 2026-09-13T04:01:41.832Z
+cites:
+  - app/elohim-app/scripts/hc-mesh.sh
+  - app/elohim-app/angular.json
 ---
 
 On the household mesh, `just mesh prologue` stages whatever sits in `app/elohim-app/dist/elohim-app/{browser,server}`. A `pnpm build` (default configuration = production, and the alpha/staging configurations too) bakes `doorway-alpha.elohim.host` into the bundle; only `ng build --configuration development` carries `localhost:8888`. With a production dist staged, OAuth succeeds at the local doorway but the app then dials the fleet doorway with a localhost-minted JWT → `Chaperone failed (401): Invalid or expired token`, `IdentityService` never reaches network mode, and the agency badge can only read "Hosted Visitor" (discovered 2026-09-13 in the pipeline shift; fixes ec96b713d/43f5f49ed made the Chaperone follow the session's issuer, but the staged dist must still be a development build for the mesh).

@@ -5,6 +5,8 @@ id: project-inequality-curve-as-bounded-standard
 description: "Dignity floor + limitarian cap, held as Mishpat guidance — bites when designing economic bounds."
 metadata:
   type: project
+cites:
+  - app/elohim-app/src/app/qahal/components/psephos-ballot-wrapper/
 ---
 
 The operator's own evolution on inequality (shared 2026-09-05):

@@ -9,6 +9,8 @@ metadata:
   type: project
   originSessionId: d37bdfc0-4d71-497c-ab53-9452e457b095
   modified: 2026-07-30T18:34:44.363Z
+cites:
+  - app/elohim-app/package.json
 ---
 
 Campaign LANDED on dev 2026-07-30 (push 9c7988542..5290e3f90, operator-authorized; orchestrator

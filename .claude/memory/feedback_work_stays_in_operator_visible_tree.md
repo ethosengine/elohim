@@ -10,6 +10,8 @@ metadata:
   type: feedback
   originSessionId: d3b11772-7c9f-4ea6-85dc-f9e1c2d68fc8
   modified: 2026-07-25T16:02:56.398Z
+cites:
+  - .claude/worktrees/
 ---
 
 Operator directive 2026-07-25: **everything stays in `/projects/elohim`.** A prior session created a

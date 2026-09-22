@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 6e06fa79-220c-45d9-82d7-bb465649dc34
+cites:
+  - genesis/data/timeline/backlog/lens-version-dag-policy-dependency.md
 ---
 
 Architect's design direction (2026-06-27, from the plural-Mishpat lens-market code review, PR4 disposition):

@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: efcfeef6-e1eb-4f9a-bc62-4a561c22b8b9
+cites:
+  - che-devworkspaces/
 ---
 
 When I edited the `elohim-edgenode` pipeline (`jenkins/Jenkinsfile-elohim-edgenode`) in the **che-devworkspaces** submodule, I pushed to a branch and opened a PR. The operator rejected the PR: **"no push to main.. there's no dev → main pipeline workflow on that repo."** Push the commit straight to `main`.

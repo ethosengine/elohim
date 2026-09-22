@@ -5,6 +5,9 @@ id: project-doorway-ops-incidents
 description: "A/B edges are islands; kitsune2 bootstrap gap islanded conductors; blocking getaddrinfo parks tokio workers."
 metadata:
   type: project
+cites:
+  - genesis/orchestrator/manifests/doorway/
+  - doorway/doorway-service/src/bootstrap/k2.rs
 ---
 
 # Doorway ops incidents (umbrella)

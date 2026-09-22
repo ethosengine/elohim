@@ -5,6 +5,8 @@ id: feedback-reader-context-shapes-recall-defaults
 description: "Operator 2026-09-11: searcher tier, capability and intent negotiate recall defaults; fixed defaults breed capture."
 metadata:
   type: feedback
+cites:
+  - .epr-meta/elohim/algorithms/recall-contract.json
 ---
 
 **What the operator said (2026-09-11):** the context of who uses the recall tool — stated and

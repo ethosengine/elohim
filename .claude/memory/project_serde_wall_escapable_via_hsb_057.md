@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: 2aa7678c-5ff4-41ac-8332-036d8e06f44c
   modified: 2026-07-30T03:20:44.615Z
+cites:
+  - steward/node/Cargo.toml
+  - .cargo/config.toml
 ---
 
 Established 2026-07-29/30 during the vulnerability-cluster campaign

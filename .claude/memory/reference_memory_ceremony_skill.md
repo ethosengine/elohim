@@ -7,6 +7,8 @@ description: "Four-agent memory team (librarian, historian, cartographer, storyt
 metadata:
   node_type: memory
   type: reference
+cites:
+  - .claude/skills/memory-ceremony/SKILL.md
 ---
 
 Pointer: `.claude/skills/memory-ceremony/SKILL.md` — the four-agent, four-phase

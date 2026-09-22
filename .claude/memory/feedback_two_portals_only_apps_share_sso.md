@@ -9,6 +9,8 @@ metadata:
   type: feedback
   originSessionId: e0407b6c-164b-489a-aa86-da20d9fa1b8b
   modified: 2026-09-05T00:27:39.084Z
+cites:
+  - app/imagodei-portal/
 ---
 
 The operator ruled (2026-09-05, during the auth-portal review): there are exactly two portals — the **p2p-native portal** (the steward's own runtime: `app/imagodei-portal/` bundle over elohim-storage `/auth/me`, `/session`, `/session/exchange`) and the **doorway portal** for hosted humans (`doorway-app` under `/threshold/*`). Apps (elohim-app, lamad, doorway-app, any EPR app) **share those portals like SSO**: they discover where to sign in from `/.well-known/elohim-auth`, redirect there with OAuth params, and consume the code on callback. An app never owns a password field or a registration form.

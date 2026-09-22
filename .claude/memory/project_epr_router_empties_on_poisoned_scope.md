@@ -8,6 +8,8 @@ metadata:
   node_type: memory
   type: project
   originSessionId: c1085239-d5b2-4b3c-874d-1a74fcacf87f
+cites:
+  - elohim/elohim-storage/src/db/rea_commitments.rs
 ---
 
 Post-rebuild-all routing "regression" (elohim-genesis #1104/#1105, 2026-06-07):

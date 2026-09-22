@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: bd085a03-fcae-4c1c-b245-fda9ca07a257
   modified: 2026-08-30T18:33:51.360Z
+cites:
+  - elohim/lvi/
 ---
 
 **Proven 2026-08-30 17:04Z/17:35Z:** a content node authored, DHT-anchored and head-declared by the

@@ -10,6 +10,9 @@ metadata:
   type: project
   originSessionId: d50e36ac-198e-48f3-9faf-3317c687c102
   modified: 2026-07-25T03:10:23.226Z
+cites:
+  - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+  - genesis/data/timeline/backlog/genesis-pair-cross-conductor-fetch-blocks-canonical-convergence.md
 ---
 
 Holochain's `GetStrategy::Network` (the `Default`) carries this in its own doc

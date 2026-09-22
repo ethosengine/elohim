@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: 88cc5b6b-b8f7-4748-9355-792108825b4c
   modified: 2026-08-10T13:27:30.551Z
+cites:
+  - scripts/ci/fleet-quiesce-gate.sh
 ---
 
 Two facts the 2026-08-09 overnight shift lost, which kept the saga register wedged at 8/11 for weeks:

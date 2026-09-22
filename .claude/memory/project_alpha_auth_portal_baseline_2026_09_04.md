@@ -10,6 +10,8 @@ metadata:
   type: project
   originSessionId: e0407b6c-164b-489a-aa86-da20d9fa1b8b
   modified: 2026-09-04T23:13:41.870Z
+cites:
+  - genesis/manifests/cluster-state.yaml
 ---
 
 Auth-portal flow review + live a2o baseline against https://doorway-alpha.elohim.host (2026-09-04).

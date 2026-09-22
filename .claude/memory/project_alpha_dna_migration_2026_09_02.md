@@ -6,6 +6,9 @@ id: project-alpha-dna-migration-2026-09-02
 description: "2026-09-02 alpha re-genesis — DNAs stale since Jul 18; drift probe's reinstall broke chains. Operator chose migration. DNA Hash Guard gated."
 metadata:
   type: project
+cites:
+  - elohim/holochain/dna/dna-hashes.baseline
+  - scripts/ci/dna-hash-guard.sh
 ---
 
 **What happened (2026-09-02).** The alpha fleet's installed lamad/imagodei/mishpat DNAs matched no CI

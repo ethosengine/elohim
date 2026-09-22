@@ -10,6 +10,8 @@ metadata:
   type: feedback
   originSessionId: a7c9725e-26d1-43a1-a859-fe672ef9fea2
   modified: 2026-08-29T16:05:15.703Z
+cites:
+  - "elohim-protocol-manifesto | manifesto | sha256:c1b65508df47bcaa | path: genesis/docs/content/elohim-protocol/manifesto.md"
 ---
 
 Operator correction (2026-07-23, ontology keel arc): I reflexively wrote "'human must decide' is the guaranteed floor of the routing space" into the reach spec's ceiling law — human-in-the-loop as terminal safety authority. The operator flagged this as a place where AI foundational training diverges from the protocol: **human deciding is itself a capture vector** (captured publics, plutocratic deliberation-capture, duress — manifesto Part I's whole diagnosis), and elohim should "steward, test, simulate, experiment, follow the empirical evidence, while holding that truth in tension."

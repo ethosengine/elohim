@@ -6,6 +6,8 @@ id: project-sovereign-peer-t3-rung-traps
 description: "Stock tx5 conductor is listed-but-unconnected to the iroh fleet; alpha agent-infos advertise storageArc null so a joiner's reads miss in both arc modes."
 metadata:
   type: project
+cites:
+  - elohim/holochain-conductor/
 ---
 
 The T3 hybrid rung is `just dev conductor alpha` (fork iroh pair from the cargo pool; `hc-start.sh` refuses a stock join unless `ALLOW_STOCK_JOIN=1`). Two traps measured 2026-08-28 (M0 shift, spec ratchet-to-delivery-dataplane-sdk-lanes, lane P rung P5):

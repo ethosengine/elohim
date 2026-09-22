@@ -5,6 +5,8 @@ id: feedback-verify-the-measure-before-the-ranking
 description: "A drift audit can source its own findings — spot-check the top-ranked surface on disk before acting."
 metadata:
   type: feedback
+cites:
+  - .epr-meta/elohim/lenses/gospel/substrate-currency-audit.py
 ---
 
 Before acting on any audit's **ranked** output, verify a sample of the top-ranked item's findings

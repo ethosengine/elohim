@@ -8,6 +8,9 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 255362f1-5d7f-4734-ba6f-99bc94310d75
+cites:
+  - genesis/seeder/src/cid-artifact.ts
+  - .husky/pre-push.bash
 ---
 
 Operator framing (2026-07-14): the local pre-push gate is the protocol's own mechanics dogfooded on our workflow. The working tree (dev) is the **authoring space** (free — max autonomy). Pushing to the shared repo is a **reach-earning activity** ([[project_weave_epic_arc]] Stance III.2, reach earned before it spreads): it must **earn a reach attestation** (passing gates) before landing. The gate is the **deterministic floor** (Stance II.1) — un-lobbyable HARD-BLOCK. Push this discipline "as low as we can, maybe even epr-meta/eprfs," **at least for CID-addressed artifacts that import into the runtime** (drift there = a live dangling CID / `/blob/<hash>` 404).

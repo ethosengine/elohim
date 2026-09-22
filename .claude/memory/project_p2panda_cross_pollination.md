@@ -6,6 +6,8 @@ id: project-p2panda-cross-pollination
 description: p2panda surveyed 2026-08-04; 7-item discipline adoption program + extraction sequence; p2panda-encryption candidate (audit-gated); truth-plane line holds.
 metadata:
   type: project
+cites:
+  - genesis/research/p2panda-cross-pollination-2026-08-04.md
 ---
 
 Surveyed the p2panda org 2026-08-04 → `genesis/research/p2panda-cross-pollination-2026-08-04.md` (repos cloned: `p2panda`, `p2panda-aquadoggo`, `p2panda-reflection`). p2panda = the SSB descendant that deprecated its own monolithic node (aquadoggo) in 2024 and rebuilt as 10 composable Rust crates over iroh (I/O-free core, trait-per-domain stores, pluggable sync `Protocol`/`Manager`, ractor supervision). Materially the closest stack to ours (Rust, iroh, CBOR, Ed25519, BLAKE3, SQLite).

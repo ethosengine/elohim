@@ -8,6 +8,8 @@ metadata:
   type: project
   originSessionId: c87b3bc9-e95e-42be-bb11-a094d8c482c6
   modified: 2026-09-17T18:12:55.492Z
+cites:
+  - "trust-as-efficiency-signal | Trust is an Efficiency Signal | sha256:40b8e3d166c935a7 | path: genesis/docs/content/elohim-protocol/architecture/trust-as-efficiency-signal.md"
 ---
 
 Operator's active design trajectory across the quiesce/dataplane work (named
