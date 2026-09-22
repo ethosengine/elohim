@@ -1,0 +1,83 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md",
+ "slug": "specs__2026-07-09-peer-discovery-fractal-federation-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §6 tiers A-C + §7 wired-vs-needs-building + §8 council decisions. Vision-tier (status: vision). Landed since: the shared signal backing (doorway signal/bus_mongo.rs, D2) and a signal_relay_id (http.rs:625). Note the substrate moved: Holochain 0.7 conductors home to an iroh-relay (hc-mesh MESH_RELAY_BIN), so the 'SBD signal twin' framing is partly superseded — re-verify each Tier-A item against the iroh-relay topology. All three cited docs are DEAD-CITEs.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Tier A: shared bootstrap backing across a domain (MongoK2Store / elohim-bootstrap) — prod + cross-namespace rollout",
+   "line": 113,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L113",
+   "class": "protocol-canonical",
+   "note": "wired on alpha A/B per the spec; prod rollout unverified."
+  },
+  {
+   "text": "Tier A: shared signal relay backing (the unshared twin) so any endpoint in a domain joins one domain-DHT",
+   "line": 114,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L114",
+   "class": "protocol-canonical",
+   "note": "doorway signal/bus_mongo.rs (D2). Under Holochain 0.7 the relay is an iroh-relay — confirm the bus still serves the live path."
+  },
+  {
+   "text": "Near-term config heal: point the genesis-commons domain's conductors at one relay/signal URL",
+   "line": 115,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L115",
+   "class": "protocol-canonical",
+   "note": "operator/pipeline; _edgenode-conductor.template.yaml:121 relay_url placeholder.",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "Tier C: backing-aware DHT-participation identity (dnaHash + bootstrap table id + signal relay id) on /health, /p2p/status and ContentView trust provenance",
+   "line": 107,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L107",
+   "class": "protocol-canonical",
+   "note": "signal_relay_id exists in doorway (http.rs:625); not yet surfaced on node status or EPR provenance."
+  },
+  {
+   "text": "Canon: document endpoint<->backing decoupling as a principle (partly wired: bootstrap + signal)",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Tier B: cross-domain earned + revocable + council-affirmed federation (design seed; depends on earned-reach + council + REA-commitment substrate)",
+   "line": 106,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L106",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Council decisions: domain boundaries (1), cross-domain federation trigger (2), aggregation substrate (3)",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L120",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Repair the three DEAD-CITEs in frontmatter (federation-bootstrap plan, crdt-notary-decouple spec, dna-conductor-dht-gossip-gap backlog) via epr flow cites seal",
+   "line": 12,
+   "state": "OPEN",
+   "id": "specs__2026-07-09-peer-discovery-fractal-federation-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-09-peer-discovery-fractal-federation-design.md#L12",
+   "class": "protocol-canonical",
+   "note": "adjacent mechanical correction for the librarian (cite hygiene)."
+  }
+ ]
+}

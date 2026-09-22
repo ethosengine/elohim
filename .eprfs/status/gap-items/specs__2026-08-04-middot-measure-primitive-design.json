@@ -1,0 +1,94 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md",
+ "slug": "specs__2026-08-04-middot-measure-primitive-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §8 MVP slice (3 pieces) + §7 gate constraints + §6/§8 later slices. MVP landed: measures.yaml registry (clippy-pedantic, review-lint-lens consuming it), .claude/scripts/measure-fold.py executor + fold cache, code-reviewer agent binding with the pedantic-lens (advisory) tier. The measure registry also feeds the native epr flow report. Open: subsumes conformance probe, canonical E-CID recipes, fold attestation, ESLint/Sonar families, per-family aggregation, graduation to Mishpat.",
+ "count": 10,
+ "items": [
+  {
+   "text": "MVP 1 canon: measure:clippy-pedantic@1 (family clippy, subsumes clippy-standard@1, toolchain env-sensitivity) + advisory review-lint-lens@1",
+   "line": 249,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L249",
+   "class": "protocol-canonical",
+   "note": ".claude/epr-meta/measures.yaml:80, :944-948."
+  },
+  {
+   "text": "MVP 2 executor + fold cache keyed by (subject tree CID x measure@version x env), diffed to changed lines, honest absence on measurement failure",
+   "line": 254,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L254",
+   "class": "protocol-canonical",
+   "note": ".claude/scripts/measure-fold.py (documents the path-dep stale-key approximation)."
+  },
+  {
+   "text": "MVP 3 binding: code-reviewer invokes the lens and labels findings 'pedantic-lens (advisory)', distinct from gate-backed findings",
+   "line": 259,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L259",
+   "class": "protocol-canonical",
+   "note": ".claude/agents/code-reviewer.md:131-136."
+  },
+  {
+   "text": "Fold key: resolve the subject by source-set CID so path-dependency edits move the key (slice-1 approximation)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L143",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "subsumes conformance probe (run both profiles on a fixture, assert superset) before a stronger fold may answer a weaker query",
+   "line": 236,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L236",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Canonical E-CID environment fingerprint recipe per family (rustc -V + clippy version + lint-config hash)",
+   "line": 238,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L238",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fold attestation (B2) carrying the claimed -> witnessed evidence-tier transition on the existing Attestation carrier",
+   "line": 226,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L226",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Later slices: ESLint / Sonar measure families on the same shape",
+   "line": 264,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L264",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Per-family non-collapsing aggregation up reach tiers via select->fold->aggregate; cross-family composition only as a derived measure record",
+   "line": 193,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L193",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Concern-canon registration (C0-C14 walk + seam-registry rows) for the measure primitive",
+   "line": 240,
+   "state": "OPEN",
+   "id": "specs__2026-08-04-middot-measure-primitive-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-04-middot-measure-primitive-design.md#L240",
+   "class": "protocol-canonical"
+  }
+ ]
+}

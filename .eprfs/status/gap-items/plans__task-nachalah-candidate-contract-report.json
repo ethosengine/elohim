@@ -1,0 +1,53 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md",
+ "slug": "plans__task-nachalah-candidate-contract-report",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A task REPORT (#1a, DONE_WITH_CONCERNS). Delivered work CLAIMED (committed as 7f95ac47f); the OPEN items are exactly the concerns the report names outside its bounded claim.",
+ "count": 5,
+ "items": [
+  {
+   "text": "AuthenticatedCandidateContent with private fields + six contract tests + three seam-registry entries; no new dependency or identity codec",
+   "line": 16,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md#L16",
+   "class": "protocol-canonical",
+   "note": "7f95ac47f."
+  },
+  {
+   "text": "Prerequisite supervisor test repairs (same-timestamp witness selection by verdict state; grace interval vs whole-run budget) so the owning gate is green",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md#L75",
+   "class": "protocol-canonical",
+   "note": "resumed gate EXIT=0, 126 tests."
+  },
+  {
+   "text": "Concern: Holochain hash strings are lexically screened and compared, not checksum/author/notarization verified",
+   "line": 30,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-candidate-contract-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md#L30",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Concern: #1b notarized grant proof at the acting node (exact grant action/entry/author, issuer, recipient, scope, validity, revocation) — C12 unbound",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-candidate-contract-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md#L63",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Concern: process activation vehicle, durable rollback journal, live household runs and adoption attestation unimplemented",
+   "line": 65,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-candidate-contract-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-report.md#L65",
+   "class": "protocol-canonical"
+  }
+ ]
+}

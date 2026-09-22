@@ -1,0 +1,83 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md",
+ "slug": "plans__2026-06-11-frontend-eyes-sprint-plan",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status landed: the webfont substrate + 14 fix-wave commits are DELIVERED (CLAIMED, render-proven per the doc). The honest remaining work is the filed residual backlog (9 rows, several also on backlog app-css-budgets-fontawesome-eyes-sprint-residuals) + the four operator decisions. Candidate for historian distillation of the 'theming theater' lesson (already in memory project_graphos_dead_binding_classes).",
+ "count": 9,
+ "items": [
+  {
+   "text": "Substrate: self-hosted @fontsource webfonts under spec-canonical family names (ffd4ff75d)",
+   "line": 25,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L25",
+   "class": "provisional"
+  },
+  {
+   "text": "Fix waves: 14 components fixed one commit each with closing render proofs (graduated-feedback ... epr-relationships-panel)",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L91",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 1-2: designed RTL canaries + forced-colors stories across Library B; lit-localize wiring for hardcoded-English primitives",
+   "line": 118,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L118",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 3: feedback-mechanism-gateway level-3 type error vs 0|1|2 union, dead @fires challenge-action, unrendered loading/controversy/settled states",
+   "line": 123,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L123",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 4 + 6: native <dialog>.showModal() migration with focus traps/arrow nav; context-menu focus indication; epr-popover dialog semantics",
+   "line": 127,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L127",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 5: epr-relationships-panel human-label path (cards show raw epr: ids) + designed empty state",
+   "line": 129,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L129",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 7-8: re-render imagodei flows (golden-hour amber, EvictedAccount dark variant); off-grid geometry sweep",
+   "line": 134,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L134",
+   "class": "provisional"
+  },
+  {
+   "text": "Residual 9: complete the sweep coverage the spend cap cut short (compute-tile, epr-link, mention-base, hub-aggregation-shift, foundations pages, Library-A deep triage)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L139",
+   "class": "provisional"
+  },
+  {
+   "text": "Operator decisions: Hebrew brand face; FeedbackMechanismLevel union widen vs doc rewrite; --el-radius-pill bless or retire",
+   "line": 144,
+   "state": "OPEN",
+   "id": "plans__2026-06-11-frontend-eyes-sprint-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-06-11-frontend-eyes-sprint-plan.md#L144",
+   "class": "provisional"
+  }
+ ]
+}

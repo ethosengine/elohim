@@ -1,0 +1,60 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md",
+ "slug": "plans__2026-08-07-version-dag-strata-compaction-handoff",
+ "method": "agent-decomposition",
+ "class": "design-handoff",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from Step 0 (MEASURE), the gate, and the Definition of done. The side-bug it surfaced (chain.last() = lexicographically largest CID) was fixed in cbb59bb07 (hop-counted VERSION_CHAIN_DEPTH). The measurement that decides whether strata are needed at all was never recorded and no strata spec exists — the handoff explicitly allows 'depths are trivial, close the row' as a success.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Correctness side-fix: VERSION_CHAIN ordering by hop depth, not Cozo row order (canonical_cid = true head)",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L76",
+   "class": "design-handoff",
+   "note": "cbb59bb07 VERSION_CHAIN_DEPTH primitive."
+  },
+  {
+   "text": "Step 0.1 measure actual chain depth for instance 1 (lenses projection) and instance 4 (rotation chain via sweettest)",
+   "line": 137,
+   "state": "OPEN",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L137",
+   "class": "design-handoff"
+  },
+  {
+   "text": "Step 0.2 measure the DHT round-trip cost per hop for identity_chain_root",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L139",
+   "class": "design-handoff"
+  },
+  {
+   "text": "Step 0.3 decision: if depths are trivial and flat, write it down and close the row (a success); otherwise proceed to design",
+   "line": 140,
+   "state": "OPEN",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L140",
+   "class": "design-handoff"
+  },
+  {
+   "text": "Instance 4 hygiene regardless of strata: O(n^2) Vec cycle guard in identity_chain_root and O(E^2) chain_head_of scan",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L58",
+   "class": "design-handoff"
+  },
+  {
+   "text": "DoD (only if justified): a strata spec answering the four gate questions, testing the Commitment-envelope hypothesis, one design for all four instances; forward cite on borrows row 9 leg (a)",
+   "line": 163,
+   "state": "OPEN",
+   "id": "plans__2026-08-07-version-dag-strata-compaction-handoff#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-07-version-dag-strata-compaction-handoff.md#L163",
+   "class": "design-handoff"
+  }
+ ]
+}

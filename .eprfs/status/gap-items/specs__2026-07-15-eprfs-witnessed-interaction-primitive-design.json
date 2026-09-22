@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md",
+ "slug": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §10 decomposition seed (P1-P2, G1-G7) + §9 D1/D5. Landed: the Count/Vote/Classification magnitude algebra (WitnessedInteraction + Magnitude in elohim/epr/src/witness.rs, ec384bbc8 — this spec's G2). Not landed: consumer blinding, the typed firewalls (contributor_presences.rs:167/225 still ORDER BY recognition_score — the live edge P2 must sever), extractor registry, consumption-record attestation, consumption_projector. D1 (denomination Option A) must be ratified first.",
+ "count": 11,
+ "items": [
+  {
+   "text": "D1 [must ratify first]: denomination ceiling — Option A (credit only the witnessable; attention permanently advisory)",
+   "line": 607,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L607",
+   "class": "process-meta"
+  },
+  {
+   "text": "P1 precondition: consumer-blinding + aggregate-without-a-subject wire shape + >=K set-membership witness proof (corroborator keys never in clear for non-public reach); D4 mechanism",
+   "line": 269,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L269",
+   "class": "process-meta"
+  },
+  {
+   "text": "P2 precondition: typed recognition -/-> discovery and consumption -/-> standing edges; SEVER the live contributor_presences recognition_score order-by with a regression test (D5)",
+   "line": 457,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L457",
+   "class": "process-meta",
+   "note": "db/contributor_presences.rs:167,225 still .order(recognition_score.desc())."
+  },
+  {
+   "text": "G1 extractor registry + ConsumptionExtractor trait + dwell fallback + LocalConsumptionTick Automerge doc (offline, monotonic clock)",
+   "line": 345,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L345",
+   "class": "process-meta"
+  },
+  {
+   "text": "G2 Count/Vote/Classification magnitude algebra unifying the carriers (governance a Magnitude variant, not a SubstrateSignal member)",
+   "line": 643,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L643",
+   "class": "process-meta",
+   "note": "elohim/epr/src/witness.rs (ec384bbc8)."
+  },
+  {
+   "text": "G3 attestation:consumption-record subtype + signer-not-in-{provider,receiver} disinterest gate + bidirectional-corroboration-density dampener (DNA-lineage)",
+   "line": 178,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L178",
+   "class": "process-meta"
+  },
+  {
+   "text": "G4 consumption_projector + per-evaluator ConsumptionLedgerRow (corroboration count, not consumer reach) + content-addressed pair-CID",
+   "line": 420,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L420",
+   "class": "process-meta"
+  },
+  {
+   "text": "G5 effect-witness lone-device escape hatch, COI-gated on the effect emitter, effect-denominated",
+   "line": 381,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L381",
+   "class": "process-meta"
+  },
+  {
+   "text": "G6 iroh reconnect-tick round driver for two driver-less spokes (asserted-not-proven today)",
+   "line": 407,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L407",
+   "class": "process-meta"
+  },
+  {
+   "text": "G7 graduated: notarization + coordinator identity + settlement under dignity floor/ceiling + sortition ratifier",
+   "line": 510,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L510",
+   "class": "process-meta"
+  },
+  {
+   "text": "D2/D3 decisions: record-integrity naming of consumption-record for solo consumption; where the cross-substrate exchange rate lives (per-collective manifest, Mishpat-contestable)",
+   "line": 619,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-eprfs-witnessed-interaction-primitive-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-eprfs-witnessed-interaction-primitive-design.md#L619",
+   "class": "process-meta"
+  }
+ ]
+}

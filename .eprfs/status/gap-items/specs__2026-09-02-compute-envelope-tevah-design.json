@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md",
+ "slug": "specs__2026-09-02-compute-envelope-tevah-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §11 sequencing (S0-S4 + deferred) and the operator-acceptance graduation of the §12 decision register. S0 landed: elohim/ark/{core,supervisor,cli} with DeathWitness, ExitClass/tally, intent log, passport, berth; hc-mesh MESH_CONDUCTOR_LAUNCH=ark with death witnesses in <peer>/ark/. S1 partly: elohim-storage depends on ark-core (spool_ingest.rs, custody_standing.rs). S2 signal handling exists in the ark CLI; the alpha entrypoint roll, S3 cgroup quota, S4 binary election are not evidenced. The 1088-line spec's other sections (§5 verbs, §6 death witness) are covered by these slice receipts.",
+ "count": 9,
+ "items": [
+  {
+   "text": "S0 launcher on the mesh: ark-core + ark-supervisor (Native driver) + ark binary; hc-mesh direct launch becomes ark run; witness to spool; intent log; ExitClass + tally + same-cause GiveUp",
+   "line": 812,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L812",
+   "class": "protocol-canonical",
+   "note": "elohim/ark/{core,supervisor,cli}; hc-mesh.sh MESH_CONDUCTOR_LAUNCH=ark (:111-388)."
+  },
+  {
+   "text": "S1 storage consumes the library: process_manager delegates to ark-core; self-contract + custody-spool commitments at first readiness; custody-scoped read gate; passport as an atom; epr-atom-home renders a witness",
+   "line": 822,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L822",
+   "class": "protocol-canonical",
+   "note": "elohim-storage depends on ark-core (services/spool_ingest.rs, custody_standing.rs); verify stations 2-4 receipts."
+  },
+  {
+   "text": "S1 alpha confirm: ship ark inside the edge storage image as its entrypoint and take a deliberate [conductor-roll]",
+   "line": 825,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L825",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "S2 PID 1 signal contract: SIGTERM -> per-child SIGINT with grace, termination-log, honest startup/readiness/liveness probes, gap record",
+   "line": 830,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L830",
+   "class": "protocol-canonical",
+   "note": "ark cli/main.rs:422 installs SIGTERM/SIGINT handlers; probes + termination-log not verified."
+  },
+  {
+   "text": "S2 receipt: a forced conductor death on alpha is served as a witness CID from the node's own surface within N seconds",
+   "line": 832,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L832",
+   "class": "protocol-canonical",
+   "note": "forcing a death needs an owned substrate — BLOCKED-BY-ENV (owned-substrate unavailable).",
+   "requires_env": [
+    "alpha-cluster-6peer",
+    "owned-substrate"
+   ]
+  },
+  {
+   "text": "S3 quota: cgroup driver on the household box (Delegate=yes), leaf topology, ram-guard ladder lifted, effective-tier honesty, accounting rows + ResourceSpecification vocabulary; memory-hog guest quota-killed with one witnessed event",
+   "line": 836,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L836",
+   "class": "protocol-canonical",
+   "note": "ark supervisor records cgroup_v2_delegated only."
+  },
+  {
+   "text": "S4 binary class adopts by election: envelope applies storage-binary releases on the mesh; pendingRestart consumed; revert by re-election; InProcess driver for Tauri",
+   "line": 840,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L840",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Deferred (shaped not to preclude): Wasm guest driver, rakia sub-envelopes, runtime-* content type + attestation:death-witness kind in the constitutional DNA batch",
+   "line": 843,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L843",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: operator acceptance of the §12 decision register",
+   "line": 848,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-compute-envelope-tevah-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-compute-envelope-tevah-design.md#L848",
+   "class": "protocol-canonical"
+  }
+ ]
+}

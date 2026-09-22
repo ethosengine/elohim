@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md",
+ "slug": "plans__2026-08-20-three-lane-dataplane-performance-contract",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §4 lane metrics, §5 ranked couplings (1-5), §7 habit deltas and §8a follow-ups. Since authoring: the latency-valueflow chain landed the T4 doorway_hop_duration_ms series + the doorway-B PodMonitor selector; p2p_iroh gained metrics call sites (gossip_receive, sync_driver, peer_book); reach-enforced-everywhere moved unwired -> red (landed this session per §7). The reach_level_index fail-open cure landed (epr_service.rs u8::MAX). The ceiling stands: faster gates are not agreement.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Instrument the lanes separately: T2 time-to-present p95, T1 head notarization lag p95, T4 request duration p95 by route class + cache status",
+   "line": 132,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L132",
+   "class": "protocol-canonical",
+   "note": "T4 series landed via the latency chain (doorway_hop_duration_ms); T2/T1 series not verified."
+  },
+  {
+   "text": "Coupling 1: set digest on the replication plane (steady state ~24,000 enumerated items/min/peer -> ~200 bytes)",
+   "line": 155,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L155",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Coupling 2: batch GetContent for cold start (4000 RTT -> ~63 at 64/request)",
+   "line": 158,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L158",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Coupling 3: doorway forwards immutable + ETag cache headers on the blob-miss path (as the pantry-hit path already does)",
+   "line": 160,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L160",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Coupling 4: move the per-request authenticated flag out of the HTML so documents stop being no-store",
+   "line": 164,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Coupling 5: arrived bytes addressable before (or without) a per-item Kad publish",
+   "line": 166,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L166",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Batch-sizing falsifier: raise/retune BATCH_SIZE_FLOOR vs the ~2,666 ms/id x 12 s budget; unattempted -> 0 without verdicts rising means batch size was not the binding cost",
+   "line": 233,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L233",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Trust lever: the pricer only cheapens undeclared rows — widen the cheap corner via receiver-side content inference so declared divergent rows can be priced",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L174",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Habit deltas: every lane habit a conjunction of performance + trust invariant; reach-enforced-everywhere asserts the absolute (unauthorized requester gets no bytes)",
+   "line": 207,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L207",
+   "class": "protocol-canonical",
+   "note": ".epr-meta/reach-enforced-everywhere.habit.md status red."
+  },
+  {
+   "text": "§8a follow-ups: validate content.reach at write time against the protocol enum + sweep/count already-written non-canonical reach rows (now dark)",
+   "line": 263,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L263",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "notary-authority check corpus-scoped on a canonical field (not the per-peer anchor)",
+   "line": 221,
+   "state": "OPEN",
+   "id": "plans__2026-08-20-three-lane-dataplane-performance-contract#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-20-three-lane-dataplane-performance-contract.md#L221",
+   "class": "protocol-canonical"
+  }
+ ]
+}

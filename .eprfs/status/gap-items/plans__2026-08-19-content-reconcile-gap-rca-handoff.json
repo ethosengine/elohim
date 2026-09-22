@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md",
+ "slug": "plans__2026-08-19-content-reconcile-gap-rca-handoff",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §4 gap inventory G1-G11 (G12 records non-work). A 2026-08-19 RCA handoff; G1 cured and fleet-confirmed. The rest are RCA threads whose current status needs re-measuring on today's substrate (Holochain 0.7, serving-edge campaign) before implementation — the owning habit dataplane-convergence is red + active.",
+ "count": 11,
+ "items": [
+  {
+   "text": "G1 classifier conflation (cured and fleet-confirmed, edge #1370)",
+   "line": 159,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L159",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G2 why are matthew and jessica the only two short? (unknown, highest value)",
+   "line": 162,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L162",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G3 identify the single poison NULL-anchor row that abstains the whole-corpus digest shortcut",
+   "line": 206,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L206",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G4 diagnose adam / elohim.host permanent catching-up shed",
+   "line": 228,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L228",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G5 find the cost centre of conductor batch throughput",
+   "line": 251,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L251",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G6 SPIN divergence — the frontier once G1 unmasked it",
+   "line": 273,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L273",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G7 make the fleet-quiesce gate measurable (its own cure)",
+   "line": 287,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L287",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G8 range-bucket corpus digests (~64 id-hash-prefix buckets, per-bucket amber, drill only mismatches) replacing the whole-corpus binary digest",
+   "line": 296,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L296",
+   "class": "protocol-canonical",
+   "note": "design gap, unbuilt; the head-plane T4 digest is the whole-corpus form."
+  },
+  {
+   "text": "G9 discovery O(corpus x peers) with a 15-minute latency floor (collapses with G8)",
+   "line": 315,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L315",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G10 instrument trap: oscillating gauges — read windows, never single readings",
+   "line": 324,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#10",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L324",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G11 coverage gap: dataplane-convergence stayed green through a 7-day non-convergence — tighten its check",
+   "line": 333,
+   "state": "OPEN",
+   "id": "plans__2026-08-19-content-reconcile-gap-rca-handoff#11",
+   "cites": "genesis/docs/superpowers/plans/2026-08-19-content-reconcile-gap-rca-handoff.md#L333",
+   "class": "protocol-canonical",
+   "note": "habit is now red and active (elohim-storage/.epr-meta/dataplane-convergence.habit.md) — the coverage half may be addressed; verify the check itself."
+  }
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md",
+ "slug": "specs__2026-09-08-epr-app-deliverability-through-doorway",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from sealed decisions D1-D5 + the 2026-09-08 delivery-evidence section. Status Active 'while fleet proof is outstanding'. Landed: BundleHeadsReconciler (doorway render/bundle_heads.rs; 40dcd56a7 keys heads by slug+channel), data-app-ready bootstrap marker (elohim-app main.ts:11), served-shell-boots static + dynamic scenarios, just dev package with EPR_APP_ADAPTER. Graduation evidence outstanding: the complete five-scenario household receipt from committed source and a fleet build carrying it.",
+ "count": 8,
+ "items": [
+  {
+   "text": "D1 storage-authoritative bundle heads: BundleHeadsReconciler tick + content event re-read, write-through blobHash/serverBlobHash, serialized passes, warm-shell eviction on head move",
+   "line": 39,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L39",
+   "class": "protocol-canonical",
+   "note": "doorway render/bundle_heads.rs."
+  },
+  {
+   "text": "D2 deliverability judged through the doorway before a shell is served; verdict readable in headers; 503 + one-line converging page only when no deliverable shell",
+   "line": 49,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L49",
+   "class": "protocol-canonical",
+   "note": "verify the AtHead classification and header contract (the peer half lives in storage app_deliverability.rs)."
+  },
+  {
+   "text": "D3 one notarized app declaration carries both bundle identities (serverBlobHash beside blobHash) with CI phase diagnostics",
+   "line": 70,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L70",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D4a served-shell-boots dynamic clause: headless browser boots / through each doorway with data-app-ready, no pageerror, /version.json stamp = declared head",
+   "line": 118,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L118",
+   "class": "protocol-canonical",
+   "note": "served-shell-boots.feature:66 scenario outline; main.ts:11 data-app-ready."
+  },
+  {
+   "text": "D4b household Act I twins under @concern:doorway-failover @requires:multi-node: N+1 via doorway A boots on both within 75s; doorway B converges after storage returns; broken bundle refused with behind;missing-asset",
+   "line": 124,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L124",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D4c app pipeline and Edge Dataplane Validation run the feature against BOTH doorways as a hard failure (error(), not unstable); pre-push T2 strict for serving paths",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L130",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D5 packaging before publication via an extensible SDK adapter (built-in Angular adapter; --adapter / EPR_APP_ADAPTER with refused missing hooks)",
+   "line": 135,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L135",
+   "class": "protocol-canonical",
+   "note": "just dev package app/elohim-app; EPR_APP_ADAPTER per root CLAUDE.md."
+  },
+  {
+   "text": "Graduation evidence: complete committed-source five-scenario household receipt + a fleet build carrying the commit",
+   "line": 178,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-epr-app-deliverability-through-doorway#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-epr-app-deliverability-through-doorway.md#L178",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  }
+ ]
+}

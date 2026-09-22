@@ -1,0 +1,113 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md",
+ "slug": "specs__2026-06-14-elohim-sdk-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from PART 3 (the buildable MVP SDK, steps 0-3, 8 slices + runtime). Landed: trait Governor lifted into elohim-compute::actuation with RefusalCode::ReservedPlace + ArcGovernor; CoverageRollup in elohim-storage/src/recursion.rs (with descend()); FeltStatusView. Not found: the second inequality-flipped FloorGovernor, @elohim/agency, authorAtom, bindAgent, the consilience veil-walker, RuntimeSpec/Runtime::launch, create-elohim-app. Vision-scale doc: rank single-household slices (step 1) UP, network-breadth DOWN.",
+ "count": 12,
+ "items": [
+  {
+   "text": "0a Fix the conductor-signal msgpack-decode class for REA/mishpat/content subscribers (holo_hash byte arrays; empty household names in felt status)",
+   "line": 176,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L176",
+   "class": "provisional",
+   "note": "partly fixed: signals.rs HoloHashB64 (2026-06-12 peer-statuses root cause) normalizes byte-array holo_hashes and rea_projection.rs:38-150 adopts it; mishpat/content subscribers not verified — finish and pin with a decode test per subscriber."
+  },
+  {
+   "text": "0b Lift trait Governor into elohim-compute::actuation (Refusal{code, elevate, limit_owner}, ReservedPlace, LimitOwner); ArcGovernor implements it",
+   "line": 180,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-elohim-sdk-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L180",
+   "class": "provisional",
+   "note": "elohim-compute/src/actuation.rs; arc_actuator.rs:383-419 ArcGovernor."
+  },
+  {
+   "text": "0b FloorGovernor — the second, inequality-flipped Governor impl proving the trait generalizes",
+   "line": 183,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L183",
+   "class": "provisional",
+   "note": "no FloorGovernor in the tree (only Demo/Restart/Arc governors)."
+  },
+  {
+   "text": "Step 1.1 @elohim/agency thin wrapper + observeCare / authorCareAtom against a running doorway",
+   "line": 190,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L190",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1.2 authorAtom in epr-ts/src/authoring.ts over the three coupling legs; putAtom; round-trip + tamper + wrong-key tests",
+   "line": 193,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L193",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 1.3 FeltStatusView + honesty-fold converter + GET /content/{id}/felt-status + getFeltStatus",
+   "line": 196,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-elohim-sdk-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L196",
+   "class": "provisional",
+   "note": "FeltStatusView exported from elohim-storage lib.rs:310; route + TS client not separately verified."
+  },
+  {
+   "text": "Step 1.4 bindAgent servant covenant: witnessed refusal to score 'best self' (limit_owner: faith); govern on a servant throws at bind-time",
+   "line": 200,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L200",
+   "class": "provisional"
+  },
+  {
+   "text": "Runtime floor: RuntimeSpec::sidecar() + Runtime::launch() moved out of Tauri into an elohim-runtime crate (lone-laptop floor headless)",
+   "line": 206,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L206",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2.5 CoverageRollup returning CoverageSet {deficit, constituents}, per-row degrade, zero DNA spend",
+   "line": 212,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-elohim-sdk-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L212",
+   "class": "provisional",
+   "note": "landed at elohim-storage/src/recursion.rs (not graph_views/recursion/)."
+  },
+  {
+   "text": "Step 2.6 descend() + layerNode() thin slices on the recursion module",
+   "line": 217,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-elohim-sdk-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L217",
+   "class": "provisional",
+   "note": "recursion.rs:273 descend(); layerNode not located — verify."
+  },
+  {
+   "text": "Step 2.7 consilience.rs veil-walker: surfaceRecognition (null on NeedDeeper) / proposeBridge over a computed rollup deficit",
+   "line": 218,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L218",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3.8 create-elohim-app --template=full-gradient; household.govern() and veil.govern() fail to compile",
+   "line": 225,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-elohim-sdk-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-elohim-sdk-design.md#L225",
+   "class": "provisional"
+  }
+ ]
+}

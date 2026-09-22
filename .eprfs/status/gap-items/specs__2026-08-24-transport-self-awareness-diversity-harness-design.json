@@ -1,0 +1,115 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md",
+ "slug": "specs__2026-08-24-transport-self-awareness-diversity-harness-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from the §7 decomposition rows (0-14; rows 3+4 and 9+10 grouped). Landed: row 0 (sync count_all), rows 1-2 (p2p/transport_paths.rs PathObservation + OpClass Small/Bulk + select_path), row 6 (hc-mesh MESH_PEER_TRANSPORTS), row 7 (hc-mesh-transport-matrix.sh), row 8 (genesis/scripts/quiesce-timeline.py), row 13 (iroh acquisition dispatch, b30512348 + homo-iroh pull parity b9c9ad477). Open: syncVerdicts, the before/after measurement + flag flip, fanout-3, transport-agnostic doorway re-admission, backpressure pass.",
+ "count": 12,
+ "items": [
+  {
+   "text": "Row 0 (cut 0 honesty fix): syncDocuments -> count_all() + test",
+   "line": 216,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L216",
+   "class": "substrate",
+   "note": "sync/mod.rs:288, :380."
+  },
+  {
+   "text": "Rows 1-2: PathObservation ring + metrics + /p2p/status transportPaths; select_path predicate + registry row + C4/C3 contract tests",
+   "line": 217,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L217",
+   "class": "substrate",
+   "note": "p2p/transport_paths.rs."
+  },
+  {
+   "text": "Rows 3-4: wire Small racing into head-record / list / small-blob paths and Bulk selection + exploration into large-blob / full-sync paths",
+   "line": 219,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L219",
+   "class": "substrate",
+   "note": "verify the call sites consume select_path."
+  },
+  {
+   "text": "Row 5: syncVerdicts structured reasons in /p2p/status + metric (bounded top-N)",
+   "line": 221,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L221",
+   "class": "substrate",
+   "note": "no syncVerdicts field in elohim-storage."
+  },
+  {
+   "text": "Row 6: MESH_PEER_TRANSPORTS + per-peer restart/assert/status in hc-mesh.sh",
+   "line": 222,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L222",
+   "class": "substrate",
+   "note": "app/elohim-app/scripts/hc-mesh.sh:73, :273."
+  },
+  {
+   "text": "Row 7: recovery primitive (warm return / cold join with a fresh identity) + six pair scenarios in hc-mesh-transport-matrix.sh + footprint line",
+   "line": 223,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L223",
+   "class": "substrate",
+   "note": "app/elohim-app/scripts/hc-mesh-transport-matrix.sh."
+  },
+  {
+   "text": "Row 8: local emitter -> shared quiesce-timeline.py reader (source field)",
+   "line": 224,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L224",
+   "class": "substrate",
+   "note": "genesis/scripts/quiesce-timeline.py."
+  },
+  {
+   "text": "Rows 9-10: before/after time_to_recover N=3 per scenario x shape (flag on/off, roles swapped); flip the alpha flag only if outside noise, confirmed via [edge:validate-only]",
+   "line": 225,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L225",
+   "class": "substrate"
+  },
+  {
+   "text": "Row 11: backpressure design pass — heal legs consume conductor_admission as demand (reactive, pull-shaped sync); brainstorm-gated",
+   "line": 230,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L230",
+   "class": "substrate"
+  },
+  {
+   "text": "Row 12: fanout-3 — a fourth castable household fixture and the recovery run with 3 survivors",
+   "line": 227,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L227",
+   "class": "substrate"
+  },
+  {
+   "text": "Row 13: iroh backend for the acquisition plane (provider rotation over IrohPeerBook, fetch via IrohBlobStore) closing P3 on pure iroh",
+   "line": 228,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L228",
+   "class": "substrate",
+   "note": "acquisition_dispatch.rs; b30512348, b9c9ad477 (homo-iroh warm recovery PASS P0-P4)."
+  },
+  {
+   "text": "Row 14: doorway admission re-admits recovering storage on a transport-agnostic health signal (ShedCause::Upstream), closing P4 on pure iroh",
+   "line": 229,
+   "state": "OPEN",
+   "id": "specs__2026-08-24-transport-self-awareness-diversity-harness-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-08-24-transport-self-awareness-diversity-harness-design.md#L229",
+   "class": "substrate"
+  }
+ ]
+}

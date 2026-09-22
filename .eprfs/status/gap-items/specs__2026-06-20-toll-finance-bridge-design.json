@@ -1,8 +1,109 @@
 {
  "doc": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md",
  "slug": "specs__2026-06-20-toll-finance-bridge-design",
- "method": "none",
+ "method": "agent-decomposition",
  "class": "protocol-canonical",
- "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
- "items": []
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Design-only / vision-deferred (sprint: vision-deferred): nothing is built (no bridges/fiat, no Verdict::Toll). Items 1-5 are operator forks to lock at the implementation /plan; 6-7 are the upstream gates; 8-13 the build once gates clear. Not BLOCKED-BY-ENV — blocked by design dependencies, so it ranks DOWN (network-scale breadth), not held.",
+ "count": 12,
+ "items": [
+  {
+   "text": "Fork A — choose the fiat rail (L402 / x402 / Interledger-Web-Monetization; Stripe-classic rejected as operator-banks custody)",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L122",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fork B — settlement split mechanics and where computed (bridges/fiat config vs payment-pointer recursion)",
+   "line": 129,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L129",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fork C — confirm heads free / bytes metered, doorway issues the 402 but the serving PEER enforces standing (no doorway toll authority)",
+   "line": 133,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L133",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fork D — crawler/bot policy: pay-per-crawl vs commons free-tier for heads/low volume",
+   "line": 136,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L136",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fork E — Verdict::Toll: extend the shared guard::Verdict enum (emitted on the Role-2 serve path, never by assess) vs a separate serve-path verdict type",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L139",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Upstream gate: bind toll-reward concentration to the limitarian ceiling via substrate_signal",
+   "line": 151,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L151",
+   "class": "protocol-canonical",
+   "note": "substrate_signal now exists on projected economic events (elohim-storage/src/rea_projection.rs:443) — the gate the spec names has partly moved; the governor binding for toll-reward flow is still unbuilt."
+  },
+  {
+   "text": "Upstream gate: donut floor/ceiling governor (conceptual only; ecological ceiling unwired)",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L157",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Build the bridges/fiat crate trio (fiat-types / fiat-bridge / fiat-tests), leaf crate mounted by doorway-service on one route",
+   "line": 99,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L99",
+   "class": "protocol-canonical",
+   "note": "bridges/ holds did, k8s, pkarr, valueflows — no fiat."
+  },
+  {
+   "text": "Inbound: external payment confirmation -> ONE epoch-aggregated REA EconomicEvent on agent_cid (never per-toll; per-toll detail stays Operational-C)",
+   "line": 104,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L104",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Outbound: route collected value by donut ratios -> appreciation EconomicEvents bounded_by each recipient's replicates-* Commitment",
+   "line": 105,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L105",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Peer-side standing check signals payment-required at the bytes step; doorway renders HTTP 402 + challenge (sibling to the 429/Challenge arm)",
+   "line": 47,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L47",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Build discipline guard: opt-in hosting offer stays a proposed replicates-* Commitment and no TollReceipt/PaymentIntent/HostingOffer entry type is minted",
+   "line": 90,
+   "state": "OPEN",
+   "id": "specs__2026-06-20-toll-finance-bridge-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-20-toll-finance-bridge-design.md#L90",
+   "class": "protocol-canonical"
+  }
+ ]
 }

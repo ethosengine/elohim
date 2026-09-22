@@ -1,0 +1,63 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md",
+ "slug": "specs__2026-06-13-conductor-authority-arc-memory-scaling",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). The 2026-06-19 banner voids the alpha-OOM evidence (glibc arena leak, cured by jemalloc); the corpus-scaling argument stands on first principles. Remaining work is the arc-factor policy (its own spec: 2026-06-13-conductor-authority-arc-auto-policy) plus cleanup of stopgap limits and the stale arc attribution they carry.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Discriminate leak vs bounded-large (per-process RSS split / raise-and-watch / arc=0 ablation)",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L69",
+   "class": "substrate",
+   "note": "resolved by other evidence: history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md (arc-independent glibc leak); the ablation is moot per the banner."
+  },
+  {
+   "text": "Hygiene: prune provide_reconcile latch, mirror pending_epr_resolves OutboundFailure cleanup, gate observed_kinds to cfg(test)",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L76",
+   "class": "substrate"
+  },
+  {
+   "text": "Fix the latent/dead unbounded structures before they are wired: observation/log.rs ObservationLog, signals.rs received_chunks, conductor_agent_info_gossip last_seen",
+   "line": 78,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L78",
+   "class": "substrate"
+  },
+  {
+   "text": "Stop the RAM-bump treadmill: step the 8Gi stopgaps in deployments.json back toward archetype floors with observed-RSS evidence (post-jemalloc conductors flat ~2.1-2.9GB)",
+   "line": 83,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L83",
+   "class": "substrate",
+   "note": "deployments.json:34,62,127 still carry edgenodeMemoryLimit/memoryLimit 8Gi."
+  },
+  {
+   "text": "Correct the stale full-arc attribution in deployments.json justification/$memoryBumpComment2 (the OOM was the glibc leak, not corpus arc)",
+   "line": 16,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L16",
+   "class": "substrate",
+   "note": "deployments.json:128 and :143 still say the working set is proportional to the corpus at full arc."
+  },
+  {
+   "text": "Design the arc-factor policy: per-archetype arc targets + shrink-as-N-grows rule + coverage invariant, aligned with tiered-quilt sharding",
+   "line": 84,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-conductor-authority-arc-memory-scaling#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-memory-scaling.md#L84",
+   "class": "substrate",
+   "note": "carried by specs/2026-06-13-conductor-authority-arc-auto-policy.md; CONDUCTOR_ARC_FACTOR is a knob in hc-mesh / conductor templates today, not a policy."
+  }
+ ]
+}

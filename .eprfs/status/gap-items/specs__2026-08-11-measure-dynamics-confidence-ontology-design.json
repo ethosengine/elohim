@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md",
+ "slug": "specs__2026-08-11-measure-dynamics-confidence-ontology-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). §5 seals six laws as enforced by existing tested code (elohim/epr/src/measure.rs e4af04b6b, elohim-epr-rea fold::with_uncertainty, the .epr-meta kind gate) — those are CLAIMED. The open residue is §4's slice-2 inheritance (the network boundary) plus the missing typed Quantity canonical-bytes entry point and the Q1-Q17 open questions.",
+ "count": 9,
+ "items": [
+  {
+   "text": "L1 a rate declares its period; a level does not (MeasureKind Level / Rate{per} / Ratio)",
+   "line": 45,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L45",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "L3/L4/L5 honest absence as Interval::unknown(); widening free, narrowing needs a new observation; folds return intervals taking the weakest claim",
+   "line": 142,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L142",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "L6 a measure declaration without kind is refused at the gate (manifest and registry paths)",
+   "line": 169,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L169",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "L2 wiring: typed measure::canonical_bytes(&Quantity) entry point so a Quantity's CID is computable through the crate API (proven only at the serializer today)",
+   "line": 540,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L540",
+   "class": "protocol-canonical",
+   "note": "no canonical_bytes fn in elohim/epr/src/measure.rs."
+  },
+  {
+   "text": "Slice 2.1: per-fold anonymity (k floor or DP noise budget per fold level, the budget as a kind:level stock) — blocks the network rung",
+   "line": 514,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L514",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2.2: correlation-aware interval arithmetic for independent peer contributions",
+   "line": 520,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L520",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2.3: cross-peer determinism at a band edge (floating-point interval threshold agreement)",
+   "line": 526,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L526",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2.4-2.5: ceiling-side reconciliation of divergent estimates (graduated-rigor ComputationAttestation) and index lenses (World3/GDP/Donut) only after 2.1-2.3",
+   "line": 534,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L534",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Open questions Q1-Q17 recorded without enforcing constructs — resolve or retire each",
+   "line": 202,
+   "state": "OPEN",
+   "id": "specs__2026-08-11-measure-dynamics-confidence-ontology-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-11-measure-dynamics-confidence-ontology-design.md#L202",
+   "class": "protocol-canonical"
+  }
+ ]
+}

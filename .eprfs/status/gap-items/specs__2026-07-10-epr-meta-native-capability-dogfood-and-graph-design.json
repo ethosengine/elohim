@@ -1,0 +1,100 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md",
+ "slug": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the Definition of Done (A2a-A3, B1-B3, C1-C2) + the explicit deferrals. Status Implemented with a 'Delivered (2026-07-10)' section (aefa1b2cf..8f322dfdf) — DoD items CLAIMED; the elohim-ceiling deferrals remain OPEN.",
+ "count": 11,
+ "items": [
+  {
+   "text": "A2a capability-governance@1 bound at .epr-meta/elohim/packages/ (govern the skill at its source)",
+   "line": 203,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L203",
+   "class": "process-meta"
+  },
+  {
+   "text": "A2b every projection carries an EprRef governance backref stanza",
+   "line": 208,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L208",
+   "class": "process-meta"
+  },
+  {
+   "text": "A2c/A2d verify renders red/green on missing/stale/forged backrefs and lodges to governance-findings.jsonl",
+   "line": 215,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L215",
+   "class": "process-meta",
+   "note": ".claude/data/governance-findings.jsonl."
+  },
+  {
+   "text": "A3 package-projections.mjs verify wired into .husky/pre-push.bash",
+   "line": 223,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L223",
+   "class": "process-meta"
+  },
+  {
+   "text": "B1 round-trip fidelity gate project(import(source)) === source for every skill/agent",
+   "line": 229,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L229",
+   "class": "process-meta"
+  },
+  {
+   "text": "B2 shared Python<->Rust .epr-meta resolver parity fixtures",
+   "line": 234,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L234",
+   "class": "process-meta"
+  },
+  {
+   "text": "B3 directionality contract stated in the elohim-package-authoring skill",
+   "line": 238,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L238",
+   "class": "process-meta"
+  },
+  {
+   "text": "C1/C2 elohim-agent-adapter crate: package tree -> validated ProjectionManifest -> eprfs-local byte-identical round-trip",
+   "line": 244,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L244",
+   "class": "process-meta"
+  },
+  {
+   "text": "Deferred ceiling: behavioral 'challenge-this-subagent' judge writing to the lodging ledger",
+   "line": 344,
+   "state": "OPEN",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L344",
+   "class": "process-meta"
+  },
+  {
+   "text": "Deferred: resolve the backref EprRef through the p2p trust substrate; eprfs as the live enforcement gate replacing the Python hook",
+   "line": 348,
+   "state": "OPEN",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L348",
+   "class": "process-meta"
+  },
+  {
+   "text": "Deferred: flip .claude/.codex to package-master (generated) once B1 + A2 are trusted; command-form skill translation",
+   "line": 355,
+   "state": "OPEN",
+   "id": "specs__2026-07-10-epr-meta-native-capability-dogfood-and-graph-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-10-epr-meta-native-capability-dogfood-and-graph-design.md#L355",
+   "class": "process-meta"
+  }
+ ]
+}

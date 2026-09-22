@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md",
+ "slug": "plans__2026-07-12-substrate-handoff-roadmap-post-fable",
+ "method": "agent-decomposition",
+ "class": "plan",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §3 ranked arcs (each arc = one shift with its own falsifiable measure). Ranking predates the Holochain 0.7 cutover and the household-mesh-first doctrine; arcs 2/3/8 are network-scale breadth and rank DOWN under the current vision axis, arcs 6/5/1 serve single-household coherence.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Arc 1: bank the convergence + flip the gates (notary scenario 2 green x2 fresh edge runs; seam-smoke --gate; de-@wip native-omni) + T4 doorbell step glue + heal-throughput smell",
+   "line": 53,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L53",
+   "class": "plan",
+   "note": "evidence-ladder spec (2026-08-10) records T3 'proven (notary 3/3 x2)'; confirm the gate flips and step glue."
+  },
+  {
+   "text": "Arc 2: the adversarial scale rig (~1000 containerized conductors, corpus >> node RAM, NAT emulation, Sybil harness) running the three stranger experiments",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L58",
+   "class": "plan",
+   "note": "network-breadth — rank DOWN behind household coherence; needs capacity the solo operator may not have."
+  },
+  {
+   "text": "Arc 3: sharded arc (arc_factor < 1) shipped and measured — bounded per-node working set at N=1000",
+   "line": 63,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L63",
+   "class": "plan",
+   "note": "the 0.7 conductor still clamps arcs to full-or-zero per space (nachalah placement ruling)."
+  },
+  {
+   "text": "Arc 4: independent failure detection — quorum-observed liveness (SWIM/phi-accrual) replacing self-asserted PeerStatus",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L67",
+   "class": "plan"
+  },
+  {
+   "text": "Arc 5: storage quota + GC/eviction — bounded steady-state footprint after a week of appending corpus",
+   "line": 71,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L71",
+   "class": "plan",
+   "note": "get_lru_candidates still has zero callers (freenet plan 3.4)."
+  },
+  {
+   "text": "Arc 6: cross-signed identity binding so the forge-another-agent's-credit experiment fails cryptographically (before any REA creator-payment work)",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L75",
+   "class": "plan",
+   "note": "algebra core landed (p2p/binding_cross_signature.rs); STAGE1 sentinel still the gossip signature."
+  },
+  {
+   "text": "Arc 7: reconcile-rail consolidation — every reconciler rides the GapTracker rail or carries a documented exemption; new-loop epr-meta guard",
+   "line": 80,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#7",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L80",
+   "class": "plan"
+  },
+  {
+   "text": "Arc 8: sovereign TURN + NAT-real CI leg (seam smoke passes behind emulated symmetric NAT)",
+   "line": 84,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#8",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L84",
+   "class": "plan",
+   "note": "dual coturn relay pair landed 2026-07-16; the NAT-real CI leg did not."
+  },
+  {
+   "text": "Arc 9: control-plane rollout/canary — one peer soaks new storage/coordinator before the fleet",
+   "line": 88,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#9",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L88",
+   "class": "plan",
+   "note": "sequenced per-peer edge roll landed (cdd8875ac) — a canary soak window is the remaining half."
+  },
+  {
+   "text": "Arc 10: earned-reach convergence — unify the reach vocabularies, close the HTTP enforcement gap, canary-governance seed (only after arc 6)",
+   "line": 92,
+   "state": "OPEN",
+   "id": "plans__2026-07-12-substrate-handoff-roadmap-post-fable#10",
+   "cites": "genesis/docs/superpowers/plans/2026-07-12-substrate-handoff-roadmap-post-fable.md#L92",
+   "class": "plan",
+   "note": "shared with the reach-ontology split + reach-archetype-floor decompositions."
+  }
+ ]
+}

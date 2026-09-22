@@ -1,0 +1,53 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md",
+ "slug": "specs__2026-08-29-sync-state-contract-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the stations. Station 1 landed with the spec (p2p/sync_state.rs epoch_base + SyncStreamState type). The SyncStreamState type has no caller outside sync_state.rs, so station 2's /p2p/status export is not wired; stations 3-5 not found.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Station 1: epoch-carrying inventory sequences (SequenceAllocator starts at epoch_base(boot_epoch)); PUBLISHER_RESTART_GAP kept as fallback",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-29-sync-state-contract-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md#L76",
+   "class": "substrate",
+   "note": "elohim-storage/src/p2p/sync_state.rs:30."
+  },
+  {
+   "text": "Station 2: SyncStreamState for the inventory stream exported per publisher on /p2p/status (inventory.streams[]) with caught_up against the latest refresh",
+   "line": 90,
+   "state": "OPEN",
+   "id": "specs__2026-08-29-sync-state-contract-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md#L90",
+   "class": "substrate",
+   "note": "SyncStreamState defined (sync_state.rs:43) but used nowhere else."
+  },
+  {
+   "text": "Station 3: sync.docsBehind (docs whose local heads do not contain the remote heads) beside syncDocuments",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-08-29-sync-state-contract-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md#L92",
+   "class": "substrate"
+  },
+  {
+   "text": "Station 4: pull.epoch (reconcile generation) beside pull.caughtUp so a stale rollup is visible",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-08-29-sync-state-contract-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md#L94",
+   "class": "substrate"
+  },
+  {
+   "text": "Station 5: answered SnapshotRequest (placeholder becomes a unicast inventory pull) reached only past the reorder window",
+   "line": 95,
+   "state": "OPEN",
+   "id": "specs__2026-08-29-sync-state-contract-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-29-sync-state-contract-design.md#L95",
+   "class": "substrate"
+  }
+ ]
+}

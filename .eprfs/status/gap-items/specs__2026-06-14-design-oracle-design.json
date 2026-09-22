@@ -1,0 +1,85 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md",
+ "slug": "specs__2026-06-14-design-oracle-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §4 first concrete implementation + §2.3 meta-process. NOTHING landed: friction.jsonl, _lib/friction.py, friction-harvest.py never existed in git, and the 'kept' sensor #1 (vision-comparator.py / vision-gaps.jsonl) never landed either; agentic-developer/SKILL.md carries no step-0.6 ritual to supersede. Item 1 is a surface-question: the design mints a new ledger + harvester, which the root CLAUDE.md four-artifact rule (2026-08-06 nomenclature review) names as the recurring anti-pattern — decide hold/supersede before building.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Surface-question: reconcile the escalation organ with the four-artifact rule (habit register / @concern / gate / habit delta) — hold to held/ or re-home as a habit before building a new ledger",
+   "line": 16,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L16",
+   "class": "provisional",
+   "note": "operator/cartographer call; do not build items 2-8 until resolved."
+  },
+  {
+   "text": "friction.jsonl ledger (the only new persisted state)",
+   "line": 293,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L293",
+   "class": "provisional"
+  },
+  {
+   "text": "_lib/friction.py pure core: fingerprint (rung, kind, pattern), reconcile with distinct-shift recurrence, _recurrence predicate (condition A)",
+   "line": 295,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L295",
+   "class": "provisional"
+  },
+  {
+   "text": "friction-harvest.py: close-time feeder from sprint-result anti-patterns / journal / dev-intent, manual door --escalate, --hook mode",
+   "line": 303,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L303",
+   "class": "provisional"
+  },
+  {
+   "text": "escalation: SessionStart doorbell line (silent when none) — now belongs in the native epr flow report --headline, not placement-audit.py",
+   "line": 313,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L313",
+   "class": "provisional"
+  },
+  {
+   "text": "Meta-process GROUND -> DECIDE -> UPDATE -> HAND BACK as a named /shift subroutine in agentic-developer/SKILL.md (cartographer wears it)",
+   "line": 330,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L330",
+   "class": "provisional"
+  },
+  {
+   "text": "Step-0.6 becomes a one-line conditional check against the escalation line",
+   "line": 337,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L337",
+   "class": "provisional",
+   "note": "no step-0.6 ritual exists in agentic-developer/SKILL.md today — likely already absent; confirm and close."
+  },
+  {
+   "text": "Sensor #1 runtime-observed comparator: vision-comparator.py -> vision-gaps.jsonl (spec says KEEP, but it was never landed)",
+   "line": 263,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L263",
+   "class": "provisional"
+  },
+  {
+   "text": "Condition B seam-cluster predicate (>= K_CLUSTER distinct open fps on one rung) composed after recurrence is proven",
+   "line": 300,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-design-oracle-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-design-oracle-design.md#L300",
+   "class": "provisional"
+  }
+ ]
+}

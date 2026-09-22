@@ -1,0 +1,68 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md",
+ "slug": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §5 V1-V4 phases + §6 open questions. Nothing landed (no binds-policy action, lens_policy_bindings table or resolve_effective_heads; commitments.rs:1113 only names the precedent in a comment). All HASH-NEUTRAL (coordinator hot-swap), provable on household-nodes. The authority question gates V1.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Decide authority: WHO may author a binds-policy for an EPR (author / qahal vote / steward via sets-authority-arc)",
+   "line": 190,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L190",
+   "class": "protocol-canonical",
+   "note": "highest-leverage open question — the binding is a power; resolve before V1."
+  },
+  {
+   "text": "V1 binds-policy validator (teeth) + schema",
+   "line": 174,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L174",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "V1 projection + lens_policy_bindings A-class DAO (anchor-preserving, fail-closed) + revokes-commitment extended to the table",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L164",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "V2 resolve_effective_heads: pin first (lockfile), wired into find_lenses_governing_epr with no-binding flat fallback; then latest, then range",
+   "line": 176,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L176",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "V3 merge: version_parent -> array in schema + validate_author_lens + projection + DAG walk; ts-rs/codegen",
+   "line": 178,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L178",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "V4 surfacing: resolved head per school + mid-fork/ambiguous flag; LensBindingView.boundConstraint",
+   "line": 180,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L180",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Open questions: range grammar, ambiguous-fork policy, standing across a version chain, DAG walk depth/size cap",
+   "line": 193,
+   "state": "OPEN",
+   "id": "specs__2026-06-27-lens-version-dag-epr-policy-dependency-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-27-lens-version-dag-epr-policy-dependency-design.md#L193",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,78 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md",
+ "slug": "specs__2026-08-30-workspace-stewarded-device-peer-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the four-station ladder + the ratchet measures + concern-canon obligations. Station 1 (joined) is green per the spec; stations 2-4 are RED/@wip: sovereign-peer-join.feature carries 5 @wip, stewarded-device-sync.feature 11 @wip (8 scenarios, 6 marked 'RED — the gap'). A binds-identity projection exists (mishpat_projection.rs:241, Wave C1) but no bind_identity verdict fn / signer_binding_lookup_total. Stations 2-4 are proven household mesh first.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Station 1 Joined: workspace conductor + storage on alpha's DHT and iroh swarm as W (sovereign-peer-join scenario 1)",
+   "line": 155,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L155",
+   "class": "substrate",
+   "note": "green per the spec (T3 rung)."
+  },
+  {
+   "text": "Station 2 Pulled: a fleet peer fetches a workspace-authored id (sovereign-peer-join RED scenarios; acquisition fetched outcome)",
+   "line": 156,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L156",
+   "class": "substrate",
+   "note": "sovereign-peer-join.feature still carries 5 @wip."
+  },
+  {
+   "text": "Station 3 Recognised: W bound as a controller of matthew's identity head with transport ids bound; signer_is_known_agent(W) true on a fleet peer (bind_identity verdict fn)",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L157",
+   "class": "substrate"
+  },
+  {
+   "text": "Station 4 Native sync: a device write under adam's grant moves the declared head and both doorways serve it, no Jenkins, no seed",
+   "line": 158,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L158",
+   "class": "substrate"
+  },
+  {
+   "text": "C4 fix: signer_is_known_agent unknown (DB error) becomes Refused{reason} at community reach — flip the Stage-1 fail-open to fail-closed and pin it",
+   "line": 187,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L187",
+   "class": "substrate",
+   "note": "same live defect as the ownership red-team #1 (reach_authorization.rs fails open)."
+  },
+  {
+   "text": "Ratchet measures: t_join, t_advert, t_pull (fan-out to 7), t_head, per-write quiesce delta as latency-scoreboard rows",
+   "line": 165,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L165",
+   "class": "substrate"
+  },
+  {
+   "text": "C8 signer_binding_lookup_total{outcome} counter + seam-registry rows (bind_identity verdict fn, W-aware classify_reach_authorization) with contract tests",
+   "line": 200,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L200",
+   "class": "substrate"
+  },
+  {
+   "text": "Revocation + stewardee scenarios: adam revokes the grant and the next write is refused; James's second device makes the same handshake as a stewardee",
+   "line": 158,
+   "state": "OPEN",
+   "id": "specs__2026-08-30-workspace-stewarded-device-peer-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-30-workspace-stewarded-device-peer-design.md#L158",
+   "class": "substrate"
+  }
+ ]
+}

@@ -1,0 +1,68 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md",
+ "slug": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status Implemented: all three levers are in elohim-storage (SelfCidSource::DerivedFromTransport at main.rs:1028-1032, re-anchor backfill at main.rs:2670, provideLoop on p2p-status-view.schema.json:189). The graduation trigger (lighting the card on live alpha) is not evidenced — backlog resilience-card-self-cid-provide-loop-gate is 'partially-resolved', ci_status blocked. Next move is VERIFY, then graduate to history.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Lever 1: derive self_cid from the transport identity at startup when SELF_CID is unset; log the source",
+   "line": 66,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L66",
+   "class": "substrate",
+   "note": "main.rs:1028-1032 SelfCidSource Env | DerivedFromTransport."
+  },
+  {
+   "text": "Join-key contract: derived self_cid == /p2p/status .peerId == seeder provider/receiver (unit test on a fixed identity.key)",
+   "line": 50,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L50",
+   "class": "substrate",
+   "note": "verify the unit test named in §Verification exists."
+  },
+  {
+   "text": "Lever 2: one-shot re-anchor backfill after the lamad bridge connects — NULL-anchor rows re-authored via call_create_content, idempotent, paced, non-fatal",
+   "line": 80,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L80",
+   "class": "substrate",
+   "note": "main.rs:2670-2671; config set_reanchor_held_backoff_seconds."
+  },
+  {
+   "text": "Lever 3: ProvideLoopState rendered as /p2p/status provideLoop (selfCidSource, active, reanchor counts) — schema-first + ts-rs",
+   "line": 97,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L97",
+   "class": "substrate",
+   "note": "p2p-status-view.schema.json:189-195."
+  },
+  {
+   "text": "iroh backend: derive self_cid from the iroh node identity (follow-up; dormant today)",
+   "line": 72,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L72",
+   "class": "substrate",
+   "note": "DerivedFromTransport may already cover iroh — verify."
+  },
+  {
+   "text": "Graduation: verify the provide-loop + re-anchor levers light the resilience card on live alpha, then graduate this spec to history",
+   "line": 8,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-resilience-card-self-cid-provide-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-resilience-card-self-cid-provide-loop-design.md#L8",
+   "class": "substrate",
+   "note": "backlog gate still partially-resolved; jessica CellDisabled was the operator-side blocker.",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  }
+ ]
+}

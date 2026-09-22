@@ -1,0 +1,116 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md",
+ "slug": "specs__2026-06-12-resilience-dimensions-proof-suite-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) per dimension (D1-D9) + the @wip acceptance gate. Layer 1 landed (tests/views/household_resilience.rs, tests/p2p/chaos_dataplane.rs, cluster_view in-module tests, distributionState unmeasured|measured). Layer 2 resilience-dimensions.feature exists but all 15 rows are still @wip — un-wipping them IS workstream D's acceptance gate. The chaos-peer-churn drills are @requires:owned-substrate (unavailable) — BLOCKED-BY-ENV, held, not ranked.",
+ "count": 12,
+ "items": [
+  {
+   "text": "D1 Layer-1: protection-status ladder boundary matrix (7 edge rows + degenerate path) in household_resilience tests",
+   "line": 48,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L48",
+   "class": "provisional",
+   "note": "elohim-storage/tests/views/household_resilience.rs."
+  },
+  {
+   "text": "D1 follow-up: degenerate row asserts distributionState=unmeasured (never a false at-risk)",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L64",
+   "class": "provisional",
+   "note": "household_resilience.rs:231-234 emits unmeasured|measured; the Layer-2 assertion row is still @wip."
+  },
+  {
+   "text": "D2/D3/D4 Layer-1 edges: peer counts (online+degraded, in-household only), commitment-backing (active provide, distinct households), diversity score floor/clamp",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L76",
+   "class": "provisional"
+  },
+  {
+   "text": "D5 Layer-1: regional distribution — all five match arms + dedupe + both fallbacks",
+   "line": 105,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L105",
+   "class": "provisional"
+  },
+  {
+   "text": "D8 Layer-1: storage triptych edges in cluster_view.rs (skip None, custody-blob only, my peers only, clamp-never-wrap)",
+   "line": 133,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L133",
+   "class": "provisional",
+   "note": "cluster_view.rs carries 7 #[test]."
+  },
+  {
+   "text": "D9 protocol chaos: real libp2p nodes with Shutdown kill-switch — fail-fast, survivor fetch, return-after-death, mid-transfer kill",
+   "line": 145,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L145",
+   "class": "provisional",
+   "note": "elohim-storage/tests/p2p/chaos_dataplane.rs."
+  },
+  {
+   "text": "Layer 2: un-@wip resilience-dimensions.feature D1/D2 rows once the humans household junction is populated on the household mesh",
+   "line": 182,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L182",
+   "class": "provisional",
+   "note": "15 @wip rows remain (resilience-dimensions.feature:34-168)."
+  },
+  {
+   "text": "Layer 2: un-@wip D3 commitment-backed row once Epic-B provide rows exist outside test_util",
+   "line": 87,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L87",
+   "class": "provisional"
+  },
+  {
+   "text": "Layer 2: un-@wip D5 geographic-distribution row once collectives.region rows are seeded",
+   "line": 107,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L107",
+   "class": "provisional"
+  },
+  {
+   "text": "Layer 2: D6 pins both icon vocabularies (felt ●/◐/○ vs status-*) on the same seeded contents (@browser-only)",
+   "line": 113,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L113",
+   "class": "provisional"
+  },
+  {
+   "text": "Layer 2: D8 cluster-page triptych for the logged-in steward (identity-bound)",
+   "line": 137,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L137",
+   "class": "provisional"
+  },
+  {
+   "text": "D9 live-cluster drills: flapping, cascading loss down the D1 ladder, mid-read kill, two-peer loss",
+   "line": 158,
+   "state": "OPEN",
+   "id": "specs__2026-06-12-resilience-dimensions-proof-suite-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md#L158",
+   "class": "provisional",
+   "note": "chaos-peer-churn.feature scenarios are @requires:owned-substrate — BLOCKED-BY-ENV (owned-substrate unavailable).",
+   "requires_env": [
+    "owned-substrate"
+   ]
+  }
+ ]
+}

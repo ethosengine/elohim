@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md",
+ "slug": "specs__2026-08-22-verification-as-memoized-derivation-guidestar",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) along §6 graduation path (Slice 1 edits 1-4, Slice 2 edits 5-10, held items, exchange leg, new wire). Slice 1 landed: just test mesh writes run-identified sprint-report-household-<runId>.json via build-sprint-report.ts (justfile:241-264), sprint-report.schema.json gains gitCommit + declared, habits-status.py renders NOT MEASURED. Slice 2 (a2o measure-fold family, gate-runner record, fulfill env/Process) not landed. Held items wait for participant #2 by the doc's own rule.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Slice 1.1: just test mesh calls build-sprint-report.ts into a run-identified path under a stable glob",
+   "line": 347,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L347",
+   "class": "protocol-canonical",
+   "note": "justfile:241-264."
+  },
+  {
+   "text": "Slice 1.2: sprint-report schema gains declared (externally anchored), env (incl. sut hash) and gitCommit",
+   "line": 348,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L348",
+   "class": "protocol-canonical",
+   "note": "sprint-report.schema.json:22 gitCommit, :66 declared; verify the env block with a sut hash."
+  },
+  {
+   "text": "Slice 1.3: habits-status.py prints NOT MEASURED per concern + observed_status / last_measured + max_evidence_age (never writes status:)",
+   "line": 349,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L349",
+   "class": "protocol-canonical",
+   "note": "habits-status.py:18-34."
+  },
+  {
+   "text": "Slice 1.4: recipes a2o:verdict points at the run-identified path; classify findings substrate vs code at write time; strike publish:results",
+   "line": 350,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L350",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2.5-2.6: generalize measure-fold.py to an a2o/dataplane measure family, shipped RECORD-ONLY (always write, print would-be hit/miss, never skip compute)",
+   "line": 358,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L358",
+   "class": "protocol-canonical",
+   "note": ".claude/data/measure-folds/ holds only clippy-pedantic."
+  },
+  {
+   "text": "Slice 2.7-2.9: gate-runner.mjs writes a run-identified record; env on the a2o commitment + Process on fulfill events (stop dropping name/status/observed at fulfill.rs); gate:verdict recipe stage",
+   "line": 360,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L360",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2.10 / Rules: declare the equilibrium window + max evidence age beside the check; delete the || echo that makes the aggregator non-blocking",
+   "line": 363,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L363",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Held until participant #2: distinct_observers/hosts seam onto graduation::diversity, tri-state threshold_met, the Affirm producer; ship 'claimed · 0 independent witnesses' meanwhile",
+   "line": 367,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L367",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Exchange leg: fetchable fold read surface, recompute-and-match verification rule, shared-commit collision surface",
+   "line": 378,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L378",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "New wire: typed evidence Vec<Cid> on FlowEvent (golden CID bump), iroh-blob observation log + ALPN handler, a producer of observation rows for verification subjects",
+   "line": 386,
+   "state": "OPEN",
+   "id": "specs__2026-08-22-verification-as-memoized-derivation-guidestar#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-22-verification-as-memoized-derivation-guidestar.md#L386",
+   "class": "protocol-canonical"
+  }
+ ]
+}

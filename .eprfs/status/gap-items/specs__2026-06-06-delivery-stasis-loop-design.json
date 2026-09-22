@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md",
+ "slug": "specs__2026-06-06-delivery-stasis-loop-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §4 wiring decisions, the watch-outs, §5 testing and §6 follow-ups. Wiring 1/3/5 and the verdict ladder landed (skill, hook, scoreboard, push-lease); the §6 follow-ups remain open by design.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Wiring 1: operator-invoked /delivery-stasis ceremony — rounds until only ceiling items remain, then present the menu",
+   "line": 78,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L78",
+   "class": "process-meta",
+   "note": ".claude/skills/delivery-stasis/"
+  },
+  {
+   "text": "Wiring 2: /loop self-paced overnight mode with an accumulating ceiling menu",
+   "line": 80,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L80",
+   "class": "process-meta",
+   "note": "carried by the delivery-stasis skill; no dedicated round-journal yet (see follow-up 3)."
+  },
+  {
+   "text": "Wiring 3: SessionStart delivery-gate.py one-line advisory (inform, never redirect; no auto-dispatch)",
+   "line": 81,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L81",
+   "class": "process-meta",
+   "note": ".claude/hooks/delivery-gate.py registered in .claude/settings.json:52."
+  },
+  {
+   "text": "Wiring 5: ambition-mode build leg under an evidence-gated push lease (.claude/data/push-lease.json; build/push fields; stall rule)",
+   "line": 88,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L88",
+   "class": "process-meta",
+   "note": ".claude/data/push-lease.json present."
+  },
+  {
+   "text": "Floor metric is the per-job VERDICT ladder (code-red / attention / env-gated / fix-landed / clearing), never a bare pass_ratio",
+   "line": 114,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L114",
+   "class": "process-meta",
+   "note": ".claude/scripts/delivery-scoreboard.py."
+  },
+  {
+   "text": "Instrument liveness: every headline gate + scoreboard section emits a gate-error line on failure instead of vanishing",
+   "line": 140,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L140",
+   "class": "process-meta",
+   "note": "delivery-scoreboard.py:74 emits it; placement-audit.py's _gate_subprocess was replaced by the native epr headline — re-verify the native port keeps the never-vanish rule."
+  },
+  {
+   "text": "Testing: gate script <1s, silent at stasis, fail-silent, pipe-tested against crafted fixtures",
+   "line": 149,
+   "state": "OPEN",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L149",
+   "class": "process-meta",
+   "note": "only a drift-observation hook test touches delivery-gate.py (.claude/hooks/__tests__/drift_observation_test.py:417); no fixture pipe-test of the counts located."
+  },
+  {
+   "text": "Follow-up 1: scheduled remote routine once cadence proves out",
+   "line": 156,
+   "state": "OPEN",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L156",
+   "class": "process-meta"
+  },
+  {
+   "text": "Follow-up 2: merge a delivery: line into the SessionStart MEMORY BUDGET headline",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L157",
+   "class": "process-meta",
+   "note": "epr flow report --headline carries recall/mempalace/cleanup/scope/memory-budget/recipe — no delivery line."
+  },
+  {
+   "text": "Follow-up 3: round-journal artifact (sibling of the shift journal) if the menu needs durable accumulation",
+   "line": 159,
+   "state": "OPEN",
+   "id": "specs__2026-06-06-delivery-stasis-loop-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-06-delivery-stasis-loop-design.md#L159",
+   "class": "process-meta"
+  }
+ ]
+}

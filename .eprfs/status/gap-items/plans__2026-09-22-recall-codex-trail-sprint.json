@@ -1,0 +1,69 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md",
+ "slug": "plans__2026-09-22-recall-codex-trail-sprint",
+ "method": "agent-decomposition",
+ "class": "devflow",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status landed 2026-09-22 with verified_by (memory-ceremony gate EXIT 0; bank 5/6; fresh reader 2 journeys) and a chronicle entry; commits cd912bd40 (S1), 452c13461 (S2 test), d013dbc97 (headline). Stations CLAIMED; the residue is the habit's window bound (needs real weekly journeys) and the held observations 5-6.",
+ "count": 7,
+ "items": [
+  {
+   "text": "S1 the entry reaches: declared first-screen globs + short terms, prefix stemming, metadata-first root route, narrowed continuation on budget cut",
+   "line": 50,
+   "state": "CLAIMED",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#1",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L50",
+   "class": "devflow",
+   "note": "cd912bd40."
+  },
+  {
+   "text": "S2 resume a concern: open --purpose resume --habit <id> read-only view (status, checks, last delta, commits/branches newer than the delta)",
+   "line": 56,
+   "state": "CLAIMED",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#2",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L56",
+   "class": "devflow",
+   "note": "452c13461."
+  },
+  {
+   "text": "S3 prose that lags its value: disagreements block for JSON/YAML sources with fixture + live pool-policy check",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#3",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L63",
+   "class": "devflow"
+  },
+  {
+   "text": "S4 review cost: blind-reader finding class (correctness / interpretability / preference) + round record in the story-harvest loop",
+   "line": 65,
+   "state": "CLAIMED",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#4",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L65",
+   "class": "devflow"
+  },
+  {
+   "text": "Habit flip condition: recall-reaches-authority window bound under 0.2 over real weekly journeys (headline currently 'recall: failed — 9 of 14 journeys')",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#5",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L78",
+   "class": "devflow"
+  },
+  {
+   "text": "Held observation 5: bind build receipts from source to pack to loaded artifact for remembered greens",
+   "line": 45,
+   "state": "OPEN",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#6",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L45",
+   "class": "devflow"
+  },
+  {
+   "text": "Held observation 6: delivered text vs running follow-up stays harness-owned (no cross-session projection of private recall)",
+   "line": 46,
+   "state": "OPEN",
+   "id": "plans__2026-09-22-recall-codex-trail-sprint#7",
+   "cites": "genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md#L46",
+   "class": "devflow"
+  }
+ ]
+}

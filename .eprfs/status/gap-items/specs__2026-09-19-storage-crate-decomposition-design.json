@@ -1,0 +1,96 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md",
+ "slug": "specs__2026-09-19-storage-crate-decomposition-design",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from the §4 crate-order table (steps 0-5 + later rows) + the step-3 runtime half and open questions. Landed: step 0b (b88503495: 168 test binaries -> 14), step 1 elohim-error (c63079ac2), step 2 fold head codec into elohim-epr (elohim/epr/src/head.rs, decision e08ba3841), step 3 elohim-settings with boot-publisher refusal (02a9d326d). Open: step 4 elohim-blob, step 5 elohim-db, later http/services-p2p splits. The uncommitted metrics-rs-loc-ceiling backlog in the tree is a sibling decomposition.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Step 0: derive the edge manifest storage source globs + Dockerfile COPY set from the crate path-dep closure in one place (prove with a sibling-only branch build)",
+   "line": 110,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L110",
+   "class": "architecture",
+   "note": "39d5bac2a made every copied path re-trigger the edge build with a test; confirm it is derived from the path-dep closure rather than listed."
+  },
+  {
+   "text": "Step 0b: 168 tests/*.rs grouped into ~8-14 binaries by area without shared-global order dependence",
+   "line": 111,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L111",
+   "class": "architecture",
+   "note": "b88503495 (14 binaries)."
+  },
+  {
+   "text": "Step 1: elohim-error carved out verbatim",
+   "line": 112,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L112",
+   "class": "architecture",
+   "note": "c63079ac2; elohim/elohim-error/."
+  },
+  {
+   "text": "Step 2: epr_codec folds into elohim-epr as head.rs (CAL-1.0 per the provisional licence rule)",
+   "line": 229,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L229",
+   "class": "architecture",
+   "note": "elohim/epr/src/head.rs."
+  },
+  {
+   "text": "Step 3: elohim-settings (config + runtime_config) with static publisher guard + runtime boot assertion, watcher split out, two module shims; verify via GET /admin/runtime-config diff",
+   "line": 114,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L114",
+   "class": "architecture",
+   "note": "02a9d326d 'a boot that skipped a publisher now refuses to start'; the /admin/runtime-config pre/post diff not evidenced."
+  },
+  {
+   "text": "Step 4: elohim-blob (blob_store, sharding, dag_store, compute_payload_store, content_server) with announce-sink + node-identity traits; blob-durability habit moves with it",
+   "line": 115,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L115",
+   "class": "architecture"
+  },
+  {
+   "text": "Step 5: elohim-db (db/, migrations/, diesel.toml, migration hygiene + identity/binding helpers) and collapse 38 stray embed_migrations! sites to one MIGRATIONS; decide elohim-metrics-registry (Q3)",
+   "line": 116,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L116",
+   "class": "architecture"
+  },
+  {
+   "text": "Later: elohim-storage-http (api/ + the 21k-line http.rs split by route family first)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L117",
+   "class": "architecture"
+  },
+  {
+   "text": "Later: the services <-> p2p seam (designed separately, §7)",
+   "line": 202,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L202",
+   "class": "architecture"
+  },
+  {
+   "text": "Born governed: every new crate carries its .epr-meta (and CLAUDE.md / justfile gate entry) from birth",
+   "line": 167,
+   "state": "OPEN",
+   "id": "specs__2026-09-19-storage-crate-decomposition-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-19-storage-crate-decomposition-design.md#L167",
+   "class": "architecture"
+  }
+ ]
+}

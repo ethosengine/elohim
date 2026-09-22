@@ -1,0 +1,89 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md",
+ "slug": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from 'The moves' M0-M7 (the spec's own decomposition: one /shift Objective per move). Per operator memory this spec is an execution scaffold, not canon — cite it for moves/rungs only. M0 pawls are evidenced (mesh restart arms, seed apply mesh content, T2 receipt in pre-push, recovery reports under genesis/a2o/reports/recovery/); M4's acquisition-over-iroh leg landed (transport-self-awareness row 13). M1 syncVerdicts, M2 QUIESCE_MODE=label, M5-M7 not found.",
+ "count": 9,
+ "items": [
+  {
+   "text": "M0 pawls: mesh storage-restart/conductors-restart arms, seed apply mesh content profile, T2 receipt banner in pre-push, durable recovery timeline under genesis/a2o/reports/",
+   "line": 150,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L150",
+   "class": "substrate",
+   "note": "justfile mesh arms + just seed apply mesh content + .husky T2 receipt leg + genesis/a2o/reports/recovery (per root CLAUDE.md)."
+  },
+  {
+   "text": "M1 name the plateau, survive saturation: syncVerdicts + metric, N=3 baseline, admission-pressure never-answered streak, admission-adaptive content-leg timeout",
+   "line": 152,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L152",
+   "class": "substrate",
+   "note": "shared with transport-self-awareness row 5."
+  },
+  {
+   "text": "M2 fleet measurability + legibility: QUIESCE_MODE=label + churn_state in run-dataplane-validation.sh, storage SIGSEGV handler, doorway per-hop timers + doorway-B PodMonitor label",
+   "line": 154,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L154",
+   "class": "substrate",
+   "note": "no QUIESCE_MODE in run-dataplane-validation.sh; PodMonitor half landed via the latency chain."
+  },
+  {
+   "text": "M3 trust-priced sync (design-gated): handshake carries steward agent key + membership CIDs, verified via the imagodei client; joins-vs-bindings decision",
+   "line": 156,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L156",
+   "class": "substrate",
+   "note": "carried by specs/2026-09-01-trust-priced-sync-edge-design (already decomposed)."
+  },
+  {
+   "text": "M4 dual/iroh harvest: acquisition through race_fetch_dual/iroh_fetch_leg; PathObservation + select_path inside peer_map::select_transport; N=3 matrix incl. fanout",
+   "line": 158,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L158",
+   "class": "substrate",
+   "note": "acquisition iroh dispatch landed (b30512348); select_path in peer_map not verified."
+  },
+  {
+   "text": "M5 federation uniform deploy: blobHash propagation to the federation peer (retire stageSpaBlob), require_seed_authority fix (sc3 un-@wip), /deliver on landing + lesson",
+   "line": 160,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L160",
+   "class": "substrate"
+  },
+  {
+   "text": "M6 SDK first honest round-trip: just test sdk quickstart against the mesh doorway then alpha; storage refuses an undeclared contentType and derives h_app_id from the manifest",
+   "line": 162,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L162",
+   "class": "substrate",
+   "note": "no 'test sdk' family in the justfile."
+  },
+  {
+   "text": "M7 the second app (WordPress-like publishing) composed as a domain manifest + EPR-app bundle served through both doorways via create-elohim-app",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L164",
+   "class": "substrate"
+  },
+  {
+   "text": "Operator decisions surfaced: doorway-B API_KEY_SEED (D4), P1 DHT-discovery cure, shem CPU, alpha iroh flip, CRDT reach wire shape (F7), second-app shape",
+   "line": 170,
+   "state": "OPEN",
+   "id": "specs__2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-28-ratchet-to-delivery-dataplane-sdk-lanes-design.md#L170",
+   "class": "substrate"
+  }
+ ]
+}

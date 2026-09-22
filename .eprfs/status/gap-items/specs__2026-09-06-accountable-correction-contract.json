@@ -1,0 +1,89 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md",
+ "slug": "specs__2026-09-06-accountable-correction-contract",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the contract sections §1-§9 as slice-1 build obligations + the graduation trigger. Substantial slice-1 code landed: migrations feedback_application + feedback_operations (2026-09-06), coordinator externs get_content_lineage / amend_content (correction.rs) and get_feedback_signal_record (ddb1742b0), POST /api/v1/feedback/operations routed (http.rs:2453). The a2o feature dataplane/accountable-correction.feature has 8 scenarios with 5 @wip — the stations are not all green.",
+ "count": 9,
+ "items": [
+  {
+   "text": "§1/§2 act identity (origin DNA, action hash) with verified fetch; action hash -> content id + root author from the Update lineage (get_content_lineage)",
+   "line": 37,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-06-accountable-correction-contract#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L37",
+   "class": "protocol-canonical",
+   "note": "content_store/src/correction.rs:213."
+  },
+  {
+   "text": "§3 discovery: persisted subscription set, per-act application join, rotating fairness position; coordinator query returning action refs + explicit per-reference fetch outcomes",
+   "line": 43,
+   "state": "OPEN",
+   "id": "specs__2026-09-06-accountable-correction-contract#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L43",
+   "class": "protocol-canonical",
+   "note": "get_feedback_signal_record landed (feedback_signal.rs:725); subscription set + fairness rotation not verified."
+  },
+  {
+   "text": "§4 additive notification reference on the p2p feedback-signal message with old<->new decode test + seam-registry row",
+   "line": 53,
+   "state": "OPEN",
+   "id": "specs__2026-09-06-accountable-correction-contract#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L53",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§5.3 content successor: root-author-gated amendment (amend_content) declared as head via the existing head path",
+   "line": 61,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-06-accountable-correction-contract#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L61",
+   "class": "protocol-canonical",
+   "note": "correction.rs:485 amend_content."
+  },
+  {
+   "text": "§6 partition behaviour: pending vs rejected acceptance; same-root conflict detection over exact root Create",
+   "line": 63,
+   "state": "OPEN",
+   "id": "specs__2026-09-06-accountable-correction-contract#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L63",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§7 projection: feedback_application generation table, single-transaction apply, operation-group unit, zero contribution for an unaccepted correction, cutover of api/epr.rs immediate writer, rebuild",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-06-accountable-correction-contract#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L69",
+   "class": "protocol-canonical",
+   "note": "migration 2026-09-06-100000_feedback_application; cutover of the immediate standing write not verified."
+  },
+  {
+   "text": "§8 submission binding: feedback_operations outbox + two-phase evidence-then-feedback with operation-group key; POST /api/v1/feedback/operations",
+   "line": 78,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-06-accountable-correction-contract#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L78",
+   "class": "protocol-canonical",
+   "note": "migration 2026-09-06-101000_feedback_operations; http.rs:2453."
+  },
+  {
+   "text": "Slice-1 stations as scenarios bound to @concern:accountable-correction green on the household mesh (5 of 8 still @wip) — the Draft->Active trigger",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-09-06-accountable-correction-contract#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L10",
+   "class": "protocol-canonical",
+   "note": "genesis/a2o/features/dataplane/accountable-correction.feature."
+  },
+  {
+   "text": "Named gaps for later slices: delegate acceptance (HeadDelegation), cross-context evidence, CIDv1 target_cid migration, sync-plane head path for accepted successors",
+   "line": 111,
+   "state": "OPEN",
+   "id": "specs__2026-09-06-accountable-correction-contract#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-06-accountable-correction-contract.md#L111",
+   "class": "protocol-canonical"
+  }
+ ]
+}

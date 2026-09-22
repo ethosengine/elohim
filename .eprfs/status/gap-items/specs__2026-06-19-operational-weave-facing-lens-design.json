@@ -1,8 +1,90 @@
 {
  "doc": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md",
  "slug": "specs__2026-06-19-operational-weave-facing-lens-design",
- "method": "none",
+ "method": "agent-decomposition",
  "class": "protocol-canonical",
- "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
- "items": []
+ "doc_requires_env": [
+  "household-nodes",
+  "observability"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Slices 1-4 landed (287864329, 1e182f0fa, be378e07d, a8199fb62); remaining: tier_occupancy (deliberately deferred — no risk-tier source), live-alpha lighting (operator-owned). Companion execution plan plans__2026-06-20-operational-weave-lens-plan carries 17 unticked checkbox steps whose code has landed — its boxes are stale (decompose-due for the librarian), not open work.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Select the relations: reuse HolderRow + sibling ShardPlacementRow/CustodianCapacityRow, joined on agent_cid (peer_id column holds agent_cid)",
+   "line": 32,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L32",
+   "class": "protocol-canonical",
+   "note": "operational_weave_facing.rs load_custodian_relation/load_all_placement_gaps/load_all_holder_relation."
+  },
+  {
+   "text": "Slice 1 (DB-free proof): placement_gap_count fold -> elohim_placement_gap_count gauge",
+   "line": 79,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L79",
+   "class": "protocol-canonical",
+   "note": "287864329; metrics.rs:95."
+  },
+  {
+   "text": "Slice 2: rs_coverage fold + WeaveView (ts-rs) + rs_coverage gauge",
+   "line": 83,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L83",
+   "class": "protocol-canonical",
+   "note": "1e182f0fa; gauge elohim_rs_coverage_milli (integer-scaled)."
+  },
+  {
+   "text": "Slice 3: node_capacity / cluster ComputeTriptych rollup; wire the dead peer_capacity handler",
+   "line": 84,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L84",
+   "class": "protocol-canonical",
+   "note": "be378e07d; api/mod.rs:478 routes peer_capacity::handle."
+  },
+  {
+   "text": "Slice 4: region_occupancy + full WeaveView + GET /api/v1/weave",
+   "line": 85,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L85",
+   "class": "protocol-canonical",
+   "note": "a8199fb62; http.rs Route::get(\"/api/v1/weave\"); doorway is_service_path covers it via the \"/api/\" prefix."
+  },
+  {
+   "text": "Second projection: custodian free/used/stewarded gauges emitted by an adapter over the same pure folds (never set() inside a fold)",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L59",
+   "class": "protocol-canonical",
+   "note": "emit_capacity_gauges; metrics.rs elohim_custodian_{free,used}_bytes."
+  },
+  {
+   "text": "tier_occupancy -> RiskTierDistribution: design a risk-tier source/derivation for the holder relation, then fill WeaveView.tierOccupancy",
+   "line": 48,
+   "state": "OPEN",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L48",
+   "class": "protocol-canonical",
+   "note": "deliberately NOT built (operational_weave.rs:171-175) — the holder relation carries no risk-tier dimension; field stays absent, never fabricated. Needs a design decision first."
+  },
+  {
+   "text": "Light the weave metrics on live alpha with real seed paths (distinct from the in-repo green proof)",
+   "line": 91,
+   "state": "OPEN",
+   "id": "specs__2026-06-19-operational-weave-facing-lens-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-19-operational-weave-facing-lens-design.md#L91",
+   "class": "protocol-canonical",
+   "note": "operator-owned per the spec's Non-goals; not evidenced.",
+   "requires_env": [
+    "alpha-cluster-6peer",
+    "observability"
+   ]
+  }
+ ]
 }

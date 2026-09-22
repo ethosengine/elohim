@@ -1,0 +1,76 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md",
+ "slug": "specs__2026-07-30-render-delivery-manifest-adapter-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §6 sequencing (1-5) + §3a-§3e decisions + §5 boundaries. The verdict (SSR aligned; the gap is the developer-half delivery contract) is settled. Step 1 (URLSearchParams shim conformance) is evidenced in elohim-render/src/shim/url.js; no manifest 'delivery' schema fields yet; render-path logic (trust-scoped cache, gating) still lives doorway-side (doorway ssr.rs, cache/store.rs), so the zero-doorway mesh test does not hold yet.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Step 1a: SSR-stall fix — URLSearchParams.sort() shim conformance in elohim-render (first instance of the env contract)",
+   "line": 160,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L160",
+   "class": "protocol-canonical",
+   "note": "elohim-render/src/shim/url.js carries the URLSearchParams shim; verify sort() coverage by test."
+  },
+  {
+   "text": "Step 1b: isolate-reuse trust-boundary settlement (realm-per-render or equivalent) before any per-user credentialed SSR",
+   "line": 147,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L147",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 2 / §3e: move render serving logic (trust-scoped cache, capability derivation, auth-mode gating, shed taxonomy) out of doorway into the shared engine/render-host layer; doorway and storage-ssr become symmetric thin hosts",
+   "line": 166,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L166",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Acceptance for step 2: a mesh with zero doorways has full SSR delivery among render-capable peers (a2o)",
+   "line": 124,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L124",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 3 / §3a: app-manifest delivery section — browser bundle CID, optional server bundle CID (= SSR-capable marker), render spec as a matching key; schema -> contract test -> TS codegen",
+   "line": 169,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L169",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 4 / §3b: versioned render-host environment contract (shim surface, fetch routing rule, stability semantics) stamped beside RenderSpec; a2o compose/capability features assert it",
+   "line": 170,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L170",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§3d framework pluggability: native-Rust content body renderer registered as another renderer id against the same manifest declaration",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L114",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Step 5: cross-peer render delegation on delegates-compute, only when a real second-peer use case exists",
+   "line": 172,
+   "state": "OPEN",
+   "id": "specs__2026-07-30-render-delivery-manifest-adapter-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-30-render-delivery-manifest-adapter-design.md#L172",
+   "class": "protocol-canonical"
+  }
+ ]
+}

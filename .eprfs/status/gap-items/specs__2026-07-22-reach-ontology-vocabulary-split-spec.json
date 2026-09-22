@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md",
+ "slug": "specs__2026-07-22-reach-ontology-vocabulary-split-spec",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §7 Definition of Done (1-6) + the §2a ceiling-marker unification + §8 open questions. Landed: VALID_REACH_LEVELS gone, the geographic vocabulary renamed LocalityLevel at the single SDK edit point (protocol-core.model.ts:36), a reach-vocabulary schema contract test (elohim-storage tests/api/reach_vocabulary_contract.rs). Open: custody vocabulary rename, verdict surface (viewer term + freshness + announcement), fixture harness, downstream audit (doorway access_control still geographic), composition-law a2o stories.",
+ "count": 10,
+ "items": [
+  {
+   "text": "DoD 1: schema 8 canonical; reach_earning.rs migrated off the stale personal..district enum; VALID_REACH_LEVELS removed; schema-contract drift test",
+   "line": 116,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L116",
+   "class": "protocol-canonical",
+   "note": "tests/api/reach_vocabulary_contract.rs; no VALID_REACH_LEVELS in app/elohim TS."
+  },
+  {
+   "text": "DoD 2a: geographic 8 renamed to locality/placement (single SDK edit point + re-exports)",
+   "line": 117,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L117",
+   "class": "protocol-canonical",
+   "note": "storage-client-ts protocol-core.model.ts LocalityLevel."
+  },
+  {
+   "text": "DoD 2b: Part-V custody vocabulary renamed + re-anchored on CustodianCommitment / Mishpat::Commitment; resilience README gap-matrix row names all five strands",
+   "line": 41,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L41",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DoD 3: verdict surface — generalized ReachVerdict with viewer term, freshness parameter, opt-in explain, announcement slot (anonymous/session in v1)",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L118",
+   "class": "protocol-canonical",
+   "note": "reach_earning::evaluate has no viewer parameter and no timestamp (spec §2 measured 2026-07-23)."
+  },
+  {
+   "text": "DoD 4: offline deterministic fixture harness ('given these declarations, agent A sees exactly {...}') shipping with the reconciliation",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L119",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DoD 5: downstream audit — content_store_integrity validator, doorway reach_aware_serving/access_control, steward storage/reach.rs, p2p/reach_authorization.rs reconciled; data-aware migration",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L120",
+   "class": "protocol-canonical",
+   "note": "doorway cache/access_control.rs still matches the geographic vocabulary (shared with reach-archetype-floor + freenet 5.2)."
+  },
+  {
+   "text": "DoD 6: a2o composition-law regression stories (narrow-never-widen; anonymous->commons; revocation-orders-before-serve)",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L121",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§2a ceiling marker: one canonical first-class Refer/ask verdict value across .epr-meta class:ask, constitution FlagForHuman, ReachVerdict::Pending, ValidatorOutcome::Flag (others become projections)",
+   "line": 59,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L59",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§4 freshness as a verdict term: revocation must order before what it protects (anchored on the amber/green DHT-witnessing signal)",
+   "line": 98,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L98",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Open questions: pending-verdict amber UX; DID-method mapping for agent_cid + AgentPeerBinding; vocabulary federation (AT lexicon namespacing)",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-07-22-reach-ontology-vocabulary-split-spec#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-22-reach-ontology-vocabulary-split-spec.md#L130",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md",
+ "slug": "specs__2026-08-08-conductor-call-deadline-capability-spike",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §6.4-§6.5 decision memo + §7 unrun verification + §8 operator decisions. The spike landed its fork patch on a branch against Holochain 0.6.3 and the §6.4 probe histogram exists (metrics.rs:2177 elohim_head_batch_queue_wait_ms). The fleet has since moved to the 0.7 fork line, so the patch must be re-based/re-evaluated against 0.7 before any deploy decision; the client-skew backlog row exists (storage-client-pin-skew-fork-app-interface).",
+ "count": 8,
+ "items": [
+  {
+   "text": "Instrument A: fork patch carrying the caller's declared deadline across the app interface (config leg: ceiling, then default deadline) — committed, not deployed",
+   "line": 132,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L132",
+   "class": "protocol-canonical",
+   "note": "on a 0.6.3 branch; re-base onto the 0.7 fork pin required."
+  },
+  {
+   "text": "Probe: read elohim_head_batch_queue_wait_ms p95 over a full quiesce window on adam (WAN) + matthew (LAN) with PTxnGuard flat; apply the three-outcome decision rule",
+   "line": 500,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L500",
+   "class": "protocol-canonical",
+   "note": "histogram registered (metrics.rs:2177).",
+   "requires_env": [
+    "alpha-cluster-6peer",
+    "observability"
+   ]
+  },
+  {
+   "text": "Write the §5.4 sweettest/integration scenarios (abandon releases DB permit, refusal is immediate, interface accepts work after a deadline fires)",
+   "line": 572,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L572",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Compile the patch under the production feature set (conductor image build) and a release profile",
+   "line": 585,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L585",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision 1-2: open the upstream holochain PR (identity + fork + develop sweettests); bundle or split the holochain_client commit",
+   "line": 594,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L594",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision 3: confirm the §6.4 probe as the deploy rule for the fork config leg (ceiling-then-deadline)",
+   "line": 601,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L601",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Decision 4: reconcile the holochain_client version skew so fork app-interface additions are reachable from our runtime",
+   "line": 603,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L603",
+   "class": "protocol-canonical",
+   "note": "backlog storage-client-pin-skew-fork-app-interface.md exists."
+  },
+  {
+   "text": "Decision 5: amend the program plan's evidence item 4 to name the cancellable/uncancellable split",
+   "line": 608,
+   "state": "OPEN",
+   "id": "specs__2026-08-08-conductor-call-deadline-capability-spike#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-08-conductor-call-deadline-capability-spike.md#L608",
+   "class": "protocol-canonical"
+  }
+ ]
+}

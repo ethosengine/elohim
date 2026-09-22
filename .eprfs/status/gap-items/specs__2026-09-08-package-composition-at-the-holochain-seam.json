@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md",
+ "slug": "specs__2026-09-08-package-composition-at-the-holochain-seam",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A rules spec (§3 don'ts D1-D8, §4 do's A1-A10) whose graduation trigger is: every rule cited by a landed package or retired by a measurement, AND sprint T12 has chosen the §5 budgets with receipt paths, AND the D6 condition. Items are those graduation obligations plus the rules that need an enforcing construct; D3's qualifier is owned by the cell-qualified contract.",
+ "count": 9,
+ "items": [
+  {
+   "text": "§5 budgets: sprint T12 chooses the P1-P5 numbers (local-save, open-with LAN, cross-peer visibility, recovery, idle cost per context) with receipt paths under genesis/a2o/reports/",
+   "line": 188,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L188",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation audit: each §3/§4 rule cited by a landed package (bundle, candidate or manifest addition) or retired by an overturning measurement",
+   "line": 8,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L8",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D5 enforcement: a bundle never carries a DNA — gate the packaging path to refuse DNA-bearing bundles",
+   "line": 106,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L106",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D3 enforcement: no projected row or sync doc without its cell qualifier (owned by the cell-qualified projection contract)",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L92",
+   "class": "protocol-canonical",
+   "note": "see specs__2026-09-08-cell-qualified-projection-and-sync-contract."
+  },
+  {
+   "text": "A5: candidates are single-role and appliesTo names the target's running coordinators",
+   "line": 154,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L154",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A6: witness identity reproducible — DNA packing only from the canonical path, only as a fleet operation",
+   "line": 160,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L160",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "A8: record the resolved composition, recoverable and readable by Shefa",
+   "line": 172,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L172",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D8: cross-peer wake-up carried by a notification, never by DHT signals (cell-local post_commit)",
+   "line": 123,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L123",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§6 twelve-line package-author checklist folded into the p2p-design-gate / package-authoring skill so authors meet it at authoring time",
+   "line": 205,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-package-composition-at-the-holochain-seam#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-package-composition-at-the-holochain-seam.md#L205",
+   "class": "protocol-canonical"
+  }
+ ]
+}

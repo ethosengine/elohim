@@ -1,0 +1,105 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md",
+ "slug": "specs__2026-08-20-latency-valueflow-chain-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §6 first/second/third cut + §7-§11 instrument rules. First cut largely landed: DoorwayHop enum + doorway_hop_duration_ms histogram (doorway metrics.rs:204/560), latency-scoreboard.py reader, PodMonitor selector covering doorway-b. Not landed: avg_resolution_ms deletion (still present), storage x-elohim-elapsed-ms residual stamping, @concern:latency-budget scenario, PeerClass::derive, the slow bucket set, AIMD trajectory test. Note: the habit register moved from habits.yaml edits to .epr-meta habit atoms — the 'habits.yaml:70 delta' step now means a delta in the owning habit atom.",
+ "count": 11,
+ "items": [
+  {
+   "text": "First cut 1-2: DoorwayHop enum + doorway_hop_duration_ms{hop,peer_class,route_class,outcome} with cached handles, boot pre-touch, completeness test; R1 timer + x-elohim-hop-serve-ms",
+   "line": 212,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L212",
+   "class": "protocol-canonical",
+   "note": "doorway metrics.rs:204, :560."
+  },
+  {
+   "text": "First cut 3: feed cache resolution duration into the histogram by tier and DELETE avg_resolution_ms",
+   "line": 214,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L214",
+   "class": "protocol-canonical",
+   "note": "avg_resolution_ms still at resolution.rs:79."
+  },
+  {
+   "text": "First cut 4-5: R3/R3b timers around storage proxy sends (pantry hit|miss); PodMonitor selector covers elohim-doorway and elohim-doorway-b",
+   "line": 216,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L216",
+   "class": "protocol-canonical",
+   "note": "podmonitor matchExpressions includes elohim-doorway-b (:55-60); verify the R3 timers."
+  },
+  {
+   "text": "First cut 6-7: latency-scoreboard.py reader (--deployed PromQL / --local harness; best_observed ratchet; re-runnable command per row) + evidence delta on the owning dataplane habit atom",
+   "line": 217,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L217",
+   "class": "protocol-canonical",
+   "note": "script exists; habit delta not verified."
+  },
+  {
+   "text": "Second cut: storage W3/W4 instrumentation, W1->kad_enqueue rename, NEW slow bucket set (1s..4h), x-elohim-elapsed-ms on storage responses (residual #2)",
+   "line": 224,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L224",
+   "class": "protocol-canonical",
+   "note": "no x-elohim-elapsed-ms in elohim-storage."
+  },
+  {
+   "text": "Third cut (one batched fork commit): promote relay_connect from a log field to a histogram in the kitsune2 iroh transport patch; iroh_stage0 dumps prometheus JSON with env=local",
+   "line": 224,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L224",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§7 stability: bucket-vector storage, BIMODAL gap test, oscillation + tail-blowout + entropy-collapse alarms, small-n print-every-run rule in the scoreboard",
+   "line": 232,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L232",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§9 PeerClass::derive(caps) pure total function, peer_class required on every measure, per-class budgets, unknown class counted and alarmed",
+   "line": 263,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L263",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§10 AdaptiveBatchBudget trajectory test (1,000 steps vs simulated admission wait) + SETTLED vs SATURATED vs phase-lock readings",
+   "line": 287,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L287",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§11 commensurability: benches drive real code paths and dump /metrics (CI-wired); a2o @concern:latency-budget S1 scenario in Dataplane Validation",
+   "line": 198,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L198",
+   "class": "protocol-canonical",
+   "note": "no latency-budget tag under genesis/a2o/features."
+  },
+  {
+   "text": "§8 observer cost: instrument_self hop + --instrument=off A/B in the local micro harness; exemplar reservoir via the existing AIMD next_size",
+   "line": 253,
+   "state": "OPEN",
+   "id": "specs__2026-08-20-latency-valueflow-chain-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-08-20-latency-valueflow-chain-design.md#L253",
+   "class": "protocol-canonical"
+  }
+ ]
+}

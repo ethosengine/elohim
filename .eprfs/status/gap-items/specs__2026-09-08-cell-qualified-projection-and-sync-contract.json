@@ -1,0 +1,86 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md",
+ "slug": "specs__2026-09-08-cell-qualified-projection-and-sync-contract",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §9 stations (1-8) + §7. Only the station-8 harness (genesis/a2o/scripts/fixtures-clone.mjs) is in the committed tree; the qualifier source, row/doc columns, refusal and partition/rebuild stations are open. The working tree has uncommitted elohim-storage edits (diesel_schema.rs, models.rs, content_diesel.rs) that may be this work in flight — re-measure after they land.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Station 1: HcClient exposes (cell_dna_hash, cell_clone_id) from app_info distinguishing Provisioned from Cloned",
+   "line": 325,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L325",
+   "class": "protocol-canonical",
+   "note": "no cell_dna_hash / cell_clone_id in hc_client.rs."
+  },
+  {
+   "text": "Station 2: content row carries both qualifier columns, widened key, upsert_with_anchor matches on it (migration for existing rows per §6)",
+   "line": 329,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L329",
+   "class": "protocol-canonical",
+   "note": "no qualifier columns in diesel_schema.rs (committed tree)."
+  },
+  {
+   "text": "Station 3: content_doc_id renders the qualified id and the producer writes it (Automerge doc)",
+   "line": 332,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L332",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 4: both re-author call sites compare qualifiers before authoring; foreign-cell refusal is terminal (base-actions/base-ops diffs EMPTY)",
+   "line": 335,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L335",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 5: base-content and targets diffs EMPTY on the receiving peer",
+   "line": 339,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L339",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 6: partition states shown — 'pending — foreign cell' for uninstalled qualifiers; two qualifiers on one id read conflict-visible",
+   "line": 341,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L341",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 7: per-partition atomic rebuild (resetting one partition changes no row of the other)",
+   "line": 345,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L345",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 8: fixtures-clone.mjs asserts stations 4-5 EMPTY across all six inventories with a receipt under genesis/a2o/reports/fixtures-clone/",
+   "line": 348,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L348",
+   "class": "protocol-canonical",
+   "note": "genesis/a2o/scripts/fixtures-clone.mjs exists; it can only go green once stations 1-5 land."
+  },
+  {
+   "text": "§7 mixed-version safety of the wire change (old<->new decode)",
+   "line": 253,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-cell-qualified-projection-and-sync-contract#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-cell-qualified-projection-and-sync-contract.md#L253",
+   "class": "protocol-canonical"
+  }
+ ]
+}

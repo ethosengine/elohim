@@ -1,0 +1,61 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md",
+ "slug": "plans__2026-06-14-vision-gap-limit-governor-stub",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §3 missing bridge (3 primitives), §6 first scenario and §8 operator questions. Status stub-greenlight-to-expand: nothing built (no respects-self-limit action, self_limit_governor.rs or SelfLimitConflict). RefusalCode/limit_owner now live in elohim-compute::actuation (the Governor lift), so the refusal contract has its home. Single-person agency over one's own limit — rank UP once the operator greenlights.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Operator greenlight: is respects-self-limit a notarized Commitment action (A) or agent-scoped (B)? (Q1 — gates everything below)",
+   "line": 248,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L248",
+   "class": "provisional"
+  },
+  {
+   "text": "Primitive 1: self-declared limit as Mishpat Commitment action respects-self-limit (CID = entry_hash), created via create_commitment",
+   "line": 73,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L73",
+   "class": "provisional"
+  },
+  {
+   "text": "Primitive 2: runtime governor service self_limit_governor.rs observing the declared signal and easing before the line",
+   "line": 87,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L87",
+   "class": "provisional"
+  },
+  {
+   "text": "Primitive 3: felt-surface refusal contract via RefusalCode::SelfLimitConflict + limit_owner: self (consume elohim-compute::actuation, do not re-own)",
+   "line": 102,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L102",
+   "class": "provisional"
+  },
+  {
+   "text": "First a2o scenario (story-first): a person approaching their own storage-held limit is told before crossing it and the system eases off",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L174",
+   "class": "provisional"
+  },
+  {
+   "text": "Operator Q2-Q5: v1 sensor set (storage-bytes-held alone), default on_approach action (signal vs signal+ease), SelfLimitConflict discriminant ownership, shared cadence with the limitarian governor",
+   "line": 255,
+   "state": "OPEN",
+   "id": "plans__2026-06-14-vision-gap-limit-governor-stub#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-14-vision-gap-limit-governor-stub.md#L255",
+   "class": "provisional"
+  }
+ ]
+}

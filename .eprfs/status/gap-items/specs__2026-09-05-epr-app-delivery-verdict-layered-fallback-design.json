@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md",
+ "slug": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design",
+ "method": "agent-decomposition",
+ "class": "design",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §9 slices (1-5) + §7 deploy verify. Slice 1 landed in storage (app_deliverability.rs judge_deliverability; X-Deliverability boots|broken|not-judged on /apps/ surfaces, http.rs:716). Doorway choose_rung / x-elohim-delivery / lastBootsHead not found; the owning habit doorway-failover is status red, active false (its flip is tied to slice 2's fleet build). Its sibling 2026-09-08 deliverability-through-doorway spec is Active.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Slice 1a: judge_deliverability inside the extraction walk, memoised per CID; deliverability on the row; X-Deliverability on app surfaces; storage metric + log",
+   "line": 326,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L326",
+   "class": "design",
+   "note": "elohim-storage/src/app_deliverability.rs:124; http.rs:716-718."
+  },
+  {
+   "text": "Slice 1b: stage-spa-blob.sh refuses to proceed to authorHeadOnce on a Broken verdict (naming the missing asset)",
+   "line": 328,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L328",
+   "class": "design",
+   "note": "verify the Broken refusal in stage-spa-blob.sh (deliverability gate references exist)."
+  },
+  {
+   "text": "Slice 2: doorway choose_rung consuming the peer verdict; x-elohim-delivery / x-elohim-failure-layer headers; peer inventory route",
+   "line": 331,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L331",
+   "class": "design",
+   "note": "no choose_rung or x-elohim-delivery in doorway."
+  },
+  {
+   "text": "§7 deploy verify: browser leg of verify-projected-head.sh; app pipeline FAILS when no doorway reaches 'boots'",
+   "line": 232,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L232",
+   "class": "design"
+  },
+  {
+   "text": "Slice 3: previous-head serve (lastBootsHead kept reachable) as ladder rung 2 + chrome context fields and badge",
+   "line": 335,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L335",
+   "class": "design"
+  },
+  {
+   "text": "Slice 4: maintenance page on withheld + diagnostic route + scaffold reach gate + transitions ledger with runtime-harvest pickup",
+   "line": 338,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L338",
+   "class": "design"
+  },
+  {
+   "text": "Slice 5 (held): per-EPR steward resolution at storage for the gate; witnessed transitions on the head CID; just status delivery",
+   "line": 342,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L342",
+   "class": "design"
+  },
+  {
+   "text": "Each slice: served-shell-boots scenario + a delta in the doorway-failover habit atom; the habit flips green on slice 2's fleet build",
+   "line": 346,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-epr-app-delivery-verdict-layered-fallback-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-epr-app-delivery-verdict-layered-fallback-design.md#L346",
+   "class": "design",
+   "note": "doorway/doorway-service/.epr-meta/doorway-failover.habit.md status red."
+  }
+ ]
+}

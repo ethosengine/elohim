@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md",
+ "slug": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §11 'Decomposition seams (the minted ledger)'. Draft design; §2 audit records the aggregator (aggregator.rs) as built-but-inert and care kinds as missing. No seam is evidenced landed. §10 identity-coherence repairs are a precondition before any dashboard is trusted — rank that one first (single-household coherence).",
+ "count": 11,
+ "items": [
+  {
+   "text": "Reverse link plane: reach-filtered flow enumeration from any EPR (A2; nav-context derived_from gains a 'flows' source)",
+   "line": 115,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L115",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Edge-reach: claims/derivation edges carrying reach independent of their endpoints (open substrate question)",
+   "line": 116,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L116",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Contextual reach: reach values as references to qahal collectives (dyad -> household -> collective -> commons)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Effective-reach overlay: mint-reach AND latest ratified reach-transition claim, computed read-side",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L118",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Co-signature proofs + the co-authored / single-authored consent line",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L119",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Signal-variety taxonomy schema (signal-variety.schema.json) + lane vocabulary at the mishpat bounds plane",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L120",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Adoption-policy atoms + adoption / revocation / re-adoption / modification ceremony + adoption-time epistemic digest",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L121",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Aggregator production caller + care observation kind + CoverageRollup chaining with witness_quorum + aggregates-as-atoms federation + participation-rate metadata",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L122",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation ceremony (voluntary) + compelled-graduation front door (k-of-n custody quorum; preservation and disclosure as separate acts)",
+   "line": 123,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L123",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Identity-coherence repairs: humans.household_id NULL class, provider namespace guard (hub id in provider), in_scope_of multi-value",
+   "line": 124,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L124",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Homeostat clocks: reach decay, mandate TTLs, re-ratification cadence",
+   "line": 125,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-care-aggregation-adoption-policy-floor-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-care-aggregation-adoption-policy-floor-design.md#L125",
+   "class": "protocol-canonical"
+  }
+ ]
+}

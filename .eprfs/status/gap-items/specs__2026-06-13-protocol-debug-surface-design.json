@@ -1,0 +1,106 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md",
+ "slug": "specs__2026-06-13-protocol-debug-surface-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from Done-when + the lens list + deferrals. The MVP landed in app/elohim-app/src/app/debug/ (shell, stability/health/logging/connection/flags lenses), /debug route, dev proxy /admin, codegen registration and doorway schema-contract case. Open: the tauri-only Native lens, the JS<->Rust set_log_level bridge, and the operator-owned /admin ingress decision.",
+ "count": 11,
+ "items": [
+  {
+   "text": "/debug shell route resolves by URL in every context (no redirecting guard); nav entry only when debug-mode on, prod/alpha default off",
+   "line": 118,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L118",
+   "class": "provisional",
+   "note": "app.routes.ts:95; debug/debug-shell.component.ts."
+  },
+  {
+   "text": "DebugContextService + DebugLens registry with three honest row states (real / pending wire-up / N/A in this context)",
+   "line": 51,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L51",
+   "class": "provisional",
+   "note": "debug/debug.types.ts."
+  },
+  {
+   "text": "Stability lens: full composed /admin/self-healing view on web; client-composed Tier-1 subset on tauri typed by codegen'd StabilityStatusView",
+   "line": 58,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L58",
+   "class": "provisional",
+   "note": "lenses/stability-lens.component.ts."
+  },
+  {
+   "text": "Health lens mounts the dark HealthIndicatorComponent",
+   "line": 62,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L62",
+   "class": "provisional",
+   "note": "lenses/health-lens.component.ts."
+  },
+  {
+   "text": "Logging lens: sticky live Angular setMinLevel + recent-log viewer; tauri displays the native Rust 6-level range",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L63",
+   "class": "provisional",
+   "note": "lenses/logging-lens.component.ts."
+  },
+  {
+   "text": "Connection/context + Feature-flags lenses (incl. the useGraphqlTopology drift note)",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L64",
+   "class": "provisional"
+  },
+  {
+   "text": "Native lens (tauri-only): doorway_status IPC, saved accounts, pending deep links, conductor admin port; 'native-only' in web",
+   "line": 66,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L66",
+   "class": "provisional",
+   "note": "no native-lens component under debug/lenses/."
+  },
+  {
+   "text": "Backend prerequisites: stability-status-view in codegen INTERFACE_FILES; /admin in proxy.conf(.alpha).mjs; doorway schema_contract case",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L82",
+   "class": "provisional",
+   "note": "codegen-ts.mjs:71; proxy.conf.mjs:20; doorway tests/schema_contract.rs:564-568."
+  },
+  {
+   "text": "Follow-on: set_log_level Tauri IPC + reloadable tracing EnvFilter for live Rust level adjustment (operator veto-point 2)",
+   "line": 71,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L71",
+   "class": "provisional"
+  },
+  {
+   "text": "Operator-owned: ingress-protect /admin/* (self-healing exposes peer IDs + topology publicly)",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L94",
+   "class": "provisional"
+  },
+  {
+   "text": "Deferred: register /p2p/status in storage build_manifest() if a future web lens needs raw per-peer detail",
+   "line": 85,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-protocol-debug-surface-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-protocol-debug-surface-design.md#L85",
+   "class": "provisional"
+  }
+ ]
+}

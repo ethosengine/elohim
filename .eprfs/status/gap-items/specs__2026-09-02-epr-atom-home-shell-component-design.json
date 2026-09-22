@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md",
+ "slug": "specs__2026-09-02-epr-atom-home-shell-component-design",
+ "method": "agent-decomposition",
+ "class": "ui-truth-layer",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §7 slices 0-3 + §8 filed follow-ons. Landed: slice 0 (app/elohim-app/src/styles/brand.css), slice 1 (components/epr-home: EprHomeComponent + legs; scenarios 1-6 live in content/epr-atom-home.feature), slice 3 bundle lens (bundle-lens.ts; scenario 'the learning app is one lens away' live). Slice 2 (the commons) is open — its three scenarios are still @wip.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Slice 0 brand foundation: brand.css tokens + fonts, scoped into the shell",
+   "line": 231,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L231",
+   "class": "ui-truth-layer",
+   "note": "app/elohim-app/src/styles/brand.css."
+  },
+  {
+   "text": "Slice 1 the frame: EprFocalComponent extraction + EprHomeComponent (arrival, identity, chips, focal, legs holds/lives/governed/from, address line, gate) + route switch",
+   "line": 232,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L232",
+   "class": "ui-truth-layer",
+   "note": "app/elohim-app/src/app/elohim/components/epr-home/; scenarios 1-6 not @wip. Verify with pnpm look on alpha."
+  },
+  {
+   "text": "Slice 2 the commons: conversation (discussions + messages, reply kinds, sort), tender + newcomer welcome, where people stand, who's here, how we talk here",
+   "line": 233,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L233",
+   "class": "ui-truth-layer",
+   "note": "epr-atom-home.feature:127-148 three @wip scenarios."
+  },
+  {
+   "text": "Slice 3 bundle lens + phone order: generated all-bundle claims + mount table -> 'Open in Lamad'; 390x844 phone look; lamad back-link audit",
+   "line": 234,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L234",
+   "class": "ui-truth-layer",
+   "note": "epr-home/bundle-lens.ts; phone-order look and back-link audit not verified."
+  },
+  {
+   "text": "Filed: containing-paths reverse projection (partOf by slug or /db/content/{id}/part-of) so 'Where this lives' shows paths",
+   "line": 238,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L238",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Filed: reconcile the three disagreeing holding instruments (resilience / household / blob distribution) in the dataplane backlog",
+   "line": 241,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L241",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Filed: governance state/mechanism/accumulation endpoints (404 today); relatedNodeIds seeding on alpha; message kind + 'most vouched' in the qahal discussion model",
+   "line": 243,
+   "state": "OPEN",
+   "id": "specs__2026-09-02-epr-atom-home-shell-component-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-02-epr-atom-home-shell-component-design.md#L243",
+   "class": "ui-truth-layer"
+  }
+ ]
+}

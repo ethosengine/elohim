@@ -1,0 +1,61 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md",
+ "slug": "specs__2026-07-31-custody-blob-canonical-artifact-address-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status implemented; graduation-trigger implementation-verified — the remaining work is verification, plus the CID-first join-key migration this rule deliberately survives (owned by the quilt-evidence spec §10).",
+ "count": 6,
+ "items": [
+  {
+   "text": "Custody-facing joins key on shard_manifests.blob_hash (the manifest's exact artifact address), never a content-row column",
+   "line": 20,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L20",
+   "class": "substrate"
+  },
+  {
+   "text": "Resolver contract: exact blobHash authoritative; contentId + explicit role (content | ssr-server) with no fallback between fields (fail-fast)",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L40",
+   "class": "substrate"
+  },
+  {
+   "text": "elohim-host-landing seed pair explicitly selects the ssr-server role",
+   "line": 52,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L52",
+   "class": "substrate",
+   "note": "verify genesis/seeder/src/seed-commitments.ts selects the role explicitly."
+  },
+  {
+   "text": "Runtime custody producers use manifest.blob_hash directly (no content-row lookup)",
+   "line": 56,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L56",
+   "class": "substrate"
+  },
+  {
+   "text": "Supersession: re-upload mints a new commitment identity; producers activate it idempotently and cancel older live runtime pledges via the notarized state transition",
+   "line": 77,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L77",
+   "class": "substrate"
+  },
+  {
+   "text": "CID-first blob-plane migration replaces the bare sha256- join key with the raw CID (bafkrei...) — rule unchanged",
+   "line": 35,
+   "state": "OPEN",
+   "id": "specs__2026-07-31-custody-blob-canonical-artifact-address-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-31-custody-blob-canonical-artifact-address-design.md#L35",
+   "class": "substrate",
+   "note": "owned by 2026-07-24-quilt-evidence-temperature-composition §10."
+  }
+ ]
+}

@@ -1,0 +1,74 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md",
+ "slug": "plans__2026-06-10-epr-durability-replication-arc-plan",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the workstreams A-F + the stability-gated Done criteria. A June dispatch prompt: much of its ground truth is superseded (Holochain 0.7, the household mesh as the T2 floor, the self-CID/provide-loop levers, peer-loss-failover green). Scenario slate exists: peer-loss-failover.feature (no @wip), peer-recovery.feature (4 @wip). The EprRouter pod-delete crutch (genesis/scripts/ci/restart-doorway-epr.sh) still exists. Candidate for historian distillation once the open rows are re-homed.",
+ "count": 7,
+ "items": [
+  {
+   "text": "A custody-sweep convergence: commitment rows reach every party's projection (provider AND receiver) without CI nudging; asserted per pod in the propagation preflight",
+   "line": 104,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L104",
+   "class": "substrate"
+  },
+  {
+   "text": "B healing & backup-restore drill: a wiped peer reconverges from the mesh within a bounded window (peer-recovery.feature)",
+   "line": 110,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L110",
+   "class": "substrate",
+   "note": "peer-recovery.feature still carries 4 @wip; wipe drills need owned-substrate on the fleet, household mesh covers the local shape."
+  },
+  {
+   "text": "C sync & peer counts: per-peer connectedPeers floors for the real topology + peer-loss tolerance (reads serve from survivors, returning peer re-syncs)",
+   "line": 118,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L118",
+   "class": "substrate",
+   "note": "federation/peer-loss-failover.feature carries no @wip."
+  },
+  {
+   "text": "D free-storage / stewarded-commitment aggregates truthful (network posture + resilience snapshot through substrate-owned humans junction)",
+   "line": 124,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L124",
+   "class": "substrate",
+   "note": "agent_pub_key stamp + self-CID provide loop landed; aggregates 'matching seeded reality' not evidenced."
+  },
+  {
+   "text": "E projection durability: bounded projector lag post-seed, projection_reconcile.caughtUp fleet-wide, retire (or formally adopt) the restart-doorway-epr.sh pod-delete crutch",
+   "line": 133,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L133",
+   "class": "substrate",
+   "note": "genesis/scripts/ci/restart-doorway-epr.sh still present."
+  },
+  {
+   "text": "F doorway federation: serve content whose home peer is down; cross-doorway content resolution (single-doorway legs on household-nodes)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L139",
+   "class": "substrate"
+  },
+  {
+   "text": "Done gate: three consecutive genesis builds with kicksFiredTotal rising on the receiver, delivery events >= 1, clean projection sync, non-zero posture",
+   "line": 176,
+   "state": "OPEN",
+   "id": "plans__2026-06-10-epr-durability-replication-arc-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-10-epr-durability-replication-arc-plan.md#L176",
+   "class": "substrate",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  }
+ ]
+}

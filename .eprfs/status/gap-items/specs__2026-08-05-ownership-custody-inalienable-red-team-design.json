@@ -1,0 +1,93 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md",
+ "slug": "specs__2026-08-05-ownership-custody-inalienable-red-team-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §6 'Live defects, ranked' (8 rows) + §4 hard-case fixes + §7 next design. Defect 1 is STILL LIVE (p2p/reach_authorization.rs returns true on db pool errors — the floor fails open under the repo's chronic disk pressure); defect 5 is addressed by the ownership-ontology-guard v2 fourth (inalienable) frame in policies.yaml. Safety-critical: rank defect 1 first.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Defect 1 (Critical): P2P reach classifier fails OPEN on db pool errors — make Stage 1 fail closed like the HTTP path (arch-confidentiality-plane-backlog row 1)",
+   "line": 315,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L315",
+   "class": "protocol-canonical",
+   "note": "reach_authorization.rs:116-136 still 'failing open at Stage 1'."
+  },
+  {
+   "text": "Defect 2 (Critical): Value Scanner camera privacy claim is narrative-only — name and build its enforcement",
+   "line": 316,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L316",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defect 3 (Critical): care-balance dashboard needs an IPV safety boundary (not a UX toggle)",
+   "line": 317,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L317",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defect 4 (High): transferCustody prohibited (not gated) for inalienable subjects",
+   "line": 318,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L318",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defect 5 (High): ownership-ontology guard gains the INALIENABLE fourth frame as a v2 registry row (operator ratification)",
+   "line": 319,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L319",
+   "class": "protocol-canonical",
+   "note": ".claude/epr-meta/policies.yaml carries the v2 inalienable frame (:255, :285); ratification status unverified."
+  },
+  {
+   "text": "Defect 6 (High): model guardian-as-abuser so a recovery quorum cannot become a takeover path; design out-of-holon guardianship challenge (§7 priority)",
+   "line": 320,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L320",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defect 7 (High): blobs plaintext at rest; build ed25519->X25519 so intimate data is encrypted before minting a CID",
+   "line": 321,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L321",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Defect 8 (Medium): moderation canon's locally-determined standards gets a floor carve-out",
+   "line": 322,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L322",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "CSAM: refusal-to-instantiate at the floor, fail-closed, never a lens verdict or locally determined",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L161",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Intimate images: every depicted person holds a joint-and-several veto; coercion (signed != consented) gets delay + reversibility",
+   "line": 271,
+   "state": "OPEN",
+   "id": "specs__2026-08-05-ownership-custody-inalienable-red-team-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-05-ownership-custody-inalienable-red-team-design.md#L271",
+   "class": "protocol-canonical"
+  }
+ ]
+}

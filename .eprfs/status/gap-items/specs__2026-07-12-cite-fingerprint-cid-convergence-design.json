@@ -1,0 +1,63 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md",
+ "slug": "specs__2026-07-12-cite-fingerprint-cid-convergence-design",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Written as a decision already landed: compute_raw, short_fingerprint and the pins exist in eprfs-core (address.rs:79-215), eprfs-cli (main.rs:121) and brit (cid.rs:33). Status still 'Draft' despite the code — the doc wants a status flip + graduation (decompose-complete trigger) rather than more work, save the optional machine-facing full-CID sealing.",
+ "count": 6,
+ "items": [
+  {
+   "text": "compute_raw (0x55 raw codec) in eprfs-core mirroring brit; BlobCid::compute's dag-cbor mislabel documented",
+   "line": 46,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L46",
+   "class": "architecture",
+   "note": "eprfs-core/src/address.rs:79; brit-epr/src/engine/cid.rs:33."
+  },
+  {
+   "text": "short_fingerprint(cid) authoritative in Rust (eprfs-core + brit); Python cite_graph fast path pinned by a cross-language corpus parity test",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L59",
+   "class": "architecture",
+   "note": "address.rs:87, :208; eprfs-cli main.rs:121."
+  },
+  {
+   "text": "cites: fingerprint slot accepts full CIDv1 tokens (baf… prefix) with envelope_verdict decoding the digest",
+   "line": 66,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L66",
+   "class": "architecture",
+   "note": "verify the native epr flow cites audit (Rust) kept the full-CID verdict when cite tooling moved native."
+  },
+  {
+   "text": "Single-source invariant: Python never encodes CIDs — all CID construction via eprfs cid CLI",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L76",
+   "class": "architecture"
+  },
+  {
+   "text": "Machine-facing surfaces (eprfs packages, agentdoc projections) seal full CIDs (graduation trigger machine-facing-surfaces-seal-full-cids)",
+   "line": 88,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L88",
+   "class": "architecture"
+  },
+  {
+   "text": "Pins do-not-regress: raw_codec_matches_brit_vector, short_fingerprint_equals_python_cite_fingerprint, short_form_of_body_matches_python_oracle, cid_fingerprint_derivation, full-CID cite verdict tests",
+   "line": 94,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-12-cite-fingerprint-cid-convergence-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-cite-fingerprint-cid-convergence-design.md#L94",
+   "class": "architecture",
+   "note": "brit cid_fingerprint_derivation not located by name — verify."
+  }
+ ]
+}

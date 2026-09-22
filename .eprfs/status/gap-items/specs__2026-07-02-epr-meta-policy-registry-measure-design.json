@@ -1,0 +1,79 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md",
+ "slug": "specs__2026-07-02-epr-meta-policy-registry-measure-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status Implemented: registry, pin doctrine, measure tier, census and seed bindings are in-tree with epr_meta_policy_test.py. Open residue: the reserved count-shaped measures, the graduation lift into Mishpat Precedent (the doc's own graduation-trigger), and draining the hard-ceiling tail it measures (http.rs has grown 14000 -> 21380 lines since landing — the ratchet is not draining).",
+ "count": 8,
+ "items": [
+  {
+   "text": "Policy registry .claude/epr-meta/policies.yaml with Precedent-shaped objects; manifests bind policy@version",
+   "line": 34,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L34",
+   "class": "process-meta"
+  },
+  {
+   "text": "Binding contract: policy owns semantics / binding owns placement; version pin required; unknown/unpinned refs fail loud; inline-shadow dedupe; resolve-time expansion",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L67",
+   "class": "process-meta"
+  },
+  {
+   "text": "Measure tier: loc-soft inject nudge (debounced) and loc-hard fingerprinted finding in architecture-findings.jsonl + dispatch directive, deleted when back under ceiling",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L82",
+   "class": "process-meta",
+   "note": ".claude/data/architecture-findings.jsonl carries 7 rows."
+  },
+  {
+   "text": "Batch census measure_census() surfaced in the SessionStart headline (edit-time gate and census cannot disagree)",
+   "line": 98,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L98",
+   "class": "process-meta",
+   "note": "placement-audit.py --epr-meta was ported to native epr — verify the native headline still carries the LoC-ceiling census line."
+  },
+  {
+   "text": "Seed bindings source-file-loc-ceiling@1 (soft 3000 / hard 7000 for *.rs) and memory-frontmatter-at-birth@1",
+   "line": 104,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L104",
+   "class": "process-meta",
+   "note": ".epr-meta/manifest.md:37."
+  },
+  {
+   "text": "Drain the hard-ceiling tail so the ceilings can ratchet down (http.rs, content_store coordinator, p2p/mod.rs)",
+   "line": 108,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L108",
+   "class": "process-meta",
+   "note": "http.rs is 21380 lines (was 14000 at landing); carried by specs/2026-09-19-storage-crate-decomposition-design."
+  },
+  {
+   "text": "Reserved: count-shaped measures (measure:{count, emit}, max-files) and host-side dispatch",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L114",
+   "class": "process-meta"
+  },
+  {
+   "text": "Graduation lift: registry rows -> Mishpat Precedent entries (standing plane) citing policy-content EPR atoms (content plane)",
+   "line": 52,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-meta-policy-registry-measure-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-meta-policy-registry-measure-design.md#L52",
+   "class": "process-meta"
+  }
+ ]
+}

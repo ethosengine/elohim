@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md",
+ "slug": "specs__2026-07-19-doorway-catching-up-page-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from 'What ships' §1-§4 + testing. All four ships landed in doorway (routes/catching_up.rs, templates/catching_up.html + _theme.css, /status.json upstreams, diagnostic breaker bypass at storage_proxy.rs:184-558) with the a2o feature carrying 3 live scenarios. Graduation trigger = shed-page-landed-and-a2o-scenario-green: verify, then graduate.",
+ "count": 7,
+ "items": [
+  {
+   "text": "§1 content-negotiated shed: one helper replaces the three shed emitters; browser -> 503 HTML page, everything else -> unchanged JSON; Retry-After on both",
+   "line": 37,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L37",
+   "class": "protocol-canonical",
+   "note": "doorway routes/catching_up.rs."
+  },
+  {
+   "text": "§2 staged honest-progress page (Askama catching_up.html + shared _theme.css; dependency-free polling of /status.json; self-recovers)",
+   "line": 52,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L52",
+   "class": "protocol-canonical",
+   "note": "doorway templates/catching_up.html, templates/_theme.css."
+  },
+  {
+   "text": "§3 /status.json gains upstreams [{endpoint, circuit, errorStreak, skipped}] + admission {maxInflight, available, shedTotal}",
+   "line": 72,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L72",
+   "class": "protocol-canonical",
+   "note": "routes/status.rs; a2o scenario 'status.json always carries the recovery-progress fields'."
+  },
+  {
+   "text": "§4 diagnostic routes (/p2p/status, /db/p2p/conductor-diagnostics) bypass the breaker shed and record no outcomes",
+   "line": 82,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L82",
+   "class": "protocol-canonical",
+   "note": "storage_proxy.rs:184, :264, :558."
+  },
+  {
+   "text": "Tests: Accept-negotiation matrix, Retry-After on both variants, template against open/half-open snapshots, diagnostic-bypass list",
+   "line": 108,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L108",
+   "class": "protocol-canonical",
+   "note": "verify unit coverage before VERIFIED."
+  },
+  {
+   "text": "a2o: visitor during a shed sees the staged page and it recovers on its own (graduation trigger)",
+   "line": 111,
+   "state": "OPEN",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L111",
+   "class": "protocol-canonical",
+   "note": "feature has status.json / diagnostic / upstream scenarios; a browser-level 'staged page recovers' scenario is not present, and the cache-warm shell scenario is @wip."
+  },
+  {
+   "text": "Non-goal follow-on: projector-lag detail on the page once a cached last-known-good lands",
+   "line": 100,
+   "state": "OPEN",
+   "id": "specs__2026-07-19-doorway-catching-up-page-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-19-doorway-catching-up-page-design.md#L100",
+   "class": "protocol-canonical"
+  }
+ ]
+}

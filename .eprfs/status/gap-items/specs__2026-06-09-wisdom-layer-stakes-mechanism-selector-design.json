@@ -1,0 +1,101 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md",
+ "slug": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the v1 STUB (ships-now + interface + deferred) and open questions. No StakesClass / AnonymityMode / Selection / JudgmentCall symbol exists in elohim-storage — the whole selector is open. Doc-level requires_env household-nodes (available).",
+ "count": 11,
+ "items": [
+  {
+   "text": "StakesClass::classify — pure deterministic floor over reach / standing / REA-bounds primitives (Trivial..Constitutional)",
+   "line": 311,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L311",
+   "class": "provisional"
+  },
+  {
+   "text": "AnonymityMode::floor_for(class) — Trivial->AnonymousAggregate (k>=5), Constitutional->Attributed (issuer_cid path)",
+   "line": 313,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L313",
+   "class": "provisional"
+  },
+  {
+   "text": "Selection {tier, mode, stakes_class, witnessed_by} as a field on the existing GateResult flow in elohim_gate.rs",
+   "line": 316,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L316",
+   "class": "provisional"
+  },
+  {
+   "text": "Honest-stub rule: with no ceiling, Constitutional/Reach/ReaBound selections degrade to Pause{confirm_token}, never PassThrough via the hardcoded-Light router",
+   "line": 328,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L328",
+   "class": "provisional"
+  },
+  {
+   "text": "ElohimReasoning carries the floor classification + a legible mock-principle marker in v1",
+   "line": 334,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L334",
+   "class": "provisional"
+  },
+  {
+   "text": "Ceiling may only tighten toward accountability, never loosen below the floor (monotonicity test)",
+   "line": 105,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L105",
+   "class": "provisional"
+  },
+  {
+   "text": "JudgmentCall composite record: content-derived identity hash(act_cid + stack_hash + selector_version); JudgmentCallRecorded signal on Constitutional/Reach/ReaBound selections",
+   "line": 257,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L257",
+   "class": "provisional"
+  },
+  {
+   "text": "Mode-by-stakes policy as a governed key in the pillar-projection Manifest, pinned Constitutional-class (open question 2)",
+   "line": 264,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L264",
+   "class": "provisional"
+  },
+  {
+   "text": "Small-cohort compensation: below small_cohort_threshold escalate Standing+ acts to PrivateWithAttestation (threshold value — open question 3)",
+   "line": 295,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L295",
+   "class": "provisional"
+  },
+  {
+   "text": "Pseudonymous mode primitive: collapse Standing->Attributed in v1 until the HMAC treatment lands (open question 1)",
+   "line": 348,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L348",
+   "class": "provisional"
+  },
+  {
+   "text": "Deferred: real LLM backend + budget path; eae<->gate composition; persisted PrecedentStore for JudgmentCall notarization",
+   "line": 338,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-wisdom-layer-stakes-mechanism-selector-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-wisdom-layer-stakes-mechanism-selector-design.md#L338",
+   "class": "provisional"
+  }
+ ]
+}

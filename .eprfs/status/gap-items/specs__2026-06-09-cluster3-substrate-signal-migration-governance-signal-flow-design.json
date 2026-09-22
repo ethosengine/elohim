@@ -1,0 +1,124 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md",
+ "slug": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §2.4 ordering, §3 seams, §6 decisions and §7 v1 slice. Decision 1 resolved in code as the first-class column: SUBSTRATE_SIGNALS alias, validator whitelist, integrity field, view field, production write path + migration 2026-06-10-010000 all landed. The ratify-writeback landed in attestation_projector.rs (not tally_projector); the GovernanceThresholdReached signal, the two governance aggregates, aggregate-tick and the votes decision remain open.",
+ "count": 13,
+ "items": [
+  {
+   "text": "Wire SUBSTRATE_SIGNALS alias + DNA validator whitelist (accept absent/member, reject non-member)",
+   "line": 89,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L89",
+   "class": "provisional",
+   "note": "content_store_integrity/src/lib.rs:71 alias; validator :4441-4442."
+  },
+  {
+   "text": "EconomicEvent.substrate_signal integrity field + EconomicEventView field (ts-rs, sha256-verified one optional field)",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L91",
+   "class": "provisional",
+   "note": "lib.rs:1154; elohim-views/src/shefa.rs:55; 31a429bf5 caught generated TS up."
+  },
+  {
+   "text": "Production write path: CreateEconomicEventInput / NewEconomicEvent / upsert_with_anchor / rea_projection extraction + economic_events.substrate_signal migration",
+   "line": 93,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L93",
+   "class": "provisional",
+   "note": "economic_events.rs:76/347; migration 2026-06-10-010000_add_economic_event_substrate_signal."
+  },
+  {
+   "text": "Backfill: COALESCE(substrate_signal,'attention') at every aggregate read (v1); real backfill when the governor goes live",
+   "line": 96,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L96",
+   "class": "provisional",
+   "note": "COALESCE documented/tested at rea_projection.rs:2000; the real backfill half is deferred to governor go-live."
+  },
+  {
+   "text": "Headline green test drives ReaEconomicEventCommitted end-to-end (attention stored, absent -> None, garbage rejected by the DNA wall)",
+   "line": 188,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L188",
+   "class": "provisional",
+   "note": "storage half exists (rea_projection.rs:1995 end-to-end); the DNA-reject leg needs a sweettest — not located."
+  },
+  {
+   "text": "ratify-limit-gradient governance kind + child attestation kind limit-gradient-approval",
+   "line": 124,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L124",
+   "class": "provisional",
+   "note": "governance_action.rs:414; generated_attestation_kinds.rs:42."
+  },
+  {
+   "text": "Ratify-writeback into responsibility_demand_configs.ratified_by/_at/dht_anchor_hash on the quorum edge, with a first-ratification-wins latch against down-then-up flips",
+   "line": 126,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L126",
+   "class": "provisional",
+   "note": "landed in services/attestation_projector.rs:84-95 via apply_ratification, not tally_projector::recompute; latch behaviour not verified."
+  },
+  {
+   "text": "Emit a GovernanceThresholdReached signal on the quorum edge so aggregation and the re-ratify loop can subscribe",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L122",
+   "class": "provisional",
+   "note": "tally_projector::recompute is still terminal (tally_projector.rs:18-25); no GovernanceThresholdReached symbol."
+  },
+  {
+   "text": "GovernanceParticipationCandidate k>=5 aggregate on aggregate_and_emit, with its firewall test",
+   "line": 131,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L131",
+   "class": "provisional"
+  },
+  {
+   "text": "POST /api/v1/governance/aggregate-tick (AppScopedDb-gated) driving v1 reflexive sensing; authority decision (6)",
+   "line": 134,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L134",
+   "class": "provisional",
+   "note": "route not present in http.rs."
+  },
+  {
+   "text": "Decision 4: governance votes auditable-by-design vs private, and the matching attestations read-path guard",
+   "line": 176,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L176",
+   "class": "provisional"
+  },
+  {
+   "text": "Name the k-unit per aggregate and the substrate-usage-as-proxy substitution for governance-power concentration (decision 8)",
+   "line": 146,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L146",
+   "class": "provisional"
+  },
+  {
+   "text": "HELD follow-ons: receive-side FeedbackSignal governance projector (sense->act), re-ratification routing target (decision 5), alpha-pair reinstall lineage for pre-field events",
+   "line": 190,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster3-substrate-signal-migration-governance-signal-flow-design.md#L190",
+   "class": "provisional"
+  }
+ ]
+}

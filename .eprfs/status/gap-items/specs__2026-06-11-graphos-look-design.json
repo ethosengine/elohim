@@ -1,0 +1,70 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md",
+ "slug": "specs__2026-06-11-graphos-look-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Status Approved and fully landed: graphos.ts + both unit tests + package script + a2o/root CLAUDE.md pointers + look timeoutMs. All items CLAIMED; the next move is verify-then-settle (candidate for VERIFIED-STABLE / distill), not implementation.",
+ "count": 7,
+ "items": [
+  {
+   "text": "graphos list: fetch <base>/index.json, filter by substring, print grouped by component",
+   "line": 43,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L43",
+   "class": "provisional",
+   "note": "genesis/a2o/scripts/graphos.ts."
+  },
+  {
+   "text": "graphos story: validate id against index.json before browser launch, derive viewMode from entry type, delegate to runLook",
+   "line": 45,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L45",
+   "class": "provisional"
+  },
+  {
+   "text": "graphos sheet: self-contained sheet.html CSS-grid of labeled iframes, one full-height composite shot.png, both families as labeled sections",
+   "line": 69,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L69",
+   "class": "provisional"
+  },
+  {
+   "text": "runLook gains additive timeoutMs (--timeout); sheets pass a size-scaled budget with the zero-error full-viewport exit-0 rule",
+   "line": 85,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L85",
+   "class": "provisional",
+   "note": "look.ts:27, :115."
+  },
+  {
+   "text": "Segment-aligned component matching with single-segment guard + nearest-match suggestions",
+   "line": 57,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L57",
+   "class": "provisional"
+  },
+  {
+   "text": "Unit tests graphos-stories.test.ts + graphos-cli.test.ts under a2o test:unit",
+   "line": 116,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L116",
+   "class": "provisional"
+  },
+  {
+   "text": "Touchpoints: package.json script, a2o CLAUDE.md tool bullet, root CLAUDE.md Frontend Eyes, frontend-review-eyes-first memory",
+   "line": 125,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-11-graphos-look-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md#L125",
+   "class": "provisional",
+   "note": "a2o/package.json:32; a2o/CLAUDE.md:97."
+  }
+ ]
+}

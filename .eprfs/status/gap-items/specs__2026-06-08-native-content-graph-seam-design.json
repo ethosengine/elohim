@@ -1,0 +1,127 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md",
+ "slug": "specs__2026-06-08-native-content-graph-seam-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §8 implementation outline (18 steps grouped to 12) + the §2/§9 tracked follow-ups. The vertical slice landed (graph_engine.rs seam + GraphSpec + tag pass, content-graph schema + ContentGraphView, exploration-sidebar + a2o feature, doctrinal seeds); open: the legacy lamad RelationshipInferenceSource retirement, relationship-kind reconciliation, affinity badge.",
+ "count": 13,
+ "items": [
+  {
+   "text": "Schema-first wire: content-graph.schema.json + ContentGraph(Node)View promoted to elohim-views ts-rs (camelCase, inferenceSource, depth); contract + codegen",
+   "line": 264,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L264",
+   "class": "provisional",
+   "note": "elohim/sdk/schemas/v1/views/content-graph.schema.json; elohim-views/src/lamad.rs:156-173."
+  },
+  {
+   "text": "ContentGraphResolver seam + NativeGraphResolver Pass 1 explicit depth-bounded BFS (de-stubs get_graph_with_depth)",
+   "line": 265,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L265",
+   "class": "provisional",
+   "note": "elohim-storage/src/graph_engine.rs."
+  },
+  {
+   "text": "Pass 2 tag co-occurrence discovery (read-only, gated, capped, explicit precedence; never persisted — A/C seam invariant)",
+   "line": 267,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L267",
+   "class": "provisional",
+   "note": "graph_engine.rs:303 content_tags self-join."
+  },
+  {
+   "text": "GraphSpec loader: graph.json -> traversal whitelist + index/rule intent",
+   "line": 268,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L268",
+   "class": "provisional",
+   "note": "graph_engine.rs:15-51."
+  },
+  {
+   "text": "Route delta: handle_db_content_graph parses depth|computed|minSharedTags|maxComputed; resolver unit tests",
+   "line": 272,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L272",
+   "class": "provisional",
+   "note": "http.rs:9827-9828."
+  },
+  {
+   "text": "Canonicalize inference_source: fully retire the hand-written lamad RelationshipInferenceSource (author|structural|usage|citation) in favour of generated InferenceSource",
+   "line": 270,
+   "state": "OPEN",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L270",
+   "class": "provisional",
+   "note": "generated InferenceSource landed; legacy type is @deprecated but still types ContentRelationshipDetail / RelationshipQuery / CreateRelationshipInput (content-node.model.ts:709-724)."
+  },
+  {
+   "text": "ExplorationSidebarComponent shared across lesson-view and content-viewer",
+   "line": 277,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L277",
+   "class": "provisional",
+   "note": "app/lamad/src/app/components/exploration-sidebar/."
+  },
+  {
+   "text": "content-viewer reconciliation: retire inline Related Content grid, de-dup the Network-tab mini-graph, keep epr-relationships-panel",
+   "line": 279,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L279",
+   "class": "provisional",
+   "note": "loadRelatedNodes no longer present in content-viewer."
+  },
+  {
+   "text": "inferenceSource plumbing + 'Discovered — you might also explore' section (discovered-concept-card)",
+   "line": 280,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L280",
+   "class": "provisional",
+   "note": "related-concepts-panel.component.ts carries discovered-concept-card."
+  },
+  {
+   "text": "Root the mini-graph at the actual content id, not the hardcoded 'manifesto'",
+   "line": 281,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L281",
+   "class": "provisional",
+   "note": "data-loader.service.ts:1462 keeps 'manifesto' only as DEFAULT_GRAPH_ROOT."
+  },
+  {
+   "text": "Seed constitution/confession/theology as commons markdown EPRs with cites-mesh relatedNodeIds; a2o exploration-sidebar feature",
+   "line": 284,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L284",
+   "class": "provisional",
+   "note": "genesis/data/lamad/content/{constitution,confession,theology}.json; a2o/features/content/exploration-sidebar.feature."
+  },
+  {
+   "text": "Relationship-KIND reconciliation (manifest 11 / DHT 6 / storage 16 vocabularies)",
+   "line": 48,
+   "state": "OPEN",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L48",
+   "class": "provisional",
+   "note": "explicitly deferred; tracked like the Reach-enum drift."
+  },
+  {
+   "text": "Restore the affinity-% badge lost with the inline related grid (backlog card)",
+   "line": 292,
+   "state": "OPEN",
+   "id": "specs__2026-06-08-native-content-graph-seam-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-native-content-graph-seam-design.md#L292",
+   "class": "provisional"
+  }
+ ]
+}

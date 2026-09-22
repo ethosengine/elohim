@@ -1,0 +1,94 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md",
+ "slug": "specs__2026-06-23-elohim-ceiling-design",
+ "method": "agent-decomposition",
+ "class": "governance",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) along the §9 rollout milestones (M0-M6) + §11 hard prerequisites + §13 open questions. The doc states most of it is THEORY and its own handoff says M1 must not be planned until the §11 prerequisites have a credible date (shipping the entry type first would put a stub of the most dangerous primitive on the DHT). Only M0's manifesto half is on disk (genesis/docs/architecture/justice-manifesto.md); no InspectionWarrant code. Rank DOWN (network-scale governance); governance-class — never auto-mark.",
+ "count": 10,
+ "items": [
+  {
+   "text": "M0: this spec + the Justice Manifesto land as canon, cite-sealed, No-Backdoor Audit accepted as the gate (dev->main review)",
+   "line": 452,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-23-elohim-ceiling-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L452",
+   "class": "governance",
+   "note": "justice-manifesto.md present; spec status still draft and several cites lack fingerprints — the seal half is unverified."
+  },
+  {
+   "text": "Prerequisite: AgentPeerBinding bidirectional cross-sign (quorum-roster provenance) — hard gate before any real assembly",
+   "line": 486,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L486",
+   "class": "governance",
+   "note": "shared with the transport-identity resolver step 0; backlog agent-peer-binding-cross-signed-proof open."
+  },
+  {
+   "text": "Prerequisite: sortition-draw primitive producing a checkable draw_proof_hash",
+   "line": 488,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L488",
+   "class": "governance"
+  },
+  {
+   "text": "M1: InspectionWarrant / InspectionObjection / ReconstructionOutcome entry types + links + InspectionAuthority shapes (all STUB-REJECTED), DNA-hash-moving, operator-gated reinstall",
+   "line": 453,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L453",
+   "class": "governance",
+   "note": "gated on the §11 prerequisites having a credible date."
+  },
+  {
+   "text": "M2: validator invariants (separation, non-standing, higher+differently-composed quorum, witness, floor HARD-BLOCK, counsel precondition, no god-mode read) against stub authority",
+   "line": 454,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L454",
+   "class": "governance"
+  },
+  {
+   "text": "M3: capability/trust/safety bar as an admissibility-token check; bad-elohim detector stays stubbed",
+   "line": 455,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L455",
+   "class": "governance"
+  },
+  {
+   "text": "M4: SortitionQuorum IMPLEMENTED — assemble->contest->decide->refuse cycle on shem cross-node",
+   "line": 456,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L456",
+   "class": "governance"
+  },
+  {
+   "text": "M5: GovernanceQuorum cross-DNA path + browser write path (Phase-11 bridge) replacing 503 BROWSER_WRITE_PATH_PENDING",
+   "line": 457,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L457",
+   "class": "governance"
+  },
+  {
+   "text": "M6: No-Backdoor Audit red-team suite under a2o/features/governance/no-backdoor/ with shem cross-node acceptance",
+   "line": 458,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L458",
+   "class": "governance"
+  },
+  {
+   "text": "Open questions: threshold-reconstruction mechanics (13.1), global-layer quorum parameters (13.2), non-firable counsel binding (13.3), sortition floor on the bad-elohim detector (13.4)",
+   "line": 506,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-elohim-ceiling-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-elohim-ceiling-design.md#L506",
+   "class": "governance"
+  }
+ ]
+}

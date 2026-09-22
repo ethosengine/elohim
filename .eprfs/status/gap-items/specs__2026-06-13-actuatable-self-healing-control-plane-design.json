@@ -1,0 +1,139 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md",
+ "slug": "specs__2026-06-13-actuatable-self-healing-control-plane-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §9 ranked map, §10 phased path and §12 memory axis. This is the single canonical source (the plans/ copies plans__2026-06-13-self-healing-control-plane-design and plans__2026-06-13-self-healing-opportunity-map are verbatim stale duplicates). P0 largely landed: warm-up 45s stream timeout + total budget, CircuitBreaker::is_open, worker_threads(), cgroup memory.max reader, doorway 503+Retry-After shed, /admin/self-healing. Open: the Auto derive() engine (elohim-compute/src/limits.rs absent), the REA actuation spine, bilateral credit windows, the memory-pressure layer.",
+ "count": 15,
+ "items": [
+  {
+   "text": "P0.1 warm-up per-stream timeout below the kill window + total budget + per-tick yield (#1, #2)",
+   "line": 275,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L275",
+   "class": "substrate",
+   "note": "warm_stream.rs:34 WARMUP_STREAM_TIMEOUT_SECS=45; WARMUP_TOTAL_BUDGET_SECS."
+  },
+  {
+   "text": "P0.2 per-upstream circuit breaker on PeerHealthRegistry + warm-up/blob-fetch skip unhealthy peer_statuses (#3, #4)",
+   "line": 276,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L276",
+   "class": "substrate",
+   "note": "elohim-compute/src/peers.rs:133-175 CircuitBreaker::is_open; peer_statuses consumption in warm-up not separately verified."
+  },
+  {
+   "text": "P0.3 worker_threads = max(4, ceil(cpu.max) x k) + cgroup cpu and memory.max readers (#5, #13 / M1)",
+   "line": 277,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L277",
+   "class": "substrate",
+   "note": "doorway main.rs:54 worker_threads(); storage system_metrics.rs:123-132 reads memory.max. The k multiplier soak (open question 3) is not evidenced."
+  },
+  {
+   "text": "detect_resources() snapshot + /admin/auto-preset view exposing detected resources, derived values and the why (#6)",
+   "line": 259,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L259",
+   "class": "substrate",
+   "note": "no auto-preset route in doorway or storage."
+  },
+  {
+   "text": "P0.4 doorway inbound admission semaphore that sheds 503/429 + Retry-After (never throttling /health) (#7)",
+   "line": 278,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L278",
+   "class": "substrate",
+   "note": "doorway server/http.rs:441-515 try_acquire_owned shed + Retry-After."
+  },
+  {
+   "text": "Self-healing read model surfaced at GET /admin/self-healing",
+   "line": 201,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L201",
+   "class": "substrate",
+   "note": "doorway/doorway-service/src/routes/self_healing.rs (program roadmap leg C)."
+  },
+  {
+   "text": "P1.2 derive() — the pure Auto-preset engine with precedence override > Auto > floor and cooldown-gated re-derivation (#8)",
+   "line": 282,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L282",
+   "class": "substrate",
+   "note": "elohim/elohim-compute/src/limits.rs does not exist."
+  },
+  {
+   "text": "P1.1 REA actuation spine: delegates-compute grant/scope/revoke + typed tool surface (tune_knob, pause_sweep, quarantine_peer) with a canonical scope namespace (#12, OQ7)",
+   "line": 281,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L281",
+   "class": "substrate"
+  },
+  {
+   "text": "Quarantine as a bounded/audited/revocable REA action consuming FeedbackSignal::Quarantine, with cooldown + half-open re-admission probe",
+   "line": 112,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L112",
+   "class": "substrate"
+  },
+  {
+   "text": "P1.3 bilateral contracts: forward_to_storage pooled client + deadline + breaker; storage sheds 429 and advertises available_permits; warm-up restrains to advertised warm_credits (#9, #10, #14)",
+   "line": 283,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L283",
+   "class": "substrate"
+  },
+  {
+   "text": "P1.4 sweep lifecycle commands: P2PCommand::ReconfigureCadence + pause/resume/run-now + timer registry view (#11)",
+   "line": 284,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L284",
+   "class": "substrate",
+   "note": "p2p/mod.rs:3812 names the variant only in a comment."
+  },
+  {
+   "text": "P2 agent self-debug closed loop (detect->recover->verify->elevate) + runtime re-derivation on cgroup change (#15)",
+   "line": 287,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L287",
+   "class": "substrate"
+  },
+  {
+   "text": "P2 defense-in-depth on remaining edges: libp2p ConnectionLimits, runtime-resizable render_semaphore, conductor_client backoff jitter (#16, #17)",
+   "line": 289,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L289",
+   "class": "substrate"
+  },
+  {
+   "text": "Memory layer 8: working-set watermark monitor + pressure shed, per-structure memory budgets in derive(), headroom feeds advertised capacity (M2, M3, M5)",
+   "line": 321,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L321",
+   "class": "substrate"
+  },
+  {
+   "text": "M4 working-set-trajectory -> elevate: auto-file monotonic-climb-toward-ceiling as the leak signal",
+   "line": 323,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-actuatable-self-healing-control-plane-design#15",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-actuatable-self-healing-control-plane-design.md#L323",
+   "class": "substrate"
+  }
+ ]
+}

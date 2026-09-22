@@ -1,0 +1,64 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md",
+ "slug": "plans__task-nachalah-candidate-contract-brief",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A task BRIEF (gap nachalah-supervised-activation#1a) whose requirements are the items; its report (task-nachalah-candidate-contract-report, DONE_WITH_CONCERNS, resumed gate EXIT=0) and commit 7f95ac47f record delivery — CLAIMED. The brief's explicitly-left-open scope (#1b grant proof, activation, rollback) is carried on the sprint handoff, not re-counted beyond a pointer.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Pure non-actuating candidate contract in elohim/ark/core/src/candidate.rs returning AuthenticatedCandidateContent (never an activation grant)",
+   "line": 57,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L57",
+   "class": "protocol-canonical",
+   "note": "7f95ac47f."
+  },
+  {
+   "text": "Signed EPR envelope payload binds channel, release ActionHash, grant ref, berth/incarnation/child, predecessor + candidate manifest/executable, platform, expiry, capabilities; issuer pin = Agent-EPR-CID + Ed25519 key provisioned separately",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L63",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Refusals: malformed identity, wrong issuer/key, tampering, expired/future validity, wrong target, stale predecessor, wrong platform, missing capabilities, incompatible database format (identical durable format required)",
+   "line": 70,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L70",
+   "class": "protocol-canonical",
+   "note": "six integration tests in elohim/ark/core/tests/candidate_contract.rs."
+  },
+  {
+   "text": "C0-C14 registered with independent tests; C12 marked unbound and supervisor integration unwired",
+   "line": 81,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L81",
+   "class": "protocol-canonical",
+   "note": "three core seam-registry entries."
+  },
+  {
+   "text": "Owning gate just gate elohim-ark green (prerequisite supervisor tests repaired separately)",
+   "line": 87,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-candidate-contract-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L87",
+   "class": "protocol-canonical",
+   "note": "resumed seat EXIT=0, 126 tests."
+  },
+  {
+   "text": "Left open by design: #1b notarized grant authority (issuer/recipient/scope/validity/revocation), activation, durable rollback, household ceremonies",
+   "line": 94,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-candidate-contract-brief#6",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-candidate-contract-brief.md#L94",
+   "class": "protocol-canonical",
+   "note": "pointer — counted on plans__2026-09-05-nachalah-supervised-activation-sprint-handoff."
+  }
+ ]
+}

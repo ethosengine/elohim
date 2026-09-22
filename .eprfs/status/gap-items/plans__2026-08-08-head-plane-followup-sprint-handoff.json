@@ -1,0 +1,95 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md",
+ "slug": "plans__2026-08-08-head-plane-followup-sprint-handoff",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from the task table F1-F7 + housekeeping. Evidence: notary-authority habit is green (elohim/holochain/.epr-meta/notary-authority.habit.md); ELOHIM_NETWORK_STAKES / ManifestStakesResolver present in storage (F6 wiring). F3 and F5 backlog rows still 'backlog'. The program plan (plans__2026-08-08-head-plane-trust-gradient-program-plan) is separately decomposed.",
+ "count": 9,
+ "items": [
+  {
+   "text": "F1 T5 flip — requester digest leg after confirming responders reply in_sync on live traffic",
+   "line": 34,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L34",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "F2 quiesce §6 measurement on the next edge deploy after F1 (predicted ~90 vs ~150 min) with PTxnGuard flat; feeds the fork-deploy decision",
+   "line": 35,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L35",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "alpha-cluster-6peer",
+    "observability"
+   ]
+  },
+  {
+   "text": "F3 client-pin skew reconciliation (backlog storage-client-pin-skew-fork-app-interface) with full cargo test",
+   "line": 36,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L36",
+   "class": "protocol-canonical",
+   "note": "backlog row status 'backlog'."
+  },
+  {
+   "text": "F4 upstream PR for per-call deadlines (operator identity + fork; sweettests against upstream develop)",
+   "line": 37,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L37",
+   "class": "protocol-canonical",
+   "note": "operator-gated; shared with the deadline spike decisions."
+  },
+  {
+   "text": "F5 integrity link validation (hash-moving lineage change) with explicit genesis-pair ALLOW_DNA_REINSTALL sequencing",
+   "line": 38,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L38",
+   "class": "protocol-canonical",
+   "note": "backlog content-store-integrity-link-validation-gap status 'backlog'."
+  },
+  {
+   "text": "F6 T10 Simulacra activation: ManifestStakesResolver + ELOHIM_NETWORK_STAKES + per-fixture seeder reach opt-in after the digest baseline is stable",
+   "line": 39,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L39",
+   "class": "protocol-canonical",
+   "note": "resolver/env wired in storage main.rs + projection_reconcile.rs; per-fixture opt-in not verified."
+  },
+  {
+   "text": "F7 memo reads stay off until standing_projector T19 wires FeedbackSignal -> invalidate_verification_memo_for_subject",
+   "line": 40,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L40",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Housekeeping: notary-authority habit flip red->green with build evidence",
+   "line": 44,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L44",
+   "class": "protocol-canonical",
+   "note": "habit status green."
+  },
+  {
+   "text": "Housekeeping: dispatch-template line (never background the gate run) + trust-gradient program plan decompose-to-zero-residue at this sprint's close",
+   "line": 47,
+   "state": "OPEN",
+   "id": "plans__2026-08-08-head-plane-followup-sprint-handoff#9",
+   "cites": "genesis/docs/superpowers/plans/2026-08-08-head-plane-followup-sprint-handoff.md#L47",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,96 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md",
+ "slug": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §12 sub-projects P0-P6 + §13 thin first slice + §14 risks. This is a framing spec (each sub-project earns its own spec->plan). Landed: P0 (root ROADMAP.md retired), P1 compose-gate (.claude/hooks/epr-meta-resolver.py + cascading .epr-meta), P6 (.ci-ignore generated from the root ci-trigger leg, 820c268e1). Partly: P2 (native epr flow report --stasis / --coverage), P4 (context-tier frontmatter in use). Open: P3 progressive-DoD rollup, P5 attention conservation, the thin fs-projector slice.",
+ "count": 10,
+ "items": [
+  {
+   "text": "P0 roadmap re-home: retire root ROADMAP.md to an authored-intent layer citing genesis/data/timeline/roadmap/",
+   "line": 312,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L312",
+   "class": "process-meta",
+   "note": "no root ROADMAP.md; relocated 2806c82fe."
+  },
+  {
+   "text": "P1 .epr-meta compose-gate: resolver + declarative vocabulary + named-validator escape + recursion guard + seeded manifests",
+   "line": 315,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L315",
+   "class": "process-meta",
+   "note": ".claude/hooks/epr-meta-resolver.py; root .epr-meta/manifest.md."
+  },
+  {
+   "text": "P2 docs-comet: three-zone stasis ratios, UNION graduation trigger, the six PLACEMENT.md edits, plans-sweep / specs-meaning-gate",
+   "line": 318,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L318",
+   "class": "process-meta",
+   "note": "native epr flow report placement --stasis carries the three-zone verdict; verify the PLACEMENT.md §10.4 edits and the graduation-trigger union before VERIFIED."
+  },
+  {
+   "text": "P3 progressive-DoD rollup (the witnessed reach-chain) wired to the context ratchet",
+   "line": 322,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L322",
+   "class": "process-meta"
+  },
+  {
+   "text": "P4 disclosure tiering: context-tier frontmatter + MemPalace as retrievable-only graduation destination",
+   "line": 324,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L324",
+   "class": "process-meta",
+   "note": "context-tier frontmatter is in use on specs; the graduation-to-palace path is not evidenced."
+  },
+  {
+   "text": "P5 attention-conservation + liability/recognition primitive (Mishpat::Commitment signal_kind)",
+   "line": 326,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L326",
+   "class": "process-meta"
+  },
+  {
+   "text": "P6 .ci-ignore convergence into the .epr-meta cascade (ci-trigger leg; flat list codegen'd)",
+   "line": 328,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L328",
+   "class": "process-meta",
+   "note": "820c268e1; .ci-ignore header 'GENERATED — projected from the ci-trigger leg'."
+  },
+  {
+   "text": "Protocol-insight note (§8 liability/recognition) homed under content/elohim-protocol/architecture/",
+   "line": 346,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L346",
+   "class": "process-meta"
+  },
+  {
+   "text": "Thin first slice: elohim-fs-projector compiles one .epr-meta into a Private atom on conductor-free storage and graduates it to a second notary peer with an identical CID",
+   "line": 349,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L349",
+   "class": "process-meta"
+  },
+  {
+   "text": "Risk: keep .epr-meta a projection of earned reach, never the authority (projection-as-truth inversion guard)",
+   "line": 365,
+   "state": "OPEN",
+   "id": "specs__2026-06-25-doc-lifecycle-as-epr-development-substrate-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-25-doc-lifecycle-as-epr-development-substrate-design.md#L365",
+   "class": "process-meta"
+  }
+ ]
+}

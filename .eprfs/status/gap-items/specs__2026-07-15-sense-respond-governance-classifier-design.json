@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md",
+ "slug": "specs__2026-07-15-sense-respond-governance-classifier-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §16 decomposition seed (G1-G8) + §15 D1/D3/D6. Nothing built (no frame_classifier.py, frames/ ontology, classifier-signal ledger). Since this spec, the governance-plane-single-evaluator habit made the evaluator NATIVE (elohim-epr-cli) with Python/Rust parity vectors — so G1/G3's Python homes (_lib/frame_classifier.py, _eval_rule) must be re-targeted at the native evaluator, and every new ledger/poller (G5-G7) must answer the root CLAUDE.md four-artifact rule before being built.",
+ "count": 11,
+ "items": [
+  {
+   "text": "D1 ratify the sensing-floor default (no terminal deny, no auto floor-mutation, human-ratified changes, existential -> escalate)",
+   "line": 682,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L682",
+   "class": "process-meta"
+  },
+  {
+   "text": "D3 interim admissibility authority for authoring apex concepts/frames before the sortition ceiling exists (capture vector)",
+   "line": 690,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L690",
+   "class": "process-meta"
+  },
+  {
+   "text": "G1 Layer-A labeling-function bank + normalized shadow + triggers() with a scan-size cap; sovereignty guard rebound as first consumer (parity-proven) — in the native evaluator",
+   "line": 723,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L723",
+   "class": "process-meta"
+  },
+  {
+   "text": "G2 frames/*.md ontology + frame-ontology@1 / frame-<name>@1 policy rows, cite-sealed",
+   "line": 225,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L225",
+   "class": "process-meta"
+  },
+  {
+   "text": "G3 engine-modification gap: Verdict carries FrameClassification (evaluate stays pure), co-resolution pre-pass, defer verdict, unregistered->ask split, rubric surfacing",
+   "line": 157,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L157",
+   "class": "process-meta"
+  },
+  {
+   "text": "G4 harness-neutral pre-commit / CI gate, advisory-annotating only (exit 0 always)",
+   "line": 194,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L194",
+   "class": "process-meta"
+  },
+  {
+   "text": "G5 classifier signal hook + drift aggregation keyed id@version + git-seam net-new hunk lines + content-hash dedup",
+   "line": 507,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L507",
+   "class": "process-meta"
+  },
+  {
+   "text": "G6 Family-2 async semantic recall: harvest poller + apex anchors + local encoder + triage via the source-agnostic resolve_escalation (compute-source toggle)",
+   "line": 312,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L312",
+   "class": "process-meta"
+  },
+  {
+   "text": "G7 guard: SessionStart gate line + stasis loop",
+   "line": 562,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L562",
+   "class": "process-meta"
+  },
+  {
+   "text": "G8 graduated: FeedbackSignal-on-Precedent-CID substrate (DNA-lineage) + coordinator-identity anti-gaming + CID story-of-why",
+   "line": 499,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L499",
+   "class": "process-meta"
+  },
+  {
+   "text": "D6 ontology amendment vs graduated immutability (constitutional defeaters immutable; detector codebooks amendable)",
+   "line": 702,
+   "state": "OPEN",
+   "id": "specs__2026-07-15-sense-respond-governance-classifier-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-15-sense-respond-governance-classifier-design.md#L702",
+   "class": "process-meta"
+  }
+ ]
+}

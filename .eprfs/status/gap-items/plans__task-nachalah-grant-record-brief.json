@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md",
+ "slug": "plans__task-nachalah-grant-record-brief",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A task BRIEF (gap #1b-a). Delivered per its report and commit 63585b542 ('#1b-b — the exact signed grant record is authenticated') and services/commitment_record.rs — CLAIMED. Full C12 authority (#1b-b) stays open by design.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Exact-ActionHash coordinator read returning the signed Record with Create + Commitment entry-type checks; legacy EntryHash readback kept with its comment corrected",
+   "line": 38,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-grant-record-brief#1",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md#L38",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Storage conductor adapter + acting-node verifier: independently pinned action hash, entry hash, author; recompute identities; verify Ed25519 over serialized Action bytes; bounded input work",
+   "line": 46,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-grant-record-brief#2",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md#L46",
+   "class": "protocol-canonical",
+   "note": "elohim-storage/src/services/commitment_record.rs; 63585b542."
+  },
+  {
+   "text": "Adversarial proof with two real keys: different author same entry bytes, tampering, pin mismatches, wrong type, Update/Delete, missing entry, malformed/oversized",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-grant-record-brief#3",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md#L64",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "C0-C14 registered; full C12 authority + activation marked unbound with #1b-b as the gap",
+   "line": 72,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-grant-record-brief#4",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md#L72",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Namespace rule held: the candidate's Agent EPR CID is not a Holochain agent key — explicit independent provisioning until the full authority verifier binds issuer, recipient, scope, validity, freshness",
+   "line": 51,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-grant-record-brief#5",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-brief.md#L51",
+   "class": "protocol-canonical"
+  }
+ ]
+}

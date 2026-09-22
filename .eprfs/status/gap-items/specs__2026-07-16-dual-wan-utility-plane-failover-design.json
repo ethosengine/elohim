@@ -1,0 +1,84 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md",
+ "slug": "specs__2026-07-16-dual-wan-utility-plane-failover-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Vision-tier (deferred) with a 2026-07-22 shipped section: RELAY plane built (dual coturn + relay-addr-beacon), §3a browser leg shipped (ElohimClient + apiBaseUrlInterceptor fallbacks), doorways.elohim.host multi-A shared record landed in manifests. Open: conductor-plane multi-URL (upstream single-typed), §3b/§3c options, pkarr doorway-set design, ISP diversity. Note the substrate moved since: Holochain 0.7 conductors home to an iroh-relay, so 'patch the tx5 fork' may be stale — re-derive against the iroh transport. Rank DOWN (network breadth).",
+ "count": 9,
+ "items": [
+  {
+   "text": "RELAY plane: dual-WAN sovereign TURN pair (coturn ethosengine + shem) + relay-addr-beacon keeping residential WAN IPs fresh",
+   "line": 173,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L173",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§3a browser leg: ElohimClient + Angular apiBaseUrlInterceptor read-failover / write-never-auto-retry across doorway fallbacks",
+   "line": 179,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L179",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "doorways.elohim.host shared multi-A record via relay-addr-beacon shared-record contribution (closes WAN-outage gap for first load/API)",
+   "line": 240,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L240",
+   "class": "protocol-canonical",
+   "note": "landed in orchestrator/manifests/doorway/alpha.yaml + both coturn beacon manifests; live multi-A resolution not re-verified."
+  },
+  {
+   "text": "Operator checklist: when CORS_ORIGINS is set, include every sibling fallback origin",
+   "line": 214,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L214",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Conductor plane multi-address failover — bootstrap_url/signal_url are single-typed upstream; re-derive the patch point against the Holochain 0.7 iroh transport (the tx5-fork path is likely stale)",
+   "line": 201,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L201",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§3b Cloudflare Load Balancing with health checks (HTTP-only, filed exit-ledger dependency)",
+   "line": 100,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L100",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "§3c BGP anycast as council-held commons (far horizon)",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L117",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Peer-native home: pkarr-resolved doorway set / DoorwayRegistration multi-address design (must pass p2p-design-gate first)",
+   "line": 262,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L262",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Correlated-failure mitigation: diversify ISPs/households beyond the two Google Fiber WANs (the N-node commons)",
+   "line": 139,
+   "state": "OPEN",
+   "id": "specs__2026-07-16-dual-wan-utility-plane-failover-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-16-dual-wan-utility-plane-failover-design.md#L139",
+   "class": "protocol-canonical"
+  }
+ ]
+}

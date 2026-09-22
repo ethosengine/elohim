@@ -1,0 +1,93 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md",
+ "slug": "specs__2026-07-18-trust-legibility-atlas-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the DoD + the six API deltas + per-state scenarios. DoD 1 met: features/trust/trust-legibility-atlas.feature exists with 10 scenarios, all @wip. None of the API deltas (shed-body reason/gauge/earnPath, availability summary, excluded-rows, 403 reason body, shadow-verdict surface, Tier-C self-report) is in storage/doorway. Household-floor testable (1-7, 9); single-household legibility — rank UP.",
+ "count": 10,
+ "items": [
+  {
+   "text": "DoD 1: all nine atlas scenarios exist and parse (@wip until wired)",
+   "line": 119,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L119",
+   "class": "protocol-canonical",
+   "note": "genesis/a2o/features/trust/trust-legibility-atlas.feature (10 scenarios, 10 @wip)."
+  },
+  {
+   "text": "Delta state 3: storage catching-up 503 gains {reason:'anchor-divergence', gauge, since, earnPath}; doorway forwards verbatim",
+   "line": 91,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L91",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Delta states 2/5: peer_selection availability summary (n committed / online / stale-key / offline) distinguishing stale-key from offline",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L94",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Delta state 4: resilience card details count excludedProviders per exclusion reason (namespace) instead of silently dropping",
+   "line": 96,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L96",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Delta state 6: reach gate 403 body {reason:'reach-not-earned', contentReach, requesterStanding, earnPath}",
+   "line": 98,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L98",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Delta state 7: read-only shadow-verdict diagnostics (op-gate would-deny counts per performer)",
+   "line": 101,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L101",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Delta state 8: Tier-C self-report (dnaHash + bootstrapId + signalId + declaredHead) on /health + views — this suite is its acceptance test",
+   "line": 103,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L103",
+   "class": "protocol-canonical",
+   "note": "shared with peer-discovery-fractal-federation Tier C."
+  },
+  {
+   "text": "Delta state 9: placement report strategy 'xor-degraded' with reason households-unknown + gauge",
+   "line": 69,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L69",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DoD 2-3: each delta lands through the view-schema contract; scenarios 1-7 green on the household floor, 8 on the A/B doorway pair, 9 once household data flows",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L121",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "DoD 4: @browser Playwright leg per state producing one screenshot each (the atlas as demo deck)",
+   "line": 123,
+   "state": "OPEN",
+   "id": "specs__2026-07-18-trust-legibility-atlas-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-18-trust-legibility-atlas-design.md#L123",
+   "class": "protocol-canonical"
+  }
+ ]
+}

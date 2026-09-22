@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md",
+ "slug": "specs__2026-07-02-epr-resolution-provider-design",
+ "method": "agent-decomposition",
+ "class": "ui-truth-layer",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from I1/I2/I3 + §6 acceptance. Landed: typed EprLinkState on <elohim-epr-link> (resolved | forbidden | missing | error — 'head-only' not adopted), an EprResolutionProvider provided in elohim-app and lamad app.config, and manifest routeClaims with codegen-route-claims.mjs. Open: the @wip landing fallback scenario (the I1 acceptance) and verification that all four W1 paths consume the provider.",
+ "count": 8,
+ "items": [
+  {
+   "text": "I1 head-first resolution: previews resolve via /epr-head; body fetched only on click-through/embed",
+   "line": 142,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L142",
+   "class": "ui-truth-layer",
+   "note": "verify EprResolverService preview path no longer touches the reach-gated body."
+  },
+  {
+   "text": "I1 typed EprLinkState on <elohim-epr-link> replacing the unreachable boolean; forbidden renders title + honest affordance; only missing may show the raw ref",
+   "line": 149,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L149",
+   "class": "ui-truth-layer",
+   "note": "app/elohim-elements/elohim-core/src/elohim-epr-link.ts:28 (resolved|forbidden|missing|error; no head-only)."
+  },
+  {
+   "text": "I1 display=\"card\" becomes real: render() branches on display x state",
+   "line": 173,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L173",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "I1 acceptance: un-@wip landing-discovery 'reference card whose body cannot be reached still renders a legible fallback'",
+   "line": 258,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L258",
+   "class": "ui-truth-layer",
+   "note": "scenario still @wip @browser-only @requires:seeded-content (landing-discovery.feature:162)."
+  },
+  {
+   "text": "I2 ambient EprResolutionProvider (Angular InjectionToken per bundle + Lit @lit/context at the shell root) as the single transport seam",
+   "line": 181,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L181",
+   "class": "ui-truth-layer",
+   "note": "provided in app/elohim-app app.config.ts and app/lamad app.config.ts; Lit context wiring not verified."
+  },
+  {
+   "text": "I2 acceptance: all four W1 paths consume the provider; the click interceptor hands off through it",
+   "line": 273,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L273",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "I3 manifest-declared routeClaims generating the TS claim tables and the doorway EprRouter mount map",
+   "line": 213,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L213",
+   "class": "ui-truth-layer",
+   "note": "elohim/sdk/schemas/scripts/codegen-route-claims.mjs; lamad manifest.json:43."
+  },
+  {
+   "text": "Separate substrate fix: the anonymous 403 on /db/content/manifesto on alpha (seed/reach heal, not this spec)",
+   "line": 266,
+   "state": "OPEN",
+   "id": "specs__2026-07-02-epr-resolution-provider-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-02-epr-resolution-provider-design.md#L266",
+   "class": "ui-truth-layer",
+   "note": "same work as the reach-archetype-floor item 1 (doctrine heal)."
+  }
+ ]
+}

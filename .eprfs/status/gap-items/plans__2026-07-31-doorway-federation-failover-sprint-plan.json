@@ -1,0 +1,102 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md",
+ "slug": "plans__2026-07-31-doorway-federation-failover-sprint-plan",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from WS0-WS3 tasks + the operator menu (disjoint Codex packages P1-P4 are backlog rows, not re-counted). Landed: doorway-failover.feature + failover.steps.ts + classifyDoorwayState (WS1), doorway JWKS-related config/node_identity + persistent node key (a9910d11c, a70ce507d — the WS2 precondition), T3.3 name routing (bef282748), warm-shell serving without an upstream fetch (warm_shell.rs:2143), prod doorwayFallbacks. The doorway-failover habit (doorway-service .epr-meta) stays red.",
+ "count": 10,
+ "items": [
+  {
+   "text": "WS0 isolated saga recording run ([build:edge] [edge:validate-only]) with ch04/06/09/10 failed=0 in sprint-report-dataplane.json",
+   "line": 120,
+   "state": "OPEN",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L120",
+   "class": "substrate",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "WS1 T1.1-T1.2 author the failover red (doorway-failover.feature: shed is not death / one of two always serves / truth survives failover) + shed-vs-dead step glue",
+   "line": 150,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L150",
+   "class": "substrate",
+   "note": "features/dataplane/doorway-failover.feature, steps/dataplane/failover.steps.ts, surfaces.ts classifyDoorwayState."
+  },
+  {
+   "text": "WS1 T1.3 doc-drift fixes (chapter headers defer to the README table)",
+   "line": 164,
+   "state": "OPEN",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L164",
+   "class": "substrate"
+  },
+  {
+   "text": "WS2 T2.1 verify sibling-minted JWTs via JWKS (dual-alg HS256/EdDSA) on a persistent node key",
+   "line": 170,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L170",
+   "class": "substrate",
+   "note": "node key persists across restarts (a9910d11c/a70ce507d); JWKS in doorway config/node_identity — verify sibling verification end-to-end."
+  },
+  {
+   "text": "WS2 T2.2-T2.3 HostedAgentBinding A2 link + honest cross-doorway landing; independent guard killing the silent identity fork",
+   "line": 177,
+   "state": "OPEN",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L177",
+   "class": "substrate"
+  },
+  {
+   "text": "WS3 T3.1-T3.2 apex multi-A manifest diff (operator-gated apply) + prod client fallbacks",
+   "line": 219,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L219",
+   "class": "substrate",
+   "note": "environment.prod.ts:29 doorwayFallbacks; doorways.elohim.host shared multi-A record landed (dual-WAN spec); the apex flip itself is operator-gated."
+  },
+  {
+   "text": "WS3 T3.3 fetch_from_remote_doorway — wire or delete (doctrine call)",
+   "line": 229,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L229",
+   "class": "substrate",
+   "note": "superseded by T3.3 name routing (bef282748 one-hop federated relay); fetch_from_remote_doorway no longer exists."
+  },
+  {
+   "text": "WS3 T3.4 warm-boot shell cache serving / through the catch-up window",
+   "line": 235,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L235",
+   "class": "substrate",
+   "note": "warm_shell.rs:2143 upstream_unavailable_with_a_warm_shell_serves_without_a_fetch."
+  },
+  {
+   "text": "Operator menu: Adam hosted-agent provisioning ceiling, apex multi-A flip timing, JWT dual-alg migration window, Cloudflare LB adopt-or-not, demand-autopin retirement semantics",
+   "line": 252,
+   "state": "OPEN",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L252",
+   "class": "substrate"
+  },
+  {
+   "text": "Habit flip: doorway-failover red -> green with a fleet receipt (one of two doorways always serves; truth survives failover)",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-07-31-doorway-federation-failover-sprint-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-07-31-doorway-federation-failover-sprint-plan.md#L152",
+   "class": "substrate",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  }
+ ]
+}

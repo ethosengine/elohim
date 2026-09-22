@@ -1,0 +1,19 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-13-self-healing-program-roadmap.md",
+ "slug": "plans__2026-06-13-self-healing-program-roadmap",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-reviewed 2026-09-22 (stasis round 3): SUPERSEDED DUPLICATE. This body is a stale pre-relocation copy of genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md (the 2806c82fe relocation copied rather than moved; the canonical copy carries later corrections and seals). Its work is decomposed ONCE, on plans__2026-06-13-self-healing-control-plane-program-roadmap; re-counting it here would double the budget. The only remaining work on this file is its retirement by the librarian: repoint the inbound reference in specs/2026-07-15-sense-respond-governance-classifier-design.md with epr flow cites seal, then delete the body.",
+ "count": 1,
+ "items": [
+  {
+   "text": "Retire this stale duplicate of plans/2026-06-13-self-healing-control-plane-program-roadmap.md (repoint inbound cites, then delete the body); it carries no independent gap work",
+   "line": 9,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-self-healing-program-roadmap#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-program-roadmap.md#L9",
+   "class": "provisional"
+  }
+ ]
+}

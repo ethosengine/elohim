@@ -1,0 +1,129 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md",
+ "slug": "specs__2026-06-13-self-healing-user-agency-opportunity-map",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §6 ranked map grouped along the §7 phased path. Canonical copy (plans__2026-06-13-self-healing-opportunity-map is a verbatim stale duplicate). Landed: bounded storage-proxy await, projector route in build_manifest, caughtUp through doorway /health, runtime-harvest.py, HealthIndicator mounted in the /debug lens. Open: recovery route, force-reconcile + pause triggers, selfCidPresent, Network&Sync panel, banner, pinned-runtime surface, auto-heal loop.",
+ "count": 14,
+ "items": [
+  {
+   "text": "#1 Bound the storage-proxy await (pooled timed client) — prerequisite for every (C) affordance",
+   "line": 106,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L106",
+   "class": "substrate",
+   "note": "doorway routes/storage_proxy.rs:47-49 connect + whole-request timeouts."
+  },
+  {
+   "text": "#2 Wire the dead recovery route and unify /identity/recovery + /identity/recover onto RecoveryRequestComponent",
+   "line": 107,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L107",
+   "class": "substrate",
+   "note": "no recovery route in imagodei routes; RecoveryRequestComponent still unrouted."
+  },
+  {
+   "text": "#4/#9 Mount HealthIndicatorComponent on a my-health surface + /api/v1/status/projector in build_manifest()",
+   "line": 132,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L132",
+   "class": "substrate",
+   "note": "storage http.rs:15535 manifest route; HealthIndicator mounted only via the /debug health lens — a user-facing /shefa/health host is not built."
+  },
+  {
+   "text": "#5/#6 Plumb caughtUp through doorway /health + Retry-After / structured catching-up body on 503s",
+   "line": 133,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L133",
+   "class": "substrate",
+   "note": "doorway main.rs:711 caught_up; connection-indicator chip rendering not verified."
+  },
+  {
+   "text": "#3 Force-reconcile trigger POST /api/v1/reconcile/projection (+ doorway POST /api/v1/me/resync), idempotent past reseed->409",
+   "line": 108,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L108",
+   "class": "substrate"
+  },
+  {
+   "text": "#7 Surface selfCidPresent / provideLoopEnabled on /p2p/status (anchor-gap self-diagnosis)",
+   "line": 112,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L112",
+   "class": "substrate"
+  },
+  {
+   "text": "#12 Network & Sync panel consuming the full P2PStatusView",
+   "line": 117,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L117",
+   "class": "substrate"
+  },
+  {
+   "text": "#8 HTTP pause/resume with auto-resume TTL over pause_sync()",
+   "line": 113,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L113",
+   "class": "substrate"
+  },
+  {
+   "text": "#13/#20 App-shell degraded 'catching up' banner, incl. reading x-ssr-skipped",
+   "line": 118,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L118",
+   "class": "substrate"
+  },
+  {
+   "text": "#10 Runtime->finding elevate bridge (runtime-harvest.py + runtime-triage)",
+   "line": 115,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L115",
+   "class": "substrate",
+   "note": ".claude/scripts/runtime-harvest.py; runtime-findings.jsonl in .claude/data."
+  },
+  {
+   "text": "#11 Bounded auto-heal loop detect->recover->verify->elevate over ProjectorStatusView + run_sweep + GapTracker",
+   "line": 116,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L116",
+   "class": "substrate"
+  },
+  {
+   "text": "#14 Dedicated pinned-runtime status surface that survives a full worker-pool stall",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L119",
+   "class": "substrate"
+  },
+  {
+   "text": "#15 Re-anchor / re-pin self-heal for seeded content — first decide which anchor-gap mechanism (SELF_CID unset vs no DevicePin for bulk seeds)",
+   "line": 147,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L147",
+   "class": "substrate"
+  },
+  {
+   "text": "#16-#19 hosted own-node reconcile view, serve-stale-on-error, 'Heal this page' CTA, agency.service totalPeers hardcoded 0",
+   "line": 124,
+   "state": "OPEN",
+   "id": "specs__2026-06-13-self-healing-user-agency-opportunity-map#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md#L124",
+   "class": "substrate",
+   "note": "agency.service.ts:104 still totalPeers: 0 TODO."
+  }
+ ]
+}

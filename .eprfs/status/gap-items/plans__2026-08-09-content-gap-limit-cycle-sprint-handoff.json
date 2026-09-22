@@ -1,0 +1,63 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md",
+ "slug": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from tasks G1-G5. The sprint closed 2026-08-10 (2a9f00050): the oscillation was an instrument artifact (G1) wrapped around a real heal-leg stall (G2/G3 fixed b96861c1b + 31f8a9e89); notary-authority 3/3 and the habit is now green (G4). Residual threads were re-owned on backlog content-gap-limit-cycle-blocks-convergence (shem-trio conductor burn, seed-pod unanchored backfill) — not re-counted here. Distill-then-retire candidate.",
+ "count": 6,
+ "items": [
+  {
+   "text": "G1 instrument before optimizing: prove what the divergence gauge measures (rotating-window aliasing) and gate it on measurement with known_gaps/known_divergent series",
+   "line": 44,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L44",
+   "class": "protocol-canonical",
+   "note": "per the 2a9f00050 sprint close."
+  },
+  {
+   "text": "G2 root-cause the cycle: heal leg broke unconditionally on the first failed batch call on CPU-starved conductors",
+   "line": 45,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L45",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G3 land the drain with bounded pacing (budget-bounded heal leg)",
+   "line": 46,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L46",
+   "class": "protocol-canonical",
+   "note": "b96861c1b + 31f8a9e89."
+  },
+  {
+   "text": "G4 harvest the waiting greens: notary-authority 3/3 flips the habit; saga ch04/06/10 recover; clean quiesce window measured",
+   "line": 47,
+   "state": "CLAIMED",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L47",
+   "class": "protocol-canonical",
+   "note": "notary-authority habit status green; saga chapters and the clean quiesce window not individually verified."
+  },
+  {
+   "text": "G5 residual watch: doorway-A ingress readiness 503, A/B doorway mutual reach (islands), genesis pipeline dispatch coverage",
+   "line": 48,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L48",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Residual re-homed: shem-trio conductor burn + seed-pod unanchored backfill (owned by backlog content-gap-limit-cycle-blocks-convergence)",
+   "line": 10,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-content-gap-limit-cycle-sprint-handoff#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-content-gap-limit-cycle-sprint-handoff.md#L10",
+   "class": "protocol-canonical",
+   "note": "pointer only — the work is counted on the backlog row."
+  }
+ ]
+}

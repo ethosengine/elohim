@@ -1,0 +1,67 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md",
+ "slug": "specs__2026-09-08-seamless-groupware-ux-addendum",
+ "method": "agent-decomposition",
+ "class": "ui-truth-layer",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §8 slices (1-6) + the §7 decision register. The doc states none is in sprint 2026-09-08 (slice 1 follows T13, slice 2 follows T10); no slice evidenced. UX addendum to the package-composition seam spec — each slice must cite the seam rule it exercises.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Operator decision register U1-U5 (runtime facet on the existing chip; Open-with computed from route-claim acts-on + offers; install-to-hub not offered by default; device branch hidden when budget refuses; dev-workspace link on every More menu)",
+   "line": 184,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L184",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 1 facet: the chip renders custody + runtime from local folds; a2o under features/elohim/ @concern:operator-runtime-surface (after T13)",
+   "line": 196,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L196",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 2 Open with: atom-home action row; one object opened via a peer's runtime on the household mesh (jessica offering, matthew selecting) (after T10)",
+   "line": 198,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L198",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 3 install on this device: four-act receipt, ark envelope, offline open",
+   "line": 200,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L200",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 4 Shefa device view: join of three facings per device (what is stored and hosted, with whom)",
+   "line": 201,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L201",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 5 install to hub + offer: adoption by election, offer commitment, hub receipt (needs the Adam worker or a household hub)",
+   "line": 202,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L202",
+   "class": "ui-truth-layer"
+  },
+  {
+   "text": "Slice 6 dev-workspace link resolving into lvi on a capable runtime; first contribution with an attested gate result",
+   "line": 204,
+   "state": "OPEN",
+   "id": "specs__2026-09-08-seamless-groupware-ux-addendum#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-08-seamless-groupware-ux-addendum.md#L204",
+   "class": "ui-truth-layer"
+  }
+ ]
+}

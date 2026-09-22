@@ -1,0 +1,71 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md",
+ "slug": "specs__2026-08-10-evidence-ladder-push-left-design",
+ "method": "agent-decomposition",
+ "class": "process-meta",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §5 increments (1-6) + the §3 ascend-only rule + §6 concern-address. Landed: the ascend-only rule at push time (pre-push T2-receipt leg via genesis/orchestrator/scripts/t2-receipt.sh, warn-only, T2_RECEIPT=strict refuses) and T2 multi-peer simulacra (the household mesh: 3 storage peers, doorway alpha/beta/gamma — 'just test mesh'). Not found: admission-cite deny rules on habits/backlog, push-time [build:edge] tag coherence, the walker's dangling-proof/stale-claim/cost columns, the redesign-pressure sentinel.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Increment 1: admission cites — .epr-meta deny-at-write on habits + backlog dirs requiring cites to the enforcing surface",
+   "line": 100,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L100",
+   "class": "process-meta"
+  },
+  {
+   "text": "Increment 2: push-time tag coherence — refuse [build:edge] when the changeset touches no edge-watched path, pointing at [edge:validate-only]",
+   "line": 104,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L104",
+   "class": "process-meta",
+   "note": "no build:edge / validate-only check in .husky/pre-push.bash."
+  },
+  {
+   "text": "Increment 3: the one command — epr flow status/walk emits compiler-format dangling-proof / orphan / stale-claim with tier and cost columns; SessionStart points there",
+   "line": 108,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L108",
+   "class": "process-meta"
+  },
+  {
+   "text": "Increment 4: T2 multi-peer simulacra (2+ storage peers + 2 doorways on the local stack) reusing personas, seeder and feature files",
+   "line": 113,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L113",
+   "class": "process-meta",
+   "note": "the household mesh (just mesh start / just test mesh) runs 3 storage peers + doorways alpha/beta/gamma."
+  },
+  {
+   "text": "Ascend-only rule enforced: a T4 banking run requires green at the highest local tier; pre-push T2 receipt names just test mesh",
+   "line": 76,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L76",
+   "class": "process-meta",
+   "note": ".husky/pre-push.bash T2 receipt leg via genesis/orchestrator/scripts/t2-receipt.sh (warn-only by default)."
+  },
+  {
+   "text": "Increment 5: REA cost accounting per concern (T4 spend, cost-per-green-evidence) + redesign-pressure sentinel via flag->agent->canon",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L119",
+   "class": "process-meta"
+  },
+  {
+   "text": "Increment 6 / §6: concern: address field on runtime/ci/deprecation finding ledgers joined by the walker; threshold bypass to the SessionStart headline",
+   "line": 120,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-evidence-ladder-push-left-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-evidence-ladder-push-left-design.md#L120",
+   "class": "process-meta",
+   "note": "shared with algedonic slice 1."
+  }
+ ]
+}

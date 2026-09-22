@@ -1,0 +1,103 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md",
+ "slug": "specs__2026-06-03-admin-key-lifecycle-dev-to-production",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §5 migration stages + §6 never-ships list. Stage 1 is partly met (camelCase adminBootstrapKey; no /auth/api-keys callers) but two Jenkins credential IDs still feed the one logical secret; stages 2-4 unstarted; prod.yaml still carries CHANGE-ME stringData.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Stage-1 gate: camelCase adminBootstrapKey everywhere; dead /auth/api-keys endpoint removed",
+   "line": 120,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L120",
+   "class": "provisional",
+   "note": "seed-humans.ts:239-264 camelCase; no /auth/api-keys reference in doorway/app/a2o."
+  },
+  {
+   "text": "Stage-1 gate: collapse to ONE canonical Jenkins credential ID for the admin secret",
+   "line": 121,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L121",
+   "class": "provisional",
+   "note": "both storage-api-key-admin (Jenkinsfile:1013-1039) and doorway-admin-bootstrap-key (genesis/Jenkinsfile:1148-1649) are still read — the silent-403 divergence hazard the spec names."
+  },
+  {
+   "text": "No-echo rule: admin/auth/jwt values never echoed to logs/console/test output (codified 2026-06-03)",
+   "line": 42,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L42",
+   "class": "provisional",
+   "note": "fixed + codified the day the spec was written (§1 leak-and-fix history); no enforcing lint located."
+  },
+  {
+   "text": "Stage 2: split the omnipotent admin key into per-surface server-side secrets",
+   "line": 122,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L122",
+   "class": "provisional"
+  },
+  {
+   "text": "Stage 2: gate doorway operational /admin/* (federation, pipeline, cache, conductors, capabilities, seed/blob) on a presented credential, not network locality",
+   "line": 65,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L65",
+   "class": "provisional"
+  },
+  {
+   "text": "Stage 2: gate elohim-storage /admin/* on a presented credential (later a bounded_by)",
+   "line": 109,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L109",
+   "class": "provisional"
+  },
+  {
+   "text": "Prod secrets from sealed-secrets only; remove CHANGE-ME stringData from orchestrator/manifests/doorway/prod.yaml",
+   "line": 140,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L140",
+   "class": "provisional",
+   "note": "prod.yaml:60-62 still commits CHANGE-ME placeholders."
+  },
+  {
+   "text": "Stage 3: named service-agent keypairs + one delegates-compute Commitment per (provider, recipient, scope)",
+   "line": 126,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L126",
+   "class": "provisional"
+  },
+  {
+   "text": "Stage 3: bounds_validator enforces bounded_by at the publish/admin boundary; revocation + standing exercised end-to-end in E2E",
+   "line": 129,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L129",
+   "class": "provisional"
+  },
+  {
+   "text": "Stage 4: retire X-API-Key -> Admin/Authenticated and the adminBootstrapKey register promotion (JWT_SECRET stays)",
+   "line": 131,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L131",
+   "class": "provisional"
+  },
+  {
+   "text": "Never-ships: E2E fallback dev key 'test-admin-key' must never be a prod default",
+   "line": 142,
+   "state": "OPEN",
+   "id": "specs__2026-06-03-admin-key-lifecycle-dev-to-production#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-03-admin-key-lifecycle-dev-to-production.md#L142",
+   "class": "provisional"
+  }
+ ]
+}

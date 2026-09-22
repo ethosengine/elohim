@@ -1,0 +1,59 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md",
+ "slug": "specs__2026-08-10-fresh-head-nomination-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A decision request — 'no implementation is authorized by this note'. No nomination path found in head_adoption.rs; the backlog 2026-08-10-fresh-head-nomination-and-declare-error-backoff is partially-resolved (the declare-error backoff half). Items are the review gate, the measurement, and the implementation contract the eligibility rules imply.",
+ "count": 6,
+ "items": [
+  {
+   "text": "Review gate: operator accepts the C1 anti-self-election eligibility contract (candidacy only; the DHT arbiter alone crowns)",
+   "line": 63,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L63",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Measure the affected cohort (eligible content ids) before implementation; >500 ids requires explicit operator sign-off",
+   "line": 28,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L28",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Register the eligibility predicate + boundary type in seam-registry.yaml with contracts before code review",
+   "line": 38,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L38",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Implement nomination: positive ghost-decay proof + exact returned ActionHash resolved locally -> enters only the existing DHT candidacy/arbiter path; no SQL stamp",
+   "line": 30,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L30",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Idempotence on (content_id, fresh_action_hash), one attempt per bounded sweep, finite per-id backoff; typed success/refusal/backoff reasons with ratio-readable counters (C8)",
+   "line": 37,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L37",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Graduation: convergence contract + soak evidence showing the remaining phantom-candidate residual (C3, C14)",
+   "line": 49,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-fresh-head-nomination-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-fresh-head-nomination-design.md#L49",
+   "class": "protocol-canonical"
+  }
+ ]
+}

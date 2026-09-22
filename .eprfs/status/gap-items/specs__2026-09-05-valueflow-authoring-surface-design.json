@@ -1,0 +1,70 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md",
+ "slug": "specs__2026-09-05-valueflow-authoring-surface-design",
+ "method": "agent-decomposition",
+ "class": "design",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §5-§8 verbs/governance/skills, §11 story and §12 close-out (operator ruled nothing stays open; slice 2 shipped). The verbs exist in the native epr CLI and are in use by this very store (claim/fulfill/context/ledger). What remains is a RATE: dev-system-equilibrium stays red until the drain is a habit, not an event.",
+ "count": 7,
+ "items": [
+  {
+   "text": "epr flow claim: a claim on a gap id mints exactly one commitment; a duplicate claim is refused naming the incumbent",
+   "line": 171,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L171",
+   "class": "design"
+  },
+  {
+   "text": "epr flow fulfill --on: DONE discharges, BLOCKED does not",
+   "line": 203,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L203",
+   "class": "design"
+  },
+  {
+   "text": "epr flow context: rulings + verdicts newest-first; a storage source file names its covering habit and gate",
+   "line": 229,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L229",
+   "class": "design"
+  },
+  {
+   "text": "Three inject rules where authoring happens + three native skill packages with one dispatch prompt shape",
+   "line": 284,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L284",
+   "class": "design"
+  },
+  {
+   "text": "Close-out: epr flow ledger <atom>; WIP fence as a bounded commitment (limit 3 encoding max-2); flips are rulings in habits-project --check; PostToolUse observer mints claims/fulfilments from brief/report frontmatter",
+   "line": 394,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L394",
+   "class": "design"
+  },
+  {
+   "text": "a2o devflow/valueflow-authoring.feature step definitions (un-@wip the four scenarios)",
+   "line": 388,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L388",
+   "class": "design"
+  },
+  {
+   "text": "The rate: commitments stock drains at least as fast as it fills — dev-system-equilibrium habit to green with a measured window, not one dogfood event",
+   "line": 427,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-valueflow-authoring-surface-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-valueflow-authoring-surface-design.md#L427",
+   "class": "design",
+   "note": ".epr-meta/dev-system-equilibrium.habit.md status red."
+  }
+ ]
+}

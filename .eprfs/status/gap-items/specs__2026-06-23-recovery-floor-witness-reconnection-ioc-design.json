@@ -1,0 +1,87 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md",
+ "slug": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design",
+ "method": "agent-decomposition",
+ "class": "imagodei",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §8 ordered PR sequence (PR-1..PR-9) + §9 anti-lockout placeholder. Nothing landed: no witness_cids in imagodei, no recovery_witness.rs port, recovery_m3.rs TODO bodies intact, doorway recovery handlers still 501, frontend still POSTs the phantom /api/recovery/initiate. Single-household coherence (a lost key recovered by one's own emergency contacts) — rank UP; the happy path is provable on household-nodes.",
+ "count": 9,
+ "items": [
+  {
+   "text": "PR-1 type reconnection: IntimateQuorum { witness_cids }, KeyRotation/CommitKeyRotationInput recovery_request_cid, SubmitIntimateWitnessOutput.witness_cid (drop zero-sentinel); delete validate_intimate_quorum",
+   "line": 413,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L413",
+   "class": "imagodei",
+   "note": "DNA-hash-moving (integrity edit)."
+  },
+  {
+   "text": "PR-2 WitnessResolver IoC port (recovery_witness.rs): ConductorWitnessResolver + MockWitnessResolver, fail-closed",
+   "line": 414,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L414",
+   "class": "imagodei"
+  },
+  {
+   "text": "PR-3 rewrite commit_key_rotation to run Gate C via the port (threshold = compute_required_witness_count; revoked/expired/cross-request excluded)",
+   "line": 415,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L415",
+   "class": "imagodei"
+  },
+  {
+   "text": "PR-4 wire views: KeyRotationView/RecoveryWitnessView _hash->_cid, RecoveryStatusView (+ EmergencyContactView decision); schema + codegen + contract",
+   "line": 416,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L416",
+   "class": "imagodei"
+  },
+  {
+   "text": "PR-5 six storage recovery routes in build_manifest() via forward_to_imagodei (writes honest 503 until M6; poll-status admission_exempt)",
+   "line": 417,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L417",
+   "class": "imagodei"
+  },
+  {
+   "text": "PR-6 sweettest e2e: fill recovery_m3.rs happy path (arm -> initiate -> vouch xN -> commit) proving HumanToCurrentAgent moved",
+   "line": 418,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L418",
+   "class": "imagodei",
+   "note": "recovery_m3.rs:79,112,135 TODO(M3-sweettest-bodies)."
+  },
+  {
+   "text": "PR-7 doorway: replace the three 501 recovery handlers with ZomeCaller calls",
+   "line": 420,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L420",
+   "class": "imagodei",
+   "note": "auth_routes.rs:3901/3942 still NOT_IMPLEMENTED."
+  },
+  {
+   "text": "PR-8 frontend: repoint recovery-coordinator.service.ts from phantom /api/recovery/initiate to /api/v1/account/recovery/* with ts-rs views",
+   "line": 403,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L403",
+   "class": "imagodei"
+  },
+  {
+   "text": "PR-9 a2o: make intimate-quorum-happy-path.feature pass on the reconnected seam; add anti-lockout/ @wip placeholder for the NetworkWitness floor",
+   "line": 429,
+   "state": "OPEN",
+   "id": "specs__2026-06-23-recovery-floor-witness-reconnection-ioc-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-23-recovery-floor-witness-reconnection-ioc-design.md#L429",
+   "class": "imagodei",
+   "note": "no anti-lockout/ directory under features/auth/recovery."
+  }
+ ]
+}

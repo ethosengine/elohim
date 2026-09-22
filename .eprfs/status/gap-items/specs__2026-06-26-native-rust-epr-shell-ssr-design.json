@@ -1,0 +1,93 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md",
+ "slug": "specs__2026-06-26-native-rust-epr-shell-ssr-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §8 rollout sequencing (steps 2-7) + the Delivery revision + §9/backlog follow-ons. Landed: row collapse (doorway ssr.rs resolve_server_blob_hash / serverBlobHash), theme on elohim-host-landing.json:51, elohim-render compose + chrome/element.rs, doorway routes/chrome.rs serving the runtime chrome element. The delivery revision supersedes §4.1 splice for the omnibar. Open: two-host two-theme eyes-on verification, SSR-first-paint toggle, native on-device counterpart.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Step 2 collapse the rows: one elohim-host-landing node carries serverBlobHash + SSR-capable; remove the -ssr seed, SSR_BUNDLE_SLUG and kind:server",
+   "line": 159,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L159",
+   "class": "protocol-canonical",
+   "note": "doorway ssr.rs:488-537 resolve/parse serverBlobHash; no SSR_BUNDLE_SLUG remains."
+  },
+  {
+   "text": "Step 3 metadata.theme + base-palette fallback; seed theme for elohim-host-landing",
+   "line": 160,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L160",
+   "class": "protocol-canonical",
+   "note": "genesis/data/lamad/content/elohim-host-landing.json:51."
+  },
+  {
+   "text": "Step 4 native chrome renderer + composition engine wrapping AngularRenderer with golden-HTML tests",
+   "line": 161,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L161",
+   "class": "protocol-canonical",
+   "note": "elohim/elohim-render/src/{compose.rs,chrome/}; golden tests not separately verified."
+  },
+  {
+   "text": "Step 5 landing angular-ssr dispatch through the composing engine, still gated by RenderCapabilityProfile",
+   "line": 162,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L162",
+   "class": "protocol-canonical",
+   "note": "verify dispatch path in doorway render/."
+  },
+  {
+   "text": "Delivery revision / step 6: omnibar as a runtime-served content-addressed vanilla web-component at /chrome/ from doorway AND storage; removed from the Angular bundle",
+   "line": 182,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L182",
+   "class": "protocol-canonical",
+   "note": "doorway routes/chrome.rs; storage-side /chrome/ serving not verified."
+  },
+  {
+   "text": "Step 7 verify on alpha AND elohim.host in both themes via pnpm look + the theme probe (the originating defect)",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L164",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "Future toggle: SSR-first-paint — server-emit the omnibar's initial markup where the peer is capable; element hydrates",
+   "line": 186,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L186",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Long-term: native on-device omnibar counterpart via a runtime flag (backlog omnibar-native-on-device-counterpart)",
+   "line": 188,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L188",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Extension: native content-EPR body rendering in Rust for markdown/html EPRs (no V8)",
+   "line": 168,
+   "state": "OPEN",
+   "id": "specs__2026-06-26-native-rust-epr-shell-ssr-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-26-native-rust-epr-shell-ssr-design.md#L168",
+   "class": "protocol-canonical"
+  }
+ ]
+}

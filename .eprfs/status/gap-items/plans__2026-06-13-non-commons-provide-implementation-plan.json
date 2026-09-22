@@ -1,0 +1,79 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md",
+ "slug": "plans__2026-06-13-non-commons-provide-implementation-plan",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the stage A (hash-neutral) and stage B (hash-moving) commits + the reinstall ceremony. Stage A landed: replicates-content coordinator action (commitments.rs:693-710, replicates-commons kept as an alias), storage projection/eligibility (mishpat_projection.rs, provide_reconcile.rs:138 reach-aware eligibility seam), schema v1/commitments/replicates-content.schema.json. Stage B did NOT land: mishpat_integrity/src/lib.rs still only has the commons-only replicates-commons arm (:841-849), no replicates-content reach arm, no ratifies-limit-gradient defense-in-depth arm. The DNA reinstall is an operator ceremony.",
+ "count": 8,
+ "items": [
+  {
+   "text": "A1-A2 projection read-through + rename/row write for replicates-content (mishpat_projection.rs, rea_commitments.rs)",
+   "line": 75,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L75",
+   "class": "substrate"
+  },
+  {
+   "text": "A3 reach-aware eligibility filter in provide_reconcile + callers + content_diesel",
+   "line": 92,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L92",
+   "class": "substrate",
+   "note": "provide_reconcile.rs:138."
+  },
+  {
+   "text": "A4 schema rename + widen (replicates-commons -> replicates-content)",
+   "line": 108,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L108",
+   "class": "substrate",
+   "note": "v1/commitments/replicates-content.schema.json; delete the orphan generated-ts replicates-commons.ts."
+  },
+  {
+   "text": "B1 (DNA hash move): reach generalization in mishpat_integrity — reach in enum, reach_ceiling >= reach",
+   "line": 134,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L134",
+   "class": "substrate",
+   "note": "integrity still commons-only (mishpat_integrity/src/lib.rs:841-849)."
+  },
+  {
+   "text": "B2 ratifies-limit-gradient integrity defense-in-depth arm batched onto the same hash move",
+   "line": 146,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L146",
+   "class": "substrate"
+  },
+  {
+   "text": "B3 coordinator twin (hash-blind) + sweettest + a2o non-commons provide scenario",
+   "line": 152,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L152",
+   "class": "substrate",
+   "note": "the coordinator half already exists (commitments.rs:696-698)."
+  },
+  {
+   "text": "Operator ceremony: DNA reinstall with ALLOW_DNA_REINSTALL on adam + matthew together (never partial — partition risk)",
+   "line": 23,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L23",
+   "class": "substrate"
+  },
+  {
+   "text": "Verification gates per §4 (sweettest in CI as backstop; local storage tests) and the §6 'landed means' handoff",
+   "line": 174,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-non-commons-provide-implementation-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-non-commons-provide-implementation-plan.md#L174",
+   "class": "substrate"
+  }
+ ]
+}

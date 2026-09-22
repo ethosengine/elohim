@@ -1,0 +1,114 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md",
+ "slug": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §8 v1 slice + HELD, §3 corrections and §7 operator decisions. Only the concentration_snapshot firewall clone landed; GA retirement, list_by_signer deletion, anti-capture test, and wall-mirror codegen are open. The §8 HELD item (attention_tending partition) was gated on shem — cluster-state now declares shem available, so it is testable, not held.",
+ "count": 12,
+ "items": [
+  {
+   "text": "Firewall mold cloned onto concentration_snapshot (no per-agent term)",
+   "line": 68,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L68",
+   "class": "provisional",
+   "note": "services/concentration_service.rs:271 snapshot_struct_has_no_peer_identity."
+  },
+  {
+   "text": "Clone the firewall mold (same commit as the struct) onto LimitGradientConfig (+exempt/bypass), CollectiveAttentionAttestation, AttentionEvent/SurfaceObservation (+engagement set), GovernanceParticipationCandidate (+governance set)",
+   "line": 63,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L63",
+   "class": "provisional",
+   "note": "zero-until-dependency: none of these structs carries a firewall test yet (GovernanceParticipationCandidate absent from storage)."
+  },
+  {
+   "text": "Anti-capture property test: prove effective_friction monotone per dimension, assert friction(C_high) > 0 at the 2^4 wall corners",
+   "line": 94,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L94",
+   "class": "provisional"
+  },
+  {
+   "text": "Non-vacuous wall-mirror coupling: codegen storage-side wall consts FROM the DNA source (no hand-copied 'keep synced' arrays)",
+   "line": 106,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L106",
+   "class": "provisional",
+   "note": "constitutional_ratio_registry.rs:15 still carries the 'Keep these synced' hand mirror."
+  },
+  {
+   "text": "Registry clamps only its own hardcoded default; walls enforced reject-at-write in validate_ratifies_limit_gradient (no clamp-at-read of manifest values)",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L114",
+   "class": "provisional"
+  },
+  {
+   "text": "Below-k suppress test for a governance-aggregate variant (a 4-cohort emits nothing)",
+   "line": 228,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L228",
+   "class": "provisional"
+  },
+  {
+   "text": "GA retirement: drop unique_viewers end-to-end (schema, ContentEngagementStatsView, COUNT(DISTINCT provider) SQL, column-drop migration, codegen) sha256-verified to one field",
+   "line": 137,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L137",
+   "class": "provisional",
+   "note": "still present: elohim-views/src/lamad.rs:550, content_engagement_stats.rs:47, diesel_schema.rs:1786."
+  },
+  {
+   "text": "Reconcile the two hand-written TS models carrying uniqueViewers (governance-feedback.model.ts, economic-event.model.ts)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L143",
+   "class": "provisional",
+   "note": "governance-feedback.model.ts:1063, economic-event.model.ts:804 still carry it."
+  },
+  {
+   "text": "Delete the unwired list_by_signer per-signer query path (free structural win)",
+   "line": 179,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L179",
+   "class": "provisional",
+   "note": "db/tending.rs:92 still defines it."
+  },
+  {
+   "text": "attestations read-path guard test: no production GROUP BY issuer_cid below k (gated on Cluster #3 votes-auditable-vs-private decision)",
+   "line": 168,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L168",
+   "class": "provisional"
+  },
+  {
+   "text": "attention_tending: add h_app_id partition + HMAC signer_pubkey -> per-node pseudonym at write time",
+   "line": 234,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L234",
+   "class": "provisional",
+   "note": "shem is available per cluster-state.yaml — no longer held; needs Decision 5 (node_secret provenance) first."
+  },
+  {
+   "text": "Operator decisions: auth-gate the GA surface (2), k>=5 under-measurement compensation (4), cache node_secret provenance (5)",
+   "line": 202,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-cluster2-sacredness-surface-firewall-anti-capture-design.md#L202",
+   "class": "provisional"
+  }
+ ]
+}

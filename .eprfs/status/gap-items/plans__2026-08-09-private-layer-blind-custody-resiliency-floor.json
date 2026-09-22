@@ -1,0 +1,75 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md",
+ "slug": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §4 'genuinely new' pieces (a)-(d) + §10 missing nodes + §7 open questions. Design-only ('no implementation this sprint'); the composition inventory is shipping (private_replica.rs envelope round-trip, sharding, custody reconcile, salvage author, peer_selection). Serves blob-durability's expansion path and makes reach-enforced-everywhere coherent (may-store vs may-read).",
+ "count": 8,
+ "items": [
+  {
+   "text": "(a) may-store / may-read split in the authorization vocabulary — 'authorized non-readable flow' (a peer unauthorized to READ is authorized to STORE)",
+   "line": 222,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#1",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L222",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "(b) reader-key substrate: resolve an X25519 key from agent_cid (ed25519 -> X25519) so the proven envelope math becomes a live path (confidentiality backlog #5)",
+   "line": 223,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#2",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L223",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "(c) the capacity pledge as the commitment root of blind custody",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#3",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L224",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "(d) decay -> re-settlement state machine: 'lapsing' with re-placement honored before release (coverage never dips); rea_commitments gains a lapsing state",
+   "line": 224,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#4",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L224",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fleet probe: a custodian holds bytes it cannot read — custodian-side plaintext-scan step for private blobs",
+   "line": 364,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#5",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L364",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Witnessed residual on custody release: define what a released custodian retains (§7 Q3)",
+   "line": 378,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#6",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L378",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Operator/council questions: key management ontology, escrow vs social recovery, decay-curve governance, adversarial custody, p2panda-encryption adoption (audit-gated), the witnessed-harm limit",
+   "line": 287,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#7",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L287",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "a2o scenarios for the §6 sketches (no .feature yet) bound to @concern:blob-durability",
+   "line": 257,
+   "state": "OPEN",
+   "id": "plans__2026-08-09-private-layer-blind-custody-resiliency-floor#8",
+   "cites": "genesis/docs/superpowers/plans/2026-08-09-private-layer-blind-custody-resiliency-floor.md#L257",
+   "class": "protocol-canonical"
+  }
+ ]
+}

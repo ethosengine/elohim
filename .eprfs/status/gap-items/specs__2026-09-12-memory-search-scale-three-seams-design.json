@@ -1,0 +1,86 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md",
+ "slug": "specs__2026-09-12-memory-search-scale-three-seams-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from §8 'Stations after station 3' (4-9 + probes) + §9 operator decisions. All registered-not-scheduled. The index vocabulary kinds landed (elohim/epr-rea/src/index.rs IndexMeasure/FoldAttestation/ReachBound/SurfaceRule/Retention per the §6 register); no provider, freshness or replication station is built. Stations 6-8 are network-breadth — rank DOWN; station 4 (native providers retiring the MemPalace mine gate) is the single-household win.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Index vocabulary kinds: IndexMeasure, FoldAttestation, ReachBound, SurfaceRule, Retention in epr-rea",
+   "line": 170,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L170",
+   "class": "protocol-canonical",
+   "note": "elohim/epr-rea/src/index.rs (landed 2026-09-12 per the register)."
+  },
+  {
+   "text": "Station 4 native providers: FTS5 lexical provider + IndexMeasure declaration + sqlite-vec semantic provider with ModelPin + fold-lag freshness retiring the MemPalace mine gate",
+   "line": 210,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L210",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 5 standing in time: bi-temporal as_of on EpistemicStanding and graph edges (demotion never deletion) + human lens negotiation",
+   "line": 211,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L211",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 6 reach at replication: household as smallest Collective EPR, private entries + cap grants for inner rings, iroh-docs read caps per ring per holon, viewer term in evaluate",
+   "line": 212,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L212",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 7 search between holons: per-peer fan-out with bounded requests and home receipts; bridging classifier as a shape",
+   "line": 213,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L213",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 8 the pool fold: council-level pool IndexMeasure, arc-sharded folds under grants, scatter/gather, hedging, tiering by ring",
+   "line": 214,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L214",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Station 9 the visitor test: MemPalace enveloped and attested (six of six); embedding-model attestation beyond Private",
+   "line": 215,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L215",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Probes: join-liveness on every schema-guarded recall path; prior-distance wherever a posterior appears",
+   "line": 216,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L216",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Operator decisions Q1-Q7 (household as smallest collective, native semantic route timing, replication grains, embedding model pin, ...)",
+   "line": 220,
+   "state": "OPEN",
+   "id": "specs__2026-09-12-memory-search-scale-three-seams-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-12-memory-search-scale-three-seams-design.md#L220",
+   "class": "protocol-canonical"
+  }
+ ]
+}

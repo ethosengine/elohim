@@ -1,8 +1,138 @@
 {
  "doc": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md",
  "slug": "specs__2026-06-10-deterministic-reach-archetype-floor-design",
- "method": "none",
+ "method": "agent-decomposition",
  "class": "protocol-canonical",
- "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
- "items": []
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3); supersedes the mis-slugged store file deterministic-reach-archetype-floor-design.json (ids G1-G11, never joined to this doc's slug). States re-verified against the tree: generated REACH_OPENNESS + seeder earnedReach/assertReach + epr_service fail-closed index landed; primitives.rs, doorway access_control.rs, trust.service default, anonymouslyServable and the drift gate did not.",
+ "count": 14,
+ "items": [
+  {
+   "text": "Heal: re-author the doctrine corpus (manifesto/constitution/confession/theology) to commons on live through the conductor, anchor-aware; assert anon 403->200",
+   "line": 205,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L205",
+   "class": "protocol-canonical",
+   "note": "probe exists: genesis/a2o/features/auth/reach-commons.feature:18 (anon reads manifesto). Live heal not evidenced."
+  },
+  {
+   "text": "Generate the reach ordinal from reach.schema.json (Rust REACH_OPENNESS + TS reachOpenness)",
+   "line": 120,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L120",
+   "class": "protocol-canonical",
+   "note": "codegen-rs.mjs emits REACH_OPENNESS; elohim/epr/src/reach.rs pins its hand-written openness() to the generated slice by test (not itself generated — the 'openness becomes generated' decision is met by pin, not by generation)."
+  },
+  {
+   "text": "Seeder: stored base = earnedReach(atom) via generated ordinal; non-canonical reach is a hard error",
+   "line": 184,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L184",
+   "class": "protocol-canonical",
+   "note": "genesis/seeder/src/reach-resolver.ts + __tests__/reach-resolver.test.ts:16 (HARD-FAILS on 'invited')."
+  },
+  {
+   "text": "Reconcile the archetype advisory with existing manifest governance.minimumReach (no parallel map)",
+   "line": 150,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L150",
+   "class": "protocol-canonical",
+   "note": "seed-sqlite.ts:569-593 resolves advisory from manifest and never drags authored grade down; audit of manifest values for canonicity not evidenced separately."
+  },
+  {
+   "text": "epr_service reach_level_index -> generated index; unknown reach sorts MOST-restrictive",
+   "line": 202,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L202",
+   "class": "protocol-canonical",
+   "note": "epr_service.rs:878 recognized_reach_level_index(..).unwrap_or(u8::MAX); ceiling path refuses unrecognized tiers (:386)."
+  },
+  {
+   "text": "graph/primitives.rs reach_filtered: lexicographic String compare -> generated ordinal index",
+   "line": 44,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L44",
+   "class": "protocol-canonical",
+   "note": "still lexicographic (primitives.rs:78-84 TODO)."
+  },
+  {
+   "text": "Doorway cache/access_control.rs: geographic vocabulary -> generated ordinal (8 canonical levels)",
+   "line": 47,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L47",
+   "class": "protocol-canonical",
+   "note": "can_serve_at_reach still matches invited/local/neighborhood/municipal/bioregional/regional."
+  },
+  {
+   "text": "trust.service.ts: DEFAULT_REACH 'commons' -> most-restrictive (ordinal already generated)",
+   "line": 46,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L46",
+   "class": "protocol-canonical",
+   "note": "REACH_ORDER = generated reachOpenness (landed); DEFAULT_REACH still 'commons' at trust.service.ts:41 — the inverted default the spec names."
+  },
+  {
+   "text": "Build/CI drift gate (b) seed resolved reach == earnedReach, (c) non-canonical manifest advisory, (d) hand-rolled ordinal lint over the known sites",
+   "line": 188,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L188",
+   "class": "protocol-canonical",
+   "note": "(a) codegen freshness is covered by the generic pre-push codegen check; (b)-(d) not located."
+  },
+  {
+   "text": "Frictionless band: generate anonymouslyServable = reach>=public and gate the doorway projection fast-path on it",
+   "line": 167,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L167",
+   "class": "protocol-canonical",
+   "note": "no anonymouslyServable symbol anywhere in the tree; conservative commons-only holds meanwhile."
+  },
+  {
+   "text": "Fixture corrections: doctrine commons, M&J intimate, A&E authored reach canonical",
+   "line": 225,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L225",
+   "class": "protocol-canonical",
+   "note": "e3ddafa5c set A&E commons (G9), then a49cd3f57 deliberately set it intimate (privacy) — the spec's A&E=commons fixture is superseded by that decision; the non-canonical regression now lives in reach-resolver.test.ts."
+  },
+  {
+   "text": "a2o reach-boundary goalposts: anon manifesto, intimate body denied, community 403",
+   "line": 229,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L229",
+   "class": "protocol-canonical",
+   "note": "auth/reach-commons.feature (:18, :41, :53) + lms/intimate-reach-household.feature."
+  },
+  {
+   "text": "Base-immutability regression: an account-package/projection pass never changes stored base reach (storage-layer assert)",
+   "line": 237,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L237",
+   "class": "protocol-canonical",
+   "note": "no storage-layer assertion located."
+  },
+  {
+   "text": "Heal pass for live reach=None atoms: re-resolve earnedReach and re-author violators through the conductor",
+   "line": 211,
+   "state": "OPEN",
+   "id": "specs__2026-06-10-deterministic-reach-archetype-floor-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-10-deterministic-reach-archetype-floor-design.md#L211",
+   "class": "protocol-canonical"
+  }
+ ]
 }

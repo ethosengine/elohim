@@ -1,0 +1,97 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md",
+ "slug": "specs__2026-08-15-actor-plane-inflight-identity-claims-design",
+ "method": "agent-decomposition",
+ "class": "design",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). Legs 1-2 implemented and evidenced (§8: 967158231, e6ad72cf0, c981229bf, c936435f7; golden CIDs pinned). Leg 3 (acceptance at ratification, adverse attestation), the concurrency-seam graduation and the ContributorPresence graduation path are design. The execution plan (plans/2026-08-15-actor-plane-implementation-plan) carries its own stations.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Leg 1: epr actor claim / current with ActorClaim atom (charset, claimed_at = HEAD author date, definition_cid, sidecar actors.jsonl, latest-wins, never blocks)",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L40",
+   "class": "design",
+   "note": "967158231."
+  },
+  {
+   "text": "Leg 2a: epr flow note --as/--session three-arm attribution with steward:<email> slot; unflagged notes byte-identical (golden CID)",
+   "line": 60,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L60",
+   "class": "design",
+   "note": "e6ad72cf0."
+  },
+  {
+   "text": "Leg 2b: epr govern --session actor stamp {claimed, session, definitionCid, source: claim|unclaimed}",
+   "line": 72,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L72",
+   "class": "design",
+   "note": "e6ad72cf0."
+  },
+  {
+   "text": "Leg 2c: Co-Authored-By trailers lifted to sorted, deduplicated co-author:<normalized> classified_as slots on newly minted Produce events",
+   "line": 78,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L78",
+   "class": "design",
+   "note": "c936435f7."
+  },
+  {
+   "text": "Leg 3a: acceptance at dev-merge ratification as a graduated-rigor Witness station — recorded, not judged (fills commitment-dispatch-puller C9)",
+   "line": 90,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L90",
+   "class": "design"
+  },
+  {
+   "text": "Leg 3b: adverse attestation via classifier §11.2 correction with an evidence CID; contest escalates the next acceptance to the Audit tier",
+   "line": 92,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L92",
+   "class": "design"
+  },
+  {
+   "text": "Concurrency seam graduation: per-instance claims or subsession ids for concurrent runs of one persona (v1 mitigation = serialized persona rounds)",
+   "line": 114,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L114",
+   "class": "design"
+  },
+  {
+   "text": "Graduation path: persistent agent identities -> ContributorPresence(unclaimed, steward=operator); co-authorship -> attestation:witnessed-ascription",
+   "line": 124,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L124",
+   "class": "design"
+  },
+  {
+   "text": "Retro-attribution migration of trailers onto existing events as a deliberate separate migration (never a side-effect of re-projection)",
+   "line": 84,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L84",
+   "class": "design"
+  },
+  {
+   "text": "Migration: normalize_co_author / producing_commit move into brit's commit-lift; register Co-Authored-By in brit's trailer key grammar",
+   "line": 126,
+   "state": "OPEN",
+   "id": "specs__2026-08-15-actor-plane-inflight-identity-claims-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-08-15-actor-plane-inflight-identity-claims-design.md#L126",
+   "class": "design"
+  }
+ ]
+}

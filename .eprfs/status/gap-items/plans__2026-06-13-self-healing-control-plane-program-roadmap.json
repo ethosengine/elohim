@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md",
+ "slug": "plans__2026-06-13-self-healing-control-plane-program-roadmap",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the program's plan table (Auto, A-D) + named follow-ons. Program-level record only: each leg's steps are captured by its own plan's checkbox stations (auto-config-resource-probe, upstream-self-protection, inbound-admission-backpressure, stability-surface-read-model, elevate-arm-runtime-harvest). Landed per the roadmap's own 2026-08-05 note + tree: A (CircuitBreaker), B doorway shed, C (/admin/self-healing), D (runtime-harvest.py). Auto (elohim-compute/src/limits.rs) absent. The older copy plans/2026-06-13-self-healing-program-roadmap.md is a superseded duplicate of this doc.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Auto-config leg: elohim-compute/src/limits.rs cgroup CPU+MEM readers, derive(), /admin/auto-preset (the shared home everything downstream consumes)",
+   "line": 32,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#1",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L32",
+   "class": "provisional",
+   "note": "limits.rs does not exist; worker_threads and the storage memory.max reader landed elsewhere."
+  },
+  {
+   "text": "Leg A upstream self-protection: shared CircuitBreaker + health-gated warm-up + total budget/timeout + anti-self-partition",
+   "line": 33,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#2",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L33",
+   "class": "provisional",
+   "note": "elohim-compute/src/peers.rs:133."
+  },
+  {
+   "text": "Leg B inbound admission: doorway accept-loop shed (503/Retry-After) + storage shed/advertise + bounded forward_to_storage, consuming A's breaker",
+   "line": 34,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#3",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L34",
+   "class": "provisional",
+   "note": "doorway shed + bounded storage proxy landed; storage-side shed/advertise available_permits not verified."
+  },
+  {
+   "text": "Leg C stability surface: GET /admin/self-healing aggregate read model",
+   "line": 35,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#4",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L35",
+   "class": "provisional",
+   "note": "doorway routes/self_healing.rs."
+  },
+  {
+   "text": "Leg D elevate arm: external runtime-harvest poller -> findings ledger + runtime-triage dispatch",
+   "line": 36,
+   "state": "CLAIMED",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#5",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L36",
+   "class": "provisional",
+   "note": ".claude/scripts/runtime-harvest.py; .claude/data/runtime-findings.jsonl."
+  },
+  {
+   "text": "Follow-on: REA delegates-compute actuation (the recover step's runtime knob mutation) — the largest remaining pillar",
+   "line": 66,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#6",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L66",
+   "class": "provisional"
+  },
+  {
+   "text": "Follow-on: the Angular stability page (HealthIndicator + /shefa/health route, render-verified)",
+   "line": 67,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#7",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L67",
+   "class": "provisional",
+   "note": "partially served by the /debug stability + health lenses; no /shefa/health route."
+  },
+  {
+   "text": "Follow-ons: bilateral credit/window numeric accounting; wire the admission ceiling to Auto's derive() instead of DOORWAY_MAX_INFLIGHT",
+   "line": 69,
+   "state": "OPEN",
+   "id": "plans__2026-06-13-self-healing-control-plane-program-roadmap#8",
+   "cites": "genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md#L69",
+   "class": "provisional"
+  }
+ ]
+}

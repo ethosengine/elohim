@@ -1,0 +1,111 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md",
+ "slug": "specs__2026-09-05-nachalah-allotment-epic-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the slice gap lists (G1.x, G2.x, G3.x) + the 2026-09-06 placement ruling's D0->D3->D6 sequence. Status Active; operator accepted §2/§2b/§2c/§3/§3b. The habit elohim/elohim-storage/.epr-meta/nachalah-allotment.habit.md is 'unwired' with checks: [] and the a2o feature (20 scenarios) all @wip — nothing runnable yet. The 0.7 fork exists (25dd2d0be) but its list_blocks/unblock + arc hook are unverified. Slice-3 conductor adoption is in flight via the supervised-activation sprint handoff and task-nachalah-* briefs.",
+ "count": 12,
+ "items": [
+  {
+   "text": "G1.1 written tier policy: every entry type in every integrity zome carries a tier (gold / deeds / paper); p2p-design-gate asks it as question 6",
+   "line": 105,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L105",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G1.2 DNA seams: which DNAs split, which records move, the migration as a crossing rehearsed with the evolution epic's vehicle",
+   "line": 107,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L107",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G1.3 allotment habit wired: @concern:nachalah-allotment runnable on the household mesh (paper never leaves its household; gold reaches every hub)",
+   "line": 110,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L110",
+   "class": "protocol-canonical",
+   "note": "habit status unwired, checks []; features/delivery/nachalah-allotment.feature 20 scenarios all @wip."
+  },
+  {
+   "text": "G1.4 reach and holding agree: the reach vocabulary gains the holding axis so audience and floor are one declaration",
+   "line": 113,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L113",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "D0 per-concern act contract (authority, durable source, validation, projection/rebuild, gaps) before any placement decision; then D3 peer-side membrane; then D6 group clone spaces",
+   "line": 392,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L392",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G2.1 the 0.7 fork carries admin list_blocks/unblock, sharding with an arc-policy hook, household gossip defaults",
+   "line": 237,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L237",
+   "class": "protocol-canonical",
+   "note": "0.7 fork line exists (25dd2d0be per the placement ruling); the three carried items unverified."
+  },
+  {
+   "text": "G2.2 arc policy hook: storage computes each cell's target arc from tier + trust gradient; changes are windowed, revertible commitments",
+   "line": 242,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L242",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G2.3 block governance: paper blocks lifted locally, commandment blocks as a Mishpat case; tier-graded intervals replace permanent-forever",
+   "line": 245,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L245",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G2.4 partition probe as a habit check: per-space dumpNetworkMetrics reds by name in the passport",
+   "line": 248,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L248",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "G3.1-G3.2 conductor-binary artifact class + the ark adopts it (verify, stage, swap, restart under the berth, roll back on failed readiness)",
+   "line": 324,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L324",
+   "class": "protocol-canonical",
+   "note": "in flight: plans/2026-09-05-nachalah-supervised-activation-sprint-handoff + task-nachalah-* briefs."
+  },
+  {
+   "text": "G3.3-G3.4 the fork joins the primary repo's watch; build stays in CI, delivery leaves it (observe -> canary -> apply per peer)",
+   "line": 330,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L330",
+   "class": "protocol-canonical",
+   "note": "root CLAUDE.md: the conductor reaches the fleet via the submodule pointer — G3.3 may be partly met."
+  },
+  {
+   "text": "Immediate gossip cure: fixtures and household working notes in their own clone spaces with non-stewards at zero arc",
+   "line": 382,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-nachalah-allotment-epic-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-nachalah-allotment-epic-design.md#L382",
+   "class": "protocol-canonical"
+  }
+ ]
+}

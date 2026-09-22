@@ -1,0 +1,65 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md",
+ "slug": "specs__2026-09-05-two-portals-sso-consolidation-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from 'The shape after consolidation' rows + the graduation trigger. Status Decided and the consolidation has landed in code: login.component.ts renders no password field and redirects to the discovered portal; register.component.ts is a prompt=create redirector; PasswordAuthProvider is gone; doorway authorize routes prompt=create to /threshold/register (auth_routes.rs:4200-4215). The companion plan's 8 boxes are unticked (stale). Remaining: verify the hosted-human station-1 scenario on the household mesh, then decompose into the gap homes (the graduation trigger).",
+ "count": 6,
+ "items": [
+  {
+   "text": "elohim-app /identity/login: resolver step then immediate redirect to the discovered doorway portal via authorize (login_hint); no password card",
+   "line": 63,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L63",
+   "class": "protocol-canonical",
+   "note": "app/elohim-app/src/app/imagodei/components/login/login.component.ts:8-244."
+  },
+  {
+   "text": "elohim-app /identity/register becomes a redirector to authorize with prompt=create",
+   "line": 64,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L64",
+   "class": "protocol-canonical",
+   "note": "register.component.ts:6-91."
+  },
+  {
+   "text": "Visitor -> hosted migration: after OAuth callback, apply visitor-session display name / bio / interests through the profile surface and link the session",
+   "line": 65,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L65",
+   "class": "protocol-canonical",
+   "note": "not verified."
+  },
+  {
+   "text": "Retire PasswordAuthProvider (refresh rides DoorwaySessionClient; me has no caller)",
+   "line": 66,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L66",
+   "class": "protocol-canonical",
+   "note": "no PasswordAuthProvider symbol left in app/elohim-app/src."
+  },
+  {
+   "text": "doorway authorize: unauthenticated + prompt=create -> /threshold/register with the same params",
+   "line": 67,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L67",
+   "class": "protocol-canonical",
+   "note": "doorway auth_routes.rs:4200-4215."
+  },
+  {
+   "text": "Graduation: hosted-human station-1 'registering because an application asked me' passes on the household mesh; then decompose into the doorway/app gap homes",
+   "line": 10,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-two-portals-sso-consolidation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-two-portals-sso-consolidation-design.md#L10",
+   "class": "protocol-canonical",
+   "note": "scenario lives in features/auth/hosted-human/01-creating-an-account.feature — run it."
+  }
+ ]
+}

@@ -1,0 +1,89 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md",
+ "slug": "specs__2026-06-15-coherent-transport-identity-resolver-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) per the §0 red-team reordered plan (step 1 stopgap, new step 0 cross-signed self-emit, resolver steps 2-3 shelved) + §5 staged plan + §3.5. Landed: stopgap (controller.rs n1d_membership_projection_stamps_null_agent_pub_key), a write-side resolve_agent_cid_write (identity_namespace.rs:126), and the cross-signature algebra core C2-S1 (p2p/binding_cross_signature.rs). STAGE1_SIGNATURE_SENTINEL is still the gossip signature; backlog agent-peer-binding-cross-signed-proof is open.",
+ "count": 9,
+ "items": [
+  {
+   "text": "Step 1 stopgap: on_membership_projected stamps humans.agent_pub_key = uhCAk (NULL-guarded) + TDD",
+   "line": 246,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L246",
+   "class": "provisional",
+   "note": "reconcile/controller.rs:2528 test n1d_membership_projection_stamps_null_agent_pub_key."
+  },
+  {
+   "text": "Step 0 (new): node self-emit path for AgentPeerBinding WITH a cross-signed control proof replacing STAGE1_SIGNATURE_SENTINEL",
+   "line": 54,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L54",
+   "class": "provisional",
+   "note": "algebra core landed (binding_cross_signature.rs, C2-S1); identity_binding_gossip.rs:129 still defines the sentinel; backlog agent-peer-binding-cross-signed-proof status open."
+  },
+  {
+   "text": "Security: stop consuming self-asserted bindings for attribution (reciprocity_view, cluster_view) until the cross-signed proof lands",
+   "line": 41,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L41",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: read-side resolve_agent_cid over peer_identity_bindings (source precedence, superseded_by, iroh fallback) + unit tests — shelved until step 0 yields signed rows",
+   "line": 247,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L247",
+   "class": "provisional",
+   "note": "only a write-side resolve_agent_cid_write exists (identity_namespace.rs:126)."
+  },
+  {
+   "text": "Step 3: household_resilience snapshot joins resolve provider + shard_locations.peer_id through the resolver",
+   "line": 248,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L248",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4: verify libp2p nodes emit their AgentPeerBinding on alpha; backfill if absent",
+   "line": 249,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L249",
+   "class": "provisional",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "Step 5 hygiene: fold peer_transport_manifest <-> peer_identity_bindings into one resolve entry point",
+   "line": 250,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L250",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 6: a2o @regression 'resilience card lights across transport namespaces'",
+   "line": 251,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L251",
+   "class": "provisional"
+  },
+  {
+   "text": "§3.5 lineage-aware resolve + social-recovery quorum: confirm superseded_by chains across KeyRotation and the household is the attesting authority",
+   "line": 262,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-coherent-transport-identity-resolver-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-coherent-transport-identity-resolver-design.md#L262",
+   "class": "provisional"
+  }
+ ]
+}

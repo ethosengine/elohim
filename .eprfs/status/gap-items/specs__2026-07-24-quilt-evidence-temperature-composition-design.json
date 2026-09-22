@@ -1,0 +1,102 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md",
+ "slug": "specs__2026-07-24-quilt-evidence-temperature-composition-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) along §12 graduation increments 1-9 (+ §10 CID migration order and §13 invariants as acceptance). Landed: increment 1 (custody class canonicalized in genesis/graphos/vocabulary.md) and increment 3 (typed custody/evidence folds, ae7c695b8). Not landed: requires-resilience commitment, the sha256-in-cid contract test (sha256- ids still used in storage tests), lamad quilt policy declarations, tier controller. Increment 9 (seed authoring) is gated by its own §9 readiness rule.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Increment 1: vocabulary normalization — separate resilience / custody / working-set / evidence / RS axes in graphos vocabulary; correct CID language",
+   "line": 575,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L575",
+   "class": "protocol-canonical",
+   "note": "graphos/vocabulary.md custody class (none < shelved < stocked < stocked-warm; drawn is working-set), ae7c695b8."
+  },
+  {
+   "text": "Increment 2: canon reconciliation — remove the protocol-spec bare-SHA contradiction; publish the CID migration ledger",
+   "line": 577,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L577",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 3: typed evidence vocabulary/fold preserving observer, source, polarity, freshness (no placement change)",
+   "line": 579,
+   "state": "CLAIMED",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L579",
+   "class": "protocol-canonical",
+   "note": "elohim-facings typed custody/evidence folds (ae7c695b8)."
+  },
+  {
+   "text": "Increment 4: lamad named content-type quilt policy declarations after vocabulary ratification (no seed overrides)",
+   "line": 581,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L581",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 5: requires-resilience author truth through the existing Commitment coordinator + projection",
+   "line": 583,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L583",
+   "class": "protocol-canonical",
+   "note": "no requires-resilience action in the tree."
+  },
+  {
+   "text": "Increment 6: evidence-qualified facing renders confirmed / witnessed / claimed coverage separately before it may drive placement",
+   "line": 585,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L585",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 7 / §10 step 1: typed raw-byte CID + distinct SHA dedup type; contract test forbidding sha256- in any *cid field",
+   "line": 526,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L526",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 7 / §10 steps 2-8: CID-primary producers, X-Blob-Cid seed route, versioned shard manifests, dual-decode P2P inventory window, CID end-to-end through doorway/SSR, then remove legacy parsers",
+   "line": 528,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L528",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 8: tier controller consuming declared intent, policy dynamics, capabilities, evidence and confidentiality readiness",
+   "line": 588,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L588",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Increment 9: seed authoring classification only after the explicit override path is real (§9 readiness gate)",
+   "line": 590,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L590",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Acceptance invariants §13 (1-15) encoded as tests/scenarios (no laundering, no double count, expired -> unknown, RS only with K shards, no reach-derived resilience, ...)",
+   "line": 592,
+   "state": "OPEN",
+   "id": "specs__2026-07-24-quilt-evidence-temperature-composition-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-24-quilt-evidence-temperature-composition-design.md#L592",
+   "class": "protocol-canonical"
+  }
+ ]
+}

@@ -1,0 +1,81 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md",
+ "slug": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design",
+ "method": "agent-decomposition",
+ "class": "devflow",
+ "doc_requires_env": [
+  "household-nodes"
+ ],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from 'Stations (for the implementation plan)' 0-5 + the graduation ladder L2/L3. Stations 0-3 landed: recall split into seams (epr-cli flow/memory/recall/{journey,discovery,providers,lens,render,refusal,measure,sample,questions}.rs), lens station measured (7ad01e8c4), bootstrapping head declared in .claude/hooks/.epr-meta (1ada9bb25), weekly standing reader across tiers (038479d84, bd4923bb6) with recall-questions.json. Habit recall-reaches-authority still reads failed on the window. Station 4 (human lens) and station 5 (L1->L2 graduation) open.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Station 0: split recall.rs behind the seams with byte-identical outputs pinned by the existing tests + golden first screen; recall contract re-declared as a ProcessSpec with Bounds",
+   "line": 364,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L364",
+   "class": "devflow",
+   "note": "elohim/eprfs/epr-cli/src/flow/memory/recall/*.rs."
+  },
+  {
+   "text": "Station 1: ReaderRef + ResolveLens from the actor sidecar and a declared role@model -> LensLevel table; lens printed on every view; --lens widens",
+   "line": 365,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L365",
+   "class": "devflow",
+   "note": "recall/lens.rs; 7ad01e8c4 records a simple-lens payload defect queued."
+  },
+  {
+   "text": "Station 2: bootstrapping head as ProjectionRequests at minimal/simple; bespoke renderers retire; rule declared in .claude/hooks/.epr-meta",
+   "line": 366,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L366",
+   "class": "devflow",
+   "note": ".claude/hooks/.epr-meta:59-72 bootstrapping-head-is-recall-open-run-projection."
+  },
+  {
+   "text": "Station 3: standing reader — question bank as Intents, sample + judge verbs producing FlowEvent + Verdict, weekly routine, rolling-window habit check, Feedback verb for disputes",
+   "line": 367,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L367",
+   "class": "devflow",
+   "note": "038479d84, bd4923bb6; recall-reaches-authority still red on its window (headline 'recall: failed')."
+  },
+  {
+   "text": "Station 4: human lens — imagodei capability profile (stated), Sophia Recognition (revealed), preset as a TTL'd AttentionTending record, graphos review-and-reveal element, B2 co-authorship attestation, anti-bubble classes in policy",
+   "line": 368,
+   "state": "OPEN",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L368",
+   "class": "devflow"
+  },
+  {
+   "text": "Station 5: graduation L1 -> L2 — recipe contributed/graduated as a Manifest EPR, ContentGraphResolver behind Provider, Scope::Ring, same a2o scenarios against a household peer",
+   "line": 369,
+   "state": "OPEN",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L369",
+   "class": "devflow"
+  },
+  {
+   "text": "L3 network rung: household search across participated holons with published recipes at reach rings, provenance-named foreign recipes, rings priced by standing",
+   "line": 324,
+   "state": "OPEN",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L324",
+   "class": "devflow"
+  },
+  {
+   "text": "Anti-capture invariants encoded as .epr-meta rules or habit checks as each station lands",
+   "line": 355,
+   "state": "OPEN",
+   "id": "specs__2026-09-11-governed-discovery-journey-lens-graduation-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-11-governed-discovery-journey-lens-graduation-design.md#L355",
+   "class": "devflow"
+  }
+ ]
+}

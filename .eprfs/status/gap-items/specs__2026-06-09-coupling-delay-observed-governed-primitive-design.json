@@ -1,0 +1,108 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md",
+ "slug": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §9 v1 slice, §5 floor-ceiling fix, §6 data model, §8 governor-spec feedback and §10 decisions. Nothing of the delay primitive is built (no DelayBreach kind, apply_decay still poke-only, no latency observation kinds). The ratify-writeback blocking dependency landed via Cluster #3 (attestation_projector.rs).",
+ "count": 12,
+ "items": [
+  {
+   "text": "apply_decay fires on the ReconcileController cadence, not an HTTP poke",
+   "line": 158,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L158",
+   "class": "provisional"
+  },
+  {
+   "text": "tau_loop = observe + actuate + ratify_writeback measured in-controller from in-memory timestamps (never via the observations projection)",
+   "line": 159,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L159",
+   "class": "provisional"
+  },
+  {
+   "text": "Ratify-writeback seam closed as a blocking dependency of tau_loop",
+   "line": 90,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L90",
+   "class": "provisional",
+   "note": "responsibility_demand_configs.apply_ratification via services/attestation_projector.rs (Cluster #3); the tau_ratify_writeback term is not yet measured."
+  },
+  {
+   "text": "Closed-loop test: concentration descends toward C_target over >=2 ticks with rich-get-richer inflow re-applied each tick",
+   "line": 160,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L160",
+   "class": "provisional"
+  },
+  {
+   "text": "Destabilization arm: tau_budget > T_c makes the plant ring (validates the control claim)",
+   "line": 161,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L161",
+   "class": "provisional"
+  },
+  {
+   "text": "SignalKind::DelayBreach signed B2 FeedbackSignal on over-budget / open-loop, bypassing quarterly re-ratification",
+   "line": 162,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L162",
+   "class": "provisional"
+  },
+  {
+   "text": "Floor-ceiling fix (Decision 1): human ratifies the period, or band + band-edge-approach algedonic signal before re-tempo",
+   "line": 106,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L106",
+   "class": "provisional"
+  },
+  {
+   "text": "T_c / inflow-exponent estimate becomes a stake-bearing, honesty-classed, human-ratified setpoint (with beta, epsilon — Decision 2)",
+   "line": 110,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L110",
+   "class": "provisional"
+  },
+  {
+   "text": "Four-state measurability enum (SameChain / ObserverRelative / CrossAgentBounded / CrossAgentUnmeasurable) + signed delta with a separate causal-order check",
+   "line": 66,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L66",
+   "class": "provisional"
+  },
+  {
+   "text": "Observation kinds economic:commitment-fulfilment-latency and economic:coupling-delay projected into observations, k-anonymous before standing use",
+   "line": 129,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L129",
+   "class": "provisional"
+  },
+  {
+   "text": "Same-chain slip companion assertion: slip projected SameChain, debit withheld unless witnessed (DelayBreach standing_impact — Decision 3)",
+   "line": 164,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L164",
+   "class": "provisional"
+  },
+  {
+   "text": "Cite-gated feedback edits to the limitarian-governor spec (§4.5 loop-delay stability, ticks_per_horizon, T19 framing)",
+   "line": 143,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-coupling-delay-observed-governed-primitive-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-coupling-delay-observed-governed-primitive-design.md#L143",
+   "class": "provisional"
+  }
+ ]
+}

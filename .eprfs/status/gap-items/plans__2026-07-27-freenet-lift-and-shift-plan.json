@@ -1,8 +1,146 @@
 {
  "doc": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md",
  "slug": "plans__2026-07-27-freenet-lift-and-shift-plan",
- "method": "none",
+ "method": "agent-decomposition",
  "class": "provisional",
- "note": "no machine-extractable gap structure \u2014 needs AGENT decomposition",
- "items": []
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). The plan's 25 table rows are grouped to 15 bounded items (one per task or per tightly-coupled task pair), each citing its table row. Landed: dead-config lint (scripts/ci/dead-config-lint.sh, run by storage-quality-gate.sh) and the Phase-2 asking half (sync_round.rs:166 constructs ListDocumentsSince; sync-scale-honesty habit status: green). The Phase-2 execution steps live in the sibling plans__2026-07-27-freenet-now-slice-plan (checkbox stations).",
+ "count": 15,
+ "items": [
+  {
+   "text": "0.1 Root LICENSE = CAL-1.0 + relicense sweep (resolve the Apache doorway-service -> CAL elohim-views path-dep inversion)",
+   "line": 30,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L30",
+   "class": "provisional",
+   "note": "no root LICENSE on disk."
+  },
+  {
+   "text": "0.2 Write the two retention rules into module docs (XOR = placement never retention; gate growth never convergence)",
+   "line": 31,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L31",
+   "class": "provisional"
+  },
+  {
+   "text": "0.3 Phantom-tier ontology audit: written real-vs-fossil verdict for salvage_capacity / peer_blob_inventory / custody_announce / placement",
+   "line": 32,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L32",
+   "class": "provisional"
+  },
+  {
+   "text": "0.4 Dead-config lint fails CI on a declared constant/flag/variant with no reader",
+   "line": 33,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L33",
+   "class": "provisional",
+   "note": "scripts/ci/dead-config-lint.sh, invoked from scripts/ci/storage-quality-gate.sh:27."
+  },
+  {
+   "text": "0.5 pr-review mechanics: dedicated worktree checkout, open-every-cited-file:line rule, lens disclosure, skills/agents/hooks version-bump gate",
+   "line": 34,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L34",
+   "class": "provisional",
+   "note": "no pr-review skill in .claude/skills (only valueflow-reviewer)."
+  },
+  {
+   "text": "1.1 Measure per-node egress split across the three anti-entropy loops (kitsune2 / inventory gossip / Automerge doc-sync) — one dated number per loop",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L44",
+   "class": "provisional",
+   "requires_env": [
+    "observability"
+   ]
+  },
+  {
+   "text": "1.2-1.4 Six-arm by-reason decomposition of the dominant loop; 'instrumentation is horizontal' .epr-meta rule over storage reconcile/p2p/services; retry-masked metric audit",
+   "line": 45,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L45",
+   "class": "provisional"
+  },
+  {
+   "text": "2.1-2.2 round_opener emits ListDocumentsSince{digest}; AnnounceChange gets a real send site",
+   "line": 59,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L59",
+   "class": "provisional",
+   "note": "p2p/sync_round.rs:166 constructs ListDocumentsSince; sync-scale-honesty habit status green."
+  },
+  {
+   "text": "2.3-2.5 Summary stays O(1) per scope (asserted); bloom_filter deleted or wired with a repair round; canonical digest serialization test",
+   "line": 62,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L62",
+   "class": "provisional",
+   "note": "bloom_filter still declared (sync_protocol.rs:64), passed None (p2p/mod.rs:8246), ignored (:7943 TODO)."
+  },
+  {
+   "text": "3.1-3.3 Wire the hosting budget from cgroup memory.max to the blob write path; headroom sizing with a laptop-class floor; heal path exempt from admission",
+   "line": 75,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L75",
+   "class": "provisional",
+   "note": "Phase 3 is gated on Phase 1 attribution by the plan's own sequencing."
+  },
+  {
+   "text": "3.4-3.5 Demand-ordered eviction (get_lru_candidates has zero callers) behind a graphed findability floor",
+   "line": 78,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L78",
+   "class": "provisional"
+  },
+  {
+   "text": "4.1-4.3 Make the pledge bind: breach-detection probe, dht_anchor_hash plumbed through Mishpat, eviction sheds uncommitted first",
+   "line": 91,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#12",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L91",
+   "class": "provisional"
+  },
+  {
+   "text": "4.4-4.5 Salvage on behind the commitment (SALVAGE_CAPACITY_ENABLED present in manifests, a real alpha commitment); computed liveness beside the stored pledge",
+   "line": 94,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#13",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L94",
+   "class": "provisional",
+   "note": "SALVAGE_CAPACITY_ENABLED still in zero manifests.",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "5.1-5.2 Classify doorway traffic (session / anonymous-commons / negotiation) so above-community never lands in the identity-free cache; delete the access_control.rs geographic fossil",
+   "line": 113,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#14",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L113",
+   "class": "provisional",
+   "note": "access_control.rs:44-66 still matches the geographic vocabulary (shared gap with the reach-archetype-floor spec)."
+  },
+  {
+   "text": "5.3-5.5 Negotiation ceremony design (Pending->Refer, DID counterparty, doorway+bridge venue); humans.agent_pub_key plumbing on alpha; non-trivial membrane_proof/genesis_self_check",
+   "line": 115,
+   "state": "OPEN",
+   "id": "plans__2026-07-27-freenet-lift-and-shift-plan#15",
+   "cites": "genesis/docs/superpowers/plans/2026-07-27-freenet-lift-and-shift-plan.md#L115",
+   "class": "provisional",
+   "note": "zero membrane_proof occurrences in the DNA today."
+  }
+ ]
 }

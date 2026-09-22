@@ -1,0 +1,96 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md",
+ "slug": "specs__2026-06-14-recursive-architecture-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) along PART 4's waves 0-8 (with §3.1 detail). Landed: Wave 0 Governor lift (elohim-compute::actuation incl. ReservedPlace) and Wave 2's CoverageRollup (elohim-storage/src/recursion.rs, with descend()). Not landed: CouplingLeg::Process (CouplingLeg is still Knowledge/Value/Governance), LayerGovernor/governs-layer, Floor/Ceiling governors, boundary_owner, VeilContext, succession/memorial. Vision-scale: rank DOWN except slices that serve one household.",
+ "count": 10,
+ "items": [
+  {
+   "text": "Wave 0: lift trait Governor over (setpoint, sensor, actuator, owner) from arc_actuator",
+   "line": 360,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-recursive-architecture-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L360",
+   "class": "provisional",
+   "note": "elohim-compute/src/actuation.rs."
+  },
+  {
+   "text": "Wave 0 hygiene gate: fix the conductor-signal msgpack-decode subscribers before wiring any recursion signal",
+   "line": 334,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L334",
+   "class": "provisional",
+   "note": "partly fixed: signals.rs HoloHashB64 (2026-06-12 peer-statuses root cause) normalizes byte-array holo_hashes and rea_projection.rs:38-150 adopts it; mishpat/content subscribers not verified — finish and pin with a decode test per subscriber."
+  },
+  {
+   "text": "Wave 1: CouplingLeg::Process (additive Option<Cid>) + supersedence-order validator + AttentionTending naming-seat",
+   "line": 365,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L365",
+   "class": "provisional",
+   "note": "elohim/epr/src/kind.rs:48 CouplingLeg has no Process variant."
+  },
+  {
+   "text": "Wave 2: CoverageRollup operator returning CoverageSet + descent pointer; shefa builders as first callers",
+   "line": 370,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-recursive-architecture-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L370",
+   "class": "provisional",
+   "note": "elohim-storage/src/recursion.rs; descent pointer on the Automerge plane (rollup_hash/as_of_heads) and shefa-builder re-expression not verified."
+  },
+  {
+   "text": "Wave 3: governs-layer face + LayerGovernor + constitutional-stack projector + bidirectional descent view",
+   "line": 375,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L375",
+   "class": "provisional"
+  },
+  {
+   "text": "Wave 4: FloorGovernor / CeilingGovernor wrapping live demurrage + dignity floor; LayerRollup over concentration_snapshots; provides-floor / respects-ceiling",
+   "line": 380,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L380",
+   "class": "provisional"
+  },
+  {
+   "text": "Wave 5: boundary_owner + cross_layer_admits + per-boundary inertia gradient (amplification fail-closed)",
+   "line": 385,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L385",
+   "class": "provisional"
+  },
+  {
+   "text": "Wave 6: descend() traversal + recognition signal kind + VeilContext + walker delegates-agent-stewardship binding; ReservedPlace / limit_owner: faith",
+   "line": 389,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L389",
+   "class": "provisional",
+   "note": "ReservedPlace landed with the Governor lift; the walker pieces did not."
+  },
+  {
+   "text": "Wave 7: commits-succession / SuccessionGovernor, memorial transform, MemoryClass, CID-conformance CI harness",
+   "line": 395,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L395",
+   "class": "provisional"
+  },
+  {
+   "text": "Wave 8 gated forks: typed care/compute partition + planetary precedence wall on a planned reinstall; CoverageRollupAttestation only after a fan-out cost probe; Dissolution validator; boundary-bind stays refusable",
+   "line": 400,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-recursive-architecture-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-recursive-architecture-design.md#L400",
+   "class": "provisional"
+  }
+ ]
+}

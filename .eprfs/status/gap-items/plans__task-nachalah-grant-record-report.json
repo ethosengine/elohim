@@ -1,0 +1,51 @@
+{
+ "doc": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md",
+ "slug": "plans__task-nachalah-grant-record-report",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A task REPORT (#1b-a, DONE_WITH_CONCERNS) with full gate evidence (elohim-storage gate EXIT=0: 4386 passed; mishpat commitment_record test; manifest-hygiene, schema-dna, sweettest-check, app gate). Delivered CLAIMED; OPEN = the named residue.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Coordinator exact-ActionHash read + storage verifier with eight adversarial tests passing inside the full owning gate",
+   "line": 18,
+   "state": "CLAIMED",
+   "id": "plans__task-nachalah-grant-record-report#1",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md#L18",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Tooling defect noted: epr flow context reports no storage gate although elohim/holochain/build-manifest.json registers elohim-storage (gate-runner resolved it)",
+   "line": 51,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-grant-record-report#2",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md#L51",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "#1b-b remaining: issuer/recipient/scope/validity, identity lineage and fresh non-revocation at the acting node (full C12)",
+   "line": 56,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-grant-record-report#3",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md#L56",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Residue: counters, residual RCA and supervisor wiring for the verifier",
+   "line": 58,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-grant-record-report#4",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md#L58",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Parent #1b, activation, automatic rollback and both household upgrade runs remain open (earned-arc actuation disabled)",
+   "line": 62,
+   "state": "OPEN",
+   "id": "plans__task-nachalah-grant-record-report#5",
+   "cites": "genesis/docs/superpowers/plans/task-nachalah-grant-record-report.md#L62",
+   "class": "protocol-canonical"
+  }
+ ]
+}

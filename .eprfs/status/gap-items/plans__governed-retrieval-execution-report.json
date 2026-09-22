@@ -1,0 +1,52 @@
+{
+ "doc": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md",
+ "slug": "plans__governed-retrieval-execution-report",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A task REPORT (gap plans__2026-09-09-governed-retrieval-execution#1, status DONE_WITH_CONCERNS) read by the valueflow observer; the delivered work is CLAIMED (29 adversarial recall tests, native commitment + independent approval CIDs recorded). The OPEN items are its stated concerns/known limits. Placement note for the librarian: reports live beside plans by the observer convention, but they are evidence records, not plans.",
+ "count": 5,
+ "items": [
+  {
+   "text": "Recall contract version2 + local executor: explicit scope/discover/filter/group/select/read/judge composition, pinned sessions, cumulative costs, session locking",
+   "line": 11,
+   "state": "CLAIMED",
+   "id": "plans__governed-retrieval-execution-report#1",
+   "cites": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md#L11",
+   "class": "provisional",
+   "note": "native commitment bafyreico3oz4...; approval bafyreie2hbil4..."
+  },
+  {
+   "text": "Bounded discovery/source/semantic output with withheld (never truncated) oversized evidence; 29 adversarial tests + 1919 package checks",
+   "line": 31,
+   "state": "CLAIMED",
+   "id": "plans__governed-retrieval-execution-report#2",
+   "cites": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md#L31",
+   "class": "provisional"
+  },
+  {
+   "text": "Concern: semantic provider ranking/version/freshness explicitly unverified — no ranking-quality claim",
+   "line": 36,
+   "state": "OPEN",
+   "id": "plans__governed-retrieval-execution-report#3",
+   "cites": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md#L36",
+   "class": "provisional"
+  },
+  {
+   "text": "Known limit: budgets can be changed by the artifact owner in a new session; method-pinned accounting does not prevent deliberate tool bypass",
+   "line": 42,
+   "state": "OPEN",
+   "id": "plans__governed-retrieval-execution-report#4",
+   "cites": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md#L42",
+   "class": "provisional"
+  },
+  {
+   "text": "Known limit: elapsed scan bounds check between filesystem operations, not cancellation of a blocked filesystem call",
+   "line": 44,
+   "state": "OPEN",
+   "id": "plans__governed-retrieval-execution-report#5",
+   "cites": "genesis/docs/superpowers/plans/governed-retrieval-execution-report.md#L44",
+   "class": "provisional"
+  }
+ ]
+}

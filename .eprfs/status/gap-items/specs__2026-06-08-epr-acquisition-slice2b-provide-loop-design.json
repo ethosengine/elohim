@@ -1,0 +1,134 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md",
+ "slug": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §12 task preview (14 tasks) + the §10/§15 CI gap. Nearly all landed in-tree (provide_reconcile.rs, revokes-commitment schema, replicates_commons view, CommitmentByState link wrapper, GET /api/v1/pins/{eprId}/pull, FetchPriority Ord, pin-as-peer + PinProgressComponent, a2o provide scenario) — CLAIMED awaiting verify. The replicates-commons schema was later renamed replicates-content (a stale generated-ts/commitments/replicates-commons.ts remains).",
+ "count": 14,
+ "items": [
+  {
+   "text": "T1 conductor round-trip: call_create_commitment + get_commitment + ConductorCommitmentFetcher wired; non-null dht_anchor_hash projection proven",
+   "line": 196,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L196",
+   "class": "provisional",
+   "note": "services/conductor_writes.rs; sweettest replicates_commons_round_trip_test.rs."
+  },
+  {
+   "text": "replicates-commons (content|capacity union) + revokes-commitment schemas; codegen",
+   "line": 197,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L197",
+   "class": "provisional",
+   "note": "v1/commitments/revokes-commitment.schema.json present; replicates-commons now lives as replicates-content.schema.json — elohim/sdk/schemas/generated-ts/commitments/replicates-commons.ts is an orphaned generated file to delete on the next codegen pass."
+  },
+  {
+   "text": "Mishpat coordinator+integrity validators for replicates-commons / revokes-commitment; create_commitment signed_at param + caller backfill",
+   "line": 198,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L198",
+   "class": "provisional",
+   "note": "mishpat/zomes/mishpat/src/commitments.rs + mishpat_integrity/src/lib.rs carry the arms."
+  },
+  {
+   "text": "Commitment immutability sweettest + a create_commitment -> post_commit -> CommitmentCommitted signal sweettest",
+   "line": 130,
+   "state": "OPEN",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L130",
+   "class": "provisional",
+   "note": "no immutability-named sweettest located under elohim/holochain/tests/sweettest."
+  },
+  {
+   "text": "ReplicatesCommonsPayload typed view (ts-rs)",
+   "line": 199,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L199",
+   "class": "provisional",
+   "note": "elohim-views/src/replicates_commons.rs."
+  },
+  {
+   "text": "Projection arms parse_replicates_commons + parse_revokes_commitment (fail-closed) and replicates_commons_validator (schema / donut[capacity] / bounds)",
+   "line": 200,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L200",
+   "class": "provisional"
+  },
+  {
+   "text": "Emit-input split: content_store_commitment_cid optional; pure provide emits fulfills:[] bounded_by <mishpat-cid>",
+   "line": 202,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L202",
+   "class": "provisional"
+  },
+  {
+   "text": "provide_reconcile state machine + logical-key dedup + restart re-derivation; acquisition_pins.commitment_cid",
+   "line": 204,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L204",
+   "class": "provisional",
+   "note": "elohim-storage/src/services/provide_reconcile.rs."
+  },
+  {
+   "text": "Revocation arm: un-pin -> revokes-commitment -> revoked_at; subsequent announces refused, prior stand",
+   "line": 205,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L205",
+   "class": "provisional"
+  },
+  {
+   "text": "Graduation CommitmentByState link authored atomically with graduate_to_active (SQL state = write-through cache)",
+   "line": 206,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L206",
+   "class": "provisional",
+   "note": "call_create_commitment_state_link in conductor_writes.rs, called from rea_projection.rs."
+  },
+  {
+   "text": "Scorer arm: ActiveCommitment.head_ref, commons -> Medium, FetchPriority Ord, Medium enqueued, content_id ctx; fix test_util shorthand",
+   "line": 207,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L207",
+   "class": "provisional",
+   "note": "replication_prioritizer.rs:22 derives PartialOrd, Ord."
+  },
+  {
+   "text": "EprPullStatusView + own-node-only GET /api/v1/pins/{eprId}/pull (grouped by head_ref; schema contract; codegen)",
+   "line": 208,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L208",
+   "class": "provisional",
+   "note": "http.rs:2473-2476."
+  },
+  {
+   "text": "Angular rung-4: pin-as-peer action + pullStatus$ poll + PinProgressComponent; a2o provide scenario",
+   "line": 209,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#13",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L209",
+   "class": "provisional",
+   "note": "epr-link.component.ts, pin-progress component; delivery/acquisition-pins.feature:69."
+  },
+  {
+   "text": "CI stage running elohim-storage lib/integration tests (backlog ci-storage-workspace-tests-uncovered)",
+   "line": 181,
+   "state": "OPEN",
+   "id": "specs__2026-06-08-epr-acquisition-slice2b-provide-loop-design#14",
+   "cites": "genesis/docs/superpowers/specs/2026-06-08-epr-acquisition-slice2b-provide-loop-design.md#L181",
+   "class": "provisional",
+   "note": "backlog entry status 'documented'; storage-quality-gate.sh runs the dead-config lint, not cargo test."
+  }
+ ]
+}

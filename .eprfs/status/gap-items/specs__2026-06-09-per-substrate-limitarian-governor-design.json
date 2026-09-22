@@ -1,0 +1,116 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md",
+ "slug": "specs__2026-06-09-per-substrate-limitarian-governor-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the §11 v1 slice (7 lands, all present in-tree — CLAIMED) + the §11 deferrals and §10 soundness decisions. The residue is mirrored by backlog limitarian-governor-v1-followons (items 1-9); the §11 erratum (item 7) is already backfilled into this spec.",
+ "count": 12,
+ "items": [
+  {
+   "text": "v1.1 concentration measure: ge_alpha / top_quantile_share / gini / composite_concentration with property tests",
+   "line": 550,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L550",
+   "class": "provisional",
+   "note": "landed at elohim-storage/src/services/measure.rs:104 (not elohim-core)."
+  },
+  {
+   "text": "v1.2 calculate_decay_rate_continuous replaces the saturating step; reuses apply_decay steps 4-6",
+   "line": 553,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L553",
+   "class": "provisional",
+   "note": "token_decay_service.rs:103."
+  },
+  {
+   "text": "v1.3 concentration_snapshot table + Phase-A aggregator (over token balances until substrate_signal distributions)",
+   "line": 555,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L555",
+   "class": "provisional",
+   "note": "concentration_service.rs; per-substrate switch is followon item 9."
+  },
+  {
+   "text": "v1.4 LimitGradientRegistry with in-wall defaults; compute_cid stub fixed",
+   "line": 558,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L558",
+   "class": "provisional",
+   "note": "services/limit_gradient_registry.rs."
+  },
+  {
+   "text": "v1.5 DNA wall validator validate_ratifies_limit_gradient — reject-at-write",
+   "line": 559,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L559",
+   "class": "provisional",
+   "note": "mishpat/zomes/mishpat/src/commitments.rs:913."
+  },
+  {
+   "text": "v1.6 ratify-writeback projector + ratify-limit-gradient kind + child attestation map",
+   "line": 560,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L560",
+   "class": "provisional",
+   "note": "attestation_projector.rs apply_ratification; governance_action.rs:414."
+  },
+  {
+   "text": "v1.7 firewall test on payload + concentration_snapshot, plus the anti-capture property test",
+   "line": 563,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L563",
+   "class": "provisional",
+   "note": "snapshot firewall landed (concentration_service.rs:271); the anti-capture property test is tracked OPEN in the Cluster #2 decomposition — verify before VERIFIED."
+  },
+  {
+   "text": "Consume the full ratified gradient (c_target, k_max, ...) via query_effective_limit_gradient instead of core_default at decay call sites",
+   "line": 357,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L357",
+   "class": "provisional",
+   "note": "followon item 8: apply_ratification only stamps dignity_floor today."
+  },
+  {
+   "text": "Renewal loop: past valid_until fall back to core default and raise a re-ratification FeedbackSignal to the governing collective",
+   "line": 353,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L353",
+   "class": "provisional"
+  },
+  {
+   "text": "Directionality validator: loosening override requires loosening_acknowledged AND super-quorum / counter-signature / deliberation window",
+   "line": 373,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L373",
+   "class": "provisional"
+  },
+  {
+   "text": "Deferred homes: aggregate-tick scheduler + poke route; limit-gradient Manifest home (Phase-3.5); step defs for the three @wip a2o scenarios",
+   "line": 565,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L565",
+   "class": "provisional",
+   "note": "followon items 1, 2, 6."
+  },
+  {
+   "text": "Operator soundness decisions: apex non-accumulability + k_max wall (1), DNA-wall width (2), measure oracle stays advisory (3), failed re-ratification fallback (6)",
+   "line": 516,
+   "state": "OPEN",
+   "id": "specs__2026-06-09-per-substrate-limitarian-governor-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-09-per-substrate-limitarian-governor-design.md#L516",
+   "class": "provisional"
+  }
+ ]
+}

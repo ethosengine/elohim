@@ -1,0 +1,77 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md",
+ "slug": "specs__2026-08-10-algedonic-feedback-signal-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §5 slices + §3 entity + §4 obligation. Landed: the schema foothold (v1/feedback-signals/algedonic-{approach,breach}.schema.json + test-zd-feedback-signals.mjs) and the typed AlgedonicKind in elohim/epr/src/algedonic.rs; ark-core carries an algedonic breach. Slice 1's execution plan (2026-08-10-algedonic-slice1-delivery-flow-plan) has 32 unticked stations of its own. Slice 2 (zome kind-gates, CounterEvidence routing, emitters, C15, algedonicHandler) is not built — the integrity feedback_signal.rs has no algedonic kind-gate.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Slice 1 schema foothold: feedback-signals/algedonic-approach + algedonic-breach instance schemas (contract-first, no zome change)",
+   "line": 139,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L139",
+   "class": "protocol-canonical",
+   "note": "elohim/sdk/schemas/v1/feedback-signals/algedonic-*.schema.json; typed kinds in elohim/epr/src/algedonic.rs."
+  },
+  {
+   "text": "Slice 1 dev-plane projection: sentinel findings gain a concern address; CI gate-skip no-measure becomes an addressed finding; pre-push makes measurement-by-deploy unwritable; habits renderer joins live pain + last evidence",
+   "line": 133,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L133",
+   "class": "protocol-canonical",
+   "note": "tracked station-by-station by plans/2026-08-10-algedonic-slice1-delivery-flow-plan.md (0/32 ticked)."
+  },
+  {
+   "text": "Slice 2: zome whitelist extension + kind-gates in create_feedback_signal (algedonic requires evidence + bound_ref)",
+   "line": 142,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L142",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2: FloorClass::CounterEvidence routing (un-cheapenable FullChain verification) + full-product-space property-test extension",
+   "line": 79,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L79",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2: storage projection + emitters at self-heal exhaustion sites; emission bounds (hysteresis, fingerprint dedupe, one open signal per (declarer,target,kind), clean-streak retirement)",
+   "line": 75,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L75",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Obligation 1: app-manifest algedonicHandler field ({signalKinds, consumer} or {none: reason})",
+   "line": 99,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L99",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Obligation 2: concern class C15 algedonic-channel bound via seam-registry with answered/partial/unbound/n-a states",
+   "line": 102,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L102",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Obligation 3: .epr-meta ask-class authoring policy where new EprKinds / content types are born",
+   "line": 108,
+   "state": "OPEN",
+   "id": "specs__2026-08-10-algedonic-feedback-signal-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-10-algedonic-feedback-signal-design.md#L108",
+   "class": "protocol-canonical"
+  }
+ ]
+}

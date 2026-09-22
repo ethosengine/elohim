@@ -1,0 +1,112 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md",
+ "slug": "specs__2026-06-14-escalated-architecture-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from PART 3 buildable-now (#0-#10) + the roadmap forks + PART 5 operator calls. Only #10 (trait Governor in elohim-compute) is evidenced; an AlgedonicKind::Approach exists (elohim/epr/src/algedonic.rs:110) but not the respects-self-limit action. Most buildable-now rows have since been re-specced by narrower specs (head-plane story 6.1, two-quilt, care) — each OPEN item should be born-linked to its narrower successor before building. Vision-scale: rank DOWN relative to single-household slices.",
+ "count": 12,
+ "items": [
+  {
+   "text": "#0 Fix the signal-decode subscriber (holo_hash byte arrays dropped on rmp->Value) — gates every human-facing projection",
+   "line": 258,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L258",
+   "class": "provisional",
+   "note": "partly fixed: signals.rs HoloHashB64 (2026-06-12 peer-statuses root cause) normalizes byte-array holo_hashes and rea_projection.rs:38-150 adopts it; mishpat/content subscribers not verified — finish and pin with a decode test per subscriber."
+  },
+  {
+   "text": "#1 Two-quilt ingest routing + byte-plane coverage gate + custody-as-coverage",
+   "line": 259,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L259",
+   "class": "provisional"
+  },
+  {
+   "text": "#2 feltStatus projection + Family Vault component + label join + compute honesty fork",
+   "line": 260,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L260",
+   "class": "provisional",
+   "note": "FeltStatusView exists (see elohim-sdk decomposition); no Family Vault component."
+  },
+  {
+   "text": "#3/#9 Care observe->mint adapter (Margaret visible) + governed MintPolicy (rates leave Rust constants)",
+   "line": 261,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L261",
+   "class": "provisional"
+  },
+  {
+   "text": "#4 respects-self-limit action + SignalKind::Approach + limit_owner invariant",
+   "line": 262,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L262",
+   "class": "provisional",
+   "note": "AlgedonicKind::Approach landed in elohim/epr/src/algedonic.rs; the respects-self-limit action does not exist."
+  },
+  {
+   "text": "#5 AI agent identity binding + delegates-agent-stewardship wired through Actuation::authorize",
+   "line": 263,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L263",
+   "class": "provisional"
+  },
+  {
+   "text": "#6 Content-wrap capability + revokes-capability rotation + threshold custody",
+   "line": 264,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L264",
+   "class": "provisional"
+  },
+  {
+   "text": "#7/#8 EPR head freshness witness + head heal-on-read + fail-closed 503; edge divergence detector as its alarm",
+   "line": 265,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L265",
+   "class": "provisional",
+   "note": "overlaps the head-plane program (doorway story 6.1 'revalidated, never cached as fresh', 1103207e4) — reconcile before re-building."
+  },
+  {
+   "text": "#10 trait Governor refactor + shared elohim-compute crate",
+   "line": 268,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-14-escalated-architecture-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L268",
+   "class": "provisional",
+   "note": "elohim-compute/src/actuation.rs."
+  },
+  {
+   "text": "Roadmap forks R1-R3: EPR head as CRDT doc (after F-BOOTSTRAP), covers-head coverage commitments, donut-ceiling coverage relation",
+   "line": 274,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L274",
+   "class": "provisional"
+  },
+  {
+   "text": "Roadmap forks R4-R7: typed care/compute DNA partition, custom kitsune2 sharding module (probe-gated), forward-secrecy wrap v2, upstream fractional sharding",
+   "line": 277,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L277",
+   "class": "provisional"
+  },
+  {
+   "text": "Operator calls 1-6: care meaning, AI covenant, privacy vs accountability, donut geometry, kitsune2 fork, manifesto coupling",
+   "line": 343,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-escalated-architecture-design#12",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-escalated-architecture-design.md#L343",
+   "class": "provisional"
+  }
+ ]
+}

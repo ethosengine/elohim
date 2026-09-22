@@ -1,0 +1,79 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md",
+ "slug": "specs__2026-08-06-staggered-conductor-restart-mitigation-design",
+ "method": "agent-decomposition",
+ "class": "operations",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the recommended contract (fingerprint / waves / convergence gate), the standing-red tests and the ratification questions. Much of the wave half landed by a different route: cdd8875ac 'sequence the fleet conductor roll behind per-peer gates' (scripts/ci/sequenced-roll-plan.sh + peer-roll-gate.sh: leechers first, one full-arc holder per step, genesis pair last, per-peer converged/CFS gate, budget clamp, ROLL_SEQUENCED=0 escape). Not landed: the runtime-content fingerprint (provenance-only deploys still restart), the head-record canary leg, and flipping the standing reds green.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Runtime-content fingerprint: digest of runtime-effective inputs (pod template minus provenance, mounted config digests, resolved hApp digest); provenance-only deploys do not restart; unresolved digest fails safe as changed",
+   "line": 74,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L74",
+   "class": "operations"
+  },
+  {
+   "text": "Wave-sequenced apply: compute the plan first; one-peer waves beginning with a non-genesis canary; Adam and Matthew in different waves; never apply the next wave before convergence",
+   "line": 106,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L106",
+   "class": "operations",
+   "note": "scripts/ci/sequenced-roll-plan.sh (cdd8875ac) — orders leechers, then full-arc holders one per step, genesis pair last."
+  },
+  {
+   "text": "Coverage-safe wave sizing: waves > 1 only with an explicit arc/coverage overlap proof; retain a converged full-coverage provider per serving-critical projection (ratification Q3)",
+   "line": 119,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L119",
+   "class": "operations"
+  },
+  {
+   "text": "Convergence gate legs 1-2: peer-direct, fallback-free /p2p/status projectionReconcile.converged with strictly advancing sweeps; caughtUp never gated",
+   "line": 139,
+   "state": "CLAIMED",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L139",
+   "class": "operations",
+   "note": "scripts/ci/peer-roll-gate.sh (+ CFS throttle leg)."
+  },
+  {
+   "text": "Convergence gate legs 3-4: target-direct /db/content/<canary>/head-record matches a non-wave survivor; both doorway projections agree on the canary head",
+   "line": 153,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L153",
+   "class": "operations",
+   "note": "not part of peer-roll-gate.sh per the commit description."
+  },
+  {
+   "text": "Deadline abort leaves unstarted waves untouched; decide retry-safe vs explicit rollback policy (ratification Q4)",
+   "line": 213,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L213",
+   "class": "operations"
+  },
+  {
+   "text": "Extract a pure runtime-classifier + wave-planner seam with behavioral fixtures (stale gauge, projection-only false green, survivor loss, false pull.caughtUp); flip the standing-red design test green and add it to the default suite",
+   "line": 187,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L187",
+   "class": "operations",
+   "note": "genesis/orchestrator/design-tests/staggered-conductor-fleet-restarts.red.mjs still stands red."
+  },
+  {
+   "text": "Ratification Q1-Q2: dependency-free canonicalization in the edge container; a peer-direct conductor-backed probe unmasked by doorway fallback",
+   "line": 207,
+   "state": "OPEN",
+   "id": "specs__2026-08-06-staggered-conductor-restart-mitigation-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-08-06-staggered-conductor-restart-mitigation-design.md#L207",
+   "class": "operations"
+  }
+ ]
+}

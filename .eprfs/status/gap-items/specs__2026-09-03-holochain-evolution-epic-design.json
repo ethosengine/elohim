@@ -1,0 +1,97 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md",
+ "slug": "specs__2026-09-03-holochain-evolution-epic-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §10 DoD + §11 progress hub (the epic's own ledger is authoritative; these items mirror it, they do not replace it). Status Active; §4 posture accepted 2026-09-05. Stations 1-5 and 7-10 recorded GREEN on the household mesh (cucumber-stations-mvp runs) — CLAIMED; station 6 is RED with a proven cause; the habit elohim/holochain/.epr-meta/happ-lineage-migration.habit.md is status red, active false. Probes A/B/B2/G/D2/E recorded PASS/DONE.",
+ "count": 10,
+ "items": [
+  {
+   "text": "De-risk probes A, B, B2, G, D2, E (two cells one key, late open_chain, remote post-close refusal, feature-gated witness with byte-identical default pack, additive dual client, lineage arms proposal)",
+   "line": 452,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L452",
+   "class": "protocol-canonical",
+   "note": "all recorded PASS/DONE 2026-09-04."
+  },
+  {
+   "text": "Stations 1-4: admissibility, notarized path, install beside same key, self-carry re-verified — green on the household mesh",
+   "line": 469,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L469",
+   "class": "protocol-canonical",
+   "note": "cucumber-stations-mvp-r3/r7/r8/r10/r12."
+  },
+  {
+   "text": "Stations 5, 7, 8: held-carry, revert before sunset, sunset (narrowed) — green on the household mesh",
+   "line": 473,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L473",
+   "class": "protocol-canonical",
+   "note": "r20, r25, and the station-8 run."
+  },
+  {
+   "text": "Stations 9-10: forged witness refused; quorum/root refused (negative controls) — green on the household mesh",
+   "line": 477,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L477",
+   "class": "protocol-canonical",
+   "note": "r13, r28."
+  },
+  {
+   "text": "Station 6 bridge direction: RED with a proven cause (james's view of jessica frozen at the rejected seq); rebuild the mesh and re-measure",
+   "line": 474,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L474",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Gap G6: a courier that never saw the close is not fenced on HDI 0.8 — close the sunset fence for that case",
+   "line": 476,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L476",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Stations 11-13: many versions (§5.1) — designed, not yet in the story",
+   "line": 479,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L479",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Lane B (§9): conductor-fork spike to keep ONE DHT across an integrity change; record the verdict",
+   "line": 415,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L415",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Operator decision: fresh holochain-0.7 fork carrying admin list_blocks / unblock (0.6.3 cures are a re-port, not a rebase)",
+   "line": 483,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L483",
+   "class": "protocol-canonical",
+   "note": "a pinned 0.7 fork now exists (hc-fork-<pin> per root CLAUDE.md); confirm whether list_blocks/unblock is on it."
+  },
+  {
+   "text": "DoD: stations 1-10 green on the mesh with the node_registry rehearsal + §9 verdict + habit happ-lineage-migration flipped green with evidence",
+   "line": 435,
+   "state": "OPEN",
+   "id": "specs__2026-09-03-holochain-evolution-epic-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md#L435",
+   "class": "protocol-canonical",
+   "note": "habit status red, active false."
+  }
+ ]
+}

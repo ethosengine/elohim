@@ -1,0 +1,61 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md",
+ "slug": "specs__2026-07-12-context-governed-binding-design",
+ "method": "agent-decomposition",
+ "class": "architecture",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3). A principle/pattern doc: §8 says it introduces no data entity, table, route or entry type — a 'reading' of the kinship-lineage primitives. Buildable residue is the offline floor (binding snapshot), the REA feedback leg, reach-graded declared heads (the same primitive as lens-version-DAG binds-policy), and the specimen resolution. brit-epr does not depend on eprfs-core yet, so the BritCid/BlobCid specimen is not resolved in code (the consolidation spec is still Draft).",
+ "count": 6,
+ "items": [
+  {
+   "text": "Floor: binding snapshot (declared head + provenance) carried in the artifact, checkable offline — like the governance backref",
+   "line": 232,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L232",
+   "class": "architecture"
+  },
+  {
+   "text": "Mapping 2/5: reach-graded declared-head binding (household binds A, community binds B) over the existing versioned-entity HEAD + Mishpat commitment",
+   "line": 111,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L111",
+   "class": "architecture",
+   "note": "same substrate as lens-version-DAG V1 binds-policy — build once."
+  },
+  {
+   "text": "Mapping 4: every invocation through a binding emits a REA feedback leg against the EprRef; renegotiation triggered from evidence",
+   "line": 127,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L127",
+   "class": "architecture"
+  },
+  {
+   "text": "Specimen: resolve BritCid vs BlobCid as a declared head (eprfs-core BlobCid as shared derivation owner; tag-42 vs text-string wire forms deliberately not unified)",
+   "line": 203,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L203",
+   "class": "architecture",
+   "note": "brit-epr/Cargo.toml has no eprfs-core dep; elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md is Draft."
+  },
+  {
+   "text": "Ceiling (deferred): runtime negotiation engine that reviews and executes a rebinding as a governance act (never automatic)",
+   "line": 244,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L244",
+   "class": "architecture"
+  },
+  {
+   "text": "Placement: graduate this principle (no entities) to the canonical architecture home as a pattern doc, cited by the kinship-lineage and dogfood specs",
+   "line": 255,
+   "state": "OPEN",
+   "id": "specs__2026-07-12-context-governed-binding-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-12-context-governed-binding-design.md#L255",
+   "class": "architecture"
+  }
+ ]
+}

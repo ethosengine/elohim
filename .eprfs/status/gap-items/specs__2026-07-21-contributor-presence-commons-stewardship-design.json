@@ -1,0 +1,105 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md",
+ "slug": "specs__2026-07-21-contributor-presence-commons-stewardship-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §6 staged plan (stages 1-5) + §7 known debts + §9 open questions. Only the Phase-0 goalposts exist (dataplane/contributor-presence-witnessed-holding.feature, feature-level @wip, 4 scenarios + steps file). Stage 1 seeding of the 11 fixture residents as presences, the holder split, and the claim ceremony are not built; debts 1-6 stand. Stage 4 names shem (now available). Single-household coherence (fixture residents stop being orphans) — rank UP.",
+ "count": 11,
+ "items": [
+  {
+   "text": "Open question 1 first: presence slug vs humans.id (fresh slug + mapping table leaning)",
+   "line": 255,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L255",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Stage 1: seed the 11 fixture residents as commons-stewarded presences through the existing presences pipeline + steward-authored attestation:witnessed-ascription residency attestations; bare humans rows stop being seedable",
+   "line": 189,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L189",
+   "class": "protocol-canonical",
+   "note": "witnessed-ascription appears only in a2o steps; no seeded ascriptions."
+  },
+  {
+   "text": "Stage 2: household-resilience holder split verified vs witnessed; invariant household_id => (agent_pub_key or witnessed-presence), zero orphans; un-@wip the Phase-0 feature",
+   "line": 196,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L196",
+   "class": "protocol-canonical",
+   "note": "contributor-presence-witnessed-holding.feature is feature-level @wip."
+  },
+  {
+   "text": "Stage 3: deterministic claim floor (intent -> claiming -> claimed, membership stamp, claimed_root anchor) with convening/backfill ceremony stubs",
+   "line": 200,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L200",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Stage 4: gertrude live — +1 conductor on shem, Phase 1-3 lifecycle legs, card flips witnessed -> verified on claim",
+   "line": 204,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L204",
+   "class": "protocol-canonical",
+   "requires_env": [
+    "shem"
+   ]
+  },
+  {
+   "text": "Debt 1: heal the storage/DHT presence split-brain — storage zome-calls the orphaned imagodei presence coordinators and stamps dht_anchor_hash",
+   "line": 212,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L212",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Debt 2: Angular presence-api.service.ts route drift (/steward, /verify vs /stewardship, /verify-claim; state vs presenceState)",
+   "line": 217,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L217",
+   "class": "protocol-canonical",
+   "note": "presence-api.service.ts:62 still posts /verify."
+  },
+  {
+   "text": "Debt 3-4: unwind the human_id-as-steward_presence_id seeding stopgap; add a presence DHT->storage signal bridge",
+   "line": 220,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L220",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Debt 5: recognition transfer in verify_claim becomes a double-entry REA event pair (no numeric copy)",
+   "line": 225,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L225",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Debt 6: issue-time validation of attestation subject_kinds (witnessed-ascription relies on convention)",
+   "line": 229,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L229",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Open questions 2-5: ascription revocation rule, witness plurality for claims, commons pool as Collective from day one, death trigger shape",
+   "line": 258,
+   "state": "OPEN",
+   "id": "specs__2026-07-21-contributor-presence-commons-stewardship-design#11",
+   "cites": "genesis/docs/superpowers/specs/2026-07-21-contributor-presence-commons-stewardship-design.md#L258",
+   "class": "protocol-canonical"
+  }
+ ]
+}

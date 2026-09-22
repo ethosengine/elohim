@@ -1,0 +1,80 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md",
+ "slug": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from §2 decisions 1-4 + §3 birth rule + §6 next rungs + §7 gates. Landed: RuntimeEnvelope/ProcessQuota in ark-core manifest.rs, bridges/k8s crate (render/verify/observe), runtime manifests under genesis/orchestrator/manifests/runtime/ pinned from deployments.json runtimeManifest, pre-push k8s-bridge verify (.husky/pre-push.bash:424-426). Ratification record + freshness leg not verified. §6 rungs are named-not-taken.",
+ "count": 8,
+ "items": [
+  {
+   "text": "Decision 1: RuntimeManifest.envelope + ChildSpec.quota (additive, CID-stable when absent); validate() refuses sum(child memory_max) + headroom > bound; memory_bound() projects to epr-rea Bound",
+   "line": 80,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L80",
+   "class": "protocol-canonical",
+   "note": "elohim/ark/core/src/manifest.rs:100, :125."
+  },
+  {
+   "text": "Decision 2: deployments.json edgenode* fields derived by k8s-bridge render from a pinned runtime manifest; verify refuses pin/file/render drift; rendered Deployment carries the runtime-manifest CID annotation",
+   "line": 91,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L91",
+   "class": "protocol-canonical",
+   "note": "deployments.json runtimeManifest pins (:12, :45); manifests/runtime/*.manifest.json; golden test vs conductor-split-budget.sh not verified."
+  },
+  {
+   "text": "Decision 3: k8s-bridge observe writes the Rakia ledger cluster block from kube-state-metrics; validator freshness leg (ledger older than 30 days downgrades ask -> refer); refuse to promote zeros on a stale Prometheus",
+   "line": 106,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L106",
+   "class": "protocol-canonical",
+   "note": "bridges/k8s/src/observe.rs; freshness leg in both validators not verified."
+  },
+  {
+   "text": "Decision 4: typed cluster.ratifications record in compute-capacity.json read by both validators (limits.cpu_m only; requests and memory never ratify); retire the prose $computeEnvelopeRatification",
+   "line": 117,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L117",
+   "class": "protocol-canonical",
+   "note": "compute-capacity.json:8 carries cluster.ratifications; verify both validators read it and that the prose comment is retired."
+  },
+  {
+   "text": "Birth rule: bridges/k8s + elohim/ark seam-registry rows, .epr-meta, S3.6 registry_crates in seam-catalog.yaml; seam_matrix_test green",
+   "line": 132,
+   "state": "CLAIMED",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L132",
+   "class": "protocol-canonical",
+   "note": "bridges/k8s/seam-registry.yaml present; S3.6 catalog row not verified."
+  },
+  {
+   "text": "drift_verdict Unpinned flips refer -> refuse once every active human is pinned (dated .epr-meta flip)",
+   "line": 152,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L152",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Next rung 1: HostPassport reports allocatable/committed; observe folds passports instead of Prometheus; retire the Rakia ledger producer",
+   "line": 208,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L208",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Next rungs 2-4: anchor the manifest (declared head on the DHT); quota rides delegates-compute bounds; epr-pvc arm (Berth.data_root -> PVC agreement)",
+   "line": 210,
+   "state": "OPEN",
+   "id": "specs__2026-09-05-k8s-bridge-runtime-envelope-render-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-05-k8s-bridge-runtime-envelope-render-design.md#L210",
+   "class": "protocol-canonical"
+  }
+ ]
+}

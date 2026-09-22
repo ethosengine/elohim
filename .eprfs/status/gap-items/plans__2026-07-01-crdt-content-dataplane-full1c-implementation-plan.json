@@ -1,0 +1,106 @@
+{
+ "doc": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md",
+ "slug": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) 1:1 from phases A1-A4, B1-B3, C1-C5 (grouped) + revocation + the multi-root convergence correction. Phases A and B and most of C are in-tree: crdt_converged_at migration, MinTrust tri-state gate (content_diesel.rs:31), ContentView.trust (elohim-views lamad.rs:51), declare_content_head coordinator (lib.rs:5447), declared_head migrations (07-04, 07-12, and 09-21 head_record still uncommitted in the working tree), versions map in the sync projector (projector.rs:282-315), convergence tests in sync_libp2p_convergence.rs. Open: C5 reach-cohort author-sig, content revocation arm, the multi-root false-green.",
+ "count": 11,
+ "items": [
+  {
+   "text": "A1 crdt_converged_at amber column",
+   "line": 38,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#1",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L38",
+   "class": "provisional",
+   "note": "migration 2026-07-01-120000_content_add_crdt_converged_at."
+  },
+  {
+   "text": "A2 tri-state MinTrust gate replacing require_provenance (serving = Amber, economic/attribution = Green)",
+   "line": 39,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#2",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L39",
+   "class": "provisional",
+   "note": "content_diesel.rs:31."
+  },
+  {
+   "text": "A4 ContentView.trust field (notarized/published/unconfirmed) co-landing before A3",
+   "line": 40,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#3",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L40",
+   "class": "provisional",
+   "note": "elohim-views/src/lamad.rs:51."
+  },
+  {
+   "text": "A3 deploy-producer diesel-direct admin-gated amber write (the live 404 fix)",
+   "line": 41,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#4",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L41",
+   "class": "provisional"
+  },
+  {
+   "text": "B1-B3 reverse projector with empty-never-wins guard; amber write seeds the DocStore; serve-path convergence proof with zero notary",
+   "line": 45,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#5",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L45",
+   "class": "provisional",
+   "note": "tests/p2p/sync_libp2p_convergence.rs."
+  },
+  {
+   "text": "C1 DNA HEAD notarization (Supersedes/ContentVersion + ContentHead selector link; declare_content_head + ContentHeadDeclared)",
+   "line": 51,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#6",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L51",
+   "class": "provisional",
+   "note": "content_store/src/lib.rs:5447."
+  },
+  {
+   "text": "C2-C3 grow-only versions map with ROOT blobHash dual-write; declared_head_action_hash column + HEAD election preserving green-over-amber",
+   "line": 52,
+   "state": "CLAIMED",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#7",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L52",
+   "class": "provisional",
+   "note": "sync/projector.rs versions map; migrations 2026-07-04 declared_head, 2026-07-12 declared_head_at."
+  },
+  {
+   "text": "C4 notary-overlay serving (green over amber) + rebuild SQL from converged L1",
+   "line": 54,
+   "state": "OPEN",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#8",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L54",
+   "class": "provisional",
+   "note": "rebuild_from_L1 proof test not located."
+  },
+  {
+   "text": "C5 reach-cohort edit-membership + author-signature (the 'TLS'): proof of membership in the origin EPR's reach+attestation edit cohort",
+   "line": 55,
+   "state": "OPEN",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#9",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L55",
+   "class": "provisional"
+  },
+  {
+   "text": "Revocation (OD-6): Content revocation arm in reconcile/controller.rs — authority revocation downgrades to amber, safety revocation hard-suppresses",
+   "line": 57,
+   "state": "OPEN",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#10",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L57",
+   "class": "provisional"
+  },
+  {
+   "text": "Correction 6: multi-root convergence — C3's single-chain assumption is falsified live (multiple roots per id); design the multi-root election",
+   "line": 32,
+   "state": "OPEN",
+   "id": "plans__2026-07-01-crdt-content-dataplane-full1c-implementation-plan#11",
+   "cites": "genesis/docs/superpowers/plans/2026-07-01-crdt-content-dataplane-full1c-implementation-plan.md#L32",
+   "class": "provisional"
+  }
+ ]
+}

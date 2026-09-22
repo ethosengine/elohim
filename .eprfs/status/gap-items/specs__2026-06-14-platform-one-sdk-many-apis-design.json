@@ -1,0 +1,69 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md",
+ "slug": "specs__2026-06-14-platform-one-sdk-many-apis-design",
+ "method": "agent-decomposition",
+ "class": "provisional",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from 'THE SMALLEST REAL FIRST STEP' (4 steps) + §1.2 five-verb grammar + §4.4 coherence gate. None of the four first steps landed (no elohim/sdk/src/grammar/, platform-catalog.json, CORPUS-MAP.md, or manifest keys). The runGovernor anchor (elohim-compute::actuation) and rollupCoverage anchor (elohim-storage/src/recursion.rs) exist as capabilities, not as grammar verbs. Vision-scale breadth: rank DOWN.",
+ "count": 7,
+ "items": [
+  {
+   "text": "Step 1: name the boundary — elohim/sdk/src/grammar/ with five thin re-export verb files; ElohimSDK facade getters re-pointed; elohim/sdk/src/api/ as the Layer-2 home",
+   "line": 397,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L397",
+   "class": "provisional"
+  },
+  {
+   "text": "Grammar verb authorAtom (person's-own-key EPR atom signing) exposed through the SDK",
+   "line": 91,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L91",
+   "class": "provisional",
+   "note": "shared with elohim-sdk step 1.2 (authorAtom not in epr-ts)."
+  },
+  {
+   "text": "Grammar verbs runGovernor + rollupCoverage bound to elohim-compute::actuation and the CoverageRollup",
+   "line": 93,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L93",
+   "class": "provisional",
+   "note": "underlying capabilities exist; no TS grammar surface."
+  },
+  {
+   "text": "Grammar verbs commit(face) + bindCapability (scoped, revocable, refuses cross-band scopes)",
+   "line": 95,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L95",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 2: elohim/sdk/platform-catalog.json (§2 tables as data keyed to real paths) + generated PlatformCatalog view via export_bindings",
+   "line": 400,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L400",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 3: domains/CORPUS-MAP.md (cite-sealed corpus table) + create-elohim-app --template=marketplace against today's substrate",
+   "line": 403,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L403",
+   "class": "provisional"
+  },
+  {
+   "text": "Step 4 coherence gate: primitive_instantiation + gradient_placement required on domain manifests; schema:validate rejects missing keys and per-soul coverage_domain; domains/README.md columns",
+   "line": 406,
+   "state": "OPEN",
+   "id": "specs__2026-06-14-platform-one-sdk-many-apis-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-14-platform-one-sdk-many-apis-design.md#L406",
+   "class": "provisional"
+  }
+ ]
+}

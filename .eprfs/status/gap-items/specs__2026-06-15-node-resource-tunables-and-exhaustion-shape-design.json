@@ -1,0 +1,99 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md",
+ "slug": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design",
+ "method": "agent-decomposition",
+ "class": "substrate",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-22 (stasis round 3) from the Scope table (A1-F) cross-checked against the doc's own 2026-06-15 Implementation status. A1, A3, B, C, D1, D2 recorded landed; A2 deferred/folded into iroh sprint; E reconciled not coded (live card is operator/pipeline); F push operator-owned (long since pushed — dev carries the work).",
+ "count": 10,
+ "items": [
+  {
+   "text": "A1 STORAGE_DB_POOL_SIZE env knob (default unchanged) + parser tests",
+   "line": 61,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L61",
+   "class": "substrate",
+   "note": "db/mod.rs; 4 unit tests (status section)."
+  },
+  {
+   "text": "A2 arc-factor deploy knob ELOHIM_TARGET_ARC_FACTOR ({0,1}) — redesign for the read-only configMap mount",
+   "line": 80,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L80",
+   "class": "substrate",
+   "note": "deferred: conductor config is a read-only configMap subPath; boot-write design B cannot work on alpha."
+  },
+  {
+   "text": "A3 matthew cpu band-aid 3000m->4000m + per-node edgenodeDbPoolSize wiring",
+   "line": 95,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L95",
+   "class": "substrate"
+  },
+  {
+   "text": "B node-resource-tunables.feature: limits documented as a2o stories referencing the guarding Rust tests",
+   "line": 101,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L101",
+   "class": "substrate",
+   "note": "features/deployment/node-resource-tunables.feature; scenarios @wip pending step defs."
+  },
+  {
+   "text": "B follow-on: step definitions to un-@wip node-resource-tunables.feature",
+   "line": 106,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L106",
+   "class": "substrate"
+  },
+  {
+   "text": "C exhaustion-shape report build-resource-shape-report.ts + schema + tests (node x resource-class x lifecycle)",
+   "line": 112,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L112",
+   "class": "substrate",
+   "note": "11 unit tests; 24 entries on first run."
+  },
+  {
+   "text": "D1 seeder validator accepts manifest ?? template; gate validate:deployments in pre-push (follow-on)",
+   "line": 131,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L131",
+   "class": "substrate",
+   "note": "validator fix landed; the pre-push gating follow-on is not evidenced."
+  },
+  {
+   "text": "D2 humans source files for caleb/daniel/emma regenerated into humans.json",
+   "line": 148,
+   "state": "CLAIMED",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L148",
+   "class": "substrate"
+  },
+  {
+   "text": "E1 honest provide-row seed reaches alpha; retire wrong-shape custody-blob rows in seed-commitments.ts",
+   "line": 169,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L169",
+   "class": "substrate",
+   "requires_env": [
+    "alpha-cluster-6peer"
+   ]
+  },
+  {
+   "text": "E2 operator-gated PUT /admin/seed/shard-manifest seed stage (status='seeded', auditable) to light stewarding",
+   "line": 171,
+   "state": "OPEN",
+   "id": "specs__2026-06-15-node-resource-tunables-and-exhaustion-shape-design#10",
+   "cites": "genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md#L171",
+   "class": "substrate"
+  }
+ ]
+}
