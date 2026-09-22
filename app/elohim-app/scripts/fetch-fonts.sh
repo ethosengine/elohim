@@ -12,6 +12,33 @@ FONTS_DIR="$APP_DIR/src/assets/fonts"
 FA_VERSION="6.4.0"
 UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120"
 
+# One download path for every CDN fetch. Bounded (connect 15s, transfer 120s),
+# retried (5x, every curl error class — a CDN stall on the CI agent surfaced
+# 2026-09-22 as elohim/dev #1717 `script returned exit code 28` with no URL
+# named), fails on HTTP errors instead of saving the error page as a font, and
+# writes through a temp file so a partial download can never satisfy the
+# "already present" short-circuit on the next run. Names the URL on failure.
+fetch_url() {
+  local url="$1" out="$2"
+  local tmp="$out.part" rc=0
+  curl -fsSL \
+      --connect-timeout 15 --max-time 120 \
+      --retry 5 --retry-delay 3 --retry-all-errors \
+      -H "User-Agent: $UA" \
+      -o "$tmp" "$url" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    rm -f "$tmp"
+    echo "fetch-fonts: FAILED (curl exit $rc) after retries: $url" >&2
+    return "$rc"
+  fi
+  if [ ! -s "$tmp" ]; then
+    rm -f "$tmp"
+    echo "fetch-fonts: FAILED (empty body): $url" >&2
+    return 1
+  fi
+  mv -f "$tmp" "$out"
+}
+
 # ── Material Icons ──────────────────────────────────────────────────
 fetch_material_icons() {
   local dir="$FONTS_DIR/material-icons"
@@ -21,8 +48,8 @@ fetch_material_icons() {
   fi
   echo "Material Icons: downloading..."
   mkdir -p "$dir"
-  curl -sL 'https://fonts.gstatic.com/s/materialicons/v145/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2' \
-    -o "$dir/material-icons.woff2"
+  fetch_url 'https://fonts.gstatic.com/s/materialicons/v145/flUhRq6tzZclQEJ-Vdg-IuiaDsNc.woff2' \
+    "$dir/material-icons.woff2"
   cat > "$dir/material-icons.css" <<'CSS'
 @font-face {
   font-family: 'Material Icons';
@@ -59,8 +86,8 @@ fetch_fontawesome() {
   fi
   echo "Font Awesome $FA_VERSION: downloading..."
   mkdir -p "$css_dir" "$wf_dir"
-  curl -sL "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/$FA_VERSION/css/all.min.css" \
-    -o "$css_dir/all.min.css"
+  fetch_url "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/$FA_VERSION/css/all.min.css" \
+    "$css_dir/all.min.css"
   local fonts=(
     fa-brands-400.woff2 fa-brands-400.ttf
     fa-regular-400.woff2 fa-regular-400.ttf
@@ -68,8 +95,8 @@ fetch_fontawesome() {
     fa-v4compatibility.woff2 fa-v4compatibility.ttf
   )
   for font in "${fonts[@]}"; do
-    curl -sL "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/$FA_VERSION/webfonts/$font" \
-      -o "$wf_dir/$font"
+    fetch_url "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/$FA_VERSION/webfonts/$font" \
+      "$wf_dir/$font"
   done
   echo "Font Awesome $FA_VERSION: done"
 }
@@ -86,20 +113,26 @@ fetch_google_fonts() {
 
   # Fetch the CSS with a modern UA to get woff2 format
   local css
-  css=$(curl -s \
+  fetch_url \
     'https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,100..900;1,100..900&family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap' \
-    -H "User-Agent: $UA")
+    "$dir/google-fonts.remote.css"
+  css=$(cat "$dir/google-fonts.remote.css")
+  rm -f "$dir/google-fonts.remote.css"
 
   # Extract and download only latin, latin-ext, and vietnamese subset files
   # Use grep to find the font URLs following subset comments
   local urls
   urls=$(echo "$css" | grep -A8 -E '/\* (latin-ext|latin|vietnamese) \*/' \
-    | grep -oP 'url\(\Khttps://[^)]+')
+    | grep -oP 'url\(\Khttps://[^)]+' || true)
+  if [ -z "$urls" ]; then
+    echo "fetch-fonts: FAILED: Google Fonts CSS carried no latin/latin-ext/vietnamese woff2 URLs (UA or CSS shape changed?)" >&2
+    return 1
+  fi
 
   for url in $urls; do
     local fname
     fname=$(basename "$url")
-    curl -sL "$url" -o "$dir/$fname"
+    fetch_url "$url" "$dir/$fname"
   done
 
   # Generate local CSS: keep only latin/latin-ext/vietnamese blocks,
