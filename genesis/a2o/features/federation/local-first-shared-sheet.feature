@@ -3,7 +3,8 @@
 # doorway architecture are judged against a real use as they mature. Two scenarios touch the live
 # serving-edge campaign — genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md:
 # "keeps editing together" leans on its story 4.2 (doorway↔peer push) and story 4.3 (eager delivery
-# on every transport, see dataplane/transport-comparison-matrix.feature); the others are ahead of any plan.
+# on every transport, see dataplane/transport-comparison-matrix.feature); its runnable seam is
+# dataplane/hub-carries-edit.feature (@concern:hub-carries-edit). The others are ahead of any plan.
 @e2e @federation @local-first @act:iii @wip @vision
 Feature: A small group edits one spreadsheet together, from a laptop at home and a browser at work
 
