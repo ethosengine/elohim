@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "recipe": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+  "recipe": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
   "questions": [
     {
       "id": "q-remine",
@@ -11,7 +11,7 @@
             "When should verified canonical memory surfaces be re-mined, and what stamps the refresh as done?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {
@@ -30,7 +30,7 @@
             "Where is a witnessed correction closed, and what closes it?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {
@@ -49,7 +49,7 @@
             "Which habit is top red right now, and what proves it moved to green?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {
@@ -68,7 +68,7 @@
             "How does a hook resolve which `epr` binary to run?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {
@@ -87,7 +87,7 @@
             "What bounds the per-file window discovery may read for term matching?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {
@@ -106,7 +106,7 @@
             "Where do recall-journey folds live, and how do they arrive?"
           ]
         },
-        "in_scope_of": "bafkreihcem42e6iyjhon5ianu2tcf5mzun2b3qv23byd2r6mnuszem6l3i",
+        "in_scope_of": "bafkreibewuf7d4x37mqaqwt5qqo4otr3ktr24lmgp4enxhgmsve3jycena",
         "raised_by": "agent:steward@repo"
       },
       "reached_when": {

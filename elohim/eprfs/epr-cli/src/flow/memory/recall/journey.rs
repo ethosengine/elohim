@@ -866,6 +866,37 @@ pub(super) fn execute(
         push_action(&mut view, priority_action);
     }
 
+    // S2 (2026-09-22 recall-Codex-trail sprint): `open --purpose resume --habit <id>` is a
+    // read-only view of one concern's own last evidence, its plans and its local git standing —
+    // entirely separate from the candidate-list doors below, so it returns before any of that
+    // discovery runs. `--habit` itself is refused up front in `mod.rs::parse_args`; reaching here
+    // (a genuinely new ceremony, `open`, purpose `resume`) means the flag was present.
+    if new_ceremony && args.purpose.as_deref() == Some("resume") {
+        let habit_id = args
+            .habit
+            .as_deref()
+            .ok_or_else(|| refused("open --purpose resume needs --habit <id>"))?;
+        resume_view(args, contract, habit_id, &mut view)?;
+        view["orientation"] = orientation(&recipe, &state);
+        let reader = lens::reader_from_session(&args.root, &args.session);
+        let resolved_lens = lens::resolve(&reader, contract, args.lens, &args.root);
+        if let Some(message) = &resolved_lens.malformed {
+            push_unresolved(&mut view, message.clone());
+        }
+        view["lens"] = resolved_lens.to_value();
+        push_action(
+            &mut view,
+            action(
+                args,
+                "Inspect governing recipe and alternatives",
+                "recipe",
+                &[("need", json!("Understand this view and its omissions"))],
+            ),
+        );
+        execution.state["ceremony"] = state;
+        return Ok((view, resolved_lens));
+    }
+
     let has_measurements = !recipe["measurements"].is_null();
     if new_ceremony && has_measurements {
         view["measurement"] = measure(args, contract, &mut state, "baseline", method)?;
@@ -1247,6 +1278,15 @@ pub(super) fn execute(
                 let mut contents = outline(args, contract, &path)?;
                 let usage = contents["usage"].take();
                 add_usage(&mut view["usage"], &usage);
+                // S3 (2026-09-22 sprint): prose that lags its value — one small bounded read of
+                // the whole file, capped at the same scan_bytes ceiling `outline` used above.
+                let mut disagreement_usage = json!({});
+                if let Some(disagreements) =
+                    disagreement::from_source(&args.root, contract, &path, &mut disagreement_usage)?
+                {
+                    add_usage(&mut view["usage"], &disagreement_usage);
+                    view["disagreements"] = disagreements;
+                }
                 let headings = contents["headings"].as_array().cloned().unwrap_or_default();
                 let line_count = contents["line_count"].as_u64().unwrap_or(0);
                 view["source_outline"] = contents;
@@ -1310,6 +1350,19 @@ pub(super) fn execute(
             retain_evidence(&mut state, &result, &args.need);
             let sources = result["sources"].as_array().cloned().unwrap_or_default();
             view["receipt_keys"] = json!(sources.iter().map(evidence_key).collect::<Vec<_>>());
+            // S3 (2026-09-22 sprint): prose that lags its value — scanned over the excerpt already
+            // fetched above, no second read. `parse_range` already validated `start`; a malformed
+            // range never reaches here (the `?` on `excerpt` would have refused first).
+            if let Some(content) = sources.first().and_then(|s| s["content"].as_str()) {
+                let start_line = lines
+                    .split_once(':')
+                    .and_then(|(a, _)| a.parse::<usize>().ok())
+                    .unwrap_or(1);
+                if let Some(disagreements) = disagreement::from_excerpt(content, &path, start_line)
+                {
+                    view["disagreements"] = disagreements;
+                }
+            }
             for message in result["unresolved"].as_array().cloned().unwrap_or_default() {
                 push_unresolved(&mut view, message.as_str().unwrap_or_default().to_string());
             }

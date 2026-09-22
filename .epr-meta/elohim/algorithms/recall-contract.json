@@ -22,7 +22,8 @@
     "provider_seconds": 15,
     "native_raw_bytes": 262144,
     "session_bytes": 1048576,
-    "habit_register_bytes": 1048576
+    "habit_register_bytes": 1048576,
+    "resume_commits": 30
   },
   "source_roots": [
     "CLAUDE.md",
