@@ -52,3 +52,32 @@ touching the dual-mode guard. Household lever for varying which peers run which 
 **Links.** Plan: `genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md`
 story 4.3 (corrected 2026-09-20 note under story 4.1). Habit:
 `elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md`.
+
+**Measurement slice, 2026-09-22.** The candidate uses
+`elohim_sync_projected_apply_staleness_seconds{plane}` to measure the age of an
+Automerge change after successful remote serving projection. Origin time uses
+Automerge's existing advisory timestamp, at one-second precision; no announce
+wire field or DHT entry is added. The measurement includes queueing, eager or
+periodic sync, dependency retrieval, application and reverse projection. It is
+not notification transit latency. Missing and future timestamps are excluded
+and counted separately; concurrent deliveries may still contribute duplicate
+samples because telemetry does not change the sync scheduling contract.
+
+The transport matrix pairs exact-head serving convergence with new valid
+histogram count/sum samples. These aggregate samples demonstrate measurement
+activity on the selected plane, not unique attribution to the authored document.
+The mixed station isolates Jessica's iroh receiver while Matthew and James use
+dual mode. Household runs on 2026-09-22 passed both stations with exact-head
+serving convergence: the isolated libp2p receivers each added one valid sample
+(Jessica 0.901s, James 0.903s); the mixed iroh receiver added one sample of
+38.597s. These are aggregate observation windows, not per-document transit
+measurements or a latency distribution. Reports:
+`sprint-report-household-20260922T140839Z-19c78d4a.json` and
+`sprint-report-household-20260922T140956Z-19c78d4a.json`; candidate binary
+`a163463094a1bbc2cac18f9afd9b7dd63c1a50daf53126afc6ab03dbd3a32f67`.
+The measured candidate was uncommitted atop the report's base commit. The
+household was restored to all-dual mode without resetting identities or data.
+The dual-mode announce guard remains in place; story 4.3's delivery change
+remains open. The next refinement is one projection followed by fan-out to both
+announcers, preserving the guard's protection against competing projection
+writers, then repeating the same mixed measurement.

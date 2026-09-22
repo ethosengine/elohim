@@ -1,10 +1,13 @@
 @e2e @dataplane @regression @requires:household-nodes @requires:owned-substrate @concern:transport-parity @act:i
 Feature: Matthew can trust every supported household transport
+  Staleness evidence is aggregate: its sample count and sum advance alongside
+  independent document convergence, without claiming unique-document correlation
+  or imposing a latency threshold.
   Matthew's family should receive the same newly shared writing whether their
   storage peers use libp2p, iroh, or dual mode. The single-plane examples
   independently isolate libp2p and iroh while proving the same fresh-writing
   contract. The dual example separately proves convergence while both planes
-  remain active; it does not claim which racing plane delivered the writing.
+  perform new sync work; it does not claim which racing plane delivered the writing.
 
   Each example creates a fresh Matthew-authored content node after recording
   the mode's sync counters. Equal Automerge heads mean the peers hold the same
@@ -26,6 +29,7 @@ Feature: Matthew can trust every supported household transport
     When Matthew creates content titled "Transport matrix <mode>" with tags "e2e,transport-matrix"
     Then the content should be created successfully
     And every household peer serves the new document at Matthew's exact Automerge heads within 30 seconds
+    And every receiving household peer records new valid origin-to-projected-apply samples for the selected plane
     And every household peer completed new sync work on every selected plane
 
     @transport:libp2p
@@ -39,7 +43,7 @@ Feature: Matthew can trust every supported household transport
       | iroh | iroh   |
 
   @transport:dual
-  Scenario: A fresh family writing converges while both planes remain active
+  Scenario: A fresh family writing converges while both planes perform new sync work
     Given the household runs in "dual" mode with selected planes "libp2p+iroh"
     And the household's current transport sync counters are recorded
     And human "Matthew" is logged in on doorway "alpha" with device
@@ -47,3 +51,14 @@ Feature: Matthew can trust every supported household transport
     Then the content should be created successfully
     And every household peer serves the new document at Matthew's exact Automerge heads within 30 seconds
     And every household peer completed new sync work on every selected plane
+
+  @transport:staleness @transport:mixed-iroh
+  Scenario: A mixed household records iroh origin-to-projected-apply staleness
+    Matthew's device authors through peer matthew; James remains dual while Jessica receives on iroh.
+    Given Matthew and James run in "dual" mode while receiver "jessica" runs in "iroh" mode
+    And the household's current transport sync counters are recorded
+    And human "Matthew" is logged in on doorway "alpha" with device
+    When Matthew creates content titled "Transport matrix mixed iroh" with tags "e2e,transport-matrix"
+    Then the content should be created successfully
+    And every household peer serves the new document at Matthew's exact Automerge heads within 120 seconds
+    And receiver "jessica" records new valid origin-to-projected-apply samples for the "iroh" plane

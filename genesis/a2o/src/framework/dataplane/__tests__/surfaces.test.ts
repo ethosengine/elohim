@@ -20,6 +20,10 @@ void describe('classifyStorageTransportStatus', () => {
     assert.equal(classifyStorageTransportStatus({ peerId: '12D3KooWpeer' }), 'libp2p');
     assert.equal(classifyStorageTransportStatus({ peerId: 'a'.repeat(64) }), 'iroh');
     assert.equal(
+      classifyStorageTransportStatus({ peerId: 'a'.repeat(64), irohNodeId: 'a'.repeat(64) }),
+      'iroh'
+    );
+    assert.equal(
       classifyStorageTransportStatus({ peerId: '12D3KooWpeer', irohNodeId: 'b'.repeat(64) }),
       'dual'
     );

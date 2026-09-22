@@ -53,6 +53,40 @@ fn parse_change_hash(hex_hash: &str) -> Option<automerge::ChangeHash> {
     Some(automerge::ChangeHash(arr))
 }
 
+/// Return advisory origin timestamps for received changes that are not already
+/// present in the local document.
+///
+/// This is deliberately a best-effort telemetry filter outside the apply
+/// boundary. A simultaneous delivery on both transport planes can race between
+/// this check and apply and produce two samples. Read or decode failures emit no
+/// sample; sync correctness remains owned by `apply_changes`.
+pub async fn new_change_origin_timestamps(
+    sync_manager: &SyncManager,
+    h_app_id: &str,
+    doc_id: &str,
+    change_blobs: &[Vec<u8>],
+) -> Vec<Option<i64>> {
+    let mut received = match sync_manager.doc_store.get(h_app_id, doc_id).await {
+        Ok(Some(stored)) => match Automerge::load(&stored.data) {
+            Ok(doc) => doc,
+            Err(_) => return Vec::new(),
+        },
+        Ok(None) => Automerge::new(),
+        Err(_) => return Vec::new(),
+    };
+    let held_heads = received.get_heads();
+    for blob in change_blobs {
+        if received.load_incremental(blob).is_err() {
+            return Vec::new();
+        }
+    }
+    received
+        .get_changes(&held_heads)
+        .into_iter()
+        .map(|change| Some(change.timestamp()))
+        .collect()
+}
+
 impl SyncManager {
     /// Create a new sync manager
     pub fn new(doc_store: Arc<DocStore>, stream_tracker: Arc<StreamTracker>) -> Self {
@@ -369,6 +403,77 @@ mod tests {
         peer.apply_changes(ns, doc, vec![delta]).await.unwrap();
         assert_eq!(peer.get_doc_field(ns, doc, "title").await.unwrap(), "v2");
         assert_eq!(peer.get_heads(ns, doc).await.unwrap(), vec![head]);
+    }
+
+    #[tokio::test]
+    async fn origin_times_include_only_changes_not_already_held() {
+        let (sync, _tmp) = test_sync_manager().await;
+        let mut authored = Automerge::new();
+        authored
+            .transact_with::<_, _, automerge::AutomergeError, _>(
+                |_| automerge::transaction::CommitOptions::default().with_time(99),
+                |tx| {
+                    tx.put(automerge::ROOT, "title", "new")?;
+                    Ok(())
+                },
+            )
+            .unwrap();
+        let first_heads = authored.get_heads();
+        let first = authored.get_changes(&[])[0].raw_bytes().to_vec();
+
+        assert_eq!(
+            new_change_origin_timestamps(&sync, "elohim", "node:new", &[first.clone()]).await,
+            vec![Some(99)]
+        );
+        sync.apply_changes("elohim", "node:new", vec![first.clone()])
+            .await
+            .unwrap();
+        assert!(
+            new_change_origin_timestamps(&sync, "elohim", "node:new", &[first.clone()])
+                .await
+                .is_empty(),
+            "a sequential duplicate must not emit a second latency sample"
+        );
+
+        authored
+            .transact_with::<_, _, automerge::AutomergeError, _>(
+                |_| automerge::transaction::CommitOptions::default().with_time(100),
+                |tx| {
+                    tx.put(automerge::ROOT, "title", "dependent")?;
+                    Ok(())
+                },
+            )
+            .unwrap();
+        let dependent = authored.get_changes(&first_heads)[0].raw_bytes().to_vec();
+        assert_eq!(
+            new_change_origin_timestamps(
+                &sync,
+                "elohim",
+                "node:new",
+                std::slice::from_ref(&dependent),
+            )
+            .await,
+            vec![Some(100)],
+            "a dependent raw change must be inspected against the held document"
+        );
+
+        let (batch_sync, _batch_tmp) = test_sync_manager().await;
+        batch_sync
+            .apply_changes("elohim", "node:new", vec![first])
+            .await
+            .unwrap();
+        let saved_after = authored.save_after(&first_heads);
+        assert_eq!(
+            new_change_origin_timestamps(
+                &batch_sync,
+                "elohim",
+                "node:new",
+                std::slice::from_ref(&saved_after),
+            )
+            .await,
+            vec![Some(100)],
+            "a dependent save_after batch must retain its origin timestamp"
+        );
     }
 
     /// `/p2p/status.syncDocuments` read 0 on a store holding 5,356 docs

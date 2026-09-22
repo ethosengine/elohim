@@ -212,6 +212,13 @@ async fn sync_document(
         }
 
         let change_count = changes.len() as u64;
+        let origin_timestamps = crate::sync::new_change_origin_timestamps(
+            sync_manager,
+            PROJECTION_NAMESPACE,
+            &remote.doc_id,
+            &changes,
+        )
+        .await;
         match sync_manager
             .apply_changes(PROJECTION_NAMESPACE, &remote.doc_id, changes)
             .await
@@ -219,7 +226,12 @@ async fn sync_document(
             Ok(applied_heads) => {
                 crate::metrics::add_iroh_sync_changes_applied(change_count);
                 local_heads = applied_heads;
-                reverse_project(sync_manager, db_pool, &remote.doc_id).await;
+                if reverse_project(sync_manager, db_pool, &remote.doc_id).await {
+                    crate::metrics::observe_sync_projected_apply_staleness(
+                        "iroh",
+                        origin_timestamps,
+                    );
+                }
                 info!(peer = %peer.node_id, doc_id = %remote.doc_id, changes = change_count, "iroh sync changes applied");
             }
             Err(error) => {
@@ -267,18 +279,22 @@ pub(crate) async fn reverse_project(
     sync_manager: &SyncManager,
     db_pool: Option<&DbPool>,
     doc_id: &str,
-) {
+) -> bool {
     if !doc_id.starts_with("node:") {
-        return;
+        return false;
     }
     let Some(pool) = db_pool else {
-        return;
+        return false;
     };
     match crate::sync::projector::reverse_project_content_doc(sync_manager, pool, doc_id).await {
-        Ok(true) => debug!(doc_id = %doc_id, "iroh sync reverse-projected content pointer"),
-        Ok(false) => {}
+        Ok(true) => {
+            debug!(doc_id = %doc_id, "iroh sync reverse-projected content pointer");
+            true
+        }
+        Ok(false) => true,
         Err(error) => {
-            warn!(doc_id = %doc_id, error = %error, "iroh sync reverse projection failed")
+            warn!(doc_id = %doc_id, error = %error, "iroh sync reverse projection failed");
+            false
         }
     }
 }

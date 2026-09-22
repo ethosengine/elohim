@@ -1496,6 +1496,36 @@ lazy_static! {
     )
     .unwrap();
 
+    /// End-to-end age of a remotely-authored Automerge change when its local
+    /// serving projection has completed. This is origin-to-projected-apply
+    /// staleness, not notification transit time: it includes queueing, a
+    /// periodic round or eager announce, dependency pulls, apply, and reverse
+    /// projection. The source timestamp has one-second precision and comes from
+    /// the author's wall clock. label: plane = "libp2p" | "iroh".
+    pub static ref SYNC_PROJECTED_APPLY_STALENESS_SECONDS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_sync_projected_apply_staleness_seconds",
+            "Seconds from the author's Automerge commit timestamp to successful remote serving projection; end-to-end staleness, not transport latency.",
+        )
+        .buckets(vec![0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0]),
+        &["plane"],
+    )
+    .unwrap();
+
+    /// Changes excluded from the staleness histogram. `missing` includes an
+    /// absent/zero/negative advisory timestamp or undecodable change bytes;
+    /// `future` means author wall time is ahead of receiver wall time. Future
+    /// samples are never clamped to zero because that would manufacture a good
+    /// latency under clock skew. labels are bounded.
+    pub static ref SYNC_PROJECTED_APPLY_STALENESS_INVALID: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_sync_projected_apply_staleness_invalid_total",
+            "Remote changes excluded from projected-apply staleness by plane and reason (missing|future).",
+        ),
+        &["plane", "reason"],
+    )
+    .unwrap();
+
     /// Event-driven head-ADOPTION TRIGGER outcomes
     /// ([`crate::services::head_adoption_trigger`]). label: outcome =
     ///
@@ -3099,6 +3129,15 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(IROH_BLOB_FETCHES.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_ROUNDS.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUESTS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_PROJECTED_APPLY_STALENESS_SECONDS.clone()));
+        let _ = REGISTRY.register(Box::new(SYNC_PROJECTED_APPLY_STALENESS_INVALID.clone()));
+        for plane in ["libp2p", "iroh"] {
+            for reason in ["missing", "future"] {
+                SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                    .with_label_values(&[plane, reason])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(HEAD_ADOPTION_TRIGGER.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_DOCS_ENUMERATED.clone()));
         let _ = REGISTRY.register(Box::new(SYNC_REQUEST_OUTCOMES.clone()));
@@ -3961,6 +4000,45 @@ pub fn inc_sync_round() {
 /// "sync_changes" | "announce_change").
 pub fn inc_sync_request(kind: &str) {
     SYNC_REQUESTS.with_label_values(&[kind]).inc();
+}
+
+/// Observe remote changes only after their serving projection succeeded.
+/// Invalid author clocks remain visible without contaminating the histogram.
+pub fn observe_sync_projected_apply_staleness(
+    plane: &str,
+    origin_timestamps: impl IntoIterator<Item = Option<i64>>,
+) {
+    observe_sync_projected_apply_staleness_at(
+        plane,
+        origin_timestamps,
+        chrono::Utc::now().timestamp_millis() as f64 / 1_000.0,
+    );
+}
+
+fn observe_sync_projected_apply_staleness_at(
+    plane: &str,
+    origin_timestamps: impl IntoIterator<Item = Option<i64>>,
+    receiver_now_seconds: f64,
+) {
+    debug_assert!(matches!(plane, "libp2p" | "iroh"));
+    for origin in origin_timestamps {
+        let Some(origin) = origin.filter(|value| *value > 0) else {
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                .with_label_values(&[plane, "missing"])
+                .inc();
+            continue;
+        };
+        let age = receiver_now_seconds - origin as f64;
+        if age < 0.0 {
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID
+                .with_label_values(&[plane, "future"])
+                .inc();
+            continue;
+        }
+        SYNC_PROJECTED_APPLY_STALENESS_SECONDS
+            .with_label_values(&[plane])
+            .observe(age);
+    }
 }
 
 /// Record one event-driven head-adoption trigger outcome. See
@@ -6912,5 +6990,29 @@ mod tests {
         assert_eq!(success.get_sample_count(), success_before);
         assert_eq!(dropped.get(), dropped_before + 1);
         assert_eq!(timeouts.get(), timeouts_before);
+    }
+
+    #[test]
+    fn projected_apply_staleness_refuses_missing_and_future_origins() {
+        let histogram = SYNC_PROJECTED_APPLY_STALENESS_SECONDS.with_label_values(&["libp2p"]);
+        let missing =
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID.with_label_values(&["libp2p", "missing"]);
+        let future =
+            SYNC_PROJECTED_APPLY_STALENESS_INVALID.with_label_values(&["libp2p", "future"]);
+        let histogram_before = histogram.get_sample_count();
+        let sum_before = histogram.get_sample_sum();
+        let missing_before = missing.get();
+        let future_before = future.get();
+
+        observe_sync_projected_apply_staleness_at(
+            "libp2p",
+            [Some(99), None, Some(0), Some(-1), Some(101)],
+            100.25,
+        );
+
+        assert_eq!(histogram.get_sample_count(), histogram_before + 1);
+        assert_eq!(missing.get(), missing_before + 3);
+        assert_eq!(future.get(), future_before + 1);
+        assert_eq!(histogram.get_sample_sum(), sum_before + 1.25);
     }
 }

@@ -281,27 +281,33 @@ pub async fn project_content_doc(
     if doc_matches(&doc, &fields) && dag_current {
         return Ok(false);
     }
-    doc.transact::<_, _, automerge::AutomergeError>(|tx| {
-        for (key, val) in &fields {
-            match val {
-                FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
-                FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+    doc.transact_with::<_, _, automerge::AutomergeError, _>(
+        |_| {
+            automerge::transaction::CommitOptions::default()
+                .with_time(chrono::Utc::now().timestamp())
+        },
+        |tx| {
+            for (key, val) in &fields {
+                match val {
+                    FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
+                    FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+                }
             }
-        }
-        // Version-DAG leg (Plan C2): record this serving version in the grow-only
-        // `versions` map keyed by its content-address, and move `head` to it. The
-        // flat ROOT `blobHash` above is the dual-write compat leg for pre-C2 peers;
-        // grow-only means a divergent peer version is ADDED, never overwriting.
-        if let Some(vcid) = &head_vcid {
-            let versions_id = match tx.get(automerge::ROOT, "versions")? {
-                Some((Value::Object(automerge::ObjType::Map), id)) => id,
-                _ => tx.put_object(automerge::ROOT, "versions", automerge::ObjType::Map)?,
-            };
-            tx.put(&versions_id, vcid.as_str(), vcid.as_str())?;
-            tx.put(automerge::ROOT, "head", vcid.as_str())?;
-        }
-        Ok(())
-    })
+            // Version-DAG leg (Plan C2): record this serving version in the grow-only
+            // `versions` map keyed by its content-address, and move `head` to it. The
+            // flat ROOT `blobHash` above is the dual-write compat leg for pre-C2 peers;
+            // grow-only means a divergent peer version is ADDED, never overwriting.
+            if let Some(vcid) = &head_vcid {
+                let versions_id = match tx.get(automerge::ROOT, "versions")? {
+                    Some((Value::Object(automerge::ObjType::Map), id)) => id,
+                    _ => tx.put_object(automerge::ROOT, "versions", automerge::ObjType::Map)?,
+                };
+                tx.put(&versions_id, vcid.as_str(), vcid.as_str())?;
+                tx.put(automerge::ROOT, "head", vcid.as_str())?;
+            }
+            Ok(())
+        },
+    )
     .map_err(|e| StorageError::Sync(format!("projector transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
@@ -366,15 +372,21 @@ pub async fn project_content_doc_reconcile_keys(
     if fields.is_empty() {
         return Ok(Vec::new());
     }
-    doc.transact::<_, _, automerge::AutomergeError>(|tx| {
-        for (key, val) in &fields {
-            match val {
-                FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
-                FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+    doc.transact_with::<_, _, automerge::AutomergeError, _>(
+        |_| {
+            automerge::transaction::CommitOptions::default()
+                .with_time(chrono::Utc::now().timestamp())
+        },
+        |tx| {
+            for (key, val) in &fields {
+                match val {
+                    FieldVal::S(s) => tx.put(automerge::ROOT, *key, s.as_str())?,
+                    FieldVal::I(i) => tx.put(automerge::ROOT, *key, *i)?,
+                }
             }
-        }
-        Ok(())
-    })
+            Ok(())
+        },
+    )
     .map_err(|e| StorageError::Sync(format!("projector reconcile transact failed: {e:?}")))?;
     sync.apply_changes(PROJECTION_NAMESPACE, &doc_id, vec![doc.save()])
         .await?;
@@ -1028,6 +1040,29 @@ mod tests {
 
         // The doc_id helper is the canonical content-node address.
         assert_eq!(super::content_doc_id("edit-prop-1"), "node:edit-prop-1");
+    }
+
+    #[tokio::test]
+    async fn projected_change_carries_nonzero_advisory_origin_time() {
+        let (sync, _temp) = test_sync_manager().await;
+        let before = chrono::Utc::now().timestamp();
+        super::project_content_doc(&sync, &sample_content("timed-change", "v1"))
+            .await
+            .unwrap();
+        let head = sync.get_heads("elohim", "node:timed-change").await.unwrap()[0].clone();
+        let bytes = sync
+            .get_change_by_hash("elohim", "node:timed-change", &head)
+            .await
+            .unwrap()
+            .expect("projected head change");
+        let timestamp = automerge::Change::from_bytes(bytes).unwrap().timestamp();
+        let after = chrono::Utc::now().timestamp();
+
+        assert!(timestamp > 0, "zero is Automerge's unstamped default");
+        assert!(
+            (before..=after).contains(&timestamp),
+            "projected change time {timestamp} outside [{before}, {after}]"
+        );
     }
 
     /// Pin the on-the-wire sync namespace. Producer/consumer drift is now

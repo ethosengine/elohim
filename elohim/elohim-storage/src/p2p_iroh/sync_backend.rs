@@ -132,6 +132,14 @@ impl SyncManagerBackend {
             };
         };
 
+        let origin_timestamps = crate::sync::new_change_origin_timestamps(
+            &self.sync_manager,
+            &h_app_id,
+            &doc_id,
+            std::slice::from_ref(&data),
+        )
+        .await;
+
         match self
             .sync_manager
             .apply_changes(&h_app_id, &doc_id, vec![data])
@@ -161,12 +169,18 @@ impl SyncManagerBackend {
                 // Amber-tier heal, same leg the pull path gets — a converged
                 // DocStore with a stale serving row is half a cure.
                 if let Some(pb) = self.pull_back.get() {
-                    super::sync_driver::reverse_project(
+                    if super::sync_driver::reverse_project(
                         &self.sync_manager,
                         pb.db_pool.as_ref(),
                         &doc_id,
                     )
-                    .await;
+                    .await
+                    {
+                        crate::metrics::observe_sync_projected_apply_staleness(
+                            "iroh",
+                            origin_timestamps,
+                        );
+                    }
                 }
                 SyncResponse::ChangeAck {
                     h_app_id,
@@ -300,11 +314,15 @@ async fn pull_announced_doc(
         return;
     }
     let count = changes.len() as u64;
+    let origin_timestamps =
+        crate::sync::new_change_origin_timestamps(sync_manager, h_app_id, doc_id, &changes).await;
     match sync_manager.apply_changes(h_app_id, doc_id, changes).await {
         Ok(_) => {
             crate::metrics::add_iroh_sync_changes_applied(count);
             info!(peer = %peer_id, doc_id = %doc_id, changes = count, "iroh announce pull applied changes");
-            super::sync_driver::reverse_project(sync_manager, db_pool, doc_id).await;
+            if super::sync_driver::reverse_project(sync_manager, db_pool, doc_id).await {
+                crate::metrics::observe_sync_projected_apply_staleness("iroh", origin_timestamps);
+            }
         }
         Err(e) => {
             warn!(peer = %peer_id, doc_id = %doc_id, error = %e, "iroh announce pull failed to apply changes")
