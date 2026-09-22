@@ -6,6 +6,15 @@ status: noted
 tier: history
 created: 2026-06-19
 topic: [conductor-leak, oom, jemalloc, glibc-arena, cure, alpha]
+# This record DISTILLS the falsified leg of the investigation trail. The retired bodies live in
+# git history: `git log --diff-filter=D --oneline -- <path>` then `git show <sha>^:<path>`.
+distills:
+  - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-empirical-reframe.md
+# Bidirectional: the canonical seed this lesson informs (it links back in its section 10.4).
+canonical:
+  - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # 10.4 "Jemalloc: an image choice, not a patch"
 ---
 
 # Conductor leak — CURED by the jemalloc allocator swap (verdict, 2026-06-19)
@@ -24,6 +33,30 @@ returns the freed-but-pinned memory glibc was hoarding in chained 64 MB secondar
 also settles the synthesis's open Layer-B question: the bytes were **freed-but-glibc-pinned
 retention (reclaimable), not a never-freed true leak** (a true never-freed leak would climb under
 jemalloc too; it went flat).
+
+> **Hot-context pointer (the one sentence to remember):** a conductor whose resident memory climbs
+> to OOM under glibc is not proven to be leaking until the allocator is swapped. Here jemalloc
+> flattened the curve, so the "leak" was freed memory that glibc kept pinned. **Read the telemetry
+> that has already shipped, and profile, before reasoning from source.**
+
+## Dead paths (bodies retired to git, lessons kept here)
+The investigation took two wrong turns before the native-heap reframe
+(`2026-06-18-conductor-leak-rca-native-heap-reframe.md`) and the synthesis of record
+(`2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`). Their bodies are retired. One lesson each:
+- **tx5 zombie PeerConnection (2026-06-17, `…-tx5-zombie-hypothesis-falsified.md`).** A source-level
+  root cause plus a fix that its unit tests proved (the teardown tests pass with the fix and time out
+  without it) was deployed fleet-wide, and the leak kept its 1.1–1.2 GB/h rate. A fix proven by its own
+  tests only proves that fix. The tx5 teardown mechanism is still correct and went upstream
+  (`2026-06-17-tx5-zombie-peerconnection-upstream-contribution.md`).
+- **Deploy recipe for that fix (`…-tx5-zombie-fix-deploy-recipe.md`).** One mechanic survives. The
+  holo-host edgenode downloads a prebuilt **glibc** `holochain` into `/bin/holochain`, so a custom
+  conductor is a COPY-over binary swap (`elohim/holochain/edgenode/Dockerfile.zombie-fix` +
+  `build-zombie-fix.sh`, which push canary tags and never `:latest`), not a rebuild of the whole image.
+- **Go live-heap / go-pion reframe (2026-06-18, `…-rca-empirical-reframe.md`).** This pass inferred
+  that off-heap anon memory must belong to go-pion, and it read "working_set climbs to OOM" as proof of
+  an unreclaimable true leak. Both were wrong. The Go arena at `0xc000000000` sat flat at ~52 MB. The
+  smaps localizer shipped in `aa9f97f09` had been flowing unread and pointed at glibc secondary arenas.
+  And jemalloc later showed the bytes were reclaimable.
 
 ## The decisive evidence — image-attributed cadvisor working_set (the number the OOM-killer acts on)
 `container_memory_working_set_bytes{container="elohim-node"}`, carrying the running `image` label,
@@ -97,6 +130,6 @@ The pasted "A (deploy elohim-edgenode:latest tx5-fix) vs B (keep profiler)" fram
 - Git: `b8481f090` body + stat; che-devworkspaces @ `e87a680`.
 - Prior RCA chain: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`,
   `2026-06-18-conductor-leak-rca-native-heap-reframe.md`, `2026-06-18-conductor-leak-canary-runbook.md`,
-  `2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md`.
+  and the retired dead paths distilled under §Dead paths above.
 </content>
 </invoke>

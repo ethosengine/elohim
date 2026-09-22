@@ -16,7 +16,7 @@ topic: [conductor-leak, rca, glibc-arena, native-heap, superseded]
 > (`2026-06-19-conductor-leak-jemalloc-cure-verdict.md`). Preserved as the analysis of record for
 > the mechanism; superseded as the live doc-of-record by the synthesis + cure verdict.
 
-Supersedes the go-pion framing of `2026-06-18-conductor-leak-rca-empirical-reframe.md`.
+Supersedes the go-pion framing of the empirical reframe (body retired; lesson in `2026-06-19-conductor-leak-jemalloc-cure-verdict.md` §Dead paths).
 This pass did the one thing every prior pass skipped: **read the live smaps localizer
 that shipped in `aa9f97f09` and has been flowing to Loki/Prometheus on alpha unread.**
 The data overturns two load-bearing claims of the previous RCA.

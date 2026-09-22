@@ -1181,6 +1181,7 @@ legitimate work; their authorization contract needs design and evidence.
 ### 10.4 "On the fork: three patches, each with an open upstream PR — and refuse sharding."
 
 **Finding, per change.** Cross-relay fix: upstream it. Jemalloc: an image choice, not a patch.
+(Why it is an image choice: the 2026-06 conductor OOM was freed memory that glibc kept pinned, cured by swapping the allocator. See history `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`.)
 Sys-validation backoff: make it a config knob and PR the knob.
 A `list_blocks`/`unblock` admin API is **the best contribution we have**: small, genuinely missing upstream, and able to retire our worst risk.
 The per-space arc hint is small, PR-able plumbing for a field the conductor already ignores.

@@ -18,7 +18,7 @@ topic: [conductor-leak, tx5, upstream, contribution, ethosengine-bot]
 
 Each comment carries the empirical confirmation (built tx5 with #194+#199, teardown tests pass with the fix / time out without it) and the credibility guardrail (framed as *the tx5-transport contribution*, not "the cause of #5664" — recent #5664 profiles are iroh builds with a separate `magicsock` VecDeque grower). Drafts below are the posted text.
 
-Survey + RCA sources: `2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md`, `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md`.
+Survey + RCA sources: the tx5-zombie RCA (body retired, falsified as the leak cause; lesson in `2026-06-19-conductor-leak-jemalloc-cure-verdict.md` §Dead paths), `HANDOFF-2026-06-17-upstream-tx5-transport-pin.md`.
 
 ---
 
