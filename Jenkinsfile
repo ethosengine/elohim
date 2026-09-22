@@ -842,6 +842,12 @@ spec:
     }
 
     options {
+        // This pipeline's own wall-clock budget. The orchestrator waits for it and
+        // sums every downstream budget along its longest dependency chain
+        // (genesis/orchestrator/pipeline-budget.test.mjs), so app is never cut off
+        // by an upstream's clock. Observed ceiling: #1718 ran 139.7 min, most of it
+        // the delivery readiness wait (stage-spa-blob.sh, <=7200s).
+        timeout(time: 180, unit: 'MINUTES')
         // Skip default checkout - it uses sparse checkout with 0% files
         // We do explicit full checkout in the Checkout stage
         skipDefaultCheckout(true)

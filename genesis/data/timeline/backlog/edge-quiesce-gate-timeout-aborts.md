@@ -7,7 +7,7 @@ title: "Edge fleet-quiesce gate rides the build to global-timeout ABORT during c
 slug: "edge-quiesce-gate-timeout-aborts"
 written: "2026-09-01"
 author: "shift velocity-rungs-overnight"
-status: "backlog"
+status: "wip"
 priority: "medium"
 jobs: [elohim-edge, elohim-holochain]
 cluster: "arch-dataplane-refactor-backlog"
@@ -58,3 +58,14 @@ arithmetic: build ~60 + roll budget 45 + storage/doorway rollouts ~15 + validati
   reports no-measure instead of being interrupted. State: **not built** (held out of the 09-19 shift's
   pushes on purpose — any change under the edge watch globs rebuilds and re-rolls the whole fleet).
 
+
+2026-09-22: the same arithmetic moved up one layer, and the gate itself stopped measuring.
+- **Parent budget.** Commit 8ebce05a3 (09-14) ordered app after edge. Commit a6ba209e2 (09-19) raised edge's own limit to 240, equal to the orchestrator's flat 240, so a coupled push (DNA → edge → app → genesis) could not fit.
+  - Orchestrators #1885-#1891 hit the parent limit.
+  - Zero of the eight app dispatches from 09-19 to 09-22 succeeded. App #1720 was cancelled 2 minutes into `ng build`.
+  - Branch `ci/wallclock-2026-09-22`: every dispatchable pipeline now owns a budget in its own Jenkinsfile (app gains 180). The orchestrator's limit is the derived longest-chain sum (780), and `genesis/orchestrator/pipeline-budget.test.mjs` enforces it.
+- **Blind gate.** `fleet-quiesce-gate.sh` passed storage `/metrics` (now over 128 KiB) to python3 through an env var. Every poll failed with `Argument list too long`, so the 45-minute window measured nothing (edge #1471-#1475).
+  - Bodies now travel as files.
+  - Three evaluator failures in a row end the run as GATE-DEFECT (exit 4).
+  - Regression test: `scripts/ci/fleet-quiesce-gate.test.sh`.
+- State: wip. Fleet-unproven until an edge run shows the gate reading real values and a coupled run reaches app.

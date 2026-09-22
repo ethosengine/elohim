@@ -1892,7 +1892,16 @@ spec:
     }
 
     options {
-        timeout(time: 240, unit: 'MINUTES')  // upstream parallel builds + genesis (60min) + a2o gap analysis
+        // Derived, not tuned: the longest dependency chain of downstream budgets
+        // (DNA 240 → edge 240 → app 180 → genesis 90 = 750) plus 30 for this
+        // run's own stages. Levels run one after another and each downstream owns
+        // its budget in its own Jenkinsfile, so this clock must never be the one
+        // that stops a downstream — pipeline-budget.test.mjs enforces the sum.
+        // The flat 240 it replaces assumed parallel dispatch; after app was ordered
+        // behind edge (8ebce05a3, 09-14) it starved app in every coupled run
+        // (#1885-#1891: zero app deliveries in eight dispatches). A downstream
+        // budget that grows raises this sum — shrink the downstream, not this.
+        timeout(time: 780, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
