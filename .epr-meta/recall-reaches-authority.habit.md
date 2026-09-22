@@ -40,6 +40,31 @@ retire-when: >
   metered bytes inside the SessionStart budget and no unmetered direct read — an entry that
   reliably serves the next agent no longer needs a reader watching it.
 ---
+DELTA 2026-09-22 (recall — Codex's trail sprint + capstone memory ceremony; NO status change — the
+habit stays red): the six observations Codex left on 2026-09-13 (consolidation queue item 25) drove
+four stations, landed on dev cd912bd40…dd75c16aa. S1 the entry reaches: declared multi-type globs,
+short terms, stemming, a root-scope authority set passed through the declared-scope gate (CLAUDE.md
+and .epr-meta/ are now DECLARED source roots, contract v13), a narrowed continuation on a budget cut,
+a new passage.rs seam (rarity-weighted word-start scoring; term-density windows for unsectioned
+files), proximity re-rank; the deterministic bank went 1/6 → 5/6 (q-hook-binary the named miss: a
+filename hit breaks a tie on passage terms). S2 `open --purpose resume --habit <id>`: last delta BY
+DATE (atoms are not reliably newest-first — a fresh reader caught the view labelling a 09-11 entry
+"last" over 09-12; fixed with a direction-aware tie-break shared with the first screen), commits
+since it, an implemented-but-unverified verdict naming the check to rerun. S3 prose that lags its
+value: read/source name `key=N` prose contradicting the document's own value (live on
+pool-policy.json max_concurrent_heavy 1 vs 2). S4 blind-reader findings carry a class and the loop
+rules record rounds. Checks: recall suites 197/62/3/3/25/5/14, clippy clean, a2o ceremony profile
+7 scenarios / 40 steps incl. the new resume scenario; `just gate memory-ceremony` native legs green,
+the hook leg red ONLY on memory-index idempotence (the index projects past its hard 24,000 B bound on
+dev and stranded memory differs per checkout — the ceremony's head-compaction batch). Fresh reader
+(context-reset Sonnet, entry-only, judged by opus): resume question 2 screens 14,160 B, pool question
+5 screens 14,259 B, 0 unmetered, 0 mistaken — folded on the plan (env
+reader=fresh-reader-codex-trail-sonnet). Window: 9 of 14 journeys (32 folds) in 91 days, still failed
+at hard 0.2 — it carries this sprint's own five pre-fix baseline misses; the standing reader's weekly
+runs decide the flip, not this sprint. Frontier: search does not match an underscored key from its
+words; the bank's q-hook-binary; S4 classes reach readers only once dispatch reads this branch's
+agent package; the build-receipt artifact chain (Codex obs. 5) held.
+
 DELTA 2026-09-11 (station 1 — reader lens; GREEN preserved, one more reader-sample): governed-discovery stations 0–1
 landed on branch sprint/2026-09-11-governed-discovery (recall.rs split into eight seams under an 1,800-line ceiling with a
 declared seam rule; Provider trait; contract as ProcessSpec+Bounds v10; reader lens from the actor sidecar with a declared
