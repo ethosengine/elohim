@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 12,
+  "version": 13,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -22,7 +22,8 @@
     "provider_seconds": 15,
     "native_raw_bytes": 262144,
     "session_bytes": 1048576,
-    "habit_register_bytes": 1048576
+    "habit_register_bytes": 1048576,
+    "resume_commits": 30
   },
   "source_roots": [
     ".claude/",

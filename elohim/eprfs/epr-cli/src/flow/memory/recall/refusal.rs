@@ -7,7 +7,7 @@ use super::*;
 /// message. Naming them is one line of prose against an unbounded number of wrong tries.
 pub(super) fn accepted_flags(operation: &str) -> &'static str {
     match operation {
-        "open" => "--need --intent --purpose bootstrap --scope --limit --offset",
+        "open" => "--need --intent --purpose bootstrap|resume --habit --scope --limit --offset",
         "select" => "--edge --need",
         "read" => "--path --lines START:END --need",
         "source" => "--path --tag --query --search-scope --name --need",
@@ -82,6 +82,17 @@ pub(super) fn one_line(text: &str) -> String {
 /// are matched on the refusal's own words, which is exactly as durable as the words are — and they
 /// are constants in this module, not prose that drifts.
 pub(super) fn remedy_for(message: &str, session: &str) -> String {
+    if message.starts_with("no habit named") {
+        return "List declared habits: python3 .claude/scripts/habits-status.py --full, or check \
+                the id in genesis/manifests/habits.yaml"
+            .into();
+    }
+    if message.contains("--purpose resume needs --habit") {
+        return format!(
+            "Name the habit to resume: epr flow memory recall open --purpose resume \
+             --habit <id> --session {session}"
+        );
+    }
     if message.contains("cannot read the habit register") {
         return "The register is a GENERATED projection, never hand-edited — re-project it, then \
                 retry: python3 .claude/scripts/habits-project.py"

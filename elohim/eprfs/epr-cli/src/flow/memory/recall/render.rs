@@ -154,6 +154,19 @@ pub(super) fn render(view: &Value, lens: &LensView, floor: &RenderFloor) -> Stri
                 out.push_str(&render_concerns(value));
                 continue;
             }
+            if key == "resume" {
+                // S2: not `is_open_shaped` (carries neither `first_screen` nor `concerns`), so
+                // this is always reached — at every lens, minimal included — the same "every
+                // other operation's own result renders in full" rule this loop already gives
+                // `read`/`source`/`history`. The verdict and the three standing omissions are
+                // part of that same full render, never gated further.
+                out.push_str(&render_resume(value));
+                continue;
+            }
+            if key == "disagreements" {
+                out.push_str(&render_disagreements(value));
+                continue;
+            }
             if let Some(line) = summary_line(key, value, operation) {
                 out.push_str(&line);
                 continue;
@@ -676,6 +689,150 @@ fn render_first_screen(screen: &Value) -> String {
                 .iter(),
         )
     {
+        out.push_str(&format!(
+            "  · {}\n",
+            bullet(message.as_str().unwrap_or_default())
+        ));
+    }
+    out
+}
+
+/// S2's whole screen: the habit's own standing, its plans, the concern paths git was bounded to,
+/// what has happened since the last evidence, local standing, then the verdict and omissions —
+/// the verdict and omissions are the last two things printed so a reader scanning to the bottom
+/// of a resumed session lands on exactly the two lines this view exists to deliver.
+fn render_resume(value: &Value) -> String {
+    let mut out = String::from("\nResume:\n");
+    let habit = &value["habit"];
+    out.push_str(&format!(
+        "Habit: {} [{}{}] — atom: {}\n",
+        habit["id"].as_str().unwrap_or_default(),
+        habit["status"].as_str().unwrap_or("unstated"),
+        if habit["active"].as_bool() == Some(true) {
+            ", active"
+        } else {
+            ""
+        },
+        habit["atom"].as_str().unwrap_or("not located"),
+    ));
+    let last = &habit["last_delta"];
+    out.push_str(&format!(
+        "Last delta ({}): {}\n",
+        last["date"].as_str().unwrap_or("date unknown"),
+        last["text"].as_str().unwrap_or("none recorded"),
+    ));
+    let checks = habit["checks"].as_array().cloned().unwrap_or_default();
+    if checks.is_empty() {
+        out.push_str("Checks: none declared\n");
+    } else {
+        out.push_str("Checks:\n");
+        for (index, check) in checks.iter().enumerate() {
+            out.push_str(&format!(
+                "  {}. {}\n",
+                index + 1,
+                clip(check.as_str().unwrap_or_default(), 200)
+            ));
+        }
+    }
+    let plans = value["plans"].as_array().cloned().unwrap_or_default();
+    if !plans.is_empty() {
+        out.push_str("Plans:\n");
+        for plan in &plans {
+            out.push_str(&format!(
+                "  · {} [{}]\n",
+                plan["path"].as_str().unwrap_or_default(),
+                if plan["exists"].as_bool() == Some(true) {
+                    "present"
+                } else {
+                    "missing"
+                }
+            ));
+        }
+    }
+    let paths: Vec<&str> = value["concern_paths"]
+        .as_array()
+        .map(|a| a.iter().filter_map(Value::as_str).collect())
+        .unwrap_or_default();
+    if !paths.is_empty() {
+        out.push_str(&format!("Concern paths: {}\n", paths.join(", ")));
+    }
+    let since = &value["since_delta"];
+    let commits = since["commits"].as_array().cloned().unwrap_or_default();
+    out.push_str(&format!(
+        "Since delta: {} commit(s) (bound {})\n",
+        commits.len(),
+        count_of(since, "bound")
+    ));
+    for commit in &commits {
+        out.push_str(&format!(
+            "  {} {} [{}] {}\n",
+            commit["sha"].as_str().unwrap_or_default(),
+            commit["date"].as_str().unwrap_or_default(),
+            commit["matched_by"].as_str().unwrap_or_default(),
+            clip(commit["subject"].as_str().unwrap_or_default(), 100),
+        ));
+    }
+    let local = &value["local_work"];
+    let ahead = &local["ahead_of_upstream"];
+    out.push_str(&format!(
+        "Local work: {} commit(s) ahead of upstream\n",
+        ahead["count"]
+            .as_u64()
+            .map(|n| n.to_string())
+            .unwrap_or_else(|| "unknown".to_string()),
+    ));
+    for commit in ahead["commits"].as_array().cloned().unwrap_or_default() {
+        out.push_str(&format!(
+            "  {} {}\n",
+            commit["sha"].as_str().unwrap_or_default(),
+            clip(commit["subject"].as_str().unwrap_or_default(), 100),
+        ));
+    }
+    for branch in local["branches"].as_array().cloned().unwrap_or_default() {
+        out.push_str(&format!(
+            "  branch {}: {} matching commit(s)\n",
+            branch["name"].as_str().unwrap_or_default(),
+            branch["commits"].as_array().map(Vec::len).unwrap_or(0),
+        ));
+    }
+    out.push_str(&format!(
+        "Verdict: {}\n",
+        value["verdict"].as_str().unwrap_or_default()
+    ));
+    out.push_str("Omissions:\n");
+    for message in value["omissions"].as_array().cloned().unwrap_or_default() {
+        out.push_str(&format!(
+            "  · {}\n",
+            bullet(message.as_str().unwrap_or_default())
+        ));
+    }
+    out
+}
+
+/// S3's whole screen: each named disagreement, one line, with its provenance keys — every lens,
+/// same reasoning as [`render_resume`] (`disagreements` is never `is_open_shaped`).
+fn render_disagreements(value: &Value) -> String {
+    let path = value["path"].as_str().unwrap_or_default();
+    let found = value["found"].as_array().cloned().unwrap_or_default();
+    let mut out = format!("\nDisagreements ({path}): {} found\n", found.len());
+    for item in &found {
+        out.push_str(&format!(
+            "  Disagreement: prose at L{} says {}={}; the effective value is {} (L{})\n",
+            item["prose_line"].as_u64().unwrap_or(0),
+            item["key"].as_str().unwrap_or_default(),
+            item["prose_value"].as_str().unwrap_or_default(),
+            item["effective_value"].as_str().unwrap_or_default(),
+            item["effective_line"].as_u64().unwrap_or(0),
+        ));
+        let provenance: Vec<&str> = item["provenance"]
+            .as_array()
+            .map(|a| a.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default();
+        if !provenance.is_empty() {
+            out.push_str(&format!("    provenance: {}\n", provenance.join(", ")));
+        }
+    }
+    for message in value["omissions"].as_array().cloned().unwrap_or_default() {
         out.push_str(&format!(
             "  · {}\n",
             bullet(message.as_str().unwrap_or_default())

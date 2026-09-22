@@ -75,6 +75,11 @@ use providers::{process_result, providers_for};
 mod journey;
 use journey::execute;
 
+mod resume;
+use resume::resume_view;
+
+mod disagreement;
+
 mod sample;
 
 mod lens;
@@ -796,8 +801,13 @@ pub struct Args {
     pub intent: Option<String>,
     /// `--purpose bootstrap`: with no `--need` and no `--intent`, `open` mints the session's own
     /// intent from the register's top red habit instead of the recipe's generic purpose — see
-    /// `discovery::bootstrap_projection`. No other value is accepted.
+    /// `discovery::bootstrap_projection`. `--purpose resume` (station S2, 2026-09-22 sprint) needs
+    /// `--habit <id>` and returns a read-only view of that one concern instead — see `resume.rs`.
+    /// No other value is accepted.
     pub purpose: Option<String>,
+    /// `open --purpose resume --habit <id>`: the habit this session is resuming. Ignored by every
+    /// other operation/purpose.
+    pub habit: Option<String>,
     pub path: Option<String>,
     pub lines: Option<String>,
     pub finding: Option<String>,
@@ -863,6 +873,7 @@ impl Args {
             scope: None,
             intent: None,
             purpose: None,
+            habit: None,
             path: None,
             lines: None,
             finding: None,
@@ -993,6 +1004,8 @@ pub fn usage() -> String {
         "usage: epr flow memory recall <{}> --session <id> [--need TEXT] [--json] [--root DIR]\n\
          \x20      epr flow memory recall open --session <id> --purpose bootstrap; with no --need, \
 mints the session's intent from the register's own top red habit\n\
+         \x20      epr flow memory recall open --session <id> --purpose resume --habit <id>; a \
+read-only view of one concern's last evidence, its plans and its local git standing\n\
          \x20      epr flow memory recall --adopt-receipts [--from-dir DIR] [--dry-run] [--json]\n\
          \x20      search|source accept --tag <t> (repeatable, EXACT frontmatter membership, local provider only)\n\
          \x20      --lens <level> widens/narrows the READER lens (minimal|simple|standard|detail|debug|trace); \
@@ -1101,6 +1114,7 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
             "--scope" => args.scope = Some(value),
             "--intent" => args.intent = Some(value),
             "--purpose" => args.purpose = Some(value),
+            "--habit" => args.habit = Some(value),
             "--path" => args.path = Some(value),
             "--lines" => args.lines = Some(value),
             "--finding" => args.finding = Some(value),
@@ -1194,8 +1208,15 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
     if !["repair", "judgment", "observation"].contains(&args.kind.as_str()) {
         return Err(refused("--kind must be repair|judgment|observation"));
     }
-    if args.purpose.as_deref().is_some_and(|p| p != "bootstrap") {
-        return Err(refused("--purpose must be bootstrap"));
+    if args
+        .purpose
+        .as_deref()
+        .is_some_and(|p| p != "bootstrap" && p != "resume")
+    {
+        return Err(refused("--purpose must be bootstrap or resume"));
+    }
+    if args.purpose.as_deref() == Some("resume") && args.habit.is_none() {
+        return Err(refused("open --purpose resume needs --habit <id>"));
     }
     for text in [
         &args.need,
