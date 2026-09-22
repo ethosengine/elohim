@@ -12,7 +12,7 @@ topic: [conductor-leak, jemalloc, production, changeset, edgenode]
 
 *The production form of the leak cure. Companion to `2026-06-19-conductor-leak-jemalloc-cure-verdict.md`
 (the verdict: jemalloc allocator swap cured the OOM) and the RCA chain (`2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`,
-`2026-06-18-conductor-leak-rca-native-heap-reframe.md`, `2026-06-18-conductor-leak-canary-runbook.md`). Authored + adversarially verified via workflow
+`2026-06-18-conductor-leak-canary-runbook.md`). Authored + adversarially verified via workflow
 (map→author→3-lens verify→revise); the edited Cargo feature graph PARSE OK offline.*
 
 ## Current state (verified 2026-06-19)

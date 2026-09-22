@@ -6,7 +6,7 @@
 > does NOT "shrink the structure that leaks." The corpus-off-DHT spike should no longer be gated on a
 > leak-confirm (the leak is gone); judge (iii) purely as a corpus-scaling decision. The {0,1} REA-grant
 > actuation work and the fractional-arc infeasibility finding are unaffected and stand.
-> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 > Working draft. NOT cite-sealed. For agentic workers: REQUIRED SUB-SKILL: superpowers:subagent-driven-development (or executing-plans). Steps use checkbox (- [ ]) syntax.

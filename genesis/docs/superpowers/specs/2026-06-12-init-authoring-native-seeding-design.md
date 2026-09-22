@@ -5,13 +5,17 @@ cites:
   - resilience-dimensions-proof-suite | the D1/D2 boundary tests this spec extends with an authored+stocked measured case; its @wip rows are the multi-peer acceptance gate | sha256:a89f58ec4906e152 | path: genesis/docs/superpowers/specs/2026-06-12-resilience-dimensions-proof-suite-design.md
   - tiered-quilt-stewardship-design | the custody-quilt / RS(N,K) replication canon this rides toward; replica_target_for(reach) and custody-blob commitments are the resiliency-replication primitives borrowed here | sha256:9f9c6a1c391712b3 | path: genesis/docs/content/elohim-protocol/architecture/2026-05-11-tiered-quilt-stewardship-design.md
   - genesis/docs/superpowers/specs/2026-05-25-stagespablob-substrate-correct-deploy.md
+# This spec DISTILLS the historical-provenance design it replaced (§The scope cut carries its lesson).
+# The retired body lives in git: `git log --diff-filter=D --oneline -- <path>` then `git show <sha>^:<path>`.
+distills:
+  - genesis/docs/superpowers/specs/2026-06-12-provenance-manifest-ingestion-digest-design.md
 ---
 
 # Init-authoring: seeding = init through the front door
 
 **Date:** 2026-06-12 (evening)
 **Status:** Approved (operator scope cut — supersedes the historical-provenance design)
-**Supersedes:** `2026-06-12-provenance-manifest-ingestion-digest-design.md` (commit 761eee27b)
+**Supersedes:** `2026-06-12-provenance-manifest-ingestion-digest-design.md` (commit 761eee27b; body retired to git — its lesson is §The scope cut below)
 **Owner surfaces:** seeder front-door author loop (Che join-alpha; later a ci-steward
 conductor service); the existing `create_content` → shard-encode → `upsert_manifest`
 path in elohim-storage; agent-key custody ceremony (operator)

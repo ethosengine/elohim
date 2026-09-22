@@ -19,7 +19,7 @@ cites:
 > glibc-malloc arena leak, arc-INDEPENDENT (arc=0 nodes leaked the same shape), CURED by glibc→jemalloc.
 > Arc-shrink does NOT touch it. The forward corpus-memory-scaling design and the spike-verified "fractional
 > arc infeasible on kitsune2 0.3.2/0.4.1 without forking holochain_p2p" finding are unaffected and stand.
-> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 ## 1. Problem & through-line

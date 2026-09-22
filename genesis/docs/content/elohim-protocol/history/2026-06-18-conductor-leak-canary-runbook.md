@@ -185,6 +185,6 @@ fix tested green in unit tests and did NOT flatten the slope in production.
 
 ## Files
 - Fork change (staged): `elohim/holochain-conductor/crates/holochain/{Cargo.toml, src/bin/holochain/main.rs}`.
-- RCA: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md` (+ `…-native-heap-reframe-…`).
+- RCA: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md` (the native-heap reframe it confirmed is distilled in `2026-06-19-conductor-leak-jemalloc-cure-verdict.md` §Dead paths).
 - Deploy/build env + cure signal: the retired tx5 deploy recipe, distilled in `2026-06-19-conductor-leak-jemalloc-cure-verdict.md` §Dead paths.
 - Spawn seam (env inheritance, no env_clear): `elohim/elohim-storage/src/conductor/process_manager.rs:64,68`.

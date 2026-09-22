@@ -12,6 +12,8 @@ distills:
   - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-tx5-zombie-hypothesis-falsified.md
   - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-tx5-zombie-fix-deploy-recipe.md
   - genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-empirical-reframe.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
 # Bidirectional: the canonical seed this lesson informs (it links back in its section 10.4).
 canonical:
   - genesis/docs/content/elohim-protocol/architecture/2026-09-06-holons-are-spaces-how-we-use-holochain.md   # 10.4 "Jemalloc: an image choice, not a patch"
@@ -20,7 +22,7 @@ canonical:
 # Conductor leak — CURED by the jemalloc allocator swap (verdict, 2026-06-19)
 
 *Live-telemetry verdict closing the RCA in `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`
-+ `2026-06-18-conductor-leak-rca-native-heap-reframe.md` + `2026-06-18-conductor-leak-canary-runbook.md`. The leak is the native glibc-malloc anon heap
++ `2026-06-18-conductor-leak-canary-runbook.md`. The leak is the native glibc-malloc anon heap
 leak in the embedded `holochain` child (layer-confirmed ~88%; Layer-C call site was still open).*
 
 ## TL;DR
@@ -40,8 +42,7 @@ jemalloc too; it went flat).
 > that has already shipped, and profile, before reasoning from source.**
 
 ## Dead paths (bodies retired to git, lessons kept here)
-The investigation took two wrong turns before the native-heap reframe
-(`2026-06-18-conductor-leak-rca-native-heap-reframe.md`) and the synthesis of record
+The investigation took wrong turns before the native-heap reframe and the synthesis of record
 (`2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`). Their bodies are retired. One lesson each:
 - **tx5 zombie PeerConnection (2026-06-17, `…-tx5-zombie-hypothesis-falsified.md`).** A source-level
   root cause plus a fix that its unit tests proved (the teardown tests pass with the fix and time out
@@ -57,6 +58,18 @@ The investigation took two wrong turns before the native-heap reframe
   an unreclaimable true leak. Both were wrong. The Go arena at `0xc000000000` sat flat at ~52 MB. The
   smaps localizer shipped in `aa9f97f09` had been flowing unread and pointed at glibc secondary arenas.
   And jemalloc later showed the bytes were reclaimable.
+- **Upstream pin research (2026-06-17, `…-upstream-research-tx5-pin-verdict.md`).** Its "no clean
+  upstream pin fixes this" verdict held, but it read the leak's allocation-size fingerprint (thousands
+  of discrete ≥128 KB mmaps) as a transport send-buffer and aimed its pin (the first 0.6.x carrying
+  holochain #5719) at the validation-receipt retry storm. A size fingerprint describes the allocator's
+  behaviour, not the caller. One finding stands on its own: arc 0 leaked the same shape as full arc, so
+  shrinking the arc is not a memory lever.
+- **Native-heap reframe (2026-06-18, `…-rca-native-heap-reframe.md`).** The pass that found the right
+  layer by reading the per-band anon histogram shipped in `aa9f97f09`. The aggregate
+  `anon_mapping_count` looked flat because 5,465 tiny mappings swamped +83 growers in the 8–64 MB
+  band. Read the per-band series, not the total. Its evidence is carried in the synthesis of record,
+  which also corrects two of its readings: `near=<DNA>-shm` is address adjacency and names no cause,
+  and the 8×24=192 arena-cap match is a coincidence.
 
 ## The decisive evidence — image-attributed cadvisor working_set (the number the OOM-killer acts on)
 `container_memory_working_set_bytes{container="elohim-node"}`, carrying the running `image` label,
@@ -129,7 +142,6 @@ The pasted "A (deploy elohim-edgenode:latest tx5-fix) vs B (keep profiler)" fram
   `kube_pod_container_resource_limits{resource="memory"}`, `kube_pod_container_info`.
 - Git: `b8481f090` body + stat; che-devworkspaces @ `e87a680`.
 - Prior RCA chain: `2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`,
-  `2026-06-18-conductor-leak-rca-native-heap-reframe.md`, `2026-06-18-conductor-leak-canary-runbook.md`,
-  and the retired dead paths distilled under §Dead paths above.
+  `2026-06-18-conductor-leak-canary-runbook.md`, and the retired records distilled under §Dead paths above.
 </content>
 </invoke>

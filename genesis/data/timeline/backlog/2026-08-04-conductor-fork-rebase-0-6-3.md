@@ -12,7 +12,7 @@ priority: "high"
 tags: [conductor, holochain-fork, rebase, kitsune2, tx5, wave-1, codex-claimable]
 cites:
   - genesis/docs/superpowers/plans/2026-08-04-holochain-iroh-convergence-upgrade-campaign.md
-  - genesis/docs/content/elohim-protocol/history/2026-06-17-conductor-leak-upstream-research-tx5-pin-verdict.md
+  - genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md
 ---
 
 # Conductor fork rebase 0.6.0 → 0.6.3 (Wave 1, Lane B — claimable by any agent)

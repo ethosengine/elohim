@@ -6,7 +6,7 @@
 > fix) is now closed: the anon was **glibc-malloc secondary-arena retention** (Rust/C allocations; Go heap
 > flat ~52MB), CURED by swapping the conductor's global allocator glibc→jemalloc — flat past the old OOM
 > cadence, DNA hash unchanged. NOT more RAM, NOT a SQLite cap, NOT arc — exactly as this verdict predicted.
-> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 **Status:** verdict CONFIRMED + attribution CONFIRMED (2026-06-17 ~00:52 UTC) · **Class:** runtime memory / self-heal · **Env:** alpha (observed live) · **Resolves:** the P-ARC §B "leak-vs-bounded-large" hard gate · **Plan:** `genesis/docs/superpowers/plans/2026-06-16-conductor-memory-attribution-instrument-plan.md`

@@ -16,7 +16,7 @@ swapping the global allocator glibc→jemalloc** (flat ~2.1–2.9 GB past the ol
 hash unchanged; go-pion exonerated — Go heap flat ~52 MB). Shipped: fork `b477ca7` + che-dw
 `ca69302` → build #13 `elohim-edgenode:latest` jemalloc-prod; Part C `ed111a5cc`. Truth docs:
 `genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md`, `genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-prod-changeset.md`,
-`genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`, `genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md`.
+`genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md`, `genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md`.
 
 Produced by the `wrong-rca-correction-sweep` workflow (one sub-agent, `sweep:backlog`, timed out →
 the 3 timeline/backlog verdict records are an ADDENDUM below, corrected by hand).

@@ -14,7 +14,7 @@ cites:
 > legitimate *corpus-memory scaling* lever, but it is NOT this leak's fix. The self-healing control-plane
 > design (observability/actuation/REA-bounded knobs, detect→recover→verify→elevate) is unaffected and stands
 > — only the leak-remedy attribution is corrected.
-> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · conductor-leak-rca-native-heap-reframe-2026-06-18.md
+> Truth: .claude/data/conductor-leak-jemalloc-cure-verdict-2026-06-19.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 ## 1. Concept

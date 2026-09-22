@@ -12,8 +12,8 @@ cites:
   - "conductor-authority-arc-auto-policy | 2026-06-13-conductor-authority-arc-auto-policy | sha256:597157e7bb552d73 | path: genesis/docs/superpowers/specs/2026-06-13-conductor-authority-arc-auto-policy.md"
   - "self-healing-user-agency-opportunity-map | Self-Healing & User-Agency Opportunity Map | sha256:31400dda6437b0dd | path: genesis/docs/superpowers/specs/2026-06-13-self-healing-user-agency-opportunity-map.md"
   - "self-healing-control-plane-program-roadmap | Self-Healing Control Plane | sha256:23e24b020eed9564 | status: stale — target content moved on; re-verify | path: genesis/docs/superpowers/plans/2026-06-13-self-healing-control-plane-program-roadmap.md"
-  - "conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:049eccfdb959ebd6 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md"
-  - "conductor-leak-rca-native-heap-reframe | Conductor leak | sha256:ec6d6d1baa3bbbf6 | path: genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md"
+  - "conductor-leak-jemalloc-cure-verdict | Conductor leak | sha256:baaeb07c717b0261 | path: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md"
+  - "conductor-leak-rca-diverse-eyes-synthesis | Conductor leak | sha256:7d2bfd709dc26164 | path: genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md"
 ---
 
 # Actuatable Self-Healing Control Plane
@@ -25,7 +25,7 @@ cites:
 > legitimate *corpus-memory scaling* lever, but it is NOT this leak's fix. The self-healing control-plane
 > design (observability/actuation/REA-bounded knobs, detect→recover→verify→elevate) is unaffected and stands
 > — only the leak-remedy attribution is corrected.
-> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 ## 1. Concept

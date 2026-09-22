@@ -6,7 +6,7 @@
 > retention** in the conductor child (Rust/C allocations; Go heap flat ~52MB; tx5/go-pion exonerated). CURED
 > by swapping the global allocator glibc→jemalloc — flat past the old OOM cadence, DNA hash unchanged. The
 > "memory ∝ corpus × arc" theory remains falsified for this OOM.
-> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-native-heap-reframe.md
+> Truth: genesis/docs/content/elohim-protocol/history/2026-06-19-conductor-leak-jemalloc-cure-verdict.md · genesis/docs/content/elohim-protocol/history/2026-06-18-conductor-leak-rca-diverse-eyes-synthesis.md
 
 
 **Status:** open · **Captured:** 2026-06-16 (shift `alpha-conductor-oom-arc-leecher`) · **Class:** self-heal / runtime memory · **Env:** alpha-cluster (observed live)
