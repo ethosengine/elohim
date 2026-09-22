@@ -6650,7 +6650,7 @@ mod tests {
                 histogram
                     .get_bucket()
                     .iter()
-                    .all(|bucket| bucket.get_cumulative_count() == 0),
+                    .all(|bucket| bucket.cumulative_count() == 0),
                 "start must not synthesize a histogram observation"
             );
         }
