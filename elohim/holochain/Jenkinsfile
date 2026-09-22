@@ -853,7 +853,7 @@ def deployHumansInParallel(List humans, String envFile, List allHumans) {
                 stageResult: 'UNSTABLE',
                 message: "conductor deploy ${h.resourcePrefix}-conductor failed — storage keeps serving; remaining conductors HELD; see log",
             ) {
-                def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin)
+                def changed = deployHumanConductor(h, queued.sedArgs, queued.conductorPin, queued.happRollKey)
                 // Only reached on clean return — catchError swallows exceptions
                 // before this line on any failure path.
                 rollState.halted = false
@@ -1030,26 +1030,74 @@ def emitDeployJunit(String envName, List humans, Map outcomes) {
  * the restart proceeds — never returns empty or a stale value (either would
  * silently reopen the skew hole). `|| true` keeps a resolution failure from
  * aborting the deploy; the fallback path handles it loudly instead.
+ *
+ * CONTENT KEY (2026-09-22): the stamp is no longer the raw manifest digest.
+ * scripts/ci/conductor-happ-stamp.sh HOLDS the live stamp when the artifact's
+ * `elohim.host/roll-key` (DNA hash set + happ.yaml, stamped by the DNA
+ * pipeline — scripts/ci/happ-roll-key.sh) equals the key recorded on the live
+ * conductor StatefulSet, so an identical-DNA rebuild's new OCI digest no
+ * longer rolls the fleet. Returns [stamp:, rollKey:]; rollKey is recorded on
+ * the conductor object by deployHumanConductor after apply.
  */
-def resolveHappDigest(String happTag, String deployVersion) {
-    def digest = ''
+def resolveHappDigest(Map humanConfig, String happTag, String deployVersion) {
+    def out = ''
     withCredentials([usernamePassword(
         credentialsId: 'harbor-robot-registry',
         usernameVariable: 'HARBOR_USER',
         passwordVariable: 'HARBOR_PASS',
     )]) {
-        digest = sh(
-            script: "bash '${env.WORKSPACE}/genesis/orchestrator/scripts/resolve-happ-digest.sh' '${happTag}' || true",
-            returnStdout: true,
-        ).trim()
+        withEnv(["CONDUCTOR_ROLL=${(params.CONDUCTOR_ROLL ?: false) == true}"]) {
+            out = sh(
+                script: "bash '${env.WORKSPACE}/scripts/ci/conductor-happ-stamp.sh' '${happTag}' '${humanConfig.resourcePrefix}-conductor' '${humanConfig.namespace}' || true",
+                returnStdout: true,
+            ).trim()
+        }
     }
-    if (digest ==~ /sha256:[a-f0-9]{64}/) {
-        echo "Resolved hApp digest for tag '${happTag}': ${digest}"
-        return digest
+    def parts = out.split(' ')
+    if (parts.length == 2 && (parts[0] ==~ /sha256:[a-f0-9]{64}/ || parts[0].startsWith('unresolved-'))) {
+        echo "hApp stamp for ${humanConfig.resourcePrefix}-conductor (tag '${happTag}'): ${parts[0]} (roll key ${parts[1]})"
+        return [stamp: parts[0], rollKey: parts[1]]
     }
     def fallback = "unresolved-${deployVersion}-${System.currentTimeMillis()}"
     echo "WARNING: could not resolve hApp digest for tag '${happTag}' — FAILING SAFE with unique marker '${fallback}'. The StatefulSet pod-template will read 'configured', so the genesis-peer rollout restart proceeds (surge guard intentionally bypassed this deploy). Investigate Harbor reachability / tag existence; a persistent failure means the genesis pair restarts on every deploy."
-    return fallback
+    return [stamp: fallback, rollKey: '-']
+}
+
+/**
+ * sha256 over the live pod template(s) — plus, in 'all' mode, the ConfigMap /
+ * Secret data — of every object in a rendered manifest
+ * (scripts/ci/pod-inputs-fingerprint.sh). Compared before vs after
+ * `kubectl apply` it says whether anything a pod consumes moved; the apply
+ * log cannot, because object-metadata version labels make it say
+ * "configured" on every commit. Empty = cannot judge → callers roll.
+ */
+def podInputsFingerprint(String file, String namespace, String mode) {
+    return sh(
+        script: "bash '${env.WORKSPACE}/scripts/ci/pod-inputs-fingerprint.sh' '${file}' '${namespace}' ${mode} || true",
+        returnStdout: true,
+    ).trim()
+}
+
+/**
+ * The image a human's STORAGE StatefulSet renders: the live one when the
+ * storage build inputs (scripts/ci/storage-input-digest.sh) equal the digest
+ * recorded on the live object, else this build's image — the conductor's
+ * "hold the live image" rule, keyed on content. Decision + Harbor retention
+ * guard live in scripts/ci/storage-workload-image.sh; `[storage-roll]` forces.
+ */
+def resolveStorageWorkloadImage(Map humanConfig, String builtImage, String inputDigest) {
+    def image = ''
+    withCredentials([usernamePassword(
+        credentialsId: 'harbor-robot-registry',
+        usernameVariable: 'HARBOR_USER',
+        passwordVariable: 'HARBOR_PASS',
+    )]) {
+        image = sh(
+            script: "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' '${humanConfig.resourcePrefix}' '${humanConfig.namespace}' '${builtImage}' '${inputDigest}' || true",
+            returnStdout: true,
+        ).trim()
+    }
+    return image ?: builtImage
 }
 
 /**
@@ -1392,7 +1440,7 @@ def resolveConductorWorkloadImage(Map humanConfig, String storageImage, String c
  * fleet-wide surge rung 2 exists to remove, and would make the genesis-peer
  * surge guard moot again.
  */
-def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
+def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin, String happRollKey) {
     // adam carries an explicit `conductorManifest` (twin of his explicit
     // storage `manifest`); everyone else sed-renders the shared conductor
     // template. Kept on ONE line: a trailing-operator line break around `?:`
@@ -1415,6 +1463,7 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
     sh "IROH_TARGET=${humanConfig.env == 'alpha' ? '1' : '0'} bash scripts/ci/validate-conductor-config.sh ${outputFile}"
     sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${humanConfig.namespace}"
 
+    def templateBefore = podInputsFingerprint(outputFile, humanConfig.namespace, 'template')
     def applyLog = "/tmp/kubectl-apply-${stsName}.log"
     def applyCode = sh(script: "kubectl apply -f ${outputFile} > ${applyLog} 2>&1", returnStatus: true)
     sh "cat ${applyLog}"
@@ -1442,16 +1491,19 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
         sh "kubectl annotate statefulset/${stsName} -n ${humanConfig.namespace} 'elohim.host/conductor-pin=${conductorPin}' --overwrite"
     }
 
-    def changed = true
-    if (applyCode == 0) {
-        def grepCode = sh(
-            script: "grep -Eq 'statefulset\\.apps/${stsName}[[:space:]]+unchanged' ${applyLog}",
-            returnStatus: true,
-        )
-        if (grepCode == 0) {
-            changed = false
-            echo "Conductor ${stsName} UNCHANGED — no restart, no re-gossip surge. (Storage may have rolled; that is the point of rung 2.)"
-        }
+    // The hApp content key this template's happ-digest stamp stands for —
+    // read back by scripts/ci/conductor-happ-stamp.sh on the next deploy.
+    sh "bash '${env.WORKSPACE}/scripts/ci/conductor-happ-stamp.sh' --record '${stsName}' '${humanConfig.namespace}' '${happRollKey ?: '-'}'"
+
+    // CHANGED = the live pod template moved (2026-09-22). The old test grepped
+    // apply for "unchanged", which object-metadata version labels made
+    // impossible, so every conductor counted as CHANGED and the sequenced
+    // phase paid its soak + settle gate for restarts that never happened
+    // (edge #1474: 5 of 6 gates ran to deadline). Unreadable → CHANGED.
+    def templateAfter = podInputsFingerprint(outputFile, humanConfig.namespace, 'template')
+    def changed = !(applyCode == 0 && templateBefore && templateBefore == templateAfter)
+    if (!changed) {
+        echo "⏭️ Conductor ${stsName} pod template unchanged (${templateAfter}) — no restart, no soak, no settle gate. (Storage may have rolled; that is the point of rung 2.)"
     }
     waitForRolloutWithEvidence('statefulset', stsName, humanConfig.namespace, '600s')
     return changed
@@ -1500,12 +1552,19 @@ def deployHumanConductor(Map humanConfig, String sedArgs, String conductorPin) {
 def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def versions = readProperties(file: envFile)
     def deployVersion = sh(script: 'git rev-parse HEAD | cut -c1-8', returnStdout: true).trim()
-    def storageImage = resolveStorageImage(humanConfig.env, versions)
+    def builtStorageImage = resolveStorageImage(humanConfig.env, versions)
+    // Content-keyed storage image (2026-09-22): hold the live image when the
+    // storage build inputs did not move. Only when THIS run built storage from
+    // HEAD — DEPLOY_ONLY / a STEPS subset renders an image HEAD's digest does
+    // not describe, so it passes '' (cannot judge → roll, record cleared).
+    def storageInputs = (params.DEPLOY_ONLY != true && shouldRunStep('cargo-build-storage')) ? sh(script: "bash '${env.WORKSPACE}/scripts/ci/storage-input-digest.sh' || true", returnStdout: true).trim() : ''
+    def storageImage = resolveStorageWorkloadImage(humanConfig, builtStorageImage, storageInputs)
     // Resolve the floating hApp tag to its content digest so a DNA-pipeline tag
     // move (new hApp bytes, no edge commit) surfaces as an STS spec change and
     // the genesis-peer surge guard lets the rollout restart proceed. FAIL SAFE
-    // by construction — see resolveHappDigest.
-    def happDigest = resolveHappDigest(versions.HAPP_TAG, deployVersion)
+    // by construction — see resolveHappDigest (content-keyed hold since 2026-09-22).
+    def happ = resolveHappDigest(humanConfig, versions.HAPP_TAG, deployVersion)
+    def happDigest = happ.stamp
     def envConfig = getEnvConfig()[humanConfig.env]
     def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
 
@@ -1613,7 +1672,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         script: "bash '${env.WORKSPACE}/scripts/ci/conductor-workload-pin.sh' 2>/dev/null || true",
         returnStdout: true,
     ).trim()
-    def conductorImage = resolveConductorWorkloadImage(humanConfig, storageImage, conductorPin)
+    def conductorImage = resolveConductorWorkloadImage(humanConfig, builtStorageImage, conductorPin)
     def conductorWs = conductorWsHost(humanConfig.resourcePrefix, humanConfig.namespace)
 
     def sedArgs = humanManifestSedArgs(humanConfig, versions, deployVersion, happDigest, storageImage, conductorImage, conductorWs, nonProdGate, primaryDoorway, relayUrl, hostAliases, p2pNodes, nodeTypeValues, deviceArchetype, householdId, nodeRole, region)
@@ -1667,6 +1726,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // the StatefulSet (pods + PVCs remain — the manifest sets
     // persistentVolumeClaimRetentionPolicy: Retain) and reapply, which re-adopts
     // the existing pods and PVCs under the new spec. No data loss.
+    def podInputsBefore = podInputsFingerprint(outputFile, humanConfig.namespace, 'all')
     def applyLog = "/tmp/kubectl-apply-${humanConfig.resourcePrefix}.log"
     def applyCode = sh(
         script: "kubectl apply -f ${outputFile} > ${applyLog} 2>&1",
@@ -1711,24 +1771,21 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // now reports UNCHANGED, and for that the explicit restart is a gratuitous
     // bounce; skip it for genesis peers so we don't induce the surge. Non-genesis
     // (reduced-arc) peers always restart — surge is cheap.
-    // (Shell grep, not Groovy =~, to avoid the CPS Matcher-serialization gotcha.)
-    def ssUnchanged = false
-    if (applyCode == 0) {
-        def grepCode = sh(
-            script: "grep -Eq 'statefulset\\.apps/${humanConfig.resourcePrefix}[[:space:]]+unchanged' ${applyLog}",
-            returnStatus: true,
-        )
-        ssUnchanged = (grepCode == 0)
-    }
-    // Rung 2 note: this guard now protects the STORAGE StatefulSet only, and is
-    // much less load-bearing than it was — a storage restart no longer touches
-    // the conductor, so it costs no re-gossip surge. The conductor's own guard
-    // is stronger and unconditional: deployHumanConductor never issues a
-    // rollout restart at all, so conductors move only when their pod template
-    // genuinely changed (conductor-pin bump or hApp digest move).
-    if (humanConfig.genesisPeer == true && ssUnchanged) {
-        echo "Skipping storage rollout restart for genesis peer ${humanConfig.resourcePrefix}: StatefulSet unchanged (no image/config change)."
+    //
+    // 2026-09-22 — the guard above never fired: every manifest stamps the commit
+    // into OBJECT metadata (app.kubernetes.io/version), so apply reported
+    // "configured" on every commit and the "unchanged" grep never matched —
+    // all seven storage peers restarted on every deploy (edge #1474). The
+    // decision is now the live pod template + ConfigMap/Secret data, read
+    // before and after apply (podInputsFingerprint), for EVERY peer: nothing
+    // a pod consumes moved → no restart; anything moved, a forbidden-field
+    // re-create, or an unreadable fingerprint → restart exactly as before.
+    def podInputsAfter = podInputsFingerprint(outputFile, humanConfig.namespace, 'all')
+    sh "bash '${env.WORKSPACE}/scripts/ci/storage-workload-image.sh' --record '${humanConfig.resourcePrefix}' '${humanConfig.namespace}' '${storageInputs}'"
+    if (applyCode == 0 && podInputsBefore && podInputsBefore == podInputsAfter) {
+        echo "⏭️ ${humanConfig.resourcePrefix}: pod template + config unchanged (${podInputsAfter}) — no storage restart"
     } else {
+        echo "${humanConfig.resourcePrefix}: pod inputs changed (${podInputsBefore ?: 'none'} -> ${podInputsAfter ?: 'unreadable'}) — restarting storage"
         sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
     }
     waitForRolloutWithEvidence('statefulset', humanConfig.resourcePrefix, humanConfig.namespace, '600s')
@@ -1742,7 +1799,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // genesis pair last, instead of all seven at once (the 2026-08-06
     // fleet-wide no-authorities regime; spec
     // 2026-08-06-staggered-conductor-restart-mitigation-design.md).
-    CONDUCTOR_DEPLOY_QUEUE[humanConfig.resourcePrefix] = [sedArgs: sedArgs, conductorPin: conductorPin]
+    CONDUCTOR_DEPLOY_QUEUE[humanConfig.resourcePrefix] = [sedArgs: sedArgs, conductorPin: conductorPin, happRollKey: happ.rollKey]
 
     def componentName = humanConfig.resourcePrefix.replace('elohim-', '')
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${humanConfig.namespace} ${deployVersion} ${componentName} || true"

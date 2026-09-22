@@ -39,6 +39,14 @@ TARGET_ENV="${2:?usage: fleet-coordswap-dispatch.sh <happ> <target-env>}"
 DEPLOYMENTS_JSON="${DEPLOYMENTS_JSON:-genesis/orchestrator/data/deployments.json}"
 DRIVER="$(dirname "$0")/fleet-coordswap.sh"
 
+# Optional verdict record for the hApp roll key (scripts/ci/happ-roll-key.sh):
+# COORDSWAP_RESULT_FILE receives "<SUCCESS|DEFERRED|INCOMPLETE> sha256:<bundle>"
+# only when the driver actually ran. Truncated FIRST, so every skip path —
+# and a stale file from an earlier build in a reused workspace — reads as
+# "hot-swap not run" (conductors then roll on any bundle byte change).
+RESULT_FILE="${COORDSWAP_RESULT_FILE:-}"
+[ -z "$RESULT_FILE" ] || : > "$RESULT_FILE"
+
 case "${COORDSWAP_ENABLE:-true}" in
   false|0|no) echo "COORDSWAP: skipped (COORDSWAP_ENABLE=${COORDSWAP_ENABLE})"; exit 0 ;;
 esac
@@ -95,11 +103,17 @@ rc=0
 bash "$DRIVER" --happ "$HAPP" --peers "$PEERS" --apply --timeout 180 || rc=$?
 
 if [ "$rc" -eq 0 ]; then
+  verdict=SUCCESS
   echo "COORDSWAP: SUCCESS — fleet coordinators in sync with this build's bundle"
 elif [ "$rc" -eq 4 ]; then
+  verdict=DEFERRED
   echo "COORDSWAP: DEFERRED — one or more peers refused the connection (an edge roll is likely in flight); nothing applied on those peers, re-run after the roll."
 else
+  verdict=INCOMPLETE
   echo "COORDSWAP: INCOMPLETE (driver rc=$rc) — see the rollout table above."
   echo "COORDSWAP: warn-only by policy; the DNA build is NOT failed by this."
+fi
+if [ -n "$RESULT_FILE" ]; then
+  printf '%s sha256:%s\n' "$verdict" "$(sha256sum "$HAPP" | awk '{print $1}')" > "$RESULT_FILE" || true
 fi
 exit 0

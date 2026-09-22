@@ -7,7 +7,7 @@ title: "Every storage/doorway push pays the ~60 min DNA sweettest before edge ca
 slug: "ci-edge-depends-on-holochain-rebuilds-dna-without-dna-change"
 written: "2026-09-02"
 author: "shift 2026-09-02T02-20-land-rung5-batch"
-status: "open"
+status: "wip"
 priority: "medium"
 ci_status: open
 jobs: [elohim-orchestrator, elohim-holochain, elohim-edge]
@@ -64,3 +64,16 @@ staggered) although nothing the conductor runs changed. Cost on 2026-09-03: the 
 was the point of the deploy waited behind a full conductor fleet roll. The digest that should
 decide a conductor roll is content-derived — the packed DNA hash set (what the guard already
 computes), not the artifact's OCI digest — so a rebuild that changes no DNA rolls no conductor.
+
+## 2026-09-22 — second costume cured in-tree (unproven on the fleet; wip)
+
+The conductor roll is now keyed on hApp CONTENT, not the OCI digest. The DNA pipeline stamps
+`elohim.host/roll-key` on the artifact (`scripts/ci/happ-roll-key.sh`): `dna-set:` (packed DNA
+hash set + happ.yaml) when the same build's coordinator hot-swap reported SUCCESS for that exact
+bundle, else `bundle:` (adds the .happ bytes, so any byte change still rolls). The edge
+(`scripts/ci/conductor-happ-stamp.sh`) holds the live `happ-digest` stamp while the key equals
+`elohim.host/happ-roll-key` on the live conductor object. Identical-hash rebuilds and hot-swapped
+coordinator-only changes stop rolling conductors; a moved DNA hash, a happ.yaml change, or an
+un-swapped byte change still rolls. The first half of this atom (reuse the last green hApp
+instead of rebuilding the DNA pipeline) is untouched — it lives in `graph-walker.mjs`, another
+lane.

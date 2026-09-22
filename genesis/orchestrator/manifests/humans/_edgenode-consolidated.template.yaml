@@ -179,7 +179,9 @@ spec:
         elohim-workload: storage
         app.kubernetes.io/name: edgenode
         app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+        # No app.kubernetes.io/version here: a git-SHA label in the POD
+        # template restarted every storage peer on every commit (the
+        # staggered-restart root cause). It stays on OBJECT metadata above.
         app.kubernetes.io/component: data
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
