@@ -766,7 +766,8 @@ def triggerPipeline(String name, String branch, Object wait = null, List changed
         // tag directly, but the explicit parameter makes the dispatch contract
         // visible in Jenkins and keeps the guarantee independent of checkout
         // history depth.
-        boolean validateOnlyDownstream = name == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true'
+        boolean validateOnlyDownstream = name == 'elohim-edge' &&
+            (env.EDGE_VALIDATE_ONLY_FROM_TAG == 'true' || env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
         // Cross-repo pipelines share none of the monorepo's parameter vocabulary —
         // sending FORCE_BUILD/DEPLOY_ONLY/CHANGED_PATHS to a job that declares none
         // of them produces undefined-parameter warnings and no behaviour. They get
@@ -1312,6 +1313,18 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         def graphResult = runBuildGraph(changedFiles)
         graphPipelines = graphResult.pipelineSteps.keySet().toList()
 
+        // An edge selection whose ONLY stale step is dataplane-validation changed
+        // nothing edge builds or deploys (a2o steps/features, the validation
+        // script): dispatch it validate-only instead of rebuilding and rolling
+        // all seven alpha peers (orchestrator #1726 → edge #1383 rolled the fleet
+        // for a step-definition edit). [build:edge] still forces a full run.
+        def edgeStaleSteps = graphResult.pipelineSteps['elohim-edge'] ?: []
+        boolean edgeForced = (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it }.contains('elohim-edge')
+        if (edgeStaleSteps && edgeStaleSteps.every { it == 'dataplane-validation' } && !edgeForced) {
+            env.EDGE_VALIDATE_ONLY_FROM_GRAPH = 'true'
+            echo '🧪 elohim-edge: only dataplane-validation is stale — dispatching validate-only (no build, no fleet roll)'
+        }
+
         // Filter to dispatchable pipelines (have jenkinsPath in their manifest).
         graphPipelines.removeAll { name -> !getPipelineMetadata(name).jenkinsPath }
 
@@ -1338,7 +1351,10 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
             def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-            def triggeringPipeline = graphPipelines.find { getPipelineMetadata(it).triggersGenesis }
+            // A validate-only edge deploys nothing, so it never pulls Genesis in.
+            def triggeringPipeline = graphPipelines.find {
+                getPipelineMetadata(it).triggersGenesis && !(it == 'elohim-edge' && env.EDGE_VALIDATE_ONLY_FROM_GRAPH == 'true')
+            }
             if (triggeringPipeline && isDevBranch) {
                 graphPipelines.add('elohim-genesis')
             }

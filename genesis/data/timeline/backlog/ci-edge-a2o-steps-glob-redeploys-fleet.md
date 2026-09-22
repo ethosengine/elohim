@@ -7,7 +7,7 @@ title: "An a2o step-definition-only change dispatches a FULL elohim-edge build +
 slug: "ci-edge-a2o-steps-glob-redeploys-fleet"
 written: "2026-08-25"
 author: "epr-card-nav shift (integrator)"
-status: "backlog"
+status: "wip"
 priority: "high"
 ci_status: open
 fingerprints: []
@@ -58,3 +58,12 @@ step file under `steps/` (elohim-core, lamad, auth, delivery …) matches, not j
 
 Out of this shift's path scope (`app/lamad`, `app/elohim-app`, `genesis/a2o`); filed rather than
 fixed mid-outage.
+
+## 2026-09-22 — fix shape 2 landed on branch `ci/wallclock-2026-09-22`
+- **What changed.** `applyBuildGraphRouting` now checks which edge steps are stale. If the only one is `dataplane-validation`, it sets `EDGE_VALIDATE_ONLY_FROM_GRAPH` and dispatches edge with `VALIDATE_ONLY=true` and `FORCE_BUILD/DEPLOY=false`, so there is no build and no fleet roll.
+  - A validate-only edge no longer pulls Genesis in.
+  - `[build:edge]` still forces a full run.
+  - Unlike the tag path, other selected pipelines (for example app) still dispatch. App stays ordered after edge, so the measurement is not perturbed mid-run.
+- **Fix shape 1 (narrow the glob): rejected on evidence.** `genesis/a2o/cucumber.mjs` loads every `steps/*.ts` and `steps/*/*.ts`, and the suite selects by `@dataplane` tag across all of `features/**`. So any step file can change what validation runs, and the wide glob is correct.
+- **Regression.** Three new tests in `genesis/orchestrator/validate-only-pipeline.test.mjs` pin two things: the validation step deploys nothing and nothing depends on it; and the rule plus the Genesis exclusion are wired.
+- **State:** wip until an a2o-only push shows `🧪 elohim-edge: only dataplane-validation is stale` and edge skipping build and deploy.
