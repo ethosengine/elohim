@@ -171,6 +171,18 @@ them, then close the zero-lag head oracle, then make the pair comparable.
   acceptance, not 1.4a's** — the design pass named it for T-1 in error, and T-1 was never going to flip it. T-1's
   proof is its red-first unit test and the absence of a torn row on the converged pair; T-2 proceeds as its own
   commit on that basis.
+  *Scheduled 2026-09-22:* a bounded pointer-audit sweep (`services::pointer_audit`, new module) heals the class
+  1.4d names — a declared row whose blob pointer no longer names the same blob as its own declared head's own
+  conductor record. It walks declared+pointer-bearing rows on a round-robin keyset cursor
+  (`content_diesel::list_declared_blob_pointer_candidates`), probes this node's own conductor
+  (`AdmissionClass::Background`, never Interactive), and runs the SAME guarded T7 heal
+  (`pointer_heal_patch` + `stamp_declared_head_mode(.., StampMode::HealCanonical, ..)`) `adopt_local` already
+  applies to a row some other path selected — never authoring, declaring, contesting, or moving a head. Metric
+  `elohim_content_pointer_audit_total{outcome}`; spawned on the same late-connect guard as the re-anchor backfill,
+  gated by `ELOHIM_POINTER_AUDIT` (default on). The fleet's own torn row (edge #1474 seam-smoke,
+  `ADVISORY-SAME-HEAD-DIFFERENT-BYTES`) cannot be healed by this sweep until it heals independently of code: both
+  doorways answered `UNREADABLE-HEAD-RECORD reason=cell-disabled` in #1474, so this node's own conductor cannot
+  yet produce the record the sweep reads FROM — it is waiting on cell health, not on this landing.
 - **1.5 The pair is compared.** *Landed locally 2026-09-19:* the existing seam-smoke `dht-fetch` seam compared only
   `headActionHash` and printed CONVERGED on edge/dev 1465 while the pair served two blobs. It now also compares the
   served `blobHash`; live it reads `ADVISORY-SAME-HEAD-DIFFERENT-BYTES` — **one notarized head, two blobs**. That is

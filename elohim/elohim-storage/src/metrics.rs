@@ -2045,6 +2045,27 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Pointer-audit sweep candidates (story 1.4d), by
+    /// [`PointerAuditOutcome`]. This sweep heals an already-torn declared
+    /// row — one whose blob pointer no longer names the same blob as its
+    /// own declared head's notarized record — via the SAME guarded T7 path
+    /// `head_adoption::adopt_local` already runs; it never authors,
+    /// declares, contests, or moves a head.
+    ///
+    /// The honesty meter for this sweep: `healed` climbing is the tear class
+    /// closing; a standing non-zero `not_canonical` or `unreadable` beside a
+    /// flat `healed` says the own conductor cannot yet answer for these ids
+    /// (e.g. `CellDisabled` — see `elohim/holochain/dna/**` health), not
+    /// that nothing needs healing.
+    pub static ref CONTENT_POINTER_AUDIT: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_content_pointer_audit_total",
+            "Pointer-audit sweep candidates by outcome (story 1.4d).",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Divergent REA commitments the heal leg ADJUDICATED without paying for a
     /// `get_rea_commitment` round-trip, by the remembered [`ReaHealSkip`].
     ///
@@ -2929,6 +2950,18 @@ pub fn register_all() {
         }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_BACKOFF_CLEARED.clone()));
         let _ = REGISTRY.register(Box::new(CONTENT_REANCHOR_SKIPPED.clone()));
+        let _ = REGISTRY.register(Box::new(CONTENT_POINTER_AUDIT.clone()));
+        // Pre-touch every outcome — a torn-row class this sweep never sees
+        // (e.g. `not_canonical` on a fully converged corpus) must read as a
+        // MEASURED zero, not an absent series.
+        {
+            use seam_contracts::ReasonLabel as _;
+            for outcome in PointerAuditOutcome::ALL {
+                CONTENT_POINTER_AUDIT
+                    .with_label_values(&[outcome.label()])
+                    .inc_by(0);
+            }
+        }
         let _ = REGISTRY.register(Box::new(CONTENT_CONTEST_REMINT_SUPPRESSED.clone()));
         let _ = REGISTRY.register(Box::new(REA_HEAL_REFUSED_SKIPPED.clone()));
         // Pre-touch both verdicts, same discipline as the evidence states below:
@@ -4588,6 +4621,53 @@ impl seam_contracts::ReasonLabel for ReanchorSkip {
     }
 }
 
+/// Outcome of one pointer-audit sweep candidate (story 1.4d) — the label
+/// vocabulary of [`CONTENT_POINTER_AUDIT`], as a closed type.
+///
+/// **Concerns:** C8 (typed reason, closed vocabulary — a skip must name its
+/// cause, never vanish into a missing count).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PointerAuditOutcome {
+    /// The row's declared head's own record named a different blob; the
+    /// pointer + size were refreshed via `StampMode::HealCanonical` — the
+    /// declared head and `dht_anchor_hash` did not move.
+    Healed,
+    /// Nothing to heal: the row already carries the record's pointer, OR the
+    /// row's declared head is not (or no longer) exactly the record's head —
+    /// a genuine head divergence, which stays with `head_adoption`'s other
+    /// paths and is never touched here.
+    InStep,
+    /// The own conductor's answer was a root-author FALLBACK, not an
+    /// authoritative record — never licenses a write.
+    NotCanonical,
+    /// The own conductor holds no head record for this id at all
+    /// (`resolve_content_head` returned `None`) — the same shape the
+    /// substrate-seam-smoke probe names `UNREADABLE-HEAD-RECORD`.
+    Unreadable,
+    /// The conductor call, or a local DB read the decision needed, failed.
+    Error,
+}
+
+impl seam_contracts::ReasonLabel for PointerAuditOutcome {
+    const ALL: &'static [Self] = &[
+        PointerAuditOutcome::Healed,
+        PointerAuditOutcome::InStep,
+        PointerAuditOutcome::NotCanonical,
+        PointerAuditOutcome::Unreadable,
+        PointerAuditOutcome::Error,
+    ];
+
+    fn label(&self) -> &'static str {
+        match self {
+            PointerAuditOutcome::Healed => "healed",
+            PointerAuditOutcome::InStep => "in_step",
+            PointerAuditOutcome::NotCanonical => "not_canonical",
+            PointerAuditOutcome::Unreadable => "unreadable",
+            PointerAuditOutcome::Error => "error",
+        }
+    }
+}
+
 /// Which ADJUDICATED heal verdict the REA leg replayed instead of re-deriving it
 /// from the own conductor — the label vocabulary of [`REA_HEAL_REFUSED_SKIPPED`],
 /// as a closed type.
@@ -4837,6 +4917,14 @@ pub fn inc_reanchor_skipped(reason: ReanchorSkip) {
     use seam_contracts::ReasonLabel as _;
     CONTENT_REANCHOR_SKIPPED
         .with_label_values(&[reason.label()])
+        .inc();
+}
+
+/// Record one pointer-audit sweep candidate's outcome (story 1.4d).
+pub fn inc_pointer_audit(outcome: PointerAuditOutcome) {
+    use seam_contracts::ReasonLabel as _;
+    CONTENT_POINTER_AUDIT
+        .with_label_values(&[outcome.label()])
         .inc();
 }
 
