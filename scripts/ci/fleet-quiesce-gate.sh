@@ -119,6 +119,17 @@
 #   1 — usage/config error
 #   3 — deadline exceeded WITHOUT sustained quiescence (prints
 #       "FLEET-CHURNING: ..." — this is a no-measure outcome, not a failure)
+#   4 — the evaluator itself could not run for QUIESCE_MAX_EVAL_ERRORS
+#       consecutive polls (prints "GATE-DEFECT: ..."). Also a no-measure
+#       outcome, but a defect in THIS gate, not a reading of the fleet.
+#
+# Response bodies travel to the evaluator as FILES, never as environment
+# variables. Linux caps one env string at MAX_ARG_STRLEN (128 KiB); storage's
+# /metrics exposition outgrew it, so every exec of python3 failed with
+# "Argument list too long", `parsed` came back empty, and the gate polled its
+# whole 2700s deadline reading `?` for every leg (edge #1471-#1475, 09-21/22 —
+# 45 min per edge run, no measurement). Three consecutive evaluator failures
+# now end the run as GATE-DEFECT instead of burning the deadline blind.
 set -euo pipefail
 
 usage() {
@@ -149,6 +160,10 @@ POLL_SECS="${QUIESCE_POLL_SECS:-60}"
 SUSTAIN_SECS="${QUIESCE_SUSTAIN_SECS:-330}"
 CURL_TIMEOUT="${QUIESCE_CURL_TIMEOUT_SECS:-20}"
 ACTIONABLE_TOL="${QUIESCE_ACTIONABLE_TOLERANCE:-0}"
+MAX_EVAL_ERRORS="${QUIESCE_MAX_EVAL_ERRORS:-3}"
+
+BODY_DIR=$(mktemp -d)
+trap 'rm -rf "$BODY_DIR"' EXIT
 
 log() {
   printf 'fleet-quiesce[%s]: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1"
@@ -161,6 +176,7 @@ deadline_ts=$((start_ts + DEADLINE_SECS))
 
 anchor_ts=""
 anchor_sweeps=""
+eval_errors=0
 
 log "starting — deadline=${DEADLINE_SECS}s poll=${POLL_SECS}s sustain=${SUSTAIN_SECS}s content=${CONTENT}"
 
@@ -174,16 +190,24 @@ while :; do
   # Fetch every leg tolerating individual curl failures — a single
   # unreachable endpoint must never kill the poll loop (or the deadline
   # check above would never get a chance to run out gracefully).
-  status_a=$(curl -fsS --max-time "$CURL_TIMEOUT" "${A_STORAGE%/}/p2p/status" 2>/dev/null) || status_a=""
-  status_b=$(curl -fsS --max-time "$CURL_TIMEOUT" "${B_STORAGE%/}/p2p/status" 2>/dev/null) || status_b=""
-  metrics_a=$(curl -fsS --max-time "$CURL_TIMEOUT" "${A_STORAGE%/}/metrics" 2>/dev/null) || metrics_a=""
+  # A failed leg leaves an EMPTY file — the evaluator reads that as absent.
+  curl -fsS --max-time "$CURL_TIMEOUT" -o "$BODY_DIR/status_a" "${A_STORAGE%/}/p2p/status" 2>/dev/null || : > "$BODY_DIR/status_a"
+  curl -fsS --max-time "$CURL_TIMEOUT" -o "$BODY_DIR/status_b" "${B_STORAGE%/}/p2p/status" 2>/dev/null || : > "$BODY_DIR/status_b"
+  curl -fsS --max-time "$CURL_TIMEOUT" -o "$BODY_DIR/metrics_a" "${A_STORAGE%/}/metrics" 2>/dev/null || : > "$BODY_DIR/metrics_a"
   code_a=$(curl -sS -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "${A_DOORWAY%/}/db/content/${ENC_CONTENT}" 2>/dev/null) || code_a="000"
   code_b=$(curl -sS -o /dev/null -w '%{http_code}' --max-time "$CURL_TIMEOUT" "${B_DOORWAY%/}/db/content/${ENC_CONTENT}" 2>/dev/null) || code_b="000"
   [ -n "$code_a" ] || code_a="000"
   [ -n "$code_b" ] || code_b="000"
 
-  parsed=$(STATUS_A="$status_a" STATUS_B="$status_b" METRICS_A="$metrics_a" ACTIONABLE_TOL="$ACTIONABLE_TOL" python3 - <<'PYEOF'
+  parsed=$(BODY_DIR="$BODY_DIR" ACTIONABLE_TOL="$ACTIONABLE_TOL" python3 - <<'PYEOF'
 import json, os, re
+
+def body(name):
+    try:
+        with open(os.path.join(os.environ["BODY_DIR"], name), encoding="utf-8", errors="replace") as fh:
+            return fh.read()
+    except OSError:
+        return ""
 
 def caught_up(raw):
     # Two satisfying shapes (2026-08-16, local-mesh measure evidence):
@@ -247,9 +271,9 @@ def labeled_metric_value(text, name, label, value):
                 best = float(m.group(1))
     return best
 
-a_caught_up = caught_up(os.environ.get("STATUS_A", ""))
-b_caught_up = caught_up(os.environ.get("STATUS_B", ""))
-metrics_a = os.environ.get("METRICS_A", "")
+a_caught_up = caught_up(body("status_a"))
+b_caught_up = caught_up(body("status_b"))
+metrics_a = body("metrics_a")
 converged = metric_value(metrics_a, "elohim_projection_reconcile_converged")
 sweeps = metric_value(metrics_a, "elohim_projection_reconcile_sweeps_total")
 # QUIESCED predicate (2026-08-07 decision — see header note 3): measured
@@ -328,6 +352,17 @@ print(f"CONVERGED={converged}")
 print(f"SWEEPS={sweeps}")
 PYEOF
 ) || parsed=""
+
+  if [ -z "$parsed" ]; then
+    eval_errors=$((eval_errors + 1))
+    log "EVAL-ERROR ${eval_errors}/${MAX_EVAL_ERRORS} — the evaluator produced no reading (a gate defect, not a fleet state)"
+    if [ "$eval_errors" -ge "$MAX_EVAL_ERRORS" ]; then
+      echo "GATE-DEFECT: evaluator failed ${eval_errors} consecutive polls — DID NOT MEASURE; fix fleet-quiesce-gate.sh, this is not a fleet reading"
+      exit 4
+    fi
+  else
+    eval_errors=0
+  fi
 
   a_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^A_CAUGHT_UP=//p')
   b_caught_up=$(printf '%s\n' "$parsed" | sed -n 's/^B_CAUGHT_UP=//p')
