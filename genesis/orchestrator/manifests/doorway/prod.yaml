@@ -61,6 +61,36 @@ stringData:
   api-key-admin: "CHANGE-ME-prod-elohim-admin-2024"
   jwt-secret: "CHANGE-ME-prod-jwt-secret-use-openssl-rand-hex-32"
 ---
+# The prod doorway's OWN Ed25519 node identity (story 5.1, commit a9910d11c).
+# Full rationale on alpha.yaml's twin block; the staging-specific note about soft node
+# affinity (the first consumer fixes the node, the hostpath PV's own nodeAffinity keeps
+# the rollout there, losing that node leaves the doorway Pending) applies here too.
+#
+# On prod this key is load-bearing beyond hygiene: it is what a doorway's DID document
+# and JWKS entry mean. Deleting this claim is a deliberate identity rotation, not a
+# cache flush — every peer that cached this doorway's key must re-fetch.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elohim-doorway-prod-node-key
+  namespace: elohim-prod
+  labels:
+    app: elohim-doorway
+    environment: prod
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-prod
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      # One 32-byte file; must never change (hostpath PVCs cannot be expanded).
+      storage: 64Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -77,6 +107,17 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
+  # EXPLICIT for the same reason as alpha.yaml's twin: the node-key PVC's safety rests
+  # on maxUnavailable:0 (the serving pod is never terminated before the surge pod is
+  # Ready), so a doorway that cannot mount or write its key file fails the rollout
+  # without interrupting serving.
+  # Covers the ROLLOUT path only — not eviction, node loss, or a pod that turns Ready
+  # and fails later. Never `Recreate`.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: elohim-doorway
@@ -93,6 +134,10 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
+      # uid/gid 1000 (`USER doorway`) must be able to write the node-key volume on
+      # first boot — see alpha.yaml's twin comment.
+      securityContext:
+        fsGroup: 1000
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -169,6 +214,11 @@ spec:
               value: "/opt/holochain/elohim.happ"
             - name: FEDERATION_PEERS
               value: "https://doorway-alpha.elohim.host,https://doorway-staging.elohim.host"
+            # This doorway's OWN persistent node identity — a FILE path inside its own
+            # claim. Story 5.1 semantics and the household's shape: see alpha.yaml's
+            # twin comment and app/elohim-app/scripts/hc-mesh.sh.
+            - name: DOORWAY_NODE_KEY_FILE
+              value: "/var/lib/doorway/node/doorway-node.key"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -208,6 +258,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 15
             failureThreshold: 5
+          volumeMounts:
+            - name: node-key
+              mountPath: /var/lib/doorway/node
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
@@ -244,6 +297,10 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 15
             failureThreshold: 5
+      volumes:
+        - name: node-key
+          persistentVolumeClaim:
+            claimName: elohim-doorway-prod-node-key
 ---
 apiVersion: v1
 kind: Service

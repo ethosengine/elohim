@@ -61,6 +61,77 @@ stringData:
   # Anthropic API key for elohim-agent-sdk sidecar (set via sealed-secret in production)
   anthropic-api-key: "REPLACE_WITH_REAL_KEY"
 ---
+# Doorway-A's OWN Ed25519 node identity (story 5.1, commit a9910d11c).
+#
+# WHY THIS EXISTS. `DOORWAY_NODE_KEY_FILE` makes the doorway load-or-generate a
+# 32-byte Ed25519 secret instead of minting a fresh one every boot. That key signs
+# EdDSA JWTs, `GET /.well-known/doorway-keys` (JWKS) and `GET /.well-known/did.json`
+# — so an ephemeral key means every restart silently rotates this doorway's
+# federation identity and the sibling doorway that cached its JWKS entry starts
+# rejecting it. Until this volume existed the fleet logged
+# `mode: generated-ephemeral` on every boot (Loki, 2026-09-21 17:28Z, both pods)
+# even though the code path to avoid it had landed. Backlog:
+# genesis/data/timeline/backlog/doorway-node-key-has-no-persistent-home-on-fleet.md
+#
+# WHY A PVC. The file holds a PRIVATE Ed25519 signing key, so it must never be
+# committed to this repo — and the generate-on-boot implementation already landed
+# (`a9910d11c`): a volume is all it was missing. An externally provisioned Secret
+# (minted outside the repo, injected by the operator or a secret manager) remains a
+# legitimate future option and would be the right shape if several pods ever had to
+# share one identity; it is not chosen here only because it would add a secret-
+# provisioning path for something the existing code can already do for itself. The
+# key is born inside the pod and never leaves it; the doorway's own first-writer-wins
+# publish (hard_link, O_EXCL, 0600) makes a shared volume correct across the
+# rollout's two concurrent pods.
+#
+# WHAT THE SHAPE ACTUALLY GUARANTEES. `openebs-hostpath` is node-local (same class
+# the mongodb archive and every edgenode PVC use). ReadWriteOnce is per-NODE, so a
+# surge pod scheduled on the same node as the outgoing pod has no attachment
+# conflict — that, not "it can never stall", is the property being relied on. What
+# CAN leave a rollout stuck is a bound PV whose node conflicts with this
+# Deployment's required affinity, or that node lacking capacity for a second pod; in
+# both cases the surge pod sits Pending and `maxUnavailable: 0` keeps the healthy
+# outgoing pod serving while `waitForRolloutWithEvidence` goes red. Note the two
+# constraints are different in kind: the affinity here pins a node CLASS
+# (node-type=operations), and it is the BOUND PV that supplies the specific-node
+# constraint. `maxUnavailable: 0` protects only the rollout path — it does not
+# protect against eviction or node loss, nor against a replacement that turns Ready
+# and fails later.
+#
+# And the boot semantics that make this safe to try: `node_identity::load_or_generate`
+# exits(1) on an unwritable or corrupt file, so a bad mount presents as a NOT-Ready
+# surge pod and a red deploy rather than a serving gap. Readiness is /health, which
+# does not consult the key.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elohim-doorway-alpha-node-key
+  namespace: elohim-alpha
+  labels:
+    app: elohim-doorway
+    environment: alpha
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-alpha
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # Node-local, same class as the doorway's mongodb archive (infra/alpha-mongodb.yaml)
+  # and every edgenode PVC. Deliberately NOT a networked class: a networked RWO volume
+  # must detach from the outgoing pod before a surge pod on a DIFFERENT node can
+  # attach, so with maxUnavailable:0 the surge pod would sit Pending until the deploy
+  # times out (the outgoing pod keeps serving throughout). Node-local keeps both pods
+  # on one node, where RWO's per-node scope means no attachment conflict at all.
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      # One 32-byte file. hostpath enforces no quota, so this is a declaration, not a
+      # reservation — and it must never change: hostpath PVCs cannot be expanded and a
+      # changed request makes `kubectl apply` fail on an immutable field.
+      storage: 64Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -77,6 +148,20 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
+  # EXPLICIT, not decorative. At replicas:1 the k8s defaults already compute to
+  # maxUnavailable:0 / maxSurge:1 (25% floors to 0, ceils to 1) — the arithmetic the
+  # node-key PVC's safety rests on: the surge pod must reach Ready before the serving
+  # pod is terminated, so a doorway that cannot mount or write its key file (boot
+  # exit(1) — see the PVC above) fails the rollout WITHOUT interrupting serving.
+  # Pinning it keeps that invariant true if replicas is ever raised, and makes it
+  # readable instead of inferred. It covers the ROLLOUT path only — not eviction, node
+  # loss, or a pod that turns Ready and fails later. Never `Recreate` here: that
+  # deletes the serving pod first, which would turn a bad key mount into an outage.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: elohim-doorway
@@ -104,6 +189,14 @@ spec:
       # node, or performance; if operations is down the ingress is down too,
       # so the pin costs no extra availability. doorway-B carries the shem-
       # side mirror via elohim.host.
+      # The doorway image runs as `USER doorway` (uid/gid 1000 —
+      # doorway/doorway-service/Dockerfile:181,200), so the node-key volume must be
+      # group-writable by 1000 for the first-boot generate to succeed. Same shape as
+      # the mongodb archive's `fsGroup: 999` (infra/alpha-mongodb.yaml), which is the
+      # proof this works with openebs-hostpath on this cluster. Harmless for the other
+      # containers and for the ssr-render-bundle emptyDir (group keeps rwx).
+      securityContext:
+        fsGroup: 1000
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -325,6 +418,14 @@ spec:
             # live again.
             - name: FEDERATION_PEERS
               value: "https://elohim.host"
+            # This doorway's OWN persistent Ed25519 node identity — a FILE path, one
+            # per doorway, never shared with doorway-B (alpha-b.yaml claims its own
+            # PVC). Story 5.1 semantics: absent -> generate + write 0600; present ->
+            # load; present-but-wrong-length -> abort boot rather than silently rotate
+            # the federation identity. Matches the household launcher's shape exactly
+            # (app/elohim-app/scripts/hc-mesh.sh: DOORWAY_NODE_KEY_FILE per doorway).
+            - name: DOORWAY_NODE_KEY_FILE
+              value: "/var/lib/doorway/node/doorway-node.key"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -424,6 +525,8 @@ spec:
           volumeMounts:
             - name: ssr-render-bundle
               mountPath: /opt/elohim-render
+            - name: node-key
+              mountPath: /var/lib/doorway/node
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
@@ -508,6 +611,9 @@ spec:
       volumes:
         - name: ssr-render-bundle
           emptyDir: {}
+        - name: node-key
+          persistentVolumeClaim:
+            claimName: elohim-doorway-alpha-node-key
 ---
 apiVersion: v1
 kind: Service

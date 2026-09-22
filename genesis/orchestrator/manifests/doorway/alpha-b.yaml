@@ -82,6 +82,42 @@ stringData:
   jwt-secret: "dev-jwt-secret-b-change-in-production-2024"
   anthropic-api-key: "REPLACE_WITH_REAL_KEY"
 ---
+# Doorway-B's OWN Ed25519 node identity (story 5.1, commit a9910d11c).
+#
+# A SEPARATE claim from doorway-A's `elohim-doorway-alpha-node-key`: the two doorways
+# are distinct federation identities that validate each other's JWKS, so sharing one
+# key file would collapse them into one identity and make the cross-doorway
+# verification vacuous. Same namespace, different claim, different node — no sharing
+# is possible.
+#
+# Full rationale (why a PVC rather than a new secret-provisioning path, and exactly
+# what the rollout shape does and does not guarantee) lives on the twin block in
+# alpha.yaml. The one difference here: doorway-B's affinity pins the node CLASS
+# node-type=remote (shem) with no fallback, so the node-local volume adds no
+# availability risk it does not already carry — if shem is unhealthy this pod is
+# already Pending by design.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elohim-doorway-alpha-b-node-key
+  namespace: elohim-alpha
+  labels:
+    app: elohim-doorway-b
+    environment: alpha
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-alpha-b
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      # One 32-byte file; must never change (hostpath PVCs cannot be expanded).
+      storage: 64Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -98,6 +134,17 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
+  # EXPLICIT for the same reason as alpha.yaml's twin: the node-key PVC's safety rests
+  # on maxUnavailable:0 (the serving pod is never terminated before the surge pod is
+  # Ready), so a doorway that cannot mount or write its key file fails the rollout
+  # without interrupting the apex.
+  # Covers the ROLLOUT path only — not eviction, node loss, or a pod that turns Ready
+  # and fails later. Never `Recreate`.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: elohim-doorway-b
@@ -121,6 +168,11 @@ spec:
       # ingress's degradation is visible rather than masked by silent
       # rescheduling onto the on-prem cluster (which doorway-A already
       # serves via doorway-alpha.elohim.host).
+      #
+      # uid/gid 1000 (`USER doorway`) must be able to write the node-key volume on
+      # first boot — see alpha.yaml's twin comment.
+      securityContext:
+        fsGroup: 1000
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -352,6 +404,12 @@ spec:
             # and run a heartbeat keeping the peer cache fresh.
             - name: FEDERATION_PEERS
               value: "https://alpha.elohim.host"
+            # doorway-B's OWN persistent node identity — a FILE path inside B's own
+            # claim (`elohim-doorway-alpha-b-node-key`), never doorway-A's. Story 5.1
+            # semantics and the household's shape: see alpha.yaml's twin comment and
+            # app/elohim-app/scripts/hc-mesh.sh's per-doorway DOORWAY_NODE_KEY_FILE.
+            - name: DOORWAY_NODE_KEY_FILE
+              value: "/var/lib/doorway/node/doorway-node.key"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -412,6 +470,8 @@ spec:
           volumeMounts:
             - name: ssr-render-bundle
               mountPath: /opt/elohim-render
+            - name: node-key
+              mountPath: /var/lib/doorway/node
         - name: doorway-app
           image: harbor.ethosengine.com/ethosengine/doorway-app:DOORWAY_APP_TAG_PLACEHOLDER
           imagePullPolicy: Always
@@ -492,6 +552,9 @@ spec:
       volumes:
         - name: ssr-render-bundle
           emptyDir: {}
+        - name: node-key
+          persistentVolumeClaim:
+            claimName: elohim-doorway-alpha-b-node-key
 ---
 apiVersion: v1
 kind: Service

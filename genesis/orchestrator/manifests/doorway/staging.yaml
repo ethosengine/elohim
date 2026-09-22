@@ -41,6 +41,41 @@ stringData:
   api-key-admin: "dev-elohim-admin-2024"
   jwt-secret: "dev-jwt-secret-change-in-production-2024"
 ---
+# The staging doorway's OWN Ed25519 node identity (story 5.1, commit a9910d11c).
+# Full rationale on alpha.yaml's twin block. Staging-specific note: this pod's node
+# affinity is `preferred`, not hard-pinned, so it is the FIRST consumer that decides
+# which node the node-local volume lands on; from then on the openebs-hostpath PV's
+# own nodeAffinity keeps the pod (and the rollout's surge pod) on that node — which is
+# exactly what makes ReadWriteOnce safe here, and also means losing that node leaves
+# this doorway Pending. That is the same exposure every staging edgenode PVC already
+# carries (edgenode/staging.yaml), not a new class.
+#
+# The `staging-read` replica fleet deliberately gets NO node key: it runs replicas:2
+# across soft affinity, so a node-local RWO claim could not be mounted by both pods,
+# and PROJECTION_WRITER=false readers are not the federation identity holder. See
+# staging-read.yaml.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elohim-doorway-staging-node-key
+  namespace: elohim-staging
+  labels:
+    app: elohim-doorway
+    environment: staging
+    app.kubernetes.io/name: doorway
+    app.kubernetes.io/instance: doorway-staging
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath
+  resources:
+    requests:
+      # One 32-byte file; must never change (hostpath PVCs cannot be expanded).
+      storage: 64Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -57,6 +92,17 @@ metadata:
     app.kubernetes.io/managed-by: jenkins
 spec:
   replicas: 1
+  # EXPLICIT for the same reason as alpha.yaml's twin: the node-key PVC's safety rests
+  # on maxUnavailable:0 (the serving pod is never terminated before the surge pod is
+  # Ready), so a doorway that cannot mount or write its key file fails the rollout
+  # without interrupting serving.
+  # Covers the ROLLOUT path only — not eviction, node loss, or a pod that turns Ready
+  # and fails later. Never `Recreate`.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: elohim-doorway
@@ -73,6 +119,10 @@ spec:
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
     spec:
+      # uid/gid 1000 (`USER doorway`) must be able to write the node-key volume on
+      # first boot — see alpha.yaml's twin comment.
+      securityContext:
+        fsGroup: 1000
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -149,6 +199,11 @@ spec:
               value: "/opt/holochain/elohim.happ"
             - name: FEDERATION_PEERS
               value: "https://doorway-alpha.elohim.host,https://doorway.elohim.host"
+            # This doorway's OWN persistent node identity — a FILE path inside its own
+            # claim. Story 5.1 semantics and the household's shape: see alpha.yaml's
+            # twin comment and app/elohim-app/scripts/hc-mesh.sh.
+            - name: DOORWAY_NODE_KEY_FILE
+              value: "/var/lib/doorway/node/doorway-node.key"
             - name: API_KEY_AUTHENTICATED
               valueFrom:
                 secretKeyRef:
@@ -188,6 +243,9 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 15
             failureThreshold: 5
+          volumeMounts:
+            - name: node-key
+              mountPath: /var/lib/doorway/node
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI
         - name: doorway-app
@@ -224,6 +282,10 @@ spec:
             periodSeconds: 30
             timeoutSeconds: 15
             failureThreshold: 5
+      volumes:
+        - name: node-key
+          persistentVolumeClaim:
+            claimName: elohim-doorway-staging-node-key
 ---
 apiVersion: v1
 kind: Service

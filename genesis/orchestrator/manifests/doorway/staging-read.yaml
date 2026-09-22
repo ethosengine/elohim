@@ -11,6 +11,23 @@
 # Architecture:
 #   Ingress (read-heavy paths) -> read replica Service -> these pods
 #   All pods share: same MongoDB, same CONDUCTOR_URLS, same STORAGE_URL
+#
+# NO NODE KEY HERE, ON PURPOSE. The four singleton doorways (alpha, alpha-b, staging,
+# prod) each carry a `DOORWAY_NODE_KEY_FILE` on their own node-local PVC so their
+# Ed25519 federation identity survives a restart (story 5.1, commit a9910d11c). These
+# read replicas deliberately do not, for two reasons:
+#   · PLACEMENT FLEXIBILITY. These are replicas:2 under SOFT node affinity —
+#     deliberately free to spread across operations/edge/performance. A node-local
+#     claim would tie a pod to whichever node its volume bound on, trading that
+#     flexibility for an identity these pods do not need.
+#   · NO IDENTITY DEPENDENCY TO ADD. A read replica is PROJECTION_WRITER=false and
+#     holds no ingress apex name; it is not the identity a federation sibling caches a
+#     JWKS entry for, so giving it a persistent one buys nothing and couples a
+#     read-scaling surface to storage.
+# If these ever do need a stable identity, it is the SAME identity as the staging
+# writer (one doorway, many pods) — which calls for a shared-key mechanism (an
+# externally provisioned Secret is the natural shape), not a per-pod PVC.
+# They therefore keep the ephemeral key and log `mode: generated-ephemeral` by design.
 ---
 apiVersion: apps/v1
 kind: Deployment

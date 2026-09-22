@@ -44,6 +44,42 @@ pods, and the key file's first-writer-wins publish (`a9910d11c`) already covers 
 — a Secret needs the mint-once step done outside the pod's own boot path so both replicas read the same
 value instead of racing to mint one each.
 
+**2026-09-22 — repo-side cure written, NOT yet measured on the fleet.** The PVC shape was chosen because
+it reuses the generate-on-boot implementation that already landed in `a9910d11c` without introducing a
+secret-provisioning path. The stored bytes are a PRIVATE Ed25519 signing key, so the thing to avoid is
+committing private key material to this repo — not the Secret mechanism itself: an **externally
+provisioned** Secret (minted outside the repo, injected by the operator or a secret manager) remains a
+legitimate future option, and is the right shape if several pods ever have to share one identity. Each of
+the four singleton doorways now declares its OWN `ReadWriteOnce` / `openebs-hostpath` / 64Mi claim
+(`elohim-doorway-{alpha,alpha-b,staging,prod}-node-key`), mounted at `/var/lib/doorway/node` with
+`DOORWAY_NODE_KEY_FILE=/var/lib/doorway/node/doorway-node.key` and `fsGroup: 1000` (the image runs as
+`USER doorway`, uid/gid 1000) — the same node-local class and `fsGroup` shape the doorway's own mongodb
+archive already uses. Doorway-A and doorway-B hold DIFFERENT claims on purpose: they validate each
+other's JWKS, so one shared key would make that verification vacuous. Each Deployment now pins
+`RollingUpdate maxUnavailable: 0 / maxSurge: 1` explicitly (at `replicas: 1` the defaults already
+computed to this) — that is the invariant the ROLLOUT path rests on: `node_identity::load_or_generate`
+exits(1) on an unwritable or corrupt file, so a bad mount surfaces as a Pending-or-NOT-Ready surge pod
+and a red `waitForRolloutWithEvidence` while the healthy outgoing pod keeps serving; readiness is
+`/health`, which never consults the key. It says nothing about eviction, node loss, or a pod that turns
+Ready and fails later. Note also what constrains placement: the affinity pins a node CLASS
+(`node-type=operations` / `remote`), and it is the BOUND PV that supplies the specific-node constraint —
+a bound PV whose node conflicts with the required affinity, or a node without room for a second pod, is
+what would leave a rollout stalled. `staging-read.yaml` is deliberately excluded to preserve the
+placement flexibility its two soft-affinity replicas are given, and to avoid adding an identity
+dependency a `PROJECTION_WRITER=false` reader does not need — the reason is written into that file so
+the omission is not read as an oversight.
+**What would close this — scoped to alpha A + B:** both alpha doorways logging `Doorway node identity
+resolved (persisted)` with `mode: generated` on the first roll and `mode: loaded` with the SAME
+`fingerprint` on the next. That is the reading the `dev` branch's edge deploy produces (it is where
+2026-09-21's `generated-ephemeral` on every doorway boot was read — habit `doorway-failover` delta
+09-21c). Staging and prod carry the same change but deploy only from their own branches, so their
+equivalent reading comes with the next `staging` / `main` edge deploy and is NOT claimed here.
+Unverifiable from the dev environment either way — it needs an edge deploy.
+**Complementary work, still missing:** no a2o scenario asserts this. The household read it BY HAND on
+2026-09-20 (habit `doorway-failover` delta 09-20b), which is evidence of the code path, not a standing
+check. The owed node is a scenario that restarts a doorway and asserts `mode: loaded` with the same
+fingerprint across the restart — the check a `checks:` line could name.
+
 **Links.** Landed code: commit `a9910d11c`. Plan:
 `genesis/docs/superpowers/plans/2026-09-19-serving-edge-failover-balance-stream-campaign-plan.md` story
 5.1 → 5.3. Habit: `doorway/doorway-service/.epr-meta/doorway-failover.habit.md` (retire-path).
