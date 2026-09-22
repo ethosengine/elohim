@@ -115,7 +115,7 @@ impl Provider for LocalLexical {
             terms,
             &[],
             "directory",
-            "*.md",
+            &["*.md".to_string()],
         )?;
         Ok(ProviderResult {
             ranked: found["candidates"].as_array().cloned().unwrap_or_default(),

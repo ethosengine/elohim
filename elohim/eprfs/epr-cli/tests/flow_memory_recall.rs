@@ -2546,7 +2546,7 @@ fn a_term_carried_only_by_the_body_is_found_and_ranked_under_a_declared_hit() {
         &["widget".into()],
         &[],
         "directory",
-        "*.md",
+        &["*.md".to_string()],
     )
     .expect("discover");
     let rows = found["candidates"].as_array().expect("candidates");
@@ -2584,7 +2584,7 @@ fn a_term_carried_only_by_the_body_is_found_and_ranked_under_a_declared_hit() {
         &["widget".into()],
         &[],
         "directory",
-        "*.md",
+        &["*.md".to_string()],
     )
     .expect("discover");
     assert!(capped["usage"]["scanned_files"].as_u64().expect("scanned") <= 1);
@@ -2643,7 +2643,7 @@ fn the_body_scan_window_holds_a_document_and_is_still_a_window() {
         &["hapaxlegomenon".into()],
         &[],
         "directory",
-        "*.md",
+        &["*.md".to_string()],
     )
     .expect("discover");
     let paths: Vec<&str> = found["candidates"]
@@ -2676,7 +2676,7 @@ fn the_body_scan_window_holds_a_document_and_is_still_a_window() {
         &["hapaxlegomenon".into()],
         &[],
         "directory",
-        "*.md",
+        &["*.md".to_string()],
     )
     .expect("discover");
     assert!(capped["usage"]["scan_bytes"].as_u64().expect("scan bytes") <= 4_096);
@@ -2722,7 +2722,7 @@ fn a_rare_term_outranks_a_word_every_candidate_shares() {
         &["common".into(), "pelican".into()],
         &[],
         "directory",
-        "*.md",
+        &["*.md".to_string()],
     )
     .expect("discover");
     assert_eq!(
@@ -3018,4 +3018,311 @@ fn a_present_but_malformed_process_spec_is_refused_not_defaulted() {
         error.contains("malformed"),
         "refusal must name the malformed field: {error}"
     );
+}
+
+// ── S1 (2026-09-22): the entry reaches — declared globs, short terms, root authority, ──────────
+// ── exhaustion continuation (genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md) ──
+
+/// Cause 1: `first_screen` used to discover `*.md` only, so a `.py`/`.json`/`.yaml` target could
+/// never become a candidate — even widening `--name` could not help, because the traversal ALSO
+/// hardcoded a `.md`-suffix check independent of the glob. Both are lifted together: the contract
+/// declares `discovery.first_screen_globs`, and a non-`.md` file with no frontmatter fence becomes
+/// a BARE candidate (title = filename) instead of being silently excluded.
+#[test]
+fn a_non_markdown_candidate_becomes_a_bare_first_screen_candidate() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    write(
+        root,
+        "tooling/resolve_bin.py",
+        "#!/usr/bin/env python3\n\"\"\"Resolve which epr binary to run.\"\"\"\n\
+         def resolve_bin():\n    # choose EPR_BIN first, then the gate target binary, then PATH \
+         via shutil.which(\"epr\")\n    return None\n",
+    );
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["tooling"]);
+    save_contract(root, contract);
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "fixture"]);
+
+    let v = view(
+        root,
+        &[
+            "open",
+            "--scope",
+            "tooling",
+            "--need",
+            "how does resolve_bin choose the epr binary",
+        ],
+    );
+    let candidates = v["first_screen"]["candidates"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        candidates
+            .iter()
+            .any(|c| c["path"] == "tooling/resolve_bin.py"),
+        "{v:#}"
+    );
+}
+
+/// Cause 2: at scope `.` with no path-shaped term naming an area, `focus_area` returned `None` and
+/// the whole-scope ceremony door rendered even when the root gospel `CLAUDE.md` plainly answered
+/// the question. The root-scope AUTHORITY SET (root `CLAUDE.md`, plus matched habits' atoms and
+/// their `checks:`/`refs:` paths) is screened FIRST, ranked by where the question's terms land in
+/// each document's own outline — no directory is walked. `CLAUDE.md` is read as a fixed,
+/// well-known input (confined under the repository root, never gated by `source_roots`), so it
+/// reaches even a fixture whose declared `source_roots` never names it.
+#[test]
+fn a_root_scope_question_reaches_claude_md_via_the_authority_set() {
+    // The authority set is gated by the declared scope like every read: with root `CLAUDE.md`
+    // declared it is ranked first-screen; with it undeclared it is never offered, because the
+    // reader could not then read it. Widening the scope is a contract edit, never a bypass.
+    for (roots, reached) in [
+        (json!(["docs", "CLAUDE.md"]), true),
+        (json!(["docs"]), false),
+    ] {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        write(
+            root,
+            "CLAUDE.md",
+            "# CLAUDE.md\n\n## What to work on\n\nWork = move the top red habit toward green with proof.\n",
+        );
+        let mut contract = contract_value(false);
+        contract["source_roots"] = roots.clone();
+        save_contract(root, contract);
+        git(root, &["init", "-q"]);
+        git(root, &["add", "-A"]);
+        git(root, &["commit", "-qm", "fixture"]);
+
+        // `--scope .` explicitly: the fixture contract defaults the ceremony scope to `docs`.
+        let v = view(
+            root,
+            &[
+                "open",
+                "--scope",
+                ".",
+                "--need",
+                "which habit is top red right now",
+            ],
+        );
+        let candidates = v["first_screen"]["candidates"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default();
+        let offered = candidates.iter().any(|c| c["path"] == "CLAUDE.md");
+        assert_eq!(offered, reached, "roots {roots}: {v:#}");
+        if reached {
+            assert_eq!(
+                v["first_screen"]["ranking"],
+                "authority set (metadata-first), no repository body scan",
+                "{v:#}"
+            );
+        }
+    }
+}
+
+/// Cause 2b: `question_terms` used to drop every token under four characters unconditionally, so
+/// `top`/`red` never survived tokenizing "top red" at all. The contract's declared
+/// `discovery.short_terms` keeps a listed short token, and two ADJACENT declared-short tokens also
+/// mint the two-word phrase as an additional term.
+#[test]
+fn a_declared_short_term_survives_tokenizing_and_forms_an_adjacent_phrase() {
+    let dir = repo();
+    begin(dir.path());
+    let v = view(
+        dir.path(),
+        &[
+            "open",
+            "--scope",
+            "docs",
+            "--need",
+            "top red priority evidence",
+        ],
+    );
+    let terms: Vec<String> = v["first_screen"]["terms"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|t| t.as_str().map(str::to_string))
+        .collect();
+    assert!(terms.iter().any(|t| t == "top"), "{terms:?}");
+    assert!(terms.iter().any(|t| t == "red"), "{terms:?}");
+    assert!(terms.iter().any(|t| t == "top red"), "{terms:?}");
+}
+
+/// Cause 3: when discovery's own scan budget cut a first-screen traversal short, the view named
+/// the exhaustion but left no path forward except raising a budget. It now offers a CONCRETE
+/// narrowed continuation — `open --scope <densest subdirectory this window reached>` — and the
+/// unresolved line names that subdirectory, without raising any budget.
+#[test]
+fn a_budget_cut_area_scan_offers_a_narrowed_continuation_at_its_densest_subdir() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    for name in ["one", "two"] {
+        write(
+            root,
+            &format!("tooling/sub/{name}.md"),
+            "---\ntitle: Widget handbook\n---\nwidget details live here\n",
+        );
+    }
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["tooling"]);
+    contract["limits"]["scan_files"] = json!(1);
+    save_contract(root, contract);
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "fixture"]);
+
+    let v = view(
+        root,
+        &[
+            "open",
+            "--scope",
+            "tooling",
+            "--need",
+            "widget details reference",
+        ],
+    );
+    let screen = &v["first_screen"];
+    let unresolved: Vec<String> = screen["unresolved"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|m| m.as_str().map(str::to_string))
+        .collect();
+    assert!(
+        unresolved.iter().any(|m| m.contains("tooling/sub")),
+        "{unresolved:?}"
+    );
+    let argv: Vec<String> = screen["continuation"]["argv"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|a| a.as_str().map(str::to_string))
+        .collect();
+    assert!(argv.iter().any(|a| a == "tooling/sub"), "{argv:?}");
+}
+
+/// A fixture repository whose declared root is `conf`, holding the files a test writes.
+fn structured_repo(files: &[(&str, &str)]) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path();
+    for (path, text) in files {
+        write(root, path, text);
+    }
+    let mut contract = contract_value(false);
+    contract["source_roots"] = json!(["conf"]);
+    save_contract(root, contract);
+    git(root, &["init", "-q"]);
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "fixture"]);
+    dir
+}
+
+/// A YAML source has no author-declared sections (its `#` lines are comments), so its passage is
+/// the term-densest line window: the block carrying the rare terms together, not the comment
+/// span that happens to precede them.
+#[test]
+fn a_structured_source_is_located_at_its_term_densest_window() {
+    let mut yaml = String::from("# measures\n");
+    for i in 0..60 {
+        yaml.push_str(&format!("  - id: filler-{i}\n    family: other\n"));
+    }
+    let cluster_start = yaml.lines().count() + 1;
+    yaml.push_str(
+        "  - id: journey-bytes\n    family: journey-folds\n    procedure: folds arrive at close\n",
+    );
+    for i in 0..60 {
+        yaml.push_str(&format!("  - id: tail-{i}\n    family: other\n"));
+    }
+    let dir = structured_repo(&[("conf/measures.yaml", &yaml)]);
+    let v = view(
+        dir.path(),
+        &[
+            "open",
+            "--scope",
+            "conf",
+            "--need",
+            "where do journey folds arrive",
+        ],
+    );
+    let section = &v["first_screen"]["candidates"][0]["best_section"];
+    let lines = section["lines"].as_str().expect("located lines");
+    let start: usize = lines.split(':').next().unwrap().parse().unwrap();
+    assert_eq!(start, cluster_start, "{v:#}");
+    assert!(
+        section["title"].as_str().unwrap().starts_with("lines "),
+        "{section}"
+    );
+}
+
+/// A term counts only where it begins a word: `delivery` never counts as `live`, while an
+/// inflection (`lives`) still does.
+#[test]
+fn a_term_inside_another_word_does_not_count() {
+    let mut text = String::new();
+    for _ in 0..30 {
+        text.push_str("delivery delivery delivery\n");
+    }
+    text.push_str("the index lives here\n");
+    for _ in 0..30 {
+        text.push_str("padding line\n");
+    }
+    let dir = structured_repo(&[("conf/notes.txt.yaml", &text)]);
+    let v = view(
+        dir.path(),
+        &[
+            "open",
+            "--scope",
+            "conf",
+            "--need",
+            "where does the index live",
+        ],
+    );
+    let section = &v["first_screen"]["candidates"][0]["best_section"];
+    let hits = section["hits"].as_object().expect("hits");
+    assert_eq!(hits.get("live"), Some(&json!(1)), "{section}");
+}
+
+/// Proximity: of two sources that both mention every term, the one whose single passage carries
+/// them together ranks first, even when the other names a term in its path.
+#[test]
+fn a_source_carrying_the_terms_together_outranks_one_that_scatters_them() {
+    let mut scattered = String::from("resolve\n");
+    for _ in 0..200 {
+        scattered.push_str("unrelated filler text\n");
+    }
+    scattered.push_str("binary\n");
+    for _ in 0..200 {
+        scattered.push_str("more unrelated filler\n");
+    }
+    scattered.push_str("locator\n");
+    let together = "def resolve():\n    # the locator picks which binary to run\n    return None\n";
+    let dir = structured_repo(&[
+        ("conf/locator-scattered.sh", &scattered),
+        ("conf/tools.sh", together),
+    ]);
+    let v = view(
+        dir.path(),
+        &[
+            "open",
+            "--scope",
+            "conf",
+            "--need",
+            "how does the locator resolve the binary",
+        ],
+    );
+    let screen = &v["first_screen"];
+    assert_eq!(screen["candidates"][0]["path"], "conf/tools.sh", "{v:#}");
+    assert!(screen["ranking"]
+        .as_str()
+        .unwrap()
+        .contains("re-ranked by the distinct question terms"));
 }
