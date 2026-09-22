@@ -83,3 +83,25 @@ fn source_finds_no_disagreement_when_prose_and_value_agree() {
         "expected no disagreements when prose matches the value, got: {found:?}"
     );
 }
+
+/// A testing note that names a range ("concurrency=1 through concurrency=8") is not a claim about
+/// the current value, so it is never reported as a disagreement (code review, 2026-09-22).
+#[test]
+fn a_range_in_prose_is_not_a_claim_about_the_current_value() {
+    let dir = fixture(
+        r#"{
+  "_comment": "tested with concurrency=1 through concurrency=8, settled on four",
+  "concurrency": 4
+}
+"#,
+    );
+    ok(
+        dir.path(),
+        &["open", "--intent", "Check the pool policy's own standing"],
+    );
+    let view: Value = ok(dir.path(), &["source", "--path", "docs/pool-policy.json"]);
+    let found = view["disagreements"]["found"]
+        .as_array()
+        .expect("found array");
+    assert!(found.is_empty(), "a range is not a stale claim: {found:?}");
+}

@@ -671,16 +671,62 @@ pub(super) fn question_terms(contract: &Contract, need: &str) -> Vec<String> {
     seen
 }
 
+/// `DELTA 2026-09-11 (…)` / `GREEN 2026-09-11 (…)` / `RED WRITTEN 2026-09-11 (…)` / `RED
+/// 2026-09-11 (…)` → `2026-09-11`. `None` for a first line that carries no such leading token —
+/// rendered as an honest omission rather than a fabricated date.
+pub(super) fn parse_delta_date(line: &str) -> Option<String> {
+    let rest = line
+        .strip_prefix("DELTA ")
+        .or_else(|| line.strip_prefix("GREEN "))
+        .or_else(|| line.strip_prefix("RED WRITTEN "))
+        .or_else(|| line.strip_prefix("RED "))?;
+    let token = rest.split_whitespace().next()?;
+    let bytes = token.as_bytes();
+    let digit = |b: u8| b.is_ascii_digit();
+    let valid = bytes.len() == 10
+        && bytes[..4].iter().copied().all(digit)
+        && bytes[4] == b'-'
+        && bytes[5..7].iter().copied().all(digit)
+        && bytes[7] == b'-'
+        && bytes[8..10].iter().copied().all(digit);
+    valid.then(|| token.to_string())
+}
+
+/// The entry carrying the latest ledger date (`date_of` → `YYYY-MM-DD`, `None` for an undated
+/// entry). Atoms are written in both directions — prepended (newest-first) or appended
+/// (oldest-first) — so a tie on that date is broken by the ledger's own direction: when the FIRST
+/// dated entry already holds the latest date the ledger reads newest-first and the first tied
+/// entry wins; otherwise it reads oldest-first and the last tied entry wins.
+pub(super) fn newest_by_date<T>(
+    entries: &[T],
+    date_of: impl Fn(&T) -> Option<String>,
+) -> Option<&T> {
+    let latest = entries.iter().filter_map(&date_of).max()?;
+    let newest_first = entries.iter().find_map(&date_of).as_ref() == Some(&latest);
+    let mut tied = entries
+        .iter()
+        .filter(|entry| date_of(entry).as_ref() == Some(&latest));
+    if newest_first {
+        tied.next()
+    } else {
+        tied.last()
+    }
+}
+
 /// One habit as the first screen needs it: what it promises, whether it holds, and what moved last.
 fn habit_row(id: &str, status: &str, invariant: &str, evidence: &str, score: usize) -> Value {
-    // The FIRST line of the ledger is the newest entry — the atoms are written newest-first — so
-    // "what moved last" is one line, never the whole ledger.
-    let delta = evidence
+    // "What moved last" is the entry with the LATEST date, not simply the first paragraph: atoms
+    // are appended at the bottom as often as prepended at the top. Among entries sharing that
+    // date the ledger's own direction breaks the tie (`newest_by_date`); an undated ledger falls
+    // back to its first paragraph.
+    let paragraphs: Vec<String> = evidence
         .split("\n\n")
         .map(one_line)
-        .find(|paragraph| !paragraph.is_empty())
-        .map(|paragraph| clip(&paragraph, 240))
-        .unwrap_or_default();
+        .filter(|paragraph| !paragraph.is_empty())
+        .collect();
+    let newest =
+        newest_by_date(&paragraphs, |p| parse_delta_date(p)).or_else(|| paragraphs.first());
+    let delta = newest.map(|p| clip(p, 240)).unwrap_or_default();
     json!({
         "id": id,
         "status": status,
@@ -1074,9 +1120,32 @@ fn root_authority_screen(
     if paths.is_empty() {
         return Ok(None);
     }
+    // The authority set spends the SAME declared scan budget every other discovery path does:
+    // one running total across its members, at most `scan_files` members, and the returned list
+    // cut to `search_results` — never a second, uncounted budget just because it is small.
+    let (scan_limit, file_limit) = (
+        contract.limit_usize("scan_bytes"),
+        contract.limit_usize("scan_files").max(1),
+    );
+    let mut omissions: Vec<String> = Vec::new();
+    if paths.len() > file_limit {
+        omissions.push(format!(
+            "authority set named {} paths; only the first {file_limit} (limits.scan_files) were located",
+            paths.len()
+        ));
+        paths.truncate(file_limit);
+    }
+    let mut scanned = 0usize;
     let mut candidates: Vec<Value> = Vec::new();
     for path in &paths {
+        if scanned >= scan_limit {
+            omissions.push(format!(
+                "authority set stopped at limits.scan_bytes ({scan_limit}); later members were not located"
+            ));
+            break;
+        }
         if let Some(section) = best_section(args, contract, path, terms) {
+            scanned += section["usage"]["scan_bytes"].as_u64().unwrap_or(0) as usize;
             add_usage(usage, &section["usage"]);
             let title = Path::new(path)
                 .file_name()
@@ -1104,6 +1173,14 @@ fn root_authority_screen(
             .cmp(&a["term_hits"].as_u64())
             .then_with(|| a["path"].as_str().cmp(&b["path"].as_str()))
     });
+    let result_limit = contract.limit_usize("search_results").max(1);
+    if candidates.len() > result_limit {
+        omissions.push(format!(
+            "{} authority candidates located; the first {result_limit} (limits.search_results) are shown",
+            candidates.len()
+        ));
+        candidates.truncate(result_limit);
+    }
     Ok(Some(json!({
         "area": ".",
         "terms": terms,
@@ -1113,7 +1190,7 @@ fn root_authority_screen(
         "ranking": "authority set (metadata-first), no repository body scan",
         "authority": "Candidate discovery over declared metadata. Membership and rank establish \
                       neither authority nor currency; read the passage.",
-        "omissions": Vec::<String>::new(),
+        "omissions": omissions,
         "unresolved": Vec::<String>::new(),
     })))
 }

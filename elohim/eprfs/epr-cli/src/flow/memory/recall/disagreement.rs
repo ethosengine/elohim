@@ -126,6 +126,14 @@ fn find_claims(text: &str) -> Vec<(String, f64)> {
             }
         }
     }
+    // A key given two different values in the same passage is a range or a comparison ("tested
+    // concurrency=1 through concurrency=8"), not a statement of the current value: drop it.
+    let ambiguous: Vec<String> = out
+        .iter()
+        .filter(|(key, value)| out.iter().any(|(other, v)| other == key && v != value))
+        .map(|(key, _)| key.clone())
+        .collect();
+    out.retain(|(key, _)| !ambiguous.contains(key));
     out
 }
 

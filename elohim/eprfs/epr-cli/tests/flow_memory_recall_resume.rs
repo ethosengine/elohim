@@ -37,7 +37,7 @@ fn git_dated(root: &Path, args: &[&str], date: &str) {
 /// The habit register + atom this station's fixtures share. `with_postdelta_change` decides
 /// whether a SECOND commit, dated after the atom's own `DELTA 2026-09-05` line, touches one of the
 /// habit's concern paths (`docs/plan.md`, named by the atom's own `refs:`) — the one variable that
-/// distinguishes "evidence current" from "implemented-but-unverified".
+/// distinguishes "no commit since the last evidence" from "implemented-but-unverified".
 fn repo_with_habit(with_postdelta_change: bool) -> tempfile::TempDir {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
@@ -132,7 +132,7 @@ fn resume_reports_evidence_current_with_no_postdelta_commits() {
     assert_eq!(resume["habit"]["last_delta"]["date"], "2026-09-05");
     let verdict = resume["verdict"].as_str().unwrap_or_default();
     assert!(
-        verdict.starts_with("evidence current"),
+        verdict.starts_with("no commit since the last evidence"),
         "expected an evidence-current verdict, got: {verdict}"
     );
     assert_eq!(resume["since_delta"]["count"], 0);
@@ -188,4 +188,72 @@ fn resume_reports_implemented_but_unverified_with_a_postdelta_commit() {
         "expected the post-delta commit to be named, got: {commits:?}"
     );
     assert_eq!(commits[0]["matched_by"], "path");
+}
+
+/// A fresh reader (2026-09-22) was shown a 2026-09-11 entry as the "last delta" of an atom whose
+/// newest evidence, 2026-09-12, sat further down: the ledger is not reliably newest-first. The
+/// newest entry is chosen by its DATE, whatever its position, and consecutive entries with no
+/// blank line between them are still separate entries.
+#[test]
+fn resume_picks_the_latest_dated_entry_not_the_first() {
+    let dir = repo_with_habit(false);
+    write(
+        dir.path(),
+        &format!(".epr-meta/{HABIT_ID}.habit.md"),
+        &format!(
+            "---\n\
+             epr-habit-version: 1\n\
+             id: {HABIT_ID}\n\
+             invariant: >\n  Test invariant.\n\
+             status: red\n\
+             active: false\n\
+             checks:\n  - \"just gate memory-ceremony\"\n\
+             refs:\n  - \"docs/plan.md — the fixture's own plan\"\n\
+             retire-when: >\n  never.\n\
+             ---\n\
+             DELTA 2026-09-03 (older entry written at the top).\n\
+             GREEN 2026-09-02 (an even older entry, no blank line before it).\n\
+             \n\
+             RED 2026-09-08 (the newest entry, appended at the bottom).\n"
+        ),
+    );
+    let payload = ok(
+        dir.path(),
+        &["open", "--purpose", "resume", "--habit", HABIT_ID],
+    );
+    let delta = &payload["resume"]["habit"]["last_delta"];
+    assert_eq!(delta["date"], "2026-09-08", "{delta}");
+    assert!(
+        delta["text"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("RED 2026-09-08"),
+        "{delta}"
+    );
+}
+
+/// Two entries share the latest date in an oldest-first (bottom-appended) ledger: the one written
+/// last is the newest, because the ledger's own direction breaks the tie.
+#[test]
+fn resume_breaks_a_same_date_tie_by_the_ledgers_direction() {
+    let dir = repo_with_habit(false);
+    write(
+        dir.path(),
+        &format!(".epr-meta/{HABIT_ID}.habit.md"),
+        &format!(
+            "---\nid: {HABIT_ID}\nstatus: red\nactive: false\nchecks:\n  - \"just gate memory-ceremony\"\n---\n\
+             DELTA 2026-09-01 (the first entry, oldest).\n\n\
+             DELTA 2026-09-08 (an earlier entry that day).\n\n\
+             RED 2026-09-08 (the last entry written that day).\n"
+        ),
+    );
+    let payload = ok(
+        dir.path(),
+        &["open", "--purpose", "resume", "--habit", HABIT_ID],
+    );
+    let text = payload["resume"]["habit"]["last_delta"]["text"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    assert!(text.starts_with("RED 2026-09-08"), "{text}");
 }

@@ -771,7 +771,7 @@ Then(
     const verdict = String(resume.verdict);
     assert.match(verdict, /^implemented-but-unverified: 1 commit/);
     // The recorded green is reported as recorded, never promoted to cover the later change.
-    assert.doesNotMatch(verdict, /evidence current/);
+    assert.doesNotMatch(verdict, /^no commit since the last evidence/);
   }
 );
 

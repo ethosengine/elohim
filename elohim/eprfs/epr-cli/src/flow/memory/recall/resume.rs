@@ -9,7 +9,7 @@
 //! its parsed date, and the bounded git reads.
 use std::path::Component;
 
-use super::discovery::{find_habit_atom, HABITS_REL};
+use super::discovery::{find_habit_atom, newest_by_date, parse_delta_date, HABITS_REL};
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -138,10 +138,8 @@ fn read_habit_row(
 // The habit atom — located, its newest delta and its `refs:`
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/// The newest `DELTA`/`GREEN`/`RED[ WRITTEN]` paragraph's first line (clipped), its 1-based
-/// inclusive line range, and the date parsed from its own leading `KEYWORD YYYY-MM-DD` token —
-/// `discovery.rs`'s `atom_last_delta` extended with date parsing (see the module doc for why this
-/// is a duplicate, not an import).
+/// The newest `DELTA`/`GREEN`/`RED[ WRITTEN]` entry — by its DATE, not its position — as its
+/// first line (clipped), its 1-based inclusive line range, and that date.
 fn last_delta(text: &str) -> Option<(String, String, Option<String>)> {
     let mut lines = text.lines().enumerate();
     if lines.next().map(|(_, line)| line.trim()) != Some("---") {
@@ -151,46 +149,49 @@ fn last_delta(text: &str) -> Option<(String, String, Option<String>)> {
         .find(|(_, line)| line.trim() == "---")
         .map(|(index, _)| index + 2)?;
     let all_lines: Vec<&str> = text.lines().collect();
-    let (mut start, mut end) = (None, body_start);
+    // An entry starts on a line carrying a ledger keyword and date (`DELTA`/`GREEN`/`RED …`) and
+    // runs until the next such line or a blank line. Atoms are NOT reliably newest-first — some
+    // are appended at the bottom, some prepended, some both — so the newest entry is the one with
+    // the LATEST date, never simply the first; among entries sharing that date the ledger's own
+    // direction breaks the tie (`newest_by_date`). A body with no dated entry falls back to its first
+    // paragraph, rendered with no date rather than a fabricated one.
+    let mut entries: Vec<(usize, usize, Option<String>)> = Vec::new(); // (start, end, date)
     for (offset, line) in all_lines.iter().enumerate().skip(body_start - 1) {
         let line_no = offset + 1;
-        if line.trim().is_empty() {
-            if start.is_some() {
-                break;
+        let date = parse_delta_date(line);
+        if date.is_some() {
+            entries.push((line_no, line_no, date));
+        } else if line.trim().is_empty() {
+            if let Some(last) = entries.last_mut() {
+                last.1 = last.1.max(last.0);
             }
-            continue;
+            entries.push((0, 0, None)); // a paragraph break closes the running entry
+        } else if let Some(last) = entries.last_mut() {
+            if last.0 != 0 {
+                last.1 = line_no;
+            }
         }
-        start.get_or_insert(line_no);
-        end = line_no;
     }
-    let start = start?;
-    let first_line = all_lines[start - 1];
+    entries.retain(|entry| entry.0 != 0);
+    let chosen = newest_by_date(&entries, |entry| entry.2.clone());
+    let (start, end, date) = match chosen {
+        Some(entry) => entry.clone(),
+        None => {
+            // No dated entry: the first non-blank paragraph, undated.
+            let start =
+                (body_start..=all_lines.len()).find(|n| !all_lines[n - 1].trim().is_empty())?;
+            let end = (start..=all_lines.len())
+                .take_while(|n| !all_lines[n - 1].trim().is_empty())
+                .last()
+                .unwrap_or(start);
+            (start, end, None)
+        }
+    };
     Some((
-        clip(first_line, 160),
+        clip(all_lines[start - 1], 160),
         format!("{start}:{end}"),
-        parse_delta_date(first_line),
+        date,
     ))
-}
-
-/// `DELTA 2026-09-11 (…)` / `GREEN 2026-09-11 (…)` / `RED WRITTEN 2026-09-11 (…)` / `RED
-/// 2026-09-11 (…)` → `2026-09-11`. `None` for a first line that carries no such leading token —
-/// rendered as an honest omission rather than a fabricated date.
-fn parse_delta_date(line: &str) -> Option<String> {
-    let rest = line
-        .strip_prefix("DELTA ")
-        .or_else(|| line.strip_prefix("GREEN "))
-        .or_else(|| line.strip_prefix("RED WRITTEN "))
-        .or_else(|| line.strip_prefix("RED "))?;
-    let token = rest.split_whitespace().next()?;
-    let bytes = token.as_bytes();
-    let digit = |b: u8| b.is_ascii_digit();
-    let valid = bytes.len() == 10
-        && bytes[..4].iter().copied().all(digit)
-        && bytes[4] == b'-'
-        && bytes[5..7].iter().copied().all(digit)
-        && bytes[7] == b'-'
-        && bytes[8..10].iter().copied().all(digit);
-    valid.then(|| token.to_string())
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -508,7 +509,9 @@ pub(super) fn resume_view(
     let register = read_habit_row(root, contract, habit_id, &mut usage)?;
     let atom_budget = contract.limit_usize("habit_register_bytes");
     let atom_path: Option<String> = match &register.declared {
-        Some(declared) => confine_under(root, &root.join(declared))
+        // The same declared-scope gate every read passes: a register row naming an atom outside
+        // the contract's source roots is not followed.
+        Some(declared) => contained(root, declared, &contract.source_roots())
             .ok()
             .filter(|p| p.is_file())
             .map(|p| rel_to_root(root, &p)),
@@ -612,7 +615,7 @@ pub(super) fn resume_view(
             clip(&first_check, 200),
         )
     } else if let Some(date) = &delta_date {
-        format!("evidence current: no commit on the concern's paths since {date}")
+        format!("no commit since the last evidence ({date}) names this concern or touches its paths; that evidence is still only as good as the check that produced it")
     } else {
         "evidence currency unknown: this habit's atom carries no parseable delta date".to_string()
     };
