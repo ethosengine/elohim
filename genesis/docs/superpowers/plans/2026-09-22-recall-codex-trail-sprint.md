@@ -1,7 +1,9 @@
 ---
 title: Recall — Codex's trail — the entry reaches, resumes a concern, and names prose that lags its value
 id: recall-codex-trail-sprint
-status: in-flight
+status: landed
+landed: 2026-09-22
+verified_by: "just gate memory-ceremony GATE_EXIT=0 on dev (main checkout); bank 5/6; fresh reader 2 journeys, 0 mistaken, 0 unmetered; chronicle genesis/data/timeline/chronicle/2026-09-22-substrate-currency-recall-codex-trail.md"
 class: devflow
 serves: recall-reaches-authority
 date: 2026-09-22
