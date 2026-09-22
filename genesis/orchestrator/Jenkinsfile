@@ -1011,6 +1011,128 @@ def manualModeAnalyze(String mode) {
 }
 
 /**
+ * Classify what started this run: TIMER (the nightly cron), WEBHOOK (a push),
+ * or MANUAL (operator start / replay).
+ *
+ * TIMER became its own class on 2026-09-22. It used to fall into the MANUAL
+ * bucket, so nothing downstream could tell an operator's deliberate rebuild
+ * from a 09:00Z soak run — and applyTimerAlreadyBuiltFilter needs exactly that
+ * distinction. Evidence of the old shape: orchestrator/dev #1886 logged
+ * `Trigger: MANUAL (Started by timer)`.
+ *
+ * Reads the cause `_class` (locale-proof) as well as the shortDescription,
+ * whose substring forms this file already matched. A run carrying BOTH a timer
+ * and a push cause classifies as TIMER (the timer branch returns from anywhere
+ * in the list) — harmless, because the already-built filter can never fire on
+ * a commit the push just introduced.
+ *
+ * Lives in its own def, not inline: the Checkout stage's script {} body is at
+ * the 11000-byte HARD ceiling this repo's method-size hook enforces.
+ *
+ * DELIBERATELY closure-free. Every construct here is one this Jenkins sandbox
+ * has already executed: an indexed loop with .size() / [i] (root Jenkinsfile
+ * line 349), safe-navigated map-property reads (the getBuildCauses()[0]?.
+ * shortDescription that this file's Checkout stage has always used), String
+ * concatenation, String.contains and ?:. No closure over the causes list, no
+ * .collect/.join/.any on it, no GString property indirection, no import, no
+ * @NonCPS, no Class.forName — a first live cron run is not the place to
+ * discover a Script Security rejection.
+ */
+def classifyBuildTrigger() {
+    def causes = currentBuild.getBuildCauses()
+    boolean webhook = false
+    for (int i = 0; i < causes.size(); i++) {
+        def cause = causes[i]
+        String text = (cause?._class ?: '') + '|' + (cause?.shortDescription ?: '')
+        if (text.contains('TimerTrigger') || text.contains('Started by timer')) {
+            return 'TIMER'
+        }
+        if (text.contains('GitHub') || text.contains('webhook') ||
+            text.contains('SCM') || text.contains('Push event')) {
+            webhook = true
+        }
+    }
+    return webhook ? 'WEBHOOK' : 'MANUAL'
+}
+
+/**
+ * On a TIMER run, drop every pipeline whose most recent build for THIS commit
+ * already succeeded. A `[build:*]` tag always overrides.
+ *
+ * WHY (2026-09-22). The cron exists for one stage — the Gate #6 iroh parity
+ * soak, which runs cargo inside this pipeline's own container and needs
+ * neither a fresh edge roll nor a running fleet. But the cron fires the whole
+ * orchestrator, and the dispatch set comes from the `__global__` baseline,
+ * which archivePipelineBaselines deliberately refuses to advance on a
+ * FAILURE/ABORTED run. A string of red orchestrator runs therefore freezes
+ * `__global__`, and every following nightly re-diffs the same range and
+ * re-dispatches the same cascade.
+ *
+ * Measured: #1886 (timer, 2026-09-21 09:00Z) loaded `__global__: 82dcb5c8`
+ * beside `elohim-edge: bc81e107` — the edge baseline already equalled its own
+ * HEAD — and still dispatched elohim-edge/dev #1471, which rebuilt the images
+ * edge #1470 had shipped SUCCESS the previous day for that same sha and rolled
+ * all seven alpha peers for 3h04m. Every roll restarts the conductor pods and
+ * leaves storage cells answering CellDisabled for hours (first recovery
+ * +108min; the authoring hosts' lamad cells still down +9h), so no app build
+ * can author heads in that window. A nightly roll of an unchanged commit buys
+ * a daily write outage with zero new information — and per
+ * AP-TIMER-WEBHOOK-COLLISION it also abortPrevious's any push in flight.
+ *
+ * The record is Jenkins' own `pipeline-baselines.json`, which
+ * recordPipelineResult advances to GIT_COMMIT_FULL only on a non-failing
+ * downstream outcome. No new state. The predicate has ONE home —
+ * genesis/orchestrator/timer-dispatch.mjs — and state travels by FILE through
+ * the same writeJSON/sh/readJSON mechanism applyConductorTag uses.
+ *
+ * Closure-free for the same reason as classifyBuildTrigger: indexed loops
+ * materialize the JSON-derived arrays into plain ArrayLists (readJSON hands
+ * back net.sf.json.JSONArray, whose collection methods Script Security blocks
+ * — the hazard this file already documents at Post Predicted Build Graph).
+ */
+def applyTimerAlreadyBuiltFilter(graphPipelines) {
+    if (env.BUILD_TRIGGER != 'TIMER') return graphPipelines
+
+    def forcedTokens = (env.FORCE_BUILD_PIPELINES ?: '').split(',')
+    def forced = []
+    for (int i = 0; i < forcedTokens.size(); i++) {
+        if (forcedTokens[i]) forced.add(forcedTokens[i])
+    }
+
+    String stateFile = '.orchestrator-timer-dispatch.json'
+    def baselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+    writeJSON file: stateFile, json: [
+        trigger: 'TIMER',
+        headSha: env.GIT_COMMIT_FULL ?: '',
+        pipelines: graphPipelines,
+        baselines: baselines,
+        forced: forced
+    ]
+    def json = sh(
+        script: "node genesis/orchestrator/timer-dispatch.mjs filter ${stateFile}",
+        returnStdout: true
+    ).trim()
+    sh "rm -f ${stateFile}"
+    def out = readJSON(text: json)
+
+    def skipped = []
+    def skippedRaw = out.skipped ?: []
+    for (int i = 0; i < skippedRaw.size(); i++) {
+        skipped.add(skippedRaw[i].toString())
+    }
+    def dispatch = []
+    def dispatchRaw = out.dispatch ?: []
+    for (int i = 0; i < dispatchRaw.size(); i++) {
+        dispatch.add(dispatchRaw[i].toString())
+    }
+
+    if (skipped) {
+        echo "⏭️  TIMER already-built filter: ${skipped.join(', ')} already built ${env.GIT_COMMIT_SHORT} green — not re-dispatched (no new commit = no new information; force with [build:*])"
+    }
+    return dispatch
+}
+
+/**
  * Apply build-graph routing on top of legacy analysis. For auto/status
  * mode, runs runBuildGraph then applies [build:*] tag overrides + genesis
  * auto-include. For manual mode, passes through the explicit pipeline list.
@@ -1039,6 +1161,12 @@ def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipeline
                 }
             }
         }
+
+        // TIMER already-built filter — runs BEFORE the genesis auto-include so
+        // genesis is never pulled in on behalf of a pipeline this filter just
+        // dropped (and so an emptied plan stays empty, skipping Execute Builds
+        // entirely while the Gate #6 parity stage still runs).
+        graphPipelines = applyTimerAlreadyBuiltFilter(graphPipelines)
 
         // Genesis auto-include for dev branches
         if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
@@ -1585,6 +1713,14 @@ spec:
         // late-evening EDT/PDT pushes — concretely on 2026-05-23 00:00 the cron
         // abortPrevious'd webhook-triggered #1003 mid-genesis (downstream #1019
         // → ABORTED → orchestrator → NOT_BUILT). AP-TIMER-WEBHOOK-COLLISION.
+        //
+        // 2026-09-22: a timer run no longer re-dispatches a pipeline that already
+        // built this exact sha green — see applyTimerAlreadyBuiltFilter. The cron
+        // wants the soak stage, not a fleet roll: #1886 (timer) re-dispatched
+        // elohim-edge #1471 for bc81e107, a commit edge #1470 had already shipped
+        // SUCCESS, rolling all seven alpha peers for 3h04m and reopening the
+        // post-roll CellDisabled write outage (+108min to first recovery, the
+        // authoring hosts' lamad cells still down +9h) for no new information.
         cron('0 9 * * *')
     }
 
@@ -1655,17 +1791,13 @@ spec:
                         env.ACTUAL_BUILD_GRAPH_FILE = artifactNames.orchestrator.actualBuildGraph
                         env.BUILD_GRAPH_RECONCILIATION_FILE = artifactNames.orchestrator.buildGraphReconciliation
 
-                        // Detect build trigger type. "Push event to branch X" is the
-                        // shortDescription Jenkins emits for git-push webhook causes from
-                        // some plugin configurations (alongside the GitHub/SCM/webhook
-                        // strings other configurations emit). Match all known forms so
-                        // commit-msg tags still fire whichever plugin path is in play.
+                        // Detect build trigger type — TIMER / WEBHOOK / MANUAL. The
+                        // cause-string forms (Push event, GitHub, SCM, webhook, timer) and
+                        // the reason every one of them is matched live in
+                        // classifyBuildTrigger; buildCause below is only the human line
+                        // printed in the banner.
                         def buildCause = currentBuild.getBuildCauses()[0]?.shortDescription ?: 'Unknown'
-                        def isWebhook = buildCause.contains('GitHub') ||
-                                        buildCause.contains('webhook') ||
-                                        buildCause.contains('SCM') ||
-                                        buildCause.contains('Push event')
-                        env.BUILD_TRIGGER = isWebhook ? 'WEBHOOK' : 'MANUAL'
+                        env.BUILD_TRIGGER = classifyBuildTrigger()
 
                         echo """
 ═══════════════════════════════════════════════════════════════════════════════
