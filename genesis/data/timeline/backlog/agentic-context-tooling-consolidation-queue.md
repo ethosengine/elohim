@@ -420,6 +420,36 @@ before investing.
       which proof remains valid and why. This is a future refinement, not permission to bypass
       the current receipt rule or to exclude all metadata indiscriminately.
 
+    **Dispositions 2026-09-22** (sprint `genesis/docs/superpowers/plans/2026-09-22-recall-codex-trail-sprint.md`,
+    branch `sprint/2026-09-22-recall-codex-trail`; evidence in the `recall-reaches-authority` habit atom):
+    - *Discovery spends its budget* — **landed (S1).** Declared multi-type globs, short terms,
+      stemming, a metadata-first authority set at root scope (every member through the declared
+      scope gate), a narrowed `open --scope` continuation on a budget cut, term-density passages
+      for unsectioned files, proximity re-rank. Deterministic bank 1/6 → 5/6; `q-hook-binary`
+      stays a named miss (a filename hit breaks a tie on passage terms).
+    - *Prose lags its value* — **landed (S3).** `read`/`source` of JSON/YAML name a prose
+      `key=N` that disagrees with the document's own value, with the dated sibling as
+      provenance; live on `pool-policy.json` (`max_concurrent_heavy=1` prose vs `2`). YAML is
+      best-effort, exercised only by unit fixtures.
+    - *Resume this concern* — **landed (S2).** `open --purpose resume --habit <id>`: last delta and
+      its date, checks, plans, commits since the delta (subject or path), local branches, and an
+      `implemented-but-unverified` verdict that names the check to rerun. Read-only; CI/Jenkins
+      state is a named omission, not read.
+    - *Review loops need cost and closure* — **landed (S4)** as a finding class
+      (correctness · interpretability · preference) and a round record in the two loop rules.
+      First measured runs: three fresh README readers each READY with 0 blocker / 3 major, no
+      major recurring after its fix but each round raising new ones on older text — the
+      observation reproduced. Readers dispatched from `dev` do not see the class contract until
+      the branch lands.
+    - *A remembered green needs an artifact chain* — **partly (S2 verdict).** The build-receipt
+      chain (source → pack → loaded artifact → outcome) stays open here; `just mesh start`
+      already refuses a stale wasm→dna→happ, the sweettest path has no such check.
+    - *Delivered text is not a running follow-up* — **held, harness-owned.** Both harnesses carry
+      the distinction; recall sessions are private, so another session's continuations are not
+      projected into a resume view.
+    - *Recording evidence changes the measured identity* — **held**; it belongs to the serving
+      receipt's component-ownership contract, not recall.
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
