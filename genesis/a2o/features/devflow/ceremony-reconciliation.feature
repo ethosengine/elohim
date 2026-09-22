@@ -24,11 +24,11 @@ Feature: Preserve purpose while reconciling memory
   Search hits are candidates requiring source inspection. Their ordering cannot establish authority,
   so the search view discloses that local discovery cannot explain another provider's undisclosed ranking.
 
-  The remaining scenario belongs to a second concern, recall-reaches-authority. Every scenario above
+  The two scenarios tagged recall-reaches-authority belong to a second concern. Every scenario above
   reaches its evidence through one command — the RECALL ENTRY, which opens an investigation, reads a
   bounded passage, and states a purpose and a byte count for each. The second concern asks whether
   that one entry serves every agent question, including a question no ceremony posed. It is exercised
-  against this same ceremony because the entry is the same command in both hands.
+  against this same ceremony because the recall entry is the same command exercised by both concerns.
   A fresh agent arrives with no prior ceremony context and carries a question of its own, and the
   entry is documented as "open with that question". That question is what the investigation is FOR.
   The recall algorithm also carries a standing description of what recall is generally for, which it
@@ -44,6 +44,12 @@ Feature: Preserve purpose while reconciling memory
   limit — the bytes of source evidence one bounded pass may read — and completion reports the counted
   bytes against that limit. A journey that answered correctly by reading everything would prove
   nothing about the entry.
+  The same entry also serves an agent RESUMING interrupted work on one tracked promise — a concern
+  the repository keeps with a check that proves it and a dated record of the evidence the check
+  last produced. A passing result recorded on one date says nothing about changes that landed
+  after it, so the resuming agent must be told which later commits the recorded evidence does not
+  cover, and which check would cover them, without the entry running that check or accepting the
+  changes on the old result's authority.
 
   Scenario: Find both entries affected by a report revision
     Given a ceremony with two assertions depending on the same changed source
@@ -84,6 +90,15 @@ Feature: Preserve purpose while reconciling memory
     And the skill passage is preserved as a receipt recording the exact bytes the agent read
     And the out-of-scope read was refused, so the declared scope is what put the skill in reach
     And the investigation's completion report names that same question, and the counted bytes stay under the packet limit
+
+  @concern:recall-reaches-authority
+  Scenario: An agent resuming interrupted work learns which changes its last evidence does not cover
+    Given a tracked concern whose evidence record says its check last passed on an illustrative date, 5 September
+    And a commit on 10 September that changed that concern's plan after the check passed
+    When a fresh agent opens the recall entry to resume that concern
+    Then the resumption view names the concern, its recorded standing and the 5 September evidence date
+    And it lists the 10 September commit as implemented but unverified, not as accepted
+    And it names the concern's check to rerun, as a handover rather than a result
 
   Scenario: Finish the reference repair and hand over the unaccepted claim
     Given the revised report records the trial reader opening a cited passage and leaves whole-workflow acceptance undecided

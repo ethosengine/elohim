@@ -680,3 +680,107 @@ Then(
     assert.equal(outstanding[0].verdict, 'stale');
   }
 );
+
+// ── recall-reaches-authority: resuming one tracked concern (Codex's trail, 2026-09-22) ───────────
+
+const resumeHabit = 'resume-story-habit';
+const resumeCheck = 'just gate memory-ceremony';
+const laterSubject = 'plan: a later change after the check passed';
+
+function commitAt(state: Fixture, message: string, date: string): void {
+  const env = { ...state.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date };
+  const run = (argv: string[]): void => {
+    const result = spawnSync(argv[0], argv.slice(1), { cwd: state.root, env, encoding: 'utf8' });
+    assert.equal(result.status, 0, `${argv.join(' ')}\n${result.stderr}`);
+  };
+  run(['git', 'add', '-A']);
+  run(['git', '-c', 'core.hooksPath=/dev/null', 'commit', '-q', '-m', message]);
+}
+
+Given(
+  'a tracked concern whose evidence record says its check last passed on an illustrative date, 5 September',
+  function () {
+    const root = mkdtempSync(join(tmpdir(), 'resume-story-'));
+    const env = { ...process.env };
+    for (const key of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR'])
+      delete env[key];
+    Object.assign(env, {
+      GIT_CONFIG_COUNT: '1',
+      GIT_CONFIG_KEY_0: 'safe.directory',
+      GIT_CONFIG_VALUE_0: root,
+      GIT_AUTHOR_NAME: 'Fixture',
+      GIT_AUTHOR_EMAIL: 'fixture@example.test',
+      GIT_COMMITTER_NAME: 'Fixture',
+      GIT_COMMITTER_EMAIL: 'fixture@example.test',
+    });
+    const state: Fixture = { root, env, view: {} };
+    fixtures.set(this, state);
+    write(
+      state,
+      'genesis/manifests/habits.yaml',
+      `habits:\n  - id: ${resumeHabit}\n    status: green\n    active: false\n    checks:\n      - "${resumeCheck}"\n`
+    );
+    write(
+      state,
+      `.epr-meta/${resumeHabit}.habit.md`,
+      `---\nepr-habit-version: 1\nid: ${resumeHabit}\ninvariant: >\n  The story's tracked promise.\nstatus: green\nactive: false\nchecks:\n  - "${resumeCheck}"\nrefs:\n  - "genesis/plan.md — the concern's plan"\nretire-when: >\n  never; a story fixture.\n---\nGREEN 2026-09-05 (the check passed on this date).\n`
+    );
+    write(state, 'genesis/plan.md', '# Plan\nThe original plan.\n');
+    const contract = JSON.parse(
+      readFileSync(join(repository, '.epr-meta/elohim/algorithms/recall-contract.json'), 'utf8')
+    ) as RecordValue;
+    write(state, contractFile, JSON.stringify(contract));
+    invoke(state, ['git', 'init', '-q']);
+    commitAt(state, 'the concern, its evidence record and its plan', '2026-09-01T00:00:00+00:00');
+  }
+);
+
+Given(
+  "a commit on 10 September that changed that concern's plan after the check passed",
+  function () {
+    const state = fixture(this);
+    write(state, 'genesis/plan.md', '# Plan\nThe original plan.\nA change the check never saw.\n');
+    commitAt(state, laterSubject, '2026-09-10T00:00:00+00:00');
+  }
+);
+
+When('a fresh agent opens the recall entry to resume that concern', function () {
+  journey(fixture(this), 'open', ['--purpose', 'resume', '--habit', resumeHabit]);
+});
+
+Then(
+  'the resumption view names the concern, its recorded standing and the 5 September evidence date',
+  function () {
+    const resume = record(fixture(this).view.resume);
+    const habit = record(resume.habit);
+    assert.equal(habit.id, resumeHabit);
+    assert.equal(habit.status, 'green');
+    assert.equal(record(habit.last_delta).date, '2026-09-05');
+  }
+);
+
+Then(
+  'it lists the 10 September commit as implemented but unverified, not as accepted',
+  function () {
+    const resume = record(fixture(this).view.resume);
+    const commits = rows(record(resume.since_delta).commits);
+    assert.ok(
+      commits.some(commit => commit.subject === laterSubject),
+      JSON.stringify(commits)
+    );
+    const verdict = String(resume.verdict);
+    assert.match(verdict, /^implemented-but-unverified: 1 commit/);
+    // The recorded green is reported as recorded, never promoted to cover the later change.
+    assert.doesNotMatch(verdict, /evidence current/);
+  }
+);
+
+Then("it names the concern's check to rerun, as a handover rather than a result", function () {
+  const state = fixture(this);
+  const verdict = String(record(state.view.resume).verdict);
+  assert.ok(verdict.includes(resumeCheck), verdict);
+  // Nothing ran: the view is an open, and the working tree the check would build is untouched.
+  assert.equal(state.view.operation, 'open');
+  const status = invoke(state, ['git', 'status', '--porcelain', '--untracked-files=no']);
+  assert.equal(status.trim(), '');
+});
