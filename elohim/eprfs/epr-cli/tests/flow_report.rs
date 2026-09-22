@@ -3455,3 +3455,88 @@ fn an_unrecognized_derive_skips_rather_than_reading_a_stray_fold_as_a_plain_boun
         outcome.summary
     );
 }
+
+// ── rate-over-window: `stale_days` — the standing reader is overdue (2026-09-22) ────────────────
+
+fn stale_fixture(stale_days: &str) -> TempDir {
+    let dir = fixture();
+    write(
+        dir.path(),
+        ".claude/epr-meta/measures.yaml",
+        &RATE_MEASURES.replace(
+            "    window-days: 10\n",
+            &format!("    window-days: 10\n    stale-days: {stale_days}\n"),
+        ),
+    );
+    dir
+}
+
+fn three_clean_journeys(root: &Path) {
+    for day in [
+        "2026-06-01T00:00:00Z",
+        "2026-06-02T00:00:00Z",
+        "2026-06-03T00:00:00Z",
+    ] {
+        fold_at(root, day, "recall-mistaken-assertions@1", ".", 0.0);
+    }
+}
+
+/// A clean quarter whose newest journey is older than `stale_days` is still a WARNING: the window
+/// can read clean on old journeys while nobody walks the entry. The recall headline slot shows
+/// this window bound — the habit's verdict — and names the workflow to run.
+#[test]
+fn an_overdue_standing_reader_turns_a_clean_window_into_a_warning_on_the_recall_slot() {
+    let dir = stale_fixture("3");
+    let root = dir.path();
+    three_clean_journeys(root);
+    let now: chrono::DateTime<chrono::Utc> = "2026-06-10T00:00:00Z".parse().unwrap();
+    let payload = report(root, &options(root).with_now(now)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert_eq!(outcome.outcome, OutcomeStatus::Passed);
+    assert!(outcome.summary.starts_with("warn: "), "{}", outcome.summary);
+    assert!(
+        outcome
+            .summary
+            .contains("standing reader due — newest journey 7 days old (stale_days 3)"),
+        "{}",
+        outcome.summary
+    );
+    let line = payload.headline_line("recall");
+    assert!(line.starts_with("recall: ⚠ "), "{line}");
+    assert!(line.contains("recall-standing-reader"), "{line}");
+}
+
+#[test]
+fn a_fresh_standing_reader_leaves_the_window_reading_alone() {
+    let dir = stale_fixture("3");
+    let root = dir.path();
+    three_clean_journeys(root);
+    let now: chrono::DateTime<chrono::Utc> = "2026-06-04T00:00:00Z".parse().unwrap();
+    let payload = report(root, &options(root).with_now(now)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert!(
+        !outcome.summary.contains("standing reader due"),
+        "{}",
+        outcome.summary
+    );
+    assert!(
+        payload.headline_line("recall").ends_with('✅'),
+        "{}",
+        payload.headline_line("recall")
+    );
+}
+
+#[test]
+fn staleness_is_never_inferred_without_a_declared_stale_days() {
+    let dir = rate_fixture();
+    let root = dir.path();
+    three_clean_journeys(root);
+    let now: chrono::DateTime<chrono::Utc> = "2026-06-10T00:00:00Z".parse().unwrap();
+    let payload = report(root, &options(root).with_now(now)).unwrap();
+    let outcome = outcome_for(&payload, "recall-journey-window-ceiling@1");
+    assert!(
+        !outcome.summary.contains("standing reader due"),
+        "{}",
+        outcome.summary
+    );
+}

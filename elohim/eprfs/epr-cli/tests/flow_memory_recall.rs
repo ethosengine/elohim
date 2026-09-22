@@ -3327,3 +3327,58 @@ fn a_source_carrying_the_terms_together_outranks_one_that_scatters_them() {
         .unwrap()
         .contains("re-ranked by the distinct question terms"));
 }
+
+/// A `search` with no `--name` spans the declared first-screen globs, so a JSON source is a
+/// candidate; an explicit `--name` still narrows it (fresh reader, 2026-09-22: a search for
+/// "concurrent heavy" could not see `pool-policy.json` because search defaulted to markdown).
+#[test]
+fn a_search_without_a_name_glob_reaches_a_json_source() {
+    let dir = structured_repo(&[(
+        "conf/pool-policy.json",
+        "{\n  \"max_concurrent_heavy\": 2,\n  \"note\": \"heavy builds share the pool\"\n}\n",
+    )]);
+    let root = dir.path();
+    view(
+        root,
+        &["open", "--scope", "conf", "--need", "how many heavy builds"],
+    );
+    let found = view(
+        root,
+        &[
+            "search",
+            "--search-scope",
+            "conf",
+            "--query",
+            "concurrent heavy",
+        ],
+    );
+    let paths: Vec<String> = found["retrieval"]["candidates"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|c| c["path"].as_str().map(str::to_string))
+        .collect();
+    assert!(
+        paths.iter().any(|p| p == "conf/pool-policy.json"),
+        "{found:#}"
+    );
+    let narrowed = view(
+        root,
+        &[
+            "search",
+            "--search-scope",
+            "conf",
+            "--query",
+            "concurrent heavy",
+            "--name",
+            "*.md",
+        ],
+    );
+    assert!(
+        narrowed["candidates"]
+            .as_array()
+            .is_none_or(|c| c.is_empty()),
+        "{narrowed:#}"
+    );
+}

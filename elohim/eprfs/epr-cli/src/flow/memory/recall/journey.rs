@@ -1483,7 +1483,7 @@ pub(super) fn execute(
                 &provider,
                 &query,
                 &args.search_scope,
-                &args.name,
+                &search_globs(args, contract),
                 &args.tags,
             )?;
             state["provider"] = json!(provider);

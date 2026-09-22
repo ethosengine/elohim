@@ -407,6 +407,11 @@ pub struct Bound {
     /// of this crate's parsing so the declared-vs-defaulted distinction stays visible to a reader
     /// of the row rather than being baked into a silently-filled field.
     pub window_days: Option<f64>,
+    /// For a `rate-over-window` bound: how many days old its NEWEST consumed fold may be before
+    /// the reading says the instrument that feeds it is overdue. A window can hold enough journeys
+    /// to read while nobody has walked the entry for weeks; this is what makes that visible.
+    /// `None` when undeclared — no staleness is ever inferred.
+    pub stale_days: Option<f64>,
     /// The raw `derive:` string when the row DECLARED one but `Derive::parse` did not recognize
     /// it (a binary older than the measure registry it is reading, most commonly). `None` covers
     /// both "no `derive:` at all" (an ordinary plain bound) and "a recognized `derive:`" — only
@@ -697,6 +702,10 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         .or_else(|| number_at(row, "window-days"))
         .or_else(|| block.and_then(|m| number_at(m, "window_days")))
         .or_else(|| block.and_then(|m| number_at(m, "window-days")));
+    let stale_days = number_at(row, "stale_days")
+        .or_else(|| number_at(row, "stale-days"))
+        .or_else(|| block.and_then(|m| number_at(m, "stale_days")))
+        .or_else(|| block.and_then(|m| number_at(m, "stale-days")));
 
     Some(Bound {
         id: format!("{bare_id}@{version}"),
@@ -715,6 +724,7 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         binding: string_at(row, "binding"),
         walk,
         window_days,
+        stale_days,
         unknown_derive,
         status: string_at(row, "status"),
         superseded_by: string_at(row, "superseded_by").or_else(|| string_at(row, "superseded-by")),

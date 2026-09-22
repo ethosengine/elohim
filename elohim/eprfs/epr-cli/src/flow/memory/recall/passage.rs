@@ -46,7 +46,9 @@ fn outline_with_terms(
     let is_code = source.extension().and_then(|e| e.to_str()) == Some("py");
     let mut headings: Vec<Value> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
-        if line.starts_with('#')
+        // In Python a `#` line is a comment (the shebang included), never a section: only
+        // `def`/`class` open one. Everywhere else a leading `#` is a markdown heading.
+        if (!is_code && line.starts_with('#'))
             || (is_code && (line.starts_with("def ") || line.starts_with("class ")))
         {
             headings.push(json!({

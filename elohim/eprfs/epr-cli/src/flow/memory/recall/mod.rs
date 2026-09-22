@@ -65,7 +65,7 @@ mod measure;
 use measure::measure;
 
 mod discovery;
-use discovery::{bootstrap_projection, first_feature_path, first_screen};
+use discovery::{bootstrap_projection, first_feature_path, first_screen, search_globs};
 // Where inside a located source the terms land — outline, best section, density window.
 mod passage;
 pub use discovery::{discover, discover_scored};
@@ -717,7 +717,7 @@ pub fn retrieve(
     provider: &str,
     query: &str,
     scope: &str,
-    name: &str,
+    names: &[String],
     tags: &[String],
 ) -> FlowResult<Value> {
     let declaration = contract
@@ -735,7 +735,7 @@ pub fn retrieve(
         // read out of a document's own frontmatter, which a semantic provider never sees. A tag
         // filter that silently did nothing on another provider would be a claim about a corpus
         // nobody filtered.
-        "local" => discover(root, contract, scope, query, tags, "directory", name)?,
+        "local" => discover_scored(root, contract, scope, query, &[], tags, "directory", names)?,
         "mempalace" => {
             let palace = root.join(".mempalace/palace");
             let args = vec![
@@ -799,6 +799,9 @@ pub struct Args {
     pub need: String,
     /// Whether `--need` was actually typed, as opposed to the standing default below.
     pub need_explicit: bool,
+    /// Whether `--name` was given. Without it a `search` spans the contract's declared
+    /// `discovery.first_screen_globs` (the same file types `open` discovers), not only markdown.
+    pub name_explicit: bool,
     pub operation: String,
     pub scope: Option<String>,
     pub intent: Option<String>,
@@ -872,6 +875,7 @@ impl Args {
             session: String::new(),
             need: "Orient and choose the next justified reconciliation action".into(),
             need_explicit: false,
+            name_explicit: false,
             operation: String::new(),
             scope: None,
             intent: None,
@@ -1131,7 +1135,10 @@ fn parse_args(argv: &[String]) -> FlowResult<(Args, bool, bool, Option<String>)>
             "--section" => args.section = Some(value),
             "--context-pin" => args.context_pin = Some(value),
             "--search-scope" => args.search_scope = value,
-            "--name" => args.name = value,
+            "--name" => {
+                args.name = value;
+                args.name_explicit = true;
+            }
             "--evidence" => args.evidence.push(value),
             "--measure-scope" => args.measure_scope.push(value),
             "--actor-session" => args.actor_session = Some(value),

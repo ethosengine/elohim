@@ -1460,6 +1460,11 @@ lenses:
     derive: rate-over-window
     consumes: [recall-mistaken-assertions@1, recall-unmetered-bytes@1, recall-not-reached@1]
     window_days: 91
+    # 2026-09-22 (recall — Codex's trail follow-up): the weekly standing reader has no durable local
+    # scheduler (a cloud routine's folds land in its own checkout; session cron dies with the
+    # session), so the reading itself says when it is overdue. This row also owns the `recall`
+    # headline slot: the habit's verdict is the quarter, not the latest journey.
+    stale_days: 7
     context: recall-journey
     hard: 0.2
     status: active

@@ -41,8 +41,8 @@ detail level, which bounds how much a view prints; a *floor* is a line no lens e
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `d949a962090ef837ebdc28bd61314f63698fb03a8665d389ece7816618a59b66` |
-| Whole open | `whole_open_is_byte_identical` | `3a2c39e289280bbc0462e0908787f4b5ffbb5ab446b47db256160350b75e84f9` |
+| Focused open | `focused_open_is_byte_identical` | `ec03406e9233df38a01423bf8848546a968bb3fc99a47042d7e5d8ab7eba6394` |
+| Whole open | `whole_open_is_byte_identical` | `f8c8970e7b2757a77b776d4ee0c721e144bae9b8ee8fda8c69c3d2e65465b8b7` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -140,3 +140,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract's metho
 and two source roots. Proof that nothing else changed: substituting the v12 fixture CID back into
 each new rendering reproduces the previous pins (`62b0037d…`, `6f55d1ba…`) byte for byte. The
 refusal digest is unchanged.
+
+## 2026-09-22 — contract v14 (search spans the declared globs; phrase matches across identifier separators; Python sections are def/class; generated directories excluded)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreih…yene → bafkreib…pv4m). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins byte for byte. The refusal digest is unchanged.

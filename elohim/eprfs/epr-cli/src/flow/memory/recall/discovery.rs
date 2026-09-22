@@ -37,6 +37,15 @@ pub fn discover(
     )
 }
 
+/// Lower-level text with `_` and `-` read as word breaks and runs of whitespace collapsed, so a
+/// phrase and an identifier spelling of the same words compare equal.
+fn identifier_words(text: &str) -> String {
+    text.replace(['_', '-'], " ")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// Suffixes light stemming strips, longest first (`discovery.stemming = "suffix-strip-v1"`) —
 /// tried in this order so an `"ings"`-shaped tail strips as `"ing"`, not as the plain `"s"` that
 /// would leave a spurious trailing `"g"`.
@@ -351,8 +360,15 @@ pub fn discover_scored(
             let body = body_prefix.to_lowercase();
             if !tags.iter().all(|t| actual_tags.contains(t))
                 || (!query.is_empty() && {
+                    // A phrase also matches across identifier separators: "concurrent heavy"
+                    // finds `max_concurrent_heavy` and `concurrent-heavy`, because a reader asks
+                    // in words and configuration names things in identifiers.
                     let needle = query.to_lowercase();
-                    !declared.contains(&needle) && !body.contains(&needle)
+                    let spaced = identifier_words(&needle);
+                    !declared.contains(&needle)
+                        && !body.contains(&needle)
+                        && !identifier_words(&declared).contains(&spaced)
+                        && !identifier_words(&body).contains(&spaced)
                 })
             {
                 continue;
@@ -879,10 +895,22 @@ fn focus_area(root: &Path, contract: &Contract, scope: &str, terms: &[String]) -
 ///
 /// Whole-scope opens get `None` — the convergence question is answered by the grouped stale-edge
 /// view, and putting a ranked source list in front of it would answer a question nobody asked.
+/// The globs a `search` spans: an explicit `--name` wins; a TAG filter stays on markdown, where
+/// frontmatter tags live; otherwise the same declared file types `open` discovers — so a question
+/// about a JSON or YAML source is not silently confined to markdown (fresh reader, 2026-09-22:
+/// `search --query "concurrent heavy cargo"` could not see `pool-policy.json` at all).
+pub(super) fn search_globs(args: &Args, contract: &Contract) -> Vec<String> {
+    if args.name_explicit || !args.tags.is_empty() {
+        vec![args.name.clone()]
+    } else {
+        first_screen_globs(contract)
+    }
+}
+
 /// The declared globs `first_screen` discovers across (`discovery.first_screen_globs`) — falls
 /// back to `["*.md"]`, today's only glob, for an older contract that does not declare the key, so
 /// the key is purely additive and never silently widens an unaware caller.
-fn first_screen_globs(contract: &Contract) -> Vec<String> {
+pub(super) fn first_screen_globs(contract: &Contract) -> Vec<String> {
     contract
         .value
         .pointer("/discovery/first_screen_globs")

@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 13,
+  "version": 14,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -174,7 +174,8 @@
       "holochain-conductor",
       "brit",
       "kitsune2",
-      "tx5"
+      "tx5",
+      "generated"
     ],
     "unreadable_candidates": "A candidate whose frontmatter does not parse is SKIPPED, COUNTED and NAMED \u2014 never silently dropped, and never a reason to abandon the rest of the traversal. The view carries an omissions line naming the skipped paths (first 8, then a remainder count) and a frontier entry `unreadable candidates: N`, so a reader learns exactly what the window could not read. Aborting the whole scan on the first unparseable document satisfied the same honesty rule and made the returned window useless.",
     "body_scan_window": "limits.body_scan_bytes (65536) is the per-file window term discovery may read for MATCHING, and it is spent only when there is a query or terms to match; a pure tag filter still reads limits.metadata_bytes. The frontmatter read stays metadata_bytes and byte-exact \u2014 a wider body window never widens what establishes membership. limits.scan_bytes (2097152) and scan_seconds (5) bound the traversal as a whole, so a scope the size of .claude/skills is one call. Every byte read here is charged to the scan counters, never to source_bytes: discovery is not evidence, and an excerpt receipt is still the only thing that quotes a document. A candidate larger than the window is scanned to it and COUNTED \u2014 the omissions line says how many were only partially scanned \u2014 because a term past the window is invisible, which is not evidence of its absence.",
@@ -189,7 +190,7 @@
     "short_terms_rule": "S1 (2026-09-22): `question_terms` drops every token under four characters UNLESS it is declared here — undeclared short tokens stay noise (a bare 'ci' or 'pr' in ordinary prose would otherwise flood matching). Two adjacent declared-short terms in the question text (e.g. `top red`) also mint the two-word PHRASE as an additional term, matched as a phrase rather than as two independent hits.",
     "stemming": "suffix-strip-v1",
     "passage_window_bytes": 4096,
-    "_passage_window_rule": "Sections of markdown and Python are scored by the same measure. First-screen candidates are then re-ranked by how many distinct question terms their one best passage carries together (proximity), discovery order breaking ties. A located source with no author-declared sections (anything but markdown and Python: JSON, YAML, Rust, shell) is read at its term-densest line window of at most passage_window_bytes; the window starts on a line carrying a question term and is chosen by the highest rarity-weighted score: each present term counts ln((lines+1)/(1+lines carrying it)) \u00d7 (1 + ln occurrences), so a window carrying several rare terms outranks one repeating a common word. A term counts only where it begins a word, so an inflection matches and a fragment inside another word does not. Scan bytes only; the read that follows is the receipt.",
+    "_passage_window_rule": "Sections of markdown and Python are scored by the same measure. First-screen candidates are then re-ranked by how many distinct question terms their one best passage carries together (proximity), discovery order breaking ties. A `search` with no explicit --name and no tag filter spans the same first_screen_globs; a tag filter stays on markdown, where frontmatter tags live. A --query phrase also matches across identifier separators (`_`, `-` read as spaces). A Python source's sections are its def/class blocks (a `#` line there is a comment). Directories named `generated` hold projections of an authority elsewhere and are excluded from discovery. A located source with no author-declared sections (anything but markdown and Python: JSON, YAML, Rust, shell) is read at its term-densest line window of at most passage_window_bytes; the window starts on a line carrying a question term and is chosen by the highest rarity-weighted score: each present term counts ln((lines+1)/(1+lines carrying it)) \u00d7 (1 + ln occurrences), so a window carrying several rare terms outranks one repeating a common word. A term counts only where it begins a word, so an inflection matches and a fragment inside another word does not. Scan bytes only; the read that follows is the receipt.",
     "stemming_rule": "S1 (2026-09-22): a term also matches a candidate's text via its STEM — the longest of `ing`/`es`/`ed`/`s` stripped from its tail, kept only when the remaining stem is at least four characters (so `habits`→`habit` and `stamps`→`stamp` stem, but `mined`→`min` does not — three characters is below the floor and stays unstemmed). This is intentionally modest: a literal suffix strip, not a lexical dictionary, so it will miss irregular inflections it was never asked to know."
   },
   "ceremony": {

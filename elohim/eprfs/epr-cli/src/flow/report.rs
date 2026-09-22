@@ -92,6 +92,9 @@ fn slot_prefix(slot: &str) -> &'static str {
 /// headline for want of a key nobody knew to write; deriving from the measure id means the
 /// conventionally-named measures land in their slot with no extra declaration, and anything
 /// unconventional can still say so outright.
+/// The bound whose reading the `recall` headline slot shows when the registry declares it.
+const RECALL_WINDOW_BOUND: &str = "recall-journey-window-ceiling@";
+
 fn headline_slot(bound: &Bound) -> Option<&'static str> {
     if let Some(declared) = &bound.headline {
         let declared = declared.trim().to_ascii_lowercase();
@@ -1460,10 +1463,13 @@ fn evaluate_rate_over_window(
             subject,
             outcome: OutcomeStatus::Skipped,
             summary: format!(
-                "fewer than 3 journeys in window — {} journeys ({} folds) in the last {} days{fallback_note}",
+                "fewer than 3 journeys in window — {} journeys ({} folds) in the last {} days{fallback_note}{}",
                 journeys.len(),
                 windowed.len(),
-                trim_number(window_days)
+                trim_number(window_days),
+                staleness_note(bound, folds, now)
+                    .map(|note| format!(" · {note}"))
+                    .unwrap_or_default()
             ),
             observed: None,
             unit: None,
@@ -1492,7 +1498,15 @@ fn evaluate_rate_over_window(
         windowed.len(),
         trim_number(window_days)
     );
-    let (outcome, summary) = judge(bound, observed, &basis, watermarks);
+    let (outcome, mut summary) = judge(bound, observed, &basis, watermarks);
+    // An overdue reader is a warning even on a passing rate: the window can still hold enough old
+    // journeys to read clean while nobody has walked the entry for weeks.
+    if let Some(note) = staleness_note(bound, folds, now) {
+        summary = format!("{summary} · {note}");
+        if outcome == OutcomeStatus::Passed && !summary.starts_with("warn: ") {
+            summary = format!("warn: {summary}");
+        }
+    }
 
     BoundOutcome {
         bound: bound.id.clone(),
@@ -1524,6 +1538,31 @@ fn fold_within_window(fold: &Fold, cutoff: DateTime<Utc>) -> bool {
     DateTime::parse_from_rfc3339(&fold.occurred_at)
         .map(|dt| dt.with_timezone(&Utc) >= cutoff)
         .unwrap_or(false)
+}
+
+/// `standing reader due …` when the bound declares `stale_days` and its NEWEST admissible fold —
+/// inside the window or not — is older than that; `None` otherwise, and always `None` when no
+/// `stale_days` is declared (staleness is never inferred). A bound with no fold at all is not
+/// "stale": it is unmeasured, which the skipped reading already says.
+///
+/// Caveat carried from the habit's own frontier: a fold's `occurred_at` is HEAD-dated, not
+/// wall-clock, so on a branch whose HEAD is old the age reads older than the walk was.
+fn staleness_note(bound: &Bound, folds: &[Fold], now: DateTime<Utc>) -> Option<String> {
+    let stale_days = bound.stale_days.filter(|d| d.is_finite() && *d >= 0.0)?;
+    let newest = folds
+        .iter()
+        .filter(|fold| admissible(bound, fold))
+        .filter_map(|fold| DateTime::parse_from_rfc3339(&fold.occurred_at).ok())
+        .map(|dt| dt.with_timezone(&Utc))
+        .max()?;
+    let age_days = (now - newest).num_seconds() as f64 / 86_400.0;
+    (age_days > stale_days).then(|| {
+        format!(
+            "standing reader due — newest journey {} days old (stale_days {}) → run the recall-standing-reader workflow",
+            age_days.floor(),
+            trim_number(stale_days)
+        )
+    })
 }
 
 /// `now - window_days` as a cutoff, never a panic — fix round 1, F2.
@@ -1756,7 +1795,9 @@ impl ReportPayload {
             // been folded yet. "no fold for recall-unmetered-bytes@1" names the row; a session
             // reader needs to be told that nobody has walked the entry since the last reset.
             OutcomeStatus::Skipped
-                if slot == "recall" && outcome.summary.starts_with("no fold") =>
+                if slot == "recall"
+                    && (outcome.summary.starts_with("no fold")
+                        || outcome.contributing_folds == Some(0)) =>
             {
                 format!("{prefix}: skipped — no journey fold")
             }
@@ -1774,6 +1815,20 @@ impl ReportPayload {
 
     /// The first PRIMARY-recipe outcome whose bound belongs to `slot`.
     fn slot_outcome(&self, slot: &str) -> Option<&BoundOutcome> {
+        // The recall slot is the habit's verdict, and that verdict is the ROLLING WINDOW: a single
+        // clean latest journey (what the per-journey ceilings read) says nothing about the quarter.
+        // It is picked by bound id because a consumes-style bound carries its first consumed
+        // measure, which the per-journey mistaken-assertions ceiling shares. Registries without
+        // the window row fall back to the id-derived owner.
+        if slot == "recall" {
+            if let Some(window) = self
+                .outcomes()
+                .iter()
+                .find(|outcome| outcome.bound.starts_with(RECALL_WINDOW_BOUND))
+            {
+                return Some(window);
+            }
+        }
         self.outcomes()
             .iter()
             .find(|outcome| slot_of_outcome(outcome) == Some(slot))
