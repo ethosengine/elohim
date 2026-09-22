@@ -289,6 +289,9 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
                 .execute(conn)
                 .map_err(diesel::r2d2::Error::QueryError)?;
         }
+        // Install after connection setup so diagnostics never count the PRAGMA
+        // bootstrap as application work. The observer never formats queries.
+        conn.set_instrumentation(crate::diagnostics::DieselDiagnostics::default());
         Ok(())
     }
 }

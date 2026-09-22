@@ -21,13 +21,14 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
+use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, warn};
 
 use holochain_client::{
-    AdminWebsocket, AllowedOrigins, AppWebsocket, CellId, ClientAgentSigner, ExternIO,
-    ZomeCallTarget,
+    AdminWebsocket, AllowedOrigins, AppWebsocket, CellId, ClientAgentSigner, ConductorApiError,
+    ExternIO, ZomeCallTarget,
 };
 
 use crate::conductor_admission::AdmissionClass;
@@ -49,6 +50,40 @@ fn is_correlated_head_record_call(zome_name: &str, fn_name: &str) -> bool {
                 | ("validate_carried_head_record", "candidate_head_http")
         )
     })
+}
+
+/// Preserve the conductor client's typed transport deadline before the error
+/// is flattened into [`StorageError`]. String matching here would conflate
+/// in-wasm/domain messages containing "timeout" with the websocket deadline.
+fn is_websocket_timeout(error: &ConductorApiError) -> bool {
+    matches!(
+        error,
+        ConductorApiError::WebsocketError(holochain_websocket::WebsocketError::Timeout(_))
+    )
+}
+
+/// Observe exactly one admitted websocket attempt while its typed result is
+/// still available. Admission, retries, credential healing and backoff remain
+/// outside this window.
+async fn observe_conductor_attempt<T, F>(
+    zome_name: &str,
+    fn_name: &str,
+    class: &'static str,
+    attempt: F,
+) -> Result<T, ConductorApiError>
+where
+    F: Future<Output = Result<T, ConductorApiError>>,
+{
+    let metrics = crate::metrics::ConductorCallMetricsGuard::start(zome_name, fn_name, class);
+    let diagnostic = crate::diagnostics::ConductorAttempt::start(zome_name, fn_name, class);
+    let result = attempt.await;
+    if result.as_ref().is_err_and(is_websocket_timeout) {
+        crate::metrics::inc_conductor_call_timeout(zome_name, fn_name, class);
+    }
+    let success = result.is_ok();
+    metrics.finish(success);
+    diagnostic.finish(success);
+    result
 }
 
 /// What the admission gate observed about one zome call.
@@ -734,15 +769,19 @@ impl HcClient {
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
-                    self.app_ws
-                        .call_zome(
+                    observe_conductor_attempt(
+                        zome_name,
+                        fn_name,
+                        AdmissionClass::Interactive.label(),
+                        self.app_ws.call_zome(
                             ZomeCallTarget::CellId(target),
                             zome_name.into(),
                             fn_name.into(),
                             ExternIO::from(payload),
-                        )
-                        .await
-                        .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                        ),
+                    )
+                    .await
+                    .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
                 }
             })
             .await?;
@@ -797,15 +836,19 @@ impl HcClient {
                     // conductor competes for the same read permits. Held across
                     // the call only, then dropped.
                     let _permit = admit(AdmissionClass::Interactive, zome_name, fn_name).await?;
-                    self.app_ws
-                        .call_zome(
+                    observe_conductor_attempt(
+                        zome_name,
+                        fn_name,
+                        AdmissionClass::Interactive.label(),
+                        self.app_ws.call_zome(
                             ZomeCallTarget::CellId(target),
                             zome_name.into(),
                             fn_name.into(),
                             ExternIO::from(payload),
-                        )
-                        .await
-                        .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
+                        ),
+                    )
+                    .await
+                    .map_err(|e| self.zome_call_failed_on(&heal_cell, e))
                 }
             })
             .await?;
@@ -907,16 +950,19 @@ impl HcClient {
                         "head-record conductor phase"
                     );
                 }
-                let result = self
-                    .app_ws
-                    .call_zome(
+                let result = observe_conductor_attempt(
+                    zome_name,
+                    fn_name,
+                    class.label(),
+                    self.app_ws.call_zome(
                         ZomeCallTarget::CellId(target),
                         zome_name.into(),
                         fn_name.into(),
                         ExternIO::from(payload),
-                    )
-                    .await
-                    .map_err(|e| self.zome_call_failed(e));
+                    ),
+                )
+                .await;
+                let result = result.map_err(|e| self.zome_call_failed(e));
                 // Held across the whole call on purpose: the permit models
                 // capacity the conductor is still spending, and releasing it
                 // early would understate occupancy by exactly the interval that
@@ -1452,7 +1498,10 @@ impl HcClient {
         // Not admission-gated (it must answer even when the pool is full), but
         // it IS a conductor round-trip — counted so the cost is visible.
         crate::metrics::inc_conductor_call("-", "app_info", "ungated");
-        match self.app_ws.app_info().await {
+        // Observe the typed transport response, not application health: both
+        // `Some(disabled)` and `None` are successful websocket completions.
+        // The match below retains the existing health classification.
+        match observe_conductor_attempt("-", "app_info", "ungated", self.app_ws.app_info()).await {
             // THE STATUS IS THE ANSWER. `app_info()` succeeds on a DISABLED app
             // — that is precisely how the 2026-09-18 incident hid for 38 hours
             // behind a probe that only asked `is_ok()` and threw the payload
@@ -1614,6 +1663,10 @@ mod cell_owner_tests {
 
 #[cfg(test)]
 mod attribution_tests {
+    use holochain_client::ConductorApiError;
+
+    use super::{is_websocket_timeout, observe_conductor_attempt};
+
     /// Every zome call must be attributable to a function. `admit` is the one
     /// place that both takes a permit and counts the call; a second direct
     /// permit acquisition in this file is a call path the per-function series cannot
@@ -1644,5 +1697,196 @@ mod attribution_tests {
             "background",
         );
         assert_eq!(series.get(), before + 1);
+    }
+
+    #[test]
+    fn every_dispatch_observes_only_after_successful_admission() {
+        let source = include_str!("hc_client.rs");
+        for (name, end, admission) in [
+            (
+                "call_zome_imagodei",
+                "/// Make a signed zome call against the MISHPAT",
+                "let _permit = admit(",
+            ),
+            (
+                "call_zome_mishpat",
+                "/// Make a signed zome call.",
+                "let _permit = admit(",
+            ),
+            (
+                "call_zome_timed",
+                "/// Get the cell ID",
+                "let permit = match admit(",
+            ),
+        ] {
+            let function = source
+                .split(&format!("pub async fn {name}("))
+                .nth(1)
+                .unwrap_or_else(|| panic!("{name} exists"))
+                .split(end)
+                .next()
+                .expect("function boundary");
+            let admitted = function.find(admission).expect("admission call");
+            let observed = function
+                .find("observe_conductor_attempt(")
+                .expect("attempt observer");
+            assert!(
+                observed > admitted,
+                "{name} must start attempt observation only after admission"
+            );
+            assert_eq!(
+                function.matches(".call_zome(").count(),
+                1,
+                "{name} must have exactly one observed websocket dispatch"
+            );
+        }
+    }
+
+    #[test]
+    fn app_info_probe_uses_the_shared_typed_transport_observer() {
+        let source = include_str!("hc_client.rs");
+        let ping = source
+            .split("pub async fn ping(&self)")
+            .nth(1)
+            .expect("ping exists")
+            .split("/// What one [`HcClient::ping`] observed")
+            .next()
+            .expect("ping boundary");
+        assert_eq!(ping.matches("observe_conductor_attempt(").count(), 1);
+        assert_eq!(ping.matches("self.app_ws.app_info()").count(), 1);
+        assert!(ping.contains("\"app_info\""));
+        assert!(ping.contains("\"ungated\""));
+        assert!(ping.contains("Ok(Some(info))"));
+        assert!(ping.contains("Ok(None)"));
+    }
+
+    #[tokio::test]
+    async fn attempt_observer_records_success_error_and_typed_timeout() {
+        let success = crate::metrics::CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "observer_zome",
+            "observer_fn",
+            "interactive",
+            "success",
+        ]);
+        let error = crate::metrics::CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "observer_zome",
+            "observer_fn",
+            "interactive",
+            "error",
+        ]);
+        let timeouts = crate::metrics::CONDUCTOR_CALL_TIMEOUTS.with_label_values(&[
+            "observer_zome",
+            "observer_fn",
+            "interactive",
+            "websocket",
+        ]);
+        let success_before = success.get_sample_count();
+        let error_before = error.get_sample_count();
+        let timeout_before = timeouts.get();
+
+        let observed =
+            observe_conductor_attempt("observer_zome", "observer_fn", "interactive", async {
+                Ok::<_, ConductorApiError>(7_u8)
+            })
+            .await
+            .expect("success is preserved");
+        assert_eq!(observed, 7);
+        assert!(observe_conductor_attempt::<(), _>(
+            "observer_zome",
+            "observer_fn",
+            "interactive",
+            async { Err(ConductorApiError::AppNotFound) },
+        )
+        .await
+        .is_err());
+        let elapsed = tokio::time::timeout(std::time::Duration::ZERO, async {
+            std::future::pending::<()>().await
+        })
+        .await
+        .expect_err("pending future exceeds a zero budget");
+        assert!(observe_conductor_attempt::<(), _>(
+            "observer_zome",
+            "observer_fn",
+            "interactive",
+            async {
+                Err(ConductorApiError::WebsocketError(
+                    holochain_websocket::WebsocketError::Timeout(elapsed),
+                ))
+            },
+        )
+        .await
+        .is_err());
+
+        assert_eq!(success.get_sample_count(), success_before + 1);
+        assert_eq!(error.get_sample_count(), error_before + 2);
+        assert_eq!(timeouts.get(), timeout_before + 1);
+    }
+
+    #[tokio::test]
+    async fn dropping_pending_attempt_is_censored_not_timed_out() {
+        let dropped = crate::metrics::CONDUCTOR_CALL_DROPPED.with_label_values(&[
+            "pending_zome",
+            "pending_fn",
+            "background",
+        ]);
+        let timeouts = crate::metrics::CONDUCTOR_CALL_TIMEOUTS.with_label_values(&[
+            "pending_zome",
+            "pending_fn",
+            "background",
+            "websocket",
+        ]);
+        let errors = crate::metrics::CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "pending_zome",
+            "pending_fn",
+            "background",
+            "error",
+        ]);
+        let dropped_before = dropped.get();
+        let timeout_before = timeouts.get();
+        let errors_before = errors.get_sample_count();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(observe_conductor_attempt(
+            "pending_zome",
+            "pending_fn",
+            "background",
+            async move {
+                let _ = started_tx.send(());
+                std::future::pending::<Result<(), ConductorApiError>>().await
+            },
+        ));
+        started_rx.await.expect("attempt future started");
+        task.abort();
+        let _ = task.await;
+
+        assert_eq!(dropped.get(), dropped_before + 1);
+        assert_eq!(timeouts.get(), timeout_before);
+        assert_eq!(errors.get_sample_count(), errors_before);
+    }
+
+    #[test]
+    fn non_websocket_timeout_is_not_classified_as_transport_timeout() {
+        assert!(!is_websocket_timeout(&ConductorApiError::AppNotFound));
+        assert!(!is_websocket_timeout(&ConductorApiError::WebsocketError(
+            holochain_websocket::WebsocketError::Other(
+                "domain response mentioned timeout".to_string(),
+            )
+        )));
+        assert!(!is_websocket_timeout(
+            &ConductorApiError::SignZomeCallError("in-wasm timeout".to_string())
+        ));
+    }
+
+    #[tokio::test]
+    async fn websocket_timeout_is_classified_from_typed_error() {
+        let elapsed = tokio::time::timeout(std::time::Duration::ZERO, async {
+            std::future::pending::<()>().await
+        })
+        .await
+        .expect_err("pending future exceeds a zero budget");
+        let error = ConductorApiError::WebsocketError(
+            holochain_websocket::WebsocketError::Timeout(elapsed),
+        );
+
+        assert!(is_websocket_timeout(&error));
     }
 }

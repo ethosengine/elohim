@@ -14,31 +14,42 @@
  * until a person read the logs.
  */
 import assert from 'node:assert/strict';
-import { execSync } from 'node:child_process';
-import { readFileSync, readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { performance } from 'node:perf_hooks';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { DataTable, Given, When, Then } from '@cucumber/cucumber';
 
 import { getRaw } from '../../src/framework/dataplane/surfaces.js';
+import { householdMeshDir } from '../../src/framework/fixtures/household-mesh.js';
+import {
+  captureHouseholdResources,
+  counterRatePerMinute,
+  requiredPrometheusSeriesSum,
+  resourceWitness,
+  type ResourceSnapshot,
+  type ResourceWitness,
+} from '../../src/framework/fixtures/process-resources.js';
 import { E2EWorld } from '../../src/framework/world.js';
 
 interface PeerReading {
-  admitted: number;
-  shed: number;
+  monotonicMs: number;
+  admitted: number | null;
+  refused: number | null;
   /** Dispatched conductor calls keyed `zome::fn (class)` — who is asking, not just how much. */
   callers: Map<string, number>;
+  issues: string[];
 }
 
 interface RestReading {
-  at: number;
   peers: Map<string, PeerReading>;
-  conductorCpuSeconds: number;
+  resources: ResourceSnapshot;
 }
 
 interface RestState {
   peers: Map<string, string>;
   before?: RestReading;
   after?: RestReading;
+  resourceWitness?: ResourceWitness;
 }
 
 const states = new WeakMap<E2EWorld, RestState>();
@@ -52,26 +63,13 @@ function state(world: E2EWorld): RestState {
   return s;
 }
 
-/** Sum every sample of one Prometheus series family in a text exposition. */
-function sumSeries(exposition: string, family: string): number {
-  let total = 0;
-  for (const line of exposition.split('\n')) {
-    if (!line.startsWith(family)) continue;
-    const next = line.charAt(family.length);
-    if (next !== '{' && next !== ' ') continue;
-    const value = Number(line.slice(line.lastIndexOf(' ') + 1));
-    if (Number.isFinite(value)) total += value;
-  }
-  return total;
-}
-
 /** Every sample of `elohim_conductor_calls_total`, keyed by its zome, function and class labels. */
 function callersOf(exposition: string): Map<string, number> {
   const callers = new Map<string, number>();
   for (const line of exposition.split('\n')) {
     if (!line.startsWith('elohim_conductor_calls_total{')) continue;
     const label = (name: string): string => new RegExp(`${name}="([^"]*)"`).exec(line)?.[1] ?? '?';
-    const value = Number(line.slice(line.lastIndexOf(' ') + 1));
+    const value = Number(line.trim().split(/\s+/)[1]);
     if (Number.isFinite(value))
       callers.set(`${label('zome')}::${label('fn')} (${label('class')})`, value);
   }
@@ -91,46 +89,140 @@ function topCallers(before: PeerReading | undefined, after: PeerReading, limit =
 }
 
 async function readPeer(url: string): Promise<PeerReading> {
-  // The framework's bounded GET, not global fetch: the harness owns HTTP.
-  const { status, text } = await getRaw(`${url}/metrics`, { timeoutMs: 10_000 });
-  assert.equal(status, 200, `${url}/metrics answered ${status}`);
-  return {
-    // Every conductor call passes the admission gate; a released permit is a call that was made.
-    admitted: sumSeries(text, 'elohim_conductor_admission_hold_ms_count'),
-    shed: sumSeries(text, 'elohim_conductor_admission_shed_total'),
-    callers: callersOf(text),
-  };
+  try {
+    // The framework's bounded GET, not global fetch: the harness owns HTTP.
+    const { status, text } = await getRaw(`${url}/metrics`, { timeoutMs: 10_000 });
+    const monotonicMs = performance.now();
+    if (status !== 200) {
+      return {
+        monotonicMs,
+        admitted: null,
+        refused: null,
+        callers: new Map(),
+        issues: [`/metrics HTTP ${status}`],
+      };
+    }
+    const admitted = requiredPrometheusSeriesSum(text, 'elohim_conductor_admission_hold_ms_count');
+    const refused = requiredPrometheusSeriesSum(text, 'elohim_conductor_admission_shed_total');
+    return {
+      monotonicMs,
+      admitted: admitted.value,
+      refused: refused.value,
+      callers: callersOf(text),
+      issues: [admitted.issue, refused.issue].filter((issue): issue is string => Boolean(issue)),
+    };
+  } catch (error) {
+    return {
+      monotonicMs: performance.now(),
+      admitted: null,
+      refused: null,
+      callers: new Map(),
+      issues: [`/metrics read failed: ${String(error)}`],
+    };
+  }
 }
 
-/** Total user+system CPU seconds of every running holochain conductor on this host. */
-function conductorCpuSeconds(): number {
-  const ticksPerSecond = Number(execSync('/usr/bin/getconf CLK_TCK').toString().trim()) || 100;
-  let ticks = 0;
-  for (const entry of readdirSync('/proc')) {
-    if (!/^\d+$/.test(entry)) continue;
-    try {
-      const cmdline = readFileSync(`/proc/${entry}/cmdline`, 'utf8').split('\0');
-      if (!/(^|\/)holochain$/.test(cmdline[0] ?? '')) continue;
-      const stat = readFileSync(`/proc/${entry}/stat`, 'utf8');
-      // Fields after the parenthesised command name; utime and stime are the 12th and 13th of those.
-      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
-      ticks += Number(fields[11]) + Number(fields[12]);
-    } catch {
-      // The process exited between the listing and the read.
-    }
-  }
-  return ticks / ticksPerSecond;
+function expectedConductorConfigs(s: RestState): Record<string, string> {
+  const root = householdMeshDir();
+  return Object.fromEntries(
+    [...s.peers.keys()].map(name => [
+      name,
+      resolve(root, 'conductors', name, 'conductor-config.yaml'),
+    ])
+  );
 }
 
 async function takeReading(s: RestState): Promise<RestReading> {
+  const resources = captureHouseholdResources(expectedConductorConfigs(s));
   const peers = new Map<string, PeerReading>();
   for (const [name, url] of s.peers) peers.set(name, await readPeer(url));
-  return { at: Date.now(), peers, conductorCpuSeconds: conductorCpuSeconds() };
+  return { peers, resources };
 }
 
-function perMinute(delta: number, before: RestReading, after: RestReading): number {
-  const minutes = (after.at - before.at) / 60_000;
-  return minutes > 0 ? delta / minutes : Number.POSITIVE_INFINITY;
+function peerEvidence(reading: PeerReading): object {
+  return {
+    admitted: reading.admitted,
+    refused: reading.refused,
+    monotonicMs: reading.monotonicMs,
+    callers: Object.fromEntries(reading.callers),
+    issues: reading.issues,
+  };
+}
+
+function unavailable(value: number | null | undefined): value is null | undefined {
+  return value === null || value === undefined;
+}
+
+function storageEvidence(before: RestReading, after: RestReading): object {
+  return Object.fromEntries(
+    [...after.peers].map(([name, reading]) => {
+      const prior = before.peers.get(name);
+      const admittedDelta =
+        unavailable(prior?.admitted) || unavailable(reading.admitted)
+          ? null
+          : reading.admitted - prior.admitted;
+      const refusedDelta =
+        unavailable(prior?.refused) || unavailable(reading.refused)
+          ? null
+          : reading.refused - prior.refused;
+      return [
+        name,
+        {
+          before: prior ? peerEvidence(prior) : null,
+          after: peerEvidence(reading),
+          deltas: { admitted: admittedDelta, refused: refusedDelta },
+          topCallers: topCallers(prior, reading),
+        },
+      ];
+    })
+  );
+}
+
+function storageViolations(
+  before: RestReading,
+  after: RestReading,
+  callsBudget: number,
+  refusedBudget: number
+): string[] {
+  const violations: string[] = [];
+  for (const [name, reading] of after.peers) {
+    const prior = before.peers.get(name);
+    violations.push(
+      ...[...(prior?.issues ?? []), ...reading.issues].map(
+        issue => `${name}: metrics apparatus: ${issue}`
+      )
+    );
+    if (unavailable(prior?.admitted) || unavailable(reading.admitted)) {
+      violations.push(`${name}: admitted-call counter was not measurable at both endpoints`);
+    } else if (reading.admitted < prior.admitted) {
+      violations.push(`${name}: admitted-call counter rolled backwards`);
+    } else {
+      const callsRate = counterRatePerMinute(
+        reading.admitted - prior.admitted,
+        prior.monotonicMs,
+        reading.monotonicMs
+      );
+      if (callsRate.issue) violations.push(`${name}: metrics apparatus: ${callsRate.issue}`);
+      else if (callsRate.value !== null && callsRate.value > callsBudget) {
+        violations.push(
+          `${name}: ${callsRate.value.toFixed(1)} calls/min > ${callsBudget} — ${topCallers(
+            prior,
+            reading
+          )}`
+        );
+      }
+    }
+    if (unavailable(prior?.refused) || unavailable(reading.refused)) {
+      violations.push(`${name}: refused-permit counter was not measurable at both endpoints`);
+    } else if (reading.refused < prior.refused) {
+      violations.push(`${name}: refused-permit counter rolled backwards`);
+    } else if (reading.refused - prior.refused > refusedBudget) {
+      violations.push(
+        `${name}: ${reading.refused - prior.refused} refused conductor permits > ${refusedBudget}`
+      );
+    }
+  }
+  return violations;
 }
 
 function readings(world: E2EWorld): { before: RestReading; after: RestReading; s: RestState } {
@@ -139,7 +231,7 @@ function readings(world: E2EWorld): { before: RestReading; after: RestReading; s
   return { before: s.before, after: s.after, s };
 }
 
-Given("the household's storage peers", function (this: E2EWorld) {
+Given("the household's three storage peer/conductor pairs", function (this: E2EWorld) {
   const declared = process.env.PEER_STORAGE_URLS;
   if (!declared) return 'pending';
   const s = state(this);
@@ -148,7 +240,14 @@ Given("the household's storage peers", function (this: E2EWorld) {
     if (!name || !host) continue;
     s.peers.set(name.trim(), host.startsWith('http') ? host.trim() : `http://${host.trim()}`);
   }
-  assert.ok(s.peers.size > 0, `PEER_STORAGE_URLS named no peers: ${declared}`);
+  const expected = ['james', 'jessica', 'matthew'];
+  const observed = [...s.peers.keys()].sort((a, b) => a.localeCompare(b));
+  assert.deepEqual(
+    observed,
+    expected,
+    `the selected household must name exactly its three peer/conductor pairs; ` +
+      `PEER_STORAGE_URLS named ${observed.join(', ') || 'none'}`
+  );
   return undefined;
 });
 
@@ -172,60 +271,73 @@ Given('every storage peer reports its content in sync', async function (this: E2
 });
 
 When(
-  'nobody authors, reads or syncs for {int} seconds',
+  'no person or external client authors, reads or syncs for {int} seconds',
   { timeout: 1_200_000 },
   async function (this: E2EWorld, seconds: number) {
     const s = state(this);
     s.before = await takeReading(s);
     await new Promise(resolve => setTimeout(resolve, seconds * 1000));
     s.after = await takeReading(s);
+    s.resourceWitness = resourceWitness(s.before.resources, s.after.resources);
+    // Foreign diagnostic evidence belongs in Cucumber's own run output. Attach
+    // it before any budget assertion so a red verdict cannot erase the measure.
+    this.attach(
+      JSON.stringify(
+        {
+          kind: 'household-idle-resource-observation/v1',
+          processes: s.resourceWitness,
+          storagePeers: storageEvidence(s.before, s.after),
+        },
+        null,
+        2
+      ),
+      'application/json'
+    );
   }
 );
 
 Then(
-  'each storage peer asked its conductor for at most {int} calls a minute',
-  function (this: E2EWorld, budget: number) {
-    const { before, after } = readings(this);
-    const over: string[] = [];
-    for (const [name, reading] of after.peers) {
-      const rate = perMinute(
-        reading.admitted - (before.peers.get(name)?.admitted ?? 0),
-        before,
-        after
+  'the quiet household stayed within its resource budgets:',
+  function (this: E2EWorld, table: DataTable) {
+    const { before, after, s } = readings(this);
+    const budgets = table.rowsHash();
+    const callsBudget = Number(budgets['average conductor calls per peer per minute']);
+    const refusedBudget = Number(budgets['refused conductor permits per peer']);
+    const cpuBudget = Number(budgets['average household CPU seconds per minute']);
+    assert.ok(
+      [callsBudget, refusedBudget, cpuBudget].every(Number.isFinite),
+      `resource budget table is incomplete: ${JSON.stringify(budgets)}`
+    );
+
+    const violations = storageViolations(before, after, callsBudget, refusedBudget);
+
+    const witness = s.resourceWitness;
+    assert.ok(witness, 'the quiet window has no attached process-resource witness');
+    violations.push(...witness.issues.map(issue => `resource apparatus: ${issue}`));
+    const expectedPeers = [...s.peers.keys()].sort((a, b) => a.localeCompare(b));
+    const measuredPeers = Object.keys(witness.deltas).sort((a, b) => a.localeCompare(b));
+    if (witness.issues.length === 0 && measuredPeers.join(',') !== expectedPeers.join(',')) {
+      violations.push(
+        `resource apparatus: expected conductors ${expectedPeers.join(',')}, measured ${measuredPeers.join(',')}`
       );
-      // A count alone sends a person to the logs; name the callers so the runaway names itself.
-      if (rate > budget) {
-        over.push(
-          `${name}: ${rate.toFixed(1)}/min — ${topCallers(before.peers.get(name), reading)}`
+    }
+    if (witness.elapsedMs > 0) {
+      const cpuSeconds = Object.values(witness.deltas).reduce(
+        (total, reading) => total + reading.cpuSeconds,
+        0
+      );
+      const cpuRate = cpuSeconds / (witness.elapsedMs / 60_000);
+      if (cpuRate > cpuBudget) {
+        violations.push(
+          `household conductors: ${cpuRate.toFixed(1)} CPU s/min > ${cpuBudget}; 60 is one core pinned`
         );
       }
     }
-    assert.deepEqual(over, [], `at rest, over the ${budget} calls/min budget — ${over.join(', ')}`);
-  }
-);
 
-Then('no storage peer was refused a conductor permit', function (this: E2EWorld) {
-  const { before, after } = readings(this);
-  const refused: string[] = [];
-  for (const [name, reading] of after.peers) {
-    const delta = reading.shed - (before.peers.get(name)?.shed ?? 0);
-    if (delta > 0) refused.push(`${name}: ${delta}`);
-  }
-  assert.deepEqual(
-    refused,
-    [],
-    `conductor permits refused while nothing was happening — ${refused.join(', ')}`
-  );
-});
-
-Then(
-  "the household's conductors together used at most {int} CPU seconds a minute",
-  function (this: E2EWorld, budget: number) {
-    const { before, after } = readings(this);
-    const rate = perMinute(after.conductorCpuSeconds - before.conductorCpuSeconds, before, after);
-    assert.ok(
-      rate <= budget,
-      `at rest the conductors burned ${rate.toFixed(1)} CPU s/min (budget ${budget}); 60 is one core pinned`
+    assert.deepEqual(
+      violations,
+      [],
+      `quiet-household resource budget failed:\n- ${violations.join('\n- ')}`
     );
   }
 );

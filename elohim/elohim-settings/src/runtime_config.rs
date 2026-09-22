@@ -202,6 +202,8 @@ pub enum Key {
     MissDormancyBaseSeconds = 9,
     /// `MISS_DORMANCY_CAP_SECONDS` — miss-ledger dormancy ladder ceiling.
     MissDormancyCapSeconds = 10,
+    /// `ELOHIM_DIAGNOSTICS_WINDOW_SECONDS` — one bounded diagnostic capture window.
+    DiagnosticsWindowSeconds = 11,
 }
 
 impl Key {
@@ -210,7 +212,7 @@ impl Key {
     }
 
     /// Every registered key, in registry order.
-    pub const ALL: [Key; 11] = [
+    pub const ALL: [Key; 12] = [
         Key::ObeyCarriedElection,
         Key::AdoptBeforeAuthor,
         Key::ContestBackoffSeconds,
@@ -222,6 +224,7 @@ impl Key {
         Key::ContestRemintWindowSeconds,
         Key::MissDormancyBaseSeconds,
         Key::MissDormancyCapSeconds,
+        Key::DiagnosticsWindowSeconds,
     ];
 }
 
@@ -253,7 +256,7 @@ pub struct SettingSpec {
 }
 
 /// The registered settings, in [`Key`] order.
-pub static SPECS: [SettingSpec; 11] = [
+pub static SPECS: [SettingSpec; 12] = [
     SettingSpec {
         name: "ELOHIM_OBEY_CARRIED_ELECTION",
         kind: Kind::Bool,
@@ -390,6 +393,23 @@ pub static SPECS: [SettingSpec; 11] = [
              already-dormant ids early; it applies to the NEXT rung each computes.",
         ),
         unpublished_by_design: None,
+    },
+    SettingSpec {
+        name: "ELOHIM_DIAGNOSTICS_WINDOW_SECONDS",
+        kind: Kind::Seconds,
+        default: 0,
+        doc: "Arm one process-local diagnostic capture window in seconds. 0 is OFF; the read \
+              site clamps the requested window to 900 seconds and does not re-arm an unchanged \
+              value after expiry.",
+        note: Some(
+            "hot and deliberately one-shot: remove the key (or set 0), then set a nonzero value \
+             to arm another window. This prevents an unchanged mounted ConfigMap from leaving \
+             detailed tracing active forever.",
+        ),
+        unpublished_by_design: Some(
+            "no boot publisher: detailed diagnostics are default-OFF and may only be armed \
+             deliberately through the watched runtime-config file",
+        ),
     },
 ];
 
@@ -551,9 +571,15 @@ pub static BOOT_ONLY: [BootOnlyFlag; 5] = [
 
 /// Mutable per-process state for one registered setting.
 struct Setting {
+    /// Serializes effective value/provenance/generation writers. Reads remain
+    /// atomic and lock-free.
+    writer: Mutex<()>,
     current: AtomicU64,
     boot: AtomicU64,
     provenance: AtomicU8,
+    /// Seqlock-style value-transition generation. Even values are stable;
+    /// odd values mean `current` is being changed.
+    generation: AtomicU64,
     /// Has a boot publisher ever run for this setting?
     ///
     /// Deliberately NOT derivable from `provenance`: every setting is seeded
@@ -565,7 +591,8 @@ struct Setting {
     published: AtomicBool,
 }
 
-/// A lock-free registry of hot-reloadable settings.
+/// A registry of hot-reloadable settings with lock-free reads and serialized
+/// per-setting writes.
 ///
 /// Instantiable rather than purely static ON PURPOSE: the unit tests drive their
 /// own `Registry` so they can exercise override/fallback/provenance transitions
@@ -589,9 +616,11 @@ impl Registry {
             settings: SPECS
                 .iter()
                 .map(|spec| Setting {
+                    writer: Mutex::new(()),
                     current: AtomicU64::new(spec.default),
                     boot: AtomicU64::new(spec.default),
                     provenance: AtomicU8::new(Provenance::BootEnv.to_u8()),
+                    generation: AtomicU64::new(0),
                     published: AtomicBool::new(false),
                 })
                 .collect(),
@@ -610,10 +639,19 @@ impl Registry {
     /// `config::set_*` publish at any point in boot without racing the watcher.
     pub fn publish_boot(&self, key: Key, value: u64) {
         let s = self.at(key);
+        let _writer = s
+            .writer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         s.boot.store(value, Ordering::Release);
         s.published.store(true, Ordering::Release);
         if Provenance::from_u8(s.provenance.load(Ordering::Acquire)) == Provenance::BootEnv {
-            s.current.store(value, Ordering::Release);
+            let old = s.current.load(Ordering::Acquire);
+            if old != value {
+                s.generation.fetch_add(1, Ordering::AcqRel);
+                s.current.store(value, Ordering::Release);
+                s.generation.fetch_add(1, Ordering::AcqRel);
+            }
         }
     }
 
@@ -637,6 +675,43 @@ impl Registry {
     /// The effective value, in registry (`u64`) representation.
     pub fn get(&self, key: Key) -> u64 {
         self.at(key).current.load(Ordering::Acquire)
+    }
+
+    /// Read one setting's value and transition generation consistently.
+    ///
+    /// The generation changes only when this key's effective value changes;
+    /// provenance-only and unrelated-key updates do not advance it.
+    pub fn get_with_generation(&self, key: Key) -> (u64, u64) {
+        let setting = self.at(key);
+        for _ in 0..16 {
+            let before = setting.generation.load(Ordering::Acquire);
+            if !before.is_multiple_of(2) {
+                std::hint::spin_loop();
+                continue;
+            }
+            let value = setting.current.load(Ordering::Acquire);
+            let after = setting.generation.load(Ordering::Acquire);
+            if before == after {
+                return (value, after);
+            }
+        }
+
+        // A writer normally holds the odd state for only two atomic stores.
+        // Fall back to its mutex rather than spin without a bound; recovering
+        // a poisoned writer also closes any odd generation it abandoned.
+        let _writer = setting
+            .writer
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let generation = setting.generation.load(Ordering::Acquire);
+        let stable_generation = if generation.is_multiple_of(2) {
+            generation
+        } else {
+            let stable = generation.wrapping_add(1);
+            setting.generation.store(stable, Ordering::Release);
+            stable
+        };
+        (setting.current.load(Ordering::Acquire), stable_generation)
     }
 
     /// The effective value of a [`Kind::Bool`] setting.
@@ -685,6 +760,10 @@ impl Registry {
                 parsed_value
             });
 
+            let writer = s
+                .writer
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             let (want, want_prov) = match from_file {
                 Some(v) => (v, Provenance::RuntimeConfig),
                 None => (s.boot.load(Ordering::Acquire), Provenance::BootEnv),
@@ -694,9 +773,15 @@ impl Registry {
             let old_prov = Provenance::from_u8(s.provenance.load(Ordering::Acquire));
 
             if old != want {
+                // Publish an odd generation before the value and the next even
+                // generation after it, so snapshot readers cannot pair a new
+                // value with its predecessor's generation.
+                s.generation.fetch_add(1, Ordering::AcqRel);
                 s.current.store(want, Ordering::Release);
                 s.provenance.store(want_prov.to_u8(), Ordering::Release);
+                s.generation.fetch_add(1, Ordering::AcqRel);
                 changed += 1;
+                drop(writer);
                 warn!(
                     setting = spec.name,
                     old = %spec.kind.display(old),
@@ -709,6 +794,9 @@ impl Registry {
                 // value, or stops naming it). Not a behaviour change, but the
                 // provenance must stay truthful for the admin surface.
                 s.provenance.store(want_prov.to_u8(), Ordering::Release);
+                drop(writer);
+            } else {
+                drop(writer);
             }
         }
         changed
@@ -790,6 +878,23 @@ pub fn get_bool(key: Key) -> bool {
 /// The effective value of a [`Kind::Seconds`] setting.
 pub fn get_secs(key: Key) -> u64 {
     GLOBAL.get(key)
+}
+
+/// Requested duration for one bounded diagnostic capture window.
+///
+/// The storage diagnostics layer owns the monotonic expiry and one-shot edge
+/// detection; this registry owns only the operator-declared duration.
+pub fn diagnostics_window_seconds() -> u64 {
+    get_secs(Key::DiagnosticsWindowSeconds)
+}
+
+/// Effective diagnostics-window request plus its per-key transition generation.
+///
+/// A consumer can therefore observe `N -> 0 -> N` even if it never sampled the
+/// intermediate zero. Reloads that only change another setting leave this
+/// generation untouched.
+pub fn diagnostics_window_state() -> (u64, u64) {
+    GLOBAL.get_with_generation(Key::DiagnosticsWindowSeconds)
 }
 
 /// The cadence a RUNNING projection-reconcile loop should tick at.
@@ -1287,6 +1392,111 @@ not a pair
         assert!(!m.contains_key(""), "an orphan '=' must not register a key");
         assert!(!m.contains_key("not a pair"));
         assert!(!m.contains_key("[section]"));
+    }
+
+    #[test]
+    fn diagnostics_window_is_default_off_and_runtime_configurable() {
+        let registry = Registry::new();
+        assert_eq!(registry.get(Key::DiagnosticsWindowSeconds), 0);
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (0, 0)
+        );
+        assert_eq!(
+            registry.apply(&parse("ELOHIM_DIAGNOSTICS_WINDOW_SECONDS = 120\n")),
+            1
+        );
+        assert_eq!(registry.get(Key::DiagnosticsWindowSeconds), 120);
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (120, 2)
+        );
+        assert_eq!(
+            registry.provenance(Key::DiagnosticsWindowSeconds),
+            Provenance::RuntimeConfig
+        );
+        assert_eq!(registry.apply(&parse("")), 1);
+        assert_eq!(registry.get(Key::DiagnosticsWindowSeconds), 0);
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (0, 4)
+        );
+
+        // The same requested value is a new edge after zero, even when no
+        // diagnostics consumer sampled the intermediate state.
+        assert_eq!(
+            registry.apply(&parse("ELOHIM_DIAGNOSTICS_WINDOW_SECONDS = 120\n")),
+            1
+        );
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (120, 6)
+        );
+
+        // An unrelated key transition must not re-arm diagnostics.
+        assert_eq!(
+            registry.apply(&parse(
+                "ELOHIM_DIAGNOSTICS_WINDOW_SECONDS = 120\nCONTEST_BACKOFF_SECONDS = 9\n"
+            )),
+            1
+        );
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (120, 6)
+        );
+    }
+
+    #[test]
+    fn concurrent_boot_and_runtime_writers_leave_a_stable_generation() {
+        let registry = Registry::new();
+        let start = std::sync::Barrier::new(3);
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                start.wait();
+                for value in 1..=256 {
+                    registry.publish_boot(Key::DiagnosticsWindowSeconds, value);
+                }
+            });
+            scope.spawn(|| {
+                let runtime = parse("ELOHIM_DIAGNOSTICS_WINDOW_SECONDS = 120\n");
+                start.wait();
+                for _ in 0..256 {
+                    registry.apply(&runtime);
+                }
+            });
+            start.wait();
+            for _ in 0..256 {
+                let (_, generation) = registry.get_with_generation(Key::DiagnosticsWindowSeconds);
+                assert_eq!(generation % 2, 0);
+            }
+        });
+
+        // A final file override deterministically wins, and a later boot
+        // publication updates only its fallback while that override is active.
+        registry.apply(&parse("ELOHIM_DIAGNOSTICS_WINDOW_SECONDS = 120\n"));
+        let before = registry.get_with_generation(Key::DiagnosticsWindowSeconds);
+        registry.publish_boot(Key::DiagnosticsWindowSeconds, 999);
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            before
+        );
+        assert_eq!(
+            registry.provenance(Key::DiagnosticsWindowSeconds),
+            Provenance::RuntimeConfig
+        );
+    }
+
+    #[test]
+    fn generation_reader_repairs_an_abandoned_odd_writer_state() {
+        let registry = Registry::new();
+        registry
+            .at(Key::DiagnosticsWindowSeconds)
+            .generation
+            .store(1, Ordering::Release);
+        assert_eq!(
+            registry.get_with_generation(Key::DiagnosticsWindowSeconds),
+            (0, 2)
+        );
     }
 
     #[test]

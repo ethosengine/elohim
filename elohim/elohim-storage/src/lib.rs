@@ -110,6 +110,7 @@ pub mod graph_views;
 #[cfg(feature = "graph-native")]
 pub mod graphql;
 
+pub mod diagnostics; // Default-off, TTL-bounded Diesel/conductor diagnostic correlation
 pub mod happ_manager;
 pub mod hc_client;
 pub mod hc_client_registry;

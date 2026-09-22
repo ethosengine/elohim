@@ -53,6 +53,12 @@
 //! `--cfg getrandom_backend="custom"` regime, so `profile.proto` is encoded by
 //! [`profile_proto`] with prost. See that module's doc and the `pprof` entry in
 //! `Cargo.toml` for the full rationale.
+//!
+//! The encoded protobuf and gzip response are size-bounded before they reach
+//! HTTP. This does **not** bound memory retained by pprof's sampler/report while
+//! a capture is running; duration, frequency and singleflight are that work's
+//! bounds. The route has no application-level authorization and is suitable
+//! only on the existing trusted operational listener.
 
 pub mod profile_proto;
 
@@ -62,6 +68,7 @@ use std::time::Duration;
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{header, Response, StatusCode};
+use prost::Message as _;
 
 /// Env var that enables the pprof endpoint. Default OFF.
 pub const PPROF_ENABLE_ENV: &str = "ELOHIM_PPROF_ENABLED";
@@ -81,6 +88,12 @@ pub const MAX_SECONDS: u64 = 60;
 /// Sampling frequency in Hz. 100 Hz is the Go runtime's default CPU profile
 /// rate and what Pyroscope's Go-target dashboards assume.
 pub const SAMPLE_FREQUENCY_HZ: i32 = 100;
+
+/// Maximum uncompressed profile.proto body accepted from the report builder.
+pub const MAX_PROFILE_PROTO_BYTES: usize = 32 * 1024 * 1024;
+
+/// Maximum gzip-framed response body retained for the HTTP response.
+pub const MAX_GZIP_PROFILE_BYTES: usize = 8 * 1024 * 1024;
 
 /// Process-global "a profile is in flight" flag. `pprof`'s guard is
 /// process-wide; this converts an overlap into a 429 instead of a 500.
@@ -140,11 +153,44 @@ pub enum ProfileOutcome {
 
 /// RAII release for [`PPROF_BUSY`] so an early return or a panic inside the
 /// blocking task cannot wedge the flag ON for the life of the process.
-struct BusyGuard;
+struct BusyGuard {
+    claimed: bool,
+    #[cfg(test)]
+    released: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl BusyGuard {
+    fn new() -> Self {
+        Self {
+            claimed: false,
+            #[cfg(test)]
+            released: None,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_release_notice(released: tokio::sync::oneshot::Sender<()>) -> Self {
+        Self {
+            claimed: false,
+            released: Some(released),
+        }
+    }
+
+    fn arm(&mut self) {
+        self.claimed = true;
+    }
+}
 
 impl Drop for BusyGuard {
     fn drop(&mut self) {
+        if !self.claimed {
+            return;
+        }
         PPROF_BUSY.store(false, Ordering::SeqCst);
+        #[cfg(test)]
+        if let Some(released) = self.released.take() {
+            let _ = released.send(());
+        }
     }
 }
 
@@ -154,6 +200,13 @@ impl Drop for BusyGuard {
 /// and must never cross an `.await`, and a 15–60s sleep must never park a core
 /// tokio worker.
 pub async fn capture_profile(seconds: u64) -> ProfileOutcome {
+    capture_profile_with(seconds, build_profile_blocking, BusyGuard::new()).await
+}
+
+async fn capture_profile_with<F>(seconds: u64, producer: F, mut busy: BusyGuard) -> ProfileOutcome
+where
+    F: FnOnce(u64) -> Result<Vec<u8>, String> + Send + 'static,
+{
     // Claim the process-global profiler slot, or report Busy.
     if PPROF_BUSY
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -161,9 +214,18 @@ pub async fn capture_profile(seconds: u64) -> ProfileOutcome {
     {
         return ProfileOutcome::Busy;
     }
-    let _busy = BusyGuard;
+    busy.arm();
 
-    let joined = tokio::task::spawn_blocking(move || build_profile_blocking(seconds)).await;
+    // Clamp here as well as in the query parser: callers inside this crate may
+    // invoke capture_profile directly and must not bypass the work bound.
+    let seconds = seconds.clamp(MIN_SECONDS, MAX_SECONDS);
+    let joined = tokio::task::spawn_blocking(move || {
+        // The WORKER owns the singleflight lease. Dropping the async waiter
+        // detaches the JoinHandle but cannot release this guard early.
+        let _busy = busy;
+        producer(seconds)
+    })
+    .await;
 
     match joined {
         Ok(Ok(bytes)) => ProfileOutcome::Profile(bytes),
@@ -190,9 +252,21 @@ fn build_profile_blocking(seconds: u64) -> Result<Vec<u8>, String> {
         .build()
         .map_err(|e| format!("pprof report build failed: {e}"))?;
 
-    let raw = profile_proto::encode(&profile_proto::report_to_profile(&report));
+    let profile = profile_proto::report_to_profile(&report);
+    let raw = encode_profile_with_cap(&profile, MAX_PROFILE_PROTO_BYTES)?;
 
-    gzip(&raw).map_err(|e| format!("pprof gzip failed: {e}"))
+    gzip_with_cap(&raw, MAX_GZIP_PROFILE_BYTES).map_err(|e| format!("pprof gzip failed: {e}"))
+}
+
+fn encode_profile_with_cap(
+    profile: &profile_proto::Profile,
+    cap: usize,
+) -> Result<Vec<u8>, String> {
+    let encoded_len = profile.encoded_len();
+    if encoded_len > cap {
+        return Err(format!("pprof encoded profile exceeds {cap} byte limit"));
+    }
+    Ok(profile_proto::encode(profile))
 }
 
 /// gzip-frame the profile the way Go's `net/http/pprof` does.
@@ -200,12 +274,40 @@ fn build_profile_blocking(seconds: u64) -> Result<Vec<u8>, String> {
 /// `google/pprof` (and Pyroscope, which parses with it) sniffs the gzip magic
 /// and accepts raw protobuf too — but emitting the gzip frame keeps this
 /// endpoint byte-shaped like a Go target, which is the whole point.
+#[cfg(test)]
 fn gzip(raw: &[u8]) -> std::io::Result<Vec<u8>> {
+    gzip_with_cap(raw, MAX_GZIP_PROFILE_BYTES)
+}
+
+fn gzip_with_cap(raw: &[u8], cap: usize) -> std::io::Result<Vec<u8>> {
     use std::io::Write as _;
 
-    let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    struct CappedWriter {
+        bytes: Vec<u8>,
+        cap: usize,
+    }
+
+    impl std::io::Write for CappedWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            if buf.len() > self.cap.saturating_sub(self.bytes.len()) {
+                return Err(std::io::Error::other("gzip profile exceeds response limit"));
+            }
+            self.bytes.extend_from_slice(buf);
+            Ok(buf.len())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let writer = CappedWriter {
+        bytes: Vec::with_capacity(cap.min(64 * 1024)),
+        cap,
+    };
+    let mut encoder = flate2::write::GzEncoder::new(writer, flate2::Compression::default());
     encoder.write_all(raw)?;
-    encoder.finish()
+    Ok(encoder.finish()?.bytes)
 }
 
 /// Run a profile for `seconds` and shape the outcome into an HTTP response.
@@ -230,8 +332,8 @@ pub async fn profile_response(seconds: u64) -> Response<Full<Bytes>> {
         ProfileOutcome::Busy => Response::builder()
             .status(StatusCode::TOO_MANY_REQUESTS)
             // MAX_SECONDS, not the requested duration: the in-flight profile's
-            // remaining time is unknown, and MAX_SECONDS is the ceiling that
-            // guarantees it has finished by the time the scraper retries.
+            // remaining time is unknown. This is retry guidance, not a promise
+            // of completion: report construction and encoding follow sampling.
             .header(header::RETRY_AFTER, MAX_SECONDS.to_string())
             .header(header::CONTENT_TYPE, "text/plain; charset=utf-8")
             .body(Full::new(Bytes::from(
@@ -252,6 +354,9 @@ pub async fn profile_response(seconds: u64) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    static PROFILE_TEST_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
 
     #[test]
     fn disabled_by_default() {
@@ -304,6 +409,50 @@ mod tests {
         assert_eq!(&out[..2], &[0x1f, 0x8b], "expected gzip magic bytes");
     }
 
+    #[test]
+    fn encoded_profile_and_gzip_output_are_capped() {
+        let mut profile = profile_proto::Profile::default();
+        profile.string_table.push("x".repeat(256));
+        let error = encode_profile_with_cap(&profile, 8).expect_err("profile must exceed cap");
+        assert!(error.contains("exceeds 8 byte limit"));
+
+        // A deliberately tiny gzip cap proves the writer refuses growth while
+        // encoding, instead of allocating the whole response and checking late.
+        let error = gzip_with_cap(&[0_u8; 1024], 4).expect_err("gzip must exceed cap");
+        assert_eq!(error.kind(), std::io::ErrorKind::Other);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn cancelled_waiter_does_not_release_worker_singleflight_and_seconds_are_clamped() {
+        let _serial = PROFILE_TEST_LOCK.lock().await;
+        let (started_tx, started_rx) = std::sync::mpsc::sync_channel(1);
+        let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
+        let (released_tx, released_rx) = tokio::sync::oneshot::channel();
+
+        let waiter = tokio::spawn(capture_profile_with(
+            0,
+            move |seconds| {
+                started_tx.send(seconds).unwrap();
+                release_rx.recv().unwrap();
+                Ok(vec![1, 2, 3])
+            },
+            BusyGuard::with_release_notice(released_tx),
+        ));
+
+        assert_eq!(started_rx.recv().unwrap(), MIN_SECONDS);
+        waiter.abort();
+        assert!(PPROF_BUSY.load(Ordering::SeqCst));
+
+        let overlap =
+            capture_profile_with(MAX_SECONDS + 1, |_| Ok(Vec::new()), BusyGuard::new()).await;
+        assert!(matches!(overlap, ProfileOutcome::Busy));
+        assert!(PPROF_BUSY.load(Ordering::SeqCst));
+
+        release_tx.send(()).unwrap();
+        released_rx.await.expect("worker released busy guard");
+        assert!(!PPROF_BUSY.load(Ordering::SeqCst));
+    }
+
     /// A real 1-second profile: proves the guard builds, the report encodes,
     /// and the body is a gzip-framed protobuf the scraper can parse — and that
     /// [`PPROF_BUSY`] is released afterwards so a scraper's next interval is
@@ -315,6 +464,7 @@ mod tests {
     /// The `pprof` guard itself is process-wide for the same reason.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn captures_a_gzip_framed_profile_and_releases_the_guard() {
+        let _serial = PROFILE_TEST_LOCK.lock().await;
         // Give the sampler Rust work for the ENTIRE capture. The former loop
         // called `Instant::now()` on every arithmetic operation, so clock checks
         // could dominate in the explicitly-blocklisted vDSO; its fixed lifetime

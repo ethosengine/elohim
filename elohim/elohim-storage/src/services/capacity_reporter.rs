@@ -62,6 +62,7 @@ use tokio::sync::broadcast;
 use tokio::time::{interval, MissedTickBehavior};
 
 use crate::db::DbPool;
+use crate::diagnostics::{with_operation, Operation, StatementSite};
 use crate::error::StorageError;
 use crate::hc_client::HcClient;
 use crate::identity_namespace::resolve_agent_cid_write;
@@ -308,7 +309,11 @@ pub async fn run_report_once(
         .get()
         .map_err(|e| StorageError::Internal(format!("capacity_reporter: pool: {e}")))?;
 
-    let custodian_id = resolve_custodian_id(&mut conn, self_cell_key);
+    let custodian_id = with_operation(
+        Operation::CapacityReport,
+        StatementSite::CapacityResolveCustodian,
+        || resolve_custodian_id(&mut conn, self_cell_key),
+    );
 
     let path_for_probe = blob_path.to_path_buf();
     let (used_bytes, total_bytes, free_bytes) = tokio::task::spawn_blocking(move || {
@@ -320,12 +325,18 @@ pub async fn run_report_once(
     .await
     .unwrap_or((0, 0, 0)); // blocking-task join error — degrade to zeros, non-fatal
 
-    let measurement = measure_capacity(
-        &mut conn,
-        used_bytes,
-        free_bytes,
-        total_bytes,
-        custodian_id.as_deref(),
+    let measurement = with_operation(
+        Operation::CapacityReport,
+        StatementSite::CapacityMeasure,
+        || {
+            measure_capacity(
+                &mut conn,
+                used_bytes,
+                free_bytes,
+                total_bytes,
+                custodian_id.as_deref(),
+            )
+        },
     );
 
     // Gauges are LOCAL truth — set every tick regardless of identity
@@ -339,7 +350,11 @@ pub async fn run_report_once(
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
             let upsert = build_upsert_row(id, h_app_id, &measurement, now_ms);
-            crate::db::custodian_metrics::upsert_metrics(&mut conn, upsert)?;
+            with_operation(
+                Operation::CapacityReport,
+                StatementSite::CapacityUpsert,
+                || crate::db::custodian_metrics::upsert_metrics(&mut conn, upsert),
+            )?;
             Ok(CapacityReportOutcome {
                 measurement,
                 upserted: true,

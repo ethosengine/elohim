@@ -2576,6 +2576,7 @@ dependencies = [
  "hex",
  "holochain_client",
  "holochain_types",
+ "holochain_websocket",
  "hostname",
  "http-body-util",
  "hyper 1.8.1",

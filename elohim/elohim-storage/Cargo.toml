@@ -136,6 +136,9 @@ rmpv = "1.3"
 # list_apps/install_app/enable_app response). Guard: tests/happ_manifest_relay_url_compat.rs.
 holochain_client = { version = "=0.9.0", default-features = false, features = ["lair_signing"] }
 holochain_types = { version = "=0.7.0", default-features = false }
+# Direct only so hc_client can preserve the typed websocket-timeout variant
+# before ConductorApiError is mapped into StorageError telemetry.
+holochain_websocket = "=0.7.0"
 # Direct use is limited to Bundle::new in happ_manager's coordinator hot-swap;
 # version must stay in the range holochain_types resolves (one shared crate).
 mr_bundle = { version = "=0.7.0", default-features = false }

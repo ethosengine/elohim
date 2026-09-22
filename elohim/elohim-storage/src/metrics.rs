@@ -16,7 +16,7 @@
 
 use lazy_static::lazy_static;
 use prometheus::{
-    Encoder, GaugeVec, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
+    Encoder, Gauge, GaugeVec, HistogramOpts, HistogramVec, IntCounter, IntCounterVec, IntGauge,
     IntGaugeVec, Opts, Registry, TextEncoder,
 };
 use std::sync::Once;
@@ -24,6 +24,23 @@ use std::sync::Once;
 lazy_static! {
     /// The single process-wide registry the `/metrics` endpoint exposes.
     pub static ref REGISTRY: Registry = Registry::new();
+
+    /// Stable process-instance identity for before/after scrape validation.
+    /// Initialized once when the metrics subsystem starts and never reset.
+    pub static ref PROCESS_START_TIME_SECONDS: Gauge = {
+        let metric = Gauge::new(
+            "process_start_time_seconds",
+            "Unix time when this process initialized its metrics subsystem.",
+        )
+        .unwrap();
+        metric.set(
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs_f64(),
+        );
+        metric
+    };
 
     // ── Memory attribution (P1: the leak-vs-cache verdict + per-process split) ──
 
@@ -2311,6 +2328,61 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Completed conductor attempts only. A locally dropped await is censored,
+    /// not a completion, and is counted separately below.
+    pub static ref CONDUCTOR_CALL_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_conductor_call_duration_ms",
+            "Completed conductor call duration in milliseconds, by bounded source-controlled method and outcome.",
+        )
+        .buckets(vec![
+            1.0, 5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 2_000.0, 5_000.0,
+            15_000.0, 30_000.0,
+        ]),
+        &["zome", "fn", "class", "outcome"],
+    )
+    .unwrap();
+
+    /// Calls whose local await was dropped after dispatch. The conductor may
+    /// still be executing them, so this is not an error or duration outcome.
+    pub static ref CONDUCTOR_CALL_DROPPED: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_call_dropped_total",
+            "Locally dropped conductor-call awaits after dispatch; remote execution may continue.",
+        ),
+        &["zome", "fn", "class"],
+    )
+    .unwrap();
+
+    /// Transport deadlines completed by the conductor websocket client. This
+    /// deliberately excludes outer caller budgets (notably view federation):
+    /// dropping an outer await censors the transport attempt and does not prove
+    /// that the websocket itself timed out.
+    pub static ref CONDUCTOR_CALL_TIMEOUTS: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_conductor_call_timeouts_total",
+            "Completed conductor transport timeouts, by bounded source-controlled method, admission class and timeout source.",
+        ),
+        &["zome", "fn", "class", "source"],
+    )
+    .unwrap();
+
+    /// Completed Diesel queries observed during a bounded diagnostics window.
+    /// Both label vocabularies are closed enums in `diagnostics`; no SQL text,
+    /// bind value, correlation id or error string reaches Prometheus.
+    pub static ref DB_DIAGNOSTIC_QUERY_DURATION_MS: HistogramVec = HistogramVec::new(
+        HistogramOpts::new(
+            "elohim_db_diagnostic_query_duration_ms",
+            "Completed Diesel query duration during bounded diagnostics, by explicit operation, source call-site and outcome.",
+        )
+        .buckets(vec![
+            0.1, 0.5, 1.0, 5.0, 25.0, 100.0, 250.0, 500.0, 1_000.0, 5_000.0,
+            15_000.0, 30_000.0,
+        ]),
+        &["operation", "statement_site", "outcome"],
+    )
+    .unwrap();
+
     pub static ref CONDUCTOR_ADMISSION_SHED: IntCounterVec = IntCounterVec::new(
         Opts::new(
             "elohim_conductor_admission_shed_total",
@@ -2520,6 +2592,7 @@ pub fn register_all() {
     REGISTERED.call_once(|| {
         // register() errors only on duplicate/invalid collectors; the Once guard
         // already prevents duplicates, so a stray Err is non-fatal.
+        let _ = REGISTRY.register(Box::new(PROCESS_START_TIME_SECONDS.clone()));
         let _ = REGISTRY.register(Box::new(NODE_PROC_RSS_BYTES.clone()));
         let _ = REGISTRY.register(Box::new(NODE_PROC_THREADS.clone()));
         let _ = REGISTRY.register(Box::new(NODE_CGROUP_MEM_BYTES.clone()));
@@ -3012,6 +3085,10 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DURATION_MS.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DROPPED.clone()));
+        let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_TIMEOUTS.clone()));
+        let _ = REGISTRY.register(Box::new(DB_DIAGNOSTIC_QUERY_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_SERIALIZED_WAIT_MS.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_RETRIED.clone()));
         let _ = REGISTRY.register(Box::new(CHAIN_WRITE_HEAD_MOVED_EXHAUSTED.clone()));
@@ -3283,6 +3360,92 @@ pub fn inc_conductor_call(zome: &str, fn_name: &str, class: &str) {
     CONDUCTOR_CALLS
         .with_label_values(&[zome, fn_name, class])
         .inc();
+}
+
+/// Observe one actually completed Diesel query during a bounded diagnostic
+/// window. The instrumentation caller supplies closed source-controlled labels.
+pub(crate) fn observe_db_diagnostic_query(
+    operation: crate::diagnostics::Operation,
+    statement_site: crate::diagnostics::StatementSite,
+    failed: bool,
+    elapsed_ms: f64,
+) {
+    DB_DIAGNOSTIC_QUERY_DURATION_MS
+        .with_label_values(&[
+            operation.label(),
+            statement_site.label(),
+            if failed { "error" } else { "success" },
+        ])
+        .observe(elapsed_ms);
+}
+
+/// One dispatched conductor attempt. `finish` records a completed response;
+/// dropping this guard records only local abandonment because the conductor's
+/// in-wasm body cannot be cancelled by dropping the client future.
+pub struct ConductorCallMetricsGuard<'a> {
+    started: std::time::Instant,
+    zome: &'a str,
+    fn_name: &'a str,
+    class: &'static str,
+    completed: bool,
+}
+
+impl<'a> ConductorCallMetricsGuard<'a> {
+    pub fn start(zome: &'a str, fn_name: &'a str, class: &'static str) -> Self {
+        // Materialise capability at every admitted method even when its count
+        // remains zero; an absent series must not masquerade as no timeouts.
+        CONDUCTOR_CALL_TIMEOUTS
+            .with_label_values(&[zome, fn_name, class, "websocket"])
+            .inc_by(0);
+        // Outcomes are a bounded success|error vocabulary. Touch both series
+        // without observing: a zero completion remains distinguishable from
+        // an endpoint whose outcome metrics were never initialized.
+        for outcome in ["success", "error"] {
+            CONDUCTOR_CALL_DURATION_MS.with_label_values(&[zome, fn_name, class, outcome]);
+        }
+        // Likewise, an admitted call that has not been abandoned yet has a
+        // measured zero dropped count; this does not manufacture a drop.
+        CONDUCTOR_CALL_DROPPED
+            .with_label_values(&[zome, fn_name, class])
+            .inc_by(0);
+        Self {
+            started: std::time::Instant::now(),
+            zome,
+            fn_name,
+            class,
+            completed: false,
+        }
+    }
+
+    pub fn finish(mut self, success: bool) {
+        CONDUCTOR_CALL_DURATION_MS
+            .with_label_values(&[
+                self.zome,
+                self.fn_name,
+                self.class,
+                if success { "success" } else { "error" },
+            ])
+            .observe(self.started.elapsed().as_secs_f64() * 1_000.0);
+        self.completed = true;
+    }
+}
+
+/// Count one typed websocket timeout. Call only while the original
+/// `ConductorApiError` is still available, before mapping it to `StorageError`.
+pub fn inc_conductor_call_timeout(zome: &str, fn_name: &str, class: &str) {
+    CONDUCTOR_CALL_TIMEOUTS
+        .with_label_values(&[zome, fn_name, class, "websocket"])
+        .inc();
+}
+
+impl Drop for ConductorCallMetricsGuard<'_> {
+    fn drop(&mut self) {
+        if !self.completed {
+            CONDUCTOR_CALL_DROPPED
+                .with_label_values(&[self.zome, self.fn_name, self.class])
+                .inc();
+        }
+    }
 }
 
 /// Count one call shed at the gate. NOT a conductor failure — nothing was
@@ -6402,5 +6565,233 @@ mod tests {
             m.is_some(),
             "(\"broken\", \"invalid-zip\") label pair present"
         );
+    }
+
+    #[test]
+    fn process_start_identity_is_registered_once_and_stable() {
+        register_all();
+        let first = PROCESS_START_TIME_SECONDS.get();
+        register_all();
+        assert!(first > 0.0);
+        assert_eq!(PROCESS_START_TIME_SECONDS.get(), first);
+        assert!(gather_text().contains("process_start_time_seconds"));
+    }
+
+    #[test]
+    fn conductor_call_completion_records_exactly_one_outcome() {
+        let success = CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "test_zome",
+            "test_fn",
+            "interactive",
+            "success",
+        ]);
+        let error = CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "test_zome",
+            "test_fn",
+            "interactive",
+            "error",
+        ]);
+        let success_before = success.get_sample_count();
+        let error_before = error.get_sample_count();
+        let dropped =
+            CONDUCTOR_CALL_DROPPED.with_label_values(&["test_zome", "test_fn", "interactive"]);
+        let dropped_before = dropped.get();
+
+        ConductorCallMetricsGuard::start("test_zome", "test_fn", "interactive").finish(true);
+        ConductorCallMetricsGuard::start("test_zome", "test_fn", "interactive").finish(false);
+
+        assert_eq!(success.get_sample_count(), success_before + 1);
+        assert_eq!(error.get_sample_count(), error_before + 1);
+        assert_eq!(dropped.get(), dropped_before);
+    }
+
+    #[test]
+    fn conductor_call_start_materializes_zero_outcomes_drop_and_timeout_series() {
+        register_all();
+        let guard = ConductorCallMetricsGuard::start(
+            "zero_outcome_zome",
+            "zero_outcome_fn",
+            "zero_outcome_class",
+        );
+
+        let has_labels = |metric: &prometheus::proto::Metric, expected: &[(&str, &str)]| {
+            expected.iter().all(|(name, value)| {
+                metric
+                    .get_label()
+                    .iter()
+                    .any(|label| label.name() == *name && label.value() == *value)
+            })
+        };
+        let histogram_family = REGISTRY
+            .gather()
+            .into_iter()
+            .find(|family| family.name() == "elohim_conductor_call_duration_ms")
+            .expect("duration histogram registered");
+        for outcome in ["success", "error"] {
+            let series = histogram_family
+                .get_metric()
+                .iter()
+                .find(|metric| {
+                    has_labels(
+                        metric,
+                        &[
+                            ("zome", "zero_outcome_zome"),
+                            ("fn", "zero_outcome_fn"),
+                            ("class", "zero_outcome_class"),
+                            ("outcome", outcome),
+                        ],
+                    )
+                })
+                .expect("guard start materializes each exact zero-valued outcome series");
+            let histogram = series.get_histogram();
+            assert_eq!(histogram.get_sample_count(), 0);
+            assert_eq!(histogram.get_sample_sum(), 0.0);
+            assert!(
+                histogram
+                    .get_bucket()
+                    .iter()
+                    .all(|bucket| bucket.get_cumulative_count() == 0),
+                "start must not synthesize a histogram observation"
+            );
+        }
+
+        let dropped_family = REGISTRY
+            .gather()
+            .into_iter()
+            .find(|family| family.name() == "elohim_conductor_call_dropped_total")
+            .expect("dropped counter registered");
+        let dropped = dropped_family
+            .get_metric()
+            .iter()
+            .find(|metric| {
+                has_labels(
+                    metric,
+                    &[
+                        ("zome", "zero_outcome_zome"),
+                        ("fn", "zero_outcome_fn"),
+                        ("class", "zero_outcome_class"),
+                    ],
+                )
+            })
+            .expect("guard start materializes the exact zero-valued dropped series");
+        assert_eq!(dropped.get_counter().value(), 0.0);
+
+        let timeout_family = REGISTRY
+            .gather()
+            .into_iter()
+            .find(|family| family.name() == "elohim_conductor_call_timeouts_total")
+            .expect("timeout counter registered");
+        let timeout = timeout_family
+            .get_metric()
+            .iter()
+            .find(|metric| {
+                has_labels(
+                    metric,
+                    &[
+                        ("zome", "zero_outcome_zome"),
+                        ("fn", "zero_outcome_fn"),
+                        ("class", "zero_outcome_class"),
+                        ("source", "websocket"),
+                    ],
+                )
+            })
+            .expect("guard start materializes the exact zero-valued timeout series");
+        assert_eq!(timeout.get_counter().value(), 0.0);
+
+        drop(guard);
+    }
+
+    #[test]
+    fn typed_websocket_timeout_increments_exact_series_once() {
+        register_all();
+        let timeouts = CONDUCTOR_CALL_TIMEOUTS.with_label_values(&[
+            "timeout_zome",
+            "timeout_fn",
+            "background",
+            "websocket",
+        ]);
+        let before = timeouts.get();
+
+        inc_conductor_call_timeout("timeout_zome", "timeout_fn", "background");
+
+        assert_eq!(timeouts.get(), before + 1);
+        let text = gather_text();
+        assert!(text.lines().any(|line| {
+            line.starts_with("elohim_conductor_call_timeouts_total{")
+                && line.contains("class=\"background\"")
+                && line.contains("fn=\"timeout_fn\"")
+                && line.contains("source=\"websocket\"")
+                && line.contains("zome=\"timeout_zome\"")
+        }));
+    }
+
+    #[test]
+    fn db_diagnostic_query_uses_only_bounded_attribution_labels() {
+        let histogram = DB_DIAGNOSTIC_QUERY_DURATION_MS.with_label_values(&[
+            "capacity_report",
+            "capacity_upsert",
+            "success",
+        ]);
+        let before = histogram.get_sample_count();
+        observe_db_diagnostic_query(
+            crate::diagnostics::Operation::CapacityReport,
+            crate::diagnostics::StatementSite::CapacityUpsert,
+            false,
+            1.25,
+        );
+        assert_eq!(histogram.get_sample_count(), before + 1);
+
+        let unattributed = DB_DIAGNOSTIC_QUERY_DURATION_MS.with_label_values(&[
+            "unattributed",
+            "unattributed",
+            "error",
+        ]);
+        let before = unattributed.get_sample_count();
+        observe_db_diagnostic_query(
+            crate::diagnostics::Operation::Unattributed,
+            crate::diagnostics::StatementSite::Unattributed,
+            true,
+            2.5,
+        );
+        assert_eq!(unattributed.get_sample_count(), before + 1);
+    }
+
+    #[test]
+    fn dropped_conductor_call_is_censored_not_completed() {
+        let duration = CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "drop_zome",
+            "drop_fn",
+            "background",
+            "error",
+        ]);
+        let success = CONDUCTOR_CALL_DURATION_MS.with_label_values(&[
+            "drop_zome",
+            "drop_fn",
+            "background",
+            "success",
+        ]);
+        let dropped =
+            CONDUCTOR_CALL_DROPPED.with_label_values(&["drop_zome", "drop_fn", "background"]);
+        let duration_before = duration.get_sample_count();
+        let success_before = success.get_sample_count();
+        let dropped_before = dropped.get();
+        let timeouts = CONDUCTOR_CALL_TIMEOUTS.with_label_values(&[
+            "drop_zome",
+            "drop_fn",
+            "background",
+            "websocket",
+        ]);
+        let timeouts_before = timeouts.get();
+
+        drop(ConductorCallMetricsGuard::start(
+            "drop_zome",
+            "drop_fn",
+            "background",
+        ));
+
+        assert_eq!(duration.get_sample_count(), duration_before);
+        assert_eq!(success.get_sample_count(), success_before);
+        assert_eq!(dropped.get(), dropped_before + 1);
+        assert_eq!(timeouts.get(), timeouts_before);
     }
 }
