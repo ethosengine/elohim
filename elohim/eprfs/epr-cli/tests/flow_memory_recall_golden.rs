@@ -31,7 +31,40 @@ fn run_text(root: &Path, args: &[&str]) -> String {
         .expect("epr runs");
     let raw = String::from_utf8(out.stdout).expect("utf8");
     let text = raw.replace(&*root.to_string_lossy(), "<FIXTURE_ROOT>");
-    redact_elapsed_seconds(&text)
+    redact_accounting_elapsed(&redact_elapsed_seconds(&text))
+}
+
+/// Replaces the rounded wall-clock segment of the `Accounting:` line (`… native bytes · 0.1s ·
+/// …`) with the same placeholder: it is the same measured duration as `elapsed_seconds`, rounded
+/// to a tenth, and a loaded machine turns `0.0s` into `0.1s` without the rendering changing.
+fn redact_accounting_elapsed(text: &str) -> String {
+    let is_seconds = |segment: &str| {
+        segment
+            .strip_suffix('s')
+            .is_some_and(|n| !n.is_empty() && n.parse::<f64>().is_ok())
+    };
+    text.split_inclusive('\n')
+        .map(|line| {
+            if !line.starts_with("Accounting:") {
+                return line.to_string();
+            }
+            let (body, newline) = match line.strip_suffix('\n') {
+                Some(body) => (body, "\n"),
+                None => (line, ""),
+            };
+            let segments: Vec<String> = body
+                .split(" · ")
+                .map(|segment| {
+                    if is_seconds(segment) {
+                        "<FIXTURE_ELAPSED>s".to_string()
+                    } else {
+                        segment.to_string()
+                    }
+                })
+                .collect();
+            segments.join(" · ") + newline
+        })
+        .collect()
 }
 
 /// Replaces the numeric value following every `elapsed_seconds ` occurrence with a fixed
@@ -64,8 +97,8 @@ fn digest(s: &str) -> String {
 // `recipe` CID (`Contract::method_cid()` over the WHOLE contract's bytes), so any contract edit
 // moves GOLDEN_FOCUSED and GOLDEN_WHOLE. GOLDEN_REFUSAL has never moved: a refusal never reaches
 // `render()`'s orientation/lens/floor preamble, so it never prints a `recipe` line.
-const GOLDEN_FOCUSED: &str = "81344107558c58984525793719b2fe5a74afc2ab1fbe36db207af92dabd889fd";
-const GOLDEN_WHOLE: &str = "aab7b527a05be529fee2ffd0948e6f8dd0d5f07c9bb839adc5a4eb1a4bd62c29";
+const GOLDEN_FOCUSED: &str = "784cb3473ab005cb21585c0b76cdd3afb178060f687bca0fb904f0e0c617e130";
+const GOLDEN_WHOLE: &str = "cc285a5423a094a1c22310d2adeec54f6d66f1df5b3fcaedf91a15d5a8028928";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

@@ -273,6 +273,19 @@ fn word_start_matches(text: &str, needle: &str) -> usize {
         .count()
 }
 
+/// The `best_section` every candidate carries — `{title, lines, hits, window_complete}` — built
+/// from one outline section (a heading, or a density window rendered as one). The one builder the
+/// first screen, the authority set and the semantic route share, so a linked `read` lands the same
+/// way whichever route named the candidate.
+pub(super) fn section_link(section: &Value) -> Value {
+    json!({
+        "title": section["title"],
+        "lines": section["read_lines"],
+        "hits": section["hits"],
+        "window_complete": section["window_complete"],
+    })
+}
+
 /// The section of `path` whose text carries most of the question's terms, if any does.
 pub(super) fn best_section(
     args: &Args,

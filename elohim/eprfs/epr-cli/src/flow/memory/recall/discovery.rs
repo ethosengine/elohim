@@ -7,7 +7,7 @@
 //! can wrap the traversal in the `Provider` trait without the two seams sharing one 3,700-line
 //! file. Behaviour is unchanged — only the location moved, plus two visibility widenings
 //! (`first_screen`, `outline`) so `mod.rs`'s `execute()` can still reach them.
-use super::passage::best_section;
+use super::passage::{best_section, section_link};
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -996,12 +996,7 @@ pub(super) fn first_screen(
             };
             if let Some(section) = best_section(args, contract, &path, &terms) {
                 add_usage(usage, &section["usage"]);
-                candidate["best_section"] = json!({
-                    "title": section["title"],
-                    "lines": section["read_lines"],
-                    "hits": section["hits"],
-                    "window_complete": section["window_complete"],
-                });
+                candidate["best_section"] = section_link(&section);
             }
         }
         // Proximity: a candidate whose ONE passage carries more of the question's distinct terms
@@ -1183,12 +1178,7 @@ fn root_authority_screen(
                 "path": path,
                 "title": title,
                 "term_hits": section["hit_total"],
-                "best_section": {
-                    "title": section["title"],
-                    "lines": section["read_lines"],
-                    "hits": section["hits"],
-                    "window_complete": section["window_complete"],
-                },
+                "best_section": section_link(&section),
             }));
         }
     }

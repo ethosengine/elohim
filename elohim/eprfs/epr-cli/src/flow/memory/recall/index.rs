@@ -364,7 +364,7 @@ impl Store {
         declared: &Declared,
         read_only: bool,
     ) -> Result<Option<Self>, String> {
-        let Some(store) = Self::open_readable(path, read_only)? else {
+        let Some(store) = Self::open_readable(path, read_only, true)? else {
             return Ok(None);
         };
         let meta = store
@@ -379,8 +379,11 @@ impl Store {
         Ok(Some(store))
     }
 
-    /// A store file that opens and passes its integrity check — whatever it was built under.
-    fn open_readable(path: &Path, read_only: bool) -> Result<Option<Self>, String> {
+    /// A store file that opens — and, when `check` (the fold and `status`), passes its integrity
+    /// check — whatever it was built under. The query path skips the check: integrity is the
+    /// fold's job (it rebuilds a store that fails it), and a corrupt store a query touches still
+    /// surfaces as the SQLite error of the read that meets it.
+    fn open_readable(path: &Path, read_only: bool, check: bool) -> Result<Option<Self>, String> {
         if !path.is_file() {
             return Ok(None);
         }
@@ -393,12 +396,14 @@ impl Store {
         let conn = Connection::open_with_flags(path, flags).map_err(unreadable)?;
         conn.busy_timeout(BUSY_TIMEOUT).map_err(unreadable)?;
         let store = Self { conn };
-        let check: String = store
-            .conn
-            .query_row("PRAGMA quick_check", [], |row| row.get(0))
-            .map_err(unreadable)?;
-        if check != "ok" {
-            return Err(format!("store fails its integrity check: {check}"));
+        if check {
+            let verdict: String = store
+                .conn
+                .query_row("PRAGMA quick_check", [], |row| row.get(0))
+                .map_err(unreadable)?;
+            if verdict != "ok" {
+                return Err(format!("store fails its integrity check: {verdict}"));
+            }
         }
         Ok(Some(store))
     }
@@ -1057,7 +1062,7 @@ impl SemanticFold {
     /// waited on for the busy timeout, never raced).
     pub(super) fn open(&self, root: &Path) -> Result<FoldReader, Absent> {
         let path = store_dir(root, &self.measure(), self.choice).join(STORE_FILE);
-        let store = match Store::open_readable(&path, true) {
+        let store = match Store::open_readable(&path, true, false) {
             Ok(Some(store)) => store,
             Ok(None) => return Err(Absent::NoFold),
             Err(why) => return Err(Absent::Unreadable(why)),

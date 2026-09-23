@@ -44,9 +44,28 @@ pub(super) type ProviderId = String;
 #[allow(dead_code)]
 pub(super) struct ProviderResult {
     pub ranked: Vec<Value>,
+    /// True only when the provider actually ranked under a known method. A provider that could
+    /// not answer (no fold, no executable, an unavailable embedder) says `false` and names why in
+    /// `unresolved` — an absent route is never a known empty ranking.
     pub ranking_known: bool,
     pub method: Option<String>,
     pub usage: Value,
+    /// Why the provider could not answer, one line each; empty when it answered.
+    pub unresolved: Vec<String>,
+    /// What an answer that did come back left out (a stale fold's `fold N files behind`, a
+    /// budget-cut traversal, skipped candidates).
+    pub omissions: Vec<String>,
+}
+
+/// A view's list of message lines (`unresolved`, `omissions`) as strings; absent is empty.
+pub(super) fn lines(value: &Value) -> Vec<String> {
+    value
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(str::to_string)
+        .collect()
 }
 
 /// A source of candidates the pinned recipe may declare under `ceremony.providers`. `id` names it
@@ -129,6 +148,8 @@ impl Provider for LocalLexical {
             ranking_known: true,
             method: Some(contract.method_cid()),
             usage: found["usage"].clone(),
+            unresolved: lines(&found["unresolved"]),
+            omissions: lines(&found["omissions"]),
         })
     }
 }
@@ -308,6 +329,8 @@ impl Provider for MemPalace {
             ranking_known: false,
             method: None,
             usage: result["usage"].clone(),
+            unresolved: lines(&result["unresolved"]),
+            omissions: Vec::new(),
         })
     }
 }
@@ -370,6 +393,7 @@ mod tests {
         assert!(out.ranking_known);
         assert_eq!(out.method.as_deref(), Some(contract.method_cid().as_str()));
         assert_eq!(out.ranked.len(), 1);
+        assert!(out.unresolved.is_empty(), "{:?}", out.unresolved);
     }
 
     #[test]
@@ -407,5 +431,9 @@ mod tests {
             .unwrap();
         assert!(!out.ranking_known);
         assert!(out.ranked.is_empty());
+        assert!(
+            !out.unresolved.is_empty(),
+            "an absent executable is named on the seam, never a silent empty"
+        );
     }
 }

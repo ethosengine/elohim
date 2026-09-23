@@ -1499,6 +1499,25 @@ pub(super) fn execute(
             for message in result["unresolved"].as_array().cloned().unwrap_or_default() {
                 push_unresolved(&mut view, message.as_str().unwrap_or_default().to_string());
             }
+            // A located candidate is a linked choice, exactly as on the first screen: the read
+            // lands on the passage its route located, never on the file head.
+            for candidate in result["candidates"].as_array().cloned().unwrap_or_default() {
+                if let (Some(path), Some(lines), Some(title)) = (
+                    candidate["path"].as_str(),
+                    candidate["best_section"]["lines"].as_str(),
+                    candidate["best_section"]["title"].as_str(),
+                ) {
+                    push_action(
+                        &mut view,
+                        action(
+                            args,
+                            &format!("Read {path} — {title} ({lines})"),
+                            "read",
+                            &[("path", json!(path)), ("lines", json!(lines))],
+                        ),
+                    );
+                }
+            }
             view["retrieval"] = result;
         }
         "prepare" => {

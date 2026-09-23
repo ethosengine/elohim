@@ -11,8 +11,9 @@
 //! 2. the cosine of it against every live (non-demoted) chunk vector in the store, each file
 //!    keeping its best chunk ([`BestPerFile`]); cosine only — no standing, no behaviour signal;
 //! 3. the top `limits.search_results` files inside the search scope and the declared source
-//!    roots, ties broken by path; the lens's `choice_count` cuts at render, as it does for the
-//!    local route;
+//!    roots, ties broken by path — `search`'s window is `search_results` for every route (parity
+//!    with the local route); the lens's `choice_count` cut belongs to the first screen, not to a
+//!    search;
 //! 4. each candidate prints `producer`, the measure CID as `method`, the `model`, the fold's lag at
 //!    answer time and a `best_section` in the first screen's shape, so its linked `read` lands on
 //!    the passage.
@@ -23,13 +24,16 @@
 //! to the scan counters exactly as the first screen's is.
 //!
 //! Absence is honest, never an error: no fold, an embedder that cannot run, or a store built under
-//! another method each answer with ONE `unresolved` line and no candidates. A stale fold answers
+//! another method each answer with ONE `unresolved` line, no candidates and `ranking_known:
+//! false` — through `retrieve()` and through the `Provider` seam alike, so a caller fusing routes
+//! sees an absent route, never a known empty ranking. A stale fold answers
 //! and says how stale (`fold N files behind`). The private chain never reaches this file: the
 //! fold excluded it, and this route reads nothing but the store and the outline of a candidate.
 use super::discovery::question_terms;
 use super::embedder::{EmbedBudget, FIXTURE_FITNESS};
 use super::index::{Absent, EmbedderChoice, FoldReader, SemanticFold};
-use super::passage::outline_at;
+use super::passage::{outline_at, section_link};
+use super::providers::lines;
 use super::providers::{Provider, ProviderId, ProviderResult};
 use super::*;
 
@@ -215,12 +219,7 @@ fn locate(
         }
     };
     if let Some(heading) = heading {
-        return Some(json!({
-            "title": heading["title"],
-            "lines": heading["read_lines"],
-            "hits": heading["hits"],
-            "window_complete": heading["window_complete"],
-        }));
+        return Some(section_link(heading));
     }
     let lines = match window_lines(section) {
         Some(lines) => lines,
@@ -230,12 +229,12 @@ fn locate(
             format!("{start}:{end}")
         }
     };
-    Some(json!({
+    Some(section_link(&json!({
         "title": section,
-        "lines": lines,
+        "read_lines": lines,
         "hits": {},
         "window_complete": true,
-    }))
+    })))
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -284,6 +283,8 @@ pub(super) fn search(
         "usage": {"search_queries": 1, "semantic_chunks_scanned": 0, "provider_seconds": 0},
     });
     if let Err(line) = answer_into(&mut answer, root, contract, declaration, query, scope) {
+        // It could not rank: an absent route, never a known empty ranking.
+        answer["ranking_known"] = json!(false);
         answer["candidates"] = json!([]);
         answer["unresolved"] = json!([line]);
     }
@@ -300,23 +301,29 @@ fn answer_into(
     scope: &str,
 ) -> Result<(), String> {
     let choice = match declaration.get("embedder").and_then(Value::as_str) {
-        None | Some("pinned") => EmbedderChoice::Pinned,
-        Some("fixture") => EmbedderChoice::Fixture,
-        Some(other) => {
-            return Err(format!(
-                "semantic: the recipe declares embedder `{other}`; the set is pinned|fixture"
-            ))
-        }
+        None | Some("pinned") => Ok(EmbedderChoice::Pinned),
+        Some("fixture") => Ok(EmbedderChoice::Fixture),
+        Some(other) => Err(format!(
+            "semantic: the recipe declares embedder `{other}`; the set is pinned|fixture"
+        )),
     };
-    answer["embedder"] = json!(choice.name());
     let rel = declaration
         .get("measure")
         .and_then(Value::as_str)
         .ok_or("semantic: the recipe declares no measure")?;
-    let fold = SemanticFold::declare(root, contract.clone(), rel, choice)
-        .map_err(|error| format!("semantic: the declared measure does not load: {error}"))?;
+    // The measure loads first, so its CID is printed wherever it loaded — an embedder the recipe
+    // spells wrongly still answers under a named method.
+    let fold = SemanticFold::declare(
+        root,
+        contract.clone(),
+        rel,
+        choice.as_ref().copied().unwrap_or_default(),
+    )
+    .map_err(|error| format!("semantic: the declared measure does not load: {error}"))?;
     let method = fold.measure();
     answer["method"] = json!(method);
+    let choice = choice?;
+    answer["embedder"] = json!(choice.name());
     let model = match choice {
         EmbedderChoice::Pinned => json!(fold.model()),
         EmbedderChoice::Fixture => {
@@ -330,9 +337,14 @@ fn answer_into(
         return Err("semantic: no question text to embed; name --query or --need".into());
     }
 
-    // The question, embedded once, by the embedder whose store this is.
+    // The embedder whose store this is — proven by its label BEFORE it runs, so a store folded by
+    // another procedure never spawns one.
     let budget = EmbedBudget::query(contract).map_err(unavailable)?;
     let (embedder, label) = fold.embedder(root).map_err(unavailable)?;
+    if reader.built_by() != label {
+        return Err(OTHER_METHOD.to_string());
+    }
+    // The question, embedded once.
     let embedding_began = Instant::now();
     let embedding = embedder
         .embed(&[query.to_string()], budget)
@@ -344,9 +356,6 @@ fn answer_into(
         .into_iter()
         .next()
         .ok_or("semantic: unavailable: the embedder returned no vector")?;
-    if reader.built_by() != label {
-        return Err(OTHER_METHOD.to_string());
-    }
     let dims = fold.dims();
     if question.len() != dims {
         return Err(format!(
@@ -377,12 +386,13 @@ fn answer_into(
 
     // Cosine over every live chunk; each file keeps its best.
     let mut best = BestPerFile::default();
-    let mut malformed = 0usize;
+    let (mut malformed, mut in_view) = (0usize, 0usize);
     let scanned = reader
         .scan(|id, path, blob| {
             if !in_scope(path, scope) {
                 return;
             }
+            in_view += 1;
             match decode(blob, dims) {
                 Some(vector) => best.offer(id, path, cosine(&question, &vector)),
                 None => malformed += 1,
@@ -390,21 +400,35 @@ fn answer_into(
         })
         .map_err(|error| format!("semantic: the fold could not be read: {error}"))?;
     answer["usage"]["semantic_chunks_scanned"] = json!(scanned);
+    if in_view == 0 {
+        omissions.push(format!("semantic: no folded chunks under {scope}"));
+    }
     if malformed > 0 {
         omissions.push(format!(
             "{malformed} chunk(s) carry a vector that is not {dims} wide and were not ranked"
         ));
     }
 
-    // The window: top files inside the declared source roots, each located at its passage.
+    // The window: `limits.search_results` files, the same window every route's `search` returns
+    // (the lens's `choice_count` cuts the first screen, not a search). Each is located at its
+    // passage; a file gone from the tree or outside the declared source roots is named, not
+    // offered; a cosine at or below zero is not a ranking and is not offered.
     let limit = contract.limit_usize("search_results").max(1);
     let terms = question_terms(contract, query);
     let roots = contract.source_roots();
     let mut candidates: Vec<Value> = Vec::new();
-    let mut outside = 0usize;
+    let (mut outside, mut unranked) = (0usize, 0usize);
     for hit in best.ranked() {
         if candidates.len() >= limit {
             break;
+        }
+        if hit.score <= 0.0 {
+            unranked += 1;
+            continue;
+        }
+        if !root.join(&hit.path).is_file() {
+            omissions.push(format!("{}: folded file no longer present", hit.path));
+            continue;
         }
         if contained(root, &hit.path, &roots).is_err() {
             outside += 1;
@@ -438,6 +462,12 @@ fn answer_into(
         omissions.push(format!(
             "{outside} ranked file(s) lie outside the recipe's declared source roots and were \
              passed over"
+        ));
+    }
+    if unranked > 0 {
+        omissions.push(format!(
+            "{unranked} file(s) scored a cosine at or below zero — no ranking — and were not \
+             offered"
         ));
     }
     answer["candidates"] = json!(candidates);
@@ -476,9 +506,11 @@ impl Provider for Semantic {
         let mut answer = search(session_root, contract, &declaration, query, &scope);
         Ok(ProviderResult {
             ranked: answer["candidates"].as_array().cloned().unwrap_or_default(),
-            ranking_known: true,
+            ranking_known: answer["ranking_known"] == json!(true),
             method: answer["method"].as_str().map(str::to_string),
             usage: answer["usage"].take(),
+            unresolved: lines(&answer["unresolved"]),
+            omissions: lines(&answer["omissions"]),
         })
     }
 }
@@ -529,6 +561,73 @@ mod tests {
             .collect();
         assert_eq!(decode(&blob, 2), Some(vec![1.5, -2.0]));
         assert_eq!(decode(&blob, 3), None);
+    }
+
+    /// The seam a fusing caller reads: an absent fold is `ranking_known: false` with its reason,
+    /// and the same provider over a fold is a known ranking with nothing unresolved.
+    #[test]
+    fn the_provider_seam_carries_absence_and_a_known_ranking() {
+        use super::super::index::{self, FoldOptions, FoldRun};
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let mut value = crate::flow::memory::recall::tests_support::minimal_contract();
+        value["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+        let measure = value["ceremony"]["providers"]["semantic"]["measure"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        for (rel, bytes) in [
+            (
+                CONTRACT_REL.to_string(),
+                serde_json::to_vec(&value).unwrap(),
+            ),
+            (measure.clone(), std::fs::read(repo.join(&measure)).unwrap()),
+            (
+                "note.md".to_string(),
+                b"# Stewardship\nThe commons is tended.\n".to_vec(),
+            ),
+        ] {
+            std::fs::create_dir_all(root.join(&rel).parent().unwrap()).unwrap();
+            std::fs::write(root.join(&rel), bytes).unwrap();
+        }
+        let contract = Contract::load(&root.join(CONTRACT_REL)).unwrap();
+        let semantic = Semantic {
+            key: "semantic".into(),
+        };
+
+        let absent = semantic
+            .candidates("tended commons", &[], root, &contract, root)
+            .unwrap();
+        assert!(
+            !absent.ranking_known,
+            "an absent route is not a known ranking"
+        );
+        assert_eq!(absent.unresolved, vec![NO_FOLD.to_string()]);
+        assert!(absent.ranked.is_empty());
+        assert!(
+            absent.method.is_some(),
+            "the measure loaded, so its CID is named"
+        );
+
+        let opts = FoldOptions {
+            embedder: EmbedderChoice::Fixture,
+            ..FoldOptions::default()
+        };
+        assert!(matches!(
+            index::fold(root, &opts).unwrap(),
+            FoldRun::Done(_)
+        ));
+        let found = semantic
+            .candidates("tended commons", &[], root, &contract, root)
+            .unwrap();
+        assert!(found.ranking_known);
+        assert!(found.unresolved.is_empty(), "{:?}", found.unresolved);
+        assert_eq!(found.ranked[0]["path"], "note.md");
+        assert_eq!(found.method, absent.method);
     }
 
     #[test]

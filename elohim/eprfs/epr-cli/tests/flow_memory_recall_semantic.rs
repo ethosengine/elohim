@@ -150,6 +150,50 @@ fn unresolved(answer: &Value) -> Vec<String> {
         .collect()
 }
 
+fn omissions(answer: &Value) -> Vec<String> {
+    answer["omissions"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| m.as_str().unwrap_or_default().to_string())
+        .collect()
+}
+
+/// The fixture fold's store copied to the PINNED store directory (its meta names the declared
+/// measure and model), relabelled `embedder` when given; and the live model manifest, its model
+/// resolving nowhere. The procedure `embed.py` is NOT copied: running it would fail loudly.
+fn pinned_store_from_fixture(root: &Path, embedder: Option<&str>) {
+    use elohim_epr_cli::flow::memory::recall::embedder::MODEL_MANIFEST_REL;
+    let cid = measure_cid(root);
+    let pinned = index::store_dir(root, &cid, EmbedderChoice::Pinned);
+    std::fs::create_dir_all(&pinned).unwrap();
+    std::fs::copy(
+        index::store_dir(root, &cid, EmbedderChoice::Fixture).join("fold.sqlite"),
+        pinned.join("fold.sqlite"),
+    )
+    .unwrap();
+    if let Some(label) = embedder {
+        let conn = rusqlite::Connection::open(pinned.join("fold.sqlite")).unwrap();
+        conn.execute("UPDATE meta SET value = ?1 WHERE key = 'embedder'", [label])
+            .unwrap();
+    }
+    let mut manifest = live(MODEL_MANIFEST_REL);
+    manifest["resolve"] = json!([root.join("no-model-here").to_string_lossy()]);
+    put_json(root, MODEL_MANIFEST_REL, &manifest);
+}
+
+/// The label a store folded by the declared procedure carries (`index.rs`'s `embedder_for`).
+fn pinned_label() -> String {
+    use elohim_epr_cli::flow::memory::recall::embedder::MODEL_MANIFEST_REL;
+    let manifest = live(MODEL_MANIFEST_REL);
+    format!(
+        "procedure {} on model {}",
+        manifest["procedure"].as_str().unwrap(),
+        manifest["model_bytes"].as_str().unwrap()
+    )
+}
+
 /// Step 3: a question the lexical route cannot rank (no term of four characters) still finds its
 /// passage, because the semantic route embeds the question's own text.
 #[test]
@@ -328,6 +372,10 @@ fn no_fold_is_an_honest_absence() {
     assert_eq!(unresolved(&answer), vec![NO_FOLD.to_string()]);
     assert!(paths(&answer).is_empty());
     assert_eq!(
+        answer["ranking_known"], false,
+        "an absent route is not a known ranking"
+    );
+    assert_eq!(
         answer["method"],
         json!(measure_cid(root)),
         "a method on every result"
@@ -338,26 +386,15 @@ fn no_fold_is_an_honest_absence() {
 /// Ruling 4: an embedder that cannot run answers `unavailable: <reason>` with no candidates.
 #[test]
 fn an_unavailable_embedder_is_an_honest_absence() {
-    use elohim_epr_cli::flow::memory::recall::embedder::{MODEL_MANIFEST_REL, PROCEDURE_REL};
+    use elohim_epr_cli::flow::memory::recall::embedder::PROCEDURE_REL;
     let dir = tree("pinned");
     let root = dir.path();
     fold(root);
-    // A pinned store for the declared measure (the fixture fold's bytes: its meta names the
-    // measure and model the declaration does), and a procedure whose model resolves nowhere.
-    let cid = measure_cid(root);
-    let pinned = index::store_dir(root, &cid, EmbedderChoice::Pinned);
-    std::fs::create_dir_all(&pinned).unwrap();
-    std::fs::copy(
-        index::store_dir(root, &cid, EmbedderChoice::Fixture).join("fold.sqlite"),
-        pinned.join("fold.sqlite"),
-    )
-    .unwrap();
+    // A pinned store labelled by the declared procedure, whose model resolves nowhere.
+    pinned_store_from_fixture(root, Some(&pinned_label()));
     let procedure = root.join(PROCEDURE_REL);
     std::fs::create_dir_all(procedure.parent().unwrap()).unwrap();
     std::fs::copy(common::repo_root().join(PROCEDURE_REL), &procedure).unwrap();
-    let mut manifest = live(MODEL_MANIFEST_REL);
-    manifest["resolve"] = json!([root.join("no-model-here").to_string_lossy()]);
-    put_json(root, MODEL_MANIFEST_REL, &manifest);
 
     let answer = ask(root, SHORT_WORDED);
     let lines = unresolved(&answer);
@@ -368,6 +405,40 @@ fn an_unavailable_embedder_is_an_honest_absence() {
     );
     assert!(paths(&answer).is_empty());
     assert_eq!(answer["embedder"], "pinned");
+    assert_eq!(answer["ranking_known"], false);
+}
+
+/// Minor 5: a store folded by another procedure is refused BEFORE the embedder runs. No
+/// procedure exists in this tree and the model resolves nowhere, so an embedding attempt would
+/// answer `unavailable`; the answer is the method refusal instead.
+#[test]
+fn a_store_folded_by_another_procedure_never_spawns_the_embedder() {
+    use elohim_epr_cli::flow::memory::recall::embedder::PROCEDURE_REL;
+    let dir = tree("pinned");
+    let root = dir.path();
+    fold(root);
+    pinned_store_from_fixture(root, None); // still labelled `fixture`
+    assert!(!root.join(PROCEDURE_REL).exists());
+    let answer = ask(root, SHORT_WORDED);
+    assert_eq!(unresolved(&answer), vec![OTHER_METHOD.to_string()]);
+    assert_eq!(answer["ranking_known"], false);
+    assert_eq!(
+        answer["usage"]["provider_seconds"], 0,
+        "nothing was embedded"
+    );
+}
+
+/// Minor 4: the measure's CID is printed wherever the measure loaded, even when the declared
+/// embedder is not one this executor knows.
+#[test]
+fn an_unknown_declared_embedder_still_names_the_method() {
+    let dir = tree("oracle");
+    let root = dir.path();
+    let answer = ask(root, SHORT_WORDED);
+    assert_eq!(answer["method"], json!(measure_cid(root)));
+    let lines = unresolved(&answer);
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("embedder `oracle`"), "{lines:?}");
 }
 
 /// Ruling 4: a store whose meta names another model is never silently used.
@@ -387,6 +458,73 @@ fn a_fold_built_under_another_method_is_refused_for_refold() {
     let answer = ask(root, SHORT_WORDED);
     assert_eq!(unresolved(&answer), vec![OTHER_METHOD.to_string()]);
     assert!(paths(&answer).is_empty());
+    assert_eq!(answer["ranking_known"], false);
+}
+
+/// Minor 7: a folded file gone from the tree is named, never offered, and never mislabelled as
+/// outside the source roots.
+#[test]
+fn a_folded_file_no_longer_present_is_named_not_offered() {
+    let dir = tree("fixture");
+    let root = dir.path();
+    fold(root);
+    std::fs::remove_file(root.join("genesis/triage.md")).unwrap();
+    let answer = ask(root, SHORT_WORDED);
+    assert!(!paths(&answer).contains(&"genesis/triage.md".to_string()));
+    let named = omissions(&answer);
+    assert!(
+        named.contains(&"genesis/triage.md: folded file no longer present".to_string()),
+        "{named:?}"
+    );
+    assert!(
+        !named.iter().any(|m| m.contains("outside the recipe")),
+        "{named:?}"
+    );
+    assert_eq!(answer["fold_lag"], 1);
+}
+
+/// A ranked file outside the recipe's declared source roots is passed over and counted.
+#[test]
+fn a_file_outside_the_source_roots_is_passed_over_and_counted() {
+    let dir = tree("fixture");
+    let root = dir.path();
+    fold(root);
+    let mut narrowed = live(CONTRACT_REL);
+    narrowed["ceremony"]["providers"]["semantic"]["embedder"] = json!("fixture");
+    narrowed["source_roots"] = json!(["genesis/", ".epr-meta/"]);
+    put_json(root, CONTRACT_REL, &narrowed);
+    let answer = ask(root, "household mesh");
+    assert!(
+        !paths(&answer).contains(&".claude/notes.md".to_string()),
+        "{answer}"
+    );
+    let named = omissions(&answer);
+    assert!(
+        named
+            .iter()
+            .any(|m| m
+                .starts_with("1 ranked file(s) lie outside the recipe's declared source roots")),
+        "{named:?}"
+    );
+}
+
+/// Minor 8: no silent empties. A scope holding no folded chunk says so; no candidate is ever
+/// offered on a cosine at or below zero.
+#[test]
+fn an_empty_scope_says_so_and_no_candidate_scores_at_or_below_zero() {
+    let dir = tree("fixture");
+    let root = dir.path();
+    fold(root);
+    let empty = ask_in(root, SHORT_WORDED, "nowhere");
+    assert!(paths(&empty).is_empty());
+    assert!(
+        omissions(&empty).contains(&"semantic: no folded chunks under nowhere".to_string()),
+        "{empty}"
+    );
+    let unrelated = ask(root, "xyzzyquux");
+    for candidate in unrelated["candidates"].as_array().unwrap() {
+        assert!(candidate["score"].as_f64().unwrap() > 0.0, "{candidate}");
+    }
 }
 
 /// Ruling 5: `--tag` is exact frontmatter membership, which only the local provider reads.
@@ -462,6 +600,50 @@ fn search_provider_semantic_answers_through_the_cli() {
     assert_eq!(code, Some(0), "{stdout}");
     let view: Value = serde_json::from_str(&stdout).expect("json");
     let retrieval = &view["retrieval"];
+    // Each located candidate is a linked choice, and the command it carries runs.
+    let reads: Vec<&Value> = view["actions"]
+        .as_array()
+        .expect("actions")
+        .iter()
+        .filter(|a| {
+            a["argv"]
+                .as_array()
+                .is_some_and(|argv| argv.iter().any(|w| w == "read"))
+        })
+        .collect();
+    assert_eq!(
+        reads.len(),
+        retrieval["candidates"].as_array().unwrap().len(),
+        "{view}"
+    );
+    assert_eq!(
+        reads[0]["label"],
+        "Read genesis/triage.md — Who fixes it (3:4)"
+    );
+    let argv: Vec<String> = reads[0]["argv"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w.as_str().unwrap().to_string())
+        .collect();
+    assert_eq!(argv[0], "epr");
+    let lines_at = argv.iter().position(|w| w == "--lines").expect("--lines");
+    assert_eq!(argv[lines_at + 1], "3:4");
+    let path_at = argv.iter().position(|w| w == "--path").expect("--path");
+    assert_eq!(argv[path_at + 1], "genesis/triage.md");
+    let out = Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(&argv[1..])
+        .current_dir(root)
+        .output()
+        .expect("the linked read runs");
+    let read = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(
+        out.status.code(),
+        Some(0),
+        "{read}{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(read.contains("Who can fix the bug now"), "{read}");
     assert_eq!(retrieval["provider"], "semantic");
     assert_eq!(retrieval["candidates"][0]["path"], "genesis/triage.md");
     assert_eq!(

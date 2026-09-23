@@ -44,8 +44,8 @@ their own recent journeys revealed, and whether its table came from the contract
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `81344107558c58984525793719b2fe5a74afc2ab1fbe36db207af92dabd889fd` |
-| Whole open | `whole_open_is_byte_identical` | `aab7b527a05be529fee2ffd0948e6f8dd0d5f07c9bb839adc5a4eb1a4bd62c29` |
+| Focused open | `focused_open_is_byte_identical` | `784cb3473ab005cb21585c0b76cdd3afb178060f687bca0fb904f0e0c617e130` |
+| Whole open | `whole_open_is_byte_identical` | `cc285a5423a094a1c22310d2adeec54f6d66f1df5b3fcaedf91a15d5a8028928` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged: a refusal exits before render()'s lens/floor preamble runs) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -163,3 +163,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract CID mov
 ## 2026-09-23 — contract v18 (station 4, Task 4.4: `ceremony.providers.semantic.embedder: "pinned"`; the method/freshness lines and `discovery.semantic_output` name the native semantic provider, mempalace the declared visitor)
 
 Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreia…onba → bafkreid…nxm4). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`cff19d6f…`, `830d1450…`) byte for byte. The refusal digest is unchanged. The Digests table, stale since v16, now mirrors the constants again.
+
+## 2026-09-23 — a third ambient field normalized (Task 4.4 fix round 1)
+
+The `Accounting:` line's rounded wall-clock segment (`· 0.0s ·`) is the same measured duration as `elapsed_seconds`, rounded to a tenth; under load it rendered `0.1s` and the focused digest flaked. `run_text()` now replaces it with `<FIXTURE_ELAPSED>s`. Focused and whole open re-baselined for that ONE reason. Proof: putting `0.0s` back into each new rendering reproduces the previous pins (`81344107…`, `aab7b527…`) byte for byte. The refusal digest is unchanged.
