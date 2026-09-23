@@ -109,6 +109,21 @@ pub async fn announce_local_change(
     doc_id: &str,
     change_hash: &str,
 ) -> usize {
+    // Scope first: a dual node's forwarder hands every change here, and in an
+    // all-dual household no book peer is iroh-only — so decide who to ring
+    // before paying a sync-store read for bytes nobody will receive.
+    let me = inputs.endpoint.node_id();
+    let peers: Vec<IrohPeerEntry> = inputs
+        .book
+        .snapshot(Some(&me))
+        .into_iter()
+        .filter(|entry| inputs.scope.admits(entry))
+        .collect();
+    if peers.is_empty() {
+        debug!(doc_id = %doc_id, scope = ?inputs.scope, "iroh announce: no book peers in scope, the round remains the propagation path");
+        return 0;
+    }
+
     // Carry THE announced change, addressed by the hash the producer already
     // names — never `get_changes_since(.., &[])`, which is every change since
     // genesis and overflows the bound on any mature doc (the libp2p plane's own
@@ -130,18 +145,6 @@ pub async fn announce_local_change(
         }
     };
     let eager_bytes = change_data.as_ref().map(|d| d.len()).unwrap_or(0);
-
-    let me = inputs.endpoint.node_id();
-    let peers: Vec<IrohPeerEntry> = inputs
-        .book
-        .snapshot(Some(&me))
-        .into_iter()
-        .filter(|entry| inputs.scope.admits(entry))
-        .collect();
-    if peers.is_empty() {
-        debug!(doc_id = %doc_id, scope = ?inputs.scope, "iroh announce: no book peers in scope, the round remains the propagation path");
-        return 0;
-    }
 
     let client = IrohSyncClient::new(&inputs.endpoint);
     let mut accepted = 0usize;
