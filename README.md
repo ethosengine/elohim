@@ -26,7 +26,7 @@ The name comes from *[elohim](https://www.youtube.com/watch?v=U5iyUik97Lg)* (Heb
 
 > The Judeo-Christian ontology and thought here come *with the founder* (introduced under [Why This Exists](#why-this-exists)): a chosen lens, not a claim on the territory. A peer project approaches the same entity through a different tradition, where it is called a Kami: the Shinto word for the spirits that inhabit places and things, and the word Botao "Amber" Hu reaches for in *[Kami of the Commons](https://arxiv.org/abs/2602.14940)* (arXiv:2602.14940, Feb 2026). That project lives at [civic.ai](https://civic.ai) ([audreyt/civic.ai](https://github.com/audreyt/civic.ai)), from Audrey Tang and Caroline Green. Different ontology, kindred aim: two lenses arriving separately at the same shape of bounded, inspectable, community-governed AI held as a commons.
 
-This monorepo holds the substrate being built toward that vision, in Rust, Holochain, libp2p, iroh, Angular and Tauri. Some of it runs today on a household mesh (a multi-peer local network of conductors, storage peers and doorways run from one machine) and on an alpha fleet (the deployed test network); some is designed and not yet running. [What runs today](#what-runs-today-september-2026) says which. The design aims at technology that:
+This monorepo holds the substrate being built toward that vision, in Rust, Holochain, libp2p, iroh, Angular and Tauri. Some of it runs today on a household mesh (every kind of peer the network has, run together on one machine) and on an alpha fleet (the deployed test network); some is designed and not yet running. [What runs today](#what-runs-today-september-2026) says which. The design aims at technology that:
 
 - Serves love rather than engagement metrics
 - Protects vulnerability through capture-resistant design
@@ -50,6 +50,8 @@ This protocol is being built by a father of three in San Antonio, working evenin
 
 ## Key Concepts
 
+These are the design's commitments, stated as the design states them; [What runs today](#what-runs-today-september-2026) marks which of them the running network enforces.
+
 **Three Inseparable Dimensions**: Every piece of content in the protocol carries knowledge, value and governance, coupled at the architectural level before anything is created or distributed. The specification's first two rules follow from that: no value-blind content, and no governance-free content. These three-part records are called **EPRs** (Elohim Protocol Records; the [specification](./genesis/docs/content/elohim-protocol/protocol-specification.md) also reads the R as Reference). An EPR is the protocol's primitive unit of meaning, and its three dimensions map to three pillars: knowledge to `lamad`, value to `shefa`, governance to `qahal`. [How Content Links Work](./genesis/docs/content/elohim-protocol/epr-developer-guide.md) explains it in plain language.
 
 **Distributed Infrastructure**: Peer-to-peer networks have no single point of control, and peer-to-peer designs have often resisted anyone who would charge rent on the combined participation of everyone in them. The protocol will never make anyone fabulously rich. A P2P technology with anti-capture mechanisms baked into its design makes wealth extraction very difficult, because the architecture functions as a complexity upgrade that accounts for the failures of the internet to protect real values. It relies on faithful cooperation, not captive audiences.
@@ -58,23 +60,21 @@ This protocol is being built by a father of three in San Antonio, working evenin
 
 **Formation Over Transaction**: Understanding is measured by social reach and content stewardship, not grades or engagement metrics. It accrues as **standing**: a relational track record of trust that grows as peers attest that your contributions were useful enough to pass on. Standing is a shape of relationships, never a single score. AI can write your essay, but it can't make your community trust your judgment.
 
-**Reach and Belonging**: **Reach** is how far a person's contributions travel beyond their intimate circle. It is earned, and gated by standing. **Belonging** is never gated; only reach is.
+**Reach and Belonging**: **Reach** is how far a person's contributions travel beyond their intimate circle, on a scale that runs from intimate through trusted, familiar and community to commons and public. It is earned, and gated by standing. **Belonging** is never gated; only reach is.
 
 **Graduated Intimacy**: The design separates spaces for personal exploration from protected commons, with consent boundaries that keep extremes from corrupting shared spaces.
 
- 
+## Domain Pillars
 
-The protocol's vocabulary draws from Hebrew and Latin to name the human practices it serves rather than the engineering it requires. Four of the pillars below live under `app/elohim-app/src/app/<pillar>/`; `lamad` is its own bundle at [`app/lamad/`](./app/lamad/). Each has an SDK domain in `elohim/sdk/domains/` (see the [domain index](./elohim/sdk/domains/README.md)).
+The protocol's vocabulary draws from Hebrew and Latin to name the human practices it serves rather than the engineering it requires. There are five pillars, and three of them anchor the three dimensions of an EPR: knowledge to `lamad`, value to `shefa`, governance to `qahal`. Each pillar declares its vocabulary as an SDK domain in `elohim/sdk/domains/` (see the [domain index](./elohim/sdk/domains/README.md)) and has an app surface: four live under `app/elohim-app/src/app/<pillar>/`, and `lamad` is its own bundle at [`app/lamad/`](./app/lamad/).
 
-| Pillar | Origin & meaning | What it serves |
-|--------|------------------|----------------|
-| [`imagodei`](./genesis/docs/content/elohim-protocol/imagodei.md) | Latin: "image of God" | Identity, presence, stewardship of self |
-| [`lamad`](./genesis/docs/content/elohim-protocol/lamad.md) | Hebrew: "to learn / to teach" | Learning content, paths, mastery, attestation |
-| `avodah` | Hebrew: "work / service / worship" | Work as service, not commodity |
-| `qahal` | Hebrew: "assembly" | Community, consent, collective decision |
-| [`shefa`](./genesis/docs/content/elohim-protocol/shefa.md) | Hebrew: "abundance / overflow" | Economy: economic events in REA (Resources, Events, Agents: the accounting vocabulary ValueFlows builds on), stewardship, resource flows |
+- [`imagodei`](./genesis/docs/content/elohim-protocol/imagodei.md) (Latin, "image of God") is identity: humans, presence, relationships, the attestations they make about one another, and the stewardship of self.
+- [`lamad`](./genesis/docs/content/elohim-protocol/lamad.md) (Hebrew, "to learn / to teach") is learning, organized around paths. Knowledge is structured as territory (content-addressed, reusable ContentNodes: videos, documents, simulations), journeys (curated paths that give the territory sequence and narrative meaning), and travelers (learners whose progress and attestations shape what they encounter). The same node can be met on many paths, each giving it a different context. Learning is something you do through relationships and contributions; no platform certifies it.
+- `avodah` (Hebrew, "work / service / worship") is work as service. A work item is an EPR, so it carries the three coupled dimensions, and it can declare attestation gates: lamad content a person masters before the task begins, so that open collaboration can be qualified by demonstrated mastery instead of credentials.
+- `qahal` (Hebrew, "assembly") is community: collectives, consent, proposals and collective decision.
+- [`shefa`](./genesis/docs/content/elohim-protocol/shefa.md) (Hebrew, "abundance / overflow") is economy: economic events recorded in REA (Resources, Events, Agents: the accounting vocabulary ValueFlows builds on), stewardship, resource flows.
 
-Two more names appear in the code. `mishpat` (Hebrew, "judgment") is a substrate domain with its own DNA and no app surface; qahal's decisions escalate into it for validation. `elohim` is the cross-pillar core the others compose on: infrastructure, data loading, trust. The agents themselves live in [`elohim/elohim-agent/`](./elohim/elohim-agent/).
+Two more names appear in the code, and neither is a pillar. `mishpat` (Hebrew, "judgment") is a substrate domain with its own Holochain DNA (a term explained under [Architecture at a Glance](#architecture-at-a-glance)) and no app surface; qahal has no DNA of its own, and its collectives, proposals and decisions are recorded and validated in mishpat. `elohim` is the cross-pillar core the others compose on: infrastructure, data loading, trust. `doorway`, beside the pillars in the app, is the gateway integration. The agents themselves live in [`elohim/elohim-agent/`](./elohim/elohim-agent/).
 
 ## How Ubiquitous Wisdom Rebuilds the Internet
 
@@ -88,9 +88,9 @@ When each person's interaction with the network is mediated by their own elohim,
 
 The coordination tools underneath stop being policy chokepoints and become shared infrastructure that wisdom uses. Content addressing gives each thing an identity derived from what it is. The Holochain distributed hash table (DHT) notarizes timing and lineage: it keeps a tamper-evident record, checked by peers, of when something was made and what it came from. libp2p and iroh move bytes. Doorways project to the legacy web.
 
-In the design, who passed what to whom is recorded at every hop and sealed so that no single peer can open it alone. Feedback travels back along that path one hop at a time, like nerves carrying pain to a hand on a stove; the [social-reach nervous system](./genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md) specifies that mechanism. Quarantine signals travel alongside the content they flag. Restitution is designed as repair with real economic weight. Accountability lands proportional to position in the chain (primary actor, accessory propagator, edge node), and the network self-heals at the edge. There is no central moderator to co-opt. [The Elohim Medium](./genesis/docs/content/elohim-protocol/social_medium/epic.md) tells the same story as daily life.
+In the design, who passed what to whom is recorded at every hop and sealed so that no single peer can open it alone. Feedback travels back along that path one hop at a time, like nerves carrying pain to a hand on a stove; the [social-reach nervous system](./genesis/docs/content/elohim-protocol/architecture/social-reach-nervous-system.md) specifies that mechanism. Quarantine signals travel alongside the content they flag. Restitution is designed as repair with real economic weight. Accountability is meant to land proportional to position in the chain (primary actor, accessory propagator, edge node), and the network self-heals at the edge. There is no central moderator to co-opt. [The Elohim Medium](./genesis/docs/content/elohim-protocol/social_medium/epic.md) tells the same story as daily life.
 
-The capture target shrinks to something the protocol can defend. The old internet was capturable because information, value and governance shipped separately, and platforms sat in the propagation path of all three. A platform could absorb the medium of communication and run for years without economic accountability, scaling on borrowed conviction that returns would arrive eventually, while shedding responsibility for the harm flowing across it onto distant statutes and overburdened courts. Here, every EPR carries all three together over a peer-to-peer substrate, and no platform sits in the path to unbundle them. The design lets any single layer be routed around, so capturing one layer does not capture the system. What remains to capture is each person's authorization of their own elohim, which is that person's agency. That's a much higher bar. It holds in full for a person who keeps their own keys; a hosted person's doorway keeps theirs and remains a target until they move up the [stewardship ladder](#progressive-stewardship), which is why hosting is a stage and not a destination.
+The capture target shrinks to something the protocol can defend. The old internet was capturable because information, value and governance shipped separately, and platforms sat in the propagation path of all three. A platform could absorb the medium of communication and run for years without economic accountability, scaling on borrowed conviction that returns would arrive eventually, while shedding responsibility for the harm flowing across it onto distant statutes and overburdened courts. Here, every EPR carries all three together over a peer-to-peer substrate, and no platform sits in the path to unbundle them. The design lets any single layer be routed around, so capturing one layer does not capture the system. What remains to capture is each person's authorization of their own elohim, which is that person's agency. That's a much higher bar. It will hold in full for a person who keeps their own keys; a hosted person's doorway keeps theirs and remains a target until they move up the [stewardship ladder](#progressive-stewardship), which is why hosting is a stage and not a destination.
 
 AI deployed one way flattens human work; deployed another, it makes human judgment the part the network depends on. The protocol is a bet that the second deployment is possible.
 
@@ -102,40 +102,47 @@ This is an AI-generated deep-dive conversation over the manifesto. It runs from 
 
 ## Architecture at a Glance
 
+An EPR couples knowledge, value and governance into one record whose address is derived from its content. The stack below exists to carry that record: to encode it so that its value and governance travel with its knowledge, to notarize when it was made and by whom, to move its bytes between peers, and to show it to the web. Two words recur. A projection is a derived, read-only view that can be regenerated from the layer beneath it and is never the source of truth; a layer that projects from another is a projection of it, and a doorway that projects to the web serves one to the web. Agent, on its own, means an elohim; Holochain also calls the keyholder whose key signs a record an agent, and where that meaning is needed this document says key or cell.
+
 ### Substrate
 
-The substrate is a layered, content-addressed stack, and Holochain is one layer of it: the integrity and notary floor.
+- Codec. [`elohim/epr/`](./elohim/epr/) (`elohim-epr`) is the root: canonical DAG-CBOR envelopes, CIDv1, Ed25519. An address is a hash of what a thing is, so the same identifier resolves anywhere. The envelope carries the record's reach and a coupling that names its value and governance records alongside its knowledge, which is how the specification's first two rules (no value-blind content, no governance-free content) are meant to hold at the level of the bytes. The codec has no Holochain dependency; every other layer builds on it, and ts-rs (a Rust-to-TypeScript type generator) produces its TypeScript bindings in `elohim/sdk/epr-ts/` for the browser.
+- Notary floor. [Holochain](https://holochain.org/) 0.7. Each node runs a conductor, the Holochain runtime that runs DNAs. A DNA is a Holochain application's validation rules and data types, organized in modules called zomes, and a cell is one person's instance of a DNA. Each person keeps their own source chain (a signed, append-only history of their actions), validated by peers through a distributed hash table, with no global consensus and no central server in the path. Five DNAs in [`elohim/holochain/dna/`](./elohim/holochain/dna/) hold the rules for the protocol's structural commitments. imagodei holds humans, their attestations about one another, presence and relationships. lamad, packed from [`elohim/holochain/dna/elohim/`](./elohim/holochain/dna/elohim/), is the content store that lamad, shefa and avodah records share. mishpat holds qahal's collectives, proposals and judgments; qahal has no DNA of its own. infrastructure and node-registry hold which nodes exist, what capacity and capabilities they offer, and how healthy they are. Identity, stewardship contracts (who has taken on the care of which content or resource, and on what terms), economic commitments and reach all live on this floor. A record is checked against the DNA's rules when its author commits it and again by the peers that validate it; once the DHT holds it, it is notarized.
+- Dataplane. `elohim-storage` ([`elohim/elohim-storage/`](./elohim/elohim-storage/)) stores and moves the bytes: chunked blobs, capability advertisement (peers announcing what they can serve), redundancy. It runs over two transports, libp2p and iroh, and the same content identifier resolves whichever transport delivered the bytes. Storage treats the DHT as the list of what should exist and keeps pulling its own holdings toward that list.
+- Projection. The doorway ([`doorway/`](./doorway/)) is the layer that faces the legacy web. It brings browser traffic into the mesh and serves canonical content back out over HTTP as a read-optimized view. The doorway service does not itself join the libp2p or iroh swarms; it proxies to a conductor and caches projections, and it is never the source of truth.
 
-- **Content-addressing codec**: [`elohim/epr/`](./elohim/epr/) (`elohim-epr`) is the root: canonical DAG-CBOR envelopes, CIDv1, Ed25519. Identity is content-derived. An address is a hash of what a thing is, so the same identifier resolves anywhere. The codec has no Holochain dependency; every other layer projects from it, and ts-rs generates its TypeScript bindings in `elohim/sdk/epr-ts/` for the browser. [`elohim/eprfs/`](./elohim/eprfs/) is the filesystem projection layer (the repository's files read as content-addressed records) and shares the same content-addressing base; the repo's own governance tool, the `epr` CLI, lives in that workspace.
-- **Integrity and notary floor**: [Holochain](https://holochain.org/) 0.7. Each node runs a conductor, the Holochain runtime that runs DNAs. A DNA is a Holochain application's validation rules and data types, organized in modules called zomes, and a cell is one agent's instance of a DNA. Each person keeps their own source chain (a signed, append-only history of their actions), validated by peers through a distributed hash table, with no global consensus and no central server in the path. Five DNAs in [`elohim/holochain/dna/`](./elohim/holochain/dna/) hold the rules for the protocol's structural commitments: lamad, imagodei, mishpat, infrastructure and node-registry (the lamad DNA is packed from the directory named `elohim`). A record is checked against those rules when its author commits it and again by the peers that validate it; once the DHT holds it, it is notarized.
-- **P2P dataplane**: `elohim-storage` ([`elohim/elohim-storage/`](./elohim/elohim-storage/)) stores and moves the bytes: chunked blobs, capability advertisement (peers announcing what they can serve), redundancy. It runs over two transports, libp2p and iroh, and the same content identifier resolves whichever transport delivered the bytes. Storage treats the DHT as the list of what should exist and keeps pulling its own holdings toward that list.
-- **Provenance**: [brit](./elohim/brit/) is a fork of gitoxide (a Rust implementation of git) whose commits carry EPR provenance trailers; its brit-epr crate carries a byte-compatible CID codec and the engine that checks content-addressed citations between documents. [rakia](./elohim/rakia/) is a distributed build system (rakia-core, rakia-brit, rakia-executor) designed to turn build manifests into peer-attested, content-addressed artifacts.
+The same codec reaches the repository itself. [`elohim/eprfs/`](./elohim/eprfs/) reads the repository's files as content-addressed records and carries the `epr` CLI, the repo's own governance tool. [brit](./elohim/brit/) is a fork of gitoxide (a Rust implementation of git) whose commits carry EPR provenance trailers; its brit-epr crate checks content-addressed citations between documents. [rakia](./elohim/rakia/) is a distributed build system (rakia-core, rakia-brit, rakia-executor) designed to turn build manifests into peer-attested, content-addressed artifacts.
 
-The layers are designed around a witness ladder: a claim starts as a local witness (one node's own record), becomes peer-validated when other peers check it, and ends notarized on the DHT. A separate axis names four ways a running node takes part (the seam map calls them participation tracks): as a DHT notary, as a libp2p or iroh storage peer, as an HTTP or WebSocket client of a peer (a spoke), or as a doorway projecting to the web. Federation and governance ride over this dataplane. The [seam map](./genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md) routes each concern to the layer and track where it lives.
+### How a node takes part
+
+The [seam map](./genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md) names four participation tracks. They are not tiers: a device can be on several at once, and what hardware it has decides which.
+
+- Notary: keeping a source chain and validating other people's records on the DHT. Every person with an account is on this track, through their own conductor or through one that hosts them.
+- Storage peer: a device with the capacity for it (a laptop or larger) runs `elohim-storage` and holds and moves bytes for others over libp2p or iroh.
+- Spoke: a device too small to run a conductor or a storage peer (a wearable, a sensor, a phone) reaches a nearby peer over HTTP or WebSocket and contributes through it.
+- Doorway: a well-provisioned node may additionally run a doorway that projects to browsers; the browsers consume through it without becoming peers.
+
+Read against the [Progressive Stewardship](#progressive-stewardship) ladder: a Visitor only consumes through a doorway; a Hosted person is on the notary track through the doorway's conductor and consumes through its projection; an App Steward runs a conductor and a storage sidecar on their own device, so notary and storage peer; a Node Steward runs both always-on and may host spokes and a doorway. The hardware specification's device tiers are a third axis, what a device can run, distinct from tracks (how it takes part) and stages (who keeps the keys).
+
+### The witness ladder
+
+Across these layers the design follows a witness ladder. A claim starts as a local witness, one node's own record. It becomes peer-validated when other peers check it against the DNA's rules. It ends notarized when the DHT holds it across enough peers that no one of them can alter or drop it, and withdrawing a claim then means issuing a superseding one. The ladder is what lets a projection be fast without being trusted: what is true lives on the notary floor, bytes move on the dataplane, and a doorway or a storage database serves a legible view of the truth and is never its source.
 
 ### Surfaces
 
-- **Doorway** ([`doorway/`](./doorway/)) brings web2 traffic into the peer-to-peer mesh and projects canonical content back to legacy audiences. Today it serves browsers and publishes its identity through a W3C DID bridge. It signs its endpoint record in the pkarr format, where records are addressed by public key; publishing that record is not yet wired. AT Protocol and ActivityPub bridges are planned. Doorways are plural and replaceable: several can serve the same content, and none of them owns it.
-- **Steward shells** ([`steward/`](./steward/)) are the software a person runs at the App Steward and Node Steward stages of the [Progressive Stewardship](#progressive-stewardship) ladder. On that ladder a steward is someone who runs their own peer; elsewhere in the protocol, stewardship is a caretaking relation to a resource or content. `device/` is a Tauri desktop app that embeds a Holochain conductor for self-custodied keys; `node/` is a headless always-on runtime for household hardware.
-- **elohim agents** ([`elohim/elohim-agent/`](./elohim/elohim-agent/)) are implemented as a Rust agent crate with a streaming LLM backend, bound to the constitution at runtime. They are not yet deployed as a running service.
-- **Sophia** ([`sophia/`](./sophia/), a fork of Khan Academy's Perseus) renders three kinds of human moments: **Perseus** for mastery exercises (graded), **Psyche** for discovery and reflection (psychometric, open-ended), and **Psephos** (Greek: "voting pebble") for governance ballots with election hygiene.
-
-### Two pillars worth introducing here
-
-**Lamad** is path-centric, not course-centric. Knowledge is structured as territory (content-addressed, reusable ContentNodes: videos, docs, simulations), journeys (curated paths that add narrative meaning and sequence), and travelers (learners whose progress and attestations shape the experience). Learning is something you do through relationships and contributions; no platform certifies it.
-
-**Avodah** t,ats work as service. Work items are EPRs, so each carries the three coupled dimensions described above. A work item can declare attestation gates, lamad content that must be mastered before the task starts, so open collaboration can be qualified by demonstrated mastery rather than credentials. The gates are declared on the work item and shown; enforcement at bid or acceptance is not yet built.
-
-For the full picture, read the pillar papers ([imagodei](./genesis/docs/content/elohim-protocol/imagodei.md), [lamad](./genesis/docs/content/elohim-protocol/lamad.md), [shefa](./genesis/docs/content/elohim-protocol/shefa.md)), the architecture [index](./genesis/docs/content/elohim-protocol/architecture/INDEX.md) and [map](./genesis/docs/content/elohim-protocol/architecture/MAP.md), and the [seam map](./genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md).
+- Doorway ([`doorway/`](./doorway/)) is the projection layer's running service. Today it serves browsers and publishes its identity through a W3C DID bridge. It signs its endpoint record in the pkarr format, where records are addressed by public key; publishing that record is not yet wired. AT Protocol and ActivityPub bridges are planned. Doorways are plural and replaceable: several can serve the same content, and none of them owns it.
+- Steward shells ([`steward/`](./steward/)) are the software a person runs at the App Steward and Node Steward stages of the [Progressive Stewardship](#progressive-stewardship) ladder. On that ladder a steward is someone who runs their own peer; elsewhere in the protocol, stewardship is a caretaking relation to a resource or content. `device/` is a Tauri desktop app that embeds a Holochain conductor for self-custodied keys; `node/` is a headless always-on runtime for household hardware.
+- elohim agents ([`elohim/elohim-agent/`](./elohim/elohim-agent/)) are implemented as a Rust agent crate with a streaming LLM backend, bound to the constitution at runtime. They are not yet deployed as a running service. `elohim/eae/` is a separate crate: the monitor, analyze, decide, execute loop of an Elohim Autonomous Entity, the agent-run organization in [the autonomous entity story](./genesis/docs/content/elohim-protocol/autonomous_entity/epic.md).
+- Sophia ([`sophia/`](./sophia/), a fork of Khan Academy's Perseus) renders three kinds of human moments: **Perseus** for mastery exercises (graded), **Psyche** for discovery and reflection (psychometric, open-ended), and **Psephos** (Greek: "voting pebble") for governance ballots with election hygiene.
 
 ### What runs today (September 2026)
 
 Running:
 
-- The household mesh, set up as a test household. `just mesh start` launches it.
+- The household mesh, set up as a test household. `just mesh start` launches it (see [Development](#development)).
 - The alpha fleet of doorways, storage and conductors. [alpha.elohim.host](https://alpha.elohim.host) serves the Angular apps, which bundle Sophia's renderers, and [doorway-alpha.elohim.host](https://doorway-alpha.elohim.host) is its doorway: it answers the apps' API calls and projects content to the web.
 - The Visitor and Hosted stages of the [stewardship ladder](#progressive-stewardship), on the alpha doorways, including the doorway's side of moving a hosted person's key to their own device.
-- The first stage of the authoring gate, with no agent in the loop: on the path that stores an EPR, `elohim-storage` classifies whether the signer is authorized for the reach the record declares, and refuses to store it if not. Public and commons reach are always allowed; intimate, trusted, familiar and community reach need a signer the node already knows. This checks who may declare a reach, not whether reach has been earned; earning is the designed second stage listed below.
+- The first stage of the authoring gate, with no agent in the loop: on the path that stores an EPR, `elohim-storage` classifies whether the signer is authorized for the reach the record declares, and refuses to store it if not. Public and commons reach are always allowed; intimate, trusted, familiar and community reach need a signer the node already knows, since a claim on someone's circle is accepted only from a signer the node holds an identity record for. This checks who may declare a reach, not whether reach has been earned; earning is the designed second stage listed below.
 - Feedback back-propagation and the standing projection, in `elohim-storage`: when a feedback signal arrives, a peer updates the standing it sees and passes the signal one hop back toward where the content came from.
 - Quarantine signals, a kind of feedback signal that travels the same path.
 
@@ -143,6 +150,7 @@ Designed, not yet running:
 
 - The agent runtime. The crate is implemented, but no service runs it, so no elohim takes part in any gate yet.
 - Reach gated by standing. The evaluator that weighs an author's standing is written and tested but not yet on the storage path; cases it cannot decide are meant to go to the person's elohim.
+- Enforcement of avodah's attestation gates at bid or acceptance; a work item declares them and its page shows them.
 - The relay and consumption gates.
 - The quarantine short-circuit at relay, and restitution as economic events.
 - The feed protocol (the specification's `/elohim/feed/1.0.0`).
@@ -150,7 +158,9 @@ Designed, not yet running:
 
 The desktop steward app (`steward/device`) and the node runtime (`steward/node`) build from source, and their pipeline runs only on demand; no packaged release is linked from this README.
 
-Production deploys are paused, and the apex elohim.host is served by an alpha doorway. The live source of truth is the habit register: `just status habits` lists what the system reliably does, each entry bound to a runnable check.
+Production deploys are paused, and the apex elohim.host is served by an alpha doorway. The live source of truth is the habit register ([How we work](#how-we-work) explains it): `just status habits` lists what the system reliably does, each entry bound to a runnable check, and it is where the pillar-level answer (what a person can do in each app today) lives; the list above is scoped to the substrate.
+
+For the full picture, read the architecture [index](./genesis/docs/content/elohim-protocol/architecture/INDEX.md) and [map](./genesis/docs/content/elohim-protocol/architecture/MAP.md), the [seam map](./genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md), and [How Content Links Work](./genesis/docs/content/elohim-protocol/epr-developer-guide.md).
 
 ## Repository Structure
 
@@ -200,7 +210,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   │   └── docs/  tests/          # Developer docs for this layer; multi-conductor sweettests and DNA manifest checks
 │   ├── brit/                      # Fork of gitoxide whose commits carry EPR provenance (git submodule)
 │   ├── rakia/                     # Distributed build system: rakia-core, rakia-brit, rakia-executor (git submodule)
-│   └── holochain-conductor/       # The pinned conductor fork (git submodule; see Prerequisites under Development)
+│   └── holochain-conductor/       # The pinned conductor fork the fleet's conductor image is built from (git submodule)
 │
 ├── app/                           # Frontend applications (Angular 22)
 │   ├── elohim-app/                # Main Angular platform
@@ -232,7 +242,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 ├── doorway/                       # Web2 doorway (bootstrap, signal, conductor gateway, projection cache)
 │   ├── doorway-service/           # Rust service
 │   ├── doorway-app/               # Angular dashboard for doorway operators
-│   ├── iroh-relay/                # Container packaging for the stock iroh relay (the doorway's relay plane)
+│   ├── iroh-relay/                # Container packaging for the stock iroh relay that conductors home to, run beside the doorway
 │   └── relay-addr-beacon/         # Keeps a home relay's changing WAN address published in DNS and pkarr
 │
 ├── genesis/                       # Content, operations and CI
@@ -248,7 +258,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   └── research/  blobs/  assets/  scripts/   # Research surveys, seed blob pack, images, ops scripts
 │
 ├── che-devworkspaces/             # Eclipse Che, Jenkins and dev container images (git submodule)
-├── vendor/                        # One patched crates.io crate (iroh-quinn-proto), retired with the iroh 1.x move
+├── vendor/                        # One patched crates.io crate (iroh-quinn-proto 0.13, a fix elohim-storage applies through [patch])
 ├── scripts/                       # Repo-wide tooling (CI job bodies, local dev, Sophia releases)
 └── patches/                       # pnpm patch for @angular/build
 ```
@@ -264,7 +274,7 @@ The Elohim Protocol meets people where they are, with a gradual path from curiou
 | **App Steward** | Desktop app, self-custodied keys | Local device + DHT |
 | **Node Steward** | Always-on infrastructure; a node steward may also host a doorway for others | Self-hosted + DHT |
 
-Moving up a stage is designed to keep your identity, content, history and standing. The same agent key moves with you: a hosted person exports it from their doorway to their own device, then confirms stewardship with the doorway. Recovery from a lost device is designed to be social: the people you trust confirm it's you. Hosted people sign in at their doorway, stewards sign in at their own runtime's portal, and apps never own a login.
+Moving up a stage is designed to keep your identity, content, history and standing. The same signing key (your Holochain agent key) is designed to move with you: a hosted person exports it from their doorway to their own device, then confirms stewardship with the doorway. The doorway's side of that move runs today; the device side is in the desktop steward app, which builds from source. Recovery from a lost device is designed to be social: the people you trust confirm it's you. Hosted people sign in at their doorway, stewards sign in at their own runtime's portal, and apps never own a login.
 
 The [hardware specification](./genesis/docs/content/elohim-protocol/hardware-spec.md) holds the canonical ladder, where the stages are named Visitor, Hosted User, App User and Node Operator; this README uses the names the app's code and the desktop steward app use. [Stewardship Over Sovereignty](./genesis/docs/architecture/stewardship-over-sovereignty.md) explains why the top rung is community-grounded autonomy rather than key custody.
 
@@ -277,68 +287,33 @@ We can encode extraction, or we can encode love.
 
 ## Development
 
-### Prerequisites
+### How we work
 
-What you need depends on which of the [three ways to run](#three-ways-to-run) you take. Path 1 needs only a browser and an account; the list below applies to paths 2 and 3, wherever you run them.
+Humans and coding agents work in this repository side by side, and the way of working is written down once for both. [CLAUDE.md](./CLAUDE.md) is the operating manual: it carries the commands, the traps that bite, and where each concern lives, and [`AGENTS.md`](./AGENTS.md) projects the same text for other agent runtimes.
 
-- Node 24.15 or later and pnpm 10 (both pinned in the root `package.json`): paths 2 and 3.
-- Rust stable, with the `wasm32-unknown-unknown` target and `wasm-pack`: paths 2 and 3. Path 2 needs them because its first-time step compiles a browser-side WASM module.
-- [`just`](https://github.com/casey/just), which runs the root developer commands: path 3, and `just gate` before you push.
-- Holochain 0.7 (`holochain` and `hc`) on your `PATH`: path 3 only. The stock release is enough for a local stack; the project's conductor fork is needed to join the alpha network (`just dev start alpha`) and to run the household mesh. The stock binaries come from Holochain's own install guide; the fork is built from the `elohim/holochain-conductor` submodule, as described in `elohim/conductor-image/README.md`.
-- Optional for path 3: `mongod` on your `PATH` gives the local doorway its own account store; without it the doorway runs keyless.
+The scenario is the specification. Feature work starts from a Gherkin scenario under [`genesis/a2o/features/`](./genesis/a2o/features/) that describes the experience a person should have; the implementation is done when the scenario passes, and the two land together.
 
-After cloning, fetch the submodules:
+What the system reliably does is kept in a habit register, each habit bound to a runnable check. A habit's status flips only on evidence (a build, a live probe, a test run), never on intention, and `just status habits` renders the register (`just` is the command runner; the root `justfile` defines its recipes). The work at any moment is to move the top red habit toward green with proof.
 
-```bash
-git submodule update --init --recursive
-```
+Verification is scoped to the tree you touched: `just gate` finds the projects a change affects and runs their build and test checks, and the pre-push hook runs the same gates. The household mesh proves first and the alpha fleet confirms: a change is shown working on the multi-peer mesh on one machine before it is expected to work on the deployed network.
 
-The conductor fork submodule (`elohim/holochain-conductor`) is set to `update = none`, so this command skips it; it is the pinned fork the fleet's conductor image is built from.
+Agents work here under directory-local governance. A directory's `.epr-meta` declares the rules an edit there must satisfy, a hook checks them before a write lands, and READMEs and scenarios pass a fresh-context blind reader (a reviewer given the finished document and nothing else) before they land. The root developer interface is eight verbs, which `just --list` shows and CLAUDE.md explains: `gate`, `test`, `dev`, `mesh`, `seed`, `look`, `status` and `codegen`.
 
-Sophia, the assessment renderer, is a git submodule with its own pnpm workspace. `pnpm build` of the app, and CI, need its web-component bundle: the build copies it from a built `sophia/` checkout (`cd sophia && pnpm install && pnpm build && pnpm build:umd`) or downloads a published copy. The dev-server paths below do not need this step.
+### Running it
 
-### Three ways to run
+There are three ways to run it, and CLAUDE.md carries the variants and the traps around each.
 
-1. Eclipse Che in the browser. The Contribute badge at the top opens a workspace on code.ethosengine.com, defined by the root `devfile.yaml`. The workspace image carries the toolchain, so you need nothing locally beyond a browser and an account on that server. Once the workspace opens, fetch the submodules and continue with path 2 or 3.
-
-2. Frontend only, against live alpha data, with no local backend:
-
-   ```bash
-   pnpm install
-   pnpm --filter elohim-app run prestart   # first time only: builds the storage client, fonts, service worker and WASM cache module
-   pnpm --filter elohim-app start:alpha
-   ```
-
-   When the dev server reports it is ready, open http://localhost:4200/. The app proxies its API calls to doorway-alpha.elohim.host, so the content you see comes from alpha. Registration on alpha is open, and an account there is a Hosted stage account, but alpha is a shared test network: use this path for reading and UI work, and do not drive write-heavy dev loops against it.
-
-3. The full local stack (one conductor, one storage peer and one doorway on this machine):
-
-   ```bash
-   just dev start    # starts the stack in the background, then returns
-   pnpm app:dev      # the app at http://localhost:4200/, proxied to the local doorway on :8888
-   ```
-
-   Initialize the submodules first (see [Prerequisites](#prerequisites)). The first `just dev start` builds five DNAs, elohim-storage and doorway-service from source and needs several GB of RAM. The stack is ready when the console prints `Elohim P2P Framework Ready` with a table of endpoints and http://localhost:8888/health answers. A fresh stack starts empty. To seed it, run `just dev start isolated true` instead: the second argument is the network profile (`isolated`, the default, keeps the conductor on its own network with no outside peers) and `true` runs the content seeder (200 items by default). `just dev stop` stops the stack.
-
-   This is the single-node stack; `just mesh start` runs the multi-peer household mesh. The mesh needs the pinned conductor fork (the `holochain` and `hc` build that the `elohim/holochain-conductor` submodule pins), `just mesh wait` blocks until every peer is ready, and `just mesh stop` stops it.
-
-`just --list` shows the eight root verbs: `gate`, `test`, `dev`, `mesh`, `seed`, `look`, `status` and `codegen`.
+- A hosted workspace. The Contribute badge at the top opens an Eclipse Che workspace on code.ethosengine.com for people with an account there; the workspace image carries the toolchain, and the commands below run from its terminal.
+- The frontend against live alpha data, with no local backend and no submodules (Sophia's renderers arrive as a prebuilt bundle that a build fetches, and the dev server runs without it). From a clone of [the repository](https://github.com/ethosengine/elohim) with Node 24 and pnpm 10 (pinned in the root `package.json`) and a Rust toolchain with the `wasm32-unknown-unknown` target and `wasm-pack`, run `pnpm install`, then `pnpm --filter elohim-app run prestart` once (it compiles a browser-side WASM module), then `pnpm --filter elohim-app start:alpha`, and open http://localhost:4200/.
+- The full local stack: a conductor, a storage peer and a doorway on your machine. Beyond the frontend's needs it takes `just`, Holochain 0.7 (`holochain` and `hc` on your `PATH`) and `git submodule update --init --recursive`; `just dev start` launches it and, from the repository root, `pnpm app:dev` serves the app against it. `just mesh start` runs the multi-peer household mesh instead, which needs the pinned conductor fork that CLAUDE.md covers.
 
 ### Contributing
 
-There is no separate contributing guide. Open an issue on [GitHub](https://github.com/ethosengine/elohim), or fork the repository and open a pull request against `dev`. Before you push, run `just gate`: its gates are the build and test checks for the projects your change touches, unrelated to the content gates described above. The pre-push hook runs the same checks. Feature work starts from a scenario: find or write the `.feature` file under `genesis/a2o/features/` that describes the experience, implement until it passes, and commit the two together. The license a contribution lands under is not yet settled; see [License](#license).
+Open an issue on [GitHub](https://github.com/ethosengine/elohim), or fork the repository and open a pull request against `dev`. Run `just gate` before you push. Feature work lands together with the scenario that specifies it; fixes and docs need only the gate, and the blind-reader pass on a README runs on the maintainers' side at review. The license a contribution lands under is not yet settled; see [License](#license).
 
 ### CI
 
-All GitHub webhooks go to one orchestrator job, which picks the pipelines a push affects and runs them in dependency order; [`genesis/orchestrator/README.md`](./genesis/orchestrator/README.md) explains how. `dev` is the integration branch. Branches pushed to this repository deploy by name: `dev` and feature branches to the alpha fleet (alpha.elohim.host), `staging*` branches to staging, and `main` to production (production deploys are paused; see [What runs today](#what-runs-today-september-2026)).
-
-### Environment notes
-
-- `devfile.yaml` defines the Eclipse Che workspace.
-- The root `Jenkinsfile` is the Angular app pipeline only. Every other pipeline is declared by a per-project `build-manifest.json`.
-- The Angular dev server allow-lists the Che workspace domain and proxies API paths to the doorway on :8888.
-- pnpm workspaces run from the repo root, except `sophia` (see [Prerequisites](#prerequisites)).
-- Kubernetes manifests live in `genesis/orchestrator/manifests/`, per service and environment. `genesis/manifests/` holds `cluster-state.yaml` and the generated `habits.yaml`; the operator-applied CI infrastructure and its runbooks sit in `genesis/orchestrator/manifests/ci-infra/`.
+All GitHub webhooks go to one orchestrator job, which picks the pipelines a push affects and runs them in dependency order; [`genesis/orchestrator/README.md`](./genesis/orchestrator/README.md) explains how. `dev` deploys to the alpha fleet and `main` to production, whose deploys are paused (see [What runs today](#what-runs-today-september-2026)); the orchestrator README carries the full branch-to-environment rules.
 
 ## Further Reading
 
