@@ -12,7 +12,7 @@ Holochain gives us agent-centric identity, content-addressed data, and cryptogra
 
 But a bridge can become a bottleneck — or worse, a chokepoint. Traditional federated systems (Mastodon, email) solve this by making instances authoritative for their users. If your instance goes down, you lose access to your data. If your admin decides to censor you, your content disappears.
 
-Doorway refuses this bargain. A doorway is a **projection** of the DHT, not an authority over it. Your identity is your cryptographic key, not your doorway account. Your content lives in the distributed hash table, validated by DNA rules that no single operator controls. If a doorway misbehaves, you walk to the next one — or build your own.
+Doorway refuses this bargain. A doorway is a **projection** of the DHT and peer fabric, not an authority over it. Your identity is your cryptographic key, not your doorway account. Your content lives in the distributed hash table, validated by DNA rules that no single operator controls. If a doorway misbehaves, you walk to the next one — or build your own.
 
 ## What a Doorway Steward Does
 
