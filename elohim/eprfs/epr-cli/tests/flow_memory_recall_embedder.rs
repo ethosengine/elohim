@@ -118,9 +118,28 @@ fn both_embedding_budgets_are_declared_by_the_contract() {
     let undeclared = Contract::from_value(undeclared).expect("still a valid contract");
     let refused = EmbedBudget::fold(&undeclared).expect_err("an undeclared budget is refused");
     assert!(
-        refused.to_string().contains("fold_batch_texts"),
+        refused
+            .to_string()
+            .contains("invalid positive budget: fold_batch_texts"),
         "{refused}"
     );
+
+    // The same reader `Contract::validate` uses: a count budget must be an integer, a seconds
+    // budget may be fractional.
+    let mut fractional = contract.value.clone();
+    fractional["limits"]["fold_batch_texts"] = serde_json::json!(1.5);
+    let fractional = Contract::from_value(fractional).expect("still a valid contract");
+    let refused = EmbedBudget::fold(&fractional).expect_err("a fractional count is refused");
+    assert!(
+        refused
+            .to_string()
+            .contains("byte/count budgets must be integers: fold_batch_texts"),
+        "{refused}"
+    );
+    let mut seconds = contract.value.clone();
+    seconds["limits"]["fold_procedure_seconds"] = serde_json::json!(0.5);
+    let seconds = Contract::from_value(seconds).expect("still a valid contract");
+    assert_eq!(EmbedBudget::fold(&seconds).unwrap().seconds, 0.5);
 }
 
 /// A batch larger than the budget allows is the caller's error, refused before anything runs.
@@ -168,11 +187,56 @@ fn a_model_dir_with_wrong_bytes_reports_the_pin_refusal() {
     let budget = EmbedBudget::query(&contract()).unwrap();
     let error = embedder.embed(&texts(&["x"]), budget).expect_err("refused");
     let rendered = error.to_string();
-    assert_eq!(
-        unavailable_reason(error),
-        "model bytes do not match the pin"
+    assert!(
+        rendered.starts_with("unavailable: model bytes do not match the pin ("),
+        "{rendered}"
     );
-    assert_eq!(rendered, "unavailable: model bytes do not match the pin");
+    // The procedure's own reason rides along: which file, what it hashes to, what was pinned.
+    let reason = unavailable_reason(error);
+    assert!(reason.contains("model.onnx hashes to bafkrei"), "{reason}");
+    assert!(reason.contains("the pin is bafkrei"), "{reason}");
+}
+
+/// A resolved directory with no `model.onnx` is not silently the same as wrong bytes: the reason
+/// says the file could not be read.
+#[test]
+fn a_model_dir_missing_its_model_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let embedder = PinnedProcedure {
+        manifest: manifest_resolving_to(dir.path()),
+        procedure: procedure_path(),
+        interpreter: "python3".to_string(),
+    };
+    let budget = EmbedBudget::query(&contract()).unwrap();
+    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    assert!(
+        reason.starts_with("model bytes do not match the pin (model.onnx unreadable"),
+        "{reason}"
+    );
+}
+
+/// An unexpected failure reports its informative last line, not `Traceback (most recent call
+/// last):`.
+#[test]
+fn an_unexpected_procedure_failure_reports_its_last_stderr_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let stub = dir.path().join("stub.py");
+    let body = b"import sys\nsys.stdin.read()\nraise RuntimeError('the session could not load')\n";
+    std::fs::write(&stub, body).unwrap();
+    let mut manifest = manifest_resolving_to(dir.path());
+    manifest.procedure = Some(BlobCid::compute_raw(body).to_string());
+    let embedder = PinnedProcedure {
+        manifest,
+        procedure: stub,
+        interpreter: "python3".to_string(),
+    };
+    let budget = EmbedBudget::query(&contract()).unwrap();
+    let reason = unavailable_reason(embedder.embed(&texts(&["x"]), budget).unwrap_err());
+    assert!(
+        reason.ends_with("RuntimeError: the session could not load"),
+        "{reason}"
+    );
+    assert!(!reason.contains("Traceback"), "{reason}");
 }
 
 /// No directory in the `resolve` list exists: the route is unavailable and says where it looked.

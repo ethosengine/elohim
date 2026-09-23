@@ -61,36 +61,22 @@ impl EmbedBudget {
     /// Embedding one question on the query path: the provider envelope.
     pub fn query(contract: &Contract) -> FlowResult<Self> {
         Ok(Self {
-            bytes: declared_limit(contract, "provider_bytes", true)? as usize,
-            seconds: declared_limit(contract, "provider_seconds", false)?,
+            bytes: contract.positive_limit("provider_bytes")? as usize,
+            seconds: contract.positive_limit("provider_seconds")?,
             texts: 1,
         })
     }
 
-    /// One fold batch, off the query path: the fold procedure's own declared envelope.
+    /// One fold batch, off the query path: the fold procedure's own declared envelope. These
+    /// budgets are not required of every contract, so they are checked here, at the point of use,
+    /// by the same reader `Contract::validate` applies to the required ones.
     pub fn fold(contract: &Contract) -> FlowResult<Self> {
         Ok(Self {
-            bytes: declared_limit(contract, "fold_procedure_bytes", true)? as usize,
-            seconds: declared_limit(contract, "fold_procedure_seconds", false)?,
-            texts: declared_limit(contract, "fold_batch_texts", true)? as usize,
+            bytes: contract.positive_limit("fold_procedure_bytes")? as usize,
+            seconds: contract.positive_limit("fold_procedure_seconds")?,
+            texts: contract.positive_limit("fold_batch_texts")? as usize,
         })
     }
-}
-
-/// A budget the contract must declare, positive and finite — the same refusal `Contract::validate`
-/// gives its required limits, raised here because only an embedding caller needs these.
-fn declared_limit(contract: &Contract, name: &str, integer: bool) -> FlowResult<f64> {
-    let raw = contract.value.pointer(&format!("/limits/{name}"));
-    let value = raw
-        .and_then(Value::as_f64)
-        .filter(|v| v.is_finite() && *v > 0.0)
-        .ok_or_else(|| refused(format!("invalid positive budget: {name}")))?;
-    if integer && !raw.is_some_and(Value::is_u64) {
-        return Err(refused(format!(
-            "byte/count budgets must be integers: {name}"
-        )));
-    }
-    Ok(value)
 }
 
 /// Texts in, one vector per text out, under the budget the caller resolved from the contract.
@@ -312,15 +298,21 @@ impl Embedder for PinnedProcedure {
         if let Some(reason) = outcome.error {
             return Err(unavailable(format!("embedding procedure: {reason}")));
         }
+        // The LAST non-empty stderr line is the informative one: the procedure's own one-line
+        // reason, or the exception line that ends an unexpected traceback.
         let said = String::from_utf8_lossy(&outcome.stderr)
             .lines()
-            .next()
+            .map(str::trim)
+            .rfind(|line| !line.is_empty())
             .unwrap_or_default()
-            .trim()
             .to_string();
         match outcome.status {
             Some(0) => self.reply(&outcome.stdout, texts.len()),
-            Some(EXIT_PIN_MISMATCH) => Err(unavailable("model bytes do not match the pin")),
+            // The procedure's reason names the file and its actual vs pinned CID — or that the
+            // file could not be read at all — so it rides along rather than being dropped.
+            Some(EXIT_PIN_MISMATCH) => Err(unavailable(format!(
+                "model bytes do not match the pin ({said})"
+            ))),
             Some(EXIT_BAD_REQUEST) => match said.strip_prefix("unavailable: ") {
                 Some(reason) => Err(unavailable(reason)),
                 None => Err(refused(format!(

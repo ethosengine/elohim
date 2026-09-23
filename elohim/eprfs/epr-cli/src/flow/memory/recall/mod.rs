@@ -131,8 +131,15 @@ const REQUIRED_LIMITS: [&str; 13] = [
     "native_timeout_seconds",
 ];
 
-/// The three budgets that may be fractional seconds; every other one counts bytes or items.
-const SECOND_LIMITS: [&str; 3] = ["scan_seconds", "provider_seconds", "native_timeout_seconds"];
+/// The budgets that may be fractional seconds; every other one counts bytes or items.
+/// `fold_procedure_seconds` is not a REQUIRED limit (only an embedding fold reads it), but it is
+/// a seconds budget wherever [`Contract::positive_limit`] reads it.
+const SECOND_LIMITS: [&str; 4] = [
+    "scan_seconds",
+    "provider_seconds",
+    "native_timeout_seconds",
+    "fold_procedure_seconds",
+];
 
 /// The ceremony operations this executor answers.
 ///
@@ -242,20 +249,7 @@ impl Contract {
             ));
         }
         for name in REQUIRED_LIMITS {
-            let raw = self
-                .value
-                .pointer(&format!("/limits/{name}"))
-                .ok_or_else(|| refused(format!("invalid positive budget: {name}")))?;
-            let value = raw
-                .as_f64()
-                .filter(|v| v.is_finite() && *v > 0.0)
-                .ok_or_else(|| refused(format!("invalid positive budget: {name}")))?;
-            if !SECOND_LIMITS.contains(&name) && !raw.is_i64() && !raw.is_u64() {
-                return Err(refused(format!(
-                    "byte/count budgets must be integers: {name}"
-                )));
-            }
-            let _ = value;
+            self.positive_limit(name)?;
         }
         let roots = self.source_roots();
         if roots.is_empty()
@@ -279,6 +273,27 @@ impl Contract {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// One declared budget, positive and finite — the single reader of the `limits.*` rule:
+    /// a seconds budget ([`SECOND_LIMITS`]) may be fractional, every other one counts bytes or
+    /// items and must be an integer. `validate` applies it to every [`REQUIRED_LIMITS`] entry; a
+    /// caller needing an optional budget (the embedding fold's) applies it at the point of use.
+    fn positive_limit(&self, name: &str) -> FlowResult<f64> {
+        let raw = self
+            .value
+            .pointer(&format!("/limits/{name}"))
+            .ok_or_else(|| refused(format!("invalid positive budget: {name}")))?;
+        let value = raw
+            .as_f64()
+            .filter(|v| v.is_finite() && *v > 0.0)
+            .ok_or_else(|| refused(format!("invalid positive budget: {name}")))?;
+        if !SECOND_LIMITS.contains(&name) && !raw.is_i64() && !raw.is_u64() {
+            return Err(refused(format!(
+                "byte/count budgets must be integers: {name}"
+            )));
+        }
+        Ok(value)
     }
 
     fn limit_usize(&self, name: &str) -> usize {
