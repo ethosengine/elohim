@@ -35,6 +35,30 @@ decision.**
   `503 {"error": …CellDisabled…, "cause": "conductor-app-disabled"}`, which is what has failed every app delivery
   since #1707. Priority raised to high.
 
+**SETTLED 2026-09-22 02:50Z (conductor logs + the fork's source).** Two mechanisms, both now named.
+(1) *Startup is the window, and it is hours.* A cell is absent from the conductor's in-memory `running_cells` until
+startup finishes `create_cells_and_startup` for its app, and startup blocks inside the kitsune space join on
+`Dht::try_from_store` — a sequential walk of 512 sectors over the peer's persistent op store. On 2026-09-21 each
+conductor logged its `DHT model initialised in …` lines and `Conductor startup: apps enabled.` 0–20 s after the
+slowest one: matthew 56 min, susan 1 h 47, james 1 h 34, jessica 2 h 09, adam 3 h 29, gertrude 5 h 51, eve 6 h 09
+after its restart. Interfaces open first, so every call in between answers `CellDisabled`; `enable_app` on an
+already-Enabled app short-circuits without touching cells (conductor.rs ~2043), so storage's enable ladder cannot
+shorten it. The window scales with stored history, which is why the household (fresh cast) sees ~11 min.
+(2) *Stranded after startup — cause still open.* gertrude, eve and adam (infrastructure) and james (lamad) kept
+answering `CellDisabled` for hours AFTER their conductor's `apps enabled`, with zero disable/teardown lines in any
+conductor log (`DISABLING the following apps` / `Cell cleaned up and removed`: 0 on all 7). A conductor restart is
+therefore NOT a reliable cure for this class. The decisive reading is the conductor's own running-cell map
+(`ListCellIds` / `DumpConductorState`) against the failing `(DNA, agent)` — an admin-interface read storage can
+make and the fleet's `/db/p2p/conductor-diagnostics` (503, PROBE-BROKEN) should carry.
+Also found: a second, coordinated restart of the three conductors on node `ethosengine` (jessica, james, matthew)
+at ~19:53Z — a node event, not a deploy; james's lamad cell went down with it and never came back. And the
+`AddrInUse` crash-loop on every restart is the app-interface port 4445 still held by the predecessor while storage
+attaches too early.
+**Cure order (Astra, source-verified):** storage observes actual cell membership via `ListCellIds` and stops
+spending `enable_app` on Enabled apps (household-verifiable) → a scoped disable→enable only for a confirmed
+stranded app → the conductor's `enable_app` reconciles missing cells → startup/attachment ordering. Restarting
+the conductor retries construction and clears a stuck attempt, but repeats the hours-long load.
+
 **What would settle it.** Whether the cells converge by themselves in restart order (jessica, james, gertrude, eve,
 adam, matthew after susan) or need a second conductor restart — read
 `{namespace="elohim-alpha"} |= "conductor app is RUNNING again"` and `elohim_conductor_app_enabled` per pod/role.

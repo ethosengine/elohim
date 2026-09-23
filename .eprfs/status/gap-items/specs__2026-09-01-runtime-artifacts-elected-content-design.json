@@ -1,0 +1,83 @@
+{
+ "doc": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md",
+ "slug": "specs__2026-09-01-runtime-artifacts-elected-content-design",
+ "method": "agent-decomposition",
+ "class": "protocol-canonical",
+ "doc_requires_env": [],
+ "note": "agent-decomposed 2026-09-23: \u00a712 (brit composition / change-class routing) only. \u00a71-\u00a711's atoms live as the task-release-* backlog atoms (several landed but still read open \u2014 see the 2026-09-23 survey).",
+ "count": 9,
+ "items": [
+  {
+   "text": "Slice 1 \u2014 envelope.requires: schema field + packager + adoption-controller verify (typed requirement_unmet, re-check per sweep) + mesh a2o station (requiring release waits, then adopts when storage converges)",
+   "line": 714,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#1",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L714",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 2 \u2014 app bundle as a release class on the app EPR's channel; doorways adopt; app pipeline publishes at staging instead of the fan-out PATCH; then delete app\u2192edge dependsOn (receipt: an app delivery with no edge in the push)",
+   "line": 717,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#2",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L717",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 3 \u2014 CI publishes coordinator releases at staging, replacing the rung-1 fleet-coordswap push; needs the operator's observe\u2192apply flip for fleet peers",
+   "line": 720,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#3",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L720",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 4 \u2014 Dataplane Validation as a continuous observer authoring soak attestations; remove the per-edge-build validation stage",
+   "line": 722,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#4",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L722",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 5 \u2014 content-keyed build memoization (input seal CID \u2192 release-build attestation); retire commit-keyed baselines and the edge live-object annotations (storage-inputs, happ-roll-key) class by class",
+   "line": 724,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#5",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L724",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 6 \u2014 storage- and doorway-binary classes climb local \u2192 T3 \u2192 mesh \u2192 cluster; doorway-binary artifactClass added beside storage-binary; conductor line via Nachalah slice 3",
+   "line": 726,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#6",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L726",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Slice 7 \u2014 any-EPR surface: publish/promote/revert/fork/pin as brit verbs over any EPR (design only until slices 1-2 prove)",
+   "line": 728,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#7",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L728",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "release-build attestation discriminator carrying brit BuildAttestationContentNode's payload; published form carries coarse device archetype only",
+   "line": 624,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#8",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L624",
+   "class": "protocol-canonical"
+  },
+  {
+   "text": "Fleet runtime-config mount is subPath + readOnly \u2014 ConfigMap edits never propagate and config-epr cannot write (backlog runtime-config-fleet-mount-subpath-never-propagates)",
+   "line": 657,
+   "state": "OPEN",
+   "id": "specs__2026-09-01-runtime-artifacts-elected-content-design#9",
+   "cites": "genesis/docs/superpowers/specs/2026-09-01-runtime-artifacts-elected-content-design.md#L657",
+   "class": "protocol-canonical"
+  }
+ ]
+}
