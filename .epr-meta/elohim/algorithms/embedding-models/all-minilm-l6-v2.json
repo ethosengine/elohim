@@ -10,9 +10,9 @@
   "max_tokens": 256,
   "source": "sentence-transformers/all-MiniLM-L6-v2",
   "resolve": [
-    "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx",
-    "$EPR_EMBED_MODEL_DIR"
+    "$EPR_EMBED_MODEL_DIR",
+    "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx"
   ],
-  "procedure": null,
+  "procedure": "bafkreiaki7eb57yokssmcxas74g5zwr4tjrqcolnk7gl7nukpnc4rii4hu",
   "fitness": "recall-bank-reach@1"
 }

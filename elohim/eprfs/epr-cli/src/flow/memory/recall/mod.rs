@@ -73,6 +73,10 @@ use passage::outline;
 
 mod providers;
 pub use providers::bounded_process;
+
+// The embedding step of the semantic route: a pinned fold procedure behind the bounded envelope,
+// and a fixture embedder for tests (governed-discovery station 4, task 4.2).
+pub mod embedder;
 use providers::{process_result, providers_for};
 
 mod journey;

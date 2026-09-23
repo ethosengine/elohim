@@ -1404,7 +1404,7 @@ fn discovery_respects_its_scan_budget_and_skips_symlinks() {
 fn a_foreign_provider_is_bounded_by_bytes_and_by_seconds() {
     use recall::bounded_process;
     let big = vec!["-c".to_string(), "print('x'*100000)".to_string()];
-    let over = bounded_process("python3", &big, 64, 5.0).expect("spawn");
+    let over = bounded_process("python3", &big, 64, 5.0, None).expect("spawn");
     assert_eq!(
         over.error.as_deref(),
         Some("provider output exceeds budget; results withheld")
@@ -1415,18 +1415,57 @@ fn a_foreign_provider_is_bounded_by_bytes_and_by_seconds() {
         "-c".to_string(),
         "import sys; sys.stderr.write('e'*100000)".to_string(),
     ];
-    let noisy = bounded_process("python3", &noisy, 64, 5.0).expect("spawn");
+    let noisy = bounded_process("python3", &noisy, 64, 5.0, None).expect("spawn");
     assert!(noisy.error.is_some());
 
     let slow = vec!["-c".to_string(), "import time; time.sleep(30)".to_string()];
-    let slow = bounded_process("python3", &slow, 4096, 0.4).expect("spawn");
+    let slow = bounded_process("python3", &slow, 4096, 0.4, None).expect("spawn");
     assert_eq!(slow.error.as_deref(), Some("provider timed out"));
 
     let failed = vec!["-c".to_string(), "raise SystemExit(3)".to_string()];
-    let failed = bounded_process("python3", &failed, 4096, 5.0).expect("spawn");
+    let failed = bounded_process("python3", &failed, 4096, 5.0, None).expect("spawn");
     assert_eq!(failed.status, Some(3));
     assert!(failed.error.is_none());
-    assert!(bounded_process("definitely-not-a-program", &[], 4096, 1.0).is_err());
+    assert!(bounded_process("definitely-not-a-program", &[], 4096, 1.0, None).is_err());
+}
+
+/// The envelope can hand a procedure its request on stdin (the embedder's fold procedure reads
+/// one JSON object there). Input is written from its own thread and then closed, so a request
+/// larger than a pipe buffer cannot deadlock against the output readers, and the byte/second
+/// bounds are unchanged.
+#[test]
+fn a_bounded_process_reads_its_input_on_stdin() {
+    use recall::bounded_process;
+    let echoed = bounded_process("cat", &[], 64, 5.0, Some(b"hello, stdin")).expect("spawn");
+    assert_eq!(echoed.status, Some(0));
+    assert!(echoed.error.is_none());
+    assert_eq!(echoed.stdout, b"hello, stdin");
+
+    // Larger than any pipe buffer, echoed back in full: the writer and the readers run together.
+    let big = vec![b'x'; 1 << 20];
+    let round_trip = bounded_process("cat", &[], 2 << 20, 10.0, Some(&big)).expect("spawn");
+    assert_eq!(round_trip.status, Some(0));
+    assert_eq!(round_trip.stdout.len(), big.len());
+
+    // The output budget still binds when the input is echoed past it.
+    let over = bounded_process("cat", &[], 64, 5.0, Some(&big)).expect("spawn");
+    assert_eq!(
+        over.error.as_deref(),
+        Some("provider output exceeds budget; results withheld")
+    );
+
+    // A child that never reads its stdin is still killed on time.
+    let deaf = vec!["-c".to_string(), "import time; time.sleep(30)".to_string()];
+    let deaf = bounded_process("python3", &deaf, 4096, 0.4, Some(&big)).expect("spawn");
+    assert_eq!(deaf.error.as_deref(), Some("provider timed out"));
+
+    // Without input, stdin stays closed: a reader sees end-of-file at once.
+    let closed = vec![
+        "-c".to_string(),
+        "import sys; print(len(sys.stdin.read()))".to_string(),
+    ];
+    let closed = bounded_process("python3", &closed, 64, 5.0, None).expect("spawn");
+    assert_eq!(closed.stdout, b"0\n");
 }
 
 /// Python: `test_method_identity_pins_contract_and_implementation_bytes` (packet suite).
@@ -2994,9 +3033,10 @@ fn a_contract_with_no_process_spec_or_bounds_key_falls_back_to_composition_and_l
     let bounds = contract.bounds().unwrap();
     assert_eq!(
         bounds.len(),
-        19,
+        22,
         "one Bound per declared limits.* entry, unit-for-unit \
-         (18 + resume_commits, station S2 of the 2026-09-22 recall-Codex-trail sprint)"
+         (18 + resume_commits, station S2 of the 2026-09-22 recall-Codex-trail sprint; \
+         + fold_procedure_bytes, fold_procedure_seconds, fold_batch_texts, station 4 task 4.2)"
     );
     let body = bounds
         .iter()

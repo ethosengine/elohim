@@ -34,7 +34,10 @@ rules:
       and edge lookups. DISCOVERY (`discovery.rs`): the deterministic local traversal — `discover`,
       `discover_scored`, outline/heading and question-term machinery. PROVIDERS (`providers.rs`):
       the `Provider` trait and its implementations (`local`, `mempalace`, `fixture`) — recipe-
-      selected, never a source of authority. LENS (`lens.rs`, station 1): the `role@model ->
+      selected, never a source of authority. EMBEDDER (`embedder.rs`, station 4): the `Embedder`
+      trait, `PinnedProcedure` (the pinned fold procedure `embedder/embed.py` behind
+      `bounded_process`) and the `Fixture` embedder — how texts become vectors, never how a
+      provider ranks them. LENS (`lens.rs`, station 1): the `role@model ->
       LensLevel` table and lens resolution — not yet split out; a function shaping that table
       belongs there once it exists. RENDER (`render.rs`): turning a view into the human screen —
       `render`, `render_first_screen`, `render_outline`, `render_hits`. PASSAGE (`passage.rs`): where inside an already-named candidate the question's terms land — `outline`, `best_section`, and the term-density window for unsectioned structured files. REFUSAL (`refusal.rs`): the

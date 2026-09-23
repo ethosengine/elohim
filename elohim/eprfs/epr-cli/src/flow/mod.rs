@@ -79,6 +79,12 @@ pub enum FlowError {
 
     #[error("resource not found in sidecar labels or the tree: {0}")]
     UnknownResource(String),
+
+    /// A declared route cannot run here and now — its interpreter, module, model or pinned bytes
+    /// were checked at call time and found wanting. Not a fault in the question: a caller reports
+    /// the reason on its screen and answers without that route.
+    #[error("unavailable: {0}")]
+    Unavailable(String),
 }
 
 pub type FlowResult<T> = std::result::Result<T, FlowError>;

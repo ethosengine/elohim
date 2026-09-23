@@ -28,6 +28,10 @@ const MODEL_REL: &str = ".epr-meta/elohim/algorithms/embedding-models/all-minilm
 /// contract's bytes changed, so its address must have moved off this one.
 const V14_METHOD_CID: &str = "bafkreieryn2ru3uz72jnif5dy3ichzpxhh22k4dtilhiwymuxgl5vyzcoa";
 
+/// The v15 contract's method CID (task 4.1). Task 4.2 declared the fold procedure's budgets, so the
+/// contract's bytes — and its address — moved off this one.
+const V15_METHOD_CID: &str = "bafkreiauhzxlr2ex6vd6lwu66la2f6dzkp6pj2ogfdjfxaemuanbfiii5q";
+
 /// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
 /// proved the string spelling of its CIDs left this address where the byte-array spelling had it
 /// (`bafyreic5…ycma` both ways); the pin then moved once, deliberately, for the self-consistent
@@ -244,7 +248,8 @@ fn contract_v15_declares_the_native_semantic_provider_and_repins_the_bank() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 15);
+    // v15 introduced these declarations; later versions keep them (each byte change bumps).
+    assert!(value["version"].as_u64() >= Some(15));
 
     let semantic_provider = value["discovery"]["semantic_provider"]
         .as_str()
@@ -269,4 +274,69 @@ fn contract_v15_declares_the_native_semantic_provider_and_repins_the_bank() {
     contract
         .question_bank()
         .expect("every question is in scope of the v15 recipe");
+}
+
+/// Task 4.2: the model manifest pins the embedding procedure's own bytes (the procedure is part
+/// of the method), and resolves the model directory explicit-first: an operator's
+/// `$EPR_EMBED_MODEL_DIR` before the default cache path.
+#[test]
+fn the_model_manifest_pins_the_embedding_procedure() {
+    use elohim_epr_cli::flow::memory::recall::embedder::PROCEDURE_REL;
+    let root = common::repo_root();
+    let manifest = read_json(&root, MODEL_REL);
+    let procedure = std::fs::read(root.join(PROCEDURE_REL)).expect("embed.py reads");
+    let pinned: cid::Cid = manifest["procedure"]
+        .as_str()
+        .expect("the manifest names its procedure")
+        .parse()
+        .expect("procedure is a CID");
+    assert_eq!(
+        pinned.codec(),
+        0x55,
+        "raw bytes are addressed with the raw codec"
+    );
+    assert_eq!(
+        manifest["procedure"].as_str(),
+        Some(
+            eprfs_core::BlobCid::compute_raw(&procedure)
+                .to_string()
+                .as_str()
+        ),
+        "embed.py on disk is the pinned procedure"
+    );
+    assert_eq!(
+        manifest["resolve"],
+        serde_json::json!([
+            "$EPR_EMBED_MODEL_DIR",
+            "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx"
+        ])
+    );
+}
+
+/// Contract v16 declares the fold procedure's own budget beside the query-time provider budget
+/// (a 32-text batch of 384-float vectors cannot fit the 8192-byte query envelope), and the bank
+/// is re-pinned to the new recipe.
+#[test]
+fn contract_v16_declares_the_fold_budget_and_repins_the_bank() {
+    let root = common::repo_root();
+    let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
+    let value = common::live_contract();
+    assert_eq!(value["version"], 16);
+    let limits = &value["limits"];
+    assert_eq!(
+        limits["provider_bytes"], 8192,
+        "the query budget is unchanged"
+    );
+    assert_eq!(limits["provider_seconds"], 15);
+    assert_eq!(limits["fold_procedure_bytes"], 262144);
+    assert_eq!(limits["fold_procedure_seconds"], 120);
+    assert_eq!(limits["fold_batch_texts"], 32);
+
+    let method = contract.method_cid();
+    assert_ne!(method, V15_METHOD_CID, "the contract's bytes moved");
+    let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v16 recipe");
 }

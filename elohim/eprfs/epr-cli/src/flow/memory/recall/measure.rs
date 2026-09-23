@@ -77,6 +77,7 @@ fn external_sample(
         &args,
         contract.limit_usize("native_raw_bytes"),
         contract.limit_secs("native_timeout_seconds"),
+        None,
     )
     .map_err(|error| refused(format!("footprint lens unavailable: {error}")))?;
     if let Some(reason) = outcome.error {

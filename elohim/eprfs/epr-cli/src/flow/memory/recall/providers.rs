@@ -6,7 +6,8 @@
 //!
 //! Moved out of `mod.rs` (governed-discovery station zero, task 0.4): `ProcessOutcome`,
 //! `bounded_process` and `process_result` are the same bytes as before, just relocated next to
-//! the provider that is their only real consumer. The trait, `LocalLexical`, `MemPalace` and
+//! the provider that is their only real consumer (station 4, task 4.2, later gave
+//! `bounded_process` an optional stdin for the embedder's fold procedure). The trait, `LocalLexical`, `MemPalace` and
 //! `providers_for` are new — `retrieve()` (still in `mod.rs`, still the explicit-provider
 //! dispatcher every currently-declared `--provider` test exercises) is untouched, so its rich,
 //! per-kind JSON shape (`candidates`/`groups`/`selection`/`omissions`/…) stays byte-identical.
@@ -138,18 +139,36 @@ pub struct ProcessOutcome {
 }
 
 /// Bound bytes and seconds before buffering foreign output, including stderr; kill on excess.
+///
+/// `input`, when present, is the child's whole stdin: written from its own thread (so a request
+/// larger than a pipe buffer cannot deadlock against the output readers) and then closed. Without
+/// it stdin is null. The byte and second bounds, and the kill, are the same either way.
 pub fn bounded_process(
     program: &str,
     args: &[String],
     output_limit: usize,
     seconds: f64,
+    input: Option<&[u8]>,
 ) -> std::io::Result<ProcessOutcome> {
     let mut child = Command::new(program)
         .args(args)
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
+    // A child that exits (or is killed) before reading everything closes the pipe; the write then
+    // fails with a broken pipe, which is the child's answer, not ours to report.
+    let in_handle = input.map(|bytes| {
+        let mut stdin = child.stdin.take().expect("piped");
+        let bytes = bytes.to_vec();
+        std::thread::spawn(move || {
+            let _ = stdin.write_all(&bytes);
+        })
+    });
     let cap = output_limit + 1;
     let mut out = child.stdout.take().expect("piped");
     let mut err = child.stderr.take().expect("piped");
@@ -183,6 +202,9 @@ pub fn bounded_process(
             }
         }
     }
+    if let Some(handle) = in_handle {
+        let _ = handle.join();
+    }
     let stdout = out_handle.join().unwrap_or_default();
     let stderr = err_handle.join().unwrap_or_default();
     if reason.is_none() && stdout.len() + stderr.len() > output_limit {
@@ -202,6 +224,7 @@ pub(super) fn process_result(program: &str, args: &[String], contract: &Contract
         args,
         contract.limit_usize("provider_bytes"),
         contract.limit_secs("provider_seconds"),
+        None,
     ) {
         Ok(outcome) => outcome,
         Err(error) => {

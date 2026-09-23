@@ -148,3 +148,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract CID mov
 ## 2026-09-23 — contract v15 (station 4, Task 4.1: the `semantic` provider over `recall-semantic-index@1`; the palace a declared visitor)
 
 Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreib…pv4m → bafkreih…udfe) because contract v15 declares `ceremony.providers.semantic`, gives `mempalace` `role: "visitor"`, and moves `discovery.semantic_provider`/`semantic_output`. The rendered diff against the v14 capture is that one `recipe` token on line 7 of each view. Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`ec03406e…`, `f8c8970e…`) byte for byte. The refusal digest is unchanged.
+
+## 2026-09-23 — contract v16 (station 4, Task 4.2: `limits.fold_procedure_bytes`/`fold_procedure_seconds`/`fold_batch_texts` declared for the embedding fold procedure)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreih…udfe → bafkreic…gbvi). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`46e2d00a…`, `562a9cd8…`) byte for byte. The refusal digest is unchanged.
