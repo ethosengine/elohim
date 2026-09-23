@@ -5,7 +5,7 @@
   "description": "Book by Hugo Mercier",
   "content": "# The Enigma of Reason\n\n**Author:** Hugo Mercier\n**Format:** book",
   "contentFormat": "markdown",
-  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "sourcePath": "fct/v1/Module 1 - The Church Dilemma.md",
   "tags": [
     "book",
     "fct",

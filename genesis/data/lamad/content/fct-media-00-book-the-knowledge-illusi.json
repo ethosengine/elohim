@@ -5,7 +5,7 @@
   "description": "Book by Steven Sloman",
   "content": "# The Knowledge Illusion\n\n**Author:** Steven Sloman\n**Format:** book",
   "contentFormat": "markdown",
-  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "sourcePath": "fct/v1/Module 1 - The Church Dilemma.md",
   "tags": [
     "book",
     "fct",

@@ -1,0 +1,249 @@
+{
+  "id": "fct-course",
+  "contentType": "lesson",
+  "title": "Foundations for Christians and Technology",
+  "name": "Foundations for Christians and Technology — course bundle",
+  "description": "The full Foundations for Christians and Technology course as a browsable bundle: a Christian companion to the Center for Humane Technology's Foundations of Humane Technology — fourteen days, fifteen modules, five movements, walking the shape of the gospel from lament to commissioning. Ships with its verse appendix, bibliography, and the editable course document (.docx) beside the HTML.",
+  "content": {
+    "slug": "fct-course",
+    "entryPoint": "index.html"
+  },
+  "contentFormat": "html5-app",
+  "entryPoint": "index.html",
+  "sourcePath": "docs/content/fct/fct-course",
+  "tags": [
+    "fct",
+    "christian-technology",
+    "humane-tech",
+    "course",
+    "discipleship",
+    "church",
+    "html5-app"
+  ],
+  "relatedNodeIds": [
+    "fct-module-01-church-dilemma",
+    "fct-module-02-systems-thinking",
+    "fct-module-03-problem-well-stated",
+    "fct-module-04-scaling-wisdom",
+    "fct-module-05-respecting-human-nature",
+    "fct-module-06-harmful-consequences",
+    "fct-module-07-regeneration",
+    "fct-module-08-centering-love",
+    "fct-module-09-fruits-of-spirit",
+    "fct-module-10-recognize-distortions",
+    "fct-module-11-collaboration-sensemaking",
+    "fct-module-12-fairness-justice",
+    "fct-module-13-helping-thrive",
+    "fct-module-14-ready-to-act",
+    "fct-module-15-retrospective",
+    "evolution-of-trust",
+    "manifesto"
+  ],
+  "blobHash": "sha256-39aa132316c048afe4d5477b93221dd432effb78f565b3eb867016a383b66a4a",
+  "metadata": {
+    "category": "course-bundle",
+    "author": "Matthew Dowell",
+    "courseId": "foundations-christian-technology",
+    "courseVersion": "review draft v2, 2026-09-16",
+    "estimatedTime": "14 sessions",
+    "embedStrategy": "iframe",
+    "localZipPath": "docs/content/fct/fct-course.zip",
+    "localSourcePath": "docs/content/fct/fct-course",
+    "blobHash": "sha256-39aa132316c048afe4d5477b93221dd432effb78f565b3eb867016a383b66a4a",
+    "requiredCapabilities": [],
+    "securityPolicy": {
+      "sandbox": [
+        "allow-same-origin",
+        "allow-downloads"
+      ],
+      "csp": "default-src 'self'"
+    },
+    "resources": [
+      {
+        "path": "Foundations-for-Christians-and-Technology.docx",
+        "role": "source-document",
+        "title": "Foundations for Christians and Technology (course document)",
+        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "sizeBytes": 100323,
+        "sha256": "88552c3b0a0842aef9407a1d4cad3cff105a9916166db253caac2426579af11a",
+        "linkedFrom": "index.html"
+      }
+    ],
+    "movements": [
+      {
+        "number": 1,
+        "title": "Waking Up — Lament & Sight",
+        "modules": [
+          {
+            "number": 1,
+            "title": "The Church Dilemma",
+            "day": 0,
+            "nodeId": "fct-module-01-church-dilemma"
+          },
+          {
+            "number": 2,
+            "title": "Systems Thinking",
+            "day": 0,
+            "nodeId": "fct-module-02-systems-thinking"
+          },
+          {
+            "number": 3,
+            "title": "A Problem Well Stated",
+            "day": 1,
+            "nodeId": "fct-module-03-problem-well-stated"
+          },
+          {
+            "number": 4,
+            "title": "The Wisdom Gap & the Conditions for Trust",
+            "day": 2,
+            "nodeId": "fct-module-04-scaling-wisdom"
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "title": "Turning — Repentance & Repair",
+        "modules": [
+          {
+            "number": 5,
+            "title": "Our Attention is Sacred",
+            "day": 3,
+            "nodeId": "fct-module-05-respecting-human-nature"
+          },
+          {
+            "number": 6,
+            "title": "Externalities & the Commons",
+            "day": 4,
+            "nodeId": "fct-module-06-harmful-consequences"
+          },
+          {
+            "number": 7,
+            "title": "Regeneration & Reconciliation",
+            "day": 5,
+            "nodeId": "fct-module-07-regeneration"
+          }
+        ]
+      },
+      {
+        "number": 3,
+        "title": "Reordering Loves",
+        "modules": [
+          {
+            "number": 8,
+            "title": "Centering Love",
+            "day": 6,
+            "nodeId": "fct-module-08-centering-love"
+          },
+          {
+            "number": 9,
+            "title": "Fruit as Metric",
+            "day": 7,
+            "nodeId": "fct-module-09-fruits-of-spirit"
+          }
+        ]
+      },
+      {
+        "number": 4,
+        "title": "Rebuilding Common Life",
+        "modules": [
+          {
+            "number": 10,
+            "title": "Recognizing Distortions",
+            "day": 8,
+            "nodeId": "fct-module-10-recognize-distortions"
+          },
+          {
+            "number": 11,
+            "title": "Collaboration & Sensemaking",
+            "day": 9,
+            "nodeId": "fct-module-11-collaboration-sensemaking"
+          },
+          {
+            "number": 12,
+            "title": "Fairness & Justice: Fill My House",
+            "day": 10,
+            "nodeId": "fct-module-12-fairness-justice"
+          }
+        ]
+      },
+      {
+        "number": 5,
+        "title": "Abundant Life & Sending",
+        "modules": [
+          {
+            "number": 13,
+            "title": "Helping People Thrive",
+            "day": 11,
+            "nodeId": "fct-module-13-helping-thrive"
+          },
+          {
+            "number": 14,
+            "title": "Ready to Act",
+            "day": 12,
+            "nodeId": "fct-module-14-ready-to-act"
+          },
+          {
+            "number": 15,
+            "title": "Digital Discipleship Retrospective",
+            "day": 13,
+            "nodeId": "fct-module-15-retrospective"
+          }
+        ]
+      }
+    ],
+    "pages": {
+      "index": "index.html",
+      "modules": "modules/NN-slug.html",
+      "verseAppendix": "appendix/verses.html",
+      "bibliography": "appendix/bibliography.html"
+    },
+    "keywords": [
+      "humane technology",
+      "attention economy",
+      "discipleship",
+      "systems thinking",
+      "church"
+    ],
+    "originalContentType": "course-module",
+    "originalContentFormat": "html5-app"
+  },
+  "reach": "commons",
+  "trustScore": 1,
+  "did": "did:web:elohim.host:content:fct-course",
+  "activityPubType": "Page",
+  "openGraphMetadata": {
+    "ogTitle": "Foundations for Christians and Technology",
+    "ogDescription": "A Christian companion to Foundations of Humane Technology — fourteen days, fifteen modules, five movements.",
+    "ogType": "website",
+    "ogUrl": "https://elohim-protocol.org/content/fct-course",
+    "ogSiteName": "Elohim Protocol - Lamad Learning Platform",
+    "articleAuthor": "Matthew Dowell"
+  },
+  "linkedData": {
+    "@context": "https://schema.org/",
+    "@type": "Course",
+    "@id": "https://elohim-protocol.org/content/fct-course",
+    "identifier": "did:web:elohim.host:content:fct-course",
+    "name": "Foundations for Christians and Technology",
+    "description": "A Christian companion to the Center for Humane Technology's Foundations of Humane Technology — fourteen days, fifteen modules, five movements.",
+    "author": {
+      "@type": "Person",
+      "name": "Matthew Dowell"
+    },
+    "numberOfCredits": 15
+  },
+  "createdAt": "2026-09-16T00:00:00.000000",
+  "updatedAt": "2026-09-23T00:00:00.000000",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "author"
+    },
+    {
+      "humanId": "human-pete-pastor",
+      "affinity": 0.7,
+      "role": "steward"
+    }
+  ]
+}

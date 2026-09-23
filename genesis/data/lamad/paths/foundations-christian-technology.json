@@ -1,6 +1,6 @@
 {
   "id": "foundations-christian-technology",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "title": "Foundations for Christian Technology",
   "description": "A course equipping Christians to navigate and shape the digital age with wisdom, integrating Center for Humane Technology principles with biblical foundations.",
   "purpose": "Upgrade the collective wisdom of the church to improve awareness and decision-making in a world facing emergent 'godlike' technology",
@@ -9,7 +9,7 @@
     "Center for Humane Technology"
   ],
   "createdAt": "2025-11-28T21:10:19.487574",
-  "updatedAt": "2025-12-24T03:05:26.551Z",
+  "updatedAt": "2026-09-23T00:00:00.000Z",
   "thumbnailUrl": "/images/fct_cover.webp",
   "thumbnailAlt": "Foundations for Christian Technology course cover",
   "localThumbnailPath": "assets/images/fct_cover.webp",
@@ -24,6 +24,26 @@
       "steps": [
         {
           "order": 0,
+          "resourceId": "fct-course",
+          "stepTitle": "The Course: Foundations for Christians and Technology",
+          "stepNarrative": "Browse the full course as its author teaches it — fifteen modules in five movements, from lament to commissioning — with the verse appendix, bibliography, and the editable course document alongside. The module lessons that follow are the earlier decomposition of this course into the knowledge graph.",
+          "learningObjectives": [
+            "See the five-movement shape of the course and where each module sits",
+            "Locate the verse appendix and bibliography for preaching and further study"
+          ],
+          "optional": true,
+          "completionCriteria": [
+            "Open the course bundle and read the course at a glance"
+          ],
+          "estimatedTime": "15 minutes",
+          "sharedConcepts": [
+            "attention-economy",
+            "systems-thinking",
+            "human-flourishing"
+          ]
+        },
+        {
+          "order": 1,
           "resourceId": "fct-module-01-church-dilemma",
           "stepTitle": "The Church Dilemma",
           "stepNarrative": "CHT Module: Introduction - Christian perspective on technology ethics",
@@ -42,7 +62,7 @@
           ]
         },
         {
-          "order": 1,
+          "order": 2,
           "resourceId": "fct-module-02-systems-thinking",
           "stepTitle": "Systems Thinking",
           "stepNarrative": "CHT Module: Module 1 - Christian perspective on technology ethics",
@@ -60,7 +80,7 @@
           ]
         },
         {
-          "order": 2,
+          "order": 3,
           "resourceId": "fct-module-03-problem-well-stated",
           "stepTitle": "A Problem Well Stated",
           "stepNarrative": "CHT Module: Module 1 - Christian perspective on technology ethics. Inspired by Daniel Schmachtenberger's work on the metacrisis.",
@@ -715,6 +735,8 @@
           }
         ]
       }
-    ]
+    ],
+    "courseBundleNodeId": "fct-course",
+    "courseVersion": "review draft v2, 2026-09-16"
   }
 }

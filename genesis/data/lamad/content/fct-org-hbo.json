@@ -5,7 +5,7 @@
   "description": "Streaming Service referenced in FCT",
   "content": "# HBO\n\n**Type:** streaming-service\n\n",
   "contentFormat": "markdown",
-  "sourcePath": "fct/Module 1 - The Church Dilemma.md",
+  "sourcePath": "fct/v1/Module 1 - The Church Dilemma.md",
   "tags": [
     "organization",
     "fct",
