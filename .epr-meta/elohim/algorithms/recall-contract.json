@@ -1,6 +1,6 @@
 {
   "id": "bounded-evidence-recall",
-  "version": 14,
+  "version": 15,
   "question_bank": ".epr-meta/elohim/algorithms/recall-questions.json",
   "purpose": "Find current authority and diagnostic wisdom for a fresh native reconciliation task without loading the full memory head.",
   "authority": "Local process policy; source hints are routes, not proof of completion or peer authority.",
@@ -181,8 +181,8 @@
     "body_scan_window": "limits.body_scan_bytes (65536) is the per-file window term discovery may read for MATCHING, and it is spent only when there is a query or terms to match; a pure tag filter still reads limits.metadata_bytes. The frontmatter read stays metadata_bytes and byte-exact \u2014 a wider body window never widens what establishes membership. limits.scan_bytes (2097152) and scan_seconds (5) bound the traversal as a whole, so a scope the size of .claude/skills is one call. Every byte read here is charged to the scan counters, never to source_bytes: discovery is not evidence, and an excerpt receipt is still the only thing that quotes a document. A candidate larger than the window is scanned to it and COUNTED \u2014 the omissions line says how many were only partially scanned \u2014 because a term past the window is invisible, which is not evidence of its absence.",
     "bounded_prefix_match": "Query terms are matched against the declared frontmatter AND the body bytes the SAME bounded read already covered (limits.body_scan_bytes per file when matching) \u2014 no second read and no wider budget. Each candidate reports where its terms were found (path, title, description, tag, body); a declared hit scores twice a body hit ON THE SAME TERM, so frontmatter outranks body without letting one hit on a word every document shares outrank several hits on the words that name the concern. A body hit BEYOND the per-file prefix is invisible to discovery and is not evidence of absence.",
     "boundary_cut_is_not_a_parse_failure": "A bounded read routinely ends mid-character. The tail is trimmed back to the last complete UTF-8 boundary before parsing; the frontmatter header itself is still exact bytes, and a trim landing before the closing delimiter reports an unproven boundary rather than a malformed document. Condemning a file because the budget cut a multibyte character is a fault of the reader, not the document.",
-    "semantic_provider": "mempalace",
-    "semantic_output": "unverified provider text; exact tag filtering requires source metadata",
+    "semantic_provider": "semantic",
+    "semantic_output": "native fold candidates; method CID printed",
     "group_scope": "returned candidate window",
     "first_screen_globs": ["*.md", "*.py", "*.json", "*.yaml", "*.yml", "*.rs", "*.ts", "*.feature", "*.sh"],
     "first_screen_globs_rule": "S1 (2026-09-22): the focused first screen (`first_screen`) discovers across EVERY declared glob in one shared traversal, charged to the SAME body-scan budget a single-glob call always used — never a second read, never a wider window. An older contract that does not declare this key falls back to `[\"*.md\"]`, today's only glob, so this key is additive and never silently widens an unaware caller.",
@@ -243,8 +243,15 @@
         "restrictions": "declared source scope and scan/output budgets",
         "optional": false
       },
+      "semantic": {
+        "kind": "semantic",
+        "measure": ".epr-meta/elohim/algorithms/recall-semantic-index.json",
+        "ranking": "cosine under the declared ModelPin",
+        "optional": true
+      },
       "mempalace": {
         "kind": "mempalace",
+        "role": "visitor",
         "ranking": null,
         "version": null,
         "freshness": null,

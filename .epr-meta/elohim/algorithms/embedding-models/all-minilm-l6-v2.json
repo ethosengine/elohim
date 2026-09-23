@@ -1,0 +1,18 @@
+{
+  "artifact_type": "model-manifest",
+  "role": "A governed artifact judged by evidence on its CID (the fitness fold below), never a setting: a different model is a new manifest and a new measure version.",
+  "model_bytes": "bafkreicpcsf2rlu4fr735zfpfmjs3ogqnrvgkrnup7edxo4yypjcxa4t4y",
+  "tokenizer_bytes": "bafkreig2bz4zgo462ulzri5oe6et2pc7usracetm552vqyuw36nu2ldcua",
+  "license": "Apache-2.0",
+  "dims": 384,
+  "pooling": "mean",
+  "normalize": true,
+  "max_tokens": 256,
+  "source": "sentence-transformers/all-MiniLM-L6-v2",
+  "resolve": [
+    "~/.cache/chroma/onnx_models/all-MiniLM-L6-v2/onnx",
+    "$EPR_EMBED_MODEL_DIR"
+  ],
+  "procedure": null,
+  "fitness": "recall-bank-reach@1"
+}

@@ -72,8 +72,8 @@ fn digest(s: &str) -> String {
 // though this fixture's own `lens_table` override did not. GOLDEN_REFUSAL is unchanged across
 // all four rounds: a refusal never reaches `render()`'s orientation/lens/floor preamble, so it
 // never prints a `recipe` line.
-const GOLDEN_FOCUSED: &str = "ec03406e9233df38a01423bf8848546a968bb3fc99a47042d7e5d8ab7eba6394";
-const GOLDEN_WHOLE: &str = "f8c8970e7b2757a77b776d4ee0c721e144bae9b8ee8fda8c69c3d2e65465b8b7";
+const GOLDEN_FOCUSED: &str = "46e2d00a401baa78dd2af568958c92c3af2b2ca4012bbf0c7e07cd493a83499f";
+const GOLDEN_WHOLE: &str = "562a9cd85cf9df15c7ec2bfa8289bb58e2a0fd204e17f9c67563f1750fe6c6b5";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";
 
 #[test]

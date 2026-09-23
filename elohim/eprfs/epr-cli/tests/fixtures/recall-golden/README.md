@@ -41,8 +41,8 @@ detail level, which bounds how much a view prints; a *floor* is a line no lens e
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `ec03406e9233df38a01423bf8848546a968bb3fc99a47042d7e5d8ab7eba6394` |
-| Whole open | `whole_open_is_byte_identical` | `f8c8970e7b2757a77b776d4ee0c721e144bae9b8ee8fda8c69c3d2e65465b8b7` |
+| Focused open | `focused_open_is_byte_identical` | `46e2d00a401baa78dd2af568958c92c3af2b2ca4012bbf0c7e07cd493a83499f` |
+| Whole open | `whole_open_is_byte_identical` | `562a9cd85cf9df15c7ec2bfa8289bb58e2a0fd204e17f9c67563f1750fe6c6b5` |
 | Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
@@ -144,3 +144,7 @@ refusal digest is unchanged.
 ## 2026-09-22 — contract v14 (search spans the declared globs; phrase matches across identifier separators; Python sections are def/class; generated directories excluded)
 
 Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreih…yene → bafkreib…pv4m). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins byte for byte. The refusal digest is unchanged.
+
+## 2026-09-23 — contract v15 (station 4, Task 4.1: the `semantic` provider over `recall-semantic-index@1`; the palace a declared visitor)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreib…pv4m → bafkreih…udfe) because contract v15 declares `ceremony.providers.semantic`, gives `mempalace` `role: "visitor"`, and moves `discovery.semantic_provider`/`semantic_output`. The rendered diff against the v14 capture is that one `recipe` token on line 7 of each view. Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`ec03406e…`, `f8c8970e…`) byte for byte. The refusal digest is unchanged.
