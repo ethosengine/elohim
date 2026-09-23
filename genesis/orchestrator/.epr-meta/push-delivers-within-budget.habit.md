@@ -37,3 +37,5 @@ Branch `ci/wallclock-2026-09-22` (not yet on dev) carries the repairs:
 - ci-harvest files timeout aborts.
 
 Stays RED until the live series reads within bounds after they land.
+
+DELTA 2026-09-23a (RED preserved; the repairs ship): the four repairs above plus the content-keyed roll (a peer restarts only when what it consumes changed) and the per-level baseline checkpoint (328efba7b, already on dev) go to dev in one push from a clean worktree off origin/dev, together with the blob-PUT off-path cure. Landing-batch gate on the batch itself: doorway 1631/0, elohim-storage 4903/0 across 17 suites, orchestrator + budget + validate-only suites green, 10 Jenkinsfiles lint-clean, elohim-app 227 test files. Predicted dispatch (graph-walker): elohim, elohim-edge, elohim-holochain, elohim-orchestrator — the first coupled chain under per-pipeline budgets; the first edge deploy after this rolls storage once to record its input digest. Stays RED until `delivery-series.mjs --window 10` reads within bounds on live runs.
