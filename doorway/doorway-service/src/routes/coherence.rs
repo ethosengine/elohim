@@ -157,6 +157,12 @@ pub struct CoherenceDoorbell {
     pub digest: String,
 }
 
+/// Body-size ceiling for `POST /api/v1/federation/doorbell`. The body is two
+/// short JSON fields (`{doorwayId, digest}`); 4 KiB mirrors
+/// `routes::admin_dev::MAX_FIXTURE_BODY_BYTES` — the route is reachable by
+/// any peer BEFORE the peer-cache check, so the read must be bounded.
+pub const MAX_DOORBELL_BODY_BYTES: usize = 4 * 1024;
+
 /// `POST /api/v1/federation/doorbell` — story 4.2 slice 1. A sibling that
 /// just changed its own digest rings this doorway so it learns within
 /// seconds, without waiting on the 60s discovery poll (see

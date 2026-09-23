@@ -772,7 +772,11 @@ async function putFederationDeafOverride(doorwayUrl: string, secs: number): Prom
 /** See `pendingShedRoute`'s doc — the same degrade shape, worded for the
  * federation-deaf fixture (story 4.2 slice 1) instead of the busy-holder shed
  * fixture (story 3.1), so a report never blames the wrong scenario. */
-function pendingFederationDeafRoute(world: E2EWorld, doorwayId: string, res: ShedResponse): 'pending' {
+function pendingFederationDeafRoute(
+  world: E2EWorld,
+  doorwayId: string,
+  res: ShedResponse
+): 'pending' {
   world.attach?.(
     `PENDING: PUT ${world.getDoorway(doorwayId).url}/admin/dev/federation-deaf answered HTTP ` +
       `${res.status} — this dev-gated doorbell-deaf fixture route is not built yet on this ` +

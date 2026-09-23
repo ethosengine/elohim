@@ -38,6 +38,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { Given, Then, When } from '@cucumber/cucumber';
 
 import { E2EWorld } from '../../src/framework/world.js';
+
 import {
   AskCapture,
   LogLineFields,
@@ -105,7 +106,7 @@ function requireDoorbellState(world: E2EWorld): DoorbellState {
   const state = doorbellStates.get(world);
   assert.ok(
     state,
-    'no doorbell staging offset captured — this scenario\'s staging Given must run first'
+    "no doorbell staging offset captured — this scenario's staging Given must run first"
   );
   return state;
 }
@@ -324,7 +325,12 @@ function logNamesDoorbellPull(
 Then(
   'doorway {string} logged a doorbell pull from doorway {string} naming the digest that holds {string}',
   { timeout: 12_000 },
-  async function (this: E2EWorld, receiverId: string, senderId: string, root: string): Promise<void> {
+  async function (
+    this: E2EWorld,
+    receiverId: string,
+    senderId: string,
+    root: string
+  ): Promise<void> {
     const state = getState(this);
     assert.equal(state.root, root, `scenario staged root "${state.root}", not "${root}"`);
     const db = requireDoorbellState(this);

@@ -8053,11 +8053,31 @@ async fn handle_request(
         // waiting on the 60s discovery poll. See
         // `services::federation_doorbell` / `routes::coherence::handle_doorbell`.
         (Method::POST, "/api/v1/federation/doorbell") => {
-            let body = match req.collect().await {
+            // Bounded like every other small-JSON mutator (`admin_dev`,
+            // `p2p_manifests`): the body is `{doorwayId, digest}`, and this
+            // route is reachable by any peer before the peer-cache check runs,
+            // so an unbounded `collect()` here is an allocation any caller can
+            // size.
+            let body = match http_body_util::Limited::new(
+                req.into_body(),
+                routes::coherence::MAX_DOORBELL_BODY_BYTES,
+            )
+            .collect()
+            .await
+            {
                 Ok(collected) => collected.to_bytes(),
                 Err(e) => {
-                    warn!("Doorbell body error: {}", e);
-                    return Ok(to_boxed(bad_request_response("Failed to read request body")));
+                    warn!("Doorbell body rejected: {}", e);
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::PAYLOAD_TOO_LARGE)
+                            .header("Content-Type", "application/json")
+                            .body(Full::new(Bytes::from(format!(
+                                "{{\"error\":\"request body exceeds {} bytes\"}}",
+                                routes::coherence::MAX_DOORBELL_BODY_BYTES
+                            ))))
+                            .unwrap(),
+                    ));
                 }
             };
             return Ok(to_boxed(

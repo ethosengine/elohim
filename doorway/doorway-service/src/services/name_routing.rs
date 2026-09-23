@@ -938,7 +938,12 @@ impl NameRouteTable {
                 .expect("name-route lock poisoned");
             installed
                 .iter()
-                .filter(|(_, &at)| at > fetch_started)
+                // `>=`, not `>`: both clocks are whole seconds, so an install
+                // that landed in the same second the poll STARTED cannot be
+                // proven older than the poll's fetch — and clobbering it
+                // re-opens the exact race this guard exists to close. Erring
+                // toward the doorbell-fresh row costs at most one 60s poll.
+                .filter(|(_, &at)| at >= fetch_started)
                 .map(|(id, _)| id.clone())
                 .collect()
         };
@@ -3659,6 +3664,43 @@ mod tests {
             .holders_for(&RouteKey::path_only("/garden-v2"), "self")
             .iter()
             .any(|h| h.doorway_id == "gamma-elohim-host"));
+    }
+
+    /// Same-second collision: both clocks are whole seconds, so a doorbell
+    /// install stamped in the SAME second a poll round started is protected
+    /// — the guard errs toward the doorbell-fresh row, never the poll's.
+    #[test]
+    fn a_poll_round_started_in_the_same_second_as_the_doorbell_install_cannot_replace_it() {
+        let table = NameRouteTable::new();
+        table.replace_holder(
+            "gamma-elohim-host",
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/garden",
+            )],
+            HolderLiveness::Serving,
+            "bafy-fresh".to_string(),
+            1_000,
+        );
+        table.replace_all_at(
+            vec![contract(
+                "gamma-elohim-host",
+                "https://gamma.example",
+                "/stale-batch",
+            )],
+            HashMap::from([("gamma-elohim-host".to_string(), HolderLiveness::Uncertain)]),
+            HashMap::from([("gamma-elohim-host".to_string(), "bafy-stale".to_string())]),
+            1_000, // fetch_started — the SAME second as the doorbell install
+        );
+        assert_eq!(
+            table.held_digest("gamma-elohim-host").as_deref(),
+            Some("bafy-fresh"),
+            "a same-second poll must not overwrite the doorbell-fresh digest"
+        );
+        assert!(table
+            .holders_for(&RouteKey::path_only("/stale-batch"), "self")
+            .is_empty());
     }
 
     #[test]
