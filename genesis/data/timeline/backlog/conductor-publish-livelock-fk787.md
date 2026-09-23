@@ -116,6 +116,21 @@ delivers every frame); the K2Proto field peek was checked against kitsune2_api 0
 The household ran the binary (`hc-fork-61565f320d0e`) with no refusals to exercise it, so the
 household proves absence of regression, not the cure — the cure is measured on the fleet by the
 adam `recv_data … Full(..)` count above going from ~15k/hour to a handful of summary lines.
-Still open here: (a) per-hash publish recording and (b) `locally_validated = 1` on the selection
-queries — the livelock itself. Landing: the pin move is a separate commit (see
-`conductor-cap-grant-scan-per-zome-call.md`, same branch).
+Landing: the pin move is a separate commit (see `conductor-cap-grant-scan-per-zome-call.md`, same branch).
+
+**2026-09-23, later — (a) and (b) are committed too; the livelock itself is cured at the source.** Fork
+commit `0efa40939` on the same branch: the selection carries `is_warrant` from the UNION arm, so
+recording routes by the op's actual type instead of a row count; chain ops update `ChainOpPublish`,
+warrants insert `WarrantPublish`, a chain op with no publish row is skipped with a warn and never
+turned into warrant state; records are written 256 per transaction and a failing chunk retries one op
+per transaction, so one unrecordable hash cannot void the others; `AND ChainOp.locally_validated = 1`
+is on `get_ops_to_publish` and `num_still_needing_publish`; and the chain arm is an INNER JOIN on
+`ChainOpPublish` (the "belt-and-braces" option above) because a limbo-integrated cache row can gain
+`locally_validated = 1` without a publish row and would otherwise be selected, sent, skipped and
+counted forever. Tests: `get_ops_to_publish_excludes_cache_rows`, `…_excludes_ops_without_publish_row`,
+`record_published_op_hashes_skips_op_with_no_publish_row`, `…_isolates_a_failing_hash`, and the
+workflow-level `poison_op_does_not_void_other_publish_records` (three authored ops beside one cache-path
+op: the poison is never sent, all three publish times persist, the next loop selects fewer). Evidence:
+holochain_data 148 + 8, holochain_state 196 (two pre-existing test-wasm fixture failures need
+`build_wasms`, unrelated), publish workflow 9 — `EXIT=0` each. Not verified: the household or fleet
+FK-787 rate; upstream report still to file (their defect, commit `e52fa68ac`).

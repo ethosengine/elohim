@@ -258,6 +258,23 @@ not a silently shorter measurement. A partial multi-peer failure closes clients/
 fails the capture; already-admitted native windows expire without a cancellation claim.
 Focused tests cover this orchestration; the real native synchronized capture remains pending.
 
+### Conductor metrics now have an exporter (2026-09-23)
+
+Every "conductor exports no metrics" statement below is superseded for a fork conductor from
+the `7e553f9c3` lineage: `HOLOCHAIN_PROMETHEUS_LISTEN=host:port` serves the conductor's
+OpenTelemetry instruments as Prometheus text at `GET /metrics`
+(`hc_conductor_workflow_{duration,run_total,in_flight}` by workflow and wake source,
+`hc_db_connections_use_time` per database, `hc_db_write_txn_duration`,
+`hc_holochain_p2p_request_duration`, `hc_ribosome_zome_call_duration`,
+`hc_keystore_lair_request_duration`, `hc_conductor_sys_validation_{missing,unfetchable}_dependencies`,
+…). Fleet: `:9464` on each `<prefix>-conductor` pod, scraped by the edgenode PodMonitor's
+`hc-metrics` endpoint. Household: `MESH_CONDUCTOR_LAUNCH=direct` (or `ark`) gives matthew/jessica/james
+`127.0.0.1:9464/9465/9466`; the default `hc sandbox run` mode exposes none. First live scrape
+2026-09-23T20:33Z: three conductors, 200 with 126/126/776 series lines within a minute of restart.
+These are the counters a capture should name in `--metrics` from now on; they are sampled
+process-level instruments, not per-call attribution, and do not by themselves satisfy
+`check --require-coverage all`.
+
 ### Fork half committed; first live admission receipt (2026-09-23)
 
 The conductor-side instrumentation this runbook has described as "source implemented; native

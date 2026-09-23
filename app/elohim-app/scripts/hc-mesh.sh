@@ -556,6 +556,16 @@ admin_port() { echo $((4444 + 10 * $1)); }
 app_port()   { echo $((4445 + 10 * $1)); }
 http_port()  { echo $((8090 + $1)); }
 p2p_port()   { echo $((9701 + $1)); }
+# Conductor Prometheus exposition (fork pin >= 61565f320 lineage:
+# HOLOCHAIN_PROMETHEUS_LISTEN → GET /metrics). One port per CONDUCTOR PROCESS,
+# so it is exported only by the per-process launch modes (`direct`, `ark`);
+# the default `hc sandbox run` supervisor runs every conductor from one
+# environment and cannot give each its own listener. Same numbering shape as
+# p2p_port: 9464 = matthew, 9465 = jessica, 9466 = james.
+conductor_metrics_port() { echo $((9464 + $1)); }
+conductor_metrics_ports_apply() { # -> 0 when this launch mode exposes per-conductor metrics
+  case "${MESH_CONDUCTOR_LAUNCH:-hc}" in direct|ark) return 0 ;; *) return 1 ;; esac
+}
 
 process_start_ticks() { # <pid> — guards a persisted pid against PID reuse
   # stat field 2 (`comm`) may contain spaces; strip pid+comm through the final
@@ -1226,6 +1236,8 @@ launch_ark_conductor() { # <peer-name> <peer-index>
   # is how a calling shell reaps its background children when it exits.
   (
     export RUST_LOG="$MESH_RUST_LOG"
+    # Per-conductor Prometheus exposition (the ark's child inherits it).
+    export HOLOCHAIN_PROMETHEUS_LISTEN="127.0.0.1:$(conductor_metrics_port "$index")"
     cd "$LOCAL_DEV_DIR" || exit 1
     setsid nohup "$ARK_BIN" run \
       --manifest "$LOCAL_DEV_DIR/$name/ark/manifest.json" \
@@ -1290,6 +1302,7 @@ mesh_owned_ports() {
   for _ in "${PEERS[@]}"; do
     printf '%s\n' "$(admin_port "$i")" "$(app_port "$i")" \
       "$(http_port "$i")" "$(p2p_port "$i")"
+    conductor_metrics_ports_apply && printf '%s\n' "$(conductor_metrics_port "$i")"
     i=$((i+1))
   done
 }
@@ -3583,14 +3596,18 @@ CFGEOF
     local hc_bin="${HOLOCHAIN_BIN:-$(command -v holochain)}"
     [ -x "$hc_bin" ] || { echo "no conductor binary: $hc_bin" >&2; return 1; }
     echo "  launch mode: direct (per-conductor logs, no hc CLI rewrite)"
+    local direct_index=0
     for name in "${PEERS[@]}"; do
       (
         export RUST_LOG="$MESH_RUST_LOG"
+        # Per-conductor Prometheus exposition; an older fork binary ignores it.
+        export HOLOCHAIN_PROMETHEUS_LISTEN="127.0.0.1:$(conductor_metrics_port "$direct_index")"
         cd "$LOCAL_DEV_DIR" || exit 1
         setsid nohup sh -c "echo test | '$hc_bin' --piped --structured=Log --config-path '$LOCAL_DEV_DIR/$name/conductor-config.yaml'" \
           >> "$LOCAL_DEV_DIR/.sandbox_run_log.$name" 2>&1 &
         record_mesh_pid conductor "$name" "$!" || true
       )
+      direct_index=$((direct_index+1))
     done
   else
     (
@@ -3820,9 +3837,10 @@ join_peer() { # <fresh-peer-name>
   # across consecutive late-join receipts.
   local index
   index="$(awk 'NF { n += 1 } END { print n + 0 }' "$LOCAL_DEV_DIR/.hc")"
-  local port
+  local port metrics_port=""
+  conductor_metrics_ports_apply && metrics_port="$(conductor_metrics_port "$index")"
   for port in "$(admin_port "$index")" "$(app_port "$index")" \
-              "$(http_port "$index")" "$(p2p_port "$index")"; do
+              "$(http_port "$index")" "$(p2p_port "$index")" $metrics_port; do
     if listener_pids_for_ports "$port" | grep -q .; then
       echo "join-peer: derived port :$port for index $index is already in use; refusing before launch" >&2
       return 2
@@ -3885,6 +3903,7 @@ join_peer() { # <fresh-peer-name>
     }
     (
       export RUST_LOG="$MESH_RUST_LOG"
+      export HOLOCHAIN_PROMETHEUS_LISTEN="127.0.0.1:$(conductor_metrics_port "$index")"
       cd "$LOCAL_DEV_DIR" || exit 2
       setsid nohup sh -c "echo test | '$conductor_bin' --piped --structured=Log --config-path '$sandbox/conductor-config.yaml'" \
         > "$conductor_log" 2>&1 &

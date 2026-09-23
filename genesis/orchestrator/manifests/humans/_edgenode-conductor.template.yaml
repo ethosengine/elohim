@@ -287,6 +287,16 @@ spec:
               value: "HUMAN_LABEL_PLACEHOLDER"
             - name: RUST_LOG
               value: "info,elohim_storage=debug,kitsune2_core=debug,kitsune2_bootstrap_client=debug"
+            # --- Conductor metrics (fork pin >= 61565f320 lineage) ---
+            # The conductor instruments ~30 OpenTelemetry meters (workflow
+            # duration/run/in_flight, db connection use time, p2p request
+            # duration, zome-call duration, sys-validation missing deps…) that
+            # were exported nowhere: holochain_metrics only spoke InfluxDB.
+            # The fork's pull exposition serves them at :9464/metrics; the
+            # PodMonitor (infra/alpha-edgenode-podmonitor.yaml) scrapes the
+            # `hc-metrics` port name. An older conductor ignores the variable.
+            - name: HOLOCHAIN_PROMETHEUS_LISTEN
+              value: "0.0.0.0:9464"
             # --- Embedded conductor mode ---
             # This is the ONLY pod in the human that spawns holochain. It also
             # owns hApp install and DNA/coordinator reconciliation:
@@ -351,6 +361,11 @@ spec:
             # elohim-storage HTTP — probe surface only, no Service port.
             - name: storage-http
               containerPort: 8090
+              protocol: TCP
+            # Conductor Prometheus exposition (HOLOCHAIN_PROMETHEUS_LISTEN
+            # above); scraped by name from the edgenode PodMonitor, no Service.
+            - name: hc-metrics
+              containerPort: 9464
               protocol: TCP
           # The conductor's SHARE of this human's one declared envelope
           # (Jenkinsfile conductorShare). BUDGET NEUTRALITY: see the header —

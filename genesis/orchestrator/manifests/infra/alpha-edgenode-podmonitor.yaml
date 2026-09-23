@@ -50,3 +50,14 @@ spec:
       # The leak-vs-cache verdict + identity-violation counter are the first
       # metrics; the RCA instrument suite registers into the same /metrics body.
       honorLabels: false
+    # The conductor's own instruments (fork pin >= 61565f320 lineage):
+    # hc_conductor_workflow_{duration,run_total,in_flight}, hc_db_connections_use_time,
+    # hc_holochain_p2p_request_duration, hc_ribosome_zome_call_duration,
+    # hc_conductor_sys_validation_{missing,unfetchable}_dependencies … served by
+    # HOLOCHAIN_PROMETHEUS_LISTEN on the `<prefix>-conductor` pods only; pods
+    # without a port named `hc-metrics` (the storage StatefulSet) are skipped.
+    - port: hc-metrics # containerPort 9464 — holochain_metrics::prometheus
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: false

@@ -41,6 +41,8 @@ retire-when: >
   than modelling it — the resource represented by the thing that owns it. This habit's
   local gate is then a compatibility shim, and shims retire.
 ---
+DELTA 2026-09-23 (retire-when now has its first half — the conductor EXPORTS its own pressure; storage does not yet consume it): fork commit 0f26f6703 on int/2026-09-23-diagnostics-throttle-perf serves the conductor's OpenTelemetry instruments as Prometheus text at HOLOCHAIN_PROMETHEUS_LISTEN (fleet: :9464 on every `<prefix>-conductor` pod via the edgenode PodMonitor's `hc-metrics` endpoint). `hc_db_connections_use_time` is the conductor's own read-pool hold time — the signal this gate today infers from db_max_readers and timeouts — beside `hc_conductor_workflow_in_flight`, `hc_ribosome_zome_call_duration` and `hc_holochain_p2p_request_duration`. Consuming it (the receiver-granted-lane design: the conductor grants, storage stops inferring) is the retire step and is not started. Habit stays GREEN on its own checks.
+
 DELTA 2026-08-20 (GREEN — the LIVE-FLEET leg is measured, and it was the
 only leg outstanding): elohim_conductor_admission_in_flight and
 elohim_conductor_admission_hold_ms are BOTH live on the alpha fleet, on
