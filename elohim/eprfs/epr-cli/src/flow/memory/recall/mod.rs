@@ -86,6 +86,10 @@ mod chunk;
 pub mod index;
 mod surface;
 
+// The native semantic candidate route (station 4, task 4.4): cosine over the declared fold, the
+// measure CID on every candidate.
+mod semantic;
+
 mod journey;
 use journey::execute;
 
@@ -188,7 +192,7 @@ fn refused(message: impl Into<String>) -> FlowError {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 /// The algorithm artifact: its exact bytes, its parsed value, and the CID every receipt pins.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Contract {
     pub raw: Vec<u8>,
     pub value: Value,
@@ -756,12 +760,21 @@ pub fn retrieve(
         .get("kind")
         .and_then(Value::as_str)
         .unwrap_or("");
+    // EXACT tag membership, and only the deterministic local traversal can honour it: a tag is
+    // read out of a document's own frontmatter, which a semantic provider never sees. A tag
+    // filter that silently did nothing on another provider would be a claim about a corpus
+    // nobody filtered. Refused before any provider runs, so a refused question embeds nothing
+    // and spawns nothing.
+    if !tags.is_empty() && kind != "local" {
+        return Err(refused(format!(
+            "--tag is exact frontmatter membership and only the local provider reads frontmatter; \
+             `{provider}` is a `{kind}` provider and would ignore it"
+        )));
+    }
     let mut result = match kind {
-        // EXACT tag membership, and only the deterministic local traversal can honour it: a tag is
-        // read out of a document's own frontmatter, which a semantic provider never sees. A tag
-        // filter that silently did nothing on another provider would be a claim about a corpus
-        // nobody filtered.
         "local" => discover_scored(root, contract, scope, query, &[], tags, "directory", names)?,
+        // Cosine over the fold the declaration names; every absence answers, never errs.
+        "semantic" => semantic::search(root, contract, &declaration, query, scope),
         "mempalace" => {
             let palace = root.join(".mempalace/palace");
             let args = vec![
@@ -796,12 +809,6 @@ pub fn retrieve(
         }
         _ => return Err(refused("unsupported declared provider kind")),
     };
-    if !tags.is_empty() && kind != "local" {
-        return Err(refused(format!(
-            "--tag is exact frontmatter membership and only the local provider reads frontmatter; \
-             `{provider}` is a `{kind}` provider and would ignore it"
-        )));
-    }
     result["tags"] = json!(tags);
     result["provider"] = json!(provider);
     result["query"] = json!(query);

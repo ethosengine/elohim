@@ -2,7 +2,8 @@
 //! recipe declares: `local` (deterministic bounded filesystem traversal, always present, wraps
 //! [`discovery::discover_scored`]) and `mempalace` (an optional external process, bounded by
 //! bytes and seconds, honest about what it cannot claim). `providers_for` reads the pinned
-//! contract's own `ceremony.providers` and returns them in the recipe's declared order.
+//! contract's own `ceremony.providers` and returns them in the recipe's declared order. The third
+//! declared kind, `semantic` (station 4, task 4.4), implements the same trait in `semantic.rs`.
 //!
 //! Moved out of `mod.rs` (governed-discovery station zero, task 0.4): `ProcessOutcome`,
 //! `bounded_process` and `process_result` are the same bytes as before, just relocated next to
@@ -24,6 +25,7 @@
 //! provider's actual answer, at which point calling it once, deliberately, to compare (not to
 //! probe-then-redo) is the right shape.
 use super::discovery::discover_scored;
+use super::semantic::Semantic;
 use super::*;
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -53,9 +55,12 @@ pub(super) struct ProviderResult {
 pub(super) trait Provider {
     fn id(&self) -> ProviderId;
     // See the module doc: exercised by this file's unit tests, not yet by production code.
+    /// `query` is the question's own text, `terms` the lexical route's shape of it; each provider
+    /// reads the one its method is defined over (the semantic route embeds the text).
     #[allow(dead_code)]
     fn candidates(
         &self,
+        query: &str,
         terms: &[String],
         scope: &Path,
         contract: &Contract,
@@ -71,7 +76,7 @@ pub(super) trait Provider {
 /// A `LocalLexical::candidates` helper — dead in production today for the same reason
 /// `Provider::candidates` is (see the module doc).
 #[allow(dead_code)]
-fn scope_string(scope: &Path, session_root: &Path) -> String {
+pub(super) fn scope_string(scope: &Path, session_root: &Path) -> String {
     let relative = if scope.is_absolute() {
         scope.strip_prefix(session_root).unwrap_or(scope)
     } else {
@@ -102,6 +107,7 @@ impl Provider for LocalLexical {
 
     fn candidates(
         &self,
+        _query: &str,
         terms: &[String],
         scope: &Path,
         contract: &Contract,
@@ -271,6 +277,7 @@ impl Provider for MemPalace {
 
     fn candidates(
         &self,
+        _query: &str,
         terms: &[String],
         _scope: &Path,
         contract: &Contract,
@@ -307,9 +314,10 @@ impl Provider for MemPalace {
 
 /// The providers this executor knows how to speak to, in the pinned recipe's own
 /// `ceremony.providers` order (an object, so — absent `preserve_order` — alphabetical; `local` <
-/// `mempalace` either way): `local` whenever declared with kind `local` (contract validation
-/// requires at least one provider, and every pinned recipe has always named this one), `mempalace`
-/// whenever declared with kind `mempalace`. A declared `fixture` provider (test interchange only,
+/// `mempalace` < `semantic` either way): `local` whenever declared with kind `local` (contract
+/// validation requires at least one provider, and every pinned recipe has always named this one),
+/// `mempalace` whenever declared with kind `mempalace`, `semantic` whenever declared with kind
+/// `semantic` (named by its declaration key, which it reads its measure and embedder from). A declared `fixture` provider (test interchange only,
 /// never live-fit) is not a `Provider` and is not returned here; `retrieve()` still answers it
 /// directly by name.
 ///
@@ -328,12 +336,13 @@ pub(super) fn providers_for(contract: &Contract) -> Vec<Box<dyn Provider>> {
     else {
         return providers;
     };
-    for declaration in declared.values() {
+    for (key, declaration) in declared {
         match declaration.get("kind").and_then(Value::as_str) {
             Some("local") => providers.push(Box::new(LocalLexical)),
             Some("mempalace") => providers.push(Box::new(MemPalace {
                 palace: PathBuf::from(".mempalace/palace"),
             })),
+            Some("semantic") => providers.push(Box::new(Semantic { key: key.clone() })),
             _ => {}
         }
     }
@@ -356,11 +365,25 @@ mod tests {
             Contract::from_value(crate::flow::memory::recall::tests_support::minimal_contract())
                 .unwrap();
         let out = LocalLexical
-            .candidates(&["mempalace".into()], dir.path(), &contract, dir.path())
+            .candidates("", &["mempalace".into()], dir.path(), &contract, dir.path())
             .unwrap();
         assert!(out.ranking_known);
         assert_eq!(out.method.as_deref(), Some(contract.method_cid().as_str()));
         assert_eq!(out.ranked.len(), 1);
+    }
+
+    #[test]
+    fn providers_for_returns_the_semantic_provider_when_declared() {
+        let contract =
+            Contract::from_value(crate::flow::memory::recall::tests_support::minimal_contract())
+                .unwrap();
+        let ids: Vec<ProviderId> = providers_for(&contract).iter().map(|p| p.id()).collect();
+        assert!(ids.contains(&"semantic".to_string()), "{ids:?}");
+        assert_eq!(
+            ids.first().map(String::as_str),
+            Some("local"),
+            "the declared default stays first"
+        );
     }
 
     #[test]
@@ -374,7 +397,13 @@ mod tests {
             Contract::from_value(crate::flow::memory::recall::tests_support::minimal_contract())
                 .unwrap();
         let out = p
-            .candidates(&["x".into()], Path::new("."), &contract, Path::new("."))
+            .candidates(
+                "x",
+                &["x".into()],
+                Path::new("."),
+                &contract,
+                Path::new("."),
+            )
             .unwrap();
         assert!(!out.ranking_known);
         assert!(out.ranked.is_empty());

@@ -17,21 +17,25 @@ use super::*;
 /// on 2026-09-11: the answer was under "Phase 4 — verify the experience, reconcile and retain
 /// learning", a heading that says nothing about re-mining an index.
 pub(super) fn outline(args: &Args, contract: &Contract, path: &str) -> FlowResult<Value> {
-    outline_with_terms(
-        args,
+    outline_at(
+        &args.root,
         contract,
         path,
         &question_terms(contract, args.need.trim()),
     )
 }
 
-fn outline_with_terms(
-    args: &Args,
+/// The outline of `path` under `root` against explicit `terms` — the shape `outline` returns, for
+/// a caller that holds a root and a question rather than a session's `Args` (the semantic route
+/// locates its winning chunk's heading here, so its linked read lands where the first screen's
+/// would).
+pub(super) fn outline_at(
+    root: &Path,
     contract: &Contract,
     path: &str,
     terms: &[String],
 ) -> FlowResult<Value> {
-    let source = contained(&args.root, path, &contract.source_roots())?;
+    let source = contained(root, path, &contract.source_roots())?;
     let bound = contract.limit_usize("scan_bytes");
     let mut raw = Vec::new();
     File::open(&source)
@@ -276,7 +280,7 @@ pub(super) fn best_section(
     path: &str,
     terms: &[String],
 ) -> Option<Value> {
-    let outline = outline_with_terms(args, contract, path, terms).ok()?;
+    let outline = outline_at(&args.root, contract, path, terms).ok()?;
     let mut best: Option<Value> = None;
     for heading in outline["headings"].as_array()? {
         if heading["hit_total"].as_u64().unwrap_or(0) == 0 {

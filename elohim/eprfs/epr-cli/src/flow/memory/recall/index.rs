@@ -190,7 +190,12 @@ impl Declared {
                 )
             })?
             .to_string();
-        let path = root.join(&rel);
+        Self::from_contract(root, contract, &rel)
+    }
+
+    /// The measure at `rel` (repository-relative), under a contract the caller already loaded.
+    fn from_contract(root: &Path, contract: Contract, rel: &str) -> FlowResult<Self> {
+        let path = root.join(rel);
         let bytes = std::fs::read(&path).map_err(|source| FlowError::Read { path, source })?;
         let raw: Value = serde_json::from_slice(&bytes)?;
         let measure: IndexMeasure = serde_json::from_value(raw.clone())?;
@@ -359,6 +364,23 @@ impl Store {
         declared: &Declared,
         read_only: bool,
     ) -> Result<Option<Self>, String> {
+        let Some(store) = Self::open_readable(path, read_only)? else {
+            return Ok(None);
+        };
+        let meta = store
+            .meta()
+            .map_err(|error| format!("store unreadable: {error}"))?;
+        if meta.get("schema").map(String::as_str) != Some(SCHEMA_VERSION) {
+            return Err("store was built under another schema".to_string());
+        }
+        if meta.get("measure") != Some(&declared.cid.to_string()) {
+            return Err("store was built under another measure".to_string());
+        }
+        Ok(Some(store))
+    }
+
+    /// A store file that opens and passes its integrity check — whatever it was built under.
+    fn open_readable(path: &Path, read_only: bool) -> Result<Option<Self>, String> {
         if !path.is_file() {
             return Ok(None);
         }
@@ -377,15 +399,6 @@ impl Store {
             .map_err(unreadable)?;
         if check != "ok" {
             return Err(format!("store fails its integrity check: {check}"));
-        }
-        let meta = store
-            .meta()
-            .map_err(|error| format!("store unreadable: {error}"))?;
-        if meta.get("schema").map(String::as_str) != Some(SCHEMA_VERSION) {
-            return Err("store was built under another schema".to_string());
-        }
-        if meta.get("measure") != Some(&declared.cid.to_string()) {
-            return Err("store was built under another measure".to_string());
         }
         Ok(Some(store))
     }
@@ -976,6 +989,149 @@ impl Run<'_> {
         };
         attest(dir, &mut report, state)?;
         Ok(FoldRun::Done(Box::new(report)))
+    }
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The query side — the fold the semantic provider ranks over (task 4.4)
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// Why a declared fold cannot answer a question: each an honest absence the semantic provider
+/// prints as one line, never an error.
+pub(super) enum Absent {
+    /// No store has been folded for this measure and embedder.
+    NoFold,
+    /// A store exists, but its meta names another schema, measure, model, chunk rule or embedder.
+    OtherMethod,
+    /// A store exists but cannot be read (the next fold rebuilds it).
+    Unreadable(String),
+}
+
+/// The measure a semantic provider declares, with the embedder whose store it reads.
+pub(super) struct SemanticFold {
+    declared: Declared,
+    choice: EmbedderChoice,
+}
+
+/// A store opened read-only whose meta matches the declaration — every key but the embedder's
+/// label, which only the embedder, once built, can name (see [`FoldReader::built_by`]).
+pub(super) struct FoldReader {
+    store: Store,
+    built_by: String,
+}
+
+impl SemanticFold {
+    /// The measure at `measure_rel` under `contract`; an error only when the declaration itself
+    /// does not load or validate.
+    pub(super) fn declare(
+        root: &Path,
+        contract: Contract,
+        measure_rel: &str,
+        choice: EmbedderChoice,
+    ) -> FlowResult<Self> {
+        Ok(Self {
+            declared: Declared::from_contract(root, contract, measure_rel)?,
+            choice,
+        })
+    }
+
+    /// The method every candidate prints: the `IndexMeasure` CID.
+    pub(super) fn measure(&self) -> String {
+        self.declared.cid.to_string()
+    }
+
+    /// The model CID the measure pins.
+    pub(super) fn model(&self) -> String {
+        self.declared.model()
+    }
+
+    pub(super) fn dims(&self) -> usize {
+        self.declared.dims()
+    }
+
+    pub(super) fn lag_bound(&self) -> String {
+        self.declared.lag_bound()
+    }
+
+    /// The store this measure's embedder folded, opened read-only (a concurrent fold's write is
+    /// waited on for the busy timeout, never raced).
+    pub(super) fn open(&self, root: &Path) -> Result<FoldReader, Absent> {
+        let path = store_dir(root, &self.measure(), self.choice).join(STORE_FILE);
+        let store = match Store::open_readable(&path, true) {
+            Ok(Some(store)) => store,
+            Ok(None) => return Err(Absent::NoFold),
+            Err(why) => return Err(Absent::Unreadable(why)),
+        };
+        let mut meta = store
+            .meta()
+            .map_err(|error| Absent::Unreadable(error.to_string()))?;
+        let built_by = meta.remove("embedder").unwrap_or_default();
+        let mut wanted = meta_rows(&self.declared, "");
+        wanted.remove("embedder");
+        if meta != wanted
+            || (self.choice == EmbedderChoice::Fixture
+                && built_by != EmbedderChoice::Fixture.name())
+        {
+            return Err(Absent::OtherMethod);
+        }
+        Ok(FoldReader { store, built_by })
+    }
+
+    /// The embedder that answers a question under this measure, and the label a store it folded
+    /// carries (the same pair a fold runs with).
+    pub(super) fn embedder(&self, root: &Path) -> FlowResult<(Box<dyn Embedder>, String)> {
+        embedder_for(root, self.choice, &self.declared)
+    }
+
+    /// The fold's lag at this moment — files new, changed or removed since their fold — or why the
+    /// source could not be listed.
+    pub(super) fn lag(&self, root: &Path, reader: &FoldReader) -> Result<usize, String> {
+        match plan(root, &self.declared, &reader.store) {
+            Ok(Ok(plan)) => Ok(plan.lag()),
+            Ok(Err(why)) => Err(why),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+}
+
+impl FoldReader {
+    /// The embedder label the store was folded under (`fixture`, or `procedure <cid> on model
+    /// <cid>`): a query embedded by anything else would be compared against foreign vectors.
+    pub(super) fn built_by(&self) -> &str {
+        &self.built_by
+    }
+
+    /// Visit every live chunk's `(id, path, vector bytes)`; returns how many were visited.
+    pub(super) fn scan(&self, mut visit: impl FnMut(i64, &str, &[u8])) -> FlowResult<u64> {
+        let mut statement = self
+            .store
+            .conn
+            .prepare("SELECT id, path, vector FROM chunks WHERE demoted_at IS NULL")
+            .map_err(db)?;
+        let mut rows = statement.query([]).map_err(db)?;
+        let mut seen = 0u64;
+        while let Some(row) = rows.next().map_err(db)? {
+            let id: i64 = row.get(0).map_err(db)?;
+            let path: String = row.get(1).map_err(db)?;
+            let vector = row.get_ref(2).map_err(db)?.as_blob().map_err(|error| {
+                FlowError::Io(std::io::Error::other(format!("fold store: {error}")))
+            })?;
+            visit(id, &path, vector);
+            seen += 1;
+        }
+        Ok(seen)
+    }
+
+    /// One chunk's `(section, text)`.
+    pub(super) fn chunk(&self, id: i64) -> FlowResult<(String, String)> {
+        self.store
+            .conn
+            .query_row(
+                "SELECT section, text FROM chunks WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(db)
     }
 }
 

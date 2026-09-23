@@ -33,7 +33,8 @@ rules:
       `native_context`, `evidence_continuation`, continuation/receipt-retention helpers, orientation
       and edge lookups. DISCOVERY (`discovery.rs`): the deterministic local traversal — `discover`,
       `discover_scored`, outline/heading and question-term machinery. PROVIDERS (`providers.rs`):
-      the `Provider` trait and its implementations (`local`, `mempalace`, `fixture`) — recipe-
+      the `Provider` trait and its implementations (`local`, `mempalace`, `fixture`; `semantic` in
+      `semantic.rs`) — recipe-
       selected, never a source of authority. EMBEDDER (`embedder.rs`, station 4): the `Embedder`
       trait, `PinnedProcedure` (the pinned fold procedure `embedder/embed.py` behind
       `bounded_process`) and the `Fixture` embedder — how texts become vectors, never how a
@@ -44,7 +45,11 @@ rules:
       and the candidate source (`git ls-files` on a checkout, else a walk). INDEX (`index.rs`,
       station 4): `epr flow memory index fold|status` — the fingerprint/stat plan, the SQLite
       fold store (its whole schema in one const), demotion, the fold lock, and the
-      `FoldAttestation` each fold appends. LENS (`lens.rs`, station 1): the `role@model ->
+      `FoldAttestation` each fold appends. SEMANTIC (`semantic.rs`, station 4): the native
+      semantic candidate route, `search --provider semantic` — the `Semantic` provider, cosine and
+      best-chunk-per-file ranking over the declared fold, the measure CID and fold lag on every
+      candidate, and each honest absence as one unresolved line (it is its own file because
+      `providers.rs` would cross 600 lines). LENS (`lens.rs`, station 1): the `role@model ->
       LensLevel` table and lens resolution — not yet split out; a function shaping that table
       belongs there once it exists. RENDER (`render.rs`): turning a view into the human screen —
       `render`, `render_first_screen`, `render_outline`, `render_hits`. PASSAGE (`passage.rs`): where inside an already-named candidate the question's terms land — `outline`, `best_section`, and the term-density window for unsectioned structured files. REFUSAL (`refusal.rs`): the

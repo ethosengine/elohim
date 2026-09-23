@@ -35,6 +35,7 @@ const V15_METHOD_CID: &str = "bafkreiauhzxlr2ex6vd6lwu66la2f6dzkp6pj2ogfdjfxaemu
 /// The v16 contract's method CID (task 4.2). Task 4.3 declared the fold's per-run file cap, so
 /// the contract's bytes — and its address — moved off this one.
 const V16_METHOD_CID: &str = "bafkreigcpetnffhhr7fdtcna3gd27rmni6fkkcoffednsjhnntvr2v7n6m";
+const V17_METHOD_CID: &str = "bafkreifrln4kyfld72xyd6nqrvzokj77gczalf6q3azdhibiestnrf7pha";
 
 /// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
 /// proved the string spelling of its CIDs left this address where the byte-array spelling had it
@@ -366,13 +367,48 @@ fn contract_v17_declares_the_fold_run_cap_and_repins_the_bank() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 17);
+    assert!(value["version"].as_u64() >= Some(17));
     assert_eq!(value["limits"]["fold_files_per_run"], 40);
     let method = contract.method_cid();
     assert_ne!(method, V16_METHOD_CID, "the contract's bytes moved");
+    assert_ne!(method, V17_METHOD_CID, "and moved again at v18");
     let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
     assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
     contract
         .question_bank()
         .expect("every question is in scope of the v17 recipe");
+}
+
+/// Contract v18 declares WHICH store the semantic provider reads (`embedder: "pinned"` — a
+/// declaration, never an environment switch) and its prose names the native semantic provider as
+/// the semantic route, with mempalace the declared visitor; the bank is re-pinned.
+#[test]
+fn contract_v18_declares_the_semantic_store_and_names_the_native_route() {
+    let root = common::repo_root();
+    let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
+    let value = common::live_contract();
+    assert_eq!(value["version"], 18);
+    let semantic = &value["ceremony"]["providers"]["semantic"];
+    assert_eq!(semantic["kind"], "semantic");
+    assert_eq!(semantic["embedder"], "pinned");
+    let method_lines = value["method"].to_string() + &value["freshness"].to_string();
+    assert!(
+        method_lines.contains("native semantic provider"),
+        "{method_lines}"
+    );
+    assert!(method_lines.contains("fold lag"), "{method_lines}");
+    assert!(
+        !method_lines.contains("one MemPalace search per packet"),
+        "mempalace is no longer the semantic route"
+    );
+    assert!(value["discovery"]["semantic_output"]
+        .as_str()
+        .is_some_and(|line| line.contains("visitor")));
+    let method = contract.method_cid();
+    assert_ne!(method, V17_METHOD_CID, "the contract's bytes moved");
+    let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v18 recipe");
 }

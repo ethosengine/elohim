@@ -1,0 +1,545 @@
+//! SEMANTIC — the native semantic candidate route (governed-discovery station 4, task 4.4):
+//! `search --provider semantic`, ranking over the fold `index.rs` keeps.
+//!
+//! The method is the declaration. The recipe's `ceremony.providers.<key>` names the
+//! `IndexMeasure` (`measure`) and which embedder's store to read (`embedder`: `pinned`, the live
+//! default, or `fixture` for tests) — never an environment switch. One answer:
+//!
+//! 1. the QUESTION TEXT (`--query`, else the session's `--need`) is embedded once, under the
+//!    provider envelope (`EmbedBudget::query`) — not the lexical term list, which is the local
+//!    route's shape;
+//! 2. the cosine of it against every live (non-demoted) chunk vector in the store, each file
+//!    keeping its best chunk ([`BestPerFile`]); cosine only — no standing, no behaviour signal;
+//! 3. the top `limits.search_results` files inside the search scope and the declared source
+//!    roots, ties broken by path; the lens's `choice_count` cuts at render, as it does for the
+//!    local route;
+//! 4. each candidate prints `producer`, the measure CID as `method`, the `model`, the fold's lag at
+//!    answer time and a `best_section` in the first screen's shape, so its linked `read` lands on
+//!    the passage.
+//!
+//! The vector scan reads a DERIVED store: it is reported in `usage` (`semantic_chunks_scanned`,
+//! `semantic_query_ms`, `provider_seconds`), never charged to `source_bytes` or `scan_bytes`.
+//! Locating the winner's heading reads the source file itself, and that outline read is charged
+//! to the scan counters exactly as the first screen's is.
+//!
+//! Absence is honest, never an error: no fold, an embedder that cannot run, or a store built under
+//! another method each answer with ONE `unresolved` line and no candidates. A stale fold answers
+//! and says how stale (`fold N files behind`). The private chain never reaches this file: the
+//! fold excluded it, and this route reads nothing but the store and the outline of a candidate.
+use super::discovery::question_terms;
+use super::embedder::{EmbedBudget, FIXTURE_FITNESS};
+use super::index::{Absent, EmbedderChoice, FoldReader, SemanticFold};
+use super::passage::outline_at;
+use super::providers::{Provider, ProviderId, ProviderResult};
+use super::*;
+
+/// Every candidate's and every answer's `producer`.
+pub(super) const PRODUCER: &str = "semantic";
+
+/// The answer when the declared store does not exist.
+pub(super) const NO_FOLD: &str = "semantic: no fold — run epr flow memory index fold";
+
+/// The answer when the store's meta names another method than the declaration.
+pub(super) const OTHER_METHOD: &str = "semantic: the fold was built under another method — refold";
+
+const SELECTION: &str = "cosine of the embedded question against every live chunk in the declared \
+                         fold; each file's best chunk; top limits.search_results files, ties by \
+                         path; not authority";
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Ranking — cosine and best chunk per file, pure
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// The cosine of two vectors; 0 when either has no length or their widths differ.
+pub(super) fn cosine(a: &[f32], b: &[f32]) -> f32 {
+    if a.len() != b.len() {
+        return 0.0;
+    }
+    let (mut dot, mut na, mut nb) = (0f32, 0f32, 0f32);
+    for (x, y) in a.iter().zip(b) {
+        dot += x * y;
+        na += x * x;
+        nb += y * y;
+    }
+    if na == 0.0 || nb == 0.0 {
+        0.0
+    } else {
+        dot / (na.sqrt() * nb.sqrt())
+    }
+}
+
+/// A cosine at the 4 decimals every candidate prints.
+fn rounded(score: f32) -> f64 {
+    (f64::from(score) * 10_000.0).round() / 10_000.0
+}
+
+/// One file's best chunk.
+#[derive(Debug, Clone, PartialEq)]
+pub(super) struct Hit {
+    pub path: String,
+    pub id: i64,
+    pub score: f32,
+}
+
+/// Each file's best chunk, offered one chunk at a time. Within a file the higher cosine wins and
+/// the earlier chunk (lower id) breaks a tie; across files [`BestPerFile::ranked`] orders by the
+/// printed (4-decimal) score, then by path, so two runs over one store print one order.
+#[derive(Default)]
+pub(super) struct BestPerFile {
+    best: BTreeMap<String, (f32, i64)>,
+}
+
+impl BestPerFile {
+    pub(super) fn offer(&mut self, id: i64, path: &str, score: f32) {
+        match self.best.get_mut(path) {
+            Some((kept, kept_id)) => {
+                if score > *kept || (score == *kept && id < *kept_id) {
+                    *kept = score;
+                    *kept_id = id;
+                }
+            }
+            None => {
+                self.best.insert(path.to_string(), (score, id));
+            }
+        }
+    }
+
+    pub(super) fn ranked(self) -> Vec<Hit> {
+        let mut hits: Vec<Hit> = self
+            .best
+            .into_iter()
+            .map(|(path, (score, id))| Hit { path, id, score })
+            .collect();
+        hits.sort_by(|a, b| {
+            rounded(b.score)
+                .total_cmp(&rounded(a.score))
+                .then_with(|| a.path.cmp(&b.path))
+        });
+        hits
+    }
+}
+
+/// A stored vector (little-endian `f32` × `dims`), or `None` when its width is not the measure's.
+fn decode(blob: &[u8], dims: usize) -> Option<Vec<f32>> {
+    if dims == 0 || blob.len() != dims * 4 {
+        return None;
+    }
+    Some(
+        blob.as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| f32::from_le_bytes(*b))
+            .collect(),
+    )
+}
+
+/// Whether `path` lies in the search scope (`.` or empty is the whole fold).
+fn in_scope(path: &str, scope: &str) -> bool {
+    let scope = scope.trim_end_matches('/');
+    scope.is_empty()
+        || scope == "."
+        || path == scope
+        || path
+            .strip_prefix(scope)
+            .is_some_and(|rest| rest.starts_with('/'))
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// Locating the passage
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// The heading title a chunk's section label names in the outline: a markdown label is its ATX
+/// line (`## Detail` → `Detail`), a Python label its `def`/`class` line; a window is `lines a-b`.
+fn heading_title(section: &str) -> String {
+    section.trim_start_matches('#').trim().to_string()
+}
+
+/// `lines a-b` → `a:b`.
+fn window_lines(section: &str) -> Option<String> {
+    let (first, last) = section.strip_prefix("lines ")?.split_once('-')?;
+    let (first, last): (usize, usize) = (first.parse().ok()?, last.parse().ok()?);
+    Some(format!("{first}:{last}"))
+}
+
+/// The first line (1-based) of `text` in the file, read to the same `scan_bytes` bound the outline
+/// reads and charged to the same scan counters; `None` when the text is not found in that window.
+fn line_of(
+    root: &Path,
+    contract: &Contract,
+    path: &str,
+    text: &str,
+    usage: &mut Value,
+) -> Option<usize> {
+    let bound = contract.limit_usize("scan_bytes");
+    let mut raw = Vec::new();
+    File::open(root.join(path))
+        .and_then(|f| f.take(bound as u64).read_to_end(&mut raw))
+        .ok()?;
+    add_usage(usage, &json!({"scan_bytes": raw.len(), "scanned_files": 1}));
+    let source = String::from_utf8_lossy(&raw);
+    let at = source.find(text.trim_end())?;
+    Some(source[..at].matches('\n').count() + 1)
+}
+
+/// Where the winning chunk sits in the file: the outline heading of the same title (the range the
+/// first screen would offer; where a title repeats, the one whose range holds the chunk), else the
+/// chunk's own line range — a window's label, or where its text sits in the file. `None` when the
+/// file no longer reads.
+fn locate(
+    root: &Path,
+    contract: &Contract,
+    path: &str,
+    section: &str,
+    text: &str,
+    terms: &[String],
+    usage: &mut Value,
+) -> Option<Value> {
+    let outline = outline_at(root, contract, path, terms).ok()?;
+    add_usage(usage, &outline["usage"]);
+    let title = heading_title(section);
+    let same: Vec<&Value> = outline["headings"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|heading| !title.is_empty() && heading["title"].as_str() == Some(&title))
+        .collect();
+    let heading = match same.len() {
+        0 => None,
+        1 => Some(same[0]),
+        _ => {
+            let at = line_of(root, contract, path, text, usage).unwrap_or(0) as u64;
+            let holds = |h: &&Value| {
+                h["line"].as_u64().unwrap_or(0) <= at && at <= h["end_line"].as_u64().unwrap_or(0)
+            };
+            same.iter().copied().find(holds).or(same.first().copied())
+        }
+    };
+    if let Some(heading) = heading {
+        return Some(json!({
+            "title": heading["title"],
+            "lines": heading["read_lines"],
+            "hits": heading["hits"],
+            "window_complete": heading["window_complete"],
+        }));
+    }
+    let lines = match window_lines(section) {
+        Some(lines) => lines,
+        None => {
+            let start = line_of(root, contract, path, text, usage)?;
+            let end = start + text.trim_end().lines().count().max(1) - 1;
+            format!("{start}:{end}")
+        }
+    };
+    Some(json!({
+        "title": section,
+        "lines": lines,
+        "hits": {},
+        "window_complete": true,
+    }))
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The answer
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+fn unavailable(error: FlowError) -> String {
+    match error {
+        FlowError::Unavailable(_) => format!("semantic: {error}"),
+        other => format!("semantic: unavailable: {other}"),
+    }
+}
+
+fn absent(why: Absent) -> String {
+    match why {
+        Absent::NoFold => NO_FOLD.to_string(),
+        Absent::OtherMethod => OTHER_METHOD.to_string(),
+        Absent::Unreadable(why) => {
+            format!("semantic: the fold is unreadable ({why}) — run epr flow memory index fold")
+        }
+    }
+}
+
+/// One question answered by the semantic provider `declaration` (a `ceremony.providers` entry of
+/// kind `semantic`), within `scope`. Never an error: every absence is one `unresolved` line.
+pub(super) fn search(
+    root: &Path,
+    contract: &Contract,
+    declaration: &Value,
+    query: &str,
+    scope: &str,
+) -> Value {
+    let began = Instant::now();
+    let mut answer = json!({
+        "producer": PRODUCER,
+        "ranking_known": true,
+        "method": Value::Null,
+        "model": Value::Null,
+        "embedder": Value::Null,
+        "fold_lag": Value::Null,
+        "scope": scope,
+        "selection": SELECTION,
+        "candidates": [],
+        "omissions": [],
+        "unresolved": [],
+        "usage": {"search_queries": 1, "semantic_chunks_scanned": 0, "provider_seconds": 0},
+    });
+    if let Err(line) = answer_into(&mut answer, root, contract, declaration, query, scope) {
+        answer["candidates"] = json!([]);
+        answer["unresolved"] = json!([line]);
+    }
+    answer["usage"]["semantic_query_ms"] = json!(began.elapsed().as_millis() as u64);
+    answer
+}
+
+fn answer_into(
+    answer: &mut Value,
+    root: &Path,
+    contract: &Contract,
+    declaration: &Value,
+    query: &str,
+    scope: &str,
+) -> Result<(), String> {
+    let choice = match declaration.get("embedder").and_then(Value::as_str) {
+        None | Some("pinned") => EmbedderChoice::Pinned,
+        Some("fixture") => EmbedderChoice::Fixture,
+        Some(other) => {
+            return Err(format!(
+                "semantic: the recipe declares embedder `{other}`; the set is pinned|fixture"
+            ))
+        }
+    };
+    answer["embedder"] = json!(choice.name());
+    let rel = declaration
+        .get("measure")
+        .and_then(Value::as_str)
+        .ok_or("semantic: the recipe declares no measure")?;
+    let fold = SemanticFold::declare(root, contract.clone(), rel, choice)
+        .map_err(|error| format!("semantic: the declared measure does not load: {error}"))?;
+    let method = fold.measure();
+    answer["method"] = json!(method);
+    let model = match choice {
+        EmbedderChoice::Pinned => json!(fold.model()),
+        EmbedderChoice::Fixture => {
+            answer["fitness"] = json!(FIXTURE_FITNESS);
+            Value::Null
+        }
+    };
+    answer["model"] = model.clone();
+    let reader: FoldReader = fold.open(root).map_err(absent)?;
+    if query.trim().is_empty() {
+        return Err("semantic: no question text to embed; name --query or --need".into());
+    }
+
+    // The question, embedded once, by the embedder whose store this is.
+    let budget = EmbedBudget::query(contract).map_err(unavailable)?;
+    let (embedder, label) = fold.embedder(root).map_err(unavailable)?;
+    let embedding_began = Instant::now();
+    let embedding = embedder
+        .embed(&[query.to_string()], budget)
+        .map_err(unavailable);
+    answer["usage"]["provider_seconds"] =
+        json!((embedding_began.elapsed().as_secs_f64() * 1e6).round() / 1e6);
+    let question = embedding?
+        .vectors
+        .into_iter()
+        .next()
+        .ok_or("semantic: unavailable: the embedder returned no vector")?;
+    if reader.built_by() != label {
+        return Err(OTHER_METHOD.to_string());
+    }
+    let dims = fold.dims();
+    if question.len() != dims {
+        return Err(format!(
+            "semantic: unavailable: the embedder replied {} dims; the measure pins {dims}",
+            question.len()
+        ));
+    }
+
+    // The lag at answer time: a stale fold answers, and says so.
+    let mut omissions: Vec<String> = Vec::new();
+    let lag = match fold.lag(root, &reader) {
+        Ok(lag) => {
+            if lag > 0 {
+                omissions.push(format!(
+                    "fold {lag} files behind ({}); a file changed since its fold ranks by its \
+                     folded text",
+                    fold.lag_bound()
+                ));
+            }
+            json!(lag)
+        }
+        Err(why) => {
+            omissions.push(format!("fold lag unknown: {why}"));
+            Value::Null
+        }
+    };
+    answer["fold_lag"] = lag.clone();
+
+    // Cosine over every live chunk; each file keeps its best.
+    let mut best = BestPerFile::default();
+    let mut malformed = 0usize;
+    let scanned = reader
+        .scan(|id, path, blob| {
+            if !in_scope(path, scope) {
+                return;
+            }
+            match decode(blob, dims) {
+                Some(vector) => best.offer(id, path, cosine(&question, &vector)),
+                None => malformed += 1,
+            }
+        })
+        .map_err(|error| format!("semantic: the fold could not be read: {error}"))?;
+    answer["usage"]["semantic_chunks_scanned"] = json!(scanned);
+    if malformed > 0 {
+        omissions.push(format!(
+            "{malformed} chunk(s) carry a vector that is not {dims} wide and were not ranked"
+        ));
+    }
+
+    // The window: top files inside the declared source roots, each located at its passage.
+    let limit = contract.limit_usize("search_results").max(1);
+    let terms = question_terms(contract, query);
+    let roots = contract.source_roots();
+    let mut candidates: Vec<Value> = Vec::new();
+    let mut outside = 0usize;
+    for hit in best.ranked() {
+        if candidates.len() >= limit {
+            break;
+        }
+        if contained(root, &hit.path, &roots).is_err() {
+            outside += 1;
+            continue;
+        }
+        let (section, text) = reader
+            .chunk(hit.id)
+            .map_err(|error| format!("semantic: the fold could not be read: {error}"))?;
+        let mut candidate = json!({
+            "path": hit.path,
+            "score": rounded(hit.score),
+            "producer": PRODUCER,
+            "method": method,
+            "model": model,
+            "fold_lag": lag,
+        });
+        if let Some(section) = locate(
+            root,
+            contract,
+            &hit.path,
+            &section,
+            &text,
+            &terms,
+            &mut answer["usage"],
+        ) {
+            candidate["best_section"] = section;
+        }
+        candidates.push(candidate);
+    }
+    if outside > 0 {
+        omissions.push(format!(
+            "{outside} ranked file(s) lie outside the recipe's declared source roots and were \
+             passed over"
+        ));
+    }
+    answer["candidates"] = json!(candidates);
+    answer["omissions"] = json!(omissions);
+    Ok(())
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// The Provider seam
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/// The recipe's semantic provider, named by the `ceremony.providers` key it is declared under.
+pub(super) struct Semantic {
+    pub key: String,
+}
+
+impl Provider for Semantic {
+    fn id(&self) -> ProviderId {
+        PRODUCER.to_string()
+    }
+
+    fn candidates(
+        &self,
+        query: &str,
+        _terms: &[String],
+        scope: &Path,
+        contract: &Contract,
+        session_root: &Path,
+    ) -> FlowResult<ProviderResult> {
+        let declaration = contract
+            .value
+            .pointer(&format!("/ceremony/providers/{}", self.key))
+            .cloned()
+            .unwrap_or(Value::Null);
+        let scope = super::providers::scope_string(scope, session_root);
+        let mut answer = search(session_root, contract, &declaration, query, &scope);
+        Ok(ProviderResult {
+            ranked: answer["candidates"].as_array().cloned().unwrap_or_default(),
+            ranking_known: true,
+            method: answer["method"].as_str().map(str::to_string),
+            usage: answer["usage"].take(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cosine_is_the_normalised_dot_product_and_zero_without_length() {
+        assert!((cosine(&[1.0, 0.0], &[2.0, 0.0]) - 1.0).abs() < 1e-6);
+        assert!(cosine(&[1.0, 0.0], &[0.0, 3.0]).abs() < 1e-6);
+        assert!((cosine(&[1.0, 1.0], &[-1.0, -1.0]) + 1.0).abs() < 1e-6);
+        assert_eq!(cosine(&[0.0, 0.0], &[1.0, 0.0]), 0.0);
+        assert_eq!(cosine(&[1.0], &[1.0, 0.0]), 0.0, "widths differ");
+    }
+
+    #[test]
+    fn each_file_keeps_its_best_chunk_and_ties_break_by_path() {
+        let question = [1.0f32, 0.0];
+        let mut best = BestPerFile::default();
+        for (id, path, vector) in [
+            (1, "b.md", [0.0f32, 1.0]),
+            (2, "b.md", [1.0, 0.0]),
+            (3, "a.md", [1.0, 0.0]),
+            (4, "c.md", [1.0, 1.0]),
+            (5, "a.md", [1.0, 0.0]),
+        ] {
+            best.offer(id, path, cosine(&question, &vector));
+        }
+        let ranked = best.ranked();
+        let order: Vec<(&str, i64)> = ranked.iter().map(|h| (h.path.as_str(), h.id)).collect();
+        // a.md and b.md tie at 1.0: path decides; within a.md the earlier chunk (id 3) is kept;
+        // b.md's best is its second chunk.
+        assert_eq!(order, vec![("a.md", 3), ("b.md", 2), ("c.md", 4)]);
+        assert_eq!(
+            rounded(ranked[2].score),
+            (std::f64::consts::FRAC_1_SQRT_2 * 10_000.0).round() / 10_000.0,
+            "cosine 1/√2, printed at 4 decimals"
+        );
+    }
+
+    #[test]
+    fn a_vector_is_little_endian_f32_of_the_measures_width() {
+        let blob: Vec<u8> = [1.5f32, -2.0]
+            .iter()
+            .flat_map(|x| x.to_le_bytes())
+            .collect();
+        assert_eq!(decode(&blob, 2), Some(vec![1.5, -2.0]));
+        assert_eq!(decode(&blob, 3), None);
+    }
+
+    #[test]
+    fn scope_and_labels_read_as_declared() {
+        assert!(in_scope("genesis/a.md", "genesis"));
+        assert!(in_scope("genesis/a.md", "genesis/"));
+        assert!(in_scope(".claude/x.md", "."));
+        assert!(!in_scope("genesis-other/a.md", "genesis"));
+        assert_eq!(heading_title("## Who fixes it"), "Who fixes it");
+        assert_eq!(heading_title("def fold():"), "def fold():");
+        assert_eq!(window_lines("lines 3-40"), Some("3:40".to_string()));
+        assert_eq!(window_lines("# lines"), None);
+    }
+}

@@ -20,9 +20,12 @@ Terms the history uses. *Stations* are the numbered steps of the plan that split
 executor into smaller files; station zero pinned today's output before anything moved, and the
 fixture predates that plan — an earlier plan's fifth station built it — and lives entirely in
 `tests/common/mod.rs` (`repo()`: a small repository with two stale citation edges). The *recall entry* is `epr flow memory recall`; its *contract*
-(`recall-contract.json`) is the declared algorithm, and its content hash (CID) is printed on
+(`.epr-meta/elohim/algorithms/recall-contract.json`) is the declared algorithm, and its content hash (CID) is printed on
 every view as the *recipe*, so any contract edit moves every digest. A *lens* is the reader's
 detail level, which bounds how much a view prints; a *floor* is a line no lens ever suppresses.
+A lens's *provenance* records why it resolved as it did: what the reader's claim stated, what
+their own recent journeys revealed, and whether its table came from the contract's declared
+`lens_table` or the executor's builtin one.
 
 ## Captured
 
@@ -41,9 +44,9 @@ detail level, which bounds how much a view prints; a *floor* is a line no lens e
 
 | Rendering | Test | Digest |
 |---|---|---|
-| Focused open | `focused_open_is_byte_identical` | `46e2d00a401baa78dd2af568958c92c3af2b2ca4012bbf0c7e07cd493a83499f` |
-| Whole open | `whole_open_is_byte_identical` | `562a9cd85cf9df15c7ec2bfa8289bb58e2a0fd204e17f9c67563f1750fe6c6b5` |
-| Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged — see below) |
+| Focused open | `focused_open_is_byte_identical` | `81344107558c58984525793719b2fe5a74afc2ab1fbe36db207af92dabd889fd` |
+| Whole open | `whole_open_is_byte_identical` | `aab7b527a05be529fee2ffd0948e6f8dd0d5f07c9bb839adc5a4eb1a4bd62c29` |
+| Refusal | `refusal_is_byte_identical` | `882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061` (unchanged: a refusal exits before render()'s lens/floor preamble runs) |
 
 ## A discovered seam: two ambient, non-algorithmic fields had to be normalized
 
@@ -156,3 +159,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract CID mov
 ## 2026-09-23 — contract v17 (station 4, Task 4.3: `limits.fold_files_per_run` declared for the semantic fold's per-run cap)
 
 Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreic…gbvi → bafkreia…onba). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`fef8f452…`, `09669f86…`) byte for byte. The refusal digest is unchanged.
+
+## 2026-09-23 — contract v18 (station 4, Task 4.4: `ceremony.providers.semantic.embedder: "pinned"`; the method/freshness lines and `discovery.semantic_output` name the native semantic provider, mempalace the declared visitor)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreia…onba → bafkreid…nxm4). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`cff19d6f…`, `830d1450…`) byte for byte. The refusal digest is unchanged. The Digests table, stale since v16, now mirrors the constants again.
