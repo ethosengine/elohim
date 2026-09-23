@@ -2362,6 +2362,16 @@ spec:
                                 archivePipelineBaselines('execute')
                                 error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
                             }
+
+                            // Checkpoint every completed level. The per-pipeline map above
+                            // is local to this stage, so a run killed mid-level by the
+                            // orchestrator's timeout used to lose every success already
+                            // recorded — DNA #1451 and edge #1477 both passed under
+                            // #1894, yet the next run re-dispatched both, re-spent the
+                            // same budget and timed out again (a livelock). The post
+                            // checkpoint still restores __global__ on a failed run.
+                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+                            archivePipelineBaselines('execute')
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
