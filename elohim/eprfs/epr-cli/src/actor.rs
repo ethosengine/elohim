@@ -28,7 +28,8 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use elohim_epr_rea::{
-    parse_agent_ref, ActorClaim, ActorRecord, ActorStore, FabricError, SidecarActorStore,
+    parse_participant_ref, ActorClaim, ActorRecord, ActorStore, FabricError, ParticipantRef,
+    SidecarActorStore,
 };
 use eprfs_meta::hex_lower;
 use serde::Serialize;
@@ -78,7 +79,9 @@ pub fn run(args: &[String]) -> ActorResult<ExitCode> {
             let (opts, rest) = parse_global(&args[1..])?;
             let claimed = take_opt(&rest, "--as")?.ok_or_else(|| {
                 ActorError::InvalidArguments(
-                    "claim needs --as agent:<role>@<model> — an unnamed claim names nobody".into(),
+                    "claim needs --as agent:<role>@<model> | human:<handle> — an unnamed claim \
+                     names nobody"
+                        .into(),
                 )
             })?;
             let session = take_opt(&rest, "--session")?.ok_or_else(|| {
@@ -173,7 +176,7 @@ impl ClaimOutcome {
     }
 }
 
-/// `epr actor claim --as agent:<role>@<model> --session <id>`.
+/// `epr actor claim --as agent:<role>@<model> | human:<handle> --session <id>`.
 ///
 /// Two phases, mirroring `flow note`: **Phase 1 resolves everything and appends nothing** — the
 /// claimed shape, the tree's date, the package address, the prior claim, and the record's own
@@ -182,8 +185,9 @@ pub fn claim(root: &Path, claimed: &str, session: &str) -> ActorResult<ClaimOutc
     // ── Phase 1: resolve. Nothing below this line touches the sidecar until Phase 2. ──
 
     // Shape first, so a malformed `--as` never even opens the store. The refusal is
-    // `elohim-epr-rea`'s own, verbatim: one parser for the shape, in one crate.
-    let (role, _model) = parse_agent_ref(claimed)?;
+    // `elohim-epr-rea`'s own, verbatim: one parser for the shape, in one crate. Either
+    // participant kind may claim; only an AI agent has a package build to address.
+    let participant = parse_participant_ref(claimed)?;
     let session = non_empty(session, "--session")?;
 
     // A claim is dated by the tree it was made against, never by wall clock — so a tree with no
@@ -197,7 +201,13 @@ pub fn claim(root: &Path, claimed: &str, session: &str) -> ActorResult<ClaimOutc
         ))
     })?;
 
-    let definition_cid = definition_cid(root, &role);
+    // A human has no build: honest absence by construction, never a lookup that happens to
+    // miss. `ActorClaim::new` refuses a definition on a human claim, so this match is what
+    // keeps the CLI from ever asserting one.
+    let definition_cid = match &participant {
+        ParticipantRef::Agent { role, .. } => definition_cid(root, role),
+        ParticipantRef::Human { .. } => None,
+    };
 
     let claim = ActorClaim::new(claimed, session, &claimed_at, definition_cid.clone())?;
     let record = ActorRecord::Claim(claim);
@@ -406,7 +416,7 @@ fn short_cid_str(cid: &str) -> String {
 
 pub fn usage() -> String {
     "usage: epr actor <\n  \
-     claim --as agent:<role>@<model> --session <id> [--json] [--root DIR]\n  \
+     claim --as agent:<role>@<model> | human:<handle> --session <id> [--json] [--root DIR]\n  \
      | current --session <id> [--json] [--root DIR]\n\
      >"
     .to_string()

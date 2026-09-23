@@ -51,8 +51,8 @@ use std::path::{Path, PathBuf};
 
 use cid::Cid;
 use elohim_epr_rea::{
-    parse_agent_ref, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude, ReaVerb,
-    SidecarActorStore, SidecarFlowStore,
+    parse_participant_ref, ActorStore, AgentRef, FlowEvent, FlowRecord, FlowStore, Magnitude,
+    ReaVerb, SidecarActorStore, SidecarFlowStore,
 };
 use serde::Serialize;
 
@@ -1041,7 +1041,9 @@ pub(crate) fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>>
     match as_ref {
         Some(raw) => {
             let trimmed = non_empty(raw, "--as")?;
-            parse_agent_ref(trimmed)?;
+            // Either participant kind may author a note; the human form is as legal here as
+            // the agent form, and the same one parser refuses everything else.
+            parse_participant_ref(trimmed)?;
             Ok(Some(trimmed.to_string()))
         }
         None => Ok(None),

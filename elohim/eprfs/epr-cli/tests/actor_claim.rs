@@ -175,6 +175,38 @@ fn a_claim_appends_one_record_dated_by_the_tree_it_was_made_against() {
 }
 
 #[test]
+fn a_human_claims_as_themselves_with_no_definition_cid_even_when_a_package_matches() {
+    // The human is a participant kind, not a role with a build: a package that happens to be
+    // named after the handle is never addressed, because a human has nothing to address.
+    let dir = fixture_with_package();
+    let root = dir.path();
+    std::fs::write(
+        root.join(".epr-meta/elohim/packages/agents/matthew.json"),
+        b"{\"name\":\"matthew\"}",
+    )
+    .expect("a decoy package on disk");
+    let outcome = claim(root, "human:matthew", SESSION).expect("a human claims");
+    assert_eq!(outcome.claimed, "human:matthew");
+    assert_eq!(
+        outcome.definition_cid, None,
+        "a human has no build to address"
+    );
+    assert!(outcome.appended);
+    let (_, current) = SidecarActorStore::open(root)
+        .unwrap()
+        .current_for(SESSION)
+        .unwrap()
+        .expect("the human is current for the session");
+    assert_eq!(current.claimed.0, "human:matthew");
+
+    // The forged form for a person is refused at the same early gate as any malformed --as.
+    let err = claim(root, "agent:matthew@human", SESSION).expect_err("forgery refused");
+    assert!(err.to_string().contains("human:<handle>"), "got: {err}");
+    let err = claim(root, "human:mbd06b@gmail.com", SESSION).expect_err("email refused");
+    assert!(err.to_string().contains('@'), "got: {err}");
+}
+
+#[test]
 fn a_claim_without_a_package_on_disk_carries_no_definition_cid() {
     let dir = fixture();
     let outcome = claim(dir.path(), CLAIMED, SESSION).expect("claim runs");

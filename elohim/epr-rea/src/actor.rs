@@ -35,10 +35,20 @@ use serde::{Deserialize, Serialize};
 use crate::error::{FabricError, Result};
 use crate::model::{atom_cid, AgentRef};
 
-/// The one legal prefix on a claimed identity. Held as a constant because
-/// [`parse_agent_ref`] is the single source of truth for the shape and every other
-/// reader — including the CLI that derives a package path from the role — goes through it.
+/// The prefix of an AI-agent claim. Held as a constant because [`parse_agent_ref`] is the
+/// single source of truth for that shape and every other reader — including the CLI that
+/// derives a package path from the role — goes through it.
 const AGENT_PREFIX: &str = "agent:";
+/// The prefix of a human participant's claim, `human:<handle>`. The handle is a slug the human
+/// chose for themselves — never derived from git, never an email, never minted by the substrate
+/// on their behalf. Both prefixes fill the same [`AgentRef`] slot: on the household mesh every
+/// participant is an `AgentPubKey` with a source chain, human or not, and these two forms are
+/// the repository node's rehearsal of that until the mesh mints the key.
+const HUMAN_PREFIX: &str = "human:";
+/// A model segment no AI agent may claim. `agent:<person>@human` is the forgery the human form
+/// exists to make unnecessary: a substrate asserting a persona nobody claimed. Refused in
+/// [`parse_agent_ref`] itself, so every caller that validates the agent shape refuses it too.
+const RESERVED_MODEL: &str = "human";
 
 /// The declared content-address scheme for [`ActorClaim::definition_cid`].
 const DEFINITION_CID_PREFIX: &str = "sha256:";
@@ -89,7 +99,17 @@ impl ActorClaim {
     ) -> Result<Self> {
         // Shape first: a claim whose identity does not parse can never be attributed to
         // anything, so nothing else about it is worth checking.
-        parse_agent_ref(claimed)?;
+        let participant = parse_participant_ref(claimed)?;
+
+        // A human has no build. A definition address on a human claim is not honest narrowing,
+        // it is a category error that would read as a real package address and compare unequal
+        // to every genuine one — refused, not dropped, so the caller learns what it asserted.
+        if matches!(participant, ParticipantRef::Human { .. }) && definition_cid.is_some() {
+            return Err(FabricError::Decode(format!(
+                "actor claim `{claimed}` is a human participant and carries a definition_cid — \
+                 a human has no package build to address; omit it"
+            )));
+        }
 
         let session = session.trim();
         if session.is_empty() {
@@ -133,6 +153,55 @@ impl ActorClaim {
     pub fn model(&self) -> Result<String> {
         Ok(parse_agent_ref(&self.claimed.0)?.1)
     }
+
+    /// Which kind of participant claimed, with its parsed halves. Re-parses for the same
+    /// reason [`Self::role`] does: the parse is the single source of truth for the shape.
+    pub fn participant(&self) -> Result<ParticipantRef> {
+        parse_participant_ref(&self.claimed.0)
+    }
+}
+
+/// A claimed identity, parsed. Two kinds fill the one [`AgentRef`] slot.
+///
+/// The distinction is load-bearing for attribution and for nothing else: an AI agent's produce
+/// is rent on a commons it did not make and flows to the pool that constituted the persona,
+/// while a human's produce is their labor. The substrate must be able to tell them apart without
+/// either one being able to pass as the other — which is why the human form has no `@` half
+/// and the agent form refuses `human` as a model.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParticipantRef {
+    /// `agent:<role>@<model>` — an AI agent, identified by its definition and its runtime build.
+    Agent { role: String, model: String },
+    /// `human:<handle>` — a human participant, identified by the handle they claimed.
+    Human { handle: String },
+}
+
+/// Parse either participant form, refusing anything else.
+///
+/// ONE source of truth for the two shapes together. [`ActorClaim::new`] validates through
+/// this; callers that accept only the agent form keep using [`parse_agent_ref`], and callers
+/// that accept any participant (a note's `--as`, a contribution's `author`) use this one.
+pub fn parse_participant_ref(claimed: &str) -> Result<ParticipantRef> {
+    if let Some(handle) = claimed.strip_prefix(HUMAN_PREFIX) {
+        if handle.contains('@') {
+            return Err(malformed(
+                claimed,
+                "a human handle carries no `@` — it is a slug the human chose, never an email \
+                 and never a role@model pair",
+            ));
+        }
+        if handle.is_empty() || !handle.chars().all(is_role_char) {
+            return Err(malformed(
+                claimed,
+                "the handle must be a non-empty `[a-z0-9-]+`",
+            ));
+        }
+        return Ok(ParticipantRef::Human {
+            handle: handle.to_string(),
+        });
+    }
+    let (role, model) = parse_agent_ref(claimed)?;
+    Ok(ParticipantRef::Agent { role, model })
 }
 
 /// Split `agent:<role>@<model>` into its halves, refusing anything else.
@@ -170,6 +239,13 @@ pub fn parse_agent_ref(claimed: &str) -> Result<(String, String)> {
             "the model segment must be a non-empty `[a-z0-9.-]+`",
         ));
     }
+    if model == RESERVED_MODEL {
+        return Err(malformed(
+            claimed,
+            "`human` is not a model — a human participant claims as `human:<handle>`, and the \
+             substrate never mints an agent persona for a person",
+        ));
+    }
     Ok((role.to_string(), model.to_string()))
 }
 
@@ -183,7 +259,7 @@ fn is_model_char(c: char) -> bool {
 
 fn malformed(claimed: &str, why: &str) -> FabricError {
     FabricError::Decode(format!(
-        "actor claim `{claimed}` is not `agent:<role>@<model>`: {why}"
+        "actor claim `{claimed}` is neither `agent:<role>@<model>` nor `human:<handle>`: {why}"
     ))
 }
 
@@ -454,6 +530,71 @@ mod tests {
     #[test]
     fn an_uppercase_model_is_refused() {
         assert!(ActorClaim::new("agent:scribe@Opus-5", "s1", AT, None).is_err());
+    }
+
+    // ── participant_ref: the human form beside the agent form ──────────────────────────
+
+    #[test]
+    fn participant_ref_parses_both_kinds() {
+        assert_eq!(
+            parse_participant_ref("human:matthew").unwrap(),
+            ParticipantRef::Human {
+                handle: "matthew".into()
+            }
+        );
+        assert_eq!(
+            parse_participant_ref("agent:scribe@opus-5").unwrap(),
+            ParticipantRef::Agent {
+                role: "scribe".into(),
+                model: "opus-5".into()
+            }
+        );
+        let c = claim("human:matthew", "s1");
+        assert_eq!(
+            c.participant().unwrap(),
+            ParticipantRef::Human {
+                handle: "matthew".into()
+            }
+        );
+    }
+
+    #[test]
+    fn participant_ref_refuses_the_forged_agent_form_for_a_person() {
+        // `agent:<person>@human` is the substrate asserting a persona nobody claimed. Refused in
+        // the agent parser itself, so every agent-only caller refuses it too.
+        let err = parse_agent_ref("agent:matthew@human").expect_err("forgery refused");
+        assert!(err.to_string().contains("human:<handle>"), "got: {err}");
+        assert!(parse_participant_ref("agent:matthew@human").is_err());
+        assert!(ActorClaim::new("agent:matthew@human", "s1", AT, None).is_err());
+    }
+
+    #[test]
+    fn participant_ref_refuses_an_email_and_any_substrate_minted_shape() {
+        // An email is a cross-namespace key the substrate must never copy into a claim.
+        assert!(parse_participant_ref("human:mbd06b@gmail.com").is_err());
+        assert!(parse_participant_ref("human:Matthew Dowell").is_err());
+        assert!(parse_participant_ref("human:").is_err());
+        assert!(parse_participant_ref("human:Matthew").is_err());
+        assert!(parse_participant_ref("human:matt/../x").is_err());
+        assert!(parse_participant_ref("person:matthew").is_err());
+        assert!(parse_participant_ref("matthew").is_err());
+        // A human handle keeps the agent role charset: lowercase slug, no dots.
+        assert!(parse_participant_ref("human:matt.hew").is_err());
+        assert!(parse_participant_ref("human:matt-hew-2").is_ok());
+    }
+
+    #[test]
+    fn a_human_claim_refuses_a_definition_cid_and_omits_the_key() {
+        // A human has no build; a definition address on a human claim is a category error.
+        let err = ActorClaim::new("human:matthew", "s1", AT, Some(DEF.into()))
+            .expect_err("a human has no package to address");
+        assert!(err.to_string().contains("human"), "got: {err}");
+        // And with none, the wire shape is byte-identical in form to an agent claim without
+        // one: the same struct, the same omitted key, no new field on the hashed atom.
+        let c = claim("human:matthew", "s1");
+        let json = serde_json::to_string(&c).unwrap();
+        assert!(!json.contains("definitionCid"), "got: {json}");
+        assert!(c.role().is_err(), "role/model are agent-only reads");
     }
 
     #[test]

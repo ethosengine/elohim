@@ -314,19 +314,31 @@ decisionPoints:
 
   # ── Actor plane (2026-08-15) — registered at birth ──────────────────────────────────────────
 
-  - name: ActorClaim::new / parse_agent_ref
+  - name: ActorClaim::new / parse_participant_ref / parse_agent_ref
     kind: pure-decision-predicate
     sourceLocation:
       file: src/actor.rs
       modulePath: elohim_epr_rea::actor
       line: 85
     summary: >
-      The admission gate for a claimed identity: `agent:<role>@<model>` with lowercase-only
-      charsets (a case variant of a real role is a free impersonation surface), a non-empty
-      session, a caller-supplied date, and a definition address that is a full digest or absent.
-      One parser owns the shape — the CLI, the note leg, and the govern stamp all resolve
-      through it, so no surface can accept an identity another would refuse.
+      The admission gate for a claimed identity. Two participant kinds fill one AgentRef slot
+      (widened 2026-09-23, human-participant-actor-plane-design station 1): `agent:<role>@<model>`
+      for an AI agent and `human:<handle>` for a human, both lowercase-only slugs (a case
+      variant of a real role is a free impersonation surface), a non-empty session, a
+      caller-supplied date, and — for an agent only — a definition address that is a full digest
+      or absent; a human claim REFUSES a definition (a human has no build) and the agent parser
+      REFUSES `human` as a model (`agent:<person>@human` is the substrate minting a persona
+      nobody claimed). One parser owns both shapes — the CLI, the note leg, the contribution
+      validator and the govern stamp all resolve through it, so no surface can accept an
+      identity another would refuse, and neither kind can pass as the other.
     concernIds:
+      - id: C12
+        status: answered
+        justification: >
+          A human is recorded only as the handle they claimed for themselves; the substrate never
+          derives the identity from git, never accepts an email as a handle (the `@` refusal),
+          and never mints an agent persona for a person. Binding a handle to any other namespace
+          is the participant's own act, outside this predicate.
       - id: C4
         status: answered
         justification: >
@@ -354,6 +366,18 @@ decisionPoints:
       - path: elohim/epr-rea/src/actor.rs
         testName: actor_claim_cid_is_stable
         kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: participant_ref_refuses_the_forged_agent_form_for_a_person
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: participant_ref_refuses_an_email_and_any_substrate_minted_shape
+        kind: unit
+      - path: elohim/epr-rea/src/actor.rs
+        testName: a_human_claim_refuses_a_definition_cid_and_omits_the_key
+        kind: unit
+      - path: elohim/eprfs/epr-cli/tests/actor_claim.rs
+        testName: a_human_claims_as_themselves_with_no_definition_cid_even_when_a_package_matches
+        kind: integration
 
   - name: ActorStore::current_for
     kind: pure-decision-predicate

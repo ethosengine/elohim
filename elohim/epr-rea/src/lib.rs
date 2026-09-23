@@ -70,7 +70,10 @@ pub mod walk;
 
 #[cfg(feature = "sidecar")]
 pub use actor::SidecarActorStore;
-pub use actor::{parse_agent_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore};
+pub use actor::{
+    parse_agent_ref, parse_participant_ref, ActorClaim, ActorRecord, ActorStore, MemoryActorStore,
+    ParticipantRef,
+};
 pub use epistemic::{
     cite_gate, classify, fold_standing, CanonizationRef, EpistemicStanding, EpistemicStatus,
     EpistemicThresholds, ReviewEvent,

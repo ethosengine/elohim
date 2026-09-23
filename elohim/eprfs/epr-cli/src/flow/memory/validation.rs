@@ -270,7 +270,9 @@ impl Reader {
         {
             return Err(refused("contribution steward or scope is not declared"));
         }
-        elohim_epr_rea::parse_agent_ref(&c.author)?;
+        // Either participant kind may author a contribution — the human as themselves, never
+        // as a persona the substrate minted for them.
+        elohim_epr_rea::parse_participant_ref(&c.author)?;
         bounded_text(&c.concern, "concern", 256)?;
         bounded_text(&c.claim, "claim", 1000)?;
         strings(&c.uncertainty, "uncertainty", 8, 300)?;
