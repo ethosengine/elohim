@@ -456,6 +456,129 @@ pub fn dev_shed_exempt(path: &str, admission_exempt: bool) -> bool {
         || path.split('/').any(|seg| seg == "federation")
 }
 
+// ============================================================================
+// PUT /admin/dev/federation-deaf — story 4.2 slice 1's counterfactual control
+// ============================================================================
+//
+// Scenario 3 (genesis/a2o/features/federation/projection-index-doorbell.feature):
+// "A lost doorbell is caught by the next refresh". Without a way to make a
+// doorway deliberately deaf to doorbells, scenario 1's "within 10 seconds"
+// claim would be indistinguishable from a lucky discovery-poll tick landing
+// inside the same window (about 1 time in 6 — design §3.5). This fixture
+// supplies exactly the CAUSE: the doorbell handler
+// (`routes::coherence::handle_doorbell`) still answers, still logged, but
+// with `pulled:false,reason:"deaf"` and no pull — the SAME shape a genuinely
+// slow/broken sibling produces. Same gate as `PUT /admin/dev/shed`, same
+// clock-injection idiom, same self-clearing window — reuses
+// `apply_shed_request` / `shed_remaining_secs` / `DEV_SHED_MAX_SECS` directly
+// rather than re-deriving the identical bounded-window math under a new name.
+
+/// Request body for `PUT /admin/dev/federation-deaf`.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FederationDeafRequest {
+    /// Seconds this doorway should ignore incoming doorbells for. `0` clears
+    /// any standing window. Capped at [`DEV_SHED_MAX_SECS`] (the design's own
+    /// "capped at 300" — the same ceiling as the shed fixture, for the same
+    /// reason: a leaked call must not wedge a household doorway indefinitely).
+    secs: u64,
+}
+
+/// `PUT /admin/dev/federation-deaf` — declare this doorway deaf to incoming
+/// doorbells for `secs` seconds (`0` clears). Gated FIRST, before body
+/// parsing, by [`fixture_surface_gate`] — never `dev_mode`. Same shape as
+/// [`handle_set_shed`].
+pub async fn handle_set_federation_deaf(
+    req: Request<Incoming>,
+    state: Arc<AppState>,
+    peer_is_loopback: bool,
+) -> Response<FullBody> {
+    if let Some(forbidden) = fixture_surface_gate(&state, peer_is_loopback) {
+        return forbidden;
+    }
+
+    let body_bytes = match collect_bounded_body(req).await {
+        Ok(b) => b,
+        Err(too_large) => return too_large,
+    };
+    let request: FederationDeafRequest = match serde_json::from_slice(&body_bytes) {
+        Ok(r) => r,
+        Err(e) => {
+            return error_response(
+                StatusCode::BAD_REQUEST,
+                &format!("Invalid JSON: {e}"),
+                "BAD_JSON",
+            )
+        }
+    };
+
+    match apply_shed_request(request.secs, now_secs()) {
+        ShedRequestOutcome::TooLarge => error_response(
+            StatusCode::BAD_REQUEST,
+            &format!("secs must be <= {DEV_SHED_MAX_SECS}"),
+            "SECS_TOO_LARGE",
+        ),
+        ShedRequestOutcome::Cleared => {
+            *state.federation_deaf_until.write().await = None;
+            info!(
+                target: "doorway::admin_dev",
+                "dev federation-deaf fixture cleared"
+            );
+            json_response(
+                StatusCode::OK,
+                &serde_json::json!({ "secs": 0, "active": false }),
+            )
+        }
+        ShedRequestOutcome::Set { until_secs } => {
+            *state.federation_deaf_until.write().await = Some(until_secs);
+            warn!(
+                target: "doorway::admin_dev",
+                secs = request.secs,
+                "dev federation-deaf fixture set — this doorway will ignore incoming doorbells"
+            );
+            json_response(
+                StatusCode::OK,
+                &serde_json::json!({ "secs": request.secs, "active": true }),
+            )
+        }
+    }
+}
+
+/// Consult the standing federation-deaf window at `now`, self-clearing it
+/// (and logging the promotion exactly once) when it has elapsed. Same shape
+/// as [`check_and_clear_at`] over `AppState::federation_deaf_until` instead of
+/// `dev_shed`, returning a bare `bool` — the doorbell handler only needs
+/// "deaf right now or not", never a remaining-seconds count.
+pub async fn check_and_clear_federation_deaf_at(state: &AppState, now: u64) -> bool {
+    {
+        let snapshot = *state.federation_deaf_until.read().await;
+        match shed_remaining_secs(snapshot, now) {
+            Some(_) => return true,
+            None if snapshot.is_none() => return false,
+            None => {} // was Some but has elapsed — fall through to clear it
+        }
+    }
+    let mut guard = state.federation_deaf_until.write().await;
+    if shed_remaining_secs(*guard, now).is_some() {
+        return true;
+    }
+    if guard.is_some() {
+        *guard = None;
+        info!(
+            target: "doorway::admin_dev",
+            "dev federation-deaf fixture window elapsed — resuming normal doorbell handling"
+        );
+    }
+    false
+}
+
+/// [`check_and_clear_federation_deaf_at`] with the wall clock read at the
+/// boundary. The only call site outside tests
+/// (`services::federation_doorbell::is_deaf`).
+pub async fn check_and_clear_federation_deaf(state: &AppState) -> bool {
+    check_and_clear_federation_deaf_at(state, now_secs()).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -786,5 +909,46 @@ mod tests {
     #[test]
     fn federation_as_a_slug_substring_is_not_exempt() {
         assert!(!dev_shed_exempt("/db/content/federation-basics", false));
+    }
+
+    // ========================================================================
+    // PUT /admin/dev/federation-deaf (story 4.2 slice 1)
+    // ========================================================================
+
+    #[test]
+    fn federation_deaf_gate_refuses_off_the_household_stage() {
+        let state = shed_test_state(NetworkStage::Bootstrap, true);
+        let resp = fixture_surface_gate(&state, true)
+            .expect("Bootstrap must refuse the federation-deaf gate, same as the shed gate");
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn federation_deaf_gate_opens_on_household_stage_plus_loopback() {
+        let state = shed_test_state(NetworkStage::Simulacra, false);
+        assert!(fixture_surface_gate(&state, true).is_none());
+    }
+
+    #[tokio::test]
+    async fn check_and_clear_federation_deaf_reports_false_when_inactive() {
+        let state = test_state(false);
+        assert!(!check_and_clear_federation_deaf_at(&state, 1_000).await);
+    }
+
+    #[tokio::test]
+    async fn check_and_clear_federation_deaf_reports_true_while_the_window_stands() {
+        let state = test_state(false);
+        *state.federation_deaf_until.write().await = Some(1_120);
+        assert!(check_and_clear_federation_deaf_at(&state, 1_000).await);
+        // A mere read must not have cleared it.
+        assert_eq!(*state.federation_deaf_until.read().await, Some(1_120));
+    }
+
+    #[tokio::test]
+    async fn an_elapsed_federation_deaf_window_self_clears_with_no_call() {
+        let state = test_state(false);
+        *state.federation_deaf_until.write().await = Some(1_000);
+        assert!(!check_and_clear_federation_deaf_at(&state, 1_000).await);
+        assert_eq!(*state.federation_deaf_until.read().await, None);
     }
 }
