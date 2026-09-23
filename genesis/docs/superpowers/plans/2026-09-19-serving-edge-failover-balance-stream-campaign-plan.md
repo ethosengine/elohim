@@ -13,6 +13,8 @@ cites:
   - elohim/elohim-storage/.epr-meta/dataplane-convergence.habit.md
   - genesis/data/timeline/backlog/head-authority-carried-with-content-sync-unit.md
   - genesis/data/timeline/backlog/conductor-admission-saturated-for-hours-after-restart.md
+  - "admission-receiver-granted-lanes-design | story 3.3's brainstorm starting frame: receiver-granted reserved lanes, shortest-expected-hold first, AIMD background after restart (TCP/Homa lessons from the 2026-09-23 publish storm) | sha256:54611915e41292b9 | path: genesis/docs/superpowers/specs/2026-09-23-admission-receiver-granted-lanes-design.md"
+  - genesis/data/timeline/backlog/arch-dataplane-borrows-backlog.md
   - genesis/data/timeline/backlog/projection-reconcile-actionable-sawtooth.md
   - genesis/data/timeline/backlog/ci-orchestrator-baseline-advance-despite-failure.md
   - genesis/data/timeline/backlog/ci-apex-doorway-cannot-reach-adam-storage-blob-forward.md
@@ -225,6 +227,11 @@ them, then close the zero-lag head oracle, then make the pair comparable.
 - **3.3 Admission degrades as a curve.** The design question from backlog conductor-admission (reserved
   interactive capacity vs background ceiling vs cold-start pacing; heartbeat call sites classed `interactive`).
   **Gate: brainstorm**, then its own plan. Scheduled here, may be pulled forward by 1.3's reading.
+  *Design input 2026-09-23* (specs/2026-09-23-admission-receiver-granted-lanes-design.md): the 2026-09-23 alpha
+  publish storm, read through TCP and Homa. The recommended frame is a receiver-issued grant over reserved
+  lanes: an interactive floor that background work never takes, shortest-expected-hold first, AIMD background
+  concurrency after a restart, and a `Retry-After` derived from the measured hold. It protects person-facing
+  calls. It does not cure a conductor-internal storm; that is borrows-backlog row 17. The brainstorm starts here.
 
 ### Sprint 4 — doorways hear each other (habit: doorway-failover; D:192-194 "designed-for, not built")
 
@@ -304,6 +311,9 @@ household-only first story that can start once 1.4 lands; every fleet story wait
 ## Complementary work captured, not planned here
 
 - The conductor ceiling itself on matthew and adam (operator lever; backlog conductor-admission).
+- Flow control borrowed from TCP/Homa after the 2026-09-23 publish storm (backlog arch-dataplane-borrows rows
+  16–17): receiver-granted doorway→storage blob forwarding with no blind retry, and conductor publish
+  backpressure in the holochain/kitsune2 fork (telemetry first).
 - `delegated-sweettest.feature` returns `pending` without its fixture and fails strict validate-only runs.
 - No gate runs `scripts/ci/*.test.sh`.
 - An untracked `resource_limit_raise_test.py` (2026-09-13) fails any push touching `.claude/scripts/_lib`.
