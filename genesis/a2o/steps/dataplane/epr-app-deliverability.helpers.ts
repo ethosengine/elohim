@@ -687,7 +687,13 @@ export async function meshControl(action: string, ...args: string[]): Promise<vo
     {
       cwd: REPO_ROOT,
       env: process.env,
-      timeout: 180_000,
+      // The step that holds every storage peer down runs under a 600s budget,
+      // and `storage-restart` itself waits up to 180s for the SET to serve on
+      // top of a per-binary feature probe and a 15s kill wait. An outer budget
+      // equal to that inner wait cannot let it finish: on 2026-09-23 three
+      // concurrent restores were killed at 180s with empty stderr and two
+      // peers never reached their kill step. The outer budget is the step's.
+      timeout: 600_000,
       maxBuffer: 4 * 1024 * 1024,
     }
   );
