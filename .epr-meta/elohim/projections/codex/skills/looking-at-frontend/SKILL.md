@@ -60,5 +60,5 @@ Subagents do NOT self-discover skills (observed twice: agents reviewed designed 
 
 - a11y/testid legibility audit → `page-model` skill.
 - Screenshot-vs-promise delivery judgment → `/deliver`.
-- Greenfield aesthetics → `frontend-design` plugin skill; **inside graphos the aesthetic is already chosen** (`genesis/graphos/elohim-protocol-design-spec.md`).
+- Greenfield aesthetics → `frontend-design` plugin skill; **inside graphos the aesthetic is already chosen** (`app/graphos/elohim-protocol-design-spec.md`).
 - Library A/B ownership + story conventions → `app/elohim-library/CLAUDE.md`. Tooling spec: `genesis/docs/superpowers/specs/2026-06-11-graphos-look-design.md`.

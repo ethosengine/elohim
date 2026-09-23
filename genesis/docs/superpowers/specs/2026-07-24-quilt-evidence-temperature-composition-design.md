@@ -21,7 +21,7 @@ topic:
   - cid
   - confidentiality
 informed-by:
-  - genesis/graphos/vocabulary.md
+  - app/graphos/vocabulary.md
   - genesis/data/timeline/backlog/resilience-tier-content-declared-floor.md
   - genesis/data/timeline/backlog/peer-hoster-async-sync-readiness-assessment.md
   - elohim/sdk/schemas/v1/manifest/app-manifest.schema.json
@@ -504,7 +504,7 @@ stopping the bare digest from competing as a public identity.
 
 ### Canon/document contradictions to reconcile first
 
-- `genesis/graphos/vocabulary.md` still presents `sha256-<hex>` as the positive shard address.
+- `app/graphos/vocabulary.md` still presents `sha256-<hex>` as the positive shard address.
 - `protocol-specification.md:1088-1094` says components MUST produce it, while `:1210` says new
   code should not.
 - `EDGE-ARCHITECTURE.md`, `P2P-DATAPLANE.md`, and Holochain `ARCHITECTURE.md` still present
@@ -572,7 +572,7 @@ The human facing follows the same honesty law:
 
 This design decomposes into independently landable increments:
 
-1. **Vocabulary normalization:** amend `genesis/graphos/vocabulary.md`; separate resilience,
+1. **Vocabulary normalization:** amend `app/graphos/vocabulary.md`; separate resilience,
    custody, working-set, evidence, and RS axes; correct CID language.
 2. **Canon reconciliation:** remove the protocol-spec bare-SHA contradiction and publish the
    CID migration ledger.

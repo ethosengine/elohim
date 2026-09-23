@@ -35,7 +35,7 @@ Your work happens at the **story decorator level** in Library B files. Binding h
 
 ## The Elohim Protocol's established aesthetic
 
-Graphos has an existing aesthetic. Your job is to **execute it with precision**, not invent it. The spec lives in `genesis/graphos/elohim-protocol-design-spec.md`. The summary register:
+Graphos has an existing aesthetic. Your job is to **execute it with precision**, not invent it. The spec lives in `app/graphos/elohim-protocol-design-spec.md`. The summary register:
 
 - **Communitarian solarpunk** with constellation language at every level
 - **Warm earth tones in the day** (Vineyard, New Growth, Harvest Gold, Terracotta, Linen, Hearthstone)

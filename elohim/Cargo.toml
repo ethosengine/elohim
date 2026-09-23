@@ -25,7 +25,6 @@ exclude = [
     "eprfs",
     "elohim-storage",
     "holochain",
-    "rust-ipfs",
     "sdk",
 ]
 

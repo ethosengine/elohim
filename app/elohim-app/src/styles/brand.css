@@ -1,4 +1,4 @@
-/* Elohim brand tokens — genesis/graphos/elohim-protocol-design-spec.md §4 Color, §5 Type.
+/* Elohim brand tokens — app/graphos/elohim-protocol-design-spec.md §4 Color, §5 Type.
    SCOPED BY CONSUMPTION: nothing in the shell binds these until a surface opts in by
    using --el-* (the EPR atom home is the first). The shell's --lamad-* tokens are
    untouched. Rules carried: no pure black/white; darks carry green/brown undertone;

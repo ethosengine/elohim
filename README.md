@@ -13,7 +13,7 @@ This is the monorepo for the Elohim Protocol: digital infrastructure organized a
 [![Ask Perplexity about elohim](https://img.shields.io/badge/Ask_Perplexity_about_elohim-20808D?logo=perplexity&logoColor=white)](https://www.perplexity.ai/search?q=Explore%20https%3A%2F%2Fgithub.com%2Fethosengine%2Felohim.%20Before%20explaining%20anything%2C%20get%20a%20sense%20of%20who%20I%20am%20and%20what%20I%20care%20about.%20Then%20tell%20me%20why%20the%20Elohim%20Protocol%20might%20matter%20to%20me%20and%20how%20I%20could%20get%20involved%2C%20through%20that%20lens.)
 
 <p align="center">
-  <img src="genesis/graphos/design-assets/vision/citizen-assembly-p2p-substrate-v4-story-value-governance.png" alt="A nighttime community: neighbors sharing a meal and one another's company around a long table while others garden, build, teach, and make; at the center a luminous woman writes with a quill among cards marked with attestation checks; overhead a constellation of AI agents carries the deliberative load; roots spread underground." width="900">
+  <img src="app/graphos/design-assets/vision/citizen-assembly-p2p-substrate-v4-story-value-governance.png" alt="A nighttime community: neighbors sharing a meal and one another's company around a long table while others garden, build, teach, and make; at the center a luminous woman writes with a quill among cards marked with attestation checks; overhead a constellation of AI agents carries the deliberative load; roots spread underground." width="900">
 </p>
 
 <p align="center"><em>At the center, an elohim sits beside us — a young Wisdom with a quill, a witness to our life — and writes the ledger of care: who tended, who taught, who mended, every entry attested. Near her, a life well lived; above, the council carries the deliberative weight, balance, and judgments no single person need hold, so the people are freed to live while the machines absorb the variety. She keeps the substrate of a commons new but ancient, and tends with us its living tree of knowledge. (Concept illustration.)</em></p>
@@ -62,7 +62,7 @@ This protocol is being built by a father of three in San Antonio, working evenin
 
 **Graduated Intimacy**: The design separates spaces for personal exploration from protected commons, with consent boundaries that keep extremes from corrupting shared spaces.
 
-## Domain Pillars
+ 
 
 The protocol's vocabulary draws from Hebrew and Latin to name the human practices it serves rather than the engineering it requires. Four of the pillars below live under `app/elohim-app/src/app/<pillar>/`; `lamad` is its own bundle at [`app/lamad/`](./app/lamad/). Each has an SDK domain in `elohim/sdk/domains/` (see the [domain index](./elohim/sdk/domains/README.md)).
 
@@ -124,7 +124,7 @@ The layers are designed around a witness ladder: a claim starts as a local witne
 
 **Lamad** is path-centric, not course-centric. Knowledge is structured as territory (content-addressed, reusable ContentNodes: videos, docs, simulations), journeys (curated paths that add narrative meaning and sequence), and travelers (learners whose progress and attestations shape the experience). Learning is something you do through relationships and contributions; no platform certifies it.
 
-**Avodah** treats work as service. Work items are EPRs, so each carries the three coupled dimensions described above. A work item can declare attestation gates, lamad content that must be mastered before the task starts, so open collaboration can be qualified by demonstrated mastery rather than credentials. The gates are declared on the work item and shown; enforcement at bid or acceptance is not yet built.
+**Avodah** t,ats work as service. Work items are EPRs, so each carries the three coupled dimensions described above. A work item can declare attestation gates, lamad content that must be mastered before the task starts, so open collaboration can be qualified by demonstrated mastery rather than credentials. The gates are declared on the work item and shown; enforcement at bid or acceptance is not yet built.
 
 For the full picture, read the pillar papers ([imagodei](./genesis/docs/content/elohim-protocol/imagodei.md), [lamad](./genesis/docs/content/elohim-protocol/lamad.md), [shefa](./genesis/docs/content/elohim-protocol/shefa.md)), the architecture [index](./genesis/docs/content/elohim-protocol/architecture/INDEX.md) and [map](./genesis/docs/content/elohim-protocol/architecture/MAP.md), and the [seam map](./genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md).
 
@@ -161,7 +161,6 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── epr/                       # elohim-epr: canonical EPR codec (DAG-CBOR, CIDv1, Ed25519), the content-addressing root
 │   ├── epr-rea/                   # REA / ValueFlows economic domain layer over EPRs
 │   ├── eprfs/                     # Filesystem projection layer: eight crates, including eprfs-cli and the epr CLI (epr-cli)
-│   ├── elohim-views/              # HTTP wire types (View / InputView) that generate the TypeScript client types
 │   ├── elohim-storage/            # P2P content storage service: chunked blobs, redundancy, reconciliation
 │   ├── elohim-error/              # Storage error types, split out of elohim-storage
 │   ├── elohim-settings/           # Storage boot settings and hot-reloadable runtime settings, split out of elohim-storage
@@ -174,7 +173,6 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── elohim-token/              # Interface for bridging value to outside settlement rails
 │   ├── elohim-hub/                # Reserved name for a future home-node cluster runtime (README only)
 │   ├── elohim-bitswap/            # IPFS Bitswap block exchange
-│   ├── rust-ipfs/                 # IPFS implementation (fork, git submodule)
 │   ├── constitution/              # The crate that loads the constitution and enforces it at runtime
 │   ├── eae/                       # Elohim Autonomous Entity: agent decision loop and governance escalation
 │   ├── elohim-agent/              # Agent runtime
@@ -202,7 +200,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   │   └── docs/  tests/          # Developer docs for this layer; multi-conductor sweettests and DNA manifest checks
 │   ├── brit/                      # Fork of gitoxide whose commits carry EPR provenance (git submodule)
 │   ├── rakia/                     # Distributed build system: rakia-core, rakia-brit, rakia-executor (git submodule)
-│   └── holochain-conductor/  kitsune2/  tx5/   # Forks (git submodules; see Prerequisites under Development)
+│   └── holochain-conductor/       # The pinned conductor fork (git submodule; see Prerequisites under Development)
 │
 ├── app/                           # Frontend applications (Angular 22)
 │   ├── elohim-app/                # Main Angular platform
@@ -210,6 +208,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── lamad/                     # Lamad learning app, built and served as its own bundle
 │   ├── imagodei-portal/           # Sign-in portal for stewards running their own peer
 │   ├── elohim-elements/           # Lit web components, one package per pillar
+│   ├── graphos/                   # Design spec, vocabulary and design assets (the design system's home)
 │   ├── elohim-library/            # Shared Angular libraries (eight projects, including elohim-service, elohim-identity, graphos)
 │   ├── scripts/                   # Lint rules shared by every app (route literals, SSR entry, cross-workspace imports)
 │   └── workspace-runtime/         # The one place that knows the dev-workspace hostname convention
@@ -220,7 +219,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── pkarr/                     # Signed endpoint records for doorways (pkarr)
 │   └── valueflows/                # ValueFlows / hREA (VF-GraphQL)
 │
-├── crates/                        # Published Rust SDK crates: doorway-client, elohim-sdk, elohim-storage-client, seam-contracts
+├── crates/                        # Published Rust SDK crates: elohim-views (the ts-rs wire types), doorway-client, elohim-sdk, elohim-storage-client, seam-contracts
 │
 ├── sophia/                        # Assessment engine, forked from Khan Academy's Perseus (git submodule, 18 packages)
 │   └── packages/                  # sophia-element/-core/-editor/-linter/-score, perseus-core/-score,
@@ -244,10 +243,9 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── docs/                      # Protocol writing in content/ (manifesto, specification, epics); design specs and plans (superpowers/)
 │   ├── data/                      # Seed inputs, fixtures, timeline backlog
 │   ├── agentic/                   # Scripts and resource guards for agent-driven development
-│   ├── graphos/                   # Design spec, vocabulary, design assets, fonts
 │   ├── seeder/                    # Content seeding pipeline (TypeScript)
 │   ├── plans/                     # Archive of earlier plans (live plans: genesis/docs/superpowers/plans/)
-│   └── landing/  research/  blobs/  assets/  scripts/   # Landing page, research surveys, seed blob cache, images, ops scripts
+│   └── research/  blobs/  assets/  scripts/   # Research surveys, seed blob pack, images, ops scripts
 │
 ├── che-devworkspaces/             # Eclipse Che, Jenkins and dev container images (git submodule)
 ├── vendor/                        # One patched crates.io crate (iroh-quinn-proto), retired with the iroh 1.x move
@@ -295,7 +293,7 @@ After cloning, fetch the submodules:
 git submodule update --init --recursive
 ```
 
-The three fork submodules (`elohim/holochain-conductor`, `elohim/kitsune2`, `elohim/tx5`) are set to `update = none`, so this command skips them. `holochain-conductor` is the pinned fork the fleet's conductor image is built from; `kitsune2` and `tx5` are kept for reference.
+The conductor fork submodule (`elohim/holochain-conductor`) is set to `update = none`, so this command skips it; it is the pinned fork the fleet's conductor image is built from.
 
 Sophia, the assessment renderer, is a git submodule with its own pnpm workspace. `pnpm build` of the app, and CI, need its web-component bundle: the build copies it from a built `sophia/` checkout (`cd sophia && pnpm install && pnpm build && pnpm build:umd`) or downloads a published copy. The dev-server paths below do not need this step.
 

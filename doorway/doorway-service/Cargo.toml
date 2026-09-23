@@ -125,7 +125,7 @@ prometheus = "0.14"
 lazy_static = "1"
 
 # Wire-shape View types — boundary is now explicit; view imports must use elohim-views, not elohim-storage
-elohim-views = { path = "../../elohim/elohim-views" }
+elohim-views = { path = "../../crates/elohim-views" }
 
 # CID (Content Identifiers) - IPFS-compatible content addressing
 cid = "0.11"

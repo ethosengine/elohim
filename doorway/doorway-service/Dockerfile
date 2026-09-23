@@ -43,10 +43,6 @@ COPY elohim/elohim-compute ./elohim/elohim-compute
 COPY elohim/elohim-cache-core ./elohim/elohim-cache-core
 COPY elohim/sdk/domains/imagodei/types ./elohim/sdk/domains/imagodei/types
 COPY elohim/sdk/domains/infrastructure/types ./elohim/sdk/domains/infrastructure/types
-# Plan 2 SDK boundary: View wire-shapes live in elohim-views. doorway-service
-# consumes it directly; without this COPY the build aborts at resolve time:
-# "failed to read /elohim/elohim-views/Cargo.toml: No such file".
-COPY elohim/elohim-views ./elohim/elohim-views
 # gate-client + its workspace root and transitive internal members
 COPY elohim/Cargo.toml ./elohim/Cargo.toml
 COPY elohim/constitution ./elohim/constitution
@@ -105,7 +101,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/sdk/domains/imagodei/types"|path = "elohim/sdk/domains/imagodei/types"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/sdk/domains/infrastructure/types"|path = "elohim/sdk/domains/infrastructure/types"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml && \
-    sed -i 's|path = "../../elohim/elohim-views"|path = "elohim/elohim-views"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-views"|path = "crates/elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-peer-fabric"|path = "elohim/elohim-peer-fabric"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml && \

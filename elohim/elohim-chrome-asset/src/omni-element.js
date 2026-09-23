@@ -624,7 +624,7 @@
   // One dial, three complications in FIXED slots (watch-face discipline —
   // nothing moves, only state changes; same snapshot → same drawing; every
   // state keeps the vertical mirror axis). Design sheet:
-  // genesis/graphos/design-assets/curated/omni-resilience-dial/index.html
+  // app/graphos/design-assets/curated/omni-resilience-dial/index.html
   //   bezel ring  = doorway plane (reach hint): solid=local · +crown=local-hub
   //                 · dashed=remote
   //   orbit triad = p2p plane (replication vs the content's floor): symmetric

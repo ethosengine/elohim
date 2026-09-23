@@ -96,18 +96,14 @@ COPY elohim/elohim-error ./elohim-error
 # the resolve aborts: "failed to read /elohim-settings/Cargo.toml: No such file".
 # Flattened /app layout; sed-rewritten below. (Its own `../elohim-cache-core`
 # dep resolves correctly in the flattened layout — no rewrite, same as
-# elohim-facings' `../elohim-views`.) Like elohim-error it declares every
+# elohim-facings' path dep.) Like elohim-error it declares every
 # package field literally, so no workspace-inheritance inline is needed.
 COPY elohim/elohim-settings ./elohim-settings
-# Plan 2 SDK boundary: elohim-views holds wire-shape Views; elohim-storage
-# depends on it directly. Without this COPY the build aborts at resolve time:
-# "failed to read /elohim-views/Cargo.toml: No such file".
-COPY elohim/elohim-views ./elohim-views
 # elohim-facings: the pure lens crate (select→fold→aggregate folds over the
 # holder-relation); a path-dep of elohim-storage since the 2026-06-19 facings
 # extraction. Without this COPY the build aborts at resolve time:
 # "failed to read /elohim-facings/Cargo.toml: No such file". (Its own
-# `../elohim-views` dep resolves correctly in the flattened /app layout — no rewrite.)
+# `../../crates/elohim-views` dep is rewritten below to the flattened /app layout.)
 COPY elohim/elohim-facings ./elohim-facings
 # elohim-peer-fabric: std-only path-dep (storage serve-routing feature). Flattened /app layout;
 # sed-rewrite below. Without this COPY the build aborts: "failed to read /elohim-peer-fabric/Cargo.toml".
@@ -183,7 +179,7 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../elohim-error"|path = "elohim-error"|' Cargo.toml && \
     sed -i 's|path = "../elohim-settings"|path = "elohim-settings"|' Cargo.toml && \
-    sed -i 's|path = "../elohim-views"|path = "elohim-views"|' Cargo.toml && \
+    sed -i 's|path = "../../crates/elohim-views"|path = "crates/elohim-views"|' Cargo.toml && \
     sed -i 's|path = "../elohim-facings"|path = "elohim-facings"|' Cargo.toml && \
     sed -i 's|path = "../elohim-peer-fabric"|path = "elohim-peer-fabric"|' Cargo.toml && \
     sed -i 's|path = "../elohim-render"|path = "elohim-render"|' Cargo.toml && \
@@ -195,16 +191,10 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../bridges/did/did-bridge"|path = "bridges/did/did-bridge"|' Cargo.toml && \
     sed -i 's|path = "../../bridges/did/did-types"|path = "bridges/did/did-types"|' Cargo.toml
 
-# Crates under ./crates reference elohim-views via `../../elohim/elohim-views`
-# (the source-tree layout: crates/<name>/ → ../../elohim/elohim-views/). In the
-# container, elohim-views is COPYd to /app/elohim-views (without the nested
-# `elohim/` segment), so the relative path resolves to a nonexistent dir and
-# cargo aborts with "failed to read /app/elohim/elohim-views/Cargo.toml — No
-# such file or directory". Rewrite the path in every crates/<name>/Cargo.toml
-# that references elohim-views to drop the extra segment.
-RUN sed -i 's|path = "../../elohim/elohim-views"|path = "../../elohim-views"|' \
-        crates/elohim-sdk/Cargo.toml \
-        crates/elohim-storage-client/Cargo.toml
+# elohim-views lives under crates/ (2026-09-23), so the crates/<name> path deps (`../elohim-views`)
+# resolve inside the copied crates/ tree. elohim-facings is COPY'd flattened to /app/elohim-facings,
+# so its `../../crates/elohim-views` dep is re-rooted to the flattened layout.
+RUN sed -i 's|path = "../../crates/elohim-views"|path = "../crates/elohim-views"|' elohim-facings/Cargo.toml
 
 
 # Constitution crate uses workspace inheritance — inline the values since
@@ -415,7 +405,7 @@ RUN CARGO_INCREMENTAL=0 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 
 # default build path. Same pattern as `check`: the CI builder image carries NO
 # Rust toolchain (by design — see scripts/ci/storage-quality-gate.sh), so the
 # matrix runs in here. Deliberately NOT `FROM deps`: crates/elohim-sdk is its
-# own workspace root whose `../../elohim/elohim-views` path deps expect the
+# own workspace root whose `../elohim-views` path deps expect the
 # REPO shape, not the flattened /app layout — and an independent stage keeps
 # its layer cache keyed on crates/** + elohim-views alone. The script it runs
 # is the SAME file the local pre-push gate runs (single source of matrix
@@ -434,7 +424,6 @@ RUN apt-get update && apt-get install -y \
 RUN rustup component add rustfmt clippy
 WORKDIR /sdk-gate
 COPY crates ./crates
-COPY elohim/elohim-views ./elohim/elohim-views
 COPY scripts/ci/elohim-sdk-feature-matrix.sh ./scripts/ci/elohim-sdk-feature-matrix.sh
 RUN bash scripts/ci/elohim-sdk-feature-matrix.sh
 

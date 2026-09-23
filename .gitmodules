@@ -1,10 +1,6 @@
 [submodule "sophia"]
 	path = sophia
 	url = https://github.com/ethosengine/sophia.git
-[submodule "rust-ipfs"]
-	path = elohim/rust-ipfs
-	url = https://github.com/ethosengine/rust-ipfs.git
-	branch = elohim
 [submodule "elohim/brit"]
 	path = elohim/brit
 	url = https://github.com/ethosengine/brit.git
@@ -14,23 +10,12 @@
 [submodule "che-devworkspaces"]
 	path = che-devworkspaces
 	url = https://github.com/ethosengine/che-devworkspaces.git
-# Conductor-line forks. update=none → NOT auto-cloned by CI/checkout.
-# holochain-conductor is the PINNED fork the fleet's conductor image is built
-# from: its committed gitlink SHA is the image tag (elohim/conductor-image/README.md).
-# tx5 and kitsune2 are reference-only, from the 2026-06 zombie-PeerConnection
-# investigation; Holochain 0.7 has no tx5 and resolves kitsune2 from crates.io.
-[submodule "elohim/tx5"]
-	path = elohim/tx5
-	url = https://github.com/ethosengine/tx5.git
-	branch = elohim-0.8.1-zombie-fix
-	update = none
+# The pinned conductor fork. update=none → NOT auto-cloned by CI/checkout: CI reads
+# the committed gitlink SHA, which is the conductor image tag (elohim/conductor-image/README.md).
+# The tx5 and kitsune2 reference forks were retired 2026-09-23 (Holochain 0.7 has no tx5
+# and resolves kitsune2 from crates.io); their GitHub forks remain the record.
 [submodule "elohim/holochain-conductor"]
 	path = elohim/holochain-conductor
 	url = https://github.com/ethosengine/holochain.git
-	branch = elohim-0.6
-	update = none
-[submodule "elohim/kitsune2"]
-	path = elohim/kitsune2
-	url = https://github.com/ethosengine/kitsune2.git
-	branch = elohim-0.3.2
+	branch = elohim-0.7
 	update = none

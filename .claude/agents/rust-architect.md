@@ -807,7 +807,7 @@ let buffer = WriteBuffer::for_recovery();      // Recovery/sync operations
 | `elohim/elohim-storage/src/db/` | Diesel models, schema, queries (incl. `predecessor_records` for EPR lineage) |
 | `elohim/elohim-storage/src/p2p/` | libp2p protocol handlers (inline adapter; conductor agent-info gossip) |
 | `elohim/elohim-storage/src/p2p_iroh/` | iroh ALPN handlers + Backend trait adapters (incl. observation + epr-atom backends) |
-| `elohim/elohim-views/` | TS-rs canonical anchor for View/InputView types (sibling crate to `elohim-storage`, re-exported through it) |
+| `crates/elohim-views/` | TS-rs canonical anchor for View/InputView types (sibling crate to `elohim-storage`, re-exported through it) |
 | `elohim/elohim-render/` | SSR core — a capable storage peer renders its own content (SSR is P2P-native; doorway is the web2 edge only). `render()` uses `ctx.data_fetcher` (per-request swap keeps reach-correctness); `RenderTerminal` splits truthful-empty from stall; compose derives the root tag, never hardcodes `app-root`. See [[project_ssr_render_trace_and_fixed_fetcher]] |
 | `elohim/epr/` | `elohim-epr` — WitnessedInteraction primitive + EPR atoms (ts-rs → `epr-ts`); `EprKind` atom variants are DNA-hash-neutral, a new `SubstrateSignal`/`Magnitude` member moves the hash. See [[project-eprfs-witnessed-interaction-primitive]] |
 | `elohim/sdk/schemas/v1/views/` | View JSON schemas (source of truth for HTTP wire shape) |

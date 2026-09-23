@@ -7,7 +7,7 @@ created: 2026-05-11
 authors: Matthew (operator decisions); spec drafted in brainstorm session 2026-05-11
 pillar coupling: elohim (substrate primitive), infrastructure (storage tiering plane)
 informed-by:
-  - genesis/graphos/vocabulary.md (quilt, pantry, stock, draw, shard, RS(N,K))
+  - app/graphos/vocabulary.md (quilt, pantry, stock, draw, shard, RS(N,K))
   - Phase 11 gate #2 — iroh-canonical `/blob` for BLAKE3-capable callers (hot plane)
 cites:
   - genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-delivery-master.md
@@ -32,7 +32,7 @@ memory_anchors:
 **Status:** Draft (post-brainstorm, pre-implementation)
 **Last updated:** 2026-06-04
 **Owner:** Matthew (operator decisions); spec drafted in brainstorm session 2026-05-11
-**Vocabulary:** `genesis/graphos/vocabulary.md` (quilt, pantry, stock, draw, shard, RS(N,K))
+**Vocabulary:** `app/graphos/vocabulary.md` (quilt, pantry, stock, draw, shard, RS(N,K))
 
 ---
 
@@ -1109,7 +1109,7 @@ Before the delivery master writes sub-plans:
 
 ## 10. Cross-references
 
-- Vocabulary: `genesis/graphos/vocabulary.md`
+- Vocabulary: `app/graphos/vocabulary.md`
 - Self-healing dataplane (absorbed Plans 2–5):
   `genesis/docs/superpowers/specs/2026-04-19-self-healing-p2p-dataplane-design.md`
 - Sweettest harness:

@@ -20,7 +20,7 @@ publish = ["elohim"]
 # `path` + `version`: `path` wins for local builds, `version` is what a
 # published artifact resolves against — cargo strips `path` on publish, so a
 # bare path dep is unpublishable no matter what the `publish` field says.
-elohim-views = { path = "../../elohim/elohim-views", version = "0.1.0" }
+elohim-views = { path = "../elohim-views", version = "0.1.0" }
 
 # HTTP client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

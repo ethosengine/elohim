@@ -18,7 +18,7 @@ categories = ["data-structures"]
 # RegionalDistributionView, StewardingCollectiveEntry, PlacementGapView, …).
 # This + std is the ENTIRE dependency surface — deliberately NO diesel, no
 # elohim-storage (add per-lens only when a fold's own type needs it).
-elohim-views = { path = "../elohim-views" }
+elohim-views = { path = "../../crates/elohim-views" }
 # Per-lens addition (folds/replication_commitment.rs): a replication commitment's
 # TIER is decided by its action-specific policy envelope (`provider_role`,
 # `capacity_bytes`, `commons_bytes`), which is stored as an opaque JSON string.

@@ -44,7 +44,7 @@
           "genesis/docs/content/elohim-protocol/hardware-spec.md",
           "genesis/docs/content/elohim-protocol/lamad.md",
           "genesis/docs/content/elohim-protocol/architecture/2026-06-21-elohim-seam-map-concern-routing.md",
-          "genesis/graphos/**",
+          "app/graphos/**",
           "genesis/orchestrator/manifests/elohim-storybook/**",
           "pnpm-lock.yaml",
           "package.json"

@@ -23,7 +23,7 @@ elohim-seam-contracts = { version = "0.1.0", path = "../../crates/seam-contracts
 elohim-sdk = { path = "../../crates/elohim-sdk" }
 
 # Wire-shape view types (ts-rs-anchored) — atomic migration from views.rs (VIEWS.T2)
-elohim-views = { path = "../elohim-views" }
+elohim-views = { path = "../../crates/elohim-views" }
 
 # The StorageError vocabulary — step 1 of the storage decomposition. `src/error.rs`
 # is now a re-export shim over this crate, so `crate::error::StorageError` and

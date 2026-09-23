@@ -124,7 +124,8 @@ epr_meta_governance:   # tunables for the epr_meta_coverage dimension's subtree-
     - "**/generated"
     - "**/generated/**"
     - "genesis/docs/_state/**"
-    - "genesis/graphos/design-assets/**"
+    - "app/graphos/design-assets"
+    - "app/graphos/design-assets/**"
     # 2026-09-23 tree ceremony: the census walks the filesystem, not the index, so gitignored
     # runtime state (the household mesh under genesis/local-dev) and cloned research repositories
     # were counted as 45 of 65 governance gaps. Neither is first-party authored context; excluding

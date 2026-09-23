@@ -418,7 +418,7 @@ Only after this output is complete and reviewed should design proposals (schemas
 | File | Purpose |
 |------|---------|
 | `elohim/holochain/dna/*/zomes/*_integrity/src/lib.rs` | **Where entry types actually live** — grep `#[hdk_entry_types]` here to answer Step 1's "does a type already exist?". Read `dna.yaml` for the real zome names |
-| `elohim/elohim-views/src/` | Rust view types with `#[derive(TS)]` — the real Rust-to-TypeScript boundary (`elohim-storage/src/views.rs` re-exports these and carries no ts-rs derives of its own) |
+| `crates/elohim-views/src/` | Rust view types with `#[derive(TS)]` — the real Rust-to-TypeScript boundary (`elohim-storage/src/views.rs` re-exports these and carries no ts-rs derives of its own) |
 | `elohim/elohim-storage/migrations/` | SQLite migrations — every table must declare source of truth |
 | `elohim/elohim-storage/src/sync/projector.rs` | The Automerge sync projection — Step 3b's second projection |
 | `elohim/elohim-storage/src/http.rs` (`build_manifest()`) | **Where you declare an HTTP route** — the registry compiles it and the doorway serves it. Step 3c's real target |

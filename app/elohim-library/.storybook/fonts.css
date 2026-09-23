@@ -2,7 +2,7 @@
  * Brand webfont substrate for the storybook preview iframe.
  *
  * Provides @font-face declarations ONLY — no element styling. The family
- * names are the canonical ones from genesis/graphos/elohim-protocol-design-spec.md
+ * names are the canonical ones from app/graphos/elohim-protocol-design-spec.md
  * §5/§14 ('Fraunces', 'Source Serif 4', 'DM Sans', 'JetBrains Mono'), so the
  * `--el-font-*` tokens that Library B story decorators declare resolve to real
  * fonts instead of silently falling back to system-ui/Georgia.

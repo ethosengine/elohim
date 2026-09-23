@@ -64,10 +64,9 @@ projects:
       #   - name: sophia
       #     path: sophia
       #     url: https://github.com/ethosengine/sophia.git
-      #   - name: rust-ipfs
-      #     path: elohim/rust-ipfs
-      #     url: https://github.com/ethosengine/rust-ipfs.git
-      #     branch: elohim
+      #   - name: brit
+      #     path: elohim/brit
+      #     url: https://github.com/ethosengine/brit.git
       #   - name: brit
       #     path: elohim/brit
       #     url: https://github.com/ethosengine/brit.git
