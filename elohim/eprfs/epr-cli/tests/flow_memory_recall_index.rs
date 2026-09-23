@@ -12,11 +12,12 @@ mod common;
 use std::path::Path;
 
 use elohim_epr::kind::EprKind;
+use elohim_epr::measure::Period;
 use elohim_epr::reach::Reach;
 use elohim_epr_cli::flow::memory::recall::{self, Contract};
 use elohim_epr_rea::{
-    atom_cid, IndexError, IndexMeasure, LimitSource, PinnedRef, RankingMethod, ReachBound, Sense,
-    VectorMetric, PRIVATE_CHAIN_KINDS,
+    atom_cid, IndexError, IndexMeasure, LimitSource, PinnedRef, RankingMethod, ReachBound,
+    Retention, Sense, VectorMetric, PRIVATE_CHAIN_KINDS,
 };
 use serde_json::Value;
 
@@ -26,6 +27,12 @@ const MODEL_REL: &str = ".epr-meta/elohim/algorithms/embedding-models/all-minilm
 /// The v14 contract's method CID — the recipe every receipt pinned before this station. The
 /// contract's bytes changed, so its address must have moved off this one.
 const V14_METHOD_CID: &str = "bafkreieryn2ru3uz72jnif5dy3ichzpxhh22k4dtilhiwymuxgl5vyzcoa";
+
+/// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
+/// proved the string spelling of its CIDs left this address where the byte-array spelling had it
+/// (`bafyreic5…ycma` both ways); the pin then moved once, deliberately, for the self-consistent
+/// chunk rule and the canonical (absent) fold-lag sense/source.
+const PINNED_MEASURE_CID: &str = "bafyreie4eowvvs7w4q54pwxfu5j4u7a6a7atmqajpoqtgfbnfyxx27m6oq";
 
 fn read_json(root: &Path, rel: &str) -> Value {
     let raw = std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("{rel} reads: {e}"));
@@ -68,8 +75,23 @@ fn the_semantic_index_declaration_is_a_valid_index_measure() {
 
     assert_eq!(measure.fold_lag.limit, 25.0);
     assert_eq!(measure.fold_lag.unit, "files");
-    assert_eq!(measure.fold_lag.sense, Some(Sense::Ceiling));
-    assert_eq!(measure.fold_lag.source, Some(LimitSource::Declared));
+    assert_eq!(measure.fold_lag.sense(), Sense::Ceiling);
+    assert_eq!(measure.fold_lag.source(), LimitSource::Declared);
+    // One meaning, one encoding: a ceiling and a declared source are spelled by absence, so the
+    // bound passes `Bound::validate()`'s refusal of the redundant explicit spellings.
+    measure
+        .fold_lag
+        .validate()
+        .expect("the fold-lag bound is canonical");
+
+    // Demotion at the first fold that observes a removal, never `Keep`, never a delete.
+    assert_eq!(
+        measure.retention,
+        Retention::DemoteAfter {
+            count: 0,
+            per: Period::Second
+        }
+    );
 
     // The surfaces are the contract's source roots minus anything its discovery excludes, and no
     // kind the private chain holds.
@@ -108,6 +130,15 @@ fn the_semantic_index_declaration_is_a_valid_index_measure() {
     assert_eq!(again.cid().unwrap(), measure.cid().unwrap());
 }
 
+/// The method CID every semantic candidate will print, pinned. It is `IndexMeasure::cid()` over
+/// canonical dag-cbor, so how the JSON spells a CID (string, not bytes) never moves it — only a
+/// changed declaration does, and that is a deliberate re-pin here.
+#[test]
+fn the_measure_method_cid_is_pinned() {
+    let measure = live_measure(&common::repo_root());
+    assert_eq!(measure.cid().unwrap().to_string(), PINNED_MEASURE_CID);
+}
+
 /// The chunk rule is content-addressed: the declaration carries the rule object it names, and
 /// `chunkRule` is that object's canonical dag-cbor CID — minted the way `IndexMeasure::cid()`
 /// mints (`elohim_epr_rea::atom_cid`), never by a second implementation.
@@ -119,19 +150,29 @@ fn the_chunk_rule_cid_addresses_the_declared_rule() {
     assert!(rule.is_object(), "the measure declares its chunk rule");
     assert_eq!(rule["max_chunk_bytes"], 2000);
     assert_eq!(rule["max_chunks_per_file"], 12);
-    // The window a non-sectioned file is cut into is the contract's own passage window, carried
-    // by value so a changed window is a changed rule CID, never a silent re-meaning.
-    assert_eq!(
-        rule["other"]["window_bytes"],
-        common::live_contract()["discovery"]["passage_window_bytes"]
-    );
+    // Self-consistent: a non-sectioned file's window is the chunk cap itself, a measure of its
+    // own (the contract's lexical passage window is a different one), and the addressed object
+    // carries values only — prose inside it would move the method CID on a rewording.
+    assert_eq!(rule["other"]["window_bytes"], rule["max_chunk_bytes"]);
+    fn has_no_prose(value: &Value) -> bool {
+        match value {
+            Value::Object(map) => map
+                .iter()
+                .all(|(key, v)| key != "declared_by" && has_no_prose(v)),
+            Value::Array(items) => items.iter().all(has_no_prose),
+            Value::String(text) => !text.contains(' '),
+            _ => true,
+        }
+    }
+    assert!(has_no_prose(rule), "the chunk rule holds values, not prose");
     let measure = live_measure(&root);
     assert_eq!(measure.chunk_rule, atom_cid(rule).unwrap());
+    // One encoding per meaning: the declaration spells its CIDs as strings, with no mirror.
     assert_eq!(
-        declared["_cids"]["chunkRule"].as_str(),
-        Some(measure.chunk_rule.to_string().as_str()),
-        "the readable form names the same chunk rule"
+        declared["chunkRule"].as_str(),
+        Some(measure.chunk_rule.to_string().as_str())
     );
+    assert!(declared.get("_cids").is_none());
 }
 
 /// The `ModelPin` resolves to the model manifest: one set of bytes, one license, one width. The
@@ -178,9 +219,9 @@ fn the_model_pin_resolves_to_the_model_manifest() {
     let declared = read_json(&root, MEASURE_REL);
     assert_eq!(declared["_model_manifest"], MODEL_REL);
     assert_eq!(
-        declared["_cids"]["embedding.modelBytes"].as_str(),
+        declared["embedding"]["modelBytes"].as_str(),
         manifest["model_bytes"].as_str(),
-        "the readable form names the same model bytes"
+        "the measure and the manifest spell the same model bytes identically"
     );
 }
 

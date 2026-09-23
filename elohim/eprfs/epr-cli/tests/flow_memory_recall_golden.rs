@@ -57,21 +57,13 @@ fn digest(s: &str) -> String {
     format!("{:x}", Sha256::digest(s.as_bytes()))
 }
 
-// Re-baselined station 1 (Task 1.1): a `lens:` line is now printed after `Guiding context` on
-// every rendered view — see tests/fixtures/recall-golden/README.md. Re-baselined AGAIN in fix
-// round 1 of Task 1.1's review: the `lens:` line gained a short CID and a `renew:` slot, and the
-// fixture contract now declares an explicit `lens_table` (see tests/common/mod.rs
-// `contract_value`) rather than only inheriting the live one. Re-baselined a THIRD time for
-// Task 1.2: the honesty floor adds one `recipe … · lens … · selection: … · omissions: … ·
-// receipts: …` line immediately after `lens:` on every view, at every lens — see
-// tests/fixtures/recall-golden/README.md's "station 1, Task 1.2" entry. Re-baselined a FOURTH
-// time for station 3 (Task 3.1): the contract bumped to v12 (`question_bank` pointer added;
-// `lens_table.levels.minimal.density_bytes` 1500 -> 2000), and `contract_value()` inherits the
-// live contract's `version`/`question_bank` fields unchanged — so the `recipe` CID every
-// rendered view prints (`Contract::method_cid()` over the WHOLE contract's bytes) moved even
-// though this fixture's own `lens_table` override did not. GOLDEN_REFUSAL is unchanged across
-// all four rounds: a refusal never reaches `render()`'s orientation/lens/floor preamble, so it
-// never prints a `recipe` line.
+// Every re-baseline of these pins, and why, is recorded in the dated history of
+// tests/fixtures/recall-golden/README.md — that file, not a count here, is the record. Two
+// kinds recur: a rendering change (a new `lens:` or honesty-floor line), and a contract byte
+// change — `contract_value()` inherits the live contract, and every rendered view prints its
+// `recipe` CID (`Contract::method_cid()` over the WHOLE contract's bytes), so any contract edit
+// moves GOLDEN_FOCUSED and GOLDEN_WHOLE. GOLDEN_REFUSAL has never moved: a refusal never reaches
+// `render()`'s orientation/lens/floor preamble, so it never prints a `recipe` line.
 const GOLDEN_FOCUSED: &str = "46e2d00a401baa78dd2af568958c92c3af2b2ca4012bbf0c7e07cd493a83499f";
 const GOLDEN_WHOLE: &str = "562a9cd85cf9df15c7ec2bfa8289bb58e2a0fd204e17f9c67563f1750fe6c6b5";
 const GOLDEN_REFUSAL: &str = "882890b4af2e5f60f4d6fbc322377fe4eb9bc12ad495fe4b435fb8d251b1a061";

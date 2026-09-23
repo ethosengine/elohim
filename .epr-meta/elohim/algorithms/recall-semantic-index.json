@@ -1,8 +1,8 @@
 {
   "measure": { "id": "recall-semantic-index", "version": 1 },
-  "chunkRule": [1, 113, 18, 32, 75, 49, 42, 81, 98, 178, 65, 24, 39, 173, 199, 25, 4, 234, 253, 148, 242, 2, 255, 66, 32, 85, 235, 96, 217, 253, 221, 103, 247, 215, 215, 109],
+  "chunkRule": "bafyreiflptmnhhzpkksfn66ieu4whsik5onq3owfdhpku5qfs554m4nowu",
   "embedding": {
-    "modelBytes": [1, 85, 18, 32, 79, 20, 139, 168, 174, 156, 44, 127, 190, 228, 175, 43, 19, 45, 184, 208, 108, 106, 101, 69, 180, 127, 200, 59, 187, 152, 195, 210, 43, 131, 147, 230],
+    "modelBytes": "bafkreicpcsf2rlu4fr735zfpfmjs3ogqnrvgkrnup7edxo4yypjcxa4t4y",
     "license": "Apache-2.0",
     "dims": 384
   },
@@ -28,22 +28,16 @@
   "foldLag": {
     "limit": 25,
     "unit": "files",
-    "thresholdPct": 100,
-    "sense": "ceiling",
-    "source": { "kind": "declared" }
+    "thresholdPct": 100
   },
   "_model_manifest": ".epr-meta/elohim/algorithms/embedding-models/all-minilm-l6-v2.json",
   "_chunk_rule": {
     "markdown": { "split": "heading", "max_level": 4 },
     "python": { "split": ["def", "class"] },
-    "other": { "split": "line-window", "window_bytes": 4096, "declared_by": "recall-contract discovery.passage_window_bytes" },
+    "other": { "split": "line-window", "window_bytes": 2000 },
     "max_chunk_bytes": 2000,
     "max_chunks_per_file": 12
   },
-  "_cids": {
-    "chunkRule": "bafyreiclgevfcyvsiemcplohdecov7mu6ibp6qrakxvwbwp53vt7pv6xnu",
-    "embedding.modelBytes": "bafkreicpcsf2rlu4fr735zfpfmjs3ogqnrvgkrnup7edxo4yypjcxa4t4y"
-  },
-  "_rule": "An IndexMeasure (elohim_epr_rea::index) and a Manifest EPR. CID fields are the cid crate's serde byte form so the file deserializes straight into the protocol type; _cids carries their readable form and the tests hold the two equal. chunkRule is atom_cid (canonical dag-cbor) of _chunk_rule. The measure's own method CID is IndexMeasure::cid() over the typed value; the underscore keys are not part of it.",
+  "_rule": "An IndexMeasure (elohim_epr_rea::index) and a Manifest EPR; it deserializes straight into the protocol type, CIDs spelled as strings. chunkRule is atom_cid (canonical dag-cbor) of _chunk_rule, which holds only the rule's values: a non-sectioned file is cut into line windows of max_chunk_bytes, a measure of its own and not the lexical passage window (discovery.passage_window_bytes). foldLag omits sense and source because an absent sense is a ceiling and an absent source is declared (Bound's one encoding per meaning). The measure's method CID is IndexMeasure::cid() over the typed value; the underscore keys are not part of it.",
   "_retention": "Retention has no fold-count period (elohim_epr::measure::Period is wall-clock), so 'demote at the next fold' is declared as a zero delay: a removed or superseded file is demoted by the first fold that observes it, never deleted."
 }

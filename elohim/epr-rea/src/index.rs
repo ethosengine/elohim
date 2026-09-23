@@ -59,12 +59,71 @@ pub enum IndexError {
     ModelPinUnused,
 }
 
+/// One encoding per meaning for a CID field: a human-readable format (a JSON declaration a
+/// person authors and reviews) carries the CID's string form (`bafy…`/`bafk…`); every other
+/// format — the canonical dag-cbor that [`atom_cid`] addresses — delegates to [`Cid`]'s own
+/// serde, so the tag-42 bytes, and therefore every atom CID, are unchanged by this helper.
+///
+/// Not applied to [`RankingMethod::Fused`]'s `recipe`: serde's internally-tagged enum
+/// serializer reports `is_human_readable() == true` whatever format it wraps, so the helper
+/// there would write a CID into canonical dag-cbor as text and re-address every fused measure.
+mod cid_serde {
+    use cid::Cid;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(cid: &Cid, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&cid.to_string())
+        } else {
+            cid.serialize(serializer)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Cid, D::Error> {
+        if deserializer.is_human_readable() {
+            let text = String::deserialize(deserializer)?;
+            Cid::try_from(text.as_str()).map_err(serde::de::Error::custom)
+        } else {
+            Cid::deserialize(deserializer)
+        }
+    }
+}
+
+/// [`cid_serde`]'s rule mapped over `(atom, head)` pairs.
+mod cid_pairs_serde {
+    use cid::Cid;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    struct Pair(
+        #[serde(with = "super::cid_serde")] Cid,
+        #[serde(with = "super::cid_serde")] Cid,
+    );
+
+    pub fn serialize<S: Serializer>(
+        pairs: &[(Cid, Cid)],
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.collect_seq(pairs.iter().map(|(a, b)| Pair(*a, *b)))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Vec<(Cid, Cid)>, D::Error> {
+        Ok(Vec::<Pair>::deserialize(deserializer)?
+            .into_iter()
+            .map(|Pair(a, b)| (a, b))
+            .collect())
+    }
+}
+
 /// The one embedding a semantic index runs under. The model's bytes are content-addressed so a
 /// candidate can name what it was embedded by; a changed pin is a new measure version, never a
 /// silent re-embed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelPin {
+    #[serde(with = "cid_serde")]
     pub model_bytes: Cid,
     /// SPDX identifier of the model's license — a pin without a license is not admissible.
     pub license: String,
@@ -207,6 +266,7 @@ pub struct IndexMeasure {
     /// The middot declaration this index instantiates, as `id@version`.
     pub measure: PinnedRef,
     /// The chunking procedure, content-addressed.
+    #[serde(with = "cid_serde")]
     pub chunk_rule: Cid,
     /// `None` for a lexical-only or graph-only index.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -269,6 +329,7 @@ pub struct ShardManifest {
     pub arc: Option<ArcRange>,
     pub atoms: u64,
     pub bytes: u64,
+    #[serde(with = "cid_serde")]
     pub manifest: Cid,
 }
 
@@ -289,9 +350,11 @@ pub enum FoldState {
 #[serde(rename_all = "camelCase")]
 pub struct FoldAttestation {
     /// [`IndexMeasure::cid`] of the declaration this fold executed.
+    #[serde(with = "cid_serde")]
     pub measure: Cid,
     pub shard: ShardManifest,
     /// `(atom, head)` pairs the fold was taken at; fold lag is measured against these.
+    #[serde(with = "cid_pairs_serde")]
     pub heads_at: Vec<(Cid, Cid)>,
     pub state: FoldState,
     pub attested_by: AgentRef,
@@ -512,5 +575,76 @@ mod tests {
             why: "head moved mid-fold".into(),
         };
         assert!(!att.is_complete());
+    }
+
+    /// A declaration a person authors spells each CID as its string; the canonical dag-cbor an
+    /// atom CID is minted over keeps `Cid`'s own tag-42 bytes. Proven against mirror structs
+    /// that carry the same fields with no helper at all: identical canonical bytes, so no CID
+    /// minted before the helper existed moves.
+    #[test]
+    fn json_spells_cids_as_strings_and_canonical_bytes_are_untouched() {
+        use crate::model::canonical_bytes;
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct PlainPin {
+            model_bytes: Cid,
+            license: String,
+            dims: u32,
+        }
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct PlainHeads {
+            heads_at: Vec<(Cid, Cid)>,
+        }
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Heads {
+            #[serde(with = "cid_pairs_serde")]
+            heads_at: Vec<(Cid, Cid)>,
+        }
+
+        let pin = ModelPin {
+            model_bytes: cid("model:v1"),
+            license: "Apache-2.0".into(),
+            dims: 384,
+        };
+        let json = serde_json::to_value(&pin).unwrap();
+        assert_eq!(json["modelBytes"], cid("model:v1").to_string());
+        assert_eq!(serde_json::from_value::<ModelPin>(json).unwrap(), pin);
+        let plain = PlainPin {
+            model_bytes: pin.model_bytes,
+            license: pin.license.clone(),
+            dims: pin.dims,
+        };
+        assert_eq!(
+            canonical_bytes(&pin).unwrap(),
+            canonical_bytes(&plain).unwrap()
+        );
+        assert_eq!(atom_cid(&pin).unwrap(), atom_cid(&plain).unwrap());
+
+        let pairs = vec![(cid("atom:a"), cid("head:a1"))];
+        let heads = Heads {
+            heads_at: pairs.clone(),
+        };
+        assert_eq!(
+            serde_json::to_value(&heads).unwrap()["headsAt"][0][1],
+            cid("head:a1").to_string()
+        );
+        assert_eq!(
+            canonical_bytes(&heads).unwrap(),
+            canonical_bytes(&PlainHeads { heads_at: pairs }).unwrap()
+        );
+
+        // The whole declaration round-trips through strings and back to the same method CID.
+        let m = local_measure();
+        let json = serde_json::to_value(&m).unwrap();
+        assert!(json["chunkRule"].is_string());
+        let back: IndexMeasure = serde_json::from_value(json).unwrap();
+        assert_eq!(back.cid().unwrap(), m.cid().unwrap());
+        assert!(serde_json::from_value::<ModelPin>(serde_json::json!({
+            "modelBytes": "not-a-cid", "license": "Apache-2.0", "dims": 384
+        }))
+        .is_err());
     }
 }
