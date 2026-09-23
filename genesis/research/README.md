@@ -146,7 +146,7 @@ How does a decentralized protocol meet people where they are — in browsers, be
 
 The closest external mirror of the doorway's job is **Distributed Press** (Hypha Co-op): a publishing platform that seeds one site to HTTP + IPFS + Hypercore, plus a **Social Inbox** that gives static/distributed content a live fediverse presence. Its design validates the doorway's own instincts — split the durable Actor/Outbox/Posts (static *projections*) from a thin dynamic inbox (follows/replies/likes), authenticate with the site keypair rather than an account, and bridge P2P content to the fediverse via the draft **FEP-1042** proposal's HTTPS-alias URLs (an ActivityPub-flavor companion to our committed `atproto-lexicon-projection-doorway` spec, which defers AP generalization until a driver appears). Surveyed June 2026.
 
-[doorway/research/](../../doorway/research/) — `activitypub-federation-prior-art.md` (Distributed Press Social Inbox, FEP-1042, Agregore — pointers for doorway federation brainstorming)
+[activitypub-federation-prior-art.md](activitypub-federation-prior-art.md) (Distributed Press Social Inbox, FEP-1042, Agregore — pointers for doorway federation brainstorming)
 
 **Key references:**
 

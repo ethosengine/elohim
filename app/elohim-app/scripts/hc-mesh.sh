@@ -137,10 +137,10 @@
 #
 #   DBTOOL_BIN      The `hc-dbtool` binary used by the `blocks` verb. Default:
 #                   the cargo-pool dev slot
-#                   /projects/.cargo-target-pool/family/dev/crates/dev/debug/hc-dbtool,
+#                   /projects/.cargo-target-pool/family/dev/elohim__holochain__tools__hc-dbtool/dev/debug/hc-dbtool,
 #                   then whatever `hc-dbtool` is on PATH. Build it with
-#                     cd crates/hc-dbtool \
-#                       && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev \
+#                     cd elohim/holochain/tools/hc-dbtool \
+#                       && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__holochain__tools__hc-dbtool/dev \
 #                          RUSTFLAGS="" cargo build
 #
 #   MESH_BLOCKS_DNA Extra DNA hashes (comma-separated) for `blocks` to read
@@ -194,7 +194,7 @@
 #                   MESH_MEMBERSHIP_PROBE_SECS (default 3) sets the probe
 #                   cadence, so a withdraw resolves in ~10s and a rejoin in ~6s.
 #                   BEACON_BIN overrides the binary (default: the pool debug
-#                   slot; build with `cd relay-addr-beacon && just gate`).
+#                   slot; build with `cd doorway/relay-addr-beacon && just gate`).
 #
 #   MESH_RUST_LOG   Conductor log level. Default is targeted, not blanket:
 #                   warn + INFO on exactly the three modules that diagnose a
@@ -372,13 +372,13 @@ elif [ -z "${STORAGE_BIN:-}" ] && [ ! -x "$_storage_release" ] && [ -x "$_storag
 fi
 STORAGE_BIN="${STORAGE_BIN:-$_storage_release}"
 DOORWAY_BIN="${DOORWAY_BIN:-$POOL/doorway__doorway-service/dev/debug/doorway}"
-# relay-addr-beacon (relay-addr-beacon/): its own workspace root, so its own
+# relay-addr-beacon (doorway/relay-addr-beacon/): its own workspace root, so its own
 # pool slot rather than elohim's. Only the membership legs need it.
 # A bare `cargo build` in that crate (its justfile sets no CARGO_TARGET_DIR)
 # lands in the crate's own ./target instead, so accept that too rather than
 # refusing a binary that is sitting right there.
 _beacon_pool="$POOL/relay-addr-beacon/dev/debug/relay-addr-beacon"
-_beacon_local="$REPO_ROOT/relay-addr-beacon/target/debug/relay-addr-beacon"
+_beacon_local="$REPO_ROOT/doorway/relay-addr-beacon/target/debug/relay-addr-beacon"
 if [ -z "${BEACON_BIN:-}" ] && [ ! -x "$_beacon_pool" ] && [ -x "$_beacon_local" ]; then
   BEACON_BIN="$_beacon_local"
 fi
@@ -409,11 +409,10 @@ absolutise_ark_bin() {
 }
 absolutise_ark_bin
 
-# hc-dbtool (crates/hc-dbtool): reads a conductor's encrypted BlockSpan rows and
-# the rejected DHT ops behind them. The `crates/` siblings are each their own
-# workspace root, so this crate has its own pool slot rather than sharing
-# elohim's. Resolved here, required only by the `blocks` verb.
-DBTOOL_BIN_POOL_SLOT="$POOL/crates/dev/debug/hc-dbtool"
+# hc-dbtool (elohim/holochain/tools/hc-dbtool): reads a conductor's encrypted BlockSpan rows and
+# the rejected DHT ops behind them. It is its own workspace root, so its gate lands in
+# its own pool slot (the flattened workspace path) rather than sharing elohim's. Resolved here, required only by the `blocks` verb.
+DBTOOL_BIN_POOL_SLOT="$POOL/elohim__holochain__tools__hc-dbtool/dev/debug/hc-dbtool"
 if [ -z "${DBTOOL_BIN:-}" ]; then
   if [ -x "$DBTOOL_BIN_POOL_SLOT" ]; then
     DBTOOL_BIN="$DBTOOL_BIN_POOL_SLOT"
@@ -2321,7 +2320,7 @@ print("eligible: " + ", ".join(parts) if parts else "EMPTY (no origin is eligibl
     if pid="$(live_recorded_pid beacon "$owner")"; then
       echo "up (pid $pid)"
     else
-      echo "down — nothing maintains this owner's entry (./hc-mesh.sh start, or cd relay-addr-beacon && just gate)"
+      echo "down — nothing maintains this owner's entry (./hc-mesh.sh start, or cd doorway/relay-addr-beacon && just gate)"
     fi
   done
 }
@@ -2333,7 +2332,7 @@ start_membership_beacons() {
   fi
   if [ ! -x "$BEACON_BIN" ]; then
     echo "WARN: no relay-addr-beacon binary ($BEACON_BIN) — the household stages NO public-name membership" >&2
-    echo "      build it: cd relay-addr-beacon && just gate   (or MESH_MEMBERSHIP=0 to declare the absence)" >&2
+    echo "      build it: cd doorway/relay-addr-beacon && just gate   (or MESH_MEMBERSHIP=0 to declare the absence)" >&2
     return 0
   fi
   local dir; dir="$MESH_DIR/membership"
@@ -4140,7 +4139,7 @@ preflight() {
     if [ -x "$BEACON_BIN" ]; then
       echo "ok relay-addr-beacon binary: $BEACON_BIN"
     else
-      echo "REFUSED relay-addr-beacon binary: not executable ($BEACON_BIN) — the household stages its public-name membership authority with it; build it: cd relay-addr-beacon && just gate (or RUSTFLAGS=\"\" CARGO_TARGET_DIR=$POOL/relay-addr-beacon/dev cargo build --bin relay-addr-beacon), or MESH_MEMBERSHIP=0 to declare the absence"
+      echo "REFUSED relay-addr-beacon binary: not executable ($BEACON_BIN) — the household stages its public-name membership authority with it; build it: cd doorway/relay-addr-beacon && just gate (or RUSTFLAGS=\"\" CARGO_TARGET_DIR=$POOL/relay-addr-beacon/dev cargo build --bin relay-addr-beacon), or MESH_MEMBERSHIP=0 to declare the absence"
       fail=1
     fi
   else
@@ -4911,7 +4910,7 @@ mesh_blocks() {
   if [ -z "${DBTOOL_BIN:-}" ] || [ ! -x "$DBTOOL_BIN" ]; then
     echo "blocks: no executable hc-dbtool (DBTOOL_BIN='${DBTOOL_BIN:-}')" >&2
     echo "  build it with:" >&2
-    echo "    cd '$REPO_ROOT/crates/hc-dbtool' && CARGO_TARGET_DIR='$POOL/crates/dev' RUSTFLAGS=\"\" cargo build" >&2
+    echo "    cd '$REPO_ROOT/elohim/holochain/tools/hc-dbtool' && CARGO_TARGET_DIR='$POOL/elohim__holochain__tools__hc-dbtool/dev' RUSTFLAGS=\"\" cargo build" >&2
     return 2
   fi
 

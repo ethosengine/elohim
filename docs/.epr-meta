@@ -1,0 +1,42 @@
+---
+epr-meta-version: 1
+id: docs-superpowers-default-path-tombstone
+covers: subtree
+purpose: >
+  A tombstone. The top-level docs/ tree was retired on 2026-09-23 and exists only to carry this
+  manifest, because the superpowers plugin still saves to docs/superpowers/ by default. Every
+  markdown birth here is routed to the governed home, genesis/docs/superpowers/.
+rules:
+  - id: route-superpowers-default-path
+    class: dispatch
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Classify the proposed document by kind (design spec, implementation plan, or sprint result)
+        and name its governed destination under genesis/docs/superpowers/, or an existing artifact
+        it should merge into. Report ROUTE, MERGE, or DROP to the editing agent; do not move or
+        create files and do not derail implementation.
+    why: >
+      docs/superpowers/ is the superpowers plugin's default save path, not this repository's: the
+      writing-plans skill saves to docs/superpowers/plans/ and the brainstorming skill to
+      docs/superpowers/specs/ unless told otherwise. The governed homes are under
+      genesis/docs/superpowers/, chosen by kind. A design spec goes to specs/, born with the
+      lifecycle frontmatter that specs/.epr-meta requires. An implementation plan goes to plans/,
+      born with id, status and cites. A sprint result or shift journal goes to sprints/. Write the
+      file there instead; the placement contract is genesis/docs/PLACEMENT.md.
+    retire-when: >
+      when every superpowers skill in use saves to genesis/docs/superpowers/ by configuration, so
+      nothing is written to the plugin's default path any more
+---
+# docs/ — tombstone for the plugin default path
+
+This directory holds nothing but this manifest. Specs, plans and sprint results used to land in
+`docs/superpowers/{specs,plans,sprint-results}` because that is where the superpowers plugin saves
+by default. The repository's design surface is `genesis/docs/superpowers/`, where the lifecycle
+gate lives, so a birth here is routed there by kind. The same routing already emptied the legacy
+`genesis/docs/plans/` and `genesis/docs/specs/`.
+
+`covers: subtree` is the ownership claim: nothing under `docs/` needs governance of its own,
+because nothing is meant to stay here.

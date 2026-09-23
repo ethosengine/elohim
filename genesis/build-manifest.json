@@ -11,7 +11,6 @@
       "description": "Generate schema types and validate seed constants against protocol schemas",
       "inputs": {
         "sources": [
-          "genesis/seeds/**",
           "elohim/sdk/schemas/**",
           "elohim/sdk/domains/**"
         ],
@@ -51,7 +50,7 @@
     "schema-validate": {
       "description": "Validate seed data against protocol schemas",
       "inputs": {
-        "sources": ["genesis/seeds/**", "elohim/sdk/schemas/**"],
+        "sources": ["elohim/sdk/schemas/**"],
         "buildProcess": []
       },
       "outputs": {
@@ -155,7 +154,6 @@
       "description": "Catch-all trigger for genesis directory quality gate (excludes orchestrator CI glue)",
       "inputs": {
         "sources": [
-          "genesis/seeds/**",
           "genesis/data/humans/**",
           "genesis/data/presences/**",
           "genesis/data/devices/**",

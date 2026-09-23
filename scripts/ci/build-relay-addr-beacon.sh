@@ -1,6 +1,6 @@
 #!/bin/bash
 # build-relay-addr-beacon.sh — build + tag the relay-addr-beacon sidecar image.
-# Own dir as build context, zero internal path-deps (see relay-addr-beacon/).
+# Own dir as build context, zero internal path-deps (see doorway/relay-addr-beacon/).
 # Builds under the SHORT local name (relay-addr-beacon:<tag>) exactly like the
 # elohim-agent-sdk build in the Jenkinsfile — a full-registry-name build under
 # BUILDKIT_HOST does not land in the local `nerdctl -n k8s.io images` store the
@@ -18,7 +18,7 @@ buildctl --addr unix:///run/buildkit/buildkitd.sock debug workers > /dev/null
 BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
     nerdctl -n k8s.io build \
     -t relay-addr-beacon:${IMAGE_TAG} \
-    -f relay-addr-beacon/Dockerfile relay-addr-beacon
+    -f doorway/relay-addr-beacon/Dockerfile doorway/relay-addr-beacon
 
 nerdctl -n k8s.io tag relay-addr-beacon:${IMAGE_TAG} relay-addr-beacon:${GIT_COMMIT_HASH}
 

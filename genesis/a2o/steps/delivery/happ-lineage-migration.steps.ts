@@ -386,7 +386,7 @@ function hcMeshScriptPath(): string {
 /**
  * `hc-mesh.sh blocks <peer>` — READ-ONLY (Task 30's verb; it reads the peer's
  * encrypted `BlockSpan` table and the rejected/warrant rows behind it through
- * `crates/hc-dbtool`, and never writes). Returns the tool's combined output.
+ * `elohim/holochain/tools/hc-dbtool`, and never writes). Returns the tool's combined output.
  *
  * A block is the ONE consequence of a post-close write that lives nowhere on
  * the wire: holochain 0.7 exposes no admin call and no HDK host fn for it, so
@@ -424,7 +424,7 @@ function readPeerBlocks(peer: PeerName): { output: string; status: number | null
  * in the same DNA's WARRANTS section. `hc-dbtool` already does the join —
  * `BlockRow.render()` emits `  #<id>  <dna>:<agent>` and `explain_block` then
  * indents `warrant:`, `blocked:`, `cause:` and `provoked by:` UNDER that row
- * (crates/hc-dbtool/src/main.rs) — so the row is a legible unit and the
+ * (elohim/holochain/tools/hc-dbtool/src/main.rs) — so the row is a legible unit and the
  * assertion can be as tight as the Gherkin sentence it implements.
  *
  * A row runs from its `  #<id>  <target>` header to the next such header or the
@@ -4630,7 +4630,7 @@ function sweepNeighbourBlocks(
     if (output.includes('no executable hc-dbtool')) {
       unaskable.push(
         `${neighbour}: hc-dbtool is not built, so this peer's block table cannot be read. Build ` +
-          "it with: cd crates/hc-dbtool && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/crates/dev RUSTFLAGS='' cargo build"
+          "it with: cd elohim/holochain/tools/hc-dbtool && CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/dev/elohim__holochain__tools__hc-dbtool/dev RUSTFLAGS='' cargo build"
       );
       continue;
     }

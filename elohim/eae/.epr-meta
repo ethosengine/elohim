@@ -1,0 +1,18 @@
+---
+epr-meta-version: 1
+id: eae-autonomous-entity-crate
+covers: subtree
+purpose: >
+  eae (Elohim Autonomous Entity), a member of the elohim/ Cargo workspace. It is an autonomous
+  agent framework built on the Monitor-Analyze-Decide-Execute (MACE) loop, with layer-aware
+  governance, anomaly detection (spiral, manipulation, constitutional drift), precedent tracking
+  and cross-agent consensus for risky actions.
+---
+# elohim/eae — autonomous entity framework
+
+What belongs here: the `ElohimAutonomousEntity` and its MACE stages (`src/mace/`), anomaly
+detection, the governance layers, precedent tracking, and the config and types they share.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule of its own. The
+workspace-wide `elohim/.epr-meta` already advises reuse of the substrate's identity and codec
+interfaces, and no drift specific to this crate has recurred.

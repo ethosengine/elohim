@@ -14,7 +14,7 @@
  * probe with join2/leave3 hysteresis (`reconcile_membership` +
  * `state::Membership`), and PROJECTS it — into Cloudflare as multi-A records on
  * the fleet, and into a JSON document the household owns through its `file`
- * sink (`relay-addr-beacon/src/sinks/file.rs`). `hc-mesh.sh`
+ * sink (`doorway/relay-addr-beacon/src/sinks/file.rs`). `hc-mesh.sh`
  * (`start_membership_beacons`) stages one leg per owned doorway — owner `alpha`
  * -> :8888, owner `apex` -> :8889, public name `elohim.local` — each writing
  * exactly its OWN entry into `$MESH_DIR/membership/elohim.local.json`, and
@@ -152,7 +152,7 @@ const INDUCE_SHED_TIMEOUT_MS =
 
 /**
  * One advertised origin. Field names are the beacon document's own vocabulary
- * (`relay-addr-beacon/src/sinks/file.rs`), which is the same snake_case the
+ * (`doorway/relay-addr-beacon/src/sinks/file.rs`), which is the same snake_case the
  * beacon's state file already uses — this is that crate's artifact, not the
  * elohim-storage View boundary.
  */
@@ -171,7 +171,7 @@ interface MembershipDocument {
 /**
  * ONE DOCUMENT NAMES ONE PUBLIC NAME. A household publishing several names has
  * one document per name, maintained by the SAME legs (one repeatable
- * `--shared-record <name>=<owner>` per name, `relay-addr-beacon/src/config.rs`).
+ * `--shared-record <name>=<owner>` per name, `doorway/relay-addr-beacon/src/config.rs`).
  * Every membership read below therefore names WHICH document it read — the
  * authority satisfies this shape for the converged name, and each entry of the
  * fixture's `lanes` satisfies it for its own name.

@@ -1,0 +1,22 @@
+---
+epr-meta-version: 1
+id: elohim-views-wire-types
+covers: subtree
+purpose: >
+  elohim-views, the wire-shape Rust types for the storage HTTP API: the ts-rs-anchored View and
+  InputView types that define the contract between elohim-storage and its clients. It is kept
+  deliberately light (serde, serde_json, chrono, serde_bytes, ts-rs), so consumers can depend on
+  the type surface without the storage implementation.
+---
+# elohim/elohim-views — the wire contract
+
+What belongs here: View and InputView types with `#[serde(rename_all = "camelCase")]` and
+`#[derive(TS)]`, matching their view schemas in `elohim/sdk/schemas/v1/views/`. The TypeScript
+projection is generated (`cargo test export_bindings` writes
+`elohim/sdk/storage-client-ts/src/generated/`) and never hand-edited.
+
+Two traps are structural, not edit-time. ts-rs derives import paths from the source crate's
+location, so a View type moves between crates only in one atomic migration with a sha256 diff of
+the generated TypeScript. And `deny.toml` keeps every consumer except the server-side wrappers on
+this crate rather than on `elohim-storage`. The schema-contract harness and the codegen freshness
+check hold both, so `covers: subtree` carries no rule.

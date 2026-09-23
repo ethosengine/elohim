@@ -12,7 +12,7 @@ related:
 **Branch:** `dev` (brainstormed session on `dev`)
 **Related:**
 - `elohim/brit/docs/plans/phases/phase-2a-build-attestation-primitives.md`
-- `rakia/docs/plans/build-attestation-integration.md`
+- `elohim/rakia/docs/plans/build-attestation-integration.md`
 - `.claude/skills/pipeline-diagnostics/SKILL.md` (superseded in part by this system)
 - `.claude/skills/ci-triage/SKILL.md` (superseded in part by this system)
 

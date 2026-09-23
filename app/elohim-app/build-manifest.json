@@ -97,7 +97,7 @@
             "app/elohim-elements/*/src/**/*.ts",
             "app/elohim-elements/*/custom-elements-manifest.config.mjs"
           ],
-          "buildProcess": ["tools/check-cem-fresh.mjs"]
+          "buildProcess": ["app/scripts/check-cem-fresh.mjs"]
         },
         "run": {
           "kind": "root-just",

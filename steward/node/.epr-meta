@@ -1,0 +1,24 @@
+---
+epr-meta-version: 1
+id: steward-node-hub-runtime
+covers: subtree
+purpose: >
+  steward/node (elohim-node), the always-on household hub runtime. It owns the hub-internal
+  cluster-ops seam: one libp2p swarm for blade discovery and doc-sync, the Automerge sync engine,
+  the pod operator (monitor, analyze, decide, execute, with consensus and admission control), the
+  axum dashboard, and the elohim-agent invoke surface. It implements the elohim-hub boundary
+  design; it does not author it.
+---
+# steward/node — household hub runtime
+
+What belongs here: the crate's modules under `src/`, its integration tests, the multi-node
+simulation harness under `simulation/`, the Nix packaging, and `seam-registry.yaml`, which
+registers each decision surface. Hub composition (which hub owns which method) routes to the
+`elohim-hub-boundaries-design` epic, and reach vocabulary routes to
+`reach-vocabulary-frontend-strand.md`. Neither is decided in this crate (`CLAUDE.md`, "Concern
+routing").
+
+`covers: subtree` is the ownership claim. The one edit-time signal lives in `src/.epr-meta`: a
+new decision surface must answer the concern canon and be registered before it ships. The
+hub-optional floor is the design rail every change here serves: a device with no hub is still a
+full participant, and this node only enhances what a lone device already does.

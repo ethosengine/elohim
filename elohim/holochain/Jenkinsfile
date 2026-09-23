@@ -1975,7 +1975,7 @@ spec:
         # shared with steward — those two are sequential per the orchestrator
         # dependsOn chain). Pre-split + pre-hostpath, the cross-pipeline
         # contention surfaced as a Jiva orphan-unmount-loop FailedMount.
-        # See genesis/manifests/nix-cache-pvc.yaml for the full rationale.
+        # See genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml for the full rationale.
         claimName: cargo-cache-edge
   containers:
     - name: builder

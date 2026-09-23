@@ -1,6 +1,7 @@
 ---
 epr-meta-version: 1
 id: elohim-app-dev-lifecycle-governance
+covers: subtree
 purpose: >
   The Angular app AND the primary home of the local-dev lifecycle scripts (scripts/hc-start.sh,
   hc-mesh.sh, hc-mesh-quiesce.sh) plus the heaviest app-side
@@ -25,6 +26,13 @@ cites:
 ---
 
 # app/elohim-app — dev-lifecycle governance
+
+`covers: subtree` claims the whole workspace. It holds the full pillar SPA (`src/app/` — the
+`elohim`, `imagodei`, `qahal`, `shefa`, `avodah` and `doorway` pillars; `lamad` lives in
+`app/lamad/`), the `elohim-host-landing` EPR served at `/`, and the local-dev lifecycle scripts.
+Its structural gates are the build and lint rails: strict AOT templates, the route-literal,
+SSR-entry and cross-workspace-import rails in `app/scripts/`, and `just gate`. Only the
+shell-script coupling below needs an edit-time signal.
 
 The `scripts/*.sh` files here are the executable local-dev lifecycle; the hc-dev-orchestrator
 skill and root CLAUDE.md are its prose projection. The inject rule keeps the two coupled at

@@ -1,0 +1,24 @@
+---
+epr-meta-version: 1
+id: elohim-agent-gate-family
+covers: subtree
+purpose: >
+  The elohim agent and its gate interface: elohim-agent-service (agent orchestration), gate-types
+  (pure gate data types, wasm32-clean), gate-client (the wisdom-as-system-auth library called from
+  relational-impact write paths), gate-client-zome (synchronous gate invocation for zome
+  coordinators), the defender specialist, the TypeScript agent SDK sidecar, the elohim-content
+  MCP server, and the gate spec and research notes.
+---
+# elohim/elohim-agent — the agent and its gate
+
+What belongs here: the gate crates, the agent service and its specialists, the agent SDK
+sidecar, and the documents that define the gate: `spec/2026-04-18-gate-interface.md`, the
+companion theory in `research/`, and the activation runbook in `gate-client/ACTIVATION.md`.
+
+One structural fact matters when editing: `gate-client-zome` is compiled into the lamad DNA's
+`content_store` coordinator zome. A change there moves no DNA hash and lands by the
+coordinator hot-swap. The gate's phase is observed, never configured. A decision is stamped
+`ElohimActive` only when a live model actually answered, so no flag or environment variable
+should ever force it.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule.

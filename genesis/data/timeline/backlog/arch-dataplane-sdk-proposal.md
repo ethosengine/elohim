@@ -20,7 +20,7 @@ cites:
 
 **Current decision / state:** the facade shipped and is daily-proven. The three
 design questions were answered on standing evidence (operator skip-the-gates
-preference) and are recorded in DATAPLANE-SDK-PATH.md critical path #3: (1)
+preference) and are recorded in genesis/docs/superpowers/plans/2026-08-14-dataplane-sdk-path.md critical path #3: (1)
 multi-peer addressing via `DataplaneFleet` (PEER_STORAGE_URLS CSV), doorway as
 single-target `DoorwayClient`; (2) healing stays a node primitive — the
 proposal's `healBlobConcurrent` client fan-out was deliberately NOT built; (3)

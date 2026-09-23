@@ -168,14 +168,10 @@ COPY genesis/a2o/scripts/__tests__/fixtures /genesis/a2o/scripts/__tests__/fixtu
 COPY elohim/sdk/domains/shefa/types /sdk/domains/shefa/types
 COPY elohim/sdk/domains/lamad/types /sdk/domains/lamad/types
 
-# Admin-seam unblock (2026-08-07): Cargo.toml's `[patch.crates-io]` points
-# holochain_serialized_bytes at `path = "../../vendor/holochain_serialized_bytes-0.0.56"`.
-# From /app/Cargo.toml that normalises to `/vendor/...` — same trick as `/sdk`
-# above. A `[patch]` path is resolved during dependency RESOLUTION, so like the
-# type crates it MUST exist before the first `cargo build` in this stage, or the
-# build aborts with:
-#   error: failed to read `/vendor/holochain_serialized_bytes-0.0.56/Cargo.toml`
-# See vendor/holochain_serialized_bytes-0.0.56/VENDOR-NOTE.md for why it exists.
+# vendor/ holds the one live [patch.crates-io] this crate still needs: iroh-quinn-proto 0.13.0
+# (see vendor/iroh-quinn-proto-0.13.0/VENDOR-NOTE.md). A [patch] path is resolved during dependency
+# RESOLUTION, so it must exist before the first `cargo build` in this stage. The retired
+# holochain_serialized_bytes patch was removed on 2026-09-23.
 COPY vendor /vendor
 
 # Fix the paths to local crates (now relative to /app)

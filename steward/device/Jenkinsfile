@@ -43,7 +43,7 @@ spec:
               # share cargo-cache-holochain — that's safe because they're
               # sequential per the orchestrator dependsOn chain, so only one
               # build holds the RWO at a time regardless of which node it
-              # lands on. See genesis/manifests/nix-cache-pvc.yaml header.
+              # lands on. See genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml header.
   tolerations:
     - key: "workload-type"
       operator: "Equal"

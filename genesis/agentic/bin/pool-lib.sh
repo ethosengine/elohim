@@ -81,6 +81,7 @@ NATIVE_WORKSPACES=(
   "doorway/doorway-service"
   "steward/node"
   "elohim/holochain/tests/sweettest"
+  "elohim/holochain/tools/hc-dbtool"
   "crates"
 )
 

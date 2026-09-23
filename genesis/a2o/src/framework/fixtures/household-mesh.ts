@@ -385,7 +385,7 @@ export function requireMembershipAuthority(
         'complete membershipAuthority (publicName + membershipFile + owners). `just mesh start` ' +
         'stages two relay-addr-beacon legs (`--sink file`, one per doorway) that maintain it, and ' +
         '`just mesh prologue` copies their declaration into this manifest. Absent here means ' +
-        'MESH_MEMBERSHIP=0, no relay-addr-beacon binary (cd relay-addr-beacon && just gate), or a ' +
+        'MESH_MEMBERSHIP=0, no relay-addr-beacon binary (cd doorway/relay-addr-beacon && just gate), or a ' +
         'prologue that ran before the legs were staged. This is a missing-apparatus refusal, not ' +
         'a defect in the doorways.'
     );

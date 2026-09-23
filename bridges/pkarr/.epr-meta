@@ -1,0 +1,34 @@
+---
+epr-meta-version: 1
+id: bridges-pkarr-integrity-coupled
+covers: subtree
+purpose: >
+  pkarr-bridge: deterministic, pkarr-shaped signed endpoint records for doorway discovery. The
+  infrastructure DHT is the truth and pkarr publication is a later projection. The crate is
+  compiled into the infrastructure DNA's integrity zome (and its coordinator), so its code is
+  part of that DNA's hash.
+rules:
+  - id: integrity-zome-dependency-moves-dna-hash
+    class: inject
+    when: { write: "*.rs", new: true }
+    dedupe-of: "elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/Cargo.toml (the path dependency that compiles this crate into the integrity zome) + elohim/holochain/dna/.epr-meta/manifest.md (dna-hash-neutrality: what a hash-moving change costs)"
+    why: >
+      This crate is compiled into the infrastructure DNA's integrity zome, so a change to the code
+      that zome compiles moves that DNA's hash, and a new module joins that build as soon as it is
+      declared. A moved hash does not reach running conductors on a normal redeploy. It lands only through a
+      deliberate DNA-lineage event (ALLOW_DNA_REINSTALL), which mints a new agent key, and peers
+      reinstalled on different hashes split into different DHTs. If the new code is only needed
+      where records are created or read, put it in the infrastructure coordinator zome or the
+      doorway side, which hot-swap without touching the hash. If it must validate, plan it as part
+      of a lineage event for the whole namespace.
+    retire-when: >
+      when the record-validation surface the integrity zome needs is split into its own crate, so
+      editing the rest of pkarr-bridge no longer touches the infrastructure DNA's hash
+---
+# bridges/pkarr — signed endpoint records
+
+The one hazard here is structural and easy to miss from inside the crate: it lives under
+`bridges/`, but its bytes are part of the infrastructure DNA hash. The rule fires when a new
+`.rs` file is born, which is where new logic most often enters. It advises and never blocks.
+Edits to existing files are not flagged; the DNA pipeline and the hash-neutrality signal in
+`elohim/holochain/dna/` carry that part.

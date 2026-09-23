@@ -14,7 +14,7 @@ Feature: Node resource limits are tunable, bounded, and documented
   (genesis/a2o/scripts/build-resource-shape-report.ts) aggregates breaches of
   these limits by node and class.
 
-  See: docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md
+  See: genesis/docs/superpowers/specs/2026-06-15-node-resource-tunables-and-exhaustion-shape-design.md
 
   # --- The catalogue of node resource tunables ---
 

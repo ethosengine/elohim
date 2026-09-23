@@ -1,0 +1,24 @@
+---
+epr-meta-version: 1
+id: genesis-seeder-corpus-seeding
+covers: subtree
+purpose: >
+  The genesis seeder. It validates and seeds the structured corpus under genesis/data/lamad
+  through doorway and storage, with Holochain providing the provenance anchors. It also carries
+  the fixture-human, conductor-identity and household-formation seeding the local mesh prologue
+  uses.
+---
+# genesis/seeder — corpus seeding
+
+What belongs here: the seeder's TypeScript sources and vitest specs (`src/`), its diagnostics and
+spikes (`scripts/`), and the declared inputs it reads, such as `stakes-declaration.json`. The
+root interface is `just seed validate|apply|stats`. `src/seed.ts` is the focused entry point for
+specialist runs.
+
+There is deliberately no seed dry-run. The retired `--dry-run` and `--validate-only` aliases were
+ignored and could write. Do not add a preview mode until the seeder has a tested non-writing
+execution path; `just seed validate` is the non-writing check.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. A tool run from this
+directory that writes its own `.claude/` state here is a stray, handled by `.gitignore`, not by
+this manifest.

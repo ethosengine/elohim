@@ -119,7 +119,7 @@ blobs (`p2p_iroh/README.md`); no WAN measure exists.
 
 **pkarr.** Four stations built, none lit: doorway `/pkarr/{z32}` relay behind
 `DOORWAY_PKARR_RESOLVER_ENABLED` (`services/pkarr_resolver.rs`, gate #10 plan), beacon pkarr sink
-(`relay-addr-beacon/src/sinks/pkarr.rs`, unreferenced by manifests), iroh discovery hook
+(`doorway/relay-addr-beacon/src/sinks/pkarr.rs`, unreferenced by manifests), iroh discovery hook
 (`p2p_iroh/config.rs:15-43`), signed doorway-endpoint record in the infrastructure zome
 (`bridges/pkarr`, `09d7a026e`, DNA-hash-moving, no reader). Nothing resolves a pkarr name into a
 doorway-set address list.

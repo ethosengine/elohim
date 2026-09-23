@@ -9,6 +9,11 @@
         "sources": [
           "bridges/k8s/**",
           "elohim/ark/core/**",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/elohim-compute/**",
+          "elohim/Cargo.toml",
+          "crates/seam-contracts/**",
           "genesis/data/devices/archetype-resource-budgets.json",
           "genesis/orchestrator/manifests/runtime/**",
           "genesis/orchestrator/data/deployments.json",

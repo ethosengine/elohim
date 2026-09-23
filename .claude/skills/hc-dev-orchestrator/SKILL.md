@@ -140,7 +140,7 @@ from `genesis/a2o`): exact signed NodeId discovery by every warm incumbent, no
 restarts, bounded by three announce cadences.
 
 `hc-mesh.sh blocks [peer...]` reads each peer's `BlockSpan` rows and the
-rejected ops behind them (`crates/hc-dbtool`, resolved from the `crates`
+rejected ops behind them (`elohim/holochain/tools/hc-dbtool`, resolved from its own
 cargo-pool slot via `DBTOOL_BIN`; `MESH_BLOCKS_DNA=<hash,...>` forces a
 rejected read for a DNA no block row names). It is READ-ONLY. Holochain 0.7
 blocks the AUTHOR'S CELL until `Timestamp::max()` when one op that author wrote
@@ -248,7 +248,7 @@ resolves the public name THROUGH the document (try the advertised origins in ord
 the first that serves) instead of through a hardcoded doorway port, which the feature's own
 preamble refuses as certification. `mesh stop` reaps the legs by recorded pid, `mesh status`
 prints the currently-eligible set plus each leg's liveness, and `mesh preflight` REFUSES
-without the binary (`cd relay-addr-beacon && just gate`, or `BEACON_BIN=<path>`).
+without the binary (`cd doorway/relay-addr-beacon && just gate`, or `BEACON_BIN=<path>`).
 `MESH_MEMBERSHIP=0` stages nothing — and the absence is honest: the apex-transition scenarios
 then fail naming a household that owns no membership authority, rather than reading a set
 nothing maintains. WAN ingress continuity remains a separate prerequisite: the document proves

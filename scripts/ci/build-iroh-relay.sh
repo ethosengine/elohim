@@ -1,6 +1,6 @@
 #!/bin/bash
 # build-iroh-relay.sh — build + tag the iroh-relay server image.
-# Own dir as build context, zero internal path-deps (see iroh-relay/).
+# Own dir as build context, zero internal path-deps (see doorway/iroh-relay/).
 # Builds under the SHORT local name (iroh-relay:<tag>) exactly like the
 # relay-addr-beacon build in the Jenkinsfile — a full-registry-name build under
 # BUILDKIT_HOST does not land in the local `nerdctl -n k8s.io images` store the
@@ -22,7 +22,7 @@ BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
     nerdctl -n k8s.io build \
     --build-arg IROH_RELAY_VERSION="${IROH_RELAY_VERSION}" \
     -t iroh-relay:${IMAGE_TAG} \
-    -f iroh-relay/Dockerfile iroh-relay
+    -f doorway/iroh-relay/Dockerfile doorway/iroh-relay
 
 nerdctl -n k8s.io tag iroh-relay:${IMAGE_TAG} iroh-relay:${GIT_COMMIT_HASH}
 

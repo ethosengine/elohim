@@ -25,7 +25,7 @@ key. There is no volume of any kind, ephemeral or persistent, for a node key on 
 
 **Evidence.** `genesis/orchestrator/manifests/doorway/alpha.yaml` (no `DOORWAY_NODE_KEY_FILE` match;
 `:508-510` the sole `volumes:` stanza for the doorway pod). Precedent for a small persistent volume
-already in the tree: `genesis/manifests/doorway-pkarr-resolver.yaml:17-42` — a `doorway-pkarr-cache`
+already in the tree: `genesis/orchestrator/manifests/ci-infra/doorway-pkarr-resolver.yaml:17-42` — a `doorway-pkarr-cache`
 `PersistentVolumeClaim` (`ReadWriteOnce`, 1Gi, `openebs-jiva-csi-default`) mounted at
 `/var/lib/doorway/pkarr`, not currently referenced by any Jenkinsfile/groovy/CI dispatch script
 (confirmed by repo-wide grep 2026-09-20). Precedent for a mint-once Secret already in the tree: `JWT_SECRET`

@@ -1,0 +1,43 @@
+---
+epr-meta-version: 1
+id: claude-handoffs-holding-pen
+purpose: >
+  A deprecated holding pen for session handoffs written before the decompose discipline replaced
+  them. Handoff documents are not an artifact class here, so no new document is born in this
+  directory. The files still present wait to be decomposed and removed
+  (genesis/data/timeline/backlog/handoff-sprawl-decompose-2026-06-23.md).
+rules:
+  - id: handoff-routes-to-sprints
+    class: dispatch
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/sprints/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Review the proposed new markdown document for context pollution. Return exactly one
+        recommendation: ROUTE with a canonical destination (a sprint result under
+        genesis/docs/superpowers/sprints/, a backlog entry, a memory file, or a shift objective),
+        MERGE into an existing artifact, or DROP as session-scoped, with the shortest supporting
+        reason. Do not create, move, or rewrite files; report to the editing agent and let
+        development continue.
+    why: >
+      The handoff pattern was retired in df250665f (2026-06-11), and this directory became a
+      holding pen for undecomposed handoffs on 2026-06-23 (archive/README.md). About a dozen more
+      were born here after that. A concluded session's durable carrier is its sprint result in
+      genesis/docs/superpowers/sprints/. Decompose the rest: open work to
+      genesis/data/timeline/backlog/, a lesson to a memory file or to
+      genesis/docs/content/elohim-protocol/history/, and the narration to git history. A shift
+      objective belongs in .claude/shifts/<shift-id>.objective.json.
+    retire-when: >
+      when the undecomposed handoffs here have been harvested and removed and the directory itself
+      is deleted, leaving nothing to route
+---
+# .claude/handoffs — deprecated holding pen
+
+`archive/README.md` records the rule: finish a shift by decomposing, not by writing a handoff.
+This manifest enforces the birth side of that rule. It re-declares the repo-root rule id
+`handoff-routes-to-sprints` (nearest wins) and widens the match from `handoff*.md` to every
+markdown birth here. That catches `OBJECTIVE-*.md`, dated `*-handoff.md` and `*-RESULT.md` files
+too, and a `HANDOFF-*.md` born here gets one review, not two.
+
+Editing an existing file here is never routed; only a new file is.

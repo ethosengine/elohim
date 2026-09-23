@@ -5,7 +5,7 @@ purpose: Govern the relocated maintenance LENSES and the memory discipline they 
 rules:
   - id: recall-algorithm-contract
     class: inject
-    when: { write: "**/recall*" }
+    when: { write: "recall*" }
     dedupe-of: .epr-meta/elohim/algorithms/recall-contract.json
     why: >
       Retrieval composition, scope, limits and fitness live in recall-contract.json, and the

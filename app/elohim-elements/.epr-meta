@@ -1,0 +1,22 @@
+---
+epr-meta-version: 1
+id: elohim-elements-ui-substrate
+covers: subtree
+purpose: >
+  The protocol's blank-slate UI substrate: stateless Lit custom elements plus the tokens and
+  light-DOM globals they consume, organised as single-concern pnpm workspace packages (elohim-core
+  for tokens and atoms, elohim-shell for host chrome, and one package per pillar: imagodei, lamad,
+  shefa, qahal, doorway, avodah). Every package depends on elohim-core and nothing else.
+---
+# app/elohim-elements — UI substrate
+
+What belongs here: an element's rendering, accessibility, reactions to host-provided state, and
+the intent events it emits, with CSS custom properties as its override surface. What does not
+belong: substrate API calls, REA event creation, aggregation, submission orchestration,
+governance logic, caching, or session handling. Each of those has a backend home, and the
+anti-pattern table in `CLAUDE.md` names it.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. The scope discipline is
+content-shaped: whether a line is business logic or presentation is a judgement, not a basename
+or a frontmatter field. The component-architect review and the layer rails described in
+`CLAUDE.md` and `README.md` hold it.

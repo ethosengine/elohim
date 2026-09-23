@@ -1,0 +1,35 @@
+---
+epr-meta-version: 1
+id: genesis-plans-legacy-routing
+covers: subtree
+purpose: >
+  The first plans home: about two hundred plans and designs written between 2026-03 and 2026-04,
+  superseded by genesis/docs/superpowers/plans/. The files stay in place as a record. The
+  p2p-plan-audit hook and the historian agent still read them. New plans are routed to the
+  governed home at birth.
+rules:
+  - id: route-plans-to-governed-home
+    class: dispatch
+    when: { write: "*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/plans/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Confirm whether this is genuinely a new plan and name the governed destination or an
+        existing artifact to merge into. Report ROUTE, MERGE, or DROP to the editing agent; do not
+        move or create files and do not derail implementation.
+    why: >
+      New plans go to genesis/docs/superpowers/plans/, born with id, status and cites under the
+      lifecycle gate, and a design spec goes to genesis/docs/superpowers/specs/. This directory is
+      the retired first plans home, not a live one.
+---
+# genesis/plans — the first plans home (legacy)
+
+This is the same routing as `genesis/docs/plans/.epr-meta`, which cut births in that legacy
+directory to zero. Existing plans are left where they are, because tooling reads them by path:
+`.claude/hooks/p2p-plan-audit.py` scans `genesis/plans/*.md`, and the historian agent treats the
+directory as the historical plans wing. Editing an existing plan is never routed; only a new file
+is.
+
+`covers: subtree` is the ownership claim. The rule is written inline in both legacy directories;
+its graduated form is one registry policy that both bind.

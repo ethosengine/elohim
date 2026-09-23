@@ -224,7 +224,7 @@ spec:
               # intel-nuc pin was removed when the caches moved back to
               # Jiva; cross-pipeline parallelism is now ensured by the
               # cargo-cache-edge / cargo-cache-holochain split alone.
-              # See genesis/manifests/nix-cache-pvc.yaml header for the
+              # See genesis/orchestrator/manifests/ci-infra/nix-cache-pvc.yaml header for the
               # full migration story.
   tolerations:
     - key: "workload-type"

@@ -1,0 +1,23 @@
+---
+epr-meta-version: 1
+id: elohim-library-pattern-libraries
+covers: subtree
+purpose: >
+  Shared Angular libraries for the frontend, under projects/: elohim-service (content
+  intelligence and the mode-aware ElohimClient), elohim-identity, elohim-rea-runtime, lamad-ui,
+  the perseus, psephos and html5-app plugins, and graphos, the Storybook that hosts both pattern
+  libraries (Library A, the default, and Library B, the designed Elohim binding).
+---
+# app/elohim-library — shared libraries and pattern libraries
+
+What belongs here: libraries and stories scoped to client concerns (UX, accessibility, and
+sense-and-respond), composed from exactly three sources. Those are the ts-rs generated views,
+the app-manifest vocabulary, and the graphos design tokens (`CLAUDE.md`, "The three sources of
+truth"). A story that invents a local interface, hardcodes a brand colour, or uses vocabulary
+outside the manifest is wrong. component-architect writes Library A; graphos-designer writes
+Library B; neither crosses into the other's.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. The drifts that matter
+here are content-shaped (thin-client scope, the Library A/B boundary), so review and the render
+rails (`pnpm graphos sheet`) hold them. A committed build artefact such as
+`projects/*/coverage/` is a `.gitignore` concern; the resolver never sees those writes.

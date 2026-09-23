@@ -1115,7 +1115,7 @@ Before the delivery master writes sub-plans:
 - Sweettest harness:
   `genesis/docs/superpowers/specs/2026-04-22-sweettest-integration-layer-design.md`
 - MinIO substrate (runbook, corrects Garage memory):
-  `genesis/manifests/RUNBOOK-minio-sccache-2026-05-09.md`
+  `genesis/orchestrator/manifests/ci-infra/RUNBOOK-minio-sccache-2026-05-09.md`
 - EPR substrate framing:
   `genesis/docs/content/elohim-protocol/architecture/2026-04-21-elohim-core-graph-substrate-design.md`
 - Three-truth-layer model: memory anchor `project_three_layer_truth_model`

@@ -5,7 +5,18 @@
   "steps": {
     "gate-ark": {
       "description": "fmt + clippy -D warnings + tests for the three ark crates",
-      "inputs": { "sources": ["elohim/ark/**", "elohim/Cargo.toml", "elohim/Cargo.lock"], "buildProcess": [] },
+      "inputs": {
+        "sources": [
+          "elohim/ark/**",
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/elohim-compute/**",
+          "crates/seam-contracts/**"
+        ],
+        "buildProcess": []
+      },
       "outputs": { "artifacts": [], "verify": null },
       "depends": [],
       "executor": { "stage": "Gate Ark", "function": null }

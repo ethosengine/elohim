@@ -223,7 +223,7 @@ path, irrelevant to what pnpm will fetch) and `404` (the mirror path, the real
 answer). Always probe the **`repository/npm/` URL explicitly** before concluding
 an artifact is available. Same caution applies to the `vite@6.4.2` /
 `glob@13.0.6` / `qs@6.15.2` "fetchable" reads recorded in
-`VULNERABILITY_CLUSTER_00_RETRY_QUEUE.md`.
+`security-cargo-vulnerability-campaign-retry-queue.md`.
 
 **Two unblock paths, both operator/infra decisions:**
 

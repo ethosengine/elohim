@@ -14,7 +14,7 @@ Feature: Compute commitments are bounded and breach without contagion
   the same family as stewardship through disability or stewardship handoff —
   the protocol treats them with equal dignity.
 
-  See: docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md
+  See: genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md
 
   Background:
     Given the alpha cluster has a compute-capacity ledger declaring per-node bounds

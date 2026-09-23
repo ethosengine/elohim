@@ -35,7 +35,7 @@ ensure_and_push() {
         BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \
             nerdctl -n k8s.io build \
             -t "${LOCAL}" \
-            -f relay-addr-beacon/Dockerfile relay-addr-beacon || return 1
+            -f doorway/relay-addr-beacon/Dockerfile doorway/relay-addr-beacon || return 1
     fi
 
     echo "Pushing Relay Addr Beacon provenance tag: ${GIT_COMMIT_HASH}"

@@ -14,6 +14,9 @@
         "sources": [
           "elohim/eprfs/**",
           "elohim/sdk/domains/elohim-agent/adapter/**",
+          "elohim/epr/**",
+          "elohim/epr-rea/**",
+          "elohim/Cargo.toml",
           "scripts/ci/cargo-publish-eprfs.sh"
         ],
         "buildProcess": ["elohim/eprfs/Jenkinsfile"]

@@ -16,7 +16,7 @@ canonical:
 cites:
   - elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
-  - elohim/holochain/dna/lamad-v1/zomes/content_store/src/lib.rs
+  - elohim/holochain/dna/archive/lamad-v1/zomes/content_store/src/lib.rs
   - elohim/holochain/rna/typescript/src/config.ts
   - elohim/holochain/rna/rust/src/config.rs
   - elohim/sdk/schemas/v1/enums/mastery-level.schema.json
@@ -112,7 +112,7 @@ in the **current** coordinator (`content_store/src/lib.rs`:
 `export_all_paths_with_steps` ~L8009, `export_all_mastery` ~L8079,
 `export_all_progress` ~L8086, `MigrationExport` + `export_for_migration`
 ~L8092–8103), with cache rules registered (~L1530–1545). The
-`dna/lamad-v1/` directory is a thin **v1 coordinator archive for healing
+`dna/archive/lamad-v1/` directory is a thin **v1 coordinator archive for healing
 migration** ("v2 queries v1 via bridge calls" — its lib.rs header), with
 per-id exports in its `healing_exports` module. The seam the snapshot
 specified became permanent infrastructure: schema evolution support also

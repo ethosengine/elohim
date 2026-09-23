@@ -568,9 +568,9 @@ _gate-seam-contracts:
     cd crates/seam-contracts && cargo build --target wasm32-unknown-unknown --no-default-features
 
 _gate-hc-dbtool:
-    cd crates/hc-dbtool && cargo test
-    cd crates/hc-dbtool && cargo clippy --all-targets -- -D warnings
-    cd crates/hc-dbtool && cargo fmt --check
+    cd elohim/holochain/tools/hc-dbtool && cargo test
+    cd elohim/holochain/tools/hc-dbtool && cargo clippy --all-targets -- -D warnings
+    cd elohim/holochain/tools/hc-dbtool && cargo fmt --check
 
 _gate-epr-storage:
     cd elohim/elohim-storage && cargo build && cargo test --test schema_contract && cargo test --test schema_contract_diesel_epr

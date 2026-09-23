@@ -39,7 +39,7 @@ ensure_and_push() {
             nerdctl -n k8s.io build \
             --build-arg IROH_RELAY_VERSION="${IROH_RELAY_VERSION}" \
             -t "${LOCAL}" \
-            -f iroh-relay/Dockerfile iroh-relay || return 1
+            -f doorway/iroh-relay/Dockerfile doorway/iroh-relay || return 1
     fi
 
     echo "Pushing iroh-relay provenance tag: ${IROH_RELAY_VERSION}-${GIT_COMMIT_HASH}"

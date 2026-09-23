@@ -19,6 +19,14 @@
           "elohim/holochain/dna/**/*.nix",
           "elohim/elohim-cache-core/**",
           "elohim/holochain/rna/**",
+          "elohim/sdk/domains/*/types/**",
+          "elohim/elohim-agent/gate-client-zome/**",
+          "elohim/elohim-agent/gate-types/**",
+          "elohim/Cargo.toml",
+          "crates/doorway-client/**",
+          "crates/seam-contracts/**",
+          "bridges/pkarr/Cargo.toml",
+          "bridges/pkarr/pkarr-bridge/**",
           "VERSION"
         ],
         "buildProcess": [
@@ -100,7 +108,18 @@
           "elohim/holochain/dna/*/zomes/**/src/*.rs",
           "elohim/holochain/dna/*/zomes/**/Cargo.toml",
           "elohim/holochain/tests/sweettest/src/**",
-          "elohim/holochain/tests/sweettest/Cargo.toml"
+          "elohim/holochain/tests/sweettest/Cargo.toml",
+          "elohim/holochain/dna/*/Cargo.toml",
+          "elohim/holochain/dna/*/Cargo.lock",
+          "elohim/holochain/rna/rust/**",
+          "elohim/sdk/domains/*/types/**",
+          "elohim/elohim-agent/gate-client-zome/**",
+          "elohim/elohim-agent/gate-types/**",
+          "elohim/Cargo.toml",
+          "crates/doorway-client/**",
+          "crates/seam-contracts/**",
+          "bridges/pkarr/Cargo.toml",
+          "bridges/pkarr/pkarr-bridge/**"
         ],
         "buildProcess": []
       },
@@ -122,7 +141,19 @@
           "elohim/holochain/dna/imagodei/zomes/imagodei/**",
           "elohim/holochain/dna/infrastructure/zomes/infrastructure/**",
           "elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/**",
-          "elohim/holochain/dna/mishpat/zomes/mishpat/**"
+          "elohim/holochain/dna/mishpat/zomes/mishpat/**",
+          "elohim/holochain/dna/*/zomes/*_integrity/**",
+          "elohim/holochain/dna/*/Cargo.toml",
+          "elohim/holochain/dna/*/Cargo.lock",
+          "elohim/holochain/rna/rust/**",
+          "elohim/sdk/domains/*/types/**",
+          "elohim/elohim-agent/gate-client-zome/**",
+          "elohim/elohim-agent/gate-types/**",
+          "elohim/Cargo.toml",
+          "crates/doorway-client/**",
+          "crates/seam-contracts/**",
+          "bridges/pkarr/Cargo.toml",
+          "bridges/pkarr/pkarr-bridge/**"
         ],
         "buildProcess": []
       },

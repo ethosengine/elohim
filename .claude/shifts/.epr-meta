@@ -1,0 +1,24 @@
+---
+epr-meta-version: 1
+id: claude-shifts-working-state
+covers: subtree
+purpose: >
+  Working state for agentic-developer shifts, one file set per shift id
+  (<ISO-timestamp-no-colons>-<objective-slug>): the Objective (<id>.objective.json), the iteration
+  journal (<id>.journal.md), a readiness report when the pre-shift check aborts, the sprint result
+  written at close, the selected-paths record, and shift-scoped measure scripts. The directory is
+  gitignored; it is working state, never canon.
+---
+# .claude/shifts — shift working state
+
+The `agentic-developer` skill writes every file here, keyed by shift id. The journal starts from
+`genesis/docs/shifts/JOURNAL-TEMPLATE.md` and becomes the sprint result
+(`genesis/docs/shifts/SPRINT-RESULT-TEMPLATE.md`) at close. The journal is never committed. A
+sprint result meant to outlive the workspace is committed under
+`genesis/docs/superpowers/sprints/`, and the shift's concluded plans are decomposed into living
+surfaces, not parked here.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. Every file is
+tool-written in a fixed shape, so there is no recurring drift for a rule to catch. The root
+`.gitignore` ignores this whole directory (`**/.claude/shifts/`), so a file meant to travel with
+the repository, such as `.gitkeep` or this manifest, is added with `git add -f`.

@@ -8,8 +8,8 @@
       "inputs": {
         "sources": [
           "elohim/elohim-compute/**",
-          "Cargo.toml",
-          "Cargo.lock"
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock"
         ],
         "buildProcess": []
       },

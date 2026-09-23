@@ -21,8 +21,8 @@ bind-time** (the bridge is the compile-time form of native extension), not
 Each bridge is a library crate. Runtimes (`doorway-service`, `elohim-storage`)
 consume the bridges they need:
 
-- `doorway-service` consumes bridges that absorb web2 traffic (`atproto`,
-  `activitypub`, future)
+- `doorway-service` consumes bridges that absorb web2 traffic (`did` today;
+  `atproto` and `activitypub` are planned, not yet built)
 - `elohim-storage` consumes bridges that speak protocol-shaped interop
   (`valueflows`)
 
@@ -34,7 +34,12 @@ by the kind of traffic it absorbs (web2 = doorway; protocol = storage).
 - `valueflows/` — hREA / VF-GraphQL interop (Wave 3)
 - `did/` — W3C DID resolution and `did:key`/Holochain key translation
 - `pkarr/` — deterministic signed doorway endpoint records; the
-  infrastructure DHT is truth and pkarr publication is a later projection
+  infrastructure DHT is truth and pkarr publication is a later projection.
+  It is compiled into the infrastructure DNA's integrity zome, so a change
+  here moves that DNA's hash.
+- `k8s/` — renders and pin-verifies runtime resource envelopes and reads
+  Prometheus capacity for the orchestrator; consumed through a CLI by CI,
+  not by a runtime
 
 ## Adding a new bridge
 

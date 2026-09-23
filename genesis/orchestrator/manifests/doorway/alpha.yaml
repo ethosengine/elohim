@@ -822,7 +822,7 @@ spec:
 #
 # ─ HARBOR MIRROR (CI-BUILT+PUSHED — operator action retired) ──────────────
 #   The image is built + pushed by the edge pipeline (elohim/holochain/
-#   Jenkinsfile, mirroring the relay-addr-beacon pattern): iroh-relay/Dockerfile
+#   Jenkinsfile, mirroring the relay-addr-beacon pattern): doorway/iroh-relay/Dockerfile
 #   + scripts/ci/build-iroh-relay.sh build the SHORT-named local image,
 #   scripts/ci/push-iroh-relay.sh tags + pushes
 #   harbor.ethosengine.com/ethosengine/iroh-relay:1.0.3-<commit-hash> always,

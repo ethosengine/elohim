@@ -359,7 +359,7 @@ built from crates.io with `--locked`, following the `relay-addr-beacon`
 precedent exactly (self-contained build context, `rust:1-slim-bookworm`
 builder, `debian:bookworm-slim` runtime, `RUSTFLAGS=""`, crates.io direct — not
 through Nexus, per the 2026-07-30 decision recorded in
-`relay-addr-beacon/Dockerfile`).
+`doorway/relay-addr-beacon/Dockerfile`).
 
 **Why not n0's published container.** Three reasons, in order of weight:
 

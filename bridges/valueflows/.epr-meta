@@ -1,0 +1,20 @@
+---
+epr-meta-version: 1
+id: bridges-valueflows-hrea
+covers: subtree
+purpose: >
+  The hREA / VF-GraphQL bridge, which translates ValueFlows into elohim's EPR-REA. elohim-storage
+  consumes it and mounts it at /api/v1/vf-graphql. Its workspace holds three crates:
+  valueflows-types (stable ledger types, free of the GraphQL stack), valueflows-bridge (the schema
+  and handler), and valueflows-tests (schema-level and HTTP-level integration tests).
+---
+# bridges/valueflows — hREA / VF-GraphQL bridge
+
+What belongs here: the three crates above. Wire field names follow the ValueFlows vocabulary
+(`provider`, `receiver`, never `providerId`). Each enum's stored value comes from its
+`as_ledger_str()` in `valueflows-types`, matching the migration's CHECK constraints, never from
+`Debug` formatting. `CLAUDE.md` records the current milestone's scope and the design spec it
+follows.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. The ledger-string
+contract is held by the integration tests, and no placement drift has recurred here.

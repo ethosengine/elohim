@@ -1,6 +1,7 @@
 ---
 epr-meta-version: 1
 id: native-reconciliation-governance
+covers: subtree
 purpose: >
   The native CLI admits local evidence and derives context over shared repository bytes.
   Acceptance-aware reconciliation serves agents choosing remaining work without promoting
@@ -35,3 +36,8 @@ matching labels. Revalidation and contested states preserve what another agent m
 
 This is a local proof of governance over bytes. Crossing the peer boundary requires independent
 receiver verification and earned authority; an appointment in this checkout cannot confer them.
+
+`covers: subtree` claims the whole `elohim-epr-cli` crate: the `epr` sources under `src/` (where
+`src/.epr-meta` adds the recall-seam rule) and the integration tests under `tests/`. Those tests
+exercise the `epr flow` verbs, and their `*_parity` gates hold the native readers to the recorded
+outputs of the Python tools they replace.

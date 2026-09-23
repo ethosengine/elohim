@@ -1,6 +1,7 @@
 ---
 epr-meta-version: 1
 id: elohim-holochain-governance
+covers: subtree
 purpose: >
   The DHT plane: the DNAs (lamad, imagodei, infrastructure, node-registry, mishpat), the edge
   deploy pipeline, and the sweettest harness. This manifest hosts the habit atom for notary
@@ -18,3 +19,9 @@ per-DNA Jenkinsfile as missing CI.
 
 The habit atom here is projected into `genesis/manifests/habits.yaml` by
 `.claude/scripts/habits-project.py`. Edit the atom, never the projection.
+
+`covers: subtree` claims the whole DHT plane: `dna/` (the DNA sources; `dna/.epr-meta` adds the
+hash-neutrality signal and `dna/imagodei/` hosts its own habit), `rna/` (the migration toolkit that
+carries data across DNA versions), `tools/` (`hc-dbtool`), `tests/` (`sweettest/` carries its own
+manifest; `manifest-hygiene/`), and `edgenode/`, `elohim-wasm/` and `docs/`. Where a deeper
+manifest exists its rules still cascade; this claim only ends the coverage walk here.

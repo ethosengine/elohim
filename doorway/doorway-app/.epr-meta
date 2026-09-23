@@ -1,0 +1,22 @@
+---
+epr-meta-version: 1
+id: doorway-app-operator-dashboard
+covers: subtree
+purpose: >
+  The Angular operator dashboard for doorway stewards, and the doorway sign-in portal served
+  under /threshold/*. It shows what a steward is stewarding (nodes, hosted humans, trust
+  relationships, federation peers, and the graduation pipeline from hosted account to full
+  agency) over the doorway service's /admin/* and /auth/* endpoints.
+---
+# doorway/doorway-app — operator dashboard
+
+What belongs here: dashboard views, the services that call the doorway's `/admin/*` and
+`/auth/*` routes, and their TypeScript models. A new admin endpoint is added in three places
+together (`CLAUDE.md`, "Adding Admin Endpoints"): the handler in
+`doorway-service/src/routes/admin.rs`, the method in `services/doorway-admin.service.ts`, and
+the types in `models/doorway.model.ts`. Admin routes are explicit handlers, never entries in the
+dynamic route registry.
+
+`covers: subtree` is a considered ownership claim with no edit-time rule. The app's gates are
+its lint, format and test scripts, and the doorway service's own manifest governs the routes
+this app calls.

@@ -6,7 +6,7 @@
  * should be imported into the network" — i.e., whose ContributorPresence,
  * relationships, stewardship, and authored content should land on a peer's
  * storage. Per the contract in
- * docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md,
+ * genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md,
  * presence is attribution-class and is independent of compute liveness.
  *
  * Note: the field name `deployedHumanIds` predates the presence/compute

@@ -14,9 +14,11 @@
 [submodule "che-devworkspaces"]
 	path = che-devworkspaces
 	url = https://github.com/ethosengine/che-devworkspaces.git
-# Conductor-leak fork references (2026-06-17). update=none → reference-only, NOT
-# auto-cloned by CI/checkout (the Dockerfile.zombie-fix builder git-clones them
-# independently). Re-init only to reopen the tx5/conductor investigation.
+# Conductor-line forks. update=none → NOT auto-cloned by CI/checkout.
+# holochain-conductor is the PINNED fork the fleet's conductor image is built
+# from: its committed gitlink SHA is the image tag (elohim/conductor-image/README.md).
+# tx5 and kitsune2 are reference-only, from the 2026-06 zombie-PeerConnection
+# investigation; Holochain 0.7 has no tx5 and resolves kitsune2 from crates.io.
 [submodule "elohim/tx5"]
 	path = elohim/tx5
 	url = https://github.com/ethosengine/tx5.git

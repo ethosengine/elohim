@@ -194,7 +194,8 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   │   ├── scripts/  fixtures/    # App packaging scripts; conformance test vectors
 │   │   └── src/                   # Legacy Holochain zome-call SDK (@elohim/holochain-sdk)
 │   ├── holochain/                 # Holochain layer
-│   │   ├── dna/                   # Five DNAs: lamad, imagodei, mishpat, infrastructure, node-registry
+│   │   ├── dna/                   # Five DNAs: lamad, imagodei, mishpat, infrastructure, node-registry (archive/ holds v1)
+│   │   ├── tools/hc-dbtool/       # Operator tool: see and lift a blocked cell in a conductor's databases
 │   │   ├── edgenode/              # Container packaging for one edge node (conductor + storage)
 │   │   ├── elohim-wasm/           # Browser-side WASM blob verification
 │   │   ├── rna/                   # DNA-to-DNA data migration toolkit
@@ -219,7 +220,7 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── pkarr/                     # Signed endpoint records for doorways (pkarr)
 │   └── valueflows/                # ValueFlows / hREA (VF-GraphQL)
 │
-├── crates/                        # Shared Rust crates: doorway-client, elohim-sdk, elohim-storage-client, hc-dbtool, seam-contracts
+├── crates/                        # Published Rust SDK crates: doorway-client, elohim-sdk, elohim-storage-client, seam-contracts
 │
 ├── sophia/                        # Assessment engine, forked from Khan Academy's Perseus (git submodule, 18 packages)
 │   └── packages/                  # sophia-element/-core/-editor/-linter/-score, perseus-core/-score,
@@ -232,12 +233,13 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 ├── doorway/                       # Web2 doorway (bootstrap, signal, conductor gateway, projection cache)
 │   ├── doorway-service/           # Rust service
 │   ├── doorway-app/               # Angular dashboard for doorway operators
-│   └── research/                  # Prior-art notes (ActivityPub federation, planned)
+│   ├── iroh-relay/                # Container packaging for the stock iroh relay (the doorway's relay plane)
+│   └── relay-addr-beacon/         # Keeps a home relay's changing WAN address published in DNS and pkarr
 │
 ├── genesis/                       # Content, operations and CI
 │   ├── orchestrator/              # CI controller: webhook → changeset → downstream pipelines
-│   │   └── manifests/             # Kubernetes deployments per service and environment (alpha, staging, prod)
-│   ├── manifests/                 # cluster-state.yaml, the generated habits.yaml register, runbooks
+│   │   └── manifests/             # Kubernetes deployments per service and environment; ci-infra/ holds operator-applied CI infra and its runbooks
+│   ├── manifests/                 # cluster-state.yaml and the generated habits.yaml register
 │   ├── a2o/                       # Alpha-to-omega end-to-end tests (BDD scenarios, page-render tools)
 │   ├── docs/                      # Protocol writing in content/ (manifesto, specification, epics); design specs and plans (superpowers/)
 │   ├── data/                      # Seed inputs, fixtures, timeline backlog
@@ -247,16 +249,10 @@ Organized by system boundary: core runtime, frontend apps, interop bridges, depl
 │   ├── plans/                     # Archive of earlier plans (live plans: genesis/docs/superpowers/plans/)
 │   └── landing/  research/  blobs/  assets/  scripts/   # Landing page, research surveys, seed blob cache, images, ops scripts
 │
-├── docs/                          # Earlier design plans and specs for brit and rakia
 ├── che-devworkspaces/             # Eclipse Che, Jenkins and dev container images (git submodule)
-├── iroh-relay/                    # Container packaging for the stock iroh relay
-├── relay-addr-beacon/             # Keeps a home relay's changing WAN address published
-├── storage-iroh/                  # Docker overlay for the iroh-transport storage image
-├── vendor/                        # Two patched crates.io crates
+├── vendor/                        # One patched crates.io crate (iroh-quinn-proto), retired with the iroh 1.x move
 ├── scripts/                       # Repo-wide tooling (CI job bodies, local dev, Sophia releases)
-├── tools/                         # Misc tooling (web-component manifest freshness check)
-├── patches/                       # pnpm patch for @angular/build
-└── rakia/                         # Design notes for rakia (the crates are in elohim/rakia/)
+└── patches/                       # pnpm patch for @angular/build
 ```
 
 ## Progressive Stewardship
@@ -344,7 +340,7 @@ All GitHub webhooks go to one orchestrator job, which picks the pipelines a push
 - The root `Jenkinsfile` is the Angular app pipeline only. Every other pipeline is declared by a per-project `build-manifest.json`.
 - The Angular dev server allow-lists the Che workspace domain and proxies API paths to the doorway on :8888.
 - pnpm workspaces run from the repo root, except `sophia` (see [Prerequisites](#prerequisites)).
-- Kubernetes manifests live in `genesis/orchestrator/manifests/`, per service and environment. `genesis/manifests/` holds `cluster-state.yaml`, the generated `habits.yaml` and runbooks.
+- Kubernetes manifests live in `genesis/orchestrator/manifests/`, per service and environment. `genesis/manifests/` holds `cluster-state.yaml` and the generated `habits.yaml`; the operator-applied CI infrastructure and its runbooks sit in `genesis/orchestrator/manifests/ci-infra/`.
 
 ## Further Reading
 

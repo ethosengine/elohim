@@ -7,8 +7,11 @@ purpose: >
   CI-ignore set, projected into the flat .ci-ignore), and author-time rules including the repo-wide
   binding of the source-file-LoC-ceiling policy (measure class — never blocks) and the
   governance-escalation-ladder (the agency charter — definitions live in the policy registry,
-  .claude/epr-meta/policies.yaml), the brand-vocabulary boundary lint, a context-blind README review
-  obligation, and three developer-valueflow authoring signals. It anchors the cascade and hosts the
+  .claude/epr-meta/policies.yaml; bound for both manifest forms), the brand-vocabulary boundary
+  lint, a context-blind README review obligation, three developer-valueflow authoring signals, and
+  two placement routes for the prose classes that kept being born at the repo root (handoffs,
+  vulnerability-cluster sheets). The body records the top-level allow-list, which the gate cannot
+  express. It anchors the cascade and hosts the
   ignores and basename-wide rules that cannot decentralize, plus the subtree/orchestrator exact-path
   entries kept inline for the first cut.
 policy-recipe: .claude/epr-meta
@@ -37,6 +40,9 @@ rules:
     policy: source-file-loc-ceiling@1
   - id: governance-escalation-ladder
     policy: governance-escalation-ladder@1
+  - id: governance-escalation-ladder-dir-form
+    policy: governance-escalation-ladder@1
+    when: { write: "manifest.md" }
   - id: brand-vocabulary-boundary
     policy: brand-vocabulary-boundary@1
   - id: habit-declaration-at-birth
@@ -99,6 +105,49 @@ rules:
     retire-when: >
       when progress projections are rendered entirely from ruling notes and cannot be authored as a
       competing decision record
+  - id: handoff-routes-to-sprints
+    class: dispatch
+    when: { write: "handoff*.md", new: true }
+    route-to: { dest: genesis/docs/superpowers/sprints/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Classify the proposed new handoff document. Report exactly one of ROUTE (the sprint result
+        under genesis/docs/superpowers/sprints/ that should carry it), MERGE (the existing sprint
+        result, backlog entry or memory file that already holds its content) or DROP (session
+        narration that git history already keeps), with the shortest supporting reason. Do not
+        create, move or rewrite files; report to the editing agent and let development continue.
+    why: >
+      Handoff documents are not an artifact class here: the handoff pattern was retired in
+      df250665f (2026-06-11) and the decompose discipline replaced it on 2026-06-23
+      (.claude/handoffs/archive/README.md). A concluded session's durable carrier is its sprint
+      result in genesis/docs/superpowers/sprints/. Decompose the rest: open work to
+      genesis/data/timeline/backlog/, a lesson to a memory file or to
+      genesis/docs/content/elohim-protocol/history/, and the narration to git history.
+    retire-when: >
+      when no handoff*.md has been born outside genesis/docs/superpowers/sprints/ for two
+      consecutive quarters, so the convention holds without a prompt
+  - id: vulnerability-cluster-routes-to-backlog
+    class: dispatch
+    when: { write: "vulnerability_cluster*.md", new: true }
+    route-to: { dest: genesis/data/timeline/backlog/ }
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        Check whether this security concern is already tracked by a security-*.md entry in
+        genesis/data/timeline/backlog/ (its CLUSTERS.md groups them). Report exactly one of ROUTE
+        (the security-<slug>.md name it should be born under), MERGE (the existing entry to
+        extend) or DROP, with the shortest supporting reason. Do not create, move or rewrite
+        files; report to the editing agent and let development continue.
+    why: >
+      A vulnerability cluster is a security concern, and security concerns live as
+      security-<slug>.md entries in genesis/data/timeline/backlog/, where the deprecation-stasis
+      loop reconciles them against .claude/data/deprecations.jsonl and drains them. Thirteen
+      VULNERABILITY_CLUSTER_*.md sheets born at the repo root on 2026-07-30 had to be swept out
+      by hand. Name the entry security-<slug>.md and write it in the backlog.
+    retire-when: >
+      when security concerns reach the backlog only through the deprecation sentinel's own
+      writer, so no hand-authored cluster sheet has a reason to exist
   - id: readme-blind-reader-review
     class: inject
     when: { write: "README*.md" }
@@ -131,7 +180,7 @@ ci-trigger:
 # repo root — constitutional base
 
 Carries the cross-cutting `ci-trigger:` ignore set (projected into `.ci-ignore` by
-`.claude/scripts/ci-ignore-projector.py`) and one author-time rule. **`.ci-ignore` is GENERATED from
+`.claude/scripts/ci-ignore-projector.py`) and the author-time rules listed above. **`.ci-ignore` is GENERATED from
 this leg — never hand-edit it.**
 
 ## rs-loc-ceiling — repo-wide source-file LoC ceiling (measure class)
@@ -155,6 +204,14 @@ itself; it cannot reach out to `.epr-meta` files elsewhere in the tree. A repo-w
 the repo-root anchor — the minimal-diff fallback the design explicitly allows when a
 `.claude`-located manifest can't scope repo-wide. See the policy row for the full why.
 
+The policy's own scope is `write: ".epr-meta"`, which matches only the flat manifest file. The
+directory form, `<dir>/.epr-meta/manifest.md`, has a different basename, so the charter never saw
+it. `governance-escalation-ladder-dir-form` binds the same `@1` policy a second time with a
+`when: { write: "manifest.md" }` override. That closes the gap without a new registry row. The
+validator checks the path first (`is_manifest_path`), so a `manifest.md` that is not an `.epr-meta`
+manifest draws nothing. A subtree under another `root: true` manifest inherits neither binding;
+such a subtree must bind the ladder in its own manifest.
+
 ## brand-vocabulary-boundary — accessible code vocabulary (inject class)
 
 Binds `brand-vocabulary-boundary@1` repo-wide. Architecture and product prose retain the domain
@@ -171,6 +228,34 @@ The three authoring signals keep orchestration artifacts joined to the valueflow
 brief claims a commitment, a discharging task report fulfils it, and a progress-file ruling is first
 recorded as a ruling note. The files remain useful projections for people, but none is the durable
 record of the act it describes.
+
+## Placement at the repo root (dispatch class, plus an allow-list the gate cannot express)
+
+Two prose classes kept being born at the top level and swept out by hand: session handoffs
+(`HANDOFF-*.md`) and vulnerability-cluster sheets (`VULNERABILITY_CLUSTER_*.md`). Each has a named
+route at birth. `handoff-routes-to-sprints` sends a handoff to `genesis/docs/superpowers/sprints/`,
+and `.claude/handoffs/.epr-meta` widens that same rule id to every markdown birth there.
+`vulnerability-cluster-routes-to-backlog` sends a cluster sheet to a `security-*.md` backlog entry.
+Both dispatch a report-only librarian review and never block.
+
+**Top-level allow-list — authoritative, not gate-enforced in v1.** The repository root holds only:
+
+- directories: `app/`, `bridges/`, `che-devworkspaces/`, `crates/`, `doorway/`, `elohim/`,
+  `genesis/`, `patches/`, `scripts/`, `sophia/`, `steward/`, `vendor/`, plus `docs/`, which is a
+  tombstone holding only its own routing manifest;
+- workspace-root files: `package.json`, `pnpm-workspace.yaml`, `pnpm-lock.yaml`, `justfile`,
+  `deny.toml`, `VERSION`, `devfile.yaml`, `Jenkinsfile`, `sophia.Jenkinsfile`, `README.md`,
+  `CLAUDE.md`, `AGENTS.md`, `.gitmodules`, `.gitignore`, `.ci-ignore`, `.npmrc`;
+- tool dotfiles and dot-directories (`.claude/`, `.codex/`, `.agents/`, `.epr-meta/`, `.eprfs/`,
+  `.github/`, `.husky/`, `.cargo/`, `.vscode/`, `.mcp.json`).
+
+`storage-iroh/`, `iroh-relay/`, `relay-addr-beacon/`, `docs/`, `rakia/` and `tools/` were relocated
+or retired on 2026-09-23. Anything else belongs inside one of the homes above. The gate cannot
+enforce this list. `when.write` matches the basename only, so it cannot tell a depth-1 file from
+any other. A root rule also cascades to every descendant, and `no-new-subdirs` and `require-sibling`
+fire at any depth, so either one here would toll every new module directory in the tree. Review
+holds the list. A tool that writes machine-local state at the root (a dependency store, a build
+pool, a crash log) needs a `.gitignore` line, not a rule: the resolver sees only Write and Edit.
 
 ## readme-blind-reader-review — newcomer legibility (inject class)
 

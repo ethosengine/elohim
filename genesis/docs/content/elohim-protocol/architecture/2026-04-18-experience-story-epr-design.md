@@ -8,7 +8,7 @@ authors: Matthew Dowell + Opus 4.7
 pillar coupling: lamad (app-schema vocabulary) on top of protocol primitives (ContentNode, Link)
 informed-by:
   - existing `ContentNode` entry type in lamad DNA; existing `human` / `collective` / `role` / `feature` contentTypes; existing `epr-composite` core protocol contentFormat
-  - rakia/docs/plans/build-attestation-integration.md (sibling pattern for build attestations)
+  - elohim/rakia/docs/plans/build-attestation-integration.md (sibling pattern for build attestations)
   - elohim/brit/docs/plans/2026-04-16-phase-2a-build-attestation-primitives.md (brit Phase 2a)
 informs:
   - All future sprint specs that touch experience-story EPR / story-point / experience-moment primitives
@@ -27,7 +27,7 @@ defers:
 **Authors:** Matthew Dowell + Opus 4.7
 **Pillar coupling:** lamad (app-schema vocabulary) on top of protocol primitives (ContentNode, Link)
 **Depends on:** existing `ContentNode` entry type in lamad DNA; existing `human` / `collective` / `role` / `feature` contentTypes; existing `epr-composite` core protocol contentFormat
-**Related:** `rakia/docs/plans/build-attestation-integration.md` (sibling pattern for build attestations); brit Phase 2a (`elohim/brit/docs/plans/2026-04-16-phase-2a-build-attestation-primitives.md`)
+**Related:** `elohim/rakia/docs/plans/build-attestation-integration.md` (sibling pattern for build attestations); brit Phase 2a (`elohim/brit/docs/plans/2026-04-16-phase-2a-build-attestation-primitives.md`)
 **Defers:** sub-project A (matthew peer persistence), C (doorway export/re-upload route), D (shefa valueflow from inter-pipeline diffs) — each gets its own spec depending on this one
 
 ---
@@ -497,7 +497,7 @@ This linkage is **explicitly out of scope for this spec**. It is a meta-concern 
 - `genesis/a2o/CLAUDE.md` — a2o test harness conventions
 - `genesis/a2o/src/framework/devices/playwright-device.ts:184–217` — current capture surface
 - `genesis/a2o/steps/common.steps.ts:139–222` — observation session lifecycle
-- `rakia/docs/plans/build-attestation-integration.md` — sibling pattern for build-state attestations
+- `elohim/rakia/docs/plans/build-attestation-integration.md` — sibling pattern for build-state attestations
 - `elohim/sdk/domains/lamad/manifest.json` — where the new contentType is declared
 - `elohim/sdk/schemas/v1/views/CONVENTIONS.md` — view-schema rules the projection must follow
 - `.claude/skills/p2p-design-gate/SKILL.md` — the gate this spec was filtered through

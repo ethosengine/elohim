@@ -16,7 +16,7 @@
 #     with auth, so it can't be measured)
 #
 # Note: the DNA pipeline is `elohim-holochain` (one job that packs all DNAs:
-# elohim, hrea, imagodei, infrastructure, lamad-v1, mishpat, node-registry);
+# elohim, hrea, imagodei, infrastructure, mishpat, node-registry);
 # there is NO separate `elohim-dna-lamad` or `elohim-dna-mishpat` parent job.
 # The app pipeline is `elohim` (NOT `elohim-app`).
 #

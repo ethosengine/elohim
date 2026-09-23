@@ -30,18 +30,21 @@ rules:
       dispatch per edit.
   - id: new-feature-subdir-needs-meta
     class: dispatch
-    when: { write: ".epr-meta", new: true }
+    when: { write: "*.feature", new: true }
     require-sibling: ".epr-meta"
     parameters:
       dispatch-agent: librarian
       dispatch-prompt: >
-        Review the new a2o subtree boundary and say whether it needs its own .epr-meta or inherits
-        an adequate nearest ancestor. Cite one existing sibling as precedent. Report only; do not
-        author governance or interrupt the current development pass.
+        Review the new a2o feature subtree boundary and say whether it needs its own .epr-meta or
+        inherits an adequate nearest ancestor. Cite one existing sibling as precedent. Report only;
+        do not author governance or interrupt the current development pass.
     why: >
-      A new subdirectory under genesis/a2o/ must be born with its own .epr-meta —
-      place one alongside the first file so governance is never silently dropped by
-      descending one directory. See genesis/a2o/features/dataplane/resiliency-saga/.epr-meta as an example.
+      A new feature directory under genesis/a2o/ must be born with its own .epr-meta. Write the
+      manifest first, declaring what the stories in it serve, so governance is never silently
+      dropped by descending one directory. See
+      genesis/a2o/features/dataplane/resiliency-saga/.epr-meta as an example. The rule fires only
+      when a .feature file is the first file written into a new directory. New step, script and
+      run-report directories are legitimate without a manifest of their own.
   - id: run-results-reach-the-run-witness
     class: inject
     when:
@@ -100,4 +103,17 @@ findings feed a revise-and-reread loop.
 ## Governance note
 
 This manifest records considered ownership (`covers: subtree`). The blind-reader rule protects story
-interpretability; `new-feature-subdir-needs-meta` prevents orphan subtrees.
+interpretability; `new-feature-subdir-needs-meta` prevents orphan feature subtrees.
+
+`require-sibling` fires when a write creates a new directory, at any depth, and the file is not the
+named sibling. So `when:` must not name `.epr-meta` itself; it names the feature file. Scoping it to
+`*.feature` keeps the guardrail on story directories. Without that scope it would also dispatch on
+every new `steps/` directory and every new run directory under the gitignored `reports/`, and
+neither needs a manifest.
+
+Run output belongs in `reports/`, not at the root of this subsystem. That includes agent-written
+`task-*-report.md` files, which the valueflow observer mints as fulfilments when they are written.
+A dated narrative report or handoff born at the root is prose for
+`genesis/docs/superpowers/sprints/`. That convention is authoritative but not gate-enforced here:
+`when.write` sees only the basename, so a `*-report.md` rule cannot tell the root from `reports/`.
+It would misroute legitimate run reports far more often than it caught a stray.

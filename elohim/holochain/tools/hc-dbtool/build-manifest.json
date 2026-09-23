@@ -1,0 +1,45 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "hc-dbtool",
+  "description": "Operator seat: see and lift a blocked cell in a Holochain 0.7 conductor's databases (gate-only; no pipeline)",
+  "steps": {
+    "gate-hc-dbtool": {
+      "description": "cargo test, clippy -D warnings, fmt --check",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/tools/hc-dbtool/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Gate hc-dbtool",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "hc-dbtool": {
+        "dir": "elohim/holochain/tools/hc-dbtool",
+        "steps": [
+          "gate-hc-dbtool"
+        ],
+        "run": {
+          "kind": "root-just",
+          "recipe": "_gate-hc-dbtool",
+          "cargo": {
+            "workspace": "elohim/holochain/tools/hc-dbtool",
+            "profile": "dev",
+            "rustflags": ""
+          }
+        }
+      }
+    }
+  },
+  "deployment": {}
+}

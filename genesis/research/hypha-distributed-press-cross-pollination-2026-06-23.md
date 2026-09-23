@@ -67,7 +67,7 @@ And the keystone: **[FEP-1042 "Peer to Peer Fediverse Identities"](https://codeb
 Matching the pattern the [dds-wg survey](dds-wg-cross-pollination-2026-05-01.md) set, this engagement landed:
 
 - **Manifest clones** (in [`research-manifest.json`](research-manifest.json), clonable via `research.sh`): `social-distributed-press` (pillar: doorway), `hypercore` (pillar: elohim), `hyperdht` (pillar: elohim).
-- **Module-boundary pointer notes**: [`doorway/research/activitypub-federation-prior-art.md`](../../doorway/research/activitypub-federation-prior-art.md) (federation leg) and [`steward/node/research/hypercore-holepunch-prior-art.md`](../../steward/node/research/hypercore-holepunch-prior-art.md) (data-plane).
+- **Module-boundary pointer notes**: [`doorway/research/activitypub-federation-prior-art.md`](activitypub-federation-prior-art.md) (federation leg) and [`steward/node/research/hypercore-holepunch-prior-art.md`](../../steward/node/research/hypercore-holepunch-prior-art.md) (data-plane).
 - **README enrichment**: the **Edge Problem** (doorway), **Networking Problem** (steward), and **Content Addressing Problem** sections now carry this prior art.
 
 Still open:

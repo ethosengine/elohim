@@ -1,0 +1,43 @@
+---
+epr-meta-version: 1
+id: genesis-docs-sibling-homes
+purpose: >
+  The genesis docs root, the protocol's interpretability layer. Every doc has one home, chosen by
+  its kind and status (PLACEMENT.md): canonical architecture and history under
+  content/elohim-protocol/, and in-flight specs, plans and sprint results under superpowers/. The
+  recurring drift here is a new sibling home born beside those, often parallel to one that
+  already exists.
+rules:
+  - id: new-sibling-home-declares-itself
+    class: dispatch
+    when: { new: true }
+    require-sibling: ".epr-meta"
+    parameters:
+      dispatch-agent: librarian
+      dispatch-prompt: >
+        A write is creating a new directory under genesis/docs/. Check whether an existing home
+        already holds this kind of document (genesis/docs/PLACEMENT.md). Canonical architecture
+        lives in content/elohim-protocol/architecture/, research in genesis/research/, and sprint
+        results and shift journals in superpowers/sprints/. Report ROUTE (name the existing home) or
+        KEEP (a genuinely new kind of home, which needs its own .epr-meta declaring its purpose),
+        with the shortest supporting reason. Do not create, move, or rewrite files; report to the
+        editing agent and let development continue.
+    why: >
+      New directories keep appearing under genesis/docs/ beside the governed homes, several of
+      them parallel to an existing one: architecture/ beside content/elohim-protocol/architecture/,
+      research/ beside genesis/research/, integration/ beside integrations/, and shifts/ beside
+      superpowers/sprints/. Put the document in the existing home for its kind (PLACEMENT.md). If
+      it really is a new kind of home, write its .epr-meta first, stating what belongs there, so
+      the directory is born governed.
+---
+# genesis/docs — the placement root
+
+`PLACEMENT.md` is the contract: one home per doc, chosen by kind and status. The two governed
+design surfaces carry `root: true` (`superpowers/` and `content/elohim-protocol/`), so this
+manifest never reaches them. Everything else under `genesis/docs/` inherits the one rule here.
+
+The rule is a structural guardrail, not a teaching rule. It fires whenever a write creates a new
+directory without that directory's own `.epr-meta`, at any depth under this root, and asks a
+background librarian whether an existing home already fits. Writes into existing directories are
+untouched. The legacy `plans/` and `specs/` manifests below still route their own births to
+`superpowers/`.

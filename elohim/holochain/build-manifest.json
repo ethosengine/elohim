@@ -28,8 +28,16 @@
           "elohim/elohim-agent/**",
           "elohim/elohim-peer-fabric/**",
           "elohim/Cargo.lock",
-          "relay-addr-beacon/**",
-          "iroh-relay/**"
+          "elohim/Cargo.toml",
+          "elohim/constitution/**",
+          "elohim/elohim-chrome-asset/**",
+          "elohim/sdk/domains/imagodei/types/**",
+          "elohim/sdk/domains/infrastructure/types/**",
+          "bridges/did/Cargo.toml",
+          "bridges/did/did-bridge/**",
+          "bridges/did/did-types/**",
+          "doorway/relay-addr-beacon/**",
+          "doorway/iroh-relay/**"
         ],
         "buildProcess": [
           "elohim/holochain/Jenkinsfile"
@@ -57,8 +65,6 @@
           "elohim/elohim-storage/Cargo.toml",
           "elohim/elohim-storage/Cargo.lock",
           "elohim/elohim-storage/Dockerfile",
-          "storage-iroh/**",
-          "scripts/ci/push-storage-iroh.sh",
           "vendor/**",
           "elohim/sdk/**",
           "elohim/epr/**",
@@ -73,6 +79,7 @@
           "crates/**",
           "bridges/**",
           "elohim/Cargo.lock",
+          "elohim/Cargo.toml",
           "elohim/elohim-storage/config/**",
           "elohim/ark/core/**",
           "elohim/elohim-cache-core/**",
@@ -217,7 +224,11 @@
         "run": {
           "kind": "root-just",
           "recipe": "_gate-elohim-sdk",
-          "cargo": { "workspace": "crates/elohim-sdk", "profile": "dev", "rustflags": "" }
+          "cargo": {
+            "workspace": "crates/elohim-sdk",
+            "profile": "dev",
+            "rustflags": ""
+          }
         }
       },
       "doorway": {
@@ -228,7 +239,11 @@
         "run": {
           "kind": "just",
           "recipe": "gate",
-          "cargo": { "workspace": "doorway/doorway-service", "profile": "dev", "rustflags": "" }
+          "cargo": {
+            "workspace": "doorway/doorway-service",
+            "profile": "dev",
+            "rustflags": ""
+          }
         }
       },
       "elohim-error": {
@@ -253,7 +268,8 @@
         "dir": "elohim/elohim-settings",
         "inputs": {
           "sources": [
-            "elohim/elohim-settings/**"
+            "elohim/elohim-settings/**",
+            "elohim/elohim-cache-core/**"
           ],
           "buildProcess": []
         },
@@ -295,7 +311,34 @@
             "elohim/sdk/schemas/v1/views/epr-*.schema.json",
             "elohim/sdk/schemas/v1/inputs/epr-*.schema.json",
             "elohim/sdk/storage-client-ts/tests/epr*",
-            "elohim/sdk/storage-client-ts/src/generated/Epr*"
+            "elohim/sdk/storage-client-ts/src/generated/Epr*",
+            "elohim/Cargo.toml",
+            "elohim/epr/**",
+            "elohim/epr-rea/**",
+            "elohim/ark/core/**",
+            "elohim/constitution/**",
+            "elohim/elohim-cache-core/**",
+            "elohim/elohim-chrome-asset/**",
+            "elohim/elohim-compute/**",
+            "elohim/elohim-error/**",
+            "elohim/elohim-facings/**",
+            "elohim/elohim-peer-fabric/**",
+            "elohim/elohim-render/**",
+            "elohim/elohim-settings/**",
+            "elohim/elohim-views/**",
+            "elohim/sdk/domains/lamad/types/**",
+            "elohim/sdk/domains/shefa/types/**",
+            "crates/doorway-client/**",
+            "crates/elohim-sdk/**",
+            "crates/elohim-storage-client/**",
+            "crates/seam-contracts/**",
+            "bridges/did/Cargo.toml",
+            "bridges/did/did-bridge/**",
+            "bridges/did/did-types/**",
+            "bridges/valueflows/Cargo.toml",
+            "bridges/valueflows/valueflows-bridge/**",
+            "bridges/valueflows/valueflows-types/**",
+            "vendor/iroh-quinn-proto-0.13.0/**"
           ],
           "buildProcess": []
         },

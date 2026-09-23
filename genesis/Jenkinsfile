@@ -1682,7 +1682,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         //
                         // Suspended humans (e.g. adam/pete/frank during shem outage) appear
                         // as authored sources in imported packages — never as POST targets.
-                        // Contract: docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md.
+                        // Contract: genesis/docs/content/elohim-protocol/architecture/2026-05-04-compute-commitment-substrate-floor-design.md.
                         //
                         // Override via env.SEEDER_TARGET_PEERS to force a specific target list
                         // (e.g. for staged rollouts or a single-peer dev seed).

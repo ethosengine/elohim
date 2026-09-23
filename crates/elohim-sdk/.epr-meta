@@ -1,0 +1,21 @@
+---
+epr-meta-version: 1
+id: elohim-sdk-client-crate
+covers: subtree
+purpose: >
+  elohim-sdk, the client half of the storage boundary for Rust programs. It builds requests to
+  one elohim-storage peer over HTTP, batches writes, and returns typed results. It is not a
+  server, not a peer and not a local database, and it does no gossip, replication or peer
+  discovery. It publishes to the elohim registry alongside elohim-views, which it re-exports.
+---
+# crates/elohim-sdk — Rust client SDK
+
+What belongs here: the client (`src/client`), its cache, reach and sync helpers, the traits a
+consumer implements, and the tests that pin its documented behaviour. The README's "Rough
+edges" section is part of the contract: a change that alters one of those edges updates the
+README in the same pass.
+
+Two structural facts keep the crate honest without an edit-time rule. Every path dependency also
+carries a `version`, so the crate stays publishable. The wire types come from `elohim-views`
+rather than from `elohim-storage` (the `deny.toml` boundary), so a consumer never pulls in the
+storage implementation.
