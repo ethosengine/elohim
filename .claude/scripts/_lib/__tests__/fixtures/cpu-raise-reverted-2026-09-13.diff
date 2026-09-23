@@ -26,7 +26,7 @@ diff --git a/genesis/orchestrator/data/deployments.json b/genesis/orchestrator/d
 diff --git a/genesis/orchestrator/manifests/humans/adam-firstman.yaml b/genesis/orchestrator/manifests/humans/adam-firstman.yaml
 --- a/genesis/orchestrator/manifests/humans/adam-firstman.yaml
 +++ b/genesis/orchestrator/manifests/humans/adam-firstman.yaml
-@@ -320,6 +320,7 @@
+@@ -321,6 +321,7 @@
            #   memory limit   8192Mi = 5120Mi (conductor 5/8) + 3072Mi (here)
            #   cpu request     1500m =   750m (conductor 1/2) +   750m (here)
            #   cpu limit       8000m =  4000m (conductor 1/2) +  4000m (here)
@@ -34,7 +34,7 @@ diff --git a/genesis/orchestrator/manifests/humans/adam-firstman.yaml b/genesis/
            # validate-deployments.ts check (3) asserts that SUM against the
            # deployments.json record, so the two files can neither drift apart
            # nor quietly inflate adam's real footprint.
-@@ -339,7 +340,7 @@
+@@ -340,7 +341,7 @@
                cpu: "750m"
              limits:
                memory: "3072Mi"
