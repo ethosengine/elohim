@@ -26,3 +26,4 @@ mod rs_blob_erasure_coded_put;
 mod seed_e2e_dual_address;
 #[cfg(feature = "p2p")]
 mod shard_frame_budget;
+mod shard_registration_off_path;

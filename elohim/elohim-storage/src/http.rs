@@ -450,6 +450,12 @@ pub struct HttpServer {
     policy_enforcement: Option<Arc<PolicyEnforcement>>,
     /// Node Registry API for tracking shards
     node_registry_api: Option<Arc<crate::node_registry_api::NodeRegistryApi>>,
+    /// Bounded off-request-path queue for advisory Node Registry shard
+    /// registration (`crate::shard_registration`). Spawned alongside
+    /// `node_registry_api` in `with_node_registry_api` — see that builder's
+    /// doc comment. `None` means registrations are simply not attempted,
+    /// exactly as `node_registry_api: None` already meant.
+    shard_registration_queue: Option<Arc<crate::shard_registration::ShardRegistrationQueue>>,
     /// P2P handle for status endpoint (Send+Sync safe)
     #[cfg(feature = "p2p")]
     p2p_handle: Option<crate::p2p::P2PHandle>,
@@ -1162,6 +1168,7 @@ impl HttpServer {
             services: None,
             policy_enforcement: None,
             node_registry_api: None,
+            shard_registration_queue: None,
             #[cfg(feature = "p2p")]
             p2p_handle: None,
             extraction_cache: None,
@@ -1488,12 +1495,35 @@ impl HttpServer {
         self
     }
 
-    /// Set the Node Registry API
+    /// Set the Node Registry API, and spawn its off-request-path shard
+    /// registration worker (`crate::shard_registration`) alongside it. The
+    /// two are wired together deliberately: there is no route that sets
+    /// `node_registry_api` without also getting a place for `put_blob_bytes`
+    /// to hand registrations off to — see that module's doc comment for the
+    /// incident this prevents.
     pub fn with_node_registry_api(
         mut self,
         api: Arc<crate::node_registry_api::NodeRegistryApi>,
     ) -> Self {
+        let registrar: Arc<dyn crate::shard_registration::ShardRegistrar> = api.clone();
+        self.shard_registration_queue = Some(
+            crate::shard_registration::ShardRegistrationQueue::spawn(registrar),
+        );
         self.node_registry_api = Some(api);
+        self
+    }
+
+    /// Test/injection seam: install a pre-built queue directly, bypassing
+    /// `NodeRegistryApi`/`HcClientRegistry` entirely. Lets integration tests
+    /// wire a fake [`crate::shard_registration::ShardRegistrar`] (a hanging,
+    /// failing, or instantly-succeeding registrar) without a live conductor.
+    /// Not `#[cfg(test)]` for the same reason `test_put_blob` isn't — `tests/`
+    /// binaries compile the library without the crate's own `cfg(test)`.
+    pub fn with_shard_registration_queue(
+        mut self,
+        queue: Arc<crate::shard_registration::ShardRegistrationQueue>,
+    ) -> Self {
+        self.shard_registration_queue = Some(queue);
         self
     }
 
@@ -3409,12 +3439,17 @@ impl HttpServer {
                 .unwrap());
         }
 
-        // Store each shard
+        // Store each shard locally, then hand its (advisory) Node Registry
+        // registration off to the bounded background queue instead of
+        // awaiting the conductor call here. This response used to be held
+        // hostage on one `create_shard_assignment` zome call PER SHARD before
+        // it could answer — under conductor CPU saturation that blew the
+        // doorway's client timeout on every app-bundle PUT (alpha,
+        // 2026-09-23). See `crate::shard_registration`'s module doc.
         for (i, shard_data) in shards.iter().enumerate() {
             self.blob_store.store(shard_data).await?;
 
-            // Register with Node Registry if available
-            if let Some(ref nr_api) = self.node_registry_api {
+            if let Some(ref queue) = self.shard_registration_queue {
                 let assignment = crate::node_registry_api::ShardAssignment {
                     assignment_hash: None,
                     content_hash: expected_hex.to_string(), // The full content hash
@@ -3428,19 +3463,7 @@ impl HttpServer {
                     created_at: chrono::Utc::now().to_rfc3339(),
                     updated_at: chrono::Utc::now().to_rfc3339(),
                 };
-                if let Err(e) = nr_api.create_shard_assignment(assignment).await {
-                    warn!(
-                        error = %e,
-                        shard_index = i,
-                        "Failed to register shard assignment with Node Registry"
-                    );
-                } else {
-                    info!(
-                        shard_index = i,
-                        content_hash = %expected_hex,
-                        "Registered shard assignment with Node Registry"
-                    );
-                }
+                queue.enqueue(assignment);
             }
         }
 

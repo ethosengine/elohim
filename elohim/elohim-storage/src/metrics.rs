@@ -2422,6 +2422,20 @@ lazy_static! {
     )
     .unwrap();
 
+    /// Advisory Node Registry shard-assignment registrations, off the
+    /// `PUT /blob/{hash}` request path (`crate::shard_registration`). label:
+    /// outcome = "enqueued" | "completed" | "failed" | "dropped". "dropped"
+    /// is the bounded-queue-full case — advisory work shed rather than piled
+    /// up in memory or held against the HTTP response it used to block.
+    pub static ref SHARD_REGISTRATION_OUTCOMES: IntCounterVec = IntCounterVec::new(
+        Opts::new(
+            "elohim_shard_registration_outcomes_total",
+            "Background Node Registry shard-assignment registrations, by outcome.",
+        ),
+        &["outcome"],
+    )
+    .unwrap();
+
     /// Milliseconds a chain WRITE spent queued behind another writer on the same
     /// source chain (`crate::chain_write_gate`).
     ///
@@ -3242,6 +3256,7 @@ pub fn register_all() {
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_HOLD_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_ACQUIRED.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_ADMISSION_SHED.clone()));
+        let _ = REGISTRY.register(Box::new(SHARD_REGISTRATION_OUTCOMES.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALLS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DURATION_MS.clone()));
         let _ = REGISTRY.register(Box::new(CONDUCTOR_CALL_DROPPED.clone()));
@@ -3611,6 +3626,14 @@ impl Drop for ConductorCallMetricsGuard<'_> {
 pub fn inc_admission_shed(class: &str, zome: &str) {
     CONDUCTOR_ADMISSION_SHED
         .with_label_values(&[class, zome])
+        .inc();
+}
+
+/// Record one background shard-registration outcome — see
+/// [`SHARD_REGISTRATION_OUTCOMES`] for the closed `outcome` vocabulary.
+pub fn inc_shard_registration(outcome: &str) {
+    SHARD_REGISTRATION_OUTCOMES
+        .with_label_values(&[outcome])
         .inc();
 }
 

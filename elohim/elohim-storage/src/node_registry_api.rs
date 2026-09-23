@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::conductor_admission::AdmissionClass;
 use crate::error::StorageError;
 use crate::hc_client_registry::HcClientRegistry;
 
@@ -57,6 +58,15 @@ impl NodeRegistryApi {
         Self { registry }
     }
 
+    /// Register one shard assignment with the Node Registry DNA.
+    ///
+    /// This call is exclusively driven off `crate::shard_registration`'s
+    /// bounded background worker now — never from an HTTP request path — so
+    /// it runs on the [`AdmissionClass::Background`] lane rather than the
+    /// default Interactive one: the registration is advisory, so it must
+    /// yield conductor capacity to a person waiting on an actual request
+    /// rather than competing with them for the same permit pool. See
+    /// `crate::shard_registration`'s module doc for the incident this fixes.
     pub async fn create_shard_assignment(
         &self,
         assignment: ShardAssignment,
@@ -72,11 +82,13 @@ impl NodeRegistryApi {
         })?;
 
         client
-            .call_zome(
+            .call_zome_timed(
                 "node_registry_coordinator",
                 "create_shard_assignment",
                 payload,
+                AdmissionClass::Background,
             )
             .await
+            .map(|(bytes, _timing)| bytes)
     }
 }
