@@ -450,6 +450,21 @@ before investing.
     - *Recording evidence changes the measured identity* — **held**; it belongs to the serving
       receipt's component-ownership contract, not recall.
 
+26. **Station 4's L2 remainder and the model as a governed artifact** (captured 2026-09-23 while
+    planning station 4 at L0 — [plan](epr:governed-discovery-station-4-native-semantic-provider-plan)).
+    - *L2 store*: the L0 plan's fold is SQLite via the already-cached bundled `rusqlite`
+      (FTS5 enabled, offline-resolvable — verified 2026-09-23), with FTS5/BM25 lexical and cosine
+      semantic providers behind the trait; sqlite-vec is the one piece not cached (crates.io 403
+      from the devspace), so vectors rank by brute-force cosine in Rust. Remainder: sqlite-vec once
+      fetchable (ranking query only), and the L2 mirror in elohim-storage's own database
+      (dataplane borrows row 14).
+    - *Native embedding runtime*: the L0 embedder is a pinned Python procedure under the bounded
+      envelope; a Rust ONNX/candle runtime is a procedure version change once a crate can be fetched.
+    - *The model as an EPR-governed artifact* (operator, 2026-09-23): the L0 plan declares the model
+      as a Manifest EPR with a CID pin and one fitness fold (`recall-bank-reach@1` per model CID).
+      Attestation of the model, reach beyond `Private`, and the palace's six-part admission are
+      station 9 (three-seams spec §8; confidentiality-plane rows 10–11).
+
 ## Exit criteria
 
 Each item lands as its own bounded change (or an explicit won't-fix note here), with the
