@@ -8,7 +8,7 @@ cites:
 
 # Elohim App - Angular Frontend
 
-Angular 19 application for the Elohim learning platform. Connects to elohim-storage via doorway proxy or directly.
+Angular 22 application for the Elohim learning platform. Connects to elohim-storage via doorway proxy or directly.
 
 ## Deployment Contexts
 
@@ -118,7 +118,7 @@ The app is served from `/apps/{appId}/{entryPoint}` via doorway, which extracts 
 
 ## Proxy Configuration
 
-### proxy.conf.mjs (Angular 19 ESM format)
+### proxy.conf.mjs (ESM format)
 ```javascript
 export default [
   {

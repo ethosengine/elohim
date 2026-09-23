@@ -3,23 +3,59 @@ id: elohim-protocol-specification
 ---
 
 # The Elohim Protocol: Content Addressing for Human Flourishing
-## A Specification for Value-Bearing, Governance-Aware, Knowledge-Coupled Content Distribution
 
-### Version 0.1 | "A Dollar from Exploitation Equals a Dollar from Care" — The Protocol That Refuses to Forget
+A specification for content that travels with its knowledge, value and governance context.
+
+Version 0.2 (September 2026)
 
 ---
 
 ## Executive Summary
 
-Existing federated protocols address content as bytes. AT Protocol addresses content as signed records in personal repositories. ActivityPub addresses content as URLs on servers. IPFS addresses content as hashes in a global namespace. None of them address content as knowledge that carries its economic meaning and governance context.
+AT Protocol, ActivityPub and IPFS address content as signed records, server URLs and hashes, and none of them addresses it together with the knowledge it belongs to, the people who care for it, or the rules that decide who may see it.
 
-The Elohim Protocol introduces the **Elohim Protocol Reference (EPR)** — a content reference that always couples three dimensions:
+The Elohim Protocol addresses content through an **Elohim Protocol Record (EPR)**: a reference that resolves to a record whose three dimensions travel together.
 
-- **Lamad** (knowledge): What is this content, how does it relate to other knowledge, what engagement exists?
-- **Shefa** (value): Who stewards this, what recognition has accumulated, what economic flows attach?
-- **Qahal** (governance): What authority ratified this, what reach level applies, what constitutional layer binds it?
+- **lamad** (knowledge): what this content is, how it relates to other knowledge, and how people have learned from it.
+- **shefa** (value): who stewards it, what recognition has accumulated, and what economic flows attach to it.
+- **qahal** (governance): what authority ratified it, how far it may travel (its [reach](glossary.md), one of eight levels from `private` to `commons`), and which constitutional layer, from the individual to the global, binds it.
 
-These three dimensions are inseparable in the same way that information, value, and responsibility are inseparable in a flourishing society. The protocol structurally refuses to serve bytes without honoring the stewardship and governance that surrounds them — eliminating the "value-blind content" problem that plagues existing systems.
+This specification reads the same EPR as a Reference while it is being composed and as a Record once it is at rest. Appendix E.1 explains the two names.
+
+The protocol is designed so that content is reached through its record. A conforming peer checks the governance in an EPR's head before it serves the content bytes, and a delivery made through EPR resolution credits the people who steward the content. Bytes fetched by their content address alone, outside EPR resolution, carry none of this context.
+
+A CID tells you what the bytes are. An AT URI tells you who published them. An Elohim EPR tells you what they mean, who cares for them, and who said they could be here.
+
+---
+
+## Scope
+
+This specification defines:
+
+- the three resolution tiers of an EPR (Part II) and the rules that couple knowledge, value and governance within them (Part III);
+- the resolution protocol `/elohim/epr/1.0.0` (Part IV);
+- the feed protocol `/elohim/feed/1.0.0` (Part V), which is specified here and not yet implemented;
+- the `epr:` URI scheme and the content-address formats (Appendix E), and the alignment with IPLD (Appendix F).
+
+Version resolution and search are outside version 1.0.0 of the resolution protocol.
+
+The record shapes and coupling rules (Parts II and III), the wire messages (Parts IV and V) and their framing (Appendix C), the `epr:` URI syntax (Appendix E.1), content-address canonicalization (E.5), the head encoding (F.1 and F.2) and the stored-head migration rule (G.2) are normative, and a **conforming peer** implements them, Part V only if it serves feeds; the worked examples and the rest of the appendices, Appendix A included, are informative.
+
+The substrate beneath these protocols is specified elsewhere. The `elohim-epr` crate is the content-addressing root: it encodes the EPR atom, the signed record itself, as a DAG-CBOR envelope addressed by CIDv1 and carrying Ed25519 proofs. Holochain DNAs notarize structural commitments. A DNA is an application's rule set, divided into modules called zomes, and its hash defines a distinct network. To notarize a commitment is to record it on the Holochain DHT, an agent-centric distributed hash table with no global consensus, in which peers validate each entry against the rules of the DNA they share. A conductor is the Holochain runtime that runs a participant's cells (a cell is one participant's running instance of a DNA), on their own device or, for a hosted participant, on a doorway. elohim-storage moves and reconciles bytes between peers over libp2p and over iroh, a QUIC-based peer-to-peer transport. Doorways project canonical content to the web; they are plural and replaceable, and none of them owns the content. The [glossary](glossary.md) defines DNA, conductor and source chain in plain terms. The [core graph substrate design](architecture/2026-04-21-elohim-core-graph-substrate-design.md) specifies the atom, and the [substrate trust contract](architecture/2026-07-12-substrate-trust-contract-runbook.md) states the invariants that govern how heads are declared, propagated and repaired.
+
+An **elohim** (the word is both singular and plural) is one of the protocol's AI agents ([glossary](glossary.md)). An elohim acts for a person and their community, under that person's authorization and within the constitution, and holds no authority of its own. In this specification an elohim may issue attestations, explain a reach negotiation, add restrictions to a policy chain and apply a community's economic rules.
+
+Several concerns that the [manifesto](manifesto.md) and the [constitution](constitution.md) raise belong to companion specifications:
+
+| Concern | Governed by | Why it is outside this specification |
+|---------|-------------|--------------------------------------|
+| Physical privacy controls | [Observer Protocol](observer-protocol.md) and [Hardware Specification](hardware-spec.md) | Hardware and firmware layer, not wire protocol |
+| Harm response and protection of those harmed | Elohim Agent Constitution (planned) | Agent behavior, not content addressing |
+| Recognition circulation: decay, thresholds, redistribution | Shefa Economic Protocol (planned; see [Shefa](shefa.md)) | Economic policy, not content format |
+| How ratifiers are chosen; cryptographic sortition is one possible mechanism | Constitutional Council Protocol (planned) | Governance mechanism, not content delivery |
+| Identity across the participation stages: Visitor (browsing, no account), Hosted (a doorway holds the person's keys and runs their cell), App Steward (the desktop app, with self-custodied keys) and Node Steward (always-on infrastructure) | Identity Portability Protocol (planned) | Identity lifecycle, not content references |
+
+This specification provides the hooks these companions attach to: the `ratifierId` on each stewardship allocation connects to how ratifiers are chosen, `recognitionPolicy` connects to the economic rules, and `reach` connects to privacy. It does not define the rules themselves.
 
 ---
 
@@ -27,126 +63,146 @@ These three dimensions are inseparable in the same way that information, value, 
 
 ### Why Existing Protocols Fail
 
-*"A dollar spent on weapons is identical to one spent on medicine — it's a system without values feedback."*
+> "A dollar spent on weapons is identical to one spent on medicine, it's a system without values feedback."
+> ([Manifesto](manifesto.md), on currency)
 
-This observation from the manifesto about currency applies equally to content protocols. A CID on IPFS carries no values. An AT Protocol record carries one owner's signature. An ActivityPub URL carries one server's authority. None of them can express:
+A CID on IPFS carries no values. An AT Protocol record carries one owner's signature. An ActivityPub URL carries one server's authority. None of them can express:
 
-- **Multiple non-owning stewards** sharing fractional responsibility for a piece of knowledge
-- **Governance-gated visibility** enforced at the protocol layer, not the application layer
-- **Recognition flows** triggered by content delivery — the act of serving knowledge generating value for those who care for it
-- **Constitutional verification** — proving that the agent serving content operates under a verified constitutional stack
+- Multiple non-owning stewards (people or collectives who hold an attested, revocable caretaking relation to the content) who share fractional responsibility for a piece of knowledge
+- Visibility gated by governance and enforced at the protocol layer, not the application layer
+- Recognition triggered by content delivery, so that serving knowledge produces value for those who care for it
+- Constitutional verification: before a peer serves content, it checks that the constitutional documents it operates under (see the [constitution](constitution.md)) match their notarized versions, and it refuses to serve if they do not (Part IV)
 
-| Protocol | Content Addressing | Ownership Model | Governance | Value Flow | P2P Native |
-|----------|-------------------|-----------------|------------|------------|------------|
+| Protocol | Content addressing | Ownership model | Governance | Value flow | Peer-to-peer |
+|----------|-------------------|-----------------|------------|------------|--------------|
 | AT Protocol | CIDs in signed repos | Single owner (one DID = one repo) | None (app-layer labeling) | None | No |
 | ActivityPub | URLs on servers | Server owns URL | Advisory (`to`/`cc` fields) | None | No |
-| IPFS | CIDv1 (content hash) | None (no ownership) | None (no access control) | None | Yes |
+| IPFS | CIDv1 (content hash) | None | None (no access control) | None | Yes |
 | Holochain | EntryHash + ActionHash | Agent provenance | DHT validation zomes | None native | Yes |
-| **Elohim Protocol** | **EPR (three-pillar reference)** | **Multi-steward, non-ownership** | **Constitutional, protocol-level** | **Recognition flows on delivery** | **Yes** |
+| Elohim Protocol | CIDv1 plus a three-pillar EPR Head | Multiple stewards, no owner | Reach and constitutional layer on every head | Recognition event on delivery | Yes |
 
-### What "Value-Blind Content" Costs
+### What Value-Blind Content Costs
 
 When content is addressed without its economic and governance context:
 
-- **Stewards are invisible.** Someone curated, translated, or maintained this knowledge. The protocol forgets them.
-- **Governance is optional.** Reach levels, constitutional constraints, and community ratification become application-layer conventions that any client can bypass.
-- **Value extraction is frictionless.** Content can be served, cached, and redistributed without any recognition flowing to those who created and care for it.
-- **Context is severed.** A concept torn from its knowledge graph, its learning paths, its prerequisite relationships is diminished — like a verse torn from its chapter.
+- Stewards are invisible. Someone curated, translated or maintained this knowledge, and the protocol forgets them.
+- Governance is optional. Reach levels, constitutional constraints and community ratification become application conventions that any client can bypass.
+- Value extraction is frictionless. Content can be served, cached and redistributed without any recognition reaching those who created it and care for it.
+- Context is severed. A concept torn from its knowledge graph, its learning paths, its prerequisite relationships is diminished, like a verse torn from its chapter.
 
-The Elohim Protocol makes these costs structurally impossible. Not through policy. Through protocol.
+The Elohim Protocol is designed to close these gaps in the protocol itself rather than in the policy of any one application.
 
 ---
 
-## Part II: The Elohim Protocol Reference (EPR)
+## Part II: The EPR and Its Three Tiers
 
-The EPR is the fundamental addressable unit. Every piece of content, every learning path, every assessment, every economic event is referenced through an EPR. An EPR always carries all three pillar dimensions.
-
-> **On the name — two answers, on purpose.** EPR expands to *both* **Elohim Protocol Reference** and **Elohim Protocol Record**, and the protocol keeps both deliberately. It began with HTML's `href` and two founding questions. First: what if a *reference* had to carry value and governance, and *earn its reach*, before it could resolve — instead of pointing at anything and asserting nothing? Second: how do you address content that could be hosted on *any number of peers*, none of them a fixed home? You cannot point at a location, so you point at the content itself — a content address (CID / DAG-CBOR) that resolves to the same bytes no matter which peer serves them (this is why the EPR Head is "the magnet link of the Elohim Protocol"). Both answers turn `href` into the **Reference** — href's accountable, *location-independent* cousin, and the sense this specification uses throughout. Once authority over it is notarized on the DHT, the reference becomes evidence that stands on its own: a **Record** (the sense used in the lifecycle, history, and agent docs — see `architecture/2026-05-24-records-lifecycle-design.md` §A.1). Reference → Record is one atom seen at compose-time and at rest; the missing letter is the whole arc. (In the tradition of HTML/SGML and the hard-`g` GIF schism — nothing confers legitimacy quite like a term with two defensible answers.)
+Every piece of content, every learning path and every assessment is reached through an EPR: a reference that resolves to a record whose three dimensions travel together. For content, that record resolves in three tiers, and the head of a content EPR always carries all three dimensions. Other kinds of EPR, such as economic events and attestations, carry the dimensions their kind requires; the core graph substrate design lists them.
 
 ### Three Tiers of Resolution
 
-The EPR exists in three tiers, each serving a different availability and privacy requirement:
+An EPR resolves in three tiers, each serving a different availability and privacy requirement:
 
 ```
-Tier 1: EPR Head        (~500 bytes, gossipped across DHT)
+Tier 1: EPR Head        (~500 bytes; fits a Kademlia record or a feed message)
   ↓ resolve
 Tier 2: EPR Document    (~5-50 KB, cached by interested peers)
   ↓ resolve
-Tier 3: Content Bytes   (any size, steward-delivered, shard-encoded)
+Tier 3: Content Bytes   (any size, steward-delivered, described by a shard manifest)
 ```
 
-This tiered model solves the **steward offline problem**: even when every steward is asleep, Tier 1 EPR Heads remain available in the DHT, allowing peers to discover, preview, and queue content for later retrieval.
+This tiered model solves the **steward offline problem**: even when every steward is asleep, Tier 1 EPR Heads remain available in Kademlia, so peers can discover, preview and queue content for later retrieval.
 
 ### Tier 1: EPR Head
 
-The "magnet link" of the Elohim Protocol. Small enough to store in a Kademlia DHT record, embed in a feed message, or gossip to any peer. Contains just enough information to render a preview card, assess access rights, and locate delivery peers.
+The **EPR Head** is the magnet link of the Elohim Protocol. It is small enough to store in a record of Kademlia (the distributed hash table libp2p peers use for discovery), embed in a feed message or send to any peer, and it carries enough to render a preview card, assess access rights and fetch the bytes by their content address. An earlier draft carried a flat signed head; the canonical shape is the nested record below, which the `elohim-epr` crate implements and Appendix F.2 encodes as DAG-CBOR.
 
 ```
 EPR Head {
-  ── Identity ──────────────────────────────────────────────
-  id:              String        // stable slug, survives updates
-  cid:             CIDv1         // SHA256 of current content bytes (raw codec 0x55)
-  version:         u64           // monotonic, increments on update
+  version:        u32                  // schema version of this record (1)
+  id:             String               // stable slug; survives updates
+  content:        CIDv1                // current content bytes (raw codec 0x55),
+                                       // carried as a string
 
-  ── Lamad (Knowledge) ────────────────────────────────────
-  contentType:     ContentType   // concept | unit | path | assessment |
-                                 // scenario | composite | simulation | ...
-  title:           String        // human-readable, max 256 bytes
-  previewCid:      CIDv1?        // thumbnail or summary blob
+  lamad: {                             // knowledge
+    title:          String
+    contentType:    ContentType        // Appendix A
+    description:    String?
+    contentFormat:  String?            // markdown | sophia-quiz-json | gherkin |
+                                       // html5-app | epr-composite | ...
+    tags:           [String]
+  }
 
-  ── Shefa (Value) ────────────────────────────────────────
-  stewards: [{
-    presenceId:    String        // ContributorPresence ID (resolves to DID)
-    did:           DID           // steward identity (denormalized for resolution)
-    ratio:         f32           // allocation (all ratios sum to 1.0)
-    contribution:  Contribution  // original_creator | curator | translator |
-                                 // editor | maintainer | inherited
+  shefa: {                             // value
+    stewards:       [String]           // steward identifiers: a DID, or a
+                                       // ContributorPresence ID that resolves to one
+                                       // once its creator claims it
+    allocations:    [f64]              // ratios in [0, 1], parallel to stewards;
+                                       // they should sum to 1.0
+  }
+
+  qahal: {                             // governance
+    reach:          Reach?             // Appendix A; absent reads as private
+    layer:          ConstitutionalLayer?   // Appendix A; absent reads as individual
+    attestationRequirements: [String]  // gates the serving peer checks before it
+                                       // serves this head (Part IV), written
+                                       // "type:reference", e.g.
+                                       // "prerequisite-mastery:calculus-101"
+  }
+
+  relationships: [{                    // typed edges to other heads
+    type:           Relationship       // Appendix A
+    target:         String             // target content id
+    targetCid:      CIDv1?             // target content address, as a string
   }]
-  recognition:     f64           // accumulated recognition on this content
 
-  ── Qahal (Governance) ───────────────────────────────────
-  reach:           Reach         // private | self | intimate | trusted |
-                                 // familiar | community | public | commons
-  layer:           ConstitutionalLayer
-                                 // individual(1)..global(7)
-  governance:      Governance    // active | disputed | pending_review | superseded
-  ratifier:        DID?          // Elohim agent that ratified this state
-                                 // Ratifiers are selected via cryptographic sortition
-                                 // per Constitutional Council Protocol — not appointed
-
-  ── Provenance ───────────────────────────────────────────
-  author:          DID           // original creator
-  created:         u64           // Unix milliseconds
-  updated:         u64           // Unix milliseconds
-  signature:       [u8; 64]      // Ed25519 over canonical MessagePack of above fields
+  author:         DID?                 // the content's creator
+  updated:        String?              // RFC 3339 UTC time of the declaration
+                                       // on the Holochain DHT (Authority, below)
 }
 ```
 
-**Canonical encoding**: Fields are serialized in the order listed above using MessagePack (`rmp_serde`). The signature is computed over the MessagePack encoding of all fields *except* the signature itself. This is consistent with the existing shard and sync protocol codecs.
+`contentFormat` names a format from the lamad domain manifest, such as `sophia-quiz-json` (an assessment rendered by Sophia, the protocol's assessment renderer) or `epr-composite` (Appendix D). A **ContributorPresence** holds a creator's attribution, and the recognition their work earns, in trust until the creator joins the network and claims it; once claimed, it resolves to the creator's DID.
 
-**DHT storage**: EPR Heads are stored in Kademlia using the content `id` as the key. Multiple versions may exist; peers accept the version with the highest `version` number whose `signature` verifies against a known steward DID.
+#### Canonical encoding
 
-**Size budget**: A typical EPR Head with 3 stewards fits in ~400-600 bytes — well within Kademlia's recommended record size limit.
+The canonical form of a head is its DAG-CBOR encoding, and the head's own address is the CIDv1 of those bytes (codec 0x71, SHA-256), which prints with the prefix `bafyr`. DAG-CBOR's deterministic encoding sorts map keys and uses the shortest integer forms, so two peers that encode the same head produce the same bytes and the same CID. Absent optional fields, and empty lists other than `relationships`, are left out of the encoding rather than written as null or empty.
+
+Inside `/elohim/epr` messages, feed messages and Kademlia records, a head travels as a MessagePack encoding of the same record (Appendix C). A receiver that needs the head's CID re-encodes it as DAG-CBOR.
+
+#### Authority
+
+A head carries no signature of its own. Its authority comes from two kinds of record on the Holochain DHT, both in the lamad DNA:
+
+- The **content record** holds a content EPR's id, title, description, content type and format, tags, reach and content address; for content stored inline it also holds the body. Each revision of the content is a new version of the record, and the versions form a chain back to the first.
+- A **declaration** names one version of the content record as current for its `id`. The author of the first version, or a device the author has delegated, declares within that chain, and a canonical declaration can choose among independent chains recorded for the same `id`. `updated` is the time of the declaration. While no declaration has named a current version, `updated` is absent and a peer may serve the head of the author's newest version, but such a head never replaces a declared one.
+
+A peer derives the head from the declared version. `id`, `content`, the `lamad` fields, `reach` and `author` come from the content record. The `shefa` summary comes from the peer's records of the content's stewardship allocations, `layer` from the content's governance state, and `relationships` and `attestationRequirements` from the content graph.
+
+#### Kademlia storage
+
+Heads are published to Kademlia under the key `epr:{id}`, as a discovery index.
+
+#### Size
+
+A head with a short description, a few tags and a few stewards encodes to roughly 400 to 600 bytes, well within the size of a Kademlia record.
 
 ### Tier 2: EPR Document
 
-Full pillar context for content that a peer has affinity with. Cached locally by peers who are learning from, stewarding, or governing this content. Too large and too sensitive for DHT gossip; retrieved directly from known peers.
+The **EPR Document** holds the full pillar context of a content EPR for peers with affinity to it, meaning peers who learn from, steward or govern the content; those peers cache it locally. It is too large and too sensitive to publish on the Holochain DHT or in Kademlia, so it is retrieved directly from known peers. Version 1.0.0 of the resolution protocol defines no message that delivers it.
 
 ```
 EPR Document {
   head:            EPR Head      // embedded, not referenced
 
-  ── Lamad (Full Knowledge Context) ───────────────────────
+  ── Lamad (full knowledge context) ───────────────────────
   relationships: [{
     targetId:      String        // related content ID
     targetCid:     CIDv1         // integrity of related content
-    type:          Relationship  // CONTAINS | REFERENCES | DEPENDS_ON |
-                                 // CONTRASTS_WITH | CONCEPTUALLY_RELATED |
-                                 // PRECEDES | PREREQUISITE | CREATED_BY | ...
+    type:          Relationship  // Appendix A
   }]
   tags:            [String]
-  contentFormat:   ContentFormat  // markdown | sophia-quiz-json | gherkin |
-                                 // html5-app | composite-layout | ...
+  contentFormat:   ContentFormat // markdown | sophia-quiz-json | gherkin |
+                                 // html5-app | epr-composite | ...
   pathMemberships: [{
     pathId:        String
     stepIndex:     u32
@@ -156,7 +212,7 @@ EPR Document {
   bloomLevel:      BloomLevel?   // not_started | remember | understand |
                                  // apply | analyze | evaluate | create
 
-  ── Shefa (Full Economic Context) ────────────────────────
+  ── Shefa (full economic context) ────────────────────────
   allocations: [{                // full StewardshipAllocation records
     id:            String
     stewardDid:    DID
@@ -171,17 +227,18 @@ EPR Document {
     recognition:   f64           // accumulated for this steward
     evidence:      Value?        // contribution evidence JSON
   }]
-  economicEvents: [{             // REA events touching this content
+  economicEvents: [{             // REA (Resource–Event–Agent) economic
+                                 // events touching this content
     eventType:     String
     resourceType:  TokenType     // care | time | learning | steward |
-                                 // culture | infrastructure
+                                 // culture | infrastructure | recognition
     agents: {
       primary:     DID
       supported:   DID?
       witnessed:   [DID]
       benefited:   [DID]
     }
-    timestamp:     u64
+    timestamp:     u64           // Unix milliseconds
   }]
   recognitionPolicy: {           // how recognition distributes on interaction
     onView:        f64           // micro-recognition on content view
@@ -191,29 +248,33 @@ EPR Document {
     distribution:  String        // "proportional" | "equal" | "primary_weighted"
   }
 
-  ── Qahal (Full Governance Context) ──────────────────────
+  ── Qahal (full governance context) ──────────────────────
   constitution: {
     layer:         ConstitutionalLayer
     version:       String        // semver
-    hash:          String        // SHA256, verifiable against blockchain anchor
-    contextId:     String?       // community_id, family_id, etc.
+    hash:          String        // SHA-256, verifiable against the
+                                 // constitution's notarized entry on the
+                                 // Holochain DHT
+    contextId:     String?       // which community, household, etc. the
+                                 // constitution belongs to
   }
   policyChain: [{                // composable restriction stack
     source:        PolicySource  // org | guardian | elohim | subject
     restrictions:  [String]      // policy IDs applied
   }]
-  reachNegotiation: {            // if reach was negotiated
-    requestedReach: Reach
+  reachNegotiation: {            // present when the author asked for one reach
+    requestedReach: Reach        // and was granted another
     grantedReach:   Reach
-    reasoning:      String       // Elohim's negotiation explanation
-    trustScore:     f32?         // at time of negotiation
+    reasoning:      String       // the elohim's explanation of the outcome
+    trustScore:     f32?         // an input local to this one negotiation;
+                                 // never a person's standing
   }?
   disputeHistory: [{             // governance state transitions
     from:          Governance
     to:            Governance
     reason:        String
     initiator:     DID
-    timestamp:     u64
+    timestamp:     u64           // Unix milliseconds
   }]
 
   ── Federation ───────────────────────────────────────────
@@ -222,7 +283,8 @@ EPR Document {
     peerId:        String        // libp2p PeerId (base58)
     multiaddrs:    [String]      // libp2p multiaddrs
     lastSeen:      u64           // Unix milliseconds
-    tier:          NodeTier      // network | home_node | home_cluster | laptop
+    tier:          NodeTier      // hardware tier: network | home_node |
+                                 // home_cluster | laptop
     capabilities:  [String]      // ["shard", "sync", "relay"]
   }]
 }
@@ -230,189 +292,185 @@ EPR Document {
 
 ### Tier 3: Content Bytes
 
-The actual content blob. Retrieved via the existing `/elohim/shard/1.0.0` protocol. Verified against the EPR Head's `cid` field.
+The content blob itself, retrieved over the shard protocol (`/elohim/shard/1.0.0` on libp2p, `/elohim/shard/2.0.0` on iroh) and verified against the head's `content` address.
 
 ```
 Content Bytes:
-  Retrieval:     ShardRequest::Get { hash: epr_head.cid }
-  Verification:  sha256(received_bytes) == epr_head.cid
-  Sharding:      Per ShardManifest encoding (none | chunked | rs-4-7)
-  Access:        Governed by epr_head.reach + epr_document.policyChain
-  Delivery:      Any peer holding the blob may serve it
+  Retrieval:     ShardRequest::Get { hash: head.content }
+  Verification:  the SHA-256 digest of the received bytes matches head.content
+  Sharding:      per ShardManifest encoding (none | chunked | rs-4-7)
+  Access:        governed by head.qahal.reach and the EPR Document's policyChain
+  Delivery:      any peer holding the blob may serve it
   Caching:       Cache-Control: public, max-age=31536000, immutable
-                 (content-addressed = immutable)
+                 (content-addressed bytes never change)
 ```
 
-The existing `BlobStore`, `ShardManifest`, and doorway blob-serving infrastructure (`/blob/{address}`) serve Tier 3 without modification. The EPR layers above are additive.
+Blob stores, shard manifests and the `/blob/{hash}` route (Appendix E.3) serve Tier 3. The tiers above add context and do not change how bytes move.
 
 ---
 
-## Part III: Pillar Coupling — The Protocol's Immune System
+## Part III: Pillar Coupling
+
+A conforming peer applies these rules in its storage layer rather than in any client, so a client cannot bypass them.
 
 ### The Four Coupling Rules
 
 **Rule 1: No value-blind content.**
 
-Every EPR Head carries a stewardship summary. Content with zero stewards is a protocol violation. At minimum, the original creator is assigned as bootstrap steward at ratio 1.0. This mirrors the manifesto's requirement that "attribution must be maintained for ALL content, even before creator joins."
+The head of every content EPR carries a stewardship summary, and a head with no stewards is invalid: a conforming peer neither announces nor serves one. At minimum the original creator is the bootstrap steward, with an allocation of 1.0. This follows the manifesto's creator-presence model, in which a creator's work is attributed, and the recognition it earns is held in trust, before the creator joins the network.
 
 ```
-VALID:    stewards: [{ did: "did:key:z6Mk...", ratio: 1.0, contribution: "original_creator" }]
-INVALID:  stewards: []
+VALID:    shefa: { stewards: ["did:key:z6Mk..."], allocations: [1.0] }
+INVALID:  shefa: { stewards: [] }
 ```
 
 **Rule 2: No governance-free content.**
 
-Every EPR Head carries reach and constitutional layer. Content without explicit governance context defaults to `reach: private, layer: individual` — the most restrictive setting, not the most permissive. This prevents accidental exposure. You must explicitly grant reach; the protocol does not assume openness.
+The head of every content EPR carries reach and a constitutional layer. Content without explicit governance context defaults to `reach: private, layer: individual`, the most restrictive setting, so an omission cannot expose anything. You must explicitly grant reach; the protocol does not assume openness.
 
 ```
-DEFAULT:  reach: "private", layer: "individual"
-          (content is invisible to everyone except the author)
-EXPLICIT: reach: "community", layer: "community"
+DEFAULT:  qahal: { reach: "private", layer: "individual" }
+          (invisible to everyone except the author)
+EXPLICIT: qahal: { reach: "community", layer: "community" }
           (content visible to community members, governed at community layer)
 ```
 
+An explicit reach starts with the author, who asks for one when composing the content; the author's peer then checks the request against the author's standing. Reach within the author's own relationships, from `private` up to `familiar`, needs no standing; `community`, `public` and `commons` need the standing that a standing policy sets for each level. The check grants the request, refuses it, or refers it for discernment, where an elohim may explain the outcome; the EPR Document's `reachNegotiation` records a grant that differs from the request. The granted reach is written into the content record, so changing it means declaring a new version of that record (Part II). A serving peer reads reach from the declared record and does not re-evaluate the grant.
+
 **Rule 3: Content delivery triggers recognition.**
 
-When a peer serves Tier 3 Content Bytes in response to a valid EPR resolution, the serving peer logs a recognition event against the EPR's stewardship allocations. Recognition flows proportionally to steward ratios. This is not a financial transaction — it is a protocol-level acknowledgment that serving knowledge generates value for those who care for it.
+When a peer delivers Tier 3 bytes in answer to a valid EPR resolution, it logs a recognition event against the content's stewardship allocations, and recognition reaches the stewards in proportion to their allocations. The event is recorded as an REA economic event:
 
-The recognition event is recorded as an REA economic event:
 ```
 EconomicEvent {
   eventType: "content_delivery"
   resourceType: "learning"        // or "care" for care-economy content
   agents: {
-    primary:   serving_peer_did
+    primary:   delivering_peer_did
     benefited: [steward_dids]     // per allocation ratio
   }
 }
 ```
 
-**Rule 4: Dimensions queryable independently, coupled structurally.**
+To a steward, recognition is credited value, and it circulates as information: each event carries which delivery produced it, which stewards it credited and in which community's context. Token types (Appendix A) are readings of these events by resource type, such as learning or care; they are not separate currencies. How recognition circulates belongs to the Shefa economic protocol: it decays over time so that it keeps moving (demurrage), recognition beyond constitutional thresholds is redistributed to the next community or to infrastructure commons, per the [manifesto](manifesto.md)'s wealth transition architecture, and each community sets the rates and bounds in its constitution, which the community's elohim apply. This specification defines only the event.
 
-While the EPR always carries all three dimensions, queries may filter by any single dimension:
-- "All content I steward" (shefa query by steward DID)
-- "Community-reach concepts" (qahal + lamad filter)
-- "Recognition flows for this path" (shefa aggregate across path steps)
+**Rule 4: Dimensions are queried independently and stored together.**
 
-The coupling is structural — the data is always present — but the query interface respects that different contexts foreground different dimensions.
+A content EPR always carries all three dimensions, and a query may filter by any one of them:
+
+- "All content I steward" (shefa, by steward)
+- "Community-reach concepts" (qahal and lamad)
+- "Recognition for this path" (shefa, aggregated across the path's steps)
+
+The data for all three is always present, so each context can select by the dimension it needs. The query interface itself is not specified here.
 
 ### Why Always-Coupled Matters
 
-Consider a piece of content — say, the manifesto's chapter on economic architecture — addressed only by its CID:
+Consider a piece of content, say the manifesto's chapter on economic architecture, addressed only by its CID:
 
 `bafkreih7mdkh5gn3mkjbagj3n22w2eyrwya3eqzhdqr2t6lnk7iyn2blea`
 
 This CID tells you nothing about:
-- Who wrote it and who maintains it (Matthew Dowell as original creator, Susan as editor)
-- Who can see it (public reach, community constitutional layer)
+
+- Who wrote it and who maintains it (Alice as original creator, Bob as editor; both are example identities)
+- Who can see it (public reach, global constitutional layer)
 - What knowledge it connects to (builds on "poverty of currency" concept, contrasts with "engagement optimization")
 - What happens when you learn from it (recognition flows to stewards, engagement tracked for affinity)
 
 The EPR Head for the same content:
+
 ```
 {
+  version: 1,
   id: "manifesto-economic-architecture",
-  cid: "bafkreih7mdkh5gn3mkjbagj3n22w2eyrwya3eqzhdqr2t6lnk7iyn2blea",
-  contentType: "unit",
-  title: "Economic Architecture: The Poverty of Currency",
-  stewards: [
-    { did: "did:web:hosted.elohim.host:humans:matthew", ratio: 0.7, contribution: "original_creator" },
-    { did: "did:web:hosted.elohim.host:humans:susan", ratio: 0.3, contribution: "editor" }
-  ],
-  reach: "public",
-  layer: "global",
-  governance: "active",
+  content: "bafkreih7mdkh5gn3mkjbagj3n22w2eyrwya3eqzhdqr2t6lnk7iyn2blea",
+  lamad: {
+    title: "Economic Architecture: The Poverty of Currency",
+    contentType: "article"
+  },
+  shefa: {
+    stewards: [
+      "did:web:doorway.example.org:humans:alice",
+      "did:web:doorway.example.org:humans:bob"
+    ],
+    allocations: [0.7, 0.3]
+  },
+  qahal: { reach: "public", layer: "global" },
   ...
 }
 ```
 
 The content is the same bytes. But the EPR carries its meaning.
 
-### Attestations: The Fourth Pillar Record
+### Attestations
 
-Attestations are the human-sourced signal that the manifesto places alongside content, stewardship, and governance as constitutionally protected records. An attestation is a signed statement about a human's relationship with knowledge — not a credential, not a grade, but a witnessed claim.
+An **attestation** is a signed witness claim by an issuer about a subject; here, about a person's relationship with a piece of knowledge. In the [manifesto](manifesto.md)'s terms, an attestation comes from a person, refers to specific content and accumulates at the creator's presence, and the constitution protects it from being sold or manipulated. An elohim that issues one does so for the person it acts for, under that person's authorization (Scope).
 
 ```
 Attestation {
   id:              String        // unique identifier
-  issuer:          DID           // who attests (may be self, peer, or Elohim agent)
-  subject:         DID           // the human being attested
+  issuer:          DID           // who attests: the subject, a peer, or an elohim
+  subject:         DID           // the person being attested
   contentCid:      CIDv1         // the content this attestation concerns
   claim:           String        // "engagement" | "reflection" | "application" | "teaching"
-  evidence:        String?       // optional narrative or hash of assessment result
+  evidence:        String?       // optional narrative or hash of an assessment result
   timestamp:       u64           // Unix milliseconds
-  signature:       [u8; 64]      // Ed25519 over canonical MessagePack of above fields
 }
 ```
 
-**Constitutional protection**: Attestations are append-only and irrevocable. Once issued, an attestation cannot be revoked, sold, transferred, or manipulated. This is enforced by storage on Holochain source chains (which are inherently append-only and tamper-evident) and by the EPR protocol refusing to process `Delete` or `Update` operations on attestation records.
+An attestation's history is append-only. An attestation cannot be sold or transferred, and it is never edited or deleted in place: withdrawing one means issuing a superseding attestation that points back to it, so the record of what was attested, and when it was withdrawn, stays auditable. Attestations travel as EPRs of kind `Attestation`. The envelope carries the issuer's Ed25519 signature over the record's canonical DAG-CBOR bytes and, for a withdrawal or revision, a `supersedes` link to the attestation it replaces. Holochain source chains (each participant's own append-only, tamper-evident log of actions) keep this history, and a conforming peer refuses `Update` and `Delete` operations on attestation records.
 
-Attestations enable access to gated content (`attestationsRequired` in EPR Documents) and contribute to the three meaning maps (knowledge, love, self). They are the protocol's alternative to engagement metrics — human witness replaces algorithmic score.
-
-### Recognition Token Circulation
-
-Recognition tokens generated by Rule 3 (content delivery triggers recognition) are subject to circulation rules defined in the Shefa economic layer:
-
-- **Demurrage**: Recognition tokens decay over time to encourage circulation. Tokens not redistributed within constitutional time bounds lose value, preventing infinite accumulation. The specific decay rate and time bounds are governance-configurable at the community constitutional layer.
-- **Accumulation thresholds**: Recognition beyond constitutional thresholds triggers redistribution to the next community or to infrastructure commons, per the manifesto's wealth transition architecture.
-- **Token provenance**: Every recognition token carries its origin (which content delivery, which stewards benefited, which community context). Tokens are not value-blind — they remember where they came from.
-
-The specific parameters (decay rates, thresholds, redistribution rules) are defined per-community in their constitutional documents and enforced by Elohim agents operating under those constitutions. This specification defines the recognition *event* format; the Shefa Economic Protocol (future specification) defines the circulation *rules*.
+Attestations are designed to meet access gates (a head's `qahal.attestationRequirements`, a Document's `attestationsRequired`), and they feed the three meaning maps that [lamad](lamad.md) builds for a learner (knowledge, love and self: how they relate to a subject, to other people and to themselves). They are the protocol's alternative to engagement metrics.
 
 ---
 
-## Part IV: Resolution Protocol — `/elohim/epr/1.0.0`
+## Part IV: Resolution Protocol, `/elohim/epr`
 
 ### Protocol Definition
 
-A new libp2p request-response protocol, following the same patterns as the existing shard and sync protocols.
+A request-response protocol carried over libp2p and, with the same message types, over iroh QUIC.
 
 ```
-Protocol ID:  "/elohim/epr/1.0.0"
-Codec:        EprCodec (4-byte big-endian length + MessagePack payload)
-Max Request:  1 MB
-Max Response: 16 MB (for large EPR Documents with many relationships)
+Protocol ID:   /elohim/epr/1.0.0     (libp2p request-response)
+ALPN:          /elohim/epr/2.0.0     (iroh; same messages)
+Codec:         4-byte big-endian length + MessagePack payload
+Max request:   1 MB on libp2p
+Max response:  64 KB on libp2p (a head is ~500 bytes; a batch of 100 is ~50 KB)
+Max frame:     16 MiB in each direction on iroh
 ```
+
+Both transports frame the messages the same way; the reference implementation encodes them positionally on libp2p and with field names on iroh (Appendix C). A receiver refuses a response larger than its limit rather than truncating it.
 
 ### Request Messages
 
 ```rust
 pub enum EprRequest {
-    /// Resolve the latest EPR Head for a content ID
+    /// Resolve the current EPR Head for a content ID. `agent_pubkey`
+    /// identifies the requester so the serving peer can apply the reach gate.
     Resolve {
         id: String,
+        agent_pubkey: Option<String>,
     },
 
-    /// Resolve a specific version
-    ResolveVersion {
-        id: String,
-        version: u64,
+    /// Announce a new or updated head (MessagePack-encoded EPR Head)
+    Announce {
+        head: Vec<u8>,
     },
 
-    /// Get the full EPR Document
+    /// Resolve several heads in one request (for composite content).
+    /// Carries no requester identity.
+    ResolveBatch {
+        ids: Vec<String>,
+    },
+
+    /// Get the Tier 2 EPR Document
     GetDocument {
         id: String,
     },
 
-    /// Search for content matching filters
-    Search {
-        query: Option<String>,          // text search
-        content_type: Option<String>,   // filter by type
-        reach: Option<String>,          // filter by max reach
-        steward_did: Option<String>,    // filter by steward
-        tags: Vec<String>,              // filter by tags
-        offset: u64,
-        limit: u64,
-    },
-
-    /// Announce a new or updated EPR Head to the network
-    Announce {
-        head: Vec<u8>,                  // MessagePack-encoded EPR Head
-    },
-
-    /// Batch resolve multiple EPR Heads (for composite content)
-    ResolveBatch {
-        ids: Vec<String>,
+    /// Ask whether a peer can serve a blob, and from which cache tier
+    QueryDelivery {
+        blob_hash: String,
     },
 }
 ```
@@ -421,18 +479,11 @@ pub enum EprRequest {
 
 ```rust
 pub enum EprResponse {
-    /// Single EPR Head
-    Head(Vec<u8>),                      // MessagePack-encoded EPR Head
+    /// Single EPR Head (MessagePack-encoded)
+    Head(Vec<u8>),
 
-    /// Full EPR Document
-    Document(Vec<u8>),                  // MessagePack-encoded EPR Document
-
-    /// Search results (array of EPR Heads)
-    SearchResults {
-        heads: Vec<Vec<u8>>,
-        total: u64,
-        has_more: bool,
-    },
+    /// One entry per requested ID; an empty entry for an ID not found
+    HeadBatch(Vec<Vec<u8>>),
 
     /// Announcement acknowledgment
     Announced {
@@ -440,91 +491,120 @@ pub enum EprResponse {
         reason: Option<String>,
     },
 
-    /// Batch of EPR Heads
-    HeadBatch(Vec<Vec<u8>>),
-
     /// Content not found
     NotFound,
 
-    /// Access denied (governance-gated)
+    /// Access denied: the reach gate failed
     AccessDenied {
         required_reach: String,
-        current_reach: String,
         reason: String,
     },
 
     /// Error
     Error(String),
+
+    /// Delivery capability for a specific blob
+    DeliveryInfo {
+        serves_extracted: bool,
+        serves_compressed: bool,
+        cache_tier: String,   // "projection" | "extraction" | "blob-only"
+        warm: bool,           // this blob is extracted and ready
+    },
 }
 ```
 
+`QueryDelivery` needs no reach authorization, because it asks whether a peer can serve a blob rather than asking for the blob. Its answer says in which forms the peer can serve it: `serves_extracted` means the blob's unpacked form, such as the files inside a packaged `html5-app`, and `serves_compressed` means the blob as stored. `cache_tier` says where the peer would serve it from: `projection` (a doorway's projection cache), `extraction` (a disk cache of rendered or unpacked content, with `warm` set when this blob is already in it) or `blob-only` (raw bytes). A peer answers `GetDocument` with `Error`.
+
+### The Reach Gate
+
+A serving peer checks the requester against a head's reach before it serves the head or its bytes.
+
+The requester is the agent named by `agent_pubkey`, a Holochain agent public key. The serving peer maps the requester's key to the person it belongs to, maps the head's `author` to a person, and maps each steward to a person, a ContributorPresence through the person who has claimed it. An unclaimed ContributorPresence maps to no one, so it admits no one at the levels that depend on stewards. A request that names no requester, or whose key maps to no person the serving peer knows, passes only for `public` and `commons`.
+
+The reference implementation applies the gate as follows (informative):
+
+| Head's reach | Who passes |
+|--------------|------------|
+| `public`, `commons` | Anyone; no identity is needed |
+| `community` | A person with a consented membership in any collective |
+| `familiar` | A person with a consented membership in a collective that one of the content's stewards also belongs to |
+| `trusted` | A person in a relationship with one of the stewards at intimacy `trusted` or closer |
+| `intimate` | A person in an intimate relationship with one of the stewards, to which both have consented |
+| `self`, `private` | The content's author, as named by the head's `author`; no one, if the head names no author |
+
+After the reach check, the requester must meet each gate in the head's `qahal.attestationRequirements`. A gate is written `type:reference`. The type this specification uses is `prerequisite-mastery:{contentId}`, met when the requester has a recorded mastery of that content beyond `not_started`; the serving peer derives these gates from the content's `PREREQUISITE` relationships. A serving peer also refuses content that a policy governing the requester excludes, such as a reach ceiling a guardian has set. Every refusal is answered with `AccessDenied { required_reach, reason }`.
+
 ### Resolution Flow
 
-A peer wants to access content with ID `manifesto-economic-architecture`:
+A peer wants to read the content with ID `manifesto-economic-architecture`. Resolution goes from the head to the bytes.
 
 ```
 0. CONSTITUTIONAL VERIFICATION (prerequisite)
-   Before serving ANY EPR resolution, a peer verifies its own constitutional stack:
-   - Load constitutional documents (Individual → Global)
-   - Verify each layer's hash against blockchain anchor / DHT consensus
-   - If any layer fails verification: refuse to serve, report to network
-   - If all layers verify: proceed with resolution
-   This ensures every serving peer operates under a verified constitutional stack.
-   Peers that cannot verify their constitution are rejected by the network.
+   Before serving any EPR resolution, a peer verifies its own constitutional stack:
+   - Load its constitutional documents, from individual to global
+   - Check each document's SHA-256 hash against that document's notarized
+     entry on the Holochain DHT
+   - If any document fails verification: refuse to serve
+   - If every document verifies: proceed with resolution
 
 1. DISCOVERY
-   Peer → Kademlia DHT: GET key="epr:manifesto-economic-architecture"
-   DHT → Peer: EPR Head (Tier 1, ~500 bytes)
+   Peer → Kademlia: GET key="epr:manifesto-economic-architecture"
+   Kademlia → Peer: EPR Head (Tier 1, ~500 bytes)
+   or
+   Peer → a resolving peer: EprRequest::Resolve { id, agent_pubkey }
 
-2. AUTHORIZATION CHECK
-   Peer evaluates: Can I see this?
-   - epr_head.reach == "public" → YES (no attestation required)
-   - epr_head.reach == "trusted" → check relationship with steward DIDs
-   - epr_head.reach == "intimate" → check mutual attestation
+2. AUTHORIZATION
+   The resolving peer applies the reach gate before it answers Resolve.
+   A refused request receives AccessDenied { required_reach, reason }.
 
-3. CONTEXT RESOLUTION (if authorized)
-   Peer → any known peer: EprRequest::GetDocument { id }
-   Peer receives: EPR Document (Tier 2, full pillar context)
-   Peer now knows: knownLocations, relationships, policy chain
-
-4. CONTENT RETRIEVAL (if context confirms access)
-   Peer → steward/cache peer: ShardRequest::Get { hash: epr_head.cid }
+3. CONTENT RETRIEVAL (if authorized)
+   Peer → a delivering peer (a steward, or any peer holding the blob):
+          ShardRequest::Get { hash: head.content }
    Peer receives: Content Bytes (Tier 3)
-   Peer verifies: sha256(bytes) == epr_head.cid
+   Peer verifies: the SHA-256 digest of the bytes matches head.content
 
-5. RECOGNITION (on successful delivery)
-   Serving peer logs: EconomicEvent { eventType: "content_delivery", ... }
-   Recognition distributes proportionally to steward ratios
+4. RECOGNITION (on successful delivery)
+   Delivering peer logs: EconomicEvent { eventType: "content_delivery", ... }
+   Recognition reaches the stewards in proportion to their allocations
 ```
+
+The resolving peer, which answers `Resolve`, and the delivering peer, which sends the bytes, can be different peers.
+
+A peer's **constitutional stack** is the set of constitutional documents that apply to the agent the peer acts for, from the agent's own individual constitution through those of the household, communities, province, nation and bioregion the agent belongs to, up to the global layer. The peer's elohim read the stack as their [constitution](constitution.md), so step 0 makes sure that the peer and its elohim do not act under a tampered or outdated copy. The stack is separate from the constitution that governs a piece of content, which a head identifies only by its `layer` and an EPR Document by its `constitution` field.
 
 ### Steward Offline Fallback
 
 ```
 Tier 1 (EPR Heads):
-  Stored in Kademlia DHT across all participating peers.
-  Available as long as ANY peer in the network is online.
+  Stored in Kademlia across all participating peers.
+  Available as long as any peer in the network is online.
   TTL: republished every 24 hours by stewards.
-  Stale detection: if updated > 30 days ago and no steward seen, mark as "dormant."
+  Stale detection: if updated more than 30 days ago and no steward seen,
+  mark as "dormant".
 
 Tier 2 (EPR Documents):
-  Cached by peers with affinity (learners on a path, community members, etc.).
-  Survives individual steward downtime.
-  Cache invalidation: version number in EPR Head > cached document's head version.
+  Designed to be cached by peers with affinity (learners on a path,
+  community members, etc.), so that a document survives the downtime of
+  individual stewards. A cached document's embedded head is stale once
+  it is no longer the current head for its id.
 
 Tier 3 (Content Bytes):
-  Reed-Solomon sharded (4 data + 3 parity) for blobs > 10MB.
-  Recoverable from any 4 of 7 shard holders.
-  Doorway servers maintain projection caches for hot content.
-  Content-addressed = immutable. Any peer who ever cached the blob can serve it.
+  Every blob has a shard manifest. A blob of up to 16 MB is one shard;
+  up to 64 MB, a sequence of chunks; above 64 MB, Reed-Solomon coded as
+  4 data and 3 parity shards, recoverable from any 4 of the 7.
+  Doorways keep projection caches of frequently requested content.
+  Content-addressed bytes never change, so any peer that ever cached the
+  blob can serve it.
 ```
 
 ---
 
-## Part V: Feed Protocol — `/elohim/feed/1.0.0`
+## Part V: Feed Protocol, `/elohim/feed/1.0.0`
 
-*"Free speech does not mean free reach. There is no right to algorithmic amplification."*
+> "Free speech does not mean free reach. There is no right to algorithmic amplification."
+> (A formulation associated with Renée DiResta and Aza Raskin, quoted in the [manifesto](manifesto.md).)
 
-Feeds in the Elohim Protocol are curated, not algorithmic. They are closer to a river than a recommendation engine — content flows through channels that communities and stewards maintain, not through engagement-optimized algorithms.
+Feeds in the Elohim Protocol are curated, not algorithmic. Content reaches a reader through channels that communities and stewards maintain, and no ranking optimizes for engagement.
 
 ### Protocol Definition
 
@@ -532,17 +612,19 @@ Feeds in the Elohim Protocol are curated, not algorithmic. They are closer to a 
 Protocol ID:  "/elohim/feed/1.0.0"
 Codec:        FeedCodec (4-byte big-endian length + MessagePack payload)
 Max Request:  64 KB
-Max Response: 1 MB (feed pages contain EPR Heads, not full content)
+Max Response: 1 MB (a feed page carries many EPR Heads, never full content)
 ```
 
 ### Feed Types
 
-| Feed Type | Curator | What It Contains | Example |
-|-----------|---------|-----------------|---------|
-| `path` | Path stewards | EPR Heads of steps in a learning path, in order | The `elohim-protocol` path is the "homepage feed" |
+| Feed type | Curator | What it contains | Example |
+|-----------|---------|------------------|---------|
+| `path` | Path stewards | EPR Heads of the steps in a learning path, in order | The `elohim-protocol` path as a homepage feed |
 | `steward` | A steward's portfolio | EPR Heads of content they steward | Follow a creator to see their work |
 | `community` | Qahal governance | EPR Heads curated by community consensus | A church community's learning feed |
 | `layer` | Constitutional layer | EPR Heads at a governance layer | All community-level governance decisions |
+
+A feed serves only heads its requester may see under the reach gate (Part IV).
 
 ### Request Messages
 
@@ -552,7 +634,7 @@ pub enum FeedRequest {
     Subscribe {
         feed_type: String,              // "path" | "steward" | "community" | "layer"
         feed_id: String,                // path ID, steward DID, community ID, layer name
-        since: Option<u64>,             // Unix ms — only updates after this time
+        since: Option<u64>,             // Unix ms: only updates after this time
         filters: FeedFilters,
     },
 
@@ -573,11 +655,13 @@ pub enum FeedRequest {
 
 pub struct FeedFilters {
     pub content_types: Vec<String>,     // filter by content type
-    pub min_reach: Option<String>,      // don't send content I can't see
-    pub max_reach: Option<String>,      // don't send public when I want intimate
+    pub min_reach: Option<String>,      // most restrictive reach to include
+    pub max_reach: Option<String>,      // most open reach to include
     pub tags: Vec<String>,              // topic filters
 }
 ```
+
+The reach filters only narrow what a requester asks for; the reach gate decides what the requester receives.
 
 ### Response Messages
 
@@ -597,7 +681,7 @@ pub enum FeedResponse {
     Update {
         subscription_id: String,
         entries: Vec<Vec<u8>>,          // MessagePack-encoded EPR Heads
-        sequence: u64,                  // monotonic for ordering
+        sequence: u64,                  // monotonic, for ordering
     },
 
     /// Feed page (response to GetPage)
@@ -614,245 +698,190 @@ pub enum FeedResponse {
 
 ### Push and Pull
 
-**Push**: Subscribers receive `FeedResponse::Update` messages whenever the feed changes. A path steward adds a new chapter → all subscribers to that path feed receive the new step's EPR Head. A community ratifies new content → all subscribers to that community feed receive the update.
+Push: subscribers receive a `FeedResponse::Update` whenever the feed changes. When a path steward adds a chapter, every subscriber to that path's feed receives the new step's EPR Head; when a community ratifies new content, every subscriber to that community's feed receives the update.
 
-**Pull**: Any peer can request `FeedRequest::GetPage` without subscribing. This enables catch-up after being offline, browsing feeds before committing to subscribe, and rendering feed previews in composite content.
+Pull: any peer can send `FeedRequest::GetPage` without subscribing. This serves catch-up after time offline, browsing a feed before subscribing, and rendering feed previews in composite content.
 
 ### No Engagement Optimization
 
 Feed ordering is determined by the feed type's natural order:
-- **Path feeds**: step order (the learning sequence the steward designed)
-- **Steward feeds**: chronological (most recent first)
-- **Community feeds**: governance-determined order (community consensus on what surfaces)
-- **Layer feeds**: chronological with severity weighting (disputed items surface)
 
-There is no engagement score, no "trending" algorithm, no attention optimization. The protocol has no mechanism for it — this is not policy, it is architecture.
+- Path feeds: step order (the learning sequence the steward designed)
+- Steward feeds: chronological (most recent first)
+- Community feeds: governance-determined order (community consensus on what surfaces)
+- Layer feeds: chronological with severity weighting (disputed items surface)
 
----
-
-## Part VI: Composite Content — The Protocol Eating Its Own Landing Page
-
-### The Problem
-
-The landing page at `/` and the content system at `/lamad` are two disconnected applications sharing a domain. The landing page is static Angular components. The content system is dynamic EPR resolution. A visitor at the front door cannot see what's inside.
-
-### The Solution: `composite` Content Type
-
-A composite EPR is a ContentNode whose "body" is a layout of references to other EPR Heads. It is the protocol's equivalent of a WordPress page template — except it lives inside the content graph, carries stewardship, respects governance, and triggers recognition like any other content.
-
-```
-EPR Head {
-  id:            "elohim-protocol-home"
-  cid:           <CID of the layout descriptor>
-  contentType:   "composite"
-  title:         "Elohim Protocol"
-  stewards:      [{ did: "did:web:elohim-protocol.org:system", ratio: 1.0,
-                    contribution: "maintainer" }]
-  reach:         "commons"           // maximally visible — the front door
-  layer:         "global"
-  governance:    "active"
-}
-```
-
-### Layout Descriptor
-
-The Tier 3 Content Bytes for a composite EPR is a JSON layout descriptor:
-
-```json
-{
-  "layout": "sections",
-  "sections": [
-    {
-      "type": "hero",
-      "eprId": "manifesto",
-      "display": "excerpt",
-      "excerpt": "first_paragraph"
-    },
-    {
-      "type": "featured_paths",
-      "eprIds": [
-        "elohim-protocol-path",
-        "governance-policy-maker",
-        "know-thyself-path"
-      ],
-      "display": "cards"
-    },
-    {
-      "type": "content_grid",
-      "query": {
-        "contentType": "unit",
-        "tags": ["crisis"],
-        "reach": "public",
-        "limit": 6
-      },
-      "display": "cards"
-    },
-    {
-      "type": "steward_spotlight",
-      "stewardDids": [
-        "did:web:hosted.elohim.host:humans:matthew"
-      ],
-      "display": "portfolio_summary"
-    },
-    {
-      "type": "community_feed",
-      "feedType": "community",
-      "feedId": "elohim-protocol-community",
-      "limit": 5,
-      "display": "feed_list"
-    }
-  ]
-}
-```
-
-### Rendering a Composite EPR
-
-1. **Resolve**: `EprRequest::Resolve { id: "elohim-protocol-home" }` → EPR Head
-2. **Fetch layout**: `ShardRequest::Get { hash: epr_head.cid }` → layout descriptor JSON
-3. **Batch resolve**: `EprRequest::ResolveBatch { ids: [...all eprIds from layout...] }` → array of EPR Heads
-4. **Render sections**: Each section type maps to an Angular component:
-   - `hero` → renders excerpt from referenced EPR's preview
-   - `featured_paths` → renders path cards with thumbnail, title, steward info from EPR Heads
-   - `content_grid` → renders content cards from EPR search results
-   - `steward_spotlight` → renders steward portfolio from EPR search by steward DID
-   - `community_feed` → renders feed entries from `FeedRequest::GetPage`
-5. **Click-through**: Each card links to the full EPR resolution path — `/lamad/path/:pathId` or `/lamad/resource/:resourceId`
-
-### What This Achieves
-
-The landing page is no longer a static artifact maintained separately from the content it describes. It is a **live view** of the content graph — updated when paths are added, when stewards change, when communities curate new material. The same pillar coupling applies: the landing page itself has stewards, governance, and recognition flows.
-
-A visitor sees preview cards rendered from EPR Heads — available even if specific stewards are offline. Clicking any card begins a full EPR resolution, descending from Tier 1 through Tier 2 to Tier 3. The front door is inside the system.
+A feed never orders its entries by recognition, by a count of deliveries or by any other measure of attention. No field in these messages carries such a measure.
 
 ---
 
-## Part VII: Relationship to Existing Implementation
+## Security and Privacy Considerations
 
-The Elohim Protocol is not designed in a vacuum. It formalizes patterns that already exist in the codebase, fills gaps between them, and unifies scattered concerns into a coherent protocol layer.
+These points collect what the rest of this specification already requires. A full threat model is deferred to a companion specification.
 
-### What Already Exists (No Changes Needed)
+- Reach at serving. A serving peer applies the reach gate before it serves a head or its bytes, and answers `AccessDenied` when the gate fails (Part IV).
+- Tier 2 sensitivity. EPR Documents hold the full stewardship, economic and governance context; they are too sensitive to publish on the Holochain DHT or in Kademlia and are retrieved directly from known peers (Part II).
+- Constitutional verification. Before it serves, a peer checks the SHA-256 hash of each constitutional document it has loaded against that document's notarized entry, and refuses to serve if any check fails (Part IV, step 0).
 
-| Protocol Concept | Existing Implementation | Status |
-|---|---|---|
-| CIDv1 content addressing | `blob_store.rs`: `compute_addresses()` → CIDv1 (raw codec 0x55, SHA256) | Production |
-| Shard delivery | `/elohim/shard/1.0.0`: `ShardRequest::Get/Have/Push` | Production |
-| CRDT sync | `/elohim/sync/1.0.0`: Automerge document sync | Production |
-| Wire format | 4-byte big-endian length + MessagePack (`rmp_serde`) | Production |
-| Reed-Solomon sharding | `sharding.rs`: `ShardManifest` with `rs-4-7` encoding | Production |
-| DID resolution | `did_resolver.rs`: `did:web` + `did:key` resolution with 5-min cache | Production |
-| DID document serving | `identity.rs`: `/.well-known/did.json` with `elohim-protocol.org/ns/v1` context | Production |
-| JWKS endpoint | `federation.rs`: `/.well-known/doorway-keys` (Ed25519 OKP) | Production |
-| Constitutional types | `constitution/types.rs`: `ConstitutionalLayer`, `ImmutabilityLevel`, `ConstitutionalDocument` | Production |
-| Stewardship model | `stewardship_allocations` table: ratios, governance state, Elohim ratification | Production |
-| Reach levels | `content_store_integrity`: 8 reach levels from private to commons | Production |
-| Blob serving | `doorway/blob.rs`: HTTP Range, ETag, immutable cache, shard fallback | Production |
-| libp2p transport | `behaviour.rs`: Kademlia + mDNS + relay + DCUtR + AutoNAT | Production |
-| W3C VC alignment | `verifiable-credential.model.ts`: `HolochainSignature2024` proof type | Model |
-| ActivityPub type stubs | `ContentNode.activityPubType`, JSON-LD, OpenGraph fields | Stub |
+---
 
-### What Needs to Be Built
+## Open Issues
 
-| Protocol Concept | Gap | Implementation Path |
-|---|---|---|
-| EPR Head type | Unify ContentNode + stewardship + reach into single signed struct | New Rust struct in `elohim-protocol` or `constitution` crate, with `ts-rs` export |
-| EPR Document type | Formalize the aggregation that `DataLoaderService` does ad-hoc | New Rust struct, same pattern |
-| `/elohim/epr/1.0.0` codec | No EPR resolution protocol exists | New `epr_protocol.rs` alongside `shard_protocol.rs`, same codec pattern |
-| EPR Heads in DHT | Kademlia currently stores only shard hashes | Extend DHT records to include EPR Head bytes under `epr:` prefixed keys |
-| `/elohim/feed/1.0.0` codec | No feed/subscription protocol exists | New `feed_protocol.rs`, same codec pattern |
-| Feed subscription state | No subscription tracking | New table in elohim-storage: `feed_subscriptions` |
-| `composite` content type | Landing page is static Angular | New content type + layout descriptor format + Angular renderer |
-| Recognition on delivery | Economic events exist but delivery doesn't trigger them | Add recognition event logging in shard delivery handler |
-| Pillar coupling validation | Enforcement is app-layer (Angular services) | Move validation to storage layer — reject EPR Heads with empty stewards |
+These are the places where the design is not complete.
 
-### Migration Path
-
-Existing content (3,526 nodes, 6 paths) can be incrementally wrapped in EPR Heads by:
-
-1. For each content record in `content` table, generate an EPR Head from existing fields (`id`, `blob_cid`, `content_type`, `reach`) + stewardship data from `stewardship_allocations` + constitutional layer from governance state
-2. Sign each EPR Head with the primary steward's key (or bootstrap key for system content)
-3. Store EPR Heads in a new `epr_heads` table and announce to Kademlia DHT
-4. The existing HTTP API (`/db/content/{id}`) continues to work — EPR resolution is an additional path, not a replacement
-5. Composite landing page can be created as a new content record with `content_type: "composite"` once the renderer exists
-
-This is additive, not disruptive. The existing infrastructure continues to function. The EPR layer adds protocol-level meaning to what was previously application-level convention.
+- Requester identity on batch and feed requests. `ResolveBatch` and the feed messages carry no requester identity, so the reach gate has no requester to check for heads narrower than `public`.
+- Requester authentication. `agent_pubkey` is a claim. Nothing in version 1.0.0 binds it to the connection's authenticated peer identity.
+- The gate for Kademlia. Every head may be published to Kademlia, and a Kademlia record, readable by any peer, cannot apply the reach gate, so where the gate sits for heads served from Kademlia is open.
+- The gate for bytes, and the delivery event. `ShardRequest::Get` names only a hash, with neither a requester nor the EPR it serves. A Bitswap request also names no requester, and one blob can sit behind several EPRs with different stewards. How to gate bytes that sit behind an EPR narrower than `public` is therefore open. Bytes fetched by address over HTTP, from an IPFS node or over Bitswap pass outside EPR resolution. Rule 3 needs a byte request that names the EPR, and a witness to the event other than the delivering peer, so that a peer cannot log deliveries it never made. Whether the delivering peer shares in the recognition is left to the Shefa economic protocol.
+- Evidence for the gate. The gate reads collective memberships, relationships between people, mastery records and the records that bind an agent key to a person and their DID; this specification defines none of them. The `Attestation` record binds a person to a content CID, which changes when the content is revised, while gates name a content id; the fields that would let an attestation meet a gate are not specified, nor whether one an elohim issues can meet a gate that asks for a person's witness.
+- Private content on the Holochain DHT. The lamad DNA's content entry has no visibility attribute, so the title, reach and content address of private content, and its body when stored inline, are readable by any participant in that DNA's network.
+- Who declares, and what a declaration fixes. How the content record that a declaration names relates to the content EPR's atom is not specified, nor who may make a canonical declaration that chooses among independent chains for one `id`. A declaration names a version of the content record but not the stewardship, governance or graph records that a head's `shefa`, `layer`, `relationships` and `attestationRequirements` are derived from, so two peers can derive different heads from one declaration.
+- Granting reach. A serving peer reads reach from the declared record and cannot tell a reach granted by standing from one its author assigned without the check (Part III, Rule 2). Whether a community can narrow the reach of content it governs is not specified.
+- Which community. A head carries no community identifier: `reach: community` admits a member of any collective, and a head with `layer: community` does not say which community's constitution governs it. Only the EPR Document's `constitution.contextId` names it. This specification also does not define what distinguishes `self` from `private`, or `commons` from `public`, beyond the standing a policy may require to grant each.
+- Document resolution. No 1.0.0 message delivers an EPR Document. Still to specify: the document response and its access rule; how `policyChain` restricts access to Tier 3; bounds or paging for `economicEvents`, which grows by one event per delivery; an invalidation rule for accumulating fields such as `recognition`; where per-learner state such as `bloomLevel` belongs, given that many peers share and cache one document; and what the `supported` agent role in an economic event means.
+- `QueryDelivery` disclosure. `QueryDelivery` needs no authorization, so anyone who knows a hash can learn whether a peer holds that blob warm in its extraction cache, including a blob behind non-public EPRs.
+- Evidence of constitutional verification. A peer verifies its own stack, but no 1.0.0 message carries evidence of the check to a requester. How a peer establishes the household, communities and places its stack draws on is not specified, nor whether it must hold the constitution that governs a piece of content before serving it.
+- Checking a received head directly. A head travels as MessagePack, and its Holochain declaration names a version of the content record rather than the head's CID. Carrying the head's DAG-CBOR bytes, with a CID that the declaration records, would let a receiver check a head without re-deriving it.
+- MessagePack and absent fields. The reference implementation encodes a head in MessagePack as a positional array (Appendix C) and leaves absent optional fields and empty lists out of it, as the DAG-CBOR form does. That moves every later field to an earlier position, so a decoder cannot always tell which field a value belongs to. How absent head fields are encoded in MessagePack is not specified.
+- HTTP projections. `GET /db/content/{id}` returns a flat content record, with the content address as `blobCid` and possibly an inline body, not a head. `GET /epr-head/{id}` returns a head-shaped projection derived from the declared content record alone, so its stewardship, relationships and attestation requirements can be empty and it is not the head a peer serves over `/elohim/epr`. Content whose body is stored inline has no blob, so its head has no address to carry in `content`. The alignment of the HTTP projections with the head is open.
+- Batch size. `ResolveBatch` sets no cap on `ids`, and a response over the size limit is refused rather than truncated.
+- Feed push. A request-response exchange returns one response per request, and the mechanism that delivers an unsolicited `FeedResponse::Update` to a subscriber is not specified.
+- Identifiers. How `id` slugs are allocated and kept unique across communities is not specified. Converting a DID to an `epr:` URI drops the host, so the conversion is lossless only while ids are unique across hosts. A client cannot tell from `epr:{id}` alone whether it names content or a path. The shape of a path record, and whether step positions start at 0 or 1, are left to the lamad domain.
+- Steward identity and the system issuer. A hosted steward's DID names a doorway's host (`did:web:{host}:humans:{id}`), while doorways are replaceable; keeping that identity when the steward moves is the Identity Portability Protocol's concern (Scope). Who operates the protocol system issuer, `did:web:elohim-protocol.org:system`, what it may issue, and where recognition credited to it goes (for example from deliveries of the landing page in Appendix D), are not specified here.
+- Dormant heads. What a peer does differently with a head marked dormant (Part IV) is not specified.
+- Reserved. `epr:{id}@{version}` is reserved until content versions are defined (Appendix E.1). The protocol ID `/elohim/cluster/1.0.0` is reserved.
 
 ---
 
 ## Appendix A: Enumeration Reference
 
+This appendix is informative. Where the protocol schema (`elohim/sdk/schemas/v1/` in the Elohim Protocol repository) or the lamad domain manifest (`elohim/sdk/domains/lamad/`) declares a vocabulary, that declaration is authoritative, and the lists below mirror it.
+
 ### ContentType
+
+Core types, notarized on the Holochain DHT with all three dimensions bound (the atom's knowledge, value and governance coupling references):
+
 ```
-concept | unit | epic | path | assessment | scenario | composite | simulation |
-resource | reference | organization | community | human | instrument | quiz |
-media | graph | gherkin | bible-verse | attestation | feature
+epic | concept | lesson | scenario | assessment | reflection | discussion |
+exercise | article | path
 ```
 
-### Reach (ordered from most restrictive to most open)
+Entity references: content records that stand for a person, a role or a collective, whose own records are notarized in their own DNAs:
+
+```
+human | role | collective
+```
+
+Communities register further types (for example `quiz`, `simulation`, `bible-verse`, `feature`, `course-module`) without a protocol change; storage accepts them and the DNA does not validate them.
+
+### Reach (from most restrictive to most open)
+
 ```
 private | self | intimate | trusted | familiar | community | public | commons
 ```
 
-### ConstitutionalLayer (ordered by precedence, highest first)
+Part IV shows who passes the reach gate at each level. For access, `private` and `self` behave alike, as do `public` and `commons`; a standing policy can require different standing to grant `public` and `commons` (Part III, Rule 2).
+
+### ConstitutionalLayer (from narrowest to widest)
+
 ```
-global(7) | bioregional(6) | nation_state(5) | provincial(4) |
-community(3) | family(2) | individual(1)
+individual | family | community | provincial | nation-state | bioregional | global
 ```
 
+- `individual`: the person; the most flexible layer
+- `family`: household norms
+- `community`: a community's local values and membership rules
+- `provincial`: a province or state
+- `nation-state`: a nation's cultural and constitutional expressions
+- `bioregional`: ecological limits
+- `global`: existential boundaries; the hardest layer to change
+
+A head's `layer` names the layer whose rules govern the content. The rules of every wider layer still apply to it, and where two layers conflict the wider one takes precedence.
+
 ### Contribution
+
 ```
 original_creator | editor | translator | curator | maintainer | inherited
 ```
 
 ### Governance
+
 ```
 active | disputed | pending_review | superseded
 ```
 
 ### AllocationMethod
+
 ```
 manual | computed | negotiated
 ```
 
 ### TokenType (REA resource types)
+
 ```
 care | time | learning | steward | culture | infrastructure | recognition
 ```
 
-### NodeTier
+Token types are readings of REA economic events by resource type. They are not separate currencies.
+
+### PolicySource
+
+```
+org | guardian | elohim | subject
+```
+
+### NodeTier (hardware)
+
 ```
 network | home_node | home_cluster | laptop
 ```
 
-Note: Doorway servers are a gateway service, not a stewardship tier. They proxy
-to elohim-storage nodes which operate at one of the above tiers. A doorway's
-backing storage node declares its own `NodeTier`.
+- `network`: an always-on node that stores content in full, replicates it to the network and serves anyone
+- `home_node`: an always-on node that serves its household
+- `home_cluster`: several nodes that pool storage for one household
+- `laptop`: an intermittently connected device with capped local storage, which does not serve others
+
+These name hardware tiers, not participation stages (Visitor, Hosted, App Steward, Node Steward). A doorway is a replaceable web2 projection of canonical content, not a node tier: it proxies to elohim-storage nodes, and each backing node declares its own `NodeTier`.
 
 ### Relationship
+
+The lamad domain manifest is the source for relationship types, and it gives each type a description. Its relationship vocabulary:
+
 ```
-CONTAINS | REFERENCES | DEPENDS_ON | IMPLEMENTS | DERIVED_FROM |
-PREREQUISITE | FOLLOWUP | PRECEDES | SIBLING | PARENT | CHILD |
-SIMILAR_TO | CONTRASTS_WITH | CONCEPTUALLY_RELATED | SHARED_CONCEPT |
-ELABORATES | SUMMARIZES | EXAMPLE_OF | DEFINITION_OF | REQUIRES |
-CREATED_BY | PUBLISHED_BY | RELATES_TO | DEMONSTRATES
+CONTAINS | BELONGS_TO | DESCRIBES | IMPLEMENTS | VALIDATES | RELATES_TO |
+REFERENCES | DEPENDS_ON | REQUIRES | FOLLOWS | ATTACHED_TO | STEP
 ```
+
+The protocol schema's relationship enum (`elohim/sdk/schemas/v1/enums/relationship-type.schema.json`) declares the same core types in lowercase and adds `derived_from` and `source_of`. The manifest's content-graph edges add `PREREQUISITE`, `TEACHES` and `SUPERSEDES`. elohim-storage also reads `FOLLOWUP`, `SIBLING`, `PARENT`, `CHILD`, `SIMILAR_TO`, `CONTRASTS_WITH`, `ELABORATES`, `SUMMARIZES`, `EXAMPLE_OF` and `DEFINITION_OF` on stored relationships.
+
+The types this specification relies on, in the manifest's terms:
+
+- `DEPENDS_ON`: the source depends on the target for correctness or completeness
+- `REQUIRES`: learners complete the target before the source
+- `PREREQUISITE`: the target must be mastered before the source can be approached; the edge the prerequisite-mastery gate reads (Part IV)
+- `TEACHES`: the source teaches the target concept
+- `STEP`: the source path's step at a given position is the target, with the position carried as `orderIndex`
 
 ---
 
 ## Appendix B: DID Methods
 
-The Elohim Protocol uses three DID methods:
+The Elohim Protocol uses two DID methods: `did:web`, in several roles, and `did:key`. `{host}` is the domain of the deployment that issues the identifier.
 
 | Method | Usage | Example |
 |--------|-------|---------|
-| `did:web` | Doorway identity | `did:web:alpha.elohim.host` |
-| `did:web` | Hosted human (custodial keys) | `did:web:hosted.elohim.host:humans:{humanId}` |
-| `did:web` | Session identity (ephemeral) | `did:web:gateway.elohim.host:session:{sessionId}` |
-| `did:web` | Content identity | `did:web:elohim.host:content:{contentId}` |
+| `did:web` | Doorway identity | `did:web:doorway.example.org` |
+| `did:web` | Hosted participant (a doorway holds their keys) | `did:web:{host}:humans:{humanId}` |
+| `did:web` | Session identity (ephemeral) | `did:web:{host}:session:{sessionId}` |
+| `did:web` | Content identity | `did:web:{host}:content:{contentId}` |
+| `did:web` | Learning path identity | `did:web:{host}:paths:{pathId}` |
+| `did:web` | Agent identity, such as an elohim | `did:web:{host}:agents:{agentId}` |
 | `did:web` | Protocol system issuer | `did:web:elohim-protocol.org:system` |
-| `did:web` | Steward issuer (for VCs) | `did:web:elohim-protocol.org:stewards:{id}` |
+| `did:web` | Steward issuer (for W3C Verifiable Credentials) | `did:web:elohim-protocol.org:stewards:{id}` |
 | `did:key` | Steward identity (local keypair) | `did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK` |
 
 DID Documents are served at `/.well-known/did.json` with the context:
+
 ```json
 [
   "https://www.w3.org/ns/did/v1",
@@ -861,363 +890,415 @@ DID Documents are served at `/.well-known/did.json` with the context:
 ]
 ```
 
-The `elohim-protocol.org/ns/v1` context defines extensions:
-- `elohim:capabilities` — node capabilities
-- `elohim:region` — geographic region
-- `elohim:holochainCellId` — Holochain cell identifier
+The `elohim-protocol.org/ns/v1` context defines these extensions:
+
+- `elohim:capabilities`: node capabilities
+- `elohim:region`: geographic region
+- `elohim:holochainCellId`: Holochain cell identifier
+
+A doorway also publishes its Ed25519 signing key as a JWKS at `/.well-known/doorway-keys`.
 
 ---
 
 ## Appendix C: Wire Format Reference
 
-All Elohim Protocol messages use the same framing convention:
+The request-response protocols in this specification share one framing: a 4-byte big-endian length followed by a MessagePack payload.
 
 ```
-┌────────────┬──────────────────────────────────────┐
+┌─────────────┬──────────────────────────────────────┐
 │ Length (4B) │ MessagePack Payload                  │
 │ big-endian  │ rmp_serde serialized enum variant    │
 │ u32         │                                      │
-└────────────┴──────────────────────────────────────┘
+└─────────────┴──────────────────────────────────────┘
 ```
 
-Protocol IDs registered in the Elohim network:
+### MessagePack mapping
+
+The payload is the Rust definition of the message (Parts IV and V). The reference implementation, elohim-storage, encodes it with the `rmp_serde` library, version 1:
+
+- On libp2p (`/elohim/epr/1.0.0`), messages use the library's default mapping. A struct is an array of its field values in the order the definition lists them, and field names are not encoded. An enum variant that carries data is a map with one entry, from the variant's name as a string to its data: a struct variant's fields as an array, or the single value of a one-value variant such as `Head` or `Error`. A variant without data, such as `NotFound`, is its name as a string. An absent `Option` is nil, and a `Vec<u8>` is an array of integers, one per byte, not a MessagePack `bin`.
+- On iroh (`/elohim/epr/2.0.0`), messages use the library's named mapping: the same, except that a struct, including a struct variant's fields, is a map from field name to value.
+- The heads it places in `Head` and `HeadBatch` responses and in Kademlia records are encoded with the default positional mapping on both transports, with their fields in the order of Part II, and are carried as bytes within the message.
+
+For example, on libp2p `EprRequest::Resolve { id: "x", agent_pubkey: None }` is the map `{"Resolve": ["x", nil]}`, 13 bytes, framed as:
+
 ```
-/elohim/shard/1.0.0    Blob shard transfer (existing)
-/elohim/sync/1.0.0     Automerge CRDT sync (existing)
-/elohim/epr/1.0.0      EPR resolution (this specification)
-/elohim/feed/1.0.0     Feed subscription (this specification)
-/elohim/id/1.0.0       Peer identification (existing)
-/elohim/cluster/1.0.0  Cluster coordination (reserved)
+00 00 00 0d    81      a7 52 65 73 6f 6c 76 65    92         a1 78    c0
+length 13      map(1)  "Resolve"                  array(2)   "x"      nil
+```
+
+Protocol IDs this specification refers to:
+
+```
+libp2p                       iroh ALPN              Purpose
+/elohim/shard/1.0.0          /elohim/shard/2.0.0    Blob shard transfer
+/elohim/storage-sync/1.0.0   /elohim/sync/2.0.0     Automerge document sync (CRDTs,
+                                                    which merge concurrent edits)
+/elohim/epr/1.0.0            /elohim/epr/2.0.0      EPR resolution (Part IV)
+/elohim/feed/1.0.0                                  Feed subscription (Part V)
+/elohim/id/1.0.0                                    Peer identification (libp2p identify)
+/elohim/cluster/1.0.0                               Cluster coordination (reserved)
 ```
 
 ---
 
-## Closing Note
+## Appendix D: Worked Example: A Landing Page Built from EPRs
 
-The Elohim Protocol does not compete with AT Protocol, ActivityPub, or IPFS. It composes their best insights — content addressing from IPFS, signed data repositories from AT Protocol, the vocabulary of ActivityPub — while adding what none of them provide: the structural coupling of knowledge, value, and governance in every content reference.
+A front page maintained outside the content graph cannot reflect what is in it. It goes stale as paths are added and stewards change, and it carries none of the stewardship or governance that the content behind it carries. This example builds a landing page as content.
 
-A CID tells you *what* the bytes are. An AT URI tells you *who* published them. An Elohim EPR tells you what they mean, who cares for them, and who said they could be here.
+A composite is an ordinary content record whose `contentFormat` is `epr-composite`: its body is a layout of references to other EPRs. Because it is content, it has stewards and governance, and serving it triggers recognition like anything else. The example uses the content type `collective`, as the protocol's own landing page does, though Appendix A describes `collective` as an entity reference. It names the protocol system issuer (Appendix B) as its steward.
 
-That is not a small difference. It is the difference between a currency that carries no values and one that remembers where it came from.
+```
+EPR Head {
+  version:   1
+  id:        "elohim-protocol-home"
+  content:   <CID of the composite body>
+  lamad:     { title: "Elohim Protocol", contentType: "collective",
+               contentFormat: "epr-composite" }
+  shefa:     { stewards: ["did:web:elohim-protocol.org:system"],
+               allocations: [1.0] }
+  qahal:     { reach: "commons", layer: "global" }   // the front door
+}
+```
+
+The body follows the `epr-composite` body schema in the lamad domain manifest: sections of items, each item a reference to another EPR.
+
+```json
+{
+  "schemaVersion": 1,
+  "layout": "exploratory",
+  "sections": [
+    {
+      "id": "why",
+      "title": "Why this exists",
+      "items": [{ "ref": "epr:manifesto" }]
+    },
+    {
+      "id": "paths",
+      "title": "Where to begin",
+      "items": [
+        { "ref": "epr:elohim-protocol" },
+        { "ref": "epr:governance-policy-maker" },
+        { "ref": "epr:know-thyself-path" }
+      ]
+    }
+  ]
+}
+```
+
+Rendering it:
+
+1. Resolve: `EprRequest::Resolve { id: "elohim-protocol-home", agent_pubkey }` returns the head.
+2. Fetch the body: `ShardRequest::Get { hash: head.content }` returns the composite body.
+3. Batch resolve: `EprRequest::ResolveBatch { ids: [...every ref in the body...] }` returns their heads.
+4. Render each section's items as preview cards from those heads (title, description, stewards).
+5. A click on a card begins a full resolution of that EPR, from its head to its bytes.
+
+Because the cards come from heads, the page stays readable while particular stewards are offline, and it changes as paths are added, stewards change and communities curate new material. Sections driven by a query or by a feed (Part V) would extend the body schema; this specification does not define them.
 
 ---
 
-## Appendix D: Scope and Companion Specifications
+## Appendix E: The `epr:` URI Scheme and Content Addressing
 
-This specification defines content addressing, resolution, and feed protocols. Several concerns referenced in the manifesto and constitution are governed by companion specifications at other layers:
-
-| Concern | Governed By | Not This Spec Because |
-|---------|------------|----------------------|
-| Physical privacy controls | Observer Protocol + Hardware Specification | Hardware/firmware layer, not wire protocol |
-| Harm response / victim sovereignty | Elohim Agent Constitution (TBD) | Agent behavior, not content addressing |
-| Token circulation / demurrage rules | Shefa Economic Protocol (TBD) | Economic policy, not content format |
-| Constitutional Council sortition | Constitutional Council Protocol (TBD) | Governance mechanism, not content delivery |
-| Identity migration between tiers | Identity Portability Protocol (TBD) | Identity lifecycle, not content references |
-
-The EPR protocol provides the *hooks* for these companion specs (the `ratifier` field connects to sortition, the `recognitionPolicy` connects to economic rules, the `reach` field connects to privacy), but does not define the rules themselves.
-
----
-
-## Appendix E: EPR URI Scheme & Content Addressing Reference
-
-*The `<a href="">` of the Elohim Protocol.*
-
-Every protocol needs a single, canonical way to point at things. HTML has `href`. IPFS has `ipfs://cid`. AT Protocol has `at://did/collection/rkey`. The Elohim Protocol has the `epr:` URI — a reference that encodes not just *where* content lives, but *what it means* in the knowledge graph and *who cares for it*.
+HTML has `href`, IPFS has `ipfs://{cid}` and AT Protocol has `at://{did}/{collection}/{rkey}`. The Elohim Protocol has the `epr:` URI. It names content by a stable id; the knowledge, value and governance context lives in the EPR Head the URI resolves to, not in the URI itself.
 
 ### E.1: The `epr:` URI Scheme
 
 ```
 epr:{id}                                    Resolve EPR Head (Tier 1)
-epr:{id}@{version}                          Resolve specific version
+epr:{id}@{version}                          Reserved: a specific version (see below)
 epr:{id}/doc                                Resolve EPR Document (Tier 2)
 epr:{id}/blob                               Resolve Content Bytes (Tier 3)
 epr:{id}#step/{index}                       Fragment: path step position
 epr:{id}#chapter/{chapterId}                Fragment: path chapter
 epr:{id}#rel/{relationship}/{targetId}      Fragment: graph edge
 epr:{id}?via={did-or-peer-id}               Hint: prefer this resolver
-epr:{id}?reach={reach-level}                Hint: my access level
+epr:{id}?reach={reach-level}                Hint: the access level I expect
+epr:human/{id}                              A person (E.4)
+epr:agent/{id}                              An agent, such as an elohim (E.4)
 ```
 
-**Syntax (informal ABNF)**:
+Syntax (informal ABNF):
+
 ```
-epr-uri     = "epr:" epr-id [ "@" version ] [ "/" tier ] [ "?" query ] [ "#" fragment ]
-epr-id      = 1*( ALPHA / DIGIT / "-" / "_" / "." )
-version     = 1*DIGIT
-tier        = "doc" / "blob"
-query       = via-param / reach-param / ( via-param "&" reach-param )
-via-param   = "via=" ( did / peer-id )
-reach-param = "reach=" reach-level
-fragment    = step-frag / chapter-frag / rel-frag
-step-frag   = "step/" 1*DIGIT
-chapter-frag = "chapter/" epr-id
-rel-frag    = "rel/" relationship-type "/" epr-id
+epr-uri      = "epr:" epr-id [ "@" version ] [ "/" tier ] [ "?" query ] [ "#" fragment ]
+epr-id       = [ namespace "/" ] slug
+namespace    = "human" / "agent"
+slug         = 1*( ALPHA / DIGIT / "-" / "_" / "." )
+version      = 1*DIGIT
+tier         = "doc" / "blob"
+query        = via-param / reach-param / ( via-param "&" reach-param )
+via-param    = "via=" ( did / peer-id )
+reach-param  = "reach=" reach-level
+fragment     = step-frag / chapter-frag / rel-frag
+step-frag    = "step/" 1*DIGIT
+chapter-frag = "chapter/" slug
+rel-frag     = "rel/" relationship-type "/" slug
 ```
 
-**Examples**:
+When the text after `epr:` begins with `human/` or `agent/`, that segment is a namespace, so the `/doc` and `/blob` forms cannot address content whose id is `human` or `agent`. The `?reach=` hint grants nothing: the serving peer's gate decides access. The `@{version}` form is reserved. A head's `version` field is the schema version of the record, so `@` has no content version to name until one is defined.
+
+Examples:
+
 ```
-epr:manifesto-foundations                    The manifesto's foundations unit
-epr:manifesto-foundations@3                  Version 3 specifically
+epr:manifesto-foundations                    The manifesto's foundations
 epr:manifesto-foundations/blob               The raw content bytes
-epr:manifesto-foundations/doc                Full EPR Document with relationships
-epr:elohim-protocol-path#step/2             Step 2 of the protocol learning path
-epr:elohim-protocol-path#chapter/economic   The "economic" chapter of that path
+epr:manifesto-foundations/doc                Full EPR Document
+epr:elohim-protocol#step/2                   Step 2 of the protocol learning path
+epr:elohim-protocol#chapter/economic         The "economic" chapter of that path
 epr:systems-thinking#rel/PREREQUISITE/feedback-loops
-                                            The prerequisite edge from systems-thinking
-                                            to feedback-loops
-epr:manifesto-foundations?via=did:web:alpha.elohim.host
-                                            Prefer resolving through alpha doorway
+                                             The prerequisite edge from systems-thinking
+                                             to feedback-loops
+epr:manifesto-foundations?via=did:web:doorway.example.org
+                                             Prefer resolving through that doorway
 ```
 
-**Why `epr:` not `elohim://`**: The `elohim://` scheme is already registered for Tauri deep links (OAuth callbacks on P2P-native devices). `epr:` is short, unambiguous, and consistent with the EPR (Elohim Protocol Reference) naming used throughout this specification.
+Why `epr:` and not `elohim://`: the desktop app already uses `elohim://` for deep links (OAuth callbacks on peer-to-peer native devices). `epr:` is short, unambiguous and matches the EPR name.
+
+On the name. EPR expands two ways, on purpose: Elohim Protocol Reference and Elohim Protocol Record. It began with HTML's `href` and two questions: what a reference would look like if it had to carry value and governance, and earn its reach, before it could resolve; and how to address content that any number of peers might host, none of them its fixed home. With no fixed home there is no location to point at, so the reference points at the content itself, through a content address that resolves to the same bytes whichever peer serves them. That makes it the Reference, `href`'s accountable, location-independent cousin, and the sense this specification uses. Once authority over it is notarized on the Holochain DHT, it is evidence that stands on its own: a Record, the sense the [Records Lifecycle design](architecture/2026-05-24-records-lifecycle-design.md) (§A.1) uses. Reference → Record is one atom seen at compose time and at rest; the missing letter is the whole arc.
 
 ### E.2: The Four-Layer Hierarchy
 
-Every content reference passes through four layers. The key design decision: **transport is NOT in the URI**. It is resolved at runtime by the connection strategy. This keeps references portable across all deployment modes.
+Every content reference passes through four layers. Transport is not part of the URI: the connection strategy resolves it at runtime, which keeps references portable across every deployment mode.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ Layer 4: GRAPH POSITION (fragment — how it connects)            │
+│ Layer 4: GRAPH POSITION (fragment: how it connects)             │
 │   #step/3    #chapter/economic    #rel/PREREQUISITE/feedback    │
 ├─────────────────────────────────────────────────────────────────┤
-│ Layer 3: PROTOCOL CONTEXT (inherent in every EPR Head)          │
-│   lamad: contentType, title, previewCid                         │
-│   shefa: stewards[], recognition                                │
-│   qahal: reach, layer, governance                               │
+│ Layer 3: PROTOCOL CONTEXT (carried by the EPR Head)             │
+│   lamad: title, contentType, contentFormat, description, tags   │
+│   shefa: stewards, allocations                                  │
+│   qahal: reach, layer, attestationRequirements                  │
 ├─────────────────────────────────────────────────────────────────┤
-│ Layer 2: RESOLUTION (query hint — where to find it)             │
-│   ?via=did:web:alpha.elohim.host   (prefer this doorway)        │
-│   ?via=12D3KooW...                 (prefer this peer)           │
-│   (omitted)                        (use DHT / default strategy) │
+│ Layer 2: RESOLUTION (query hint: where to find it)              │
+│   ?via=did:web:doorway.example.org   (prefer this doorway)      │
+│   ?via=12D3KooW...                   (prefer this peer)         │
+│   (omitted)                          (use Kademlia or a default)│
 ├─────────────────────────────────────────────────────────────────┤
-│ Layer 1: TRANSPORT (implicit — resolved at runtime)             │
-│   web:     HTTPS via doorway (browser, hosted users)            │
-│   native:  HTTP to local elohim-storage (P2P-native device)    │
-│   p2p:     libp2p request-response (device-to-device)           │
-│   dev:     Angular proxy to localhost (development)              │
+│ Layer 1: TRANSPORT (implicit: resolved at runtime)              │
+│   web:     HTTPS via a doorway (browsers, hosted participants)  │
+│   native:  HTTP to the local elohim-storage node                │
+│   p2p:     libp2p or iroh request-response (device to device)   │
 └─────────────────────────────────────────────────────────────────┘
 
          epr:systems-thinking#rel/PREREQUISITE/feedback-loops
               ───────┬───────  ──────────┬──────────────────
                    id           graph position (Layer 4)
 
-    Protocol context (Layer 3) is not in the URI — it's in the EPR Head
-    that the URI resolves to. Every EPR Head always carries all three
-    pillar dimensions. The URI is the key; the EPR is the value.
+    Protocol context (Layer 3) is not in the URI. It is in the EPR Head
+    that the URI resolves to: the URI is the key, the head is the value.
 ```
 
-### E.3: Resolution Matrix — `epr:` to Transport-Specific URLs
+### E.3: Resolution Matrix: `epr:` to Transport-Specific Operations
 
-Given an `epr:` reference, the connection strategy resolves it to a transport-specific operation. This table is the developer's lookup — the one place to find "how do I fetch this?"
+Given an `epr:` reference, the connection strategy resolves it to a transport-specific operation. Here:
 
-#### Tier 1: EPR Head (metadata + stewardship + governance)
+- `{doorway}` is a doorway's base URL (for example `https://doorway.example.org`)
+- `{storage}` is an elohim-storage node's base URL (on a peer-to-peer native device, the local node)
 
-| EPR URI | Web (Doorway) | P2P-Native Device | P2P (libp2p) | App Route |
-|---------|---------------|----------------------|--------------|-----------|
-| `epr:{id}` | `GET {doorway}/db/content/{id}` | `GET {storage}/db/content/{id}` | `EprRequest::Resolve { id }` | `/lamad/resource/{id}` |
-| `epr:{id}@{v}` | `GET {doorway}/db/content/{id}?version={v}` | `GET {storage}/db/content/{id}?version={v}` | `EprRequest::ResolveVersion { id, version }` | — |
-| `epr:{id}` (path) | `GET {doorway}/db/paths/{id}` | `GET {storage}/db/paths/{id}` | `EprRequest::Resolve { id }` | `/lamad/path/{id}` |
+Over HTTP the routes return projections: views of a record shaped for web clients, which a doorway or storage node derives from the records it holds.
 
-Where:
-- `{doorway}` = doorway base URL (e.g. `https://doorway-alpha.elohim.host`)
-- `{storage}` = elohim-storage base URL (e.g. `http://localhost:8090`)
+#### Tier 1: EPR Head (metadata, stewardship, governance)
 
-#### Tier 2: EPR Document (full pillar context, relationships, economic events)
+| EPR URI | Web (doorway) | Peer-to-peer native device | Peer to peer | App route |
+|---------|---------------|----------------------------|--------------|-----------|
+| `epr:{id}` | `GET {doorway}/epr-head/{id}` | `GET {storage}/epr-head/{id}` | `EprRequest::Resolve { id, agent_pubkey }` | `/lamad/resource/{id}` |
+| `epr:{id}` (path) | `GET {doorway}/db/paths/{id}` | `GET {storage}/db/paths/{id}` | `EprRequest::Resolve { id, agent_pubkey }` | `/lamad/path/{id}` |
 
-| EPR URI | Web (Doorway) | P2P-Native Device | P2P (libp2p) |
-|---------|---------------|----------------------|--------------|
-| `epr:{id}/doc` | `GET {doorway}/db/content/{id}` + `GET {doorway}/db/relationships/graph/{id}` | Same pattern against `{storage}` | `EprRequest::GetDocument { id }` |
+The head route returns a projection in the head's shape: DAG-CBOR when the client asks for `application/vnd.ipld.dag-cbor`, and JSON otherwise. Web clients can also read the content projection, `GET {doorway}/db/content/{id}` (the same route serves against `{storage}`). The content and path routes return the record as a flat object, with the content address as `blobCid` (E.6); they are not heads.
 
-Note: The current HTTP API returns metadata and relationships separately. The P2P `EprRequest::GetDocument` returns them as a single EPR Document. HTTP implementations compose the equivalent from two calls until a unified endpoint exists.
+#### Tier 2: EPR Document (full pillar context)
 
-#### Tier 3: Content Bytes (the blob)
+| EPR URI | Web (doorway) | Peer-to-peer native device | Peer to peer |
+|---------|---------------|----------------------------|--------------|
+| `epr:{id}/doc` | No Document route | No Document route | `EprRequest::GetDocument { id }` |
 
-| EPR URI | Web (Doorway) | P2P-Native Device | P2P (libp2p) |
-|---------|---------------|----------------------|--------------|
-| `epr:{id}/blob` | **Two-step**: resolve `epr:{id}` → get `blobHash` → `GET {doorway}/blob/{hash}` | **Two-step**: resolve → `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
-| (by hash directly) | `GET {doorway}/blob/{hash}` | `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
+Over HTTP a client can compose part of the Tier 2 context, such as the content's relationships, from `GET {doorway}/db/content/{id}` and `GET {doorway}/db/relationships/graph/{id}`. The result is not an EPR Document.
 
-**Path is unified**: Both doorway and the local steward (elohim-storage) serve blobs at `/blob/{hash}`. The difference is in what's wrapped around the request, not the path name. On doorway, requests pass through the projection/caching layer and reach the configured steward via registry-routed proxy (HTTP Range, ETag, CDN-friendly caching, shard-resolution fallback all happen there). On a P2P-native device, the local steward (elohim-storage) is hit directly — same path, no projection layer in front. The vocabulary cleanup (2026-04-30) retired the legacy `/store/{hash}` (gateway-only) and `/api/blob/{hash}` (admin proxy alias) paths in favor of this single canonical route. `POST /api/blob/verify` remains as a separate verification endpoint.
+#### Tier 3: Content Bytes
+
+| EPR URI | Web (doorway) | Peer-to-peer native device | Peer to peer |
+|---------|---------------|----------------------------|--------------|
+| `epr:{id}/blob` | Two steps: resolve `epr:{id}`, read its content address, then `GET {doorway}/blob/{hash}` | Two steps: resolve, then `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
+| (by address directly) | `GET {doorway}/blob/{hash}` | `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
+
+The canonical blob route is `/blob/{hash}` on both doorways and elohim-storage nodes. On a doorway, the request passes through the projection and caching layer (HTTP Range, ETag, CDN-friendly caching, shard-resolution fallback) and is routed to a storage node through the doorway's registry. On a peer-to-peer native device, the local elohim-storage node answers directly on the same path. `POST /api/blob/verify` is a separate verification endpoint.
 
 #### Path Steps (fragment resolution)
 
 | EPR URI | Resolution |
-|---------|-----------|
-| `epr:{pathId}#step/{n}` | Resolve `epr:{pathId}` as path → extract step `n` from `steps[]` → resolve step's content EPR |
+|---------|------------|
+| `epr:{pathId}#step/{n}` | Resolve `epr:{pathId}` as a path, take its step at position `n` (the target of its `STEP` relationship with that `orderIndex`; Appendix A), then resolve that step's content EPR |
 | App route | `/lamad/path/{pathId}/step/{n}` |
 
-Fragments are resolved client-side after the parent EPR resolves. The fragment is not sent to the server.
+Fragments are resolved on the client after the parent EPR resolves; the fragment is never sent to the server.
 
 #### Batch Resolution (for composite content)
 
-| EPR URI | Web/Direct | P2P |
-|---------|-----------|-----|
-| Multiple `epr:{id}` refs in a composite layout | Parallel `GET /db/content/{id}` calls | `EprRequest::ResolveBatch { ids: [...] }` |
+| EPR URI | Web or direct | Peer to peer |
+|---------|---------------|--------------|
+| Several `epr:{id}` references in a composite body | Parallel `GET /epr-head/{id}` calls | `EprRequest::ResolveBatch { ids: [...] }` |
 
-### E.4: DID ↔ EPR Bridge
+### E.4: DID and EPR Identifiers
 
-Two identifier systems coexist. DIDs are for W3C interop (Verifiable Credentials, federation discovery, DID document resolution). EPR URIs are for protocol-native operations (content resolution, feed subscriptions, graph traversal, UI links).
+Two identifier systems coexist. DIDs serve W3C interoperability (Verifiable Credentials, or VCs; federation discovery; DID document resolution). EPR URIs serve protocol operations (content resolution, feed subscriptions, graph traversal, links in the interface).
 
-**Conversion rules**:
+Conversion rules:
 
-| DID | EPR URI | When to use DID | When to use EPR |
-|-----|---------|----------------|-----------------|
-| `did:web:{host}:content:{id}` | `epr:{id}` | VCs, federation, external references | Resolution, feeds, UI |
-| `did:web:{host}:paths:{id}` | `epr:{id}` | VCs about path completion | Resolution, UI |
-| `did:web:{host}:humans:{id}` | `epr:human/{id}` | Identity, auth, VCs | Steward feed subscriptions |
-| `did:web:{host}:agents:{id}` | `epr:agent/{id}` | Elohim agent identity | Agent-related queries |
+| DID | EPR URI | Use the DID for | Use the EPR for |
+|-----|---------|-----------------|-----------------|
+| `did:web:{host}:content:{id}` | `epr:{id}` | VCs, federation, external references | Resolution, feeds, interface |
+| `did:web:{host}:paths:{id}` | `epr:{id}` | VCs about path completion | Resolution, interface |
+| `did:web:{host}:humans:{id}` | `epr:human/{id}` | Identity, authentication, VCs | Steward feed subscriptions |
+| `did:web:{host}:agents:{id}` | `epr:agent/{id}` | elohim identity | Agent-related queries |
 
-**Examples**:
-```
-did:web:hosted.elohim.host:content:manifesto-foundations  ↔  epr:manifesto-foundations
-did:web:hosted.elohim.host:paths:elohim-protocol          ↔  epr:elohim-protocol
-did:web:hosted.elohim.host:humans:matthew                  ↔  epr:human/matthew
-```
-
-The `{host}` in the DID varies by deployment (doorway DIDs use their host, hosted users use `hosted.elohim.host`). The EPR URI is host-independent — it resolves through whatever transport is available. This is the key portability benefit: `epr:manifesto-foundations` works whether you're on a doorway, a P2P-native device, or a headless storage node.
-
-### E.5: Hash Format Canonicalization
-
-One canonical format for content-addressed blobs:
+Examples:
 
 ```
-CANONICAL:     sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
-               ~~~~~~ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-               prefix  64 lowercase hex characters (32 bytes)
+did:web:doorway.example.org:content:manifesto-foundations  →  epr:manifesto-foundations
+did:web:doorway.example.org:paths:elohim-protocol          →  epr:elohim-protocol
+did:web:doorway.example.org:humans:alice                   →  epr:human/alice
 ```
 
-All components MUST produce `sha256-{hex}` when generating blob references.
-All components MUST accept these formats on input:
+Converting a DID to an EPR URI drops the host. The EPR URI names no host and resolves through whatever transport is available, so `epr:manifesto-foundations` works the same on a doorway, on a peer-to-peer native device and on a headless storage node. Converting back needs a host, which the resolver supplies, and the round trip is lossless only while ids are unique across hosts.
 
-| Format | Example | Status | Where It Appears |
-|--------|---------|--------|-----------------|
-| `sha256-{hex}` | `sha256-a7ffc6f8...` | **Canonical** | EPR Heads, shard protocol, HTTP APIs, all new code |
-| `bafkrei...` | `bafkreigdyrzt5sfp7...` | Valid input | CIDv1 (raw codec 0x55, SHA256 multihash, base32lower). Accepted everywhere. Stored internally as `sha256-{hex}` |
-| `sha256:{hex}` | `sha256:a7ffc6f8...` | **Deprecated** | Legacy blob references in some content bodies. Accept on input, never produce |
-| Raw hex | `a7ffc6f8bf1ed766...` | Valid input | 64-char hex string. Accepted by `parse_content_address()`. Never produce — always prefix with `sha256-` |
+### E.5: Content-Address Canonicalization
 
-**Normalization** (pseudo-code for any component accepting a content address):
+In this section and in Appendix G, the capitalised words MUST, SHOULD and MAY carry their RFC 2119 meanings.
+
+The canonical content address of a blob is a CIDv1 (Appendix F.1):
+
 ```
-fn normalize(input: &str) -> String {
-    if input.starts_with("sha256-") && input.len() == 71 { return input }
-    if input.starts_with("sha256:") { return "sha256-" + &input[7..] }
-    if input.len() == 64 && is_hex(input) { return "sha256-" + input }
-    if input.starts_with("bafkrei") { return "sha256-" + cid_to_sha256_hex(input) }
-    error("unrecognized content address format")
+CANONICAL:  bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44mcplnzjhclme
+            CIDv1 · raw codec 0x55 · SHA-256 multihash · base32lower
+```
+
+All components MUST produce a CIDv1 when they generate a blob reference. All components MUST accept every form below on input. Every form names the same SHA-256 digest, so normalizing changes the representation and never re-hashes.
+
+| Format | Example | Status |
+|--------|---------|--------|
+| `bafkrei...` | `bafkreibm6jg3...` | Canonical. Produce and accept. |
+| `sha256-{hex}` | `sha256-a7ffc6f8...` | Legacy. Accept, never produce. |
+| Raw hex | `a7ffc6f8bf1ed766...` | Legacy: 64 lowercase hex characters. Accept, never produce. |
+| `sha256:{hex}` | `sha256:a7ffc6f8...` | Deprecated: appears in older content bodies. Accept, never produce. |
+
+Normalization (pseudo-code for any component that accepts a content address):
+
+```
+fn normalize(input: &str) -> Result<Cid> {
+    if let Ok(cid) = Cid::parse(input) { return Ok(cid) }     // canonical
+    let hex = input.strip_prefix("sha256-")                   // legacy
+        .or_else(|| input.strip_prefix("sha256:"))            // deprecated
+        .unwrap_or(input);                                    // raw hex
+    if hex.len() == 64 && is_hex(hex) {
+        let digest = hex_decode(hex);
+        return Ok(Cid::v1(RAW_0x55, Multihash::wrap(SHA2_256_0x12, digest)))
+    }
+    Err("unrecognized content address format")
 }
 ```
 
-### E.6: Two-Step Content Resolution (Metadata → Blob)
+### E.6: Two-Step Content Resolution (Metadata, then Blob)
 
-Most content retrieval follows a two-step pattern: first resolve the EPR to get the blob hash, then fetch the blob by hash. This is the standard flow every developer will implement.
+Most content retrieval takes two steps: learn the blob's content address, then fetch the blob by that address. Over the peer-to-peer protocol the address is the head's `content` field (Part IV). Over HTTP a client reads it from the head route, or from the content projection, which carries it as `blobCid`:
 
 ```
-Step 1: Resolve EPR
+Step 1: Read the content projection (or the head, GET /epr-head/{id})
   epr:manifesto-foundations
     → GET /db/content/manifesto-foundations
     → {
         id: "manifesto-foundations",
-        blobHash: "sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
-        contentType: "unit",
+        blobCid: "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44mcplnzjhclme",
+        contentType: "article",
         contentFormat: "markdown",
         title: "Foundations of the Elohim Protocol",
         ...
       }
 
-Step 2: Fetch blob (if content body is a blob reference)
-  sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
-    → GET /blob/sha256-a7ffc6f8...   (canonical — through doorway with CDN/Range, or direct to storage)
-    → ShardRequest::Get { hash: "sha256-a7ffc6f8..." }  (P2P)
+Step 2: Fetch the blob (if the content body is a blob reference)
+    → GET /blob/bafkreibm6jg3...   (through a doorway with CDN and Range support,
+                                    or directly from a storage node)
+    → ShardRequest::Get { hash: "bafkreibm6jg3..." }   (peer to peer)
     → raw bytes (markdown text, image data, video, etc.)
 
 Step 3: Verify integrity
-  sha256(received_bytes) == epr_head.cid
-  If mismatch: discard, try alternate peer/doorway
+  The SHA-256 digest of the received bytes matches the content address.
+  On a mismatch: discard, and try another peer or doorway.
 ```
 
-**When is step 2 needed?** When the content's `content` field (or `contentBody`) starts with `sha256-` or `sha256:`, it's a blob reference. Otherwise, the content body is inline (small text content stored directly in the metadata record).
+In the content projection, Step 2 is needed when the content body is a blob reference, meaning it starts with `bafk`, `sha256-` or `sha256:`, or when the body is empty and the record carries `blobCid`. Otherwise the body is inline, stored directly in the record, and has no blob. The raw-hex form, which E.5 accepts wherever a field is known to hold an address, is not read as a blob reference inside a body.
 
-**Decision tree**:
 ```
 content.contentBody
-  ├── starts with "sha256-" or "sha256:" → BLOB: fetch from /blob/{hash}
-  ├── starts with "{" or "[" → INLINE JSON: parse directly (sophia-quiz-json, html5-app config)
-  └── otherwise → INLINE TEXT: render directly (short markdown, descriptions)
+  ├── starts with "bafk", "sha256-" or "sha256:" → BLOB: fetch from /blob/{hash}
+  ├── empty, and the record carries blobCid       → BLOB: fetch blobCid
+  ├── starts with "{" or "["                      → INLINE JSON: parse directly
+  │                                                  (sophia-quiz-json, html5-app config)
+  └── otherwise                                   → INLINE TEXT: render directly
+                                                     (short markdown, descriptions)
 ```
 
 ### E.7: Delivery Mode Decision Tree
 
-For developers implementing content retrieval — which URL pattern to use:
+Which operation to use, by the kind of device doing the retrieving:
 
 ```
-Am I a P2P-native device? (own conductor, own storage, own keys)
-  ├── YES: I talk to my local steward (elohim-storage) over HTTP
-  │     │  AND to the network over libp2p — both paths are mine.
+Am I a peer-to-peer native device? (own conductor, own storage, own keys)
+  ├── YES: I talk to my local elohim-storage node over HTTP,
+  │     │  and to the network over libp2p or iroh. Both paths are mine.
   │     │
-  │     │  Local steward (HTTP to localhost):
-  │     │     Metadata: GET http://localhost:8090/db/content/{id}
-  │     │     Blobs:    GET http://localhost:8090/blob/{hash}
-  │     │     Paths:    GET http://localhost:8090/db/paths/{id}
-  │     │     WS:       ws://localhost:{port}
+  │     │  Local storage node (HTTP):
+  │     │     Heads:    GET {storage}/epr-head/{id}
+  │     │     Content:  GET {storage}/db/content/{id}   (projection)
+  │     │     Blobs:    GET {storage}/blob/{hash}
+  │     │     Paths:    GET {storage}/db/paths/{id}
   │     │
-  │     │  Network (libp2p to peers):
-  │     │     Metadata: EprRequest::Resolve { id }
+  │     │  Network (peer to peer):
+  │     │     Heads:    EprRequest::Resolve { id, agent_pubkey }
   │     │     Blobs:    ShardRequest::Get { hash }
-  │     │     Feeds:    FeedRequest::Subscribe { ... }
+  │     │     Feeds:    FeedRequest::Subscribe { ... }   (Part V)
   │     │     Sync:     Automerge sync protocol
   │     │
-  │     └── My local steward may also use libp2p to fetch content
-  │         I don't have yet — the two paths compose, not compete.
+  │     └── My local storage node may also fetch, over the network,
+  │         content I don't have yet. The two paths compose.
   │
-  └── NO: I'm a browser. Someone else stewards for me.
-        ├── Doorway configured (production/hosted):
-        │     Metadata: GET {doorway}/db/content/{id}
-        │     Blobs:    GET {doorway}/blob/{hash}      (CDN-cached, Range-capable, registry-routed to steward)
-        │     Paths:    GET {doorway}/db/paths/{id}
-        │     Graphs:   GET {doorway}/db/relationships/graph/{id}
-        │     WS:       wss://{doorway}/hc/app/{port}?apiKey=...&token=...
-        └── No doorway (dev server):
-              Same paths, proxied through localhost:4200 → localhost:8888
-              (proxy.conf.mjs maps /db/, /blob/, /api/ to doorway)
+  └── NO: I'm a browser, and a doorway serves me.
+        Heads:    GET {doorway}/epr-head/{id}
+        Content:  GET {doorway}/db/content/{id}      (projection)
+        Blobs:    GET {doorway}/blob/{hash}    (CDN-cached, Range-capable,
+                                                registry-routed to a storage node)
+        Paths:    GET {doorway}/db/paths/{id}
+        Graphs:   GET {doorway}/db/relationships/graph/{id}
+        WS:       wss://{doorway}/hc/app/{port}?apiKey=...&token=...
 ```
-
-### E.8: Known Inconsistencies
-
-Issues in the current codebase that this specification normalizes:
-
-| Issue | Current State | Correct Per This Spec | Fix |
-|-------|-------------|----------------------|-----|
-| Legacy doorway blob paths | `/store/{hash}` and `/api/blob/{hash}` historically routed to storage | Single canonical `/blob/{hash}` via registry | RESOLVED 2026-04-30 (vocabulary cleanup sprint) |
-| `sha256:` colon format | Accepted by `BlobManagerService` | Deprecated — accept, never produce | Add deprecation comment in `blob-manager.service.ts` |
-| DID host inconsistency | Models use `elohim.host`, doorway uses `hosted.elohim.host` | `hosted.elohim.host` for hosted humans | Align model examples |
 
 ---
 
-## Appendix F: IPLD Alignment — EPR as an IPLD Extension
+## Appendix F: IPLD Alignment: EPR as an IPLD Extension
 
-The Elohim Protocol composes on IPFS primitives rather than building alongside them. EPR Heads are IPLD-compatible documents: any IPLD tool can traverse their links, but only EPR-aware tools understand the three-pillar semantics.
+The Elohim Protocol composes on IPFS primitives rather than building beside them. EPR Heads are IPLD-compatible documents: any IPLD tool can decode them, and only EPR-aware tools understand the three-pillar semantics.
 
-### F.1: Content Addressing — CIDv1 as Canonical
+### F.1: Content Addressing: CIDv1 as Canonical
 
-EPR uses IPFS Content Identifiers (CIDv1) as the canonical content address format:
+EPR uses IPFS Content Identifiers (CIDv1) as its canonical content address:
 
-- **Codec**: Raw (0x55) — content bytes are opaque, not structured
-- **Hash**: SHA-256 (0x12) via multihash
-- **Base**: base32lower — produces `bafkrei...` strings
-- **Example**: `bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44mcplnzjhclme`
+- Codec: raw (0x55); content bytes are opaque, not structured
+- Hash: SHA-256 (0x12) via multihash
+- Base: base32lower, which produces `bafkrei...` strings
+- Example: `bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44mcplnzjhclme`
 
-The Rust backend (`blob_store.rs`) already computes both CID and legacy `sha256-{hex}` on every store operation. The `parse_content_address()` function accepts CID, `sha256-{hex}`, and raw hex — enabling gradual migration.
+Appendix E.5 lists the legacy forms that are accepted on input and never produced.
 
-Legacy `sha256-{hex}` format is accepted on input but should not be produced by new code.
+### F.2: EPR Head as an IPLD Document (normative)
 
-### F.2: EPR Head as IPLD Document
+This is the normative encoding of the head defined in Part II. It is shown here as JSON for reading; the canonical bytes are its DAG-CBOR encoding (multicodec 0x71).
 
-An EPR Head serialized as DAG-CBOR (multicodec 0x71):
-
-```cbor
+```json
 {
   "version": 1,
   "id": "rea-foundations",
-  "content": { "/": "bafkreibm6jg3..." },
+  "content": "bafkreibm6jg3...",
 
   "lamad": {
     "title": "REA Foundations",
@@ -1228,8 +1309,8 @@ An EPR Head serialized as DAG-CBOR (multicodec 0x71):
   },
 
   "shefa": {
-    "stewards": ["did:web:alpha.elohim.host:humans:contributor-1"],
-    "allocations": [100]
+    "stewards": ["did:web:doorway.example.org:humans:contributor-1"],
+    "allocations": [1.0]
   },
 
   "qahal": {
@@ -1241,7 +1322,7 @@ An EPR Head serialized as DAG-CBOR (multicodec 0x71):
     {
       "type": "PREREQUISITE",
       "target": "systems-thinking",
-      "targetCid": { "/": "bafkrei..." }
+      "targetCid": "bafkrei..."
     },
     {
       "type": "TEACHES",
@@ -1249,120 +1330,123 @@ An EPR Head serialized as DAG-CBOR (multicodec 0x71):
     }
   ],
 
-  "author": "did:web:alpha.elohim.host:humans:contributor-1",
+  "author": "did:web:doorway.example.org:humans:contributor-1",
   "updated": "2026-02-27T00:00:00Z"
 }
 ```
 
-**IPLD link format**: The `{ "/": "bafkrei..." }` syntax is IPLD's standard CID link representation in DAG-CBOR/DAG-JSON. IPLD tools follow these links during traversal.
+Links: the head carries its CIDs (`content` and `relationships[].targetCid`) as strings. A generic IPLD tool decodes them as text, not as links; encoding them as native DAG-CBOR links (CBOR tag 42) would let such tools traverse them.
 
-**Three-pillar extension**: The `lamad`, `shefa`, and `qahal` fields are EPR's semantic extension to IPLD. They carry no meaning to generic IPLD tools but are the core value proposition for EPR-aware applications.
+Three-pillar extension: the `lamad`, `shefa` and `qahal` fields are EPR's extension to IPLD. They mean nothing to a generic IPLD tool and carry the three-pillar context for EPR-aware ones.
 
-### F.3: What IPLD Provides vs What EPR Adds
+### F.3: What IPLD Provides and What EPR Adds
 
-| Capability | IPLD Primitive | EPR Extension |
-|-----------|---------------|---------------|
-| Content addressing | CIDv1 (multihash + multicodec) | — (uses as-is) |
+| Capability | IPLD primitive | EPR extension |
+|------------|----------------|---------------|
+| Content addressing | CIDv1 (multihash + multicodec) | Used as it is |
 | Immutable links | DAG-CBOR CID links | Typed relationships (PREREQUISITE, TEACHES, etc.) |
-| Graph traversal | IPLD Selectors | Three-pillar-aware traversal (future) |
+| Graph traversal | IPLD Selectors | Three-pillar-aware traversal (planned) |
 | Mutable naming | IPNS (name → CID pointer) | EPR Head (name → rich metadata → CID) |
-| Block exchange | Bitswap | Shard protocol with stewardship economics |
-| Data model | IPLD Data Model (maps, lists, links) | Three-pillar coupling (lamad/shefa/qahal) |
-| Content verification | Hash verification | Hash + governance (reach) + steward attestation |
+| Block exchange | Bitswap | Shard protocol with stewardship economics (planned) |
+| Data model | IPLD Data Model (maps, lists, links) | Three-pillar coupling (lamad, shefa, qahal) |
+| Content verification | Hash verification | Hash, plus governance (the reach gate) |
 
-### F.4: Migration Path
-
-**Current state** (this sprint):
-- EPR Head defined as TypeScript interface (`epr-head.model.ts`)
-- CIDv1 recognized as canonical in frontend (`multiformats` package)
-- Backend produces CID on every blob store
-- Wire format remains JSON (not yet DAG-CBOR)
-
-**Next sprint**:
-- Rust IPFS SDK (forked `rust-ipfs`) as submodule for Bitswap, IPLD DAG store, CID routing
-- Helia `@helia/verified-fetch` for trustless blob retrieval in browser
-- EPR Head serialization to DAG-CBOR alongside JSON
-
-**Future**:
-- EPR multicodec registration (private range, then IANA if adopted)
-- IPNS integration for EPR mutable naming
-- IPLD Selectors for knowledge graph traversal
-- Push for IPLD spec extension with three-pillar patterns
-
-### F.5: Interoperability Guarantee
+### F.4: Interoperability Guarantee
 
 Any IPFS node can:
-1. **Store** EPR content bytes (they're just blobs with CIDs)
-2. **Pin** EPR content (standard IPFS pinning)
-3. **Exchange** EPR blobs via Bitswap (standard block exchange)
-4. **Traverse** EPR Head links (standard IPLD DAG-CBOR)
+
+1. Store EPR content bytes (they are blobs with CIDs)
+2. Pin EPR content (standard IPFS pinning)
+3. Exchange EPR blobs via Bitswap (standard block exchange)
+4. Decode EPR Heads (standard DAG-CBOR)
 
 Only EPR-aware nodes can:
-1. **Interpret** three-pillar semantics (lamad/shefa/qahal)
-2. **Enforce** governance (reach levels, constitutional layers)
-3. **Route** stewardship economics (recognition flows)
-4. **Resolve** context-aware navigation (path-aware link resolution)
 
-This is by design: interoperable by default, EPR extensions prove their value through use. If EPR gains adoption, the three-pillar coupling becomes a candidate for IPLD spec extension.
+1. Interpret the three-pillar semantics (lamad, shefa, qahal)
+2. Enforce governance (reach levels, constitutional layers)
+3. Route stewardship economics (recognition)
+4. Resolve context-aware navigation (path-aware link resolution)
 
-### F.6: Multicodec Registration
+If the three-pillar coupling proves itself in use, it becomes a candidate for an IPLD specification extension.
 
-EPR defines three application-specific multicodec entries in the private-use range `0x300000–0x3FFFFF`, alongside the standard DAG-CBOR codec used for EPR Head encoding:
+### F.5: Multicodec Codes
+
+EPR defines three application-specific codes in the multicodec private-use range `0x300000–0x3FFFFF`, alongside the standard DAG-CBOR codec it uses to encode heads:
 
 | Code | Name | Description |
 |------|------|-------------|
-| `0x71` | dag-cbor | Standard IPLD DAG-CBOR codec (used for EPR Head encoding) |
-| `0x300001` | epr-head | EPR Head metadata envelope (private-use range) |
-| `0x300002` | epr-document | EPR Document body (private-use range) |
-| `0x300003` | epr-relationship | EPR Relationship edge (private-use range) |
+| `0x71` | dag-cbor | Standard IPLD DAG-CBOR codec (used to encode EPR Heads) |
+| `0x300001` | epr-head | EPR Head metadata envelope (private use) |
+| `0x300002` | epr-document | EPR Document body (private use) |
+| `0x300003` | epr-relationship | EPR Relationship edge (private use) |
 
-EPR uses the private-use range `0x300000–0x3FFFFF` per the [multicodec specification](https://github.com/multiformats/multicodec). These codes are not registered upstream and are only meaningful within the Elohim Protocol ecosystem. If EPR gains broader adoption, these codes will be submitted for formal IANA registration.
+The private-use range follows the [multicodec specification](https://github.com/multiformats/multicodec). These codes are not registered upstream and mean something only within the Elohim Protocol. If EPR is adopted more widely, they will be submitted to the multiformats multicodec table.
 
-The `dag-cbor` codec (`0x71`) is the standard IPLD codec and is used directly for EPR Head serialization. The EPR-specific codes (`0x300001`–`0x300003`) identify the semantic type of the encoded document, enabling EPR-aware tools to distinguish an EPR Head from a generic DAG-CBOR document without inspecting the payload.
+A head's CID uses the standard dag-cbor codec (0x71). The EPR-specific codes are reserved for a later phase of IPLD integration (Appendix G), in which they would identify the semantic type of an encoded document, so an EPR-aware tool could tell an EPR Head from a generic DAG-CBOR document without inspecting the payload.
 
-### F.7: Wire Format Migration (JSON to DAG-CBOR)
+### F.6: CID Format Convention
 
-EPR Heads are migrating from raw JSON to DAG-CBOR as the canonical wire format. The migration proceeds in three phases:
+A CID's prefix encodes its codec as well as its hash, so the prefix separates structured metadata from raw bytes at a glance:
 
-1. **Phase 1 (current)**: EPR Heads stored as DAG-CBOR with codec `0x71`. Backward compatibility via first-byte detection: `0x7B` (ASCII `{`) indicates JSON, anything else indicates CBOR. All readers MUST support both formats during this phase.
-2. **Phase 2 (planned)**: All new EPR Heads written exclusively as DAG-CBOR. JSON reading retained for migration of existing content. New implementations MAY omit JSON writing support.
-3. **Phase 3 (future)**: JSON fallback deprecated. All content IPLD-native. Implementations MAY drop JSON reading support after a migration period (to be defined by constitutional governance).
+| Prefix | Codec | Meaning | Example |
+|--------|-------|---------|---------|
+| `bafyr...` | `0x71` (dag-cbor) | Structured IPLD document (EPR Head, EPR Document) | The EPR Head for "rea-foundations" |
+| `bafkrei...` | `0x55` (raw) | Opaque content bytes (markdown, images, video) | The blob for a concept's markdown body |
 
-**First-byte detection** (pseudo-code):
+Both are base32lower CIDv1 over SHA-256. A system that processes EPR references can tell from the prefix alone whether a CID points to traversable structured data or to opaque bytes, without resolving it.
+
+---
+
+## Appendix G: Migration
+
+Migration is additive. Existing content and HTTP routes keep working while EPR resolution is added beside them.
+
+### G.1: Wrapping Existing Content in Heads
+
+1. For each content record, derive an EPR Head from its fields (id, content address, content type and format, description, tags, reach), its stewardship allocations (shefa), its relationships, and the constitutional layer of its governance state (qahal).
+2. Declare each content record on the Holochain DHT through the canonical declaration channel, and publish its head to Kademlia under `epr:{id}`.
+3. Keep the HTTP content API (`/db/content/{id}`) working. EPR resolution is an additional path, not a replacement.
+
+### G.2: Stored Head Encoding: JSON to DAG-CBOR
+
+Stored heads move from JSON to DAG-CBOR (codec 0x71) in three phases:
+
+1. Phase 1: heads are stored as DAG-CBOR, and readers tell them apart from the older JSON form by the first byte: `0x7B` (ASCII `{`) is JSON, and anything else is DAG-CBOR. All readers MUST support both formats during this phase.
+2. Phase 2: all new heads are written only as DAG-CBOR. Readers keep reading JSON so that existing content can be migrated, and new implementations MAY omit JSON writing.
+3. Phase 3: the JSON fallback is deprecated and all content is IPLD-native. Implementations MAY drop JSON reading after a migration period set by constitutional governance.
+
+This rule covers heads exchanged or stored as canonical bytes, such as those served by the HTTP head route. A head received in an `/elohim/epr` message, a feed message or a Kademlia record is MessagePack (Part II) and is decoded as MessagePack.
+
+First-byte detection (pseudo-code):
+
 ```
-fn decode_epr_head(bytes: &[u8]) -> EprHead {
-    if bytes[0] == 0x7B {   // '{' — JSON
-        serde_json::from_slice(bytes)
-    } else {                 // DAG-CBOR
-        serde_cbor::from_slice(bytes)
+fn decode_epr_head(bytes: &[u8]) -> Result<EprHead> {
+    match bytes.first() {
+        None       => Err("empty input"),
+        Some(0x7B) => json::decode(bytes),       // '{': legacy JSON
+        Some(_)    => dag_cbor::decode(bytes),   // canonical DAG-CBOR
     }
 }
 ```
 
-This approach avoids version negotiation or content-type headers at the storage layer — the format is self-describing from the first byte.
+### G.3: Content Addresses: `sha256-{hex}` to CIDv1
 
-### F.8: CID Format Convention
+New code produces CIDv1 and accepts the legacy forms listed in Appendix E.5, so content addressed as `sha256-{hex}` stays reachable while references move to CIDv1.
 
-CID prefixes encode both the hash function and the codec, providing a visual distinction between structured metadata and raw content bytes:
+### G.4: Deeper IPLD Integration
 
-- **EPR Head CIDs** use codec `0x71` (dag-cbor), producing `bafyr...` prefixed strings (base32lower multibase + CIDv1 + dag-cbor + sha256)
-- **Content blob CIDs** use codec `0x55` (raw), producing `bafkrei...` prefixed strings (base32lower multibase + CIDv1 + raw + sha256)
-
-The CID prefix distinguishes structured metadata from raw bytes at a glance:
-
-| Prefix | Codec | Meaning | Example |
-|--------|-------|---------|---------|
-| `bafyr...` | `0x71` (dag-cbor) | Structured IPLD document (EPR Head, EPR Document) | EPR Head for "rea-foundations" |
-| `bafkrei...` | `0x55` (raw) | Opaque content bytes (markdown, images, video) | Blob for a unit's markdown body |
-
-This convention means that any system processing EPR references can immediately determine whether a CID points to traversable structured data or opaque bytes, without resolving the reference first.
+- Submit the EPR multicodec codes (Appendix F.5) to the multiformats multicodec table if EPR is adopted beyond this network
+- IPNS for EPR mutable naming
+- IPLD Selectors for knowledge-graph traversal
+- Trustless blob retrieval in the browser (verified fetch) and Bitswap block exchange
+- Propose the three-pillar pattern as an IPLD specification extension
 
 ---
 
 ## License and Openness
 
-This specification is published as open documentation under the same terms as the Elohim Protocol codebase. All protocol specifications, reference implementations, and constitutional documents are publicly auditable, modifiable, and community-maintained.
+This specification is published as open documentation under the same terms as the Elohim Protocol codebase. All protocol specifications, reference implementations and constitutional documents are publicly auditable, modifiable and community-maintained.
 
-No entity — including the Elohim Protocol organization — holds exclusive rights to implement, extend, or restrict this specification. The protocol's anti-capture design applies to the specification itself: it belongs to the commons, stewarded by the community that uses it.
+No entity, including the Elohim Protocol organization, holds exclusive rights to implement, extend or restrict this specification. The protocol's anti-capture design applies to the specification itself: it belongs to the commons, stewarded by the community that uses it.
 
-Implementations of this specification should be open source. Proprietary implementations that restrict auditability violate the constitutional requirement that "no single entity should control the infrastructure of human connection."
+Implementations of this specification should be open source. A proprietary implementation that restricts auditability conflicts with the manifesto's first principle, that no single entity should control the infrastructure of human connection.
