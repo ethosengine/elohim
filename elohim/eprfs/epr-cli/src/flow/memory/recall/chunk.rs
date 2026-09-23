@@ -233,7 +233,7 @@ mod tests {
             "python": { "split": ["def", "class"] },
             "other": { "split": "line-window", "window_bytes": 2000 },
             "max_chunk_bytes": 2000,
-            "max_chunks_per_file": 12
+            "max_chunks_per_file": 40
         }))
         .expect("the declared rule reads")
     }
@@ -313,11 +313,11 @@ mod tests {
     }
 
     #[test]
-    fn at_most_twelve_chunks_per_file_and_the_rest_are_counted() {
-        let text: String = (0..20).map(|i| format!("# H{i}\nbody {i}\n")).collect();
+    fn at_most_forty_chunks_per_file_and_the_rest_are_counted() {
+        let text: String = (0..50).map(|i| format!("# H{i}\nbody {i}\n")).collect();
         let chunked = declared().chunk("many.md", &text);
-        assert_eq!(chunked.chunks.len(), 12);
-        assert_eq!(chunked.dropped, 8);
+        assert_eq!(chunked.chunks.len(), 40);
+        assert_eq!(chunked.dropped, 10);
     }
 
     #[test]
@@ -327,7 +327,7 @@ mod tests {
             "python": { "split": ["def", "class"] },
             "other": { "split": "line-window", "window_bytes": 2000 },
             "max_chunk_bytes": 2000,
-            "max_chunks_per_file": 12
+            "max_chunks_per_file": 40
         });
         rule["other"]["split"] = json!("paragraph");
         assert!(ChunkRule::from_declared(&rule).is_err());

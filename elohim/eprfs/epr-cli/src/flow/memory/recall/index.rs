@@ -2,53 +2,73 @@
 //! `epr flow memory index fold|status`.
 //!
 //! The fold executes `recall-semantic-index@1` (the `IndexMeasure` the contract's `semantic`
-//! provider names) against the tree: it walks the measure's surfaces under the contract's
-//! `discovery.exclude_directories` (at every depth — the private recall store under `.eprfs` and a
-//! sibling checkout under `worktrees` never enter) and `first_screen_globs`, fingerprints each
-//! file (the raw CID of its bytes — the cites convention's body CID), and diffs against its
-//! derived store. Only new and changed files are re-chunked (by the declared rule, `chunk.rs`) and
-//! re-embedded, at most `limits.fold_files_per_run` a run; removed and superseded chunks are
-//! demoted with a timestamp, never deleted (`Retention` has no delete, and the store's own trigger
-//! refuses one). Every run ends in a [`FoldAttestation`]: `complete` when nothing is left behind,
-//! `degraded` when the run cap stopped it, `failed` when the method or the procedure refused —
-//! the latest at `attestation.json` and every one appended to `attestations.jsonl`.
+//! provider names) against the tree. Which files it covers is `surface.rs`'s concern: the
+//! measure's own glob surface over the declared source (git-tracked files on a checkout), with
+//! the contract's excluded directories and the private-chain floor on top. Each candidate is
+//! fingerprinted by the raw CID of its bytes — the cites convention's body CID — and a file whose
+//! size and mtime match the store's row is not re-hashed at all. Only new and changed files are
+//! re-chunked (by the declared rule, `chunk.rs`) and re-embedded, at most
+//! `limits.fold_files_per_run` a run; removed and superseded chunks are demoted with a timestamp,
+//! never deleted (`Retention` has no delete, and the store's own triggers refuse one). Every run
+//! ends in a [`FoldAttestation`]: `complete` when nothing is left behind or unread, `degraded`
+//! when the run cap stopped it or a candidate could not be read, `failed` when the method, the
+//! source or the procedure refused — appended to `attestations.jsonl`, then the latest renamed
+//! into `attestation.json`.
 //!
-//! The store is `.eprfs/status/index/<measure-cid>/fold.sqlite` — derived and gitignored: a
-//! missing, corrupt or foreign store is rebuilt from scratch, never repaired by hand.
+//! The store is `.eprfs/status/index/<measure-cid>/<embedder>/fold.sqlite` — one per embedder, so
+//! fixture vectors and live ones never share a store or a log — derived and gitignored: a
+//! missing, corrupt or foreign store is rebuilt from scratch, never repaired by hand. One fold at a
+//! time holds `fold.lock`; a second exits reporting `busy`, writing nothing.
+use std::time::Duration;
+
 use super::chunk::ChunkRule;
-use super::discovery::{atom_search_excluded, first_screen_globs};
 use super::embedder::{EmbedBudget, Embedder, Fixture, PinnedProcedure};
+use super::surface::{self, Listing, Surface};
 use super::*;
 use cid::Cid;
 use elohim_epr_rea::{atom_cid, AgentRef, FoldAttestation, FoldState, IndexMeasure, ShardManifest};
 use rusqlite::{params, Connection, OpenFlags};
 use serde::Serialize;
 
-/// Every semantic fold's store and attestations live under here, one directory per measure CID.
+/// Every semantic fold's store and attestations live under here, one directory per measure CID
+/// and, beneath it, one per embedder.
 pub const INDEX_DIR_REL: &str = ".eprfs/status/index";
 
 /// Who attested a fold when no session claim names anyone — the honest literal, never a guess.
 pub const UNCLAIMED: &str = "(unclaimed)";
 
+/// What a second, concurrent fold prints.
+pub const BUSY: &str = "busy: another fold holds the store";
+
 const STORE_FILE: &str = "fold.sqlite";
 const LATEST_FILE: &str = "attestation.json";
 const LOG_FILE: &str = "attestations.jsonl";
+const LOCK_FILE: &str = "fold.lock";
 const ACTOR_LOG_REL: &str = ".eprfs/status/actors.jsonl";
 const CHUNK_RULE_MISMATCH: &str = "chunk rule on disk does not hash to the measure";
 
-/// Bumped when the tables below change shape; a store of another version is rebuilt.
-const SCHEMA_VERSION: &str = "1";
+/// How long a reader waits on a fold's write transaction before reporting the store busy.
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// The whole store, in one place. `files` is the fold's manifest of what it has seen (a file that
-/// yields no chunk — empty, or skipped as non-UTF-8 — is still seen, so it is not behind forever);
-/// `chunks` holds each chunk's text and its vector (little-endian `f32` × the pinned dims); the
-/// external-content FTS5 table indexes the same rows for the lexical provider, which — like every
-/// ranking — joins back on `demoted_at IS NULL`.
+/// Bumped when the tables below change shape; a store of another version is rebuilt.
+const SCHEMA_VERSION: &str = "2";
+
+/// The whole store, in one place.
+///
+/// - `files` is the fold's manifest of what it has seen, with the stat taken when its bytes were
+///   read (a file whose size and mtime still match is not re-hashed). A file that yields no chunk
+///   — empty, or skipped as non-UTF-8 — is still seen, so it is not behind forever.
+/// - `chunks` holds each chunk's text and vector (little-endian `f32` × the pinned dims). A row's
+///   text, path and section are fixed once written; only `demoted_at` moves, and only once.
+/// - `chunks_fts` is external-content FTS5 over `text` holding LIVE chunks only: a demotion
+///   issues FTS5's `'delete'` for that row, so the lexical provider never ranks a demoted chunk.
 const SCHEMA: &str = "
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE files (
   path TEXT PRIMARY KEY,
   fingerprint TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  mtime_ns INTEGER NOT NULL,
   chunks INTEGER NOT NULL,
   skipped TEXT,
   folded_at INTEGER NOT NULL,
@@ -72,6 +92,18 @@ CREATE VIRTUAL TABLE chunks_fts USING fts5(
 CREATE TRIGGER chunks_fts_insert AFTER INSERT ON chunks BEGIN
   INSERT INTO chunks_fts(rowid, text, path, section) VALUES (new.id, new.text, new.path, new.section);
 END;
+CREATE TRIGGER chunks_fts_demote AFTER UPDATE OF demoted_at ON chunks
+WHEN old.demoted_at IS NULL AND new.demoted_at IS NOT NULL BEGIN
+  INSERT INTO chunks_fts(chunks_fts, rowid, text, path, section)
+    VALUES ('delete', old.id, old.text, old.path, old.section);
+END;
+CREATE TRIGGER chunks_demoted_once BEFORE UPDATE OF demoted_at ON chunks
+WHEN old.demoted_at IS NOT NULL BEGIN
+  SELECT RAISE(ABORT, 'a demoted chunk stays demoted; a returning file folds new rows');
+END;
+CREATE TRIGGER chunks_identity_fixed BEFORE UPDATE OF text, path, section ON chunks BEGIN
+  SELECT RAISE(ABORT, 'a chunk''s text, path and section are fixed; demote it and fold another');
+END;
 CREATE TRIGGER chunks_never_deleted BEFORE DELETE ON chunks BEGIN
   SELECT RAISE(ABORT, 'demotion, never deletion');
 END;
@@ -94,19 +126,52 @@ fn now() -> i64 {
         .map_or(0, |d| d.as_secs() as i64)
 }
 
-/// Where a measure's store and attestations live.
-pub fn store_dir(root: &Path, measure_cid: &str) -> PathBuf {
-    root.join(INDEX_DIR_REL).join(measure_cid)
+/// Which [`Embedder`] a fold runs — and so which store it writes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum EmbedderChoice {
+    /// The declared procedure the model manifest pins (the default).
+    #[default]
+    Pinned,
+    /// The deterministic test embedder — never a claim of live fitness.
+    Fixture,
+}
+
+impl EmbedderChoice {
+    pub fn name(self) -> &'static str {
+        match self {
+            EmbedderChoice::Pinned => "pinned",
+            EmbedderChoice::Fixture => "fixture",
+        }
+    }
+
+    fn parse(value: &str) -> FlowResult<Self> {
+        match value {
+            "pinned" => Ok(EmbedderChoice::Pinned),
+            "fixture" => Ok(EmbedderChoice::Fixture),
+            other => Err(index_refused(format!(
+                "--embedder is pinned|fixture, not {other}"
+            ))),
+        }
+    }
+}
+
+/// Where a measure's store, lock and attestations live for one embedder.
+pub fn store_dir(root: &Path, measure_cid: &str, embedder: EmbedderChoice) -> PathBuf {
+    root.join(INDEX_DIR_REL)
+        .join(measure_cid)
+        .join(embedder.name())
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // The declaration
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/// The contract, the measure it names, the measure file's raw value (for `_chunk_rule`) and CID.
+/// The contract, the measure it names (with its compiled surface), the measure file's raw value
+/// (for `_chunk_rule`) and its CID.
 struct Declared {
     contract: Contract,
     measure: IndexMeasure,
+    surface: Surface,
     raw: Value,
     cid: Cid,
 }
@@ -119,7 +184,10 @@ impl Declared {
             .pointer("/ceremony/providers/semantic/measure")
             .and_then(Value::as_str)
             .ok_or_else(|| {
-                index_refused("the recall contract names no semantic measure (ceremony.providers.semantic.measure)")
+                index_refused(
+                    "the recall contract names no semantic measure \
+                     (ceremony.providers.semantic.measure)",
+                )
             })?
             .to_string();
         let path = root.join(&rel);
@@ -129,10 +197,13 @@ impl Declared {
         measure
             .validate()
             .map_err(|error| index_refused(format!("{rel}: {error}")))?;
+        let surface = Surface::declared(measure.surfaces.paths(), &contract)
+            .map_err(|error| index_refused(format!("{rel}: {error}")))?;
         let cid = measure.cid()?;
         Ok(Self {
             contract,
             measure,
+            surface,
             raw,
             cid,
         })
@@ -166,90 +237,40 @@ impl Declared {
     fn run_cap(&self) -> FlowResult<usize> {
         Ok(self.contract.positive_limit("fold_files_per_run")? as usize)
     }
+
+    fn lag_bound(&self) -> String {
+        format!(
+            "fold_lag ceiling {} {}",
+            self.measure.fold_lag.limit, self.measure.fold_lag.unit
+        )
+    }
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-// The surface walk
+// The plan: the tree against the store
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-
-/// Every admitted file under the measure's surfaces, repository-relative and sorted. An excluded
-/// directory name anywhere in a path — a surface root's own included — keeps it out; symlinks
-/// are not followed.
-fn walk(root: &Path, declared: &Declared) -> FlowResult<Vec<String>> {
-    let excluded = atom_search_excluded(&declared.contract);
-    let mut globs = Vec::new();
-    for pattern in first_screen_globs(&declared.contract) {
-        globs.push(glob::Pattern::new(&pattern).map_err(|_| {
-            index_refused(format!(
-                "first_screen_globs holds an invalid glob {pattern}"
-            ))
-        })?);
-    }
-    let excluded_path = |rel: &str| rel.split('/').any(|part| excluded.contains(part));
-    let admitted = |name: &str| globs.iter().any(|g| g.matches(name));
-    let mut found = BTreeSet::new();
-    for surface in declared.measure.surfaces.paths() {
-        let surface = surface.trim_end_matches('/');
-        if surface.is_empty()
-            || surface.starts_with('/')
-            || surface.split('/').any(|part| part == "..")
-            || excluded_path(surface)
-        {
-            continue;
-        }
-        let base = root.join(surface);
-        let Ok(meta) = std::fs::symlink_metadata(&base) else {
-            continue;
-        };
-        if meta.is_file() {
-            let name = surface.rsplit('/').next().unwrap_or(surface);
-            if admitted(name) {
-                found.insert(surface.to_string());
-            }
-            continue;
-        }
-        if !meta.is_dir() {
-            continue;
-        }
-        let mut stack = vec![(base, surface.to_string())];
-        while let Some((dir, rel)) = stack.pop() {
-            let Ok(entries) = std::fs::read_dir(&dir) else {
-                continue;
-            };
-            for entry in entries.flatten() {
-                let Some(name) = entry.file_name().to_str().map(str::to_string) else {
-                    continue;
-                };
-                let Ok(kind) = entry.file_type() else {
-                    continue;
-                };
-                let child = format!("{rel}/{name}");
-                if kind.is_dir() {
-                    if !excluded.contains(&name) {
-                        stack.push((entry.path(), child));
-                    }
-                } else if kind.is_file() && admitted(&name) {
-                    found.insert(child);
-                }
-            }
-        }
-    }
-    Ok(found.into_iter().collect())
-}
 
 /// The raw CID of a file's bytes, stored as its string.
 fn fingerprint(bytes: &[u8]) -> String {
     BlobCid::compute_raw(bytes).to_string()
 }
 
-/// What the tree holds against what the store holds.
+/// A stored file row, as the plan compares it.
+struct Row {
+    fingerprint: String,
+    size: u64,
+    mtime_ns: i64,
+}
+
 #[derive(Default)]
 struct Plan {
     /// New or changed files, sorted.
     behind: Vec<String>,
-    /// Live in the store, gone from the tree.
+    /// Live in the store, gone from the source.
     removed: Vec<String>,
-    /// Admitted files that could not be read to fingerprint (counted, not guessed).
+    /// Unchanged bytes under a moved stat: the fold records the new stat, nothing else.
+    restat: Vec<(String, u64, i64)>,
+    /// Candidates that exist but could not be read, and listing errors — their rows stay current.
     unreadable: usize,
 }
 
@@ -259,26 +280,42 @@ impl Plan {
     }
 }
 
-fn plan(root: &Path, declared: &Declared, store: &Store) -> FlowResult<Plan> {
-    let stored = store.live_files()?;
-    let mut plan = Plan::default();
+/// `Err(why)` when the source cannot be listed at all.
+fn plan(root: &Path, declared: &Declared, store: &Store) -> FlowResult<Result<Plan, String>> {
+    let listing: Listing = match surface::list(root, &declared.contract, &declared.surface) {
+        Ok(listing) => listing,
+        Err(why) => return Ok(Err(why)),
+    };
+    let stored = store.live_rows()?;
+    let mut plan = Plan {
+        unreadable: listing.errors + listing.held.len(),
+        ..Plan::default()
+    };
     let mut present = BTreeSet::new();
-    for rel in walk(root, declared)? {
-        let Ok(bytes) = std::fs::read(root.join(&rel)) else {
-            plan.unreadable += 1;
+    for candidate in &listing.files {
+        present.insert(candidate.rel.clone());
+        let Some(row) = stored.get(&candidate.rel) else {
+            plan.behind.push(candidate.rel.clone());
             continue;
         };
-        if stored.get(&rel) != Some(&fingerprint(&bytes)) {
-            plan.behind.push(rel.clone());
+        if row.size == candidate.size && row.mtime_ns == candidate.mtime_ns {
+            continue;
         }
-        present.insert(rel);
+        match std::fs::read(root.join(&candidate.rel)) {
+            Err(_) => plan.unreadable += 1,
+            Ok(bytes) if fingerprint(&bytes) == row.fingerprint => {
+                plan.restat
+                    .push((candidate.rel.clone(), candidate.size, candidate.mtime_ns))
+            }
+            Ok(_) => plan.behind.push(candidate.rel.clone()),
+        }
     }
     plan.removed = stored
         .keys()
-        .filter(|path| !present.contains(*path))
+        .filter(|path| !present.contains(*path) && !listing.holds(path))
         .cloned()
         .collect();
-    Ok(plan)
+    Ok(Ok(plan))
 }
 
 // ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -290,14 +327,17 @@ struct Store {
 }
 
 /// The identity a store was built under; any difference is a different fold.
-fn meta_rows(declared: &Declared, embedder: &str) -> Vec<(&'static str, String)> {
-    vec![
+fn meta_rows(declared: &Declared, embedder: &str) -> BTreeMap<String, String> {
+    [
         ("schema", SCHEMA_VERSION.to_string()),
         ("measure", declared.cid.to_string()),
         ("model", declared.model()),
         ("chunk_rule", declared.measure.chunk_rule.to_string()),
         ("embedder", embedder.to_string()),
     ]
+    .into_iter()
+    .map(|(k, v)| (k.to_string(), v))
+    .collect()
 }
 
 impl Store {
@@ -312,19 +352,29 @@ impl Store {
         rows.collect::<Result<_, _>>().map_err(db)
     }
 
-    /// A readable store of this measure, without writing anything: `Ok(None)` when there is no
-    /// file, `Err(why)` when there is one that cannot serve (the next fold rebuilds it).
-    fn open_existing(path: &Path, declared: &Declared) -> Result<Option<Self>, String> {
+    /// A readable store of this measure: `Ok(None)` when there is no file, `Err(why)` when there
+    /// is one that cannot serve (the next fold rebuilds it). `status` opens it read-only.
+    fn open_existing(
+        path: &Path,
+        declared: &Declared,
+        read_only: bool,
+    ) -> Result<Option<Self>, String> {
         if !path.is_file() {
             return Ok(None);
         }
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_WRITE)
-            .map_err(|error| format!("store unreadable: {error}"))?;
+        let flags = if read_only {
+            OpenFlags::SQLITE_OPEN_READ_ONLY
+        } else {
+            OpenFlags::SQLITE_OPEN_READ_WRITE
+        };
+        let unreadable = |error: rusqlite::Error| format!("store unreadable: {error}");
+        let conn = Connection::open_with_flags(path, flags).map_err(unreadable)?;
+        conn.busy_timeout(BUSY_TIMEOUT).map_err(unreadable)?;
         let store = Self { conn };
         let check: String = store
             .conn
             .query_row("PRAGMA quick_check", [], |row| row.get(0))
-            .map_err(|error| format!("store unreadable: {error}"))?;
+            .map_err(unreadable)?;
         if check != "ok" {
             return Err(format!("store fails its integrity check: {check}"));
         }
@@ -347,15 +397,12 @@ impl Store {
         declared: &Declared,
         embedder: &str,
     ) -> FlowResult<(Self, String)> {
-        let wanted: BTreeMap<String, String> = meta_rows(declared, embedder)
-            .into_iter()
-            .map(|(k, v)| (k.to_string(), v))
-            .collect();
-        let why = match Self::open_existing(path, declared) {
+        let wanted = meta_rows(declared, embedder);
+        let why = match Self::open_existing(path, declared, false) {
             Ok(None) => None,
             Ok(Some(store)) => match store.meta() {
                 Ok(meta) if meta == wanted => return Ok((store, "reused".into())),
-                Ok(_) => Some("store was folded under another embedder".to_string()),
+                Ok(_) => Some("store was folded under another procedure".to_string()),
                 Err(error) => Some(error.to_string()),
             },
             Err(why) => Some(why),
@@ -372,10 +419,8 @@ impl Store {
             }
             None => "created".to_string(),
         };
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
         let mut conn = Connection::open(path).map_err(db)?;
+        conn.busy_timeout(BUSY_TIMEOUT).map_err(db)?;
         let tx = conn.transaction().map_err(db)?;
         tx.execute_batch(SCHEMA).map_err(db)?;
         for (key, value) in &wanted {
@@ -389,14 +434,23 @@ impl Store {
         Ok((Self { conn }, outcome))
     }
 
-    /// `path -> fingerprint` for every file the fold currently holds.
-    fn live_files(&self) -> FlowResult<BTreeMap<String, String>> {
+    /// Every file the fold currently holds, with its fingerprint and recorded stat.
+    fn live_rows(&self) -> FlowResult<BTreeMap<String, Row>> {
         let mut statement = self
             .conn
-            .prepare("SELECT path, fingerprint FROM files WHERE demoted_at IS NULL")
+            .prepare("SELECT path, fingerprint, size, mtime_ns FROM files WHERE demoted_at IS NULL")
             .map_err(db)?;
         let rows = statement
-            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    Row {
+                        fingerprint: row.get(1)?,
+                        size: row.get::<_, i64>(2)?.max(0) as u64,
+                        mtime_ns: row.get(3)?,
+                    },
+                ))
+            })
             .map_err(db)?;
         rows.collect::<Result<_, _>>().map_err(db)
     }
@@ -413,7 +467,10 @@ impl Store {
     fn shard(&self) -> FlowResult<ShardManifest> {
         let mut statement = self
             .conn
-            .prepare("SELECT path, section, fingerprint, length(CAST(text AS BLOB)) FROM chunks WHERE demoted_at IS NULL")
+            .prepare(
+                "SELECT path, section, fingerprint, length(CAST(text AS BLOB)) FROM chunks \
+                 WHERE demoted_at IS NULL",
+            )
             .map_err(db)?;
         let mut rows: Vec<(String, String, String)> = Vec::new();
         let mut bytes = 0u64;
@@ -435,20 +492,21 @@ impl Store {
         })
     }
 
-    /// One `(root, head)` pair per declared surface root: the raw CID of the root's path bytes,
-    /// and the CID of that root's sorted `(path, fingerprint)` list — so a later fold can name
-    /// which root moved.
+    /// One `(root, head)` pair per declared include pattern (the surface's roots; a negation owns
+    /// no files): the raw CID of the pattern's bytes, and the CID of the sorted
+    /// `(path, fingerprint)` list of the held files it matches — so a later fold can name which
+    /// root moved.
     fn heads(&self, declared: &Declared) -> FlowResult<Vec<(Cid, Cid)>> {
-        let files = self.live_files()?;
+        let files = self.live_rows()?;
         let mut heads = Vec::new();
-        for surface in declared.measure.surfaces.paths() {
-            let bare = surface.trim_end_matches('/');
+        for (text, pattern) in declared.surface.includes() {
             let under: Vec<(&String, &String)> = files
                 .iter()
-                .filter(|(path, _)| *path == bare || path.starts_with(&format!("{bare}/")))
+                .filter(|(path, _)| Surface::include_matches(pattern, path))
+                .map(|(path, row)| (path, &row.fingerprint))
                 .collect();
             heads.push((
-                *BlobCid::compute_raw(surface.as_bytes()).as_cid(),
+                *BlobCid::compute_raw(text.as_bytes()).as_cid(),
                 atom_cid(&under)?,
             ));
         }
@@ -469,16 +527,6 @@ fn empty_shard() -> FlowResult<ShardManifest> {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 // The fold
 // ───────────────────────────────────────────────────────────────────────────────────────────────
-
-/// Which [`Embedder`] a fold runs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum EmbedderChoice {
-    /// The declared procedure the model manifest pins (the default).
-    #[default]
-    Pinned,
-    /// The deterministic test embedder — never a claim of live fitness.
-    Fixture,
-}
 
 /// What one `index fold` may be told.
 #[derive(Debug, Clone, Default)]
@@ -502,11 +550,11 @@ pub struct FoldReport {
     /// Files re-chunked and re-embedded this run (or skipped as non-UTF-8), sorted.
     pub folded: Vec<String>,
     pub embedded_chunks: usize,
-    /// Files gone from the tree whose chunks this run demoted.
+    /// Files gone from the source whose chunks this run demoted.
     pub demoted: Vec<String>,
     /// Folded files skipped as binary or non-UTF-8.
     pub skipped: Vec<String>,
-    /// Admitted files that could not be read to fingerprint.
+    /// Candidates that exist but could not be read, and listing errors.
     pub unreadable: usize,
     /// Chunks past `max_chunks_per_file`, dropped and counted.
     pub dropped_chunks: usize,
@@ -514,6 +562,13 @@ pub struct FoldReport {
     pub lag: Option<usize>,
     pub attestation: FoldAttestation,
     pub attestation_cid: String,
+}
+
+/// A fold either ran (and attested), or found another fold holding the store.
+#[derive(Debug)]
+pub enum FoldRun {
+    Done(Box<FoldReport>),
+    Busy,
 }
 
 /// Who attests: the session's current claim in its participant form, or [`UNCLAIMED`].
@@ -553,8 +608,24 @@ fn embedder_for(
     }
 }
 
-/// The previous attestation's state decides `retried`: a capped run following a capped run is
-/// the next retry of the same backlog.
+/// The exclusive fold lock, or `None` when another fold holds it.
+fn lock(dir: &Path) -> FlowResult<Option<File>> {
+    std::fs::create_dir_all(dir)?;
+    let file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(dir.join(LOCK_FILE))?;
+    match rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive) {
+        Ok(()) => Ok(Some(file)),
+        Err(errno) if errno == rustix::io::Errno::WOULDBLOCK => Ok(None),
+        Err(errno) => Err(FlowError::Io(errno.into())),
+    }
+}
+
+/// The previous attestation's state decides `retried`: a degraded run following a degraded run
+/// is the next retry of the same backlog.
 fn next_retry(dir: &Path) -> u32 {
     std::fs::read(dir.join(LATEST_FILE))
         .ok()
@@ -565,49 +636,51 @@ fn next_retry(dir: &Path) -> u32 {
         })
 }
 
-/// Write the latest snapshot and append the act.
+/// Append the act, then rename the latest snapshot into place — the log is never behind the
+/// snapshot.
 fn record(dir: &Path, attestation: &FoldAttestation) -> FlowResult<String> {
     std::fs::create_dir_all(dir)?;
     let cid = attestation.cid()?.to_string();
-    let staged = dir.join(format!("{LATEST_FILE}.tmp"));
-    std::fs::write(&staged, serde_json::to_string_pretty(attestation)? + "\n")?;
-    std::fs::rename(&staged, dir.join(LATEST_FILE))?;
     let mut log = OpenOptions::new()
         .create(true)
         .append(true)
         .open(dir.join(LOG_FILE))?;
     writeln!(log, "{}", serde_json::to_string(attestation)?)?;
+    let staged = dir.join(format!("{LATEST_FILE}.tmp"));
+    std::fs::write(&staged, serde_json::to_string_pretty(attestation)? + "\n")?;
+    std::fs::rename(&staged, dir.join(LATEST_FILE))?;
     Ok(cid)
 }
 
-/// One chunk ready to write.
-struct Pending {
-    path: String,
-    section: String,
-    ordinal: usize,
-    fingerprint: String,
-    text: String,
+fn attest(dir: &Path, report: &mut FoldReport, state: FoldState) -> FlowResult<()> {
+    report.attestation.state = state;
+    report.attestation.at = now();
+    report.attestation_cid = record(dir, &report.attestation)?;
+    Ok(())
 }
 
-/// A file this run folds: its fingerprint, and why it has no chunks if it was skipped.
-struct FoldedFile {
-    path: String,
-    fingerprint: String,
-    chunks: usize,
-    skipped: Option<&'static str>,
-}
-
-fn vector_blob(vector: &[f32]) -> Vec<u8> {
-    vector.iter().flat_map(|x| x.to_le_bytes()).collect()
+/// Record the shard and heads a store holds, then attest `Failed{why}`.
+fn attest_failed(
+    dir: &Path,
+    declared: &Declared,
+    store: Option<&Store>,
+    mut report: FoldReport,
+    why: String,
+) -> FlowResult<FoldRun> {
+    if let Some(store) = store {
+        report.attestation.shard = store.shard()?;
+        report.attestation.heads_at = store.heads(declared)?;
+    }
+    attest(dir, &mut report, FoldState::Failed { why })?;
+    Ok(FoldRun::Done(Box::new(report)))
 }
 
 /// `epr flow memory index fold`: fold what moved, at most the run cap, and attest the result.
-/// A fold that ran always attests — `failed` included — and returns `Ok`; only an unreadable
-/// declaration (no measure CID to attest under) is an `Err`.
-pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldReport> {
+/// A fold that ran always attests — `failed` included; a fold that found the lock held returns
+/// [`FoldRun::Busy`] having written nothing; only an unreadable declaration (no measure CID to
+/// attest under) or a bad option is an `Err`.
+pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldRun> {
     let declared = Declared::load(root)?;
-    let dir = store_dir(root, &declared.cid.to_string());
-    let by = attested_by(root, opts.session.as_deref());
     if let Some(scope) = &opts.scope {
         if scope.starts_with('/') || scope.split('/').any(|part| part == "..") {
             return Err(index_refused("--scope must be repository-relative"));
@@ -618,7 +691,11 @@ pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldReport> {
         Some(n) => n,
         None => declared.run_cap()?,
     };
-    let mut report = FoldReport {
+    let dir = store_dir(root, &declared.cid.to_string(), opts.embedder);
+    let Some(_held) = lock(&dir)? else {
+        return Ok(FoldRun::Busy);
+    };
+    let report = FoldReport {
         measure: declared.cid.to_string(),
         store: String::new(),
         embedder: String::new(),
@@ -634,84 +711,104 @@ pub fn fold(root: &Path, opts: &FoldOptions) -> FlowResult<FoldReport> {
             shard: empty_shard()?,
             heads_at: Vec::new(),
             state: FoldState::Complete,
-            attested_by: by,
+            attested_by: attested_by(root, opts.session.as_deref()),
             at: 0,
         },
         attestation_cid: String::new(),
     };
 
     // Before any store is touched: the method, then the procedure that will run it.
+    let existing = || {
+        Store::open_existing(&dir.join(STORE_FILE), &declared, true)
+            .ok()
+            .flatten()
+    };
     let rule = match declared.chunk_rule() {
         Ok(rule) => rule,
-        Err(why) => return failed_before_store(&declared, &dir, report, why),
+        Err(why) => return attest_failed(&dir, &declared, existing().as_ref(), report, why),
     };
     let (embedder, label) = match embedder_for(root, opts.embedder, &declared) {
         Ok(pair) => pair,
-        Err(error) => return failed_before_store(&declared, &dir, report, error.to_string()),
+        Err(error) => {
+            let why = error.to_string();
+            return attest_failed(&dir, &declared, existing().as_ref(), report, why);
+        }
     };
-    report.embedder = label.clone();
     let run = Run {
         root,
         declared: &declared,
         dir: &dir,
         rule,
         embedder: embedder.as_ref(),
-        label: &label,
         opts,
         max_files,
     };
-    run.fold(report)
+    run.fold(report, label)
 }
 
-/// A fold refused before it opened its store still attests, over whatever store already exists.
-fn failed_before_store(
-    declared: &Declared,
-    dir: &Path,
-    mut report: FoldReport,
-    why: String,
-) -> FlowResult<FoldReport> {
-    if let Ok(Some(store)) = Store::open_existing(&dir.join(STORE_FILE), declared) {
-        report.attestation.shard = store.shard()?;
-        report.attestation.heads_at = store.heads(declared)?;
-    }
-    attest(dir, &mut report, FoldState::Failed { why })?;
-    Ok(report)
+/// One chunk ready to write.
+struct Pending {
+    path: String,
+    section: String,
+    ordinal: usize,
+    fingerprint: String,
+    text: String,
 }
 
-fn attest(dir: &Path, report: &mut FoldReport, state: FoldState) -> FlowResult<()> {
-    report.attestation.state = state;
-    report.attestation.at = now();
-    report.attestation_cid = record(dir, &report.attestation)?;
-    Ok(())
+/// A file this run folds: its fingerprint and stat (taken with the bytes it read), and why it has
+/// no chunks if it was skipped.
+struct FoldedFile {
+    path: String,
+    fingerprint: String,
+    size: u64,
+    mtime_ns: i64,
+    chunks: usize,
+    skipped: Option<&'static str>,
 }
 
-/// One fold run, once the method and the embedder have both been checked.
+fn vector_blob(vector: &[f32]) -> Vec<u8> {
+    vector.iter().flat_map(|x| x.to_le_bytes()).collect()
+}
+
+/// Read a file and the stat of the very handle it was read through (the stat first, so a write
+/// racing the read moves the mtime past what is recorded and the next plan re-hashes).
+fn read_with_stat(path: &Path) -> std::io::Result<(Vec<u8>, u64, i64)> {
+    let mut file = File::open(path)?;
+    let (size, mtime_ns) = surface::stat_of(&file.metadata()?);
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)?;
+    Ok((bytes, size, mtime_ns))
+}
+
+/// One fold run, once the lock is held and the method and the embedder are both checked.
 struct Run<'a> {
     root: &'a Path,
     declared: &'a Declared,
     dir: &'a Path,
     rule: ChunkRule,
     embedder: &'a dyn Embedder,
-    label: &'a str,
     opts: &'a FoldOptions,
     max_files: usize,
 }
 
 impl Run<'_> {
-    fn fold(self, mut report: FoldReport) -> FlowResult<FoldReport> {
+    fn fold(self, mut report: FoldReport, label: String) -> FlowResult<FoldRun> {
         let Run {
             root,
             declared,
             dir,
             rule,
             embedder,
-            label,
             opts,
             max_files,
         } = self;
-        let (mut store, outcome) = Store::open_or_rebuild(&dir.join(STORE_FILE), declared, label)?;
+        let (mut store, outcome) = Store::open_or_rebuild(&dir.join(STORE_FILE), declared, &label)?;
         report.store = outcome;
-        let plan = plan(root, declared, &store)?;
+        report.embedder = label;
+        let plan = match plan(root, declared, &store)? {
+            Ok(plan) => plan,
+            Err(why) => return attest_failed(dir, declared, Some(&store), report, why),
+        };
         report.unreadable = plan.unreadable;
         let in_scope = |path: &String| match &opts.scope {
             Some(scope) => {
@@ -720,12 +817,11 @@ impl Run<'_> {
             }
             None => true,
         };
-        let selected: Vec<String> = plan
+        let selected: Vec<&String> = plan
             .behind
             .iter()
             .filter(|p| in_scope(p))
             .take(max_files)
-            .cloned()
             .collect();
         let removed: Vec<String> = plan
             .removed
@@ -737,31 +833,31 @@ impl Run<'_> {
         // Chunk what this run folds, by the declared rule.
         let mut files = Vec::new();
         let mut pending = Vec::new();
-        for path in &selected {
-            // Gone or unreadable since the plan fingerprinted it: counted, left behind, not guessed.
-            let Ok(bytes) = std::fs::read(root.join(path)) else {
+        for path in selected {
+            // Unreadable since the plan listed it: counted, its rows kept, not guessed.
+            let Ok((bytes, size, mtime_ns)) = read_with_stat(&root.join(path)) else {
                 report.unreadable += 1;
                 continue;
             };
             let fingerprint = fingerprint(&bytes);
+            let mut file = FoldedFile {
+                path: path.clone(),
+                fingerprint: fingerprint.clone(),
+                size,
+                mtime_ns,
+                chunks: 0,
+                skipped: None,
+            };
             let Ok(text) = String::from_utf8(bytes) else {
                 report.skipped.push(path.clone());
-                files.push(FoldedFile {
-                    path: path.clone(),
-                    fingerprint,
-                    chunks: 0,
-                    skipped: Some("non-utf8"),
-                });
+                file.skipped = Some("non-utf8");
+                files.push(file);
                 continue;
             };
             let chunked = rule.chunk(path, &text);
             report.dropped_chunks += chunked.dropped;
-            files.push(FoldedFile {
-                path: path.clone(),
-                fingerprint: fingerprint.clone(),
-                chunks: chunked.chunks.len(),
-                skipped: None,
-            });
+            file.chunks = chunked.chunks.len();
+            files.push(file);
             for (ordinal, chunk) in chunked.chunks.into_iter().enumerate() {
                 pending.push(Pending {
                     path: path.clone(),
@@ -773,19 +869,18 @@ impl Run<'_> {
             }
         }
 
-        // Embed in declared batches; a refusal anywhere is the fold's failure, and nothing is written.
+        // Embed in declared batches; a refusal anywhere is the fold's failure, and nothing is
+        // written.
+        let dims = declared.dims();
         let embedded = EmbedBudget::fold(&declared.contract).and_then(|budget| {
             let mut vectors = Vec::with_capacity(pending.len());
             let texts: Vec<String> = pending.iter().map(|p| p.text.clone()).collect();
             for batch in texts.chunks(budget.texts) {
                 let reply = embedder.embed(batch, budget)?;
-                if reply.dims != declared.dims()
-                    || reply.vectors.iter().any(|v| v.len() != declared.dims())
-                {
+                if reply.dims != dims || reply.vectors.iter().any(|v| v.len() != dims) {
                     return Err(FlowError::Unavailable(format!(
-                        "the embedder replied {} dims; the measure pins {}",
-                        reply.dims,
-                        declared.dims()
+                        "the embedder replied {} dims; the measure pins {dims}",
+                        reply.dims
                     )));
                 }
                 vectors.extend(reply.vectors);
@@ -795,36 +890,35 @@ impl Run<'_> {
         let vectors = match embedded {
             Ok(vectors) => vectors,
             Err(error) => {
-                report.attestation.shard = store.shard()?;
-                report.attestation.heads_at = store.heads(declared)?;
                 report.lag = Some(plan.lag());
-                attest(
-                    dir,
-                    &mut report,
-                    FoldState::Failed {
-                        why: error.to_string(),
-                    },
-                )?;
-                return Ok(report);
+                let why = error.to_string();
+                return attest_failed(dir, declared, Some(&store), report, why);
             }
         };
 
         let at = now();
         let tx = store.conn.transaction().map_err(db)?;
-        for file in &files {
+        let demote = |tx: &rusqlite::Transaction, path: &str| -> FlowResult<()> {
             tx.execute(
                 "UPDATE chunks SET demoted_at = ?2 WHERE path = ?1 AND demoted_at IS NULL",
-                params![file.path, at],
+                params![path, at],
             )
             .map_err(db)?;
+            Ok(())
+        };
+        for file in &files {
+            demote(&tx, &file.path)?;
             tx.execute(
-                "INSERT INTO files (path, fingerprint, chunks, skipped, folded_at, demoted_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, NULL)
-             ON CONFLICT(path) DO UPDATE SET fingerprint = ?2, chunks = ?3, skipped = ?4,
-               folded_at = ?5, demoted_at = NULL",
+                "INSERT INTO files (path, fingerprint, size, mtime_ns, chunks, skipped, folded_at,
+                   demoted_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                 ON CONFLICT(path) DO UPDATE SET fingerprint = ?2, size = ?3, mtime_ns = ?4,
+                   chunks = ?5, skipped = ?6, folded_at = ?7, demoted_at = NULL",
                 params![
                     file.path,
                     file.fingerprint,
+                    file.size as i64,
+                    file.mtime_ns,
                     file.chunks as i64,
                     file.skipped,
                     at
@@ -835,7 +929,7 @@ impl Run<'_> {
         for (chunk, vector) in pending.iter().zip(&vectors) {
             tx.execute(
                 "INSERT INTO chunks (path, section, ordinal, fingerprint, text, vector, folded_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
                     chunk.path,
                     chunk.section,
@@ -849,14 +943,17 @@ impl Run<'_> {
             .map_err(db)?;
         }
         for path in &removed {
-            tx.execute(
-                "UPDATE chunks SET demoted_at = ?2 WHERE path = ?1 AND demoted_at IS NULL",
-                params![path, at],
-            )
-            .map_err(db)?;
+            demote(&tx, path)?;
             tx.execute(
                 "UPDATE files SET demoted_at = ?2 WHERE path = ?1 AND demoted_at IS NULL",
                 params![path, at],
+            )
+            .map_err(db)?;
+        }
+        for (path, size, mtime_ns) in &plan.restat {
+            tx.execute(
+                "UPDATE files SET size = ?2, mtime_ns = ?3 WHERE path = ?1",
+                params![path, *size as i64, mtime_ns],
             )
             .map_err(db)?;
         }
@@ -865,11 +962,12 @@ impl Run<'_> {
         report.folded = files.iter().map(|file| file.path.clone()).collect();
         report.embedded_chunks = pending.len();
         report.demoted = removed;
+        // A file the run selected but could not read stays behind.
         let lag = plan.lag() - report.folded.len() - report.demoted.len();
         report.lag = Some(lag);
         report.attestation.shard = store.shard()?;
         report.attestation.heads_at = store.heads(declared)?;
-        let state = if lag == 0 {
+        let state = if lag == 0 && report.unreadable == 0 {
             FoldState::Complete
         } else {
             FoldState::Degraded {
@@ -877,7 +975,7 @@ impl Run<'_> {
             }
         };
         attest(dir, &mut report, state)?;
-        Ok(report)
+        Ok(FoldRun::Done(Box::new(report)))
     }
 }
 
@@ -885,35 +983,48 @@ impl Run<'_> {
 // Status
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
-/// `epr flow memory index status`: the stable shape later routes read —
-/// `{measure, model, chunk_rule, chunks, demoted, bytes, lag, last}`. `lag` is `null` when there
-/// is no readable fold; `last` is the latest attestation's `{state, at, attested_by}` or `null`.
-pub fn status(root: &Path) -> FlowResult<Value> {
+/// `epr flow memory index status`: the stable shape later routes read — `{measure, embedder,
+/// source, model, chunk_rule, chunks, demoted, bytes, lag, unreadable, last}`. `model` is `null`
+/// for the fixture (its vectors are no model's). `lag`/`unreadable` are `null` when there is no
+/// readable fold; `last` is the latest attestation's `{state, at, attested_by}` or `null`.
+/// Status writes nothing: the store is opened read-only, and an unchanged file is not re-hashed.
+pub fn status(root: &Path, embedder: EmbedderChoice) -> FlowResult<Value> {
     let declared = Declared::load(root)?;
-    let dir = store_dir(root, &declared.cid.to_string());
+    let dir = store_dir(root, &declared.cid.to_string(), embedder);
     let last = std::fs::read(dir.join(LATEST_FILE))
         .ok()
         .and_then(|raw| serde_json::from_slice::<FoldAttestation>(&raw).ok())
         .map(|a| json!({"state": a.state, "at": a.at, "attested_by": a.attested_by.0}));
+    let model = match embedder {
+        EmbedderChoice::Pinned => json!(declared.model()),
+        EmbedderChoice::Fixture => Value::Null,
+    };
     let mut view = json!({
         "measure": declared.cid.to_string(),
-        "model": declared.model(),
+        "embedder": embedder.name(),
+        "source": surface::source_of(root),
+        "model": model,
         "chunk_rule": declared.measure.chunk_rule.to_string(),
         "chunks": 0,
         "demoted": 0,
         "bytes": 0,
         "lag": Value::Null,
+        "unreadable": Value::Null,
         "last": last.unwrap_or(Value::Null),
     });
-    if let Ok(Some(store)) = Store::open_existing(&dir.join(STORE_FILE), &declared) {
+    if let Ok(Some(store)) = Store::open_existing(&dir.join(STORE_FILE), &declared, true) {
         view["chunks"] =
             json!(store.count("SELECT count(*) FROM chunks WHERE demoted_at IS NULL")?);
         view["demoted"] =
             json!(store.count("SELECT count(*) FROM chunks WHERE demoted_at IS NOT NULL")?);
         view["bytes"] = json!(store.count(
-            "SELECT coalesce(sum(length(CAST(text AS BLOB))), 0) FROM chunks WHERE demoted_at IS NULL"
+            "SELECT coalesce(sum(length(CAST(text AS BLOB))), 0) FROM chunks \
+             WHERE demoted_at IS NULL"
         )?);
-        view["lag"] = json!(plan(root, &declared, &store)?.lag());
+        let plan = plan(root, &declared, &store)?
+            .map_err(|why| FlowError::Unavailable(format!("fold source: {why}")))?;
+        view["lag"] = json!(plan.lag());
+        view["unreadable"] = json!(plan.unreadable);
     }
     Ok(view)
 }
@@ -929,13 +1040,22 @@ fn render_status(view: &Value, declared_lag: &str) -> String {
         None => "none".to_string(),
     };
     let lag = match view["lag"].as_u64() {
-        Some(n) => format!("{n} files behind ({declared_lag})"),
+        Some(n) => format!(
+            "{n} files behind ({declared_lag}), {} unreadable",
+            view["unreadable"]
+        ),
         None => "skipped — no fold".to_string(),
     };
     format!(
-        "index status\nmeasure     {}\nmodel       {}\nchunk rule  {}\nfold        {} chunks, {} demoted, {} bytes\nlag         {lag}\nlast        {last}\n",
+        "index status\nmeasure     {}\nembedder    {} ({} source)\nmodel       {}\n\
+         chunk rule  {}\nfold        {} chunks, {} demoted, {} bytes\nlag         {lag}\n\
+         last        {last}\n",
         view["measure"].as_str().unwrap_or_default(),
-        view["model"].as_str().unwrap_or_default(),
+        view["embedder"].as_str().unwrap_or_default(),
+        view["source"].as_str().unwrap_or_default(),
+        view["model"]
+            .as_str()
+            .unwrap_or("none — fixture vectors are no model's"),
         view["chunk_rule"].as_str().unwrap_or_default(),
         view["chunks"],
         view["demoted"],
@@ -966,20 +1086,20 @@ fn render_fold(report: &FoldReport, declared_lag: &str) -> FlowResult<String> {
         report.folded.len(),
         report.embedded_chunks
     );
-    if !report.demoted.is_empty() {
-        out += &format!("demoted     {} files\n", report.demoted.len());
-    }
-    if !report.skipped.is_empty() {
-        out += &format!("skipped     {} non-UTF-8 files\n", report.skipped.len());
-    }
-    if report.unreadable > 0 {
-        out += &format!("unreadable  {} files\n", report.unreadable);
-    }
-    if report.dropped_chunks > 0 {
-        out += &format!(
-            "dropped     {} chunks past the per-file cap\n",
-            report.dropped_chunks
-        );
+    let counted = [
+        (report.demoted.len(), "demoted", "files"),
+        (report.skipped.len(), "skipped", "non-UTF-8 files"),
+        (report.unreadable, "unreadable", "files (rows kept)"),
+        (
+            report.dropped_chunks,
+            "dropped",
+            "chunks past the per-file cap",
+        ),
+    ];
+    for (count, label, what) in counted {
+        if count > 0 {
+            out += &format!("{label:<11} {count} {what}\n");
+        }
     }
     if let Some(lag) = report.lag {
         out += &format!("lag         {lag} files behind ({declared_lag})\n");
@@ -1000,11 +1120,11 @@ fn render_fold(report: &FoldReport, declared_lag: &str) -> FlowResult<String> {
 // ───────────────────────────────────────────────────────────────────────────────────────────────
 
 pub fn usage() -> String {
-    "usage: epr flow memory index <fold|status> [--root DIR] [--json]\n\n  \
+    "usage: epr flow memory index <fold|status> [--root DIR] [--embedder pinned|fixture] \
+     [--json]\n\n  \
      fold    fold what moved under recall-semantic-index@1 and attest the result\n          \
-     [--scope DIR] [--max-files N (default limits.fold_files_per_run)]\n          \
-     [--embedder pinned|fixture] [--session ID]\n  \
-     status  the fold's lag, chunks and last attestation\n"
+     [--scope DIR] [--max-files N (default limits.fold_files_per_run)] [--session ID]\n  \
+     status  the fold's lag, chunks and last attestation (per embedder; default pinned)\n"
         .to_string()
 }
 
@@ -1036,6 +1156,7 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
             "--root" => root = value.into(),
             "--scope" => opts.scope = Some(value.clone()),
             "--session" => opts.session = Some(value.clone()),
+            "--embedder" => opts.embedder = EmbedderChoice::parse(value)?,
             "--max-files" => {
                 opts.max_files = Some(
                     value
@@ -1043,46 +1164,34 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
                         .map_err(|_| index_refused("--max-files takes a positive integer"))?,
                 )
             }
-            "--embedder" => {
-                opts.embedder = match value.as_str() {
-                    "pinned" => EmbedderChoice::Pinned,
-                    "fixture" => EmbedderChoice::Fixture,
-                    other => {
-                        return Err(index_refused(format!(
-                            "--embedder is pinned|fixture, not {other}"
-                        )))
-                    }
-                }
-            }
             _ => return Err(index_refused(format!("unknown option {key}"))),
         }
         i += 2;
     }
-    let bound = |root: &Path| -> FlowResult<String> {
-        let declared = Declared::load(root)?;
-        Ok(format!(
-            "fold_lag ceiling {} {}",
-            declared.measure.fold_lag.limit, declared.measure.fold_lag.unit
-        ))
-    };
     match operation.as_str() {
-        "fold" => {
-            let report = fold(&root, &opts)?;
-            if json_output {
-                println!("{}", serde_json::to_string(&report)?);
-            } else {
-                print!("{}", render_fold(&report, &bound(&root)?)?);
+        "fold" => match fold(&root, &opts)? {
+            FoldRun::Busy if json_output => println!("{}", json!({ "busy": BUSY })),
+            FoldRun::Busy => println!("{BUSY}"),
+            FoldRun::Done(report) if json_output => {
+                println!("{}", serde_json::to_string(&report)?)
             }
-        }
+            FoldRun::Done(report) => {
+                let bound = Declared::load(&root)?.lag_bound();
+                print!("{}", render_fold(&report, &bound)?);
+            }
+        },
         "status" => {
             if opts.scope.is_some() || opts.max_files.is_some() || opts.session.is_some() {
-                return Err(index_refused("status takes only --root and --json"));
+                return Err(index_refused(
+                    "status takes only --root, --embedder and --json",
+                ));
             }
-            let view = status(&root)?;
+            let view = status(&root, opts.embedder)?;
             if json_output {
                 println!("{}", serde_json::to_string(&view)?);
             } else {
-                print!("{}", render_status(&view, &bound(&root)?));
+                let bound = Declared::load(&root)?.lag_bound();
+                print!("{}", render_status(&view, &bound));
             }
         }
         other => {

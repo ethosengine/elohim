@@ -38,9 +38,10 @@ const V16_METHOD_CID: &str = "bafkreigcpetnffhhr7fdtcna3gd27rmni6fkkcoffednsjhnn
 
 /// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
 /// proved the string spelling of its CIDs left this address where the byte-array spelling had it
-/// (`bafyreic5…ycma` both ways); the pin then moved once, deliberately, for the self-consistent
-/// chunk rule and the canonical (absent) fold-lag sense/source.
-const PINNED_MEASURE_CID: &str = "bafyreie4eowvvs7w4q54pwxfu5j4u7a6a7atmqajpoqtgfbnfyxx27m6oq";
+/// (`bafyreic5…ycma` both ways); the pin moved once for the self-consistent chunk rule and the
+/// canonical fold-lag spelling (`bafyreie4…m6oq`), and once more in task 4.3 fix round 1, when the
+/// surface became the authority layer as globs and `max_chunks_per_file` became 40.
+const PINNED_MEASURE_CID: &str = "bafyreigdsxgzho6gcbnfilr2ry5itsejmtaixvpf44ej6wgqccgxy6rn6e";
 
 fn read_json(root: &Path, rel: &str) -> Value {
     let raw = std::fs::read(root.join(rel)).unwrap_or_else(|e| panic!("{rel} reads: {e}"));
@@ -55,7 +56,7 @@ fn live_measure(root: &Path) -> IndexMeasure {
 /// The declared measure is a well-formed `IndexMeasure`: it deserializes through the protocol
 /// type's own serde, re-validates against the same refusals the constructors apply, and carries
 /// exactly the declaration the plan names — a cosine ranking under a pinned model, a
-/// `SelfScope` ceiling, the contract's source roots as its surfaces, and a declared fold-lag
+/// `SelfScope` ceiling, the authority layer as its glob surface, and a declared fold-lag
 /// ceiling of 25 files.
 #[test]
 fn the_semantic_index_declaration_is_a_valid_index_measure() {
@@ -101,28 +102,38 @@ fn the_semantic_index_declaration_is_a_valid_index_measure() {
         }
     );
 
-    // The surfaces are the contract's source roots minus anything its discovery excludes, and no
-    // kind the private chain holds.
-    let contract = common::live_contract();
-    let excluded: Vec<&str> = contract["discovery"]["exclude_directories"]
-        .as_array()
-        .expect("exclude_directories")
-        .iter()
-        .filter_map(Value::as_str)
-        .collect();
-    let expected: Vec<String> = contract["source_roots"]
-        .as_array()
-        .expect("source_roots")
-        .iter()
-        .filter_map(Value::as_str)
-        .filter(|root| {
-            !Path::new(root)
-                .components()
-                .any(|c| excluded.contains(&c.as_os_str().to_string_lossy().as_ref()))
-        })
-        .map(str::to_string)
-        .collect();
-    assert_eq!(measure.surfaces.paths(), expected.as_slice());
+    // The surface is the authority layer as gitignore-style globs (task 4.3 fix round 1): prose,
+    // scripts, stories and declarations, never seed data, generated output or fixtures — and no
+    // include reaches the private chain (the fold's own floor refuses it besides).
+    assert_eq!(
+        measure.surfaces.paths(),
+        [
+            "CLAUDE.md",
+            "**/CLAUDE.md",
+            "**/*.md",
+            "**/*.py",
+            "**/*.feature",
+            "**/*.yaml",
+            "**/*.yml",
+            "**/*.sh",
+            ".epr-meta/**/*.json",
+            "!genesis/data/**",
+            "!.codex/**",
+            "!.agents/**",
+            "!.epr-meta/elohim/projections/**",
+            "!**/generated/**",
+            "!**/fixtures/**",
+            "!**/node_modules/**",
+        ]
+    );
+    for pattern in measure.surfaces.paths() {
+        let bare = pattern.trim_start_matches('!');
+        glob::Pattern::new(bare).unwrap_or_else(|e| panic!("{pattern} compiles: {e}"));
+        assert!(
+            !bare.contains(".eprfs") && !bare.contains("worktrees"),
+            "{pattern} names the private chain"
+        );
+    }
     assert!(!measure.surfaces.kinds().is_empty());
     assert!(measure
         .surfaces
@@ -157,7 +168,7 @@ fn the_chunk_rule_cid_addresses_the_declared_rule() {
     let rule = &declared["_chunk_rule"];
     assert!(rule.is_object(), "the measure declares its chunk rule");
     assert_eq!(rule["max_chunk_bytes"], 2000);
-    assert_eq!(rule["max_chunks_per_file"], 12);
+    assert_eq!(rule["max_chunks_per_file"], 40);
     // Self-consistent: a non-sectioned file's window is the chunk cap itself, a measure of its
     // own (the contract's lexical passage window is a different one), and the addressed object
     // carries values only — prose inside it would move the method CID on a rewording.
