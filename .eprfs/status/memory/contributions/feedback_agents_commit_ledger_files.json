@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_agents_commit_ledger_files.md",
-        "cid": "bafkreigpuefauvcsesjub6w76g3cszjn33cqyh7ep6htnaqiile5sk2phq"
+        "cid": "bafkreiel3am35mh5p75fugn4nxydpgqevpnabkmef4n7ytm4uxfwkwhx5m"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Agent commits drag in hook-maintained ledgers",
     "file": "feedback_agents_commit_ledger_files.md",
     "scopePath": ".claude/memory/feedback_agents_commit_ledger_files.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": false
   }

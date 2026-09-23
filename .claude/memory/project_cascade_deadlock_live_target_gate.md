@@ -13,6 +13,8 @@ cites:
   - genesis/orchestrator/Jenkinsfile
 ---
 
+> STALE ORDERING (2026-09-22): since 8ebce05a3 (09-14) app is no longer Level 0 — it runs AFTER edge; the deadlock shape below is historical. See [[project_pipeline_dispatch_ordering]].
+
 The orchestrator cascade deadlocked on 2026-06-13 (orchestrator #1240): a down/flapping alpha blocked the deploy that would FIX alpha. Mechanism — `elohim-app` is the ONLY non-`longRunning` (waited-on) Level-0 pipeline; its `E2E Testing - Alpha Validation` stage opens with `timeout 60s curl alpha.elohim.host`, so a down alpha → app build FAILURE → orchestrator level-fail abort (`error "Build(s) failed: elohim - Aborting"`, Execute Builds ~1807) → `elohim-edge` (Level 1+, the ONLY `kubectl apply` pipeline) **never dispatched** → self-healing/arc code never reached the cluster. The DNA/holochain pipeline has no deploy stage; edge deploys. `longRunning` pipelines (storybook, holochain) dispatch fire-and-forget so their failures are invisible to the abort — only the waited-on app could trip it.
 
 **Fixed 2026-06-14 (51d16c4d4, feat/frontend-eyes-sprint):** wrap `runE2ETests('alpha')` in `catchError(buildResult:'UNSTABLE')`. `triggerPipeline` treats UNSTABLE as success (`result in [SUCCESS, UNSTABLE]`) → no abort → edge deploys. App build/compile/Sonar still hard-gate.

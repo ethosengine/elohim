@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_fleet_conductor_admission_ceiling.md",
-        "cid": "bafkreihcywgjz72esx5775w53j46zqd7y7fz257s6dhv75emrpmomfok6y"
+        "cid": "bafkreifklpag245vukbbqwymf3ravldjvuuh4necnki7d7bj2iomzmi43i"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Fleet ceiling — pool conductors shed interactive writes",
     "file": "project_fleet_conductor_admission_ceiling.md",
     "scopePath": ".claude/memory/project_fleet_conductor_admission_ceiling.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
     "indexed": false
   }

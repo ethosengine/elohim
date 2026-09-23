@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_shared_tree_commit_and_gate_mechanics.md",
-        "cid": "bafkreifxmmcezooxnwcih6dlcwxv7ye3weroonmdaixe6dtqdvk4imqo4y"
+        "cid": "bafkreihr7nkkzyw4yib5rhdehj7oajasdkrf76tfsptxgnahqwpxcurxhe"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Shared-tree commit and gate mechanics",
     "file": "feedback_shared_tree_commit_and_gate_mechanics.md",
     "scopePath": ".claude/memory/feedback_shared_tree_commit_and_gate_mechanics.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": false
   }

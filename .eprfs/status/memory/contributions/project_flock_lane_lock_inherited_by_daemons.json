@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/project_flock_lane_lock_inherited_by_daemons.md",
-        "cid": "bafkreifav63qstff2pwvaecuq73jsg5t4qoggasw42oouxb2vwktahxwoe"
+        "cid": "bafkreiafcq33k3swsuziwvpb6ki6l6fm2dylkndbmtnt2ytq3igqazrqta"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Never start mesh daemons inside a flock'd shell",
     "file": "project_flock_lane_lock_inherited_by_daemons.md",
     "scopePath": ".claude/memory/project_flock_lane_lock_inherited_by_daemons.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "project",
     "indexed": false
   }

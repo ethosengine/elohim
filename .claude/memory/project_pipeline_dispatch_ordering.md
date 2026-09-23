@@ -15,6 +15,14 @@ cites:
 
 Folds the CI dispatch-ordering and deploy-sequencing trap cluster. Members:
 
+**Current dispatch shape (2026-09-14 onward, supersedes older ordering notes below):** app `dependsOn` edge
+(8ebce05a3), and a selected long-running DNA is awaited by a detached barrier when a selected consumer
+depends on it. So a coupled push runs DNA → edge → app → genesis **in sequence**. Under a flat 240-minute
+orchestrator limit that starved app: 0 of 8 app dispatches delivered from 09-19 to 09-22. Branch
+`ci/wallclock-2026-09-22` makes each pipeline own a budget, with the parent limit as the chain sum
+(`pipeline-budget.test.mjs`). Read delivery with `node genesis/orchestrator/delivery-series.mjs`, never
+from one downstream's colour. Habit: [[push-delivers-within-budget]].
+
 - [[project_cascade_deadlock_live_target_gate]] — A live-target E2E gate on the only waited-on Level-0 pipeline deadlocks the edge deploy that fixes that target; fixed via catchError→UNSTABLE.
 - [[project_edge_happ_fetch_race]] — Edge bakes elohim-happ:dev-latest fetched mid-build; same-wave dispatch with the DNA pipeline ships the PREVIOUS bundle — dependsOn is not wave-ordered.
 - [[project_edge_deploy_restarts_genesis_conductors]] — Edge Deploy restarts conductors; genesis pair skips on STS-unchanged (9f9c4aec4), happ-digest stamp keeps real DNA moves restarting; doorway-only fix = operator kubectl path.
@@ -45,7 +53,8 @@ at the tip is the honest carrier when the tagged work is already committed.
   re-dispatching; the first build after a default change is a sacrificial one unless the caller passes the value.
 - **DNA pipeline on the 0.7 line (2026-09-03):** sweettest shard pods need ≥12Gi/24Gi ephemeral storage (holonix 0.7
   closure + 945 MB nextest archive) or kubelet evicts them mid-run and "N tests run" is ONE shard's count; the
-  orchestrator fires elohim-holochain fire-and-forget and starts elohim-edge right after the app build, and edge pulls
+  orchestrator (then) fired elohim-holochain fire-and-forget and started elohim-edge right after the app build — STALE since
+  09-14: DNA is now awaited before edge, app runs after edge — and edge pulls
   the FLOATING `elohim-happ:dev-latest` — so a DNA change needs its own round (`[build:dna]`), and only then an edge
   round; an edge failure cascades `Aborting` through the orchestrator. The 0.7 client family compiles OpenSSL from
   source (openssl-src via keystore/sqlcipher) — builder images need full `perl`, not perl-base.

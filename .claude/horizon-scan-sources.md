@@ -53,4 +53,4 @@ The scan's job is NOT exhaustive coverage. The job is "is anything emerging that
 
 ## Output discipline
 
-Per `.claude/skills/mem-horizon-scan/SKILL.md` — output is a single dated report at `.claude/memory-kit/horizon-scans/YYYY-MM-DD.md` with frontmatter for `scanned_at`, `next_recommended_scan`, `sources_checked`, plus body sections for `Horizon delta`, `Already-aligned`, `Elevation candidates`.
+Per `.claude/skills/mem-horizon-scan/SKILL.md` — output is a single dated report at `genesis/docs/analysis/horizon-scans/YYYY-MM-DD.md` with frontmatter for `scanned_at`, `next_recommended_scan`, `sources_checked`, plus body sections for `Horizon delta`, `Already-aligned`, `Elevation candidates`.

@@ -14,6 +14,7 @@
 - [Diesel migration timestamp collisions](feedback_diesel_migration_timestamp_collision.md) — Migration dirs sharing a timestamp prefix: embed_migrations! keeps one — runtime 'no such table', build green.
 - [Doorway projection = challengeable commons privilege](feedback_doorway_projection_is_commons_privilege.md) — Operator 2026-09-12: a doorway serving EPRs to the public holds a commons standing under reach; publicly challengeable.
 - [Doorway = thin plural projection](feedback_doorway_thin_plural_projection_not_trusted_tier.md) — Operator 2026-09-12: doorways hold only notarized projections under a plural contract — never a trust tier or warehouse.
+- [Editorial loops invent design on normative docs](feedback_editorial_loop_invents_design.md) — Blind-reader loops on spec/law/whitepaper do not converge; editors invent rules to close findings. Cap rounds, diff-based drift check, defer by name.
 - [Epic scenes: the elohim speaks as a friend](feedback_epic_friend_voice_at_moment_of_need.md) — At the moment of need protocol vocabulary never reaches the person; the precise form is one request away.
 - [EPR chrome is the trust signal of a governed place](feedback_epr_chrome_is_the_trust_signal.md) — Operator 2026-09-12: chrome signals governance, fair trade, redress, owed response — a concierge to the commons.
 - [Framing & ontology guards (umbrella)](feedback_framing_guards.md) — Sovereign ≠ apex; Mishpat ≠ punishment; human-in-loop ≠ terminal; collectives starved, not failing; hosted cost = anti-capture.
@@ -72,6 +73,7 @@
 - [EPR-link seed authoring (deferred)](project_epr_link_first_class_seed_authoring.md) — Seed slug links drift silently; a seal tool is DEFERRED until docs graduate peer-native — don't build it.
 - [.epr-meta compose-gate — directory-local governance](project_epr_meta_compose_gate.md) — PreToolUse gate on Edit/Write via cascading .epr-meta manifests; governed dirs need frontmatter; malformed → ask.
 - [Prove the experience across runtime boundaries](project_experiential_evidence_boundary.md) — A green check proves only its boundary: qualify running bytes, peers, exercised scenarios, adoption.
+- [FCT v2 recomposition intent](project_fct_v2_recomposition_intent.md) — FCT v2 is seeded only as an html5-app "teacher's workbook"; the real job is re-composing it into EPR atoms so the medium reveals the protocol
 - [Graphos dead-binding classes](project_graphos_dead_binding_classes.md) — 6 theming-theater causes (ghost names, IACVT, hardcodes, clobbers, kebab attrs, homonyms) — only renders catch them.
 - [Reach / head / freshness semantics (umbrella)](project_head_reach_freshness_semantics.md) — Reach (audience) ≠ head (version) ≠ replication (custody); head = declared dependency; staleness graded by stakes.
 - [Holochain Evolution Epic hub (umbrella)](project_holochain_evolution_epic.md) — hApp-lineage migration epic: spec §11 is the hub; station 6 RED with a proven cause; 0.7.0 assessment steers it.

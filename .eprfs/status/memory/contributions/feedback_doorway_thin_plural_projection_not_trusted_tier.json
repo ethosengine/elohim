@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/feedback_doorway_thin_plural_projection_not_trusted_tier.md",
-        "cid": "bafkreiflm3zn2aubzvc4vyv2x2y3ngwjijkzws6y7zyhsxvpuxwk3supii"
+        "cid": "bafkreiadudxzu6u6c56546x5mvfm7yk47lo2mumpcblye6j4fg54k2dbp4"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Doorway = thin plural projection",
     "file": "feedback_doorway_thin_plural_projection_not_trusted_tier.md",
     "scopePath": ".claude/memory/feedback_doorway_thin_plural_projection_not_trusted_tier.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "feedback",
     "indexed": true
   }

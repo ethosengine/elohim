@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "collective": {
+    "path": ".epr-meta/collective.json",
+    "cid": "bafkreihcq3q7qgwncossxf6q7rowjsysgw3wqt2lpu2w6mnoosd7abmfku"
+  },
+  "author": "agent:librarian@claude-opus-5-5",
+  "steward": "repo:ethosengine/elohim",
+  "scope": "repository",
+  "reach": "repository",
+  "concern": "fct-v2-recomposition-intent",
+  "claim": "FCT v2 is seeded only as an html5-app \"teacher's workbook\"; the real job is re-composing it into EPR atoms so the medium reveals the protocol",
+  "uncertainty": [
+    "Imported verbatim from .claude/memory/project_fct_v2_recomposition_intent.md; the claim is the entry's own one-line description and the entry body is the pinned source, not restated here."
+  ],
+  "sources": [
+    {
+      "resource": {
+        "path": ".claude/memory/project_fct_v2_recomposition_intent.md",
+        "cid": "bafkreif7iefjbodbbtlpofxz6wm52cgee2xlch5vnfml4ononeeof25qiu"
+      },
+      "reach": "repository"
+    }
+  ],
+  "supersedes": [],
+  "contradicts": [],
+  "imported": {
+    "display": "FCT v2 recomposition intent",
+    "file": "project_fct_v2_recomposition_intent.md",
+    "scopePath": ".claude/memory/project_fct_v2_recomposition_intent.md",
+    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "entryType": "project",
+    "indexed": true
+  }
+}

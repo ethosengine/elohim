@@ -17,7 +17,7 @@
     {
       "resource": {
         "path": ".claude/memory/reference_node_hardware_ethosengine_shem.md",
-        "cid": "bafkreief64mbrfapvz7mw54qmycpnhezlmyyigdjpuwz473kvrzekesunm"
+        "cid": "bafkreiffibxbv53xeljfyx3g3jivpexn2f3wclsliyyo67r2pnp2qaewp4"
       },
       "reach": "repository"
     }
@@ -28,7 +28,7 @@
     "display": "Node hardware — ethosengine + shem",
     "file": "reference_node_hardware_ethosengine_shem.md",
     "scopePath": ".claude/memory/reference_node_hardware_ethosengine_shem.md",
-    "gitAuthor": "(untracked: no commit carries these bytes)",
+    "gitAuthor": "Matthew Dowell <mbd06b+github@gmail.com>",
     "entryType": "reference",
     "indexed": true
   }
