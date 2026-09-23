@@ -8,7 +8,7 @@ steward: rust-architect
 graduation-trigger: the mesh a2o receipt (publish → elect → adopt → attest → promote → converge → revert-by-re-election) passes on 3 peers AND the operator records acceptance of §4's constitutional-posture language (a signed-off edit or an epr flow note on this spec)
 created: 2026-09-01
 domain: D2
-topic: [upgrade-propagation, canonical-head, release-channel, adoption-controller, reach, vsm-ecology, rollback, dataplane]
+topic: [upgrade-propagation, canonical-head, release-channel, adoption-controller, reach, vsm-ecology, rollback, dataplane, brit, change-class-routing, ci-publisher, build-attestation]
 informed-by:
   - genesis/data/timeline/backlog/upgrade-propagation-p2p-design-arc.md (the velocity ladder + all three 2026-08-31/2026-09-01 operator course-sets this spec designs from)
   - genesis/docs/content/elohim-protocol/architecture/2026-06-11-dna-upgrade-governance.md (the hash mechanics + migration-seam build-state this spec composes with, never restates)
@@ -31,6 +31,14 @@ cites:
   - elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
   - elohim/rakia/README.md
   - elohim/rakia/docs/plans/stage-2-canopy.md
+  - elohim/brit/docs/specs/2026-04-12-brit-design.md
+  - elohim/brit/docs/specs/2026-06-29-canonical-epr-meta-git-bridge-design.md
+  - elohim/brit/docs/specs/2026-07-12-shared-crate-consolidation-design.md
+  - elohim/brit/docs/specs/2026-04-27-build-contract-before-push-design.md
+  - elohim/rakia/docs/specs/2026-04-27-rakia-as-brit-attestation-executor-design.md
+  - "rung5-workspace-orchestration-plan | Rung 5 from the workspace — the every-class-over-p2p plan §12.2 routes change classes onto | sha256:169a4ce413aaa5aa | path: genesis/docs/superpowers/plans/2026-09-05-rung5-workspace-orchestration-plan.md"
+  - "holochain-evolution-epic | Holochain Evolution Epic — the happ-lineage class and the accepted constitutional crossing §12.1's promotion row defers to | sha256:d821c5f45fd5d2e5 | path: genesis/docs/superpowers/specs/2026-09-03-holochain-evolution-epic-design.md"
+  - genesis/data/timeline/backlog/edge-quiesce-gate-timeout-aborts.md
 ---
 
 # Runtime Artifacts as Elected Content
@@ -395,6 +403,9 @@ machine-checkable at verify time from the manifest:
    lineage-guard rule at verify time).
 4. **Floor-protected verification** — never stage-priced.
 
+5. **Declared requirements** — a release may require another channel's head
+   (`envelope.requires`); adoption waits until the node's own passports satisfy it. See §12.3.
+
 A branch inside the envelope is ecology; a branch that breaks it is a declared
 fork with a bridge map, a rung-6 migration, or it is not the network. What
 works flows UP through hubs (soak evidence over the recursive rollup seam) and
@@ -484,3 +495,244 @@ implementation agent; dependency edges declared in each):
    post-join convergence handshake.
 5. When binaries come in scope: is steward/node the update agent (it owns the
    process), with elohim-storage attesting?
+
+## 12. Brit composition — one evolution primitive for every EPR; CI publishes, it does not deliver
+
+*Added 2026-09-23, Draft. Composed from brit's designed model and from the CI wall-clock
+investigation of 2026-09-22 (orchestrator #1884-#1891: DNA → edge → app ran in series, and
+app delivered in 0 of 8 dispatches). §1-§11 stand unchanged. This section adds the frame
+they compose into.*
+
+### 12.1 The recognition: brit's deferred layer already runs in the network
+
+brit (`elohim/brit`, the covenantal VCS) designs version control as EPRs:
+- a branch is `{stable id, head, steward, reach}`;
+- a ref update is a chained, authority-gated record ("a ref update without qahal authority
+  is a protocol violation");
+- a merge is a proposal whose consent rules are read from the parent EPR;
+- a fork is "a legitimate new covenant, not a defection";
+- build, deploy and validation are attestations of one shape.
+
+The layer that makes that model live is DEFERRED in brit: the commit-like head-able node
+with `parent`, signed heads, and head election. What is BUILT there is content addressing
+(`BritCid` = CIDv1 dag-cbor sha2-256, byte-identical to `elohim-epr`), directory seals
+(`EprMeta`), and signed Build/Deploy/Validation attestation nodes indexed by notes refs.
+
+That deferred layer already exists in the network, and §1 names it: the
+declared-head-over-lineage DAG on `content_store` (`declare_canonical_content_head` /
+`declare_earned_canonical_head`, the lineage-parent admission rule, the arbitrated election).
+brit's own design says its `HeadDeclaration` is "the same shape as the live substrate rule
+that canonical channels alone move declared heads".
+
+| brit concept (designed) | Network primitive (running) |
+|---|---|
+| Branch `{id, head, steward, reach}` | Release channel / content id with a canonical head and a declared reach (§3) |
+| `RefUpdate` chain, authority-gated | Head declarations chained by `lineageParentCid`, admitted by the zome; canonical channels alone move a declared head (I2) |
+| Merge proposal, consent from the parent EPR | Promotion = earned declaration under the parent's authority: constitutional for runtime (§4, epic §4.1), steward/collective for content |
+| Fork = legitimate covenant | Sibling channel with a declared divergence (§8's "declared fork with a bridge map") |
+| Build / Deploy / Validation attestation | Provenance + publish / adoption event / soak attestation (§5, §6) |
+| Reach lifecycle self → trusted → community → public | Local draft → staging tier at channel reach → earned tier → widened reach (narrow-never-widen, §3) |
+
+**The decision:**
+- brit does NOT build a second version DAG in git notes.
+- Below the publish line (reach `self`/`intimate`: drafts, local branches), brit keeps local
+  heads and seals. That costs nothing on the DHT.
+- Publishing makes brit's local head CID a `Content` version plus a staging declaration on
+  the EPR's channel. From then on the network's election is the version DAG. brit is its
+  canonical-first client.
+- Git stays the bridge for source files: an `EprMeta` seal CID names a source tree, and builds
+  and releases cite that seal as their input.
+
+So "rung 5" is not a runtime special case. It is the fifth instance (§1) of the primitive by
+which **any EPR** evolves: a learning path, a governance document, an app bundle, a schema,
+or the network's own runtime. Versions are content, heads are declared per branch, promotion
+is earned by attestation, consumers pin heads as dependencies, forks are sibling channels,
+and revert moves the head back. The SDK exposes one primitive, and the network's own upgrades
+dogfood it.
+
+### 12.2 Change classes are channels; routing is by class, not by pipeline order
+
+Each artifact class is a channel of that primitive. The adoption controller's vehicle for the
+class (§6, `release_adoption/apply.rs`) is the only class-specific code.
+
+**Current state per class (2026-09-23 survey):**
+
+| Class | Current state |
+|---|---|
+| coordinator | VERIFIED on mesh. On fleet, verified to canary apply + attest (2026-09-06). Six alpha peers follow at `observe`, so promotion moves nobody yet. |
+| config | Watcher VERIFIED on mesh. `config-epr` vehicle BUILT; see the fleet mount caveat under 12.7. |
+| happ-lineage | Mesh stations 1-5 and 7-10 green. Station 6 red. |
+| storage-binary | BUILT; Simulacra-gated. |
+| SPA / app bundle | No class (see below). |
+| doorway binary | No class (see below). |
+| conductor line | No vehicle (Nachalah slice 3). |
+
+**The SPA already delivers as a content head.** CI PUTs the bytes, PATCHes the pillar EPR's
+`blobHash` once, and fans out staging `canonical-head` declarations. But CI authors that head
+with an admin key; there is no manifest, envelope, canary or earned tier. Making the app
+bundle a class means doorways adopt it from the app EPR's own channel. The app pipeline then
+publishes a candidate instead of steering every doorway. The app is an ordinary EPR evolving
+by the §12.1 primitive, which is the "any EPR" claim proven on the protocol's own front door.
+
+The doorway binary gets a class beside `storage-binary`, with the same stage-slot vehicle and
+the same ladder gate (local → T3 → mesh → cluster; the §9 cut is a gate on that ladder, never
+an exclusion — operator ruling 2026-09-06).
+
+### 12.3 Cross-class ordering is a declared requirement, not a pipeline sequence
+
+The app pipeline was ordered behind edge (commit `8ebce05a3`, 09-14) to express one fact: this
+app build needs a storage version that speaks the new head contract. That is a compatibility
+requirement, and encoding it as pipeline order is what starved app delivery. §8 gains a fifth
+envelope item:
+
+5. **Declared requirements** — `envelope.requires: [{ channel, atLeast: <manifestCid> }]`.
+   - **Satisfied** iff the adopting node's own runtime passport, plus the passports of the
+     co-located components it declares (a doorway declares its backing storage), shows an
+     applied release on `channel` whose L2 version chain contains `atLeast`.
+   - **Unsatisfied** → a typed refusal `requirement_unmet { channel, atLeast, installed }`.
+     The controller re-checks on its next sweep: a bounded wait, never a push.
+   - A requirement never causes the other class to be adopted. It only defers this one. That
+     keeps the anti-self-election rule (C1) and never lets a release force a peer's hand.
+   - Additive schema, carried in `metadata_json`: DNA-hash-NEUTRAL.
+
+With requirements carried by artifacts, the CI dependency edge app → edge is deleted: the
+build DAG orders builds only by build inputs (rakia's `hash_inputs`), never by delivery. A
+push's wall clock becomes its longest single build, not the sum of a delivery chain.
+
+### 12.4 CI's role: builder, publisher, witness — never the delivery path
+
+- **Build:** unchanged. rakia/Jenkins compile.
+- **Publish:** CI runs `release-ceremony publish` into the class's channel at **staging** tier,
+  at a reach no wider than the channel's, carrying the build attestation (12.5). This replaces
+  rung 1's `fleet-coordswap-dispatch.sh` push, the SPA fan-out PATCH, and the edge fleet roll
+  as delivery paths.
+- **Never promote:** the earned tier requires soak attestations and excludes the builder
+  (the `attestationThreshold` rule). CI cannot promote its own output. This is the brit
+  principle "CI doesn't own governance".
+- **Witness:** Dataplane Validation stops being a stage inside every edge build (measurement by
+  deploy). It becomes a continuous observer that authors soak (Validation) attestations the
+  promotion rule already reads. Delivery reads the latest attestation; it never produces one.
+
+The k8s roll remains the vehicle only for what no vehicle carries yet: fleet binaries before
+their ladder receipt, and the conductor line. For those, the 2026-09-22 content-keyed restart
+decision (edge `pod-inputs-fingerprint.sh`, `storage-workload-image.sh`,
+`conductor-happ-stamp.sh`) is the interim. The live-object annotations it records
+(`elohim.host/storage-inputs`, `happ-roll-key`) are **scaffold**: they hold the facts a
+release manifest's `artifacts` + `appliesTo` carry, and they retire when the class moves to
+election. Do not extend them (the "k8s is not the architecture" rule).
+
+### 12.5 One attestation schema, two homes
+
+brit's `BuildAttestationContentNode`
+`{manifestCid, stepName, inputsHash, outputCid, agentId, hardwareProfile, buildDurationMs,
+builtAt, success, signature}` is adopted as the payload of a `release-build` discriminator,
+riding the existing attestation kind exactly as soak evidence does (`attestation:device-health`
++ `release-soak`, per §5). Deploy maps to the adoption event. Validation maps to
+`release-soak`.
+
+Because `BritCid` and the network CID are byte-identical:
+- a build attestation sealed locally (brit notes ref, reach `self`) and the same attestation
+  published on the DHT are **one object at one address**;
+- publishing is a reach change, not a copy.
+
+Only attestations of published candidates enter the DHT; every other build's attestation
+stays local.
+
+### 12.6 Content-keyed memoization replaces commit-keyed baselines
+
+The orchestrator's selection diffs from a held global baseline (`__global__`), so every
+failed run re-selects everything since the last good commit. That is why DNA and edge
+re-ran on every push from #1884 to #1891, even where edge had already shipped the range.
+rakia-brit's baselines as git refs are still commit-keyed, and brit's own build-contract
+spec names commit-keyed baselines as the root cause of over-building.
+
+**The primitive:**
+- A step's input CID is the `EprMeta` seal of its declared inputs (rakia `hash_inputs`).
+- A step is stale iff no successful build attestation exists for that input CID.
+- The index (input CID → attestation CID) is **Ephemeral (C)**, rebuilt from local brit
+  notes refs and published `release-build` attestations.
+- Baselines — a record of the last commit that built — are no longer needed at all: the
+  question becomes "has this exact input been built?", answered by content.
+
+### 12.7 P2P design gate (2026-09-23; answers forward)
+
+**Release requirement (`envelope.requires`)**
+- **Classification:** part of the release manifest's content (Notarized A via `Content`). Not
+  a new entity.
+- **Head plane:** +0 heads.
+- **Address:** inside the manifest CID.
+- **DNA:** `content_store_integrity` untouched; DNA-hash-NEUTRAL.
+- **Stakes:** all four stages; verification is floor-protected.
+
+**App-bundle and doorway-binary classes**
+- **Classification:** Notarized A. Versions are `Content` under one channel content id, so a
+  composite root: one head per channel.
+- **Head plane:** about 0.5-1k versions a year per channel, all under that single head.
+- **Bytes:** blob-plane `bafkrei…`. Transport `auto`, with iroh-blobs for large artifacts.
+- **DNA:** hash-NEUTRAL.
+
+**`release-build` attestation**
+- **Classification:** Linked A2 on the release. It rides the existing attestation kind with a
+  discriminator; no new type.
+- **Head plane:** 1-3 per published release. Unpublished builds stay local (B).
+
+**Published brit head**
+- **Classification:** Notarized A. It *is* a `Content` version plus a declaration.
+- **Head plane:** one head per published branch. Local branches cost nothing.
+
+**Memoization index**
+- **Classification:** Ephemeral C.
+- **Reconstruction:** from notes refs and published attestations.
+
+**Concern canon for the `requirement_unmet` predicate**
+- C1 answered (defers only, never elects).
+- C3 answered (bounded re-check each sweep).
+- C4 answered (typed refusal names what is installed).
+- C8 partial (needs a `/db/p2p/adoption` field).
+- C10 answered (additive field; old controllers ignore it and adopt as today). The consequence
+  is that the requirement is honored only by upgraded controllers, so the first `requires`
+  release ships after the controller that reads it.
+- The remaining classes are `n-a`: the predicate reads only local passports.
+
+**SDO/RWA test**
+- `hardwareProfile` in a published attestation can fingerprint participants (boundary 6).
+- The published form carries a coarse device archetype only; the full profile stays in the
+  local seal.
+- A doorway projection aggregating every network's attestations would be a dragnet of who
+  builds what and when. Attestations stay within their channel's reach, and projections carry
+  a retention floor (boundary 2).
+
+**Fleet caveat found in the 2026-09-23 survey (unverified, captured as backlog)**
+- The runtime-config file is mounted `subPath` + `readOnly` in
+  `_edgenode-consolidated.template.yaml`.
+- k8s does not propagate ConfigMap edits into subPath mounts, and a read-only mount defeats
+  `ConfigEprVehicle` and `/admin/runtime-config/follow` on fleet pods.
+- So config-class election may be mesh-only until the mount changes.
+
+### 12.8 Slices — each receipt admits the next
+
+1. **Requirements.** `envelope.requires` in the schema + packager + the adoption controller's
+   verify step; a mesh a2o station (a release requiring a storage version waits, then adopts
+   when storage converges).
+2. **App bundle as a class.** The app EPR's channel; doorways adopt; the app pipeline publishes
+   at staging instead of the fan-out PATCH; then delete the app → edge `dependsOn`.
+   Receipt: an app delivery with no edge in the push.
+3. **CI publishes coordinators.** Replace the rung-1 push with a staging publish. Needs the
+   operator's observe → apply flip for fleet peers (a `deployments.json` edit, reversible).
+4. **Continuous witness.** Dataplane Validation runs as a scheduled observer authoring soak
+   attestations; the per-edge-build stage is removed.
+5. **Content-keyed memoization** (12.6); retire commit-keyed baselines and the 12.4
+   annotations as each class moves.
+6. **Binaries climb the ladder.** storage- and doorway-binary on local → T3 → mesh → cluster;
+   the conductor line via Nachalah slice 3.
+7. **The any-EPR surface.** Expose publish, promote, revert, fork and pin to app developers as
+   brit verbs over any EPR; content-fork arbitration composes from
+   `content-head-election-vs-reach-fork-arbitration.md`. Design only until 1-2 prove.
+
+**Blockers to name, not design around**
+- brit and rakia crates resolve only from the auth-gated `elohim` Nexus (HTTP 401 in the
+  devspace); brit-side code cannot be built here until read access returns.
+- Channel publish is "god-mode OPEN" (`authorize_canonical_head_declarer`, a labeled dev
+  scaffold). CI publishing at staging is safe only because staging can never beat earned.
+- §4's constitutional posture still awaits operator acceptance. 12.4's "never promote" holds
+  regardless of how §4 settles.
