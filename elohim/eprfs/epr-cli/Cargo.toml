@@ -31,6 +31,10 @@ glob = "0.3"
 # Advisory file locking for the recall executor's session continuation — a safe `flock`
 # wrapper, so the lock needs no `unsafe` block in this crate.
 rustix = { version = "1", features = ["fs"] }
+# The semantic fold's derived store (`.eprfs/status/index/<measure-cid>/fold.sqlite`): chunks,
+# their vectors and an FTS5 table the lexical provider shares. `bundled` compiles SQLite with FTS5
+# in, so the store does not depend on whichever libsqlite3 a machine happens to carry.
+rusqlite = { version = "0.37", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true

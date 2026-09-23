@@ -32,6 +32,10 @@ const V14_METHOD_CID: &str = "bafkreieryn2ru3uz72jnif5dy3ichzpxhh22k4dtilhiwymux
 /// contract's bytes — and its address — moved off this one.
 const V15_METHOD_CID: &str = "bafkreiauhzxlr2ex6vd6lwu66la2f6dzkp6pj2ogfdjfxaemuanbfiii5q";
 
+/// The v16 contract's method CID (task 4.2). Task 4.3 declared the fold's per-run file cap, so
+/// the contract's bytes — and its address — moved off this one.
+const V16_METHOD_CID: &str = "bafkreigcpetnffhhr7fdtcna3gd27rmni6fkkcoffednsjhnntvr2v7n6m";
+
 /// `IndexMeasure::cid()` of the live `recall-semantic-index@1` declaration. Task 4.1 fix round 1
 /// proved the string spelling of its CIDs left this address where the byte-array spelling had it
 /// (`bafyreic5…ycma` both ways); the pin then moved once, deliberately, for the self-consistent
@@ -321,7 +325,8 @@ fn contract_v16_declares_the_fold_budget_and_repins_the_bank() {
     let root = common::repo_root();
     let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
     let value = common::live_contract();
-    assert_eq!(value["version"], 16);
+    // v16 introduced these budgets; later versions keep them (each byte change bumps).
+    assert!(value["version"].as_u64() >= Some(16));
     let limits = &value["limits"];
     assert_eq!(
         limits["provider_bytes"], 8192,
@@ -334,9 +339,29 @@ fn contract_v16_declares_the_fold_budget_and_repins_the_bank() {
 
     let method = contract.method_cid();
     assert_ne!(method, V15_METHOD_CID, "the contract's bytes moved");
+    assert_ne!(method, V16_METHOD_CID, "and moved again at v17");
     let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
     assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
     contract
         .question_bank()
         .expect("every question is in scope of the v16 recipe");
+}
+
+/// Contract v17 declares the semantic fold's per-run file cap (`limits.fold_files_per_run`) — the
+/// number `index fold` defaults to and `--max-files` overrides for one run, never a constant in
+/// the executor — and the bank is re-pinned to the new recipe.
+#[test]
+fn contract_v17_declares_the_fold_run_cap_and_repins_the_bank() {
+    let root = common::repo_root();
+    let contract = Contract::load(&root.join(recall::CONTRACT_REL)).expect("live contract loads");
+    let value = common::live_contract();
+    assert_eq!(value["version"], 17);
+    assert_eq!(value["limits"]["fold_files_per_run"], 40);
+    let method = contract.method_cid();
+    assert_ne!(method, V16_METHOD_CID, "the contract's bytes moved");
+    let bank = read_json(&root, value["question_bank"].as_str().expect("bank"));
+    assert_eq!(bank["recipe"].as_str(), Some(method.as_str()));
+    contract
+        .question_bank()
+        .expect("every question is in scope of the v17 recipe");
 }

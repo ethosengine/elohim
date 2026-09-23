@@ -57,6 +57,8 @@ pub enum IndexError {
     ModelPinMissing,
     #[error("the measure pins a model that no ranking uses")]
     ModelPinUnused,
+    #[error("the fold lag bound is refused: {0}")]
+    FoldLag(String),
 }
 
 /// One encoding per meaning for a CID field: a human-readable format (a JSON declaration a
@@ -301,9 +303,13 @@ impl IndexMeasure {
 
     /// A semantic ranking without a model pin is malformed; a lexical ranking with one is a
     /// declaration of a model that nothing uses. Both are refused, as is a surface that admits
-    /// the private chain, so a deserialized value is re-checkable against the same rules.
+    /// the private chain and a fold-lag bound its own [`Bound::validate`] refuses, so a
+    /// deserialized value is re-checkable against the same rules.
     pub fn validate(&self) -> std::result::Result<(), IndexError> {
         self.surfaces.validate()?;
+        self.fold_lag
+            .validate()
+            .map_err(|error| IndexError::FoldLag(error.to_string()))?;
         match (self.ranking.needs_model(), self.embedding.is_some()) {
             (true, false) => Err(IndexError::ModelPinMissing),
             (false, true) => Err(IndexError::ModelPinUnused),
@@ -506,6 +512,23 @@ mod tests {
             repinned.cid().unwrap(),
             b,
             "new model bytes, new method CID"
+        );
+    }
+
+    /// `validate()` composes the fold-lag bound's own refusals: a declaration spelling its
+    /// ceiling explicitly (`sense: ceiling`, the redundant second encoding of the v1 default)
+    /// gives one promise two CIDs, and is refused at the measure, not only at the bound.
+    #[test]
+    fn validate_composes_the_fold_lag_bound() {
+        let mut m = local_measure();
+        m.validate().expect("a canonical fold-lag bound validates");
+        m.fold_lag.sense = Some(Sense::Ceiling);
+        let refused = m
+            .validate()
+            .expect_err("an explicit redundant ceiling is refused by the measure");
+        assert!(
+            refused.to_string().contains("fold lag"),
+            "the refusal names the fold-lag bound: {refused}"
         );
     }
 

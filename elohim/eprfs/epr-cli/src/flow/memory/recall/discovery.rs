@@ -1492,7 +1492,7 @@ fn top_red_habit(text: &str) -> Result<Option<TopRedHabit>, String> {
 /// exclude_directories` (version-control, dependency and build trees; `worktrees` is literally
 /// another checkout). Reused rather than re-declared so the two traversals can never disagree
 /// about what is "irrelevant tree," and a repo that adds a new one only has to say so once.
-fn atom_search_excluded(contract: &Contract) -> BTreeSet<String> {
+pub(super) fn atom_search_excluded(contract: &Contract) -> BTreeSet<String> {
     contract
         .value
         .pointer("/discovery/exclude_directories")

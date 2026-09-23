@@ -152,3 +152,7 @@ Focused and whole open re-baselined for ONE reason: the fixture contract CID mov
 ## 2026-09-23 — contract v16 (station 4, Task 4.2: `limits.fold_procedure_bytes`/`fold_procedure_seconds`/`fold_batch_texts` declared for the embedding fold procedure)
 
 Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreih…udfe → bafkreic…gbvi). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`46e2d00a…`, `562a9cd8…`) byte for byte. The refusal digest is unchanged.
+
+## 2026-09-23 — contract v17 (station 4, Task 4.3: `limits.fold_files_per_run` declared for the semantic fold's per-run cap)
+
+Focused and whole open re-baselined for ONE reason: the fixture contract CID moved (bafkreic…gbvi → bafkreia…onba). Proof: substituting the previous fixture CID back into each new rendering reproduces the previous pins (`fef8f452…`, `09669f86…`) byte for byte. The refusal digest is unchanged.

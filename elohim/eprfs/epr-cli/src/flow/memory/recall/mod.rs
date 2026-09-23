@@ -79,6 +79,11 @@ pub use providers::bounded_process;
 pub mod embedder;
 use providers::{process_result, providers_for};
 
+// The semantic fold (station 4, task 4.3): the declared chunker, and `index fold|status` — the
+// incremental, fingerprinted, attested store the semantic route ranks over.
+mod chunk;
+pub mod index;
+
 mod journey;
 use journey::execute;
 

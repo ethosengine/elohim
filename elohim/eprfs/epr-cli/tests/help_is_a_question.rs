@@ -64,3 +64,11 @@ fn the_recall_executor_answers_help_on_stdout() {
     assert!(out.contains("--session"), "{out}");
     assert!(out.contains("open"), "{out}");
 }
+
+#[test]
+fn the_semantic_index_answers_help_on_stdout() {
+    let out = answer(&["flow", "memory", "index", "--help"]);
+    assert!(out.contains("fold"), "{out}");
+    assert!(out.contains("status"), "{out}");
+    assert!(answer(&["flow", "memory", "--help"]).contains("index"));
+}

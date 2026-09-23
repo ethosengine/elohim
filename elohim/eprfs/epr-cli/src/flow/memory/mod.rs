@@ -52,7 +52,7 @@ pub struct Options<'a> {
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
-const OPERATIONS: [&str; 8] = [
+const OPERATIONS: [&str; 9] = [
     "collective",
     "pin",
     "contribute",
@@ -61,6 +61,7 @@ const OPERATIONS: [&str; 8] = [
     "graduate",
     "import",
     "recall",
+    "index",
 ];
 
 /// What `epr flow memory` offers, printed as an ANSWER rather than a refusal.
@@ -74,7 +75,8 @@ pub fn usage() -> String {
          feedback      file governed feedback on a contribution\n  \
          graduate      rehearse local repository reach for a contribution\n  \
          import        adopt an authored directory of requests\n  \
-         recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n",
+         recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n  \
+         index         the semantic fold \u{2014} `index fold|status`, `index --help` for its surface\n",
         OPERATIONS.join("|")
     )
 }
@@ -96,6 +98,10 @@ pub fn run(args: &[String]) -> FlowResult<ExitCode> {
     // memory shell every recall flag, so the raw tail is handed over intact instead.
     if operation == "recall" {
         return recall::run(&args[1..]);
+    }
+    // The semantic fold likewise owns its own surface (`fold|status`, a run cap, an embedder).
+    if operation == "index" {
+        return recall::index::run(&args[1..]);
     }
     let mut root = std::path::PathBuf::from(".");
     let mut opts = Options::default();
