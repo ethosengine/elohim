@@ -113,3 +113,22 @@ per cell, and count it in a metric so the standing case is visible without a log
 **Links.** `scripts/ci/stage-spa-blob.sh` (the bounded class's CI cure). `elohim/elohim-storage/src/p2p/projection_reconcile.rs`
 and the feedback projector (the retrying callers). Evidence run: `genesis/a2o/reports/recovery/serving-edge-20260921/`.
 Sibling: `doorway-registry-ttl-unenforced-no-heartbeat.md`.
+
+**2026-09-23 — mechanism (1) has a fix on a buildable branch; the fleet has not run it.** The fork's
+`perf/k2-dht-model-sargable-arc` (`e0bfc6c7a`: ArcBounds chooses a sargable predicate shape in
+Rust, covering `elohim_ChainOp_loc_sync_idx` / `elohim_WarrantOp_loc_idx` created `IF NOT EXISTS`
+after migrations so an older binary still opens the store) is now `8ccffdedb` on
+`int/2026-09-23-diagnostics-throttle-perf`, with the cap-grant fix and the private diagnostics.
+Its three tests pass in the fork (`sector_arc_reads_use_loc_index_not_chain_op_scan`,
+`arc_shapes_select_the_same_rows`, `sync_indexes_are_created_idempotently_outside_migrations`).
+Household (36 GB Dowell fixture, three conductors, `hc-fork-61565f320d0e`): processes started
+18:43:57Z; storage first read every role's cell ABSENT at 18:44:25Z; matthew's first successful
+zome call landed at about 18:46:24Z (its `/health` at 18:48:30Z showed `lastZomeCallAgeSecs` 126
+on node_registry) and all fifteen role cells on the three peers were serving by 18:49Z — a
+window of roughly two and a half minutes on this store. No same-store baseline with the old
+binary exists (the household's conductors log at `warn`, so the `DHT model initialised in` line is
+not captured here), so this is "boots and serves", not a controlled before/after; the fleet's
+per-pod `DHT model initialised in` lines (Loki, `container="elohim-conductor"`) are the measurement
+that closes this row once a conductor image carrying `61565f320` rolls. Today's fleet reading for
+scale: gertrude 24 176 s, eve 15 138 s, susan 10 078 s, each a single space join.
+Mechanism (2), stranded after startup, is untouched by this.

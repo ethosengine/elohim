@@ -289,6 +289,20 @@ statement disappears from matthew's and adam's conductor logs, `elohim_conductor
 converges on susan's, and genesis seeds Matthew and Adam (the #1577 failure above) — that last one is the
 delivery-level proof.
 
+**2026-09-23 — the order above has been walked up to the pin.** `28fc8ad6d` is now `61565f320` on the fork
+branch `int/2026-09-23-diagnostics-throttle-perf` (parent `25dd2d0be`, the fleet's pin), together with the
+sargable-arc fix, the receive throttle and the private diagnostics. Fork evidence on rust 1.96.1:
+`cargo test -p holochain_data -p holochain_state` — 146 + 8 + 193 passed, 0 failed, including
+`cap_grant_lookup_cost_does_not_scale_with_grant_count`, the randomised differential against the kept
+reference body, `cap_grant_corrupt_live_action_fails_closed` and `cap_grant_foreign_author_cannot_revoke_a_grant`.
+Household (36 GB Dowell fixture, three conductors on the production-feature release build,
+`hc-fork-61565f320d0e`): all fifteen role cells across matthew, jessica and james answer zome calls
+(`/health` per-role `zomePath: live`, `consecutiveFailures: 0`) within about two and a half minutes of
+process start, and today's conductor log carries zero `CapGrant … ORDER BY Action.seq` slow statements —
+though the household never produced that statement (0 in its whole log history), so "gone" is a fleet
+measurement, not a household one. The superproject pin move is the next commit on `dev`; pushing it is the
+roll. What the fleet should then show is unchanged from the paragraph above.
+
 Filed separately, NOT caused by this change (identical before and after): on the cap-grant read a public
 `Entry` row outranks a same-hash `PrivateEntry`, and `cache_chain_ops` inserts a network-supplied
 `(hash, blob)` pair. If that hash is not re-derived from the content before insert, a peer could plant a blob

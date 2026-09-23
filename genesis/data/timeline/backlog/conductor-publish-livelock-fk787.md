@@ -105,3 +105,17 @@ ratio on `787`, flat-vs-decaying discriminator).
 
 **Captured, not started.** Owner: next conductor-fork shift. Blocks nothing tonight — a fresh
 household sidesteps the amplitude (no poisoned rows in a new store) rather than curing the defect.
+
+**2026-09-23 — (c) is committed; (a) and (b) are not.** The receive-throttle patch left untracked
+in §4 is now fork commit `ff2ea44c6` on `int/2026-09-23-diagnostics-throttle-perf` (parent
+`25dd2d0be`, the fleet's pin): per-connection, module-scoped (`Publish` only), 250 ms cooldown,
+summaries rate-limited to one per 30 s, config keys with serde defaults so an older rendered
+config still loads. 76 transport tests pass (13 new, three of them end-to-end over a real pair:
+a refusal does not close the connection, only the refusing module is throttled, a disabled throttle
+delivers every frame); the K2Proto field peek was checked against kitsune2_api 0.5.0's `wire.proto`.
+The household ran the binary (`hc-fork-61565f320d0e`) with no refusals to exercise it, so the
+household proves absence of regression, not the cure — the cure is measured on the fleet by the
+adam `recv_data … Full(..)` count above going from ~15k/hour to a handful of summary lines.
+Still open here: (a) per-hash publish recording and (b) `locally_validated = 1` on the selection
+queries — the livelock itself. Landing: the pin move is a separate commit (see
+`conductor-cap-grant-scan-per-zome-call.md`, same branch).

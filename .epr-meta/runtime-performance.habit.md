@@ -59,6 +59,23 @@ passed; the expanded source story received a context-isolated READY review. Nati
 runtime capture, per-cell workflows and statement timing remain the RED frontier; exact resume
 commands are in genesis/a2o/scripts/runtime-performance.md.
 
+DELTA 2026-09-23 (fork half committed; first live household admission receipt; still RED): the
+conductor-side instrumentation that had sat uncommitted in the fork's working tree since
+2026-09-21 is now fork commit 915acf6bc on int/2026-09-23-diagnostics-throttle-perf (SQL timing,
+workflow wake/run attribution, heap-capture canary, admin wire types, seam registries), verified
+on rust 1.96.1: holochain_conductor_api 31 tests, holochain_trace 29 + 1 SQLite-worker integration,
+holochain lib 29 passed / 1 pre-existing ignored (the three Linux-native heap tests need the
+jemalloc-prof feature and did not run). Live: the household's three conductors ran the
+production-feature release build with HOLOCHAIN_SQL_DIAGNOSTICS_DIR authorized; `runtime-performance
+arm --family sqlTiming --seconds 30` against matthew's admin websocket answered admitted
+(producer sql-f720b-1a0cf94e8c9, generation 1) and the conductor wrote
+sql-timing-g01-hh-20260923-a.jsonl (20 511 bytes, mode 0600) carrying the kernel process witness
+(pid, start ticks, boot id, executable) and HMAC statement identities with counts and elapsed —
+no statement text. That is admission and a terminal artifact, not coverage: no matched CPU
+capture accompanied it, the workflow and heap families were not armed live, and `check
+--require-coverage all` is unchanged. Private receipt: the artifact stayed in the session's
+private directory; nothing from it is imported here.
+
 2026-09-20 framework-reuse delta: audited existing perf/libdw, pprof-rs, conductor timed tracing,
 metrics, jemalloc and Diesel query instrumentation; documented what is wired versus optional,
 including pprof's missing route authentication/response ceiling. Added and independently reviewed

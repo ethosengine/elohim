@@ -258,6 +258,20 @@ not a silently shorter measurement. A partial multi-peer failure closes clients/
 fails the capture; already-admitted native windows expire without a cancellation claim.
 Focused tests cover this orchestration; the real native synchronized capture remains pending.
 
+### Fork half committed; first live admission receipt (2026-09-23)
+
+The conductor-side instrumentation this runbook has described as "source implemented; native
+verification pending" is now a fork commit (`915acf6bc` on
+`int/2026-09-23-diagnostics-throttle-perf`, parent `25dd2d0be`), no longer a dirty working tree, and
+the branch also carries the receive throttle and the two perf branches that were unpushed. The
+household's three conductors ran the production-feature release build of that branch with
+`HOLOCHAIN_SQL_DIAGNOSTICS_DIR` authorized; `arm --family sqlTiming --seconds 30` against
+matthew's admin websocket was admitted and the conductor wrote
+`sql-timing-g01-<nonce>.jsonl` (mode 0600, kernel process witness, HMAC statement identities, no
+statement text). Workflow and heap families were not armed live. The handoff below is otherwise
+unchanged: admission plus a terminal artifact is not coverage, and `check --require-coverage all`
+remains RED until a matched capture accompanies it.
+
 ### Current verification handoff (2026-09-21)
 
 An earlier source tranche recorded 129 focused telemetry tests across 12 suites and a full A2O
