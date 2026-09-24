@@ -8,6 +8,7 @@
   "cost_class": "high-fp-cost",
   "binding": "binding-local",
   "linguistic_definition": "Apex ownership framing asserts ownership as the right relationship to a resource, collapsing rights (primaryAccountable) into custody (custodianScope): the enclosure a holon commits when it owns the commons it stewards. The discriminator is property versus responsibility; accountability idioms such as taking ownership of a bug are not members. The exception is inalienable: a person's absolute claim over their own body, likeness, voice, medical record, private communications or intimate images, where custody transfer is prohibited rather than gated.",
+  "reason_clause": "net-new apex-ownership framing needs an explicit custody/stewardship frame",
   "rubric": {
     "question": "Does the net-new passage assert ownership as the right relationship to a resource, or does it name ownership inside one of the legitimate frames?",
     "legitimate_frames": [
@@ -48,7 +49,7 @@
     ],
     "min_net_new": 1,
     "scan_cap_bytes": 262144,
-    "cosine_floor": 0.35,
+    "cosine_floor_permille": 350,
     "probe_min_net_new_bytes": 400
   },
   "cites": [

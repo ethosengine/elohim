@@ -47,6 +47,10 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 sha2 = "0.10"
 thiserror.workspace = true
+# NFKC for the frame classifier's shadow text (`frames.rs`): the fold that lets a compatibility
+# form (fullwidth letters, ligatures) meet the frame atoms' lowercase phrases. The same crate and
+# version elohim-storage already carries, so this adds no new vetting surface.
+unicode-normalization = "0.1.25"
 
 [dev-dependencies]
 # The index-parity harness pins the projector's expected bytes by digest, so a fixture that

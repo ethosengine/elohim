@@ -7,10 +7,13 @@
 
 use std::{collections::HashMap, collections::HashSet, fs, path::Path};
 
+use elohim_epr::FrameVerdict;
 use eprfs_core::GovernanceRuleClass;
 use eprfs_meta::{ValidatorOutcome, ValidatorProvider, ValidatorRequest};
 use serde::Deserialize;
 use serde_json::Value;
+
+use crate::frames;
 
 const ARCHETYPE_BUDGETS: &str = "genesis/data/devices/archetype-resource-budgets.json";
 const CAPACITY_LEDGER: &str = "genesis/data/rakia/compute-capacity.json";
@@ -60,8 +63,8 @@ impl ValidatorProvider for ElohimRepositoryValidators {
         let detail = match request.reference {
             "epr:validator-p2p-design-gate" => p2p_design_gate(request),
             "epr:validator-brand-vocabulary-boundary" => brand_vocabulary_boundary(request),
-            "epr:validator-sovereignty-ontology-guard" => sovereignty_guard(request),
-            "epr:validator-ownership-ontology-guard" => ownership_guard(request),
+            "epr:validator-sovereignty-ontology-guard" => return sovereignty_guard(request),
+            "epr:validator-ownership-ontology-guard" => return ownership_guard(request),
             "epr:validator-archetype-resource-alignment" => archetype_resource_alignment(request),
             "epr:validator-test-bench-aggregate-capacity" => {
                 return test_bench_aggregate_capacity(request).unwrap_or(ValidatorOutcome::Pass);
@@ -408,95 +411,46 @@ fn p2p_design_gate(request: &ValidatorRequest<'_>) -> Option<String> {
         .map(|needle| format!("found conventional-first design marker `{needle}`"))
 }
 
-fn sovereignty_guard(request: &ValidatorRequest<'_>) -> Option<String> {
-    const PHRASES: &[&str] = &[
-        "self-sovereign",
-        "self sovereign",
-        "self-sovereignty",
-        "self sovereignty",
-        "true data sovereignty",
-        "full data sovereignty",
-        "sovereign identity",
-        "digital sovereignty",
-        "fully sovereign",
-    ];
-    let post = request
-        .write
-        .content
-        .as_deref()
-        .unwrap_or("")
-        .to_lowercase();
-    if post.contains("sovereignty-frame:") {
-        return None;
-    }
-    let count = |text: &str| {
-        PHRASES
-            .iter()
-            .map(|phrase| text.matches(phrase).count())
-            .sum::<usize>()
-    };
-    let post_count = count(&post);
-    if post_count == 0 {
-        return None;
-    }
-    let prior = request
-        .write
-        .prior_content
-        .as_deref()
-        .unwrap_or("")
-        .to_lowercase();
-    if !request.write.is_new && post_count <= count(&prior) {
-        return None;
-    }
-    Some("net-new apex-sovereignty framing needs an explicit bounded frame".into())
+/// Sovereignty ontology guard — names self-sovereignty as the protocol's own apex value. The
+/// vocabulary (phrases, the `sovereignty-frame:` marker, the reason clause) lives in the frame atom
+/// `frame-sovereignty-apex`; this host only classifies against it (`frames::classify`).
+fn sovereignty_guard(request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+    frame_guard(request)
 }
 
 /// Ownership ontology guard — the sibling drift to sovereignty, same shape. OWNERSHIP is the
-/// enclosure-flavoured apex the protocol subordinates to STEWARDSHIP and CUSTODY. The phrase list
-/// is deliberately narrow (property-flavoured only): English overloads "ownership" for
-/// RESPONSIBILITY too ("take full ownership of this bug"), so `full ownership` and `sole ownership`
-/// are not members. Either frame marker quiets it — the two frames travel together.
-fn ownership_guard(request: &ValidatorRequest<'_>) -> Option<String> {
-    const PHRASES: &[&str] = &[
-        "data ownership",
-        "own your data",
-        "owns their data",
-        "owns your data",
-        "true ownership",
-        "outright ownership",
-        "ownership rights",
-        "ownership of the commons",
-        "owns the commons",
-    ];
-    let post = request
-        .write
-        .content
-        .as_deref()
-        .unwrap_or("")
-        .to_lowercase();
-    if post.contains("stewardship-frame:") || post.contains("sovereignty-frame:") {
-        return None;
-    }
-    let count = |text: &str| {
-        PHRASES
-            .iter()
-            .map(|phrase| text.matches(phrase).count())
-            .sum::<usize>()
+/// enclosure-flavoured apex the protocol subordinates to STEWARDSHIP and CUSTODY. Its phrase list
+/// (property-flavoured only: "take full ownership of this bug" is an accountability idiom, not a
+/// member) and its two markers live in the frame atom `frame-ownership-inalienable`.
+fn ownership_guard(request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+    frame_guard(request)
+}
+
+/// A values guard bound to a frame atom by its validator reference.
+///
+/// - atom or ontology unreadable → `Unavailable` (never `Pass`: without the atom the guard cannot
+///   know the write is clean, and the evaluator clamps `Unavailable` to the rule's declared class);
+/// - no net-new apex phrase, or a declared legitimate frame → `Pass`;
+/// - `Drift` (an `apex` marker) or `Abstain` (hits with no marker) → `Classified`, carrying the
+///   `FrameClassification` and its CID as opaque evidence.
+fn frame_guard(request: &ValidatorRequest<'_>) -> ValidatorOutcome {
+    let Ok((frame, ontology)) = frames::frame_for(request.repo_root, request.reference) else {
+        return ValidatorOutcome::Unavailable;
     };
-    let post_count = count(&post);
-    if post_count == 0 {
-        return None;
+    let Some((classification, cid)) = frames::classify(request.write, &frame, &ontology) else {
+        return ValidatorOutcome::Pass;
+    };
+    if classification.verdict == FrameVerdict::Legitimate {
+        return ValidatorOutcome::Pass;
     }
-    let prior = request
-        .write
-        .prior_content
-        .as_deref()
-        .unwrap_or("")
-        .to_lowercase();
-    if !request.write.is_new && post_count <= count(&prior) {
-        return None;
-    }
-    Some("net-new apex-ownership framing needs an explicit custody/stewardship frame".into())
+    let reason = frames::reason_line(
+        &frame.0,
+        &frame.1.to_string(),
+        &cid.to_string(),
+        frames::verdict_word(classification.verdict),
+    );
+    let evidence = frames::evidence_value(&classification, &cid, &reason);
+    ValidatorOutcome::Classified { reason, evidence }
 }
 
 fn archetype_resource_alignment(request: &ValidatorRequest<'_>) -> Option<String> {
@@ -1010,22 +964,80 @@ mod tests {
         );
     }
 
-    fn ownership_flag(prior: Option<&str>, content: &str) -> Option<String> {
-        let dir = TempDir::new().unwrap();
+    /// The live repository root — the guards read their frame atoms from it.
+    fn live_root() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../..")
+            .canonicalize()
+            .unwrap()
+    }
+
+    fn guard_outcome(reference: &str, prior: Option<&str>, content: &str) -> ValidatorOutcome {
+        let root = live_root();
         let rule = dummy_rule();
         let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");
         write.is_new = prior.is_none();
         write.prior_content = prior.map(str::to_string);
         write.content = Some(content.to_string());
         let request = ValidatorRequest {
-            repo_root: dir.path(),
-            reference: "epr:validator-ownership-ontology-guard",
+            repo_root: &root,
+            reference,
             rule: &rule,
             write: &write,
             cid: None,
             fuel: None,
         };
-        ownership_guard(&request)
+        match reference {
+            "epr:validator-ownership-ontology-guard" => ownership_guard(&request),
+            _ => sovereignty_guard(&request),
+        }
+    }
+
+    /// The Classified outcome's reason line, or `None` when the guard passes.
+    fn ownership_flag(prior: Option<&str>, content: &str) -> Option<String> {
+        match guard_outcome("epr:validator-ownership-ontology-guard", prior, content) {
+            ValidatorOutcome::Classified { reason, .. } => Some(reason),
+            ValidatorOutcome::Pass => None,
+            other => panic!("the live atoms must classify, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn reason_line_carries_frame_and_classification_short_cids() {
+        let outcome = guard_outcome(
+            "epr:validator-sovereignty-ontology-guard",
+            None,
+            "The protocol is fully sovereign.",
+        );
+        let ValidatorOutcome::Classified { reason, evidence } = outcome else {
+            panic!("net-new apex framing must classify");
+        };
+        let frame_ref = evidence["frameRef"].as_str().unwrap();
+        let classification = evidence["classificationCid"].as_str().unwrap();
+        assert!(frame_ref.starts_with("bafy") && classification.starts_with("bafy"));
+        assert_eq!(
+            reason,
+            format!(
+                "net-new apex-sovereignty framing needs an explicit bounded frame · frame {} · \
+                 classification {} · abstain",
+                frames::short_cid(frame_ref),
+                frames::short_cid(classification)
+            )
+        );
+        assert_eq!(evidence["reason"], reason.as_str());
+        assert_eq!(evidence["verdict"], "abstain");
+        assert_eq!(evidence["classification"]["frameRef"], frame_ref);
+        assert_eq!(evidence["spans"][0]["start"], 16);
+
+        // ONE format, parameterised by the atom: ownership leads with its own clause.
+        let own = ownership_flag(None, "Members get true data ownership.").unwrap();
+        assert!(
+            own.starts_with(
+                "net-new apex-ownership framing needs an explicit custody/stewardship frame · frame bafyrei"
+            ),
+            "{own}"
+        );
+        assert!(own.ends_with(" · abstain"), "{own}");
     }
 
     #[test]
@@ -1068,13 +1080,13 @@ mod tests {
 
     #[test]
     fn ownership_reference_resolves_in_the_native_provider() {
-        let dir = TempDir::new().unwrap();
+        let root = live_root();
         let rule = dummy_rule();
         let mut write = GovernanceWrite::new("genesis/docs/content/elohim-protocol/note.md");
         write.is_new = true;
         write.content = Some("Custody is stewarded, never enclosed.".into());
         let request = ValidatorRequest {
-            repo_root: dir.path(),
+            repo_root: &root,
             reference: "epr:validator-ownership-ontology-guard",
             rule: &rule,
             write: &write,

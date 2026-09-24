@@ -15,6 +15,7 @@
     "cost_class",
     "binding",
     "linguistic_definition",
+    "reason_clause",
     "rubric",
     "recall_signal",
     "cites",
@@ -57,6 +58,11 @@
     "linguistic_definition": {
       "type": "string",
       "minLength": 1
+    },
+    "reason_clause": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The leading clause of the guard's reason line, derived from the linguistic definition. Both hosts render ONE format around it: `<reason_clause> · frame <short> · classification <short> · <verdict>`."
     },
     "rubric": {
       "type": "object",
@@ -107,7 +113,7 @@
         "markers",
         "min_net_new",
         "scan_cap_bytes",
-        "cosine_floor",
+        "cosine_floor_permille",
         "probe_min_net_new_bytes"
       ],
       "properties": {
@@ -142,11 +148,11 @@
           "minimum": 1,
           "description": "Beyond this many bytes the fold is skipped: substring-only scan, `unscanned-tail` recorded."
         },
-        "cosine_floor": {
-          "type": "number",
+        "cosine_floor_permille": {
+          "type": "integer",
           "minimum": 0,
-          "maximum": 1,
-          "description": "Semantic shadow-probe floor; a hit at or above it is recorded as abstain, never an accusation."
+          "maximum": 1000,
+          "description": "Semantic shadow-probe floor in thousandths of cosine similarity (350 = 0.35); a hit at or above it is recorded as abstain, never an accusation. An integer, never a float: the atom's identity is the registry-row CID recipe, whose canonical JSON refuses floats because CPython and Rust render them differently."
         },
         "probe_min_net_new_bytes": {
           "type": "integer",

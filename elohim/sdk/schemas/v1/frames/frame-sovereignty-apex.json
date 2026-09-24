@@ -8,6 +8,7 @@
   "cost_class": "high-fp-cost",
   "binding": "binding-local",
   "linguistic_definition": "Apex sovereignty framing names self-sovereignty as the protocol's own top identity or agency value, or celebrates true, full or digital data sovereignty as an implementation goal. The protocol does not consider sovereignty itself the right framing: agency is imago-dei and community-backstopped, exercised with and through others, so sovereignty is not forbidden but made mechanically expensive.",
+  "reason_clause": "net-new apex-sovereignty framing needs an explicit bounded frame",
   "rubric": {
     "question": "Does the net-new passage assert sovereignty as the protocol's own apex identity or agency value, or does it name sovereignty inside one of the legitimate frames?",
     "legitimate_frames": [
@@ -43,7 +44,7 @@
     ],
     "min_net_new": 1,
     "scan_cap_bytes": 262144,
-    "cosine_floor": 0.35,
+    "cosine_floor_permille": 350,
     "probe_min_net_new_bytes": 400
   },
   "cites": [

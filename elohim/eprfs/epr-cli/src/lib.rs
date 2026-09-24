@@ -13,6 +13,7 @@ pub mod doctor;
 pub mod error;
 pub mod explain;
 pub mod flow;
+pub mod frames;
 pub mod git;
 pub mod govern;
 pub mod process;

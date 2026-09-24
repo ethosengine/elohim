@@ -56,7 +56,7 @@ PINNED_OWN_MARKERS = ["stewardship-frame:", "sovereignty-frame:"]
 
 REQUIRED_ATOM_KEYS = {
     "id", "version", "validator", "apex_concept", "family", "polarity", "cost_class", "binding",
-    "linguistic_definition", "rubric", "recall_signal", "cites", "established_by",
+    "linguistic_definition", "reason_clause", "rubric", "recall_signal", "cites", "established_by",
 }
 LIFECYCLE_KEYS = {"status", "contentHash", "superseded_by", "retire-when"}
 
@@ -74,6 +74,16 @@ def check(name: str, cond: bool, detail: str = "") -> None:
         print(f"  FAIL {name}")
         if detail:
             print(f"       {detail}")
+
+
+def _has_float(value) -> bool:
+    if isinstance(value, float):
+        return True
+    if isinstance(value, dict):
+        return any(_has_float(v) for v in value.values())
+    if isinstance(value, list):
+        return any(_has_float(v) for v in value)
+    return False
 
 
 def load(path: Path):
@@ -124,8 +134,11 @@ for aid, atom in atoms.items():
     check(f"{aid} rubric.apex_answer is apex", atom.get("rubric", {}).get("apex_answer") == "apex")
     rs = atom.get("recall_signal", {})
     check(f"{aid} recall_signal parameters are the ruled values",
-          (rs.get("min_net_new"), rs.get("scan_cap_bytes"), rs.get("cosine_floor"),
-           rs.get("probe_min_net_new_bytes")) == (1, 262144, 0.35, 400))
+          (rs.get("min_net_new"), rs.get("scan_cap_bytes"), rs.get("cosine_floor_permille"),
+           rs.get("probe_min_net_new_bytes")) == (1, 262144, 350, 400))
+    # Ruling R-C6: governed declarations carry no floats — the atom's identity is the registry-row
+    # CID recipe, whose canonical JSON refuses a float (CPython and Rust render them differently).
+    check(f"{aid} carries no float anywhere (R-C6)", not _has_float(atom))
     cites = atom.get("cites", [])
     stale = [c for c in cites if not (REPO / c).is_file()]
     check(f"{aid} cites resolve to files on disk", bool(cites) and not stale, f"missing: {stale}")
