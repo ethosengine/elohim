@@ -7,14 +7,15 @@
 //! - `POST /admin/federation/peers` — add a federation peer
 //! - `DELETE /admin/federation/peers` — remove a federation peer
 //! - `POST /admin/federation/peers/refresh` — force peer cache refresh
-//! - `POST /admin/federation/deregister` — take THIS doorway off the DHT roster
+//! - `POST /admin/federation/deregister` — take THIS doorway off the DHT roster (Admin)
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{Response, StatusCode};
+use hyper::{Request, Response, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use crate::routes::admin_users::require_admin;
 use crate::server::AppState;
 use crate::services::federation::{self, FederationConfig};
 
@@ -640,10 +641,24 @@ pub struct DeregisterResponse {
 /// by the a2o `OwnedDoorwayPair` fixture on teardown, before its scenario
 /// doorways stop (conductor-store growth report 2026-09-24 §7.1).
 ///
+/// Admin-gated by the shared [`require_admin`] (the `/admin/users` and
+/// `/admin/conductors` gate): registration is boot-once
+/// (`spawn_doorway_registration_task` never re-registers), so an accepted call
+/// removes this doorway from the roster, and from every sibling's JWKS trust
+/// anchors, for the rest of the process lifetime. An anonymous caller must
+/// never hold that lever. The request body is never read.
+///
 /// - 200 `{doorwayId, linksDeleted}`
+/// - 401 — no or invalid bearer token; 403 — a valid token below Admin
 /// - 503 — federation not configured or no conductor connection
 /// - 502 — the zome call failed
-pub async fn handle_admin_federation_deregister(state: Arc<AppState>) -> Response<Full<Bytes>> {
+pub async fn handle_admin_federation_deregister<B>(
+    req: &Request<B>,
+    state: Arc<AppState>,
+) -> Response<Full<Bytes>> {
+    if let Err(resp) = require_admin(req, &state).await {
+        return resp;
+    }
     let Some(zome_caller) = state.zome_caller.as_ref() else {
         return json_error_response(StatusCode::SERVICE_UNAVAILABLE, "no conductor connection");
     };
@@ -784,6 +799,8 @@ fn hosted_binding_json(status: StatusCode, body: String) -> Response<Full<Bytes>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::{JwtValidator, PermissionLevel, TokenInput};
+    use http_body_util::Empty;
 
     /// With no conductor there is nothing to deregister from: the verb must say
     /// so (503), never answer 200 — the a2o fixture records the outcome and a
@@ -802,7 +819,98 @@ mod tests {
         ]);
         let state = Arc::new(AppState::new(args));
         assert!(state.zome_caller.is_none());
-        let response = handle_admin_federation_deregister(state).await;
+        let token = mint(PermissionLevel::Admin);
+        let response = handle_admin_federation_deregister(&req(Some(&token)), state).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    // ── The deregister verb is Admin-gated (H1 review, 2026-09-24) ──────────
+    //
+    // Registration is boot-once, so one accepted POST drops this doorway from
+    // the roster and from siblings' JWKS trust anchors for the process
+    // lifetime. These pin that it answers exactly as the other admin routes
+    // (`admin_conductors`, `admin_users`) do: 401 / 403 / through.
+
+    fn deregister_state() -> Arc<AppState> {
+        use clap::Parser;
+        let args = crate::config::Args::parse_from([
+            "doorway",
+            "--listen",
+            "127.0.0.1:0",
+            "--doorway-id",
+            "epr-deliverability-test-a",
+            "--doorway-url",
+            "http://127.0.0.1:1",
+        ]);
+        Arc::new(AppState::new(args))
+    }
+
+    /// No `JWT_SECRET` in the test args, so `require_admin` verifies against
+    /// the dev validator — the same arrangement `admin_conductors` tests use.
+    fn mint(level: PermissionLevel) -> String {
+        JwtValidator::new_dev()
+            .generate_token(TokenInput {
+                human_id: "human-1".into(),
+                agent_pub_key: "uhCAk-test".into(),
+                identifier: "operator@example.com".into(),
+                permission_level: level,
+                session_id: None,
+                doorway_id: None,
+                doorway_url: None,
+                conductor_id: None,
+                installed_app_id: None,
+                is_steward: false,
+                has_local_conductor: false,
+            })
+            .unwrap()
+    }
+
+    fn req(token: Option<&str>) -> Request<Empty<Bytes>> {
+        let mut builder = Request::builder()
+            .method(hyper::Method::POST)
+            .uri("/admin/federation/deregister");
+        if let Some(token) = token {
+            builder = builder.header(hyper::header::AUTHORIZATION, format!("Bearer {token}"));
+        }
+        builder.body(Empty::<Bytes>::new()).unwrap()
+    }
+
+    #[tokio::test]
+    async fn deregister_without_a_token_is_refused_like_every_admin_route() {
+        let response = handle_admin_federation_deregister(&req(None), deregister_state()).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        // Same status the admin_conductors gate answers for the same request.
+        let sibling =
+            crate::routes::admin_conductors::handle_list_conductors(&req(None), deregister_state())
+                .await;
+        assert_eq!(response.status(), sibling.status());
+    }
+
+    #[tokio::test]
+    async fn deregister_with_a_non_admin_token_is_forbidden() {
+        let token = mint(PermissionLevel::Authenticated);
+        let response =
+            handle_admin_federation_deregister(&req(Some(&token)), deregister_state()).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[tokio::test]
+    async fn deregister_with_a_forged_token_is_refused() {
+        let response =
+            handle_admin_federation_deregister(&req(Some("not.a.jwt")), deregister_state()).await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    /// An Admin token passes the gate and reaches the deregistration itself —
+    /// here the no-conductor 503, since the zome effect needs a conductor
+    /// (proved by the sweettest `a_deregistered_doorway_leaves_the_roster`).
+    #[tokio::test]
+    async fn deregister_with_an_admin_token_reaches_the_verb() {
+        let token = mint(PermissionLevel::Admin);
+        let response =
+            handle_admin_federation_deregister(&req(Some(&token)), deregister_state()).await;
+        assert_ne!(response.status(), StatusCode::UNAUTHORIZED);
+        assert_ne!(response.status(), StatusCode::FORBIDDEN);
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 

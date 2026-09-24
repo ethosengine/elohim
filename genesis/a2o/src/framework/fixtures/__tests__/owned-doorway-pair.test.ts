@@ -6,7 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
+  canonicalDoorwayUrl,
   deregisterFixtureDoorway,
+  fixtureAdminToken,
   fixtureDoorwayLaunch,
   startOwnedChild,
   stopFixtureProcesses,
@@ -240,6 +242,59 @@ void test('deregistration POSTs the doorway own verb and reports the links it re
   assert.deepEqual(outcome, { status: 'deregistered', linksDeleted: 4 });
 });
 
+void test('deregistration sends the Admin bearer the verb requires, and a refusal is a recorded failure', async () => {
+  const seen: (string | undefined)[] = [];
+  const respond = (_url: string, init?: RequestInit): Response => {
+    const auth = (init?.headers as Record<string, string> | undefined)?.['authorization'];
+    seen.push(auth);
+    return auth === 'Bearer admin-jwt'
+      ? new Response(JSON.stringify({ linksDeleted: 2 }), { status: 200 })
+      : new Response('{"error":"No token provided"}', { status: 401 });
+  };
+  assert.deepEqual(
+    await deregisterFixtureDoorway(FIXTURE_A_URL, fakeFetch(respond, []), 'admin-jwt'),
+    { status: 'deregistered', linksDeleted: 2 }
+  );
+  const refused = await deregisterFixtureDoorway(FIXTURE_A_URL, fakeFetch(respond, []));
+  assert.equal(refused.status, 'failed');
+  assert.match((refused as { detail: string }).detail, /^401 /);
+  assert.deepEqual(seen, ['Bearer admin-jwt', undefined]);
+});
+
+void test('the Admin token is minted on the canonical doorway the fixture was cloned from', async () => {
+  assert.equal(
+    canonicalDoorwayUrl({ argv: ['doorway', '--listen', '0.0.0.0:8888'] }),
+    'http://127.0.0.1:8888'
+  );
+  assert.equal(
+    canonicalDoorwayUrl({ argv: ['doorway', '--listen', '127.0.0.1:8889'] }),
+    'http://127.0.0.1:8889'
+  );
+  assert.equal(canonicalDoorwayUrl({ argv: ['doorway'] }), undefined);
+
+  const minted: string[] = [];
+  const mint = async (url: string, key: string): Promise<string | null> => {
+    minted.push(`${url}|${key}`);
+    return await Promise.resolve('admin-jwt');
+  };
+  const template = {
+    argv: ['doorway', '--listen', '0.0.0.0:8888'],
+    env: { API_KEY_ADMIN: 'mesh-admin-dev-key' },
+  };
+  assert.equal(await fixtureAdminToken(template, mint), 'admin-jwt');
+  assert.deepEqual(minted, ['http://127.0.0.1:8888|mesh-admin-dev-key']);
+
+  // A mint that fails or throws leaves the token absent; teardown still runs.
+  assert.equal(
+    await fixtureAdminToken(template, async () => await Promise.resolve(null)),
+    undefined
+  );
+  assert.equal(
+    await fixtureAdminToken(template, async () => await Promise.reject(new Error('down'))),
+    undefined
+  );
+});
+
 void test('deregistration names an older binary unsupported and never throws on failure', async () => {
   const calls: { url: string; method?: string }[] = [];
   assert.deepEqual(
@@ -272,17 +327,19 @@ void test('teardown deregisters every scenario doorway while it runs, then stops
         name: 'b',
         url: FIXTURE_B_URL,
         handle: { pid: 21, ticks: '1', executable: '/d' },
+        adminToken: 'jwt-b',
       },
       {
         name: 'a',
         url: FIXTURE_A_URL,
         handle: { pid: 22, ticks: '2', executable: '/d' },
+        adminToken: 'jwt-a',
       },
     ],
     { pid: 23, ticks: '3', executable: '/mongod' },
     {
-      deregister: async (url: string): Promise<DeregistrationOutcome> => {
-        events.push(`deregister ${url}`);
+      deregister: async (url: string, adminToken?: string): Promise<DeregistrationOutcome> => {
+        events.push(`deregister ${url} as ${adminToken}`);
         return await Promise.resolve({ status: 'deregistered', linksDeleted: 4 });
       },
       stop: async (_handle, label) => {
@@ -292,8 +349,8 @@ void test('teardown deregisters every scenario doorway while it runs, then stops
     }
   );
   assert.deepEqual(events, [
-    `deregister ${FIXTURE_B_URL}`,
-    `deregister ${FIXTURE_A_URL}`,
+    `deregister ${FIXTURE_B_URL} as jwt-b`,
+    `deregister ${FIXTURE_A_URL} as jwt-a`,
     'stop fixture doorway b',
     'stop fixture doorway a',
     'stop fixture mongod',

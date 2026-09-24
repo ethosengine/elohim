@@ -424,6 +424,31 @@ pub fn spawn_doorway_registration_task(
 /// This bounds WHO is probed; what one probe writes is unchanged.
 pub const PROBE_ROSTER_EXPIRY_ROUNDS: u64 = 3;
 
+/// Every this-many probe rounds, expired roster members get a grace re-probe.
+///
+/// Expiry alone was a one-way ratchet: an expired peer came back only when its
+/// `record_serial` changed (a reboot), so a live sibling that stalled WITHOUT
+/// restarting — a partition, a parked worker, a certificate lapse — was
+/// skipped forever. A grace probe that gets any answer is ordinary liveness
+/// evidence ([`ProbeRoster::observe`]) and the peer is live again from the
+/// next round.
+///
+/// 12 rounds is one hour at the configured 300 s round (5 x 60 s heartbeat).
+/// With [`PROBE_ROSTER_GRACE_BATCH`] this bounds the write rate a fully dead
+/// roster costs one attestor to `GRACE_BATCH / GRACE_ROUNDS` attestations per
+/// round — 16 per hour, whatever the roster's size — against one per member
+/// per round before H1 (the store report's ~648/h across three attestors).
+pub const PROBE_ROSTER_GRACE_ROUNDS: u64 = 12;
+
+/// Most expired members one grace round re-probes, least recently tried first.
+///
+/// The order rotates through every expired member: a peer's turn comes from
+/// the round it expired or was last grace-probed, whichever is later, so a
+/// silent peer goes to the back and the whole expired set is revisited every
+/// `ceil(expired / GRACE_BATCH)` grace rounds (179 dead registrations — the
+/// household's measured count — are all revisited within 12 grace rounds).
+pub const PROBE_ROSTER_GRACE_BATCH: usize = 16;
+
 /// Per-attestor liveness book for the peer-health probe roster.
 ///
 /// Liveness evidence for a peer is any of: first appearing in the roster;
@@ -432,7 +457,8 @@ pub const PROBE_ROSTER_EXPIRY_ROUNDS: u64 = 3;
 /// doorway does on every boot. There is no `active|<ts>` link on doorway
 /// registrations; these three are the freshness markers that exist. A peer
 /// with no evidence for [`PROBE_ROSTER_EXPIRY_ROUNDS`] rounds is skipped, and
-/// re-enters the moment it re-registers.
+/// re-enters the moment it re-registers — or when it answers a grace re-probe
+/// (every [`PROBE_ROSTER_GRACE_ROUNDS`], at most [`PROBE_ROSTER_GRACE_BATCH`]).
 ///
 /// Pure bookkeeping on round numbers (no clock), so the expiry is testable
 /// without sleeping. Entries for ids that leave the roster are dropped, so the
@@ -447,6 +473,22 @@ pub struct ProbeRoster {
 struct ProbeRosterEntry {
     last_live_round: u64,
     record_serial: Option<u64>,
+    /// Round of this peer's last grace re-probe, if any since it last lived.
+    last_grace_round: Option<u64>,
+}
+
+impl ProbeRosterEntry {
+    fn expired_at(&self, round: u64) -> bool {
+        round.saturating_sub(self.last_live_round) >= PROBE_ROSTER_EXPIRY_ROUNDS
+    }
+
+    /// Grace-queue position: the later of when it expired and when it was
+    /// last grace-probed. Lower goes first.
+    fn grace_turn(&self) -> u64 {
+        let expired_round = self.last_live_round + PROBE_ROSTER_EXPIRY_ROUNDS;
+        self.last_grace_round
+            .map_or(expired_round, |g| g.max(expired_round))
+    }
 }
 
 impl ProbeRoster {
@@ -455,6 +497,10 @@ impl ProbeRoster {
     }
 
     /// Start a probe round over `roster`: returns `(to_probe, skipped_ids)`.
+    ///
+    /// `to_probe` keeps roster order and includes this round's grace
+    /// re-probes; `skipped_ids` is every expired member NOT probed this round,
+    /// so the skip counter keeps counting the rounds a peer goes unprobed.
     pub fn begin_round(&mut self, roster: &[PeerDoorway]) -> (Vec<PeerDoorway>, Vec<String>) {
         self.round += 1;
         let round = self.round;
@@ -462,8 +508,6 @@ impl ProbeRoster {
             roster.iter().map(|peer| peer.id.as_str()).collect();
         self.peers.retain(|id, _| present.contains(id.as_str()));
 
-        let mut to_probe = Vec::new();
-        let mut skipped = Vec::new();
         for peer in roster {
             let entry = self
                 .peers
@@ -471,18 +515,57 @@ impl ProbeRoster {
                 .or_insert_with(|| ProbeRosterEntry {
                     last_live_round: round,
                     record_serial: peer.record_serial,
+                    last_grace_round: None,
                 });
             if peer.record_serial.is_some() && peer.record_serial != entry.record_serial {
                 entry.record_serial = peer.record_serial;
                 entry.last_live_round = round;
+                entry.last_grace_round = None;
             }
-            if round.saturating_sub(entry.last_live_round) >= PROBE_ROSTER_EXPIRY_ROUNDS {
-                skipped.push(peer.id.clone());
-            } else {
+        }
+
+        let grace = self.grace_selection(round);
+
+        let mut to_probe = Vec::new();
+        let mut skipped = Vec::new();
+        for peer in roster {
+            let expired = self
+                .peers
+                .get(&peer.id)
+                .is_some_and(|entry| entry.expired_at(round));
+            if !expired || grace.contains(peer.id.as_str()) {
                 to_probe.push(peer.clone());
+            } else {
+                skipped.push(peer.id.clone());
             }
         }
         (to_probe, skipped)
+    }
+
+    /// On a grace round, pick up to [`PROBE_ROSTER_GRACE_BATCH`] expired ids,
+    /// least recently tried first (ties by id, so the order is deterministic),
+    /// and stamp them as tried this round.
+    fn grace_selection(&mut self, round: u64) -> std::collections::HashSet<String> {
+        if !round.is_multiple_of(PROBE_ROSTER_GRACE_ROUNDS) {
+            return std::collections::HashSet::new();
+        }
+        let mut expired: Vec<(u64, String)> = self
+            .peers
+            .iter()
+            .filter(|(_, entry)| entry.expired_at(round))
+            .map(|(id, entry)| (entry.grace_turn(), id.clone()))
+            .collect();
+        expired.sort_unstable();
+        expired.truncate(PROBE_ROSTER_GRACE_BATCH);
+        expired
+            .into_iter()
+            .map(|(_, id)| {
+                if let Some(entry) = self.peers.get_mut(&id) {
+                    entry.last_grace_round = Some(round);
+                }
+                id
+            })
+            .collect()
     }
 
     /// Record one probe's outcome in the current round. `answered` is true for
@@ -491,6 +574,7 @@ impl ProbeRoster {
         if answered {
             if let Some(entry) = self.peers.get_mut(peer_id) {
                 entry.last_live_round = self.round;
+                entry.last_grace_round = None;
             }
         }
     }
@@ -502,7 +586,9 @@ impl ProbeRoster {
 /// records peer-witnessed health attestations via the infrastructure zome.
 /// Only the LIVE roster is probed: [`ProbeRoster`] skips a peer with no
 /// liveness evidence for [`PROBE_ROSTER_EXPIRY_ROUNDS`] rounds, counted as
-/// `doorway_federation_doorbell_total{side="probe",outcome="skipped_expired"}`.
+/// `doorway_federation_doorbell_total{side="probe",outcome="skipped_expired"}`
+/// for every round it goes unprobed; expired peers get a bounded grace
+/// re-probe every [`PROBE_ROSTER_GRACE_ROUNDS`].
 /// Logs warnings on failure but does not crash.
 ///
 /// NOTE: This task no longer reports a *self*-heartbeat to the conductor. The
@@ -2837,18 +2923,161 @@ mod tests {
         }
 
         #[test]
-        fn a_doorway_that_was_never_alive_is_probed_only_for_the_grace_rounds() {
+        fn a_doorway_that_was_never_alive_is_probed_only_for_the_expiry_rounds() {
             // A freshly booted attestor finds 170-odd dead registrations: each
-            // gets PROBE_ROSTER_EXPIRY_ROUNDS probes, then silence.
+            // gets PROBE_ROSTER_EXPIRY_ROUNDS probes, then silence until the
+            // first grace round.
             let mut roster = ProbeRoster::new();
             let members = vec![peer("dead", Some(3))];
             let mut probed = 0;
-            for _ in 0..20 {
+            for _ in 0..(PROBE_ROSTER_GRACE_ROUNDS - 1) {
                 let (probe, _) = roster.begin_round(&members);
                 probed += probe.len() as u64;
                 roster.observe("dead", false);
             }
             assert_eq!(probed, PROBE_ROSTER_EXPIRY_ROUNDS);
+        }
+
+        /// Run rounds until the next grace round is the one about to begin.
+        fn advance_to_just_before_grace(roster: &mut ProbeRoster, members: &[PeerDoorway]) {
+            while !(roster.round + 1).is_multiple_of(PROBE_ROSTER_GRACE_ROUNDS) {
+                let (probe, _) = roster.begin_round(members);
+                for peer in &probe {
+                    roster.observe(&peer.id, false);
+                }
+            }
+        }
+
+        #[test]
+        fn an_expired_peer_that_answers_its_grace_probe_is_live_again() {
+            // A sibling that stalled without restarting (same record_serial).
+            let mut roster = ProbeRoster::new();
+            let members = vec![peer("stalled", Some(5))];
+            // It expires, and is still stalled at the first grace round.
+            advance_to_just_before_grace(&mut roster, &members);
+            let (probe, _) = roster.begin_round(&members);
+            assert_eq!(ids(&probe), vec!["stalled"]);
+            roster.observe("stalled", false);
+            let (probe, skipped) = roster.begin_round(&members);
+            assert!(probe.is_empty());
+            assert_eq!(skipped, vec!["stalled".to_string()]);
+            advance_to_just_before_grace(&mut roster, &members);
+
+            // Next grace round: it is re-probed, and this time it answers (healed).
+            let (probe, skipped) = roster.begin_round(&members);
+            assert_eq!(ids(&probe), vec!["stalled"]);
+            assert!(skipped.is_empty(), "a grace-probed peer is not a skip");
+            roster.observe("stalled", true);
+
+            // Live again from the very next round, every round.
+            for _ in 0..(PROBE_ROSTER_EXPIRY_ROUNDS * 2) {
+                let (probe, skipped) = roster.begin_round(&members);
+                assert_eq!(ids(&probe), vec!["stalled"]);
+                assert!(skipped.is_empty());
+                roster.observe("stalled", true);
+            }
+        }
+
+        #[test]
+        fn a_silent_peer_stays_expired_between_grace_rounds() {
+            let mut roster = ProbeRoster::new();
+            let members = vec![peer("silent", Some(9))];
+            advance_to_just_before_grace(&mut roster, &members);
+            for grace_round in 0..3 {
+                let (probe, _) = roster.begin_round(&members);
+                assert_eq!(ids(&probe), vec!["silent"], "grace round {grace_round}");
+                roster.observe("silent", false);
+                // Every round until the next grace round: skipped and counted.
+                for _ in 1..PROBE_ROSTER_GRACE_ROUNDS {
+                    let (probe, skipped) = roster.begin_round(&members);
+                    assert!(probe.is_empty(), "grace round {grace_round}");
+                    assert_eq!(skipped, vec!["silent".to_string()]);
+                    roster.observe("silent", false);
+                }
+            }
+        }
+
+        #[test]
+        fn grace_rotates_through_the_expired_set_oldest_first() {
+            // More expired members than one batch: every one is revisited, and
+            // the batch never exceeds PROBE_ROSTER_GRACE_BATCH.
+            let n = PROBE_ROSTER_GRACE_BATCH * 3 + 1;
+            let members: Vec<PeerDoorway> = (0..n)
+                .map(|i| peer(&format!("dead-{i:03}"), Some(1)))
+                .collect();
+            let mut roster = ProbeRoster::new();
+            let mut grace_probed = std::collections::HashSet::new();
+            let grace_rounds_needed = n.div_ceil(PROBE_ROSTER_GRACE_BATCH);
+            let mut grace_rounds_seen = 0;
+            while grace_rounds_seen < grace_rounds_needed {
+                let (probe, _) = roster.begin_round(&members);
+                if roster.round.is_multiple_of(PROBE_ROSTER_GRACE_ROUNDS) {
+                    grace_rounds_seen += 1;
+                    assert_eq!(probe.len(), PROBE_ROSTER_GRACE_BATCH, "a full batch");
+                    let untried_before = n - grace_probed.len();
+                    let fresh = probe
+                        .iter()
+                        .filter(|peer| grace_probed.insert(peer.id.clone()))
+                        .count();
+                    // Untried peers always go before any repeat.
+                    assert_eq!(fresh, untried_before.min(PROBE_ROSTER_GRACE_BATCH));
+                }
+                for peer in &probe {
+                    roster.observe(&peer.id, false);
+                }
+            }
+            assert_eq!(grace_probed.len(), n, "every expired peer got a grace turn");
+        }
+
+        /// The point of H1: a fully dead roster of N costs one attestor at most
+        /// ceil(N / PROBE_ROSTER_GRACE_ROUNDS) probe writes per round on
+        /// average once it has expired — never N per round.
+        #[test]
+        fn a_fully_dead_roster_costs_a_bounded_write_rate_not_n_per_round() {
+            for n in [1usize, 3, 16, 50, 179, 400] {
+                let members: Vec<PeerDoorway> = (0..n)
+                    .map(|i| peer(&format!("gone-{i}"), Some(1)))
+                    .collect();
+                let mut roster = ProbeRoster::new();
+                // Let every member expire (they never answer).
+                for _ in 0..PROBE_ROSTER_EXPIRY_ROUNDS {
+                    let (probe, _) = roster.begin_round(&members);
+                    for peer in &probe {
+                        roster.observe(&peer.id, false);
+                    }
+                }
+                let window = PROBE_ROSTER_GRACE_ROUNDS * 10;
+                let mut writes = 0u64;
+                for _ in 0..window {
+                    let (probe, skipped) = roster.begin_round(&members);
+                    assert!(probe.len() <= PROBE_ROSTER_GRACE_BATCH, "n={n}");
+                    assert_eq!(
+                        probe.len() + skipped.len(),
+                        n,
+                        "n={n}: every member accounted"
+                    );
+                    writes += probe.len() as u64;
+                    for peer in &probe {
+                        roster.observe(&peer.id, false);
+                    }
+                }
+                let bound_per_round = (n as u64).div_ceil(PROBE_ROSTER_GRACE_ROUNDS);
+                assert!(
+                    writes <= bound_per_round * window,
+                    "n={n}: {writes} writes in {window} rounds exceeds ceil(N/G)={bound_per_round}/round"
+                );
+                assert!(
+                    writes
+                        <= (PROBE_ROSTER_GRACE_BATCH as u64) * (window / PROBE_ROSTER_GRACE_ROUNDS),
+                    "n={n}: more than one batch per grace period"
+                );
+                if n > 1 {
+                    assert!(
+                        writes < (n as u64) * window,
+                        "n={n}: N per round is the pre-H1 cost"
+                    );
+                }
+            }
         }
 
         #[test]

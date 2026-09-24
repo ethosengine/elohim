@@ -6,6 +6,8 @@ import { chmod, copyFile, mkdir, mkdtemp, open, readFile, readlink, rm } from 'n
 import { connect, createServer } from 'node:net';
 import { join } from 'node:path';
 
+import { adminBootstrapKey, mintAdminToken } from '../api/admin-bootstrap.js';
+
 import { householdMeshDir } from './household-mesh.js';
 import {
   assertStillOwnedProcess,
@@ -181,11 +183,19 @@ export async function stopFixtureProcesses(
  */
 export async function deregisterFixtureDoorway(
   url: string,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  adminToken?: string
 ): Promise<DeregistrationOutcome> {
   try {
+    // The verb is Admin-gated (`require_admin`, like /admin/users and
+    // /admin/conductors): a bearer Admin JWT, the same credential the admin
+    // scenarios send. Without one the doorway answers 401 and the outcome is
+    // recorded as `failed` — never a silent success.
+    const headers: Record<string, string> = {};
+    if (adminToken) headers['authorization'] = `Bearer ${adminToken}`;
     const response = await fetchImpl(`${url}/admin/federation/deregister`, {
       method: 'POST',
+      headers,
       signal: AbortSignal.timeout(15_000),
     });
     if (response.ok) {
@@ -206,6 +216,49 @@ interface TeardownTarget {
   name: DoorwayName;
   url: string;
   handle: OwnedProcessHandle;
+  /** Admin JWT the deregister verb requires; absent → recorded 401 failure. */
+  adminToken?: string;
+}
+
+/**
+ * The canonical doorway a fixture doorway was cloned from, as a loopback URL
+ * (its launch template's `--listen`). Undefined when the template has none.
+ */
+export function canonicalDoorwayUrl(template: Pick<LaunchTemplate, 'argv'>): string | undefined {
+  const at = template.argv.indexOf('--listen');
+  const listen = at >= 0 ? template.argv[at + 1] : undefined;
+  if (!listen) return undefined;
+  const colon = listen.lastIndexOf(':');
+  const host = listen.slice(0, colon).replace(/^\[|\]$/g, '');
+  const port = listen.slice(colon + 1);
+  const loopback = ['', '0.0.0.0', '::'].includes(host) ? '127.0.0.1' : host;
+  const authority = loopback.includes(':') ? '[' + loopback + ']' : loopback;
+  return `http://${authority}:${port}`;
+}
+
+/**
+ * Mint the Admin JWT a fixture doorway's deregister verb requires, the way
+ * the admin scenarios do (`api/admin-bootstrap.ts`: the bootstrap actor, from
+ * the admin key alone) — but against the CANONICAL doorway the fixture was
+ * cloned from, never the fixture doorway itself: a register there would
+ * provision a hosted cell on a fresh Mongo at every teardown, which is exactly
+ * the work-on-behalf-of-nobody this teardown exists to stop. The fixture runs
+ * with the canonical's environment, so both share one JWT secret and the
+ * token (HS256, no `kid`) verifies on the fixture doorway. Never throws.
+ */
+export async function fixtureAdminToken(
+  template: Pick<LaunchTemplate, 'argv' | 'env'>,
+  mint: typeof mintAdminToken = mintAdminToken
+): Promise<string | undefined> {
+  const own = template.env['API_KEY_ADMIN'];
+  const key = own !== undefined && own !== '' ? own : adminBootstrapKey();
+  const canonical = canonicalDoorwayUrl(template);
+  if (!key || !canonical) return undefined;
+  try {
+    return (await mint(canonical, key)) ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -217,15 +270,17 @@ export async function teardownFixtureDoorways(
   doorways: TeardownTarget[],
   mongo: OwnedProcessHandle,
   deps: {
-    deregister?: (url: string) => Promise<DeregistrationOutcome>;
+    deregister?: (url: string, adminToken?: string) => Promise<DeregistrationOutcome>;
     stop?: typeof stopOwnedProcess;
   } = {}
 ): Promise<Partial<Record<DoorwayName, DeregistrationOutcome>>> {
   const deregister =
-    deps.deregister ?? (async (url: string) => await deregisterFixtureDoorway(url));
+    deps.deregister ??
+    (async (url: string, adminToken?: string) =>
+      await deregisterFixtureDoorway(url, fetch, adminToken));
   const outcomes: Partial<Record<DoorwayName, DeregistrationOutcome>> = {};
   for (const doorway of doorways) {
-    outcomes[doorway.name] = await deregister(doorway.url);
+    outcomes[doorway.name] = await deregister(doorway.url, doorway.adminToken);
   }
   await stopFixtureProcesses(
     [
@@ -574,10 +629,11 @@ export class OwnedDoorwayPair {
 
   async close(): Promise<void> {
     try {
-      this.deregistration = await teardownFixtureDoorways(
-        [this.doorways.b, this.doorways.a],
-        this.mongo
-      );
+      const targets: TeardownTarget[] = [];
+      for (const doorway of [this.doorways.b, this.doorways.a]) {
+        targets.push({ ...doorway, adminToken: await fixtureAdminToken(doorway.template) });
+      }
+      this.deregistration = await teardownFixtureDoorways(targets, this.mongo);
       for (const [name, outcome] of Object.entries(this.deregistration)) {
         if (outcome.status !== 'deregistered') {
           console.warn(

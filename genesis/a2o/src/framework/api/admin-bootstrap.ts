@@ -107,7 +107,7 @@ async function send(
 }
 
 /** Mint an Admin JWT by provisioning (or reusing) the bootstrap actor. */
-async function mintAdminToken(doorwayUrl: string, key: string): Promise<string | null> {
+export async function mintAdminToken(doorwayUrl: string, key: string): Promise<string | null> {
   const base = doorwayUrl.replace(/\/$/, '');
   const password = derivedPassword(key);
 
