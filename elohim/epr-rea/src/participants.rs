@@ -403,12 +403,18 @@ impl Roster {
         members
     }
 
-    /// The CIDs contested by an EFFECTIVE contest: a contest row whose signature verifies and
-    /// which is not itself the target of an effective contest. Content addressing makes the
-    /// contest graph acyclic (a row can only name CIDs that existed before it), so the recursion
-    /// terminates.
+    /// The CIDs contested by an EFFECTIVE contest: an ADMISSIBLE contest row — signed by a
+    /// device that is a member of this roster, and whose signature verifies — which is not itself
+    /// the target of an effective contest. Content addressing makes the contest graph acyclic (a
+    /// row can only name CIDs that existed before it), so the recursion terminates.
+    ///
+    /// Membership is the admissibility rule (ruling R-P14), for contests of contests too: a
+    /// contest signed by a throwaway key names nothing, so a stranger can neither void the
+    /// human's standing nor void the human's contest by counter-contesting it. A witness agent
+    /// signs from the device key, which is a member by genesis or by binding.
     pub fn contested(&self, verifier: &dyn SignatureVerifier) -> BTreeSet<String> {
-        // target CID -> the CIDs of the verified contest rows naming it.
+        let members = self.members(verifier);
+        // target CID -> the CIDs of the admissible contest rows naming it.
         let mut contests: HashMap<String, Vec<String>> = HashMap::new();
         for (cid, row) in &self.rows {
             if let ParticipantRow::Contest {
@@ -418,7 +424,7 @@ impl Roster {
                 ..
             } = row
             {
-                if row_signature_verifies(verifier, row, by, signature) {
+                if members.contains(by) && row_signature_verifies(verifier, row, by, signature) {
                     contests
                         .entry(target_cid.clone())
                         .or_default()
@@ -449,6 +455,130 @@ impl Roster {
             .map(|(target, _)| target.clone())
             .collect()
     }
+
+    /// The admissible contest rows (by CID) that are EFFECTIVE and name `target` — the contests a
+    /// re-witness of `target` must answer.
+    pub fn effective_contests_of(
+        &self,
+        target: &str,
+        verifier: &dyn SignatureVerifier,
+    ) -> Vec<String> {
+        let contested = self.contested(verifier);
+        let members = self.members(verifier);
+        self.rows
+            .iter()
+            .filter_map(|(cid, row)| match row {
+                ParticipantRow::Contest {
+                    target_cid,
+                    by,
+                    signature,
+                    ..
+                } if target_cid == target
+                    && members.contains(by)
+                    && row_signature_verifies(verifier, row, by, signature)
+                    && !contested.contains(&cid.to_string()) =>
+                {
+                    Some(cid.to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Whether this roster's verified chain root is `pin` — the root a device recorded the first
+    /// time it read this handle's roster (ruling R-P15).
+    ///
+    /// The chain root is otherwise trust-on-first-use by line order: whoever writes the first
+    /// verifying genesis owns the lineage. A device that has already seen the lineage keeps its
+    /// own record of it, so a history rewritten to start from another key reads as a DIFFERENT
+    /// root on that device — contested, never standing. `false` for a roster with no verified
+    /// root at all. The pin itself lives with the device (the caller's); this crate never holds
+    /// it.
+    pub fn chain_root_matches(&self, pin: &str, verifier: &dyn SignatureVerifier) -> bool {
+        self.chain_root(verifier).as_deref() == Some(pin)
+    }
+
+    /// The roster row `signer_did` stands on by the roster ALONE — for a device reading a
+    /// checkout that lacks the actor records (a fresh worktree on a witnessed device, ruling
+    /// R-P16): the chain root stands on its genesis row, a bound controller on its latest
+    /// binding row. `None` when the device is not a member, or when that row (or, for the chain
+    /// root, the founding record it names) is effectively contested.
+    ///
+    /// The genesis row is the chain root's own signature over the founding record's CID, and a
+    /// binding row carries the controller's countersignature — each is the device's signed
+    /// statement that it speaks for the handle, exactly the evidence a `Signed` actor record is.
+    pub fn device_standing_row(
+        &self,
+        signer_did: &str,
+        verifier: &dyn SignatureVerifier,
+    ) -> Option<RosterStanding> {
+        let members = self.members(verifier);
+        if !members.contains(signer_did) {
+            return None;
+        }
+        let root = self.chain_root(verifier)?;
+        let contested = self.contested(verifier);
+        let found = if signer_did == root {
+            self.rows.iter().find_map(|(cid, row)| match row {
+                ParticipantRow::Genesis {
+                    chain_root,
+                    record_cid,
+                    signer,
+                    signature,
+                    ..
+                } if chain_root == &root
+                    && row_signature_verifies(verifier, row, signer, signature) =>
+                {
+                    Some(RosterStanding {
+                        row_cid: cid.to_string(),
+                        record_cid: record_cid.clone(),
+                        via: RosterVia::Genesis,
+                    })
+                }
+                _ => None,
+            })
+        } else {
+            self.rows.iter().rev().find_map(|(cid, row)| match row {
+                ParticipantRow::Binding {
+                    chain_root,
+                    controller,
+                    ..
+                } if chain_root == &root
+                    && controller == signer_did
+                    && verify_binding(row, verifier).is_ok() =>
+                {
+                    Some(RosterStanding {
+                        row_cid: cid.to_string(),
+                        record_cid: cid.to_string(),
+                        via: RosterVia::Binding,
+                    })
+                }
+                _ => None,
+            })
+        }?;
+        if contested.contains(&found.row_cid) || contested.contains(&found.record_cid) {
+            return None;
+        }
+        Some(found)
+    }
+}
+
+/// How a device stands by the roster alone — see [`Roster::device_standing_row`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RosterStanding {
+    /// The roster row the device signed: its genesis, or its binding.
+    pub row_cid: String,
+    /// The record the standing pins: the founding record a genesis names, or the binding row
+    /// itself for a bound device.
+    pub record_cid: String,
+    pub via: RosterVia,
+}
+
+/// Which roster row a [`RosterStanding`] rests on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RosterVia {
+    Genesis,
+    Binding,
 }
 
 /// Which human `signer_did` (a device) speaks for right now, per this roster and these actor
@@ -505,6 +635,25 @@ pub fn standing_human(
         }
         Some(AgentRef(format!("human:{handle}")))
     })
+}
+
+/// [`standing_human`] on a device that has pinned this handle's chain root (ruling R-P15):
+/// `None` — contested, never standing — when the roster's verified root is not `pin`. A `None`
+/// pin (the device has never read this roster) defers to [`standing_human`]; recording the pin on
+/// that first verified read is the caller's, beside the device key.
+pub fn standing_human_pinned(
+    roster: &Roster,
+    records: &[ActorRecord],
+    signer_did: &str,
+    verifier: &dyn SignatureVerifier,
+    pin: Option<&str>,
+) -> Option<AgentRef> {
+    if let Some(pin) = pin {
+        if !roster.chain_root_matches(pin, verifier) {
+            return None;
+        }
+    }
+    standing_human(roster, records, signer_did, verifier)
 }
 
 fn validate_handle(handle: &str) -> Result<()> {
@@ -598,11 +747,40 @@ impl SidecarRoster {
     /// Append one row under the exclusive lock, after re-verifying every existing line and the
     /// new row's shape. Returns the row's CID.
     pub fn append(&self, row: ParticipantRow) -> Result<Cid> {
-        let mut log = crate::sidecar::LockedLog::exclusive(&self.log_path)?;
-        let mut roster = Roster::from_jsonl(&self.handle, &log.contents()?)?;
+        self.transaction()?.append(row)
+    }
+
+    /// Hold the roster's exclusive lock across a read, a decision and an append — so "the handle
+    /// has no roster yet, so this is its genesis" is decided on the same bytes the genesis is
+    /// appended to. The lock releases when the handle drops.
+    pub fn transaction(&self) -> Result<RosterTransaction> {
+        Ok(RosterTransaction {
+            handle: self.handle.clone(),
+            log: crate::sidecar::LockedLog::exclusive(&self.log_path)?,
+        })
+    }
+}
+
+/// One handle's roster under its exclusive lock — see [`SidecarRoster::transaction`].
+#[cfg(feature = "sidecar")]
+pub struct RosterTransaction {
+    handle: String,
+    log: crate::sidecar::LockedLog,
+}
+
+#[cfg(feature = "sidecar")]
+impl RosterTransaction {
+    /// Read and verify the whole roster, under the held lock.
+    pub fn read(&self) -> Result<Roster> {
+        Roster::from_jsonl(&self.handle, &self.log.contents()?)
+    }
+
+    /// Append one row, re-verifying every existing line and the new row's shape first.
+    pub fn append(&mut self, row: ParticipantRow) -> Result<Cid> {
+        let mut roster = self.read()?;
         let line = Roster::line_for(&row)?;
         let cid = roster.append(row)?;
-        log.append(line)?;
+        self.log.append(line)?;
         Ok(cid)
     }
 }
@@ -876,6 +1054,165 @@ mod tests {
             .append(contest(&contest_cid.to_string(), &a))
             .unwrap();
         assert!(standing_human(&roster, &records_w1_only, &a.did, &v).is_some());
+    }
+
+    // ── W1: only a member's contest counts (R-P14) ──────────────────────────────────────
+
+    #[test]
+    fn w1_non_member_contest_is_inadmissible() {
+        let a = device("DeviceA", 1);
+        let eve = device("DeviceEve", 9);
+        let v = verifier(&[&a, &eve]);
+        let w = ActorRecord::Witness(witness("s1"));
+        let records = vec![w.clone(), signed(&w, &a)];
+        let mut roster = Roster::new("matthew").unwrap();
+        roster.append(genesis(&w, &a)).unwrap();
+
+        // A well-formed, verifying contest — signed by a key that is not in the lineage.
+        roster
+            .append(contest(&w.cid().unwrap().to_string(), &eve))
+            .unwrap();
+        assert!(
+            roster.contested(&v).is_empty(),
+            "a stranger's contest names nothing"
+        );
+        assert_eq!(
+            standing_human(&roster, &records, &a.did, &v),
+            Some(AgentRef("human:matthew".into())),
+            "a throwaway key cannot void the human's standing"
+        );
+    }
+
+    #[test]
+    fn w1_counter_contest_by_stranger_does_not_restore_standing() {
+        let a = device("DeviceA", 1);
+        let eve = device("DeviceEve", 9);
+        let v = verifier(&[&a, &eve]);
+        let w = ActorRecord::Witness(witness("s1"));
+        let records = vec![w.clone(), signed(&w, &a)];
+        let mut roster = Roster::new("matthew").unwrap();
+        roster.append(genesis(&w, &a)).unwrap();
+
+        // The member (the human, on their device) contests the witness.
+        let contest_cid = roster
+            .append(contest(&w.cid().unwrap().to_string(), &a))
+            .unwrap();
+        assert_eq!(standing_human(&roster, &records, &a.did, &v), None);
+
+        // A stranger counter-contests the human's contest: inadmissible, so the contest stands.
+        roster
+            .append(contest(&contest_cid.to_string(), &eve))
+            .unwrap();
+        assert_eq!(
+            standing_human(&roster, &records, &a.did, &v),
+            None,
+            "a stranger cannot void the human's contest right"
+        );
+        assert_eq!(
+            roster.effective_contests_of(&w.cid().unwrap().to_string(), &v),
+            vec![contest_cid.to_string()]
+        );
+
+        // A MEMBER's counter-contest still voids it — the rule is membership, not "no counters".
+        roster
+            .append(contest(&contest_cid.to_string(), &a))
+            .unwrap();
+        assert!(standing_human(&roster, &records, &a.did, &v).is_some());
+        assert!(roster
+            .effective_contests_of(&w.cid().unwrap().to_string(), &v)
+            .is_empty());
+    }
+
+    // ── W2: the chain root is pinned per device (R-P15) ─────────────────────────────────
+
+    #[test]
+    fn w2_roster_with_a_different_root_is_contested_not_standing() {
+        let a = device("DeviceA", 1);
+        let eve = device("DeviceEve", 9);
+        let v = verifier(&[&a, &eve]);
+        let w = ActorRecord::Witness(witness("s1"));
+        let records = vec![w.clone(), signed(&w, &a), signed(&w, &eve)];
+
+        let mut honest = Roster::new("matthew").unwrap();
+        honest.append(genesis(&w, &a)).unwrap();
+        assert!(honest.chain_root_matches(&a.did, &v));
+        assert_eq!(
+            standing_human_pinned(&honest, &records, &a.did, &v, Some(&a.did)),
+            Some(AgentRef("human:matthew".into()))
+        );
+        assert_eq!(
+            standing_human_pinned(&honest, &records, &a.did, &v, None),
+            Some(AgentRef("human:matthew".into())),
+            "an unpinned device defers to the ordinary resolver (and pins on that read)"
+        );
+
+        // A rewritten history whose first verifying genesis is Eve's: by line order Eve is the
+        // root and Eve stands — but a device that pinned A reads it as contested.
+        let mut hijacked = Roster::new("matthew").unwrap();
+        hijacked.append(genesis(&w, &eve)).unwrap();
+        hijacked.append(genesis(&w, &a)).unwrap();
+        assert_eq!(hijacked.chain_root(&v), Some(eve.did.clone()));
+        assert!(standing_human(&hijacked, &records, &eve.did, &v).is_some());
+        assert!(!hijacked.chain_root_matches(&a.did, &v));
+        for signer in [&a.did, &eve.did] {
+            assert_eq!(
+                standing_human_pinned(&hijacked, &records, signer, &v, Some(&a.did)),
+                None,
+                "a root that differs from the pin is contested, never standing"
+            );
+        }
+        // A roster with no verified root matches no pin.
+        assert!(!Roster::new("matthew")
+            .unwrap()
+            .chain_root_matches(&a.did, &v));
+    }
+
+    // ── W3: standing by the roster alone (R-P16) ────────────────────────────────────────
+
+    #[test]
+    fn w3_the_roster_alone_stands_the_chain_root_and_a_bound_device() {
+        let a = device("DeviceA", 1);
+        let b = device("DeviceB", 2);
+        let c = device("DeviceC", 3);
+        let v = verifier(&[&a, &b, &c]);
+        let w = ActorRecord::Witness(witness("s1"));
+        let mut roster = Roster::new("matthew").unwrap();
+        let genesis_cid = roster.append(genesis(&w, &a)).unwrap();
+        let binding_cid = roster.append(binding(&a, &a, &b, (true, true))).unwrap();
+
+        let root = roster.device_standing_row(&a.did, &v).expect("the root");
+        assert_eq!(root.via, RosterVia::Genesis);
+        assert_eq!(root.row_cid, genesis_cid.to_string());
+        assert_eq!(root.record_cid, w.cid().unwrap().to_string());
+
+        let bound = roster.device_standing_row(&b.did, &v).expect("bound");
+        assert_eq!(bound.via, RosterVia::Binding);
+        assert_eq!(bound.row_cid, binding_cid.to_string());
+
+        assert_eq!(roster.device_standing_row(&c.did, &v), None, "not a member");
+
+        // A member's contest of the founding record takes the root's roster standing away.
+        roster
+            .append(contest(&w.cid().unwrap().to_string(), &a))
+            .unwrap();
+        assert_eq!(roster.device_standing_row(&a.did, &v), None);
+        assert!(roster.device_standing_row(&b.did, &v).is_some());
+    }
+
+    #[test]
+    fn a_witness_without_answers_keeps_its_address() {
+        let w = witness("s1");
+        let json = serde_json::to_string(&w).unwrap();
+        assert!(!json.contains("answers"), "{json}");
+        let answering = w
+            .clone()
+            .answering(&ActorRecord::Witness(w.clone()).cid().unwrap().to_string())
+            .unwrap();
+        assert_ne!(
+            ActorRecord::Witness(answering).cid().unwrap(),
+            ActorRecord::Witness(w.clone()).cid().unwrap()
+        );
+        assert!(w.answering("not-a-cid").is_err());
     }
 
     // ── identity + integrity ────────────────────────────────────────────────────────────

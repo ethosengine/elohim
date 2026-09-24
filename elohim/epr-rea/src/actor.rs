@@ -313,6 +313,12 @@ pub struct ActorWitness {
     pub basis: String,
     /// When, in the caller's supplied encoding. Never read from a clock here.
     pub claimed_at: String,
+    /// The CID of the roster `Contest` row this witness answers — a re-witness after a contest
+    /// names the contest it answers (ruling R-P19), so a reader sees the re-witness as a reply,
+    /// never as a quiet overwrite. Omitted when absent, so every witness written before this field
+    /// existed keeps its address.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answers: Option<String>,
 }
 
 impl ActorWitness {
@@ -366,7 +372,24 @@ impl ActorWitness {
             session: session.to_string(),
             basis: basis.to_string(),
             claimed_at: claimed_at.to_string(),
+            answers: None,
         })
+    }
+
+    /// This witness as the answer to the contest row `contest_cid` (a CID in its canonical
+    /// string form). Whether that row is a live contest of this device's record is the caller's
+    /// question — it needs the roster; this only refuses a malformed address.
+    pub fn answering(mut self, contest_cid: &str) -> Result<Self> {
+        let parsed = Cid::try_from(contest_cid).map_err(|e| {
+            FabricError::Decode(format!("`{contest_cid}` is not a contest CID: {e}"))
+        })?;
+        if parsed.to_string() != contest_cid {
+            return Err(FabricError::Decode(format!(
+                "`{contest_cid}` is not a CID in its canonical string form"
+            )));
+        }
+        self.answers = Some(contest_cid.to_string());
+        Ok(self)
     }
 
     /// The witnessed handle (the `<handle>` of `human:<handle>`).

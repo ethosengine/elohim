@@ -93,9 +93,12 @@ pub use model::{
     EdgeSpec, EdgeStatus, FlowEvent, Governor, Intent, LimitSource, PinnedRef, Process,
     ProcessSpec, ResourceSpec, Sense, StageSpec, ValidatorRef,
 };
+pub use participants::{
+    standing_human, standing_human_pinned, verify_binding, ParticipantRow, Roster, RosterStanding,
+    RosterVia,
+};
 #[cfg(feature = "sidecar")]
-pub use participants::SidecarRoster;
-pub use participants::{standing_human, verify_binding, ParticipantRow, Roster};
+pub use participants::{RosterTransaction, SidecarRoster};
 pub use scope::{Containers, Scopes};
 pub use stock::{
     respite_response, stock_over_window, stock_over_window_within, Stock, StockError, Window,
