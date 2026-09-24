@@ -1088,16 +1088,32 @@ fn run_observation(opts: &GlobalOpts, rest: &[String], measure: &str) -> FlowRes
     Ok(ExitCode::SUCCESS)
 }
 
-/// The environment variables a session id is read from, in order, after the explicit flag.
+/// The environment variables a session id is read from, in order, after the explicit flag
+/// (ruling R-P17).
 ///
-/// `CLAUDE_CODE_SESSION_ID` first: it is the variable this harness actually exports (the one the
-/// capability-tier gate reads), so a hook-emitted note that passes no `--session` still resolves
-/// the session it ran in. `CLAUDE_SESSION_ID` and `ELOHIM_SESSION_ID` follow, unchanged.
+/// `ELOHIM_SESSION_ID` first: it is the one an agent sets for ITSELF, so a subagent can carve its
+/// own session out of the harness's. `CLAUDE_CODE_SESSION_ID` next — the variable this harness
+/// actually exports (the one the capability-tier gate reads), so a hook-emitted note that passes
+/// no `--session` still resolves the session it ran in — then `CLAUDE_SESSION_ID`.
 const SESSION_ENV_KEYS: [&str; 3] = [
+    "ELOHIM_SESSION_ID",
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_SESSION_ID",
-    "ELOHIM_SESSION_ID",
 ];
+
+thread_local! {
+    /// The session this command resolved from the ENVIRONMENT rather than `--session`, if any —
+    /// set by [`resolve_session`], read by the note leg to stamp `source:session-env`. A command
+    /// is one thread's one act, so this is the resolution the act's attribution was built from;
+    /// library callers that construct a `NoteActor` by hand never set it.
+    static SESSION_FROM_ENV: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Whether `session` is the one this command inferred from the environment.
+pub(crate) fn session_came_from_env(session: &str) -> bool {
+    SESSION_FROM_ENV.with(|cell| cell.borrow().as_deref() == Some(session))
+}
 
 /// The session id a run is acting under: the explicit flag first, then [`SESSION_ENV_KEYS`] in
 /// order.
@@ -1107,20 +1123,41 @@ const SESSION_ENV_KEYS: [&str; 3] = [
 /// literally would send every such run asking the actor sidecar who claimed session `""` — a
 /// question that has one answer for everybody.
 fn resolve_session(explicit: Option<String>) -> Option<String> {
-    resolve_session_with(explicit, |key| std::env::var(key).ok())
+    let (session, from_env) = resolve_session_origin(explicit, |key| std::env::var(key).ok());
+    SESSION_FROM_ENV.with(|cell| {
+        *cell.borrow_mut() = if from_env { session.clone() } else { None };
+    });
+    session
 }
 
 /// [`resolve_session`] over an injected environment lookup, so the precedence is testable without
 /// mutating the process environment parallel tests share.
+#[cfg(test)]
 fn resolve_session_with(
     explicit: Option<String>,
     lookup: impl Fn(&str) -> Option<String>,
 ) -> Option<String> {
-    explicit
-        .into_iter()
-        .chain(SESSION_ENV_KEYS.into_iter().filter_map(lookup))
+    resolve_session_origin(explicit, lookup).0
+}
+
+/// The resolved session and whether it came from the environment (`true`) or the flag.
+fn resolve_session_origin(
+    explicit: Option<String>,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> (Option<String>, bool) {
+    if let Some(flag) = explicit
         .map(|value| value.trim().to_string())
-        .find(|value| !value.is_empty())
+        .filter(|value| !value.is_empty())
+    {
+        return (Some(flag), false);
+    }
+    let from_env = SESSION_ENV_KEYS
+        .into_iter()
+        .filter_map(lookup)
+        .map(|value| value.trim().to_string())
+        .find(|value| !value.is_empty());
+    let inferred = from_env.is_some();
+    (from_env, inferred)
 }
 
 /// `epr flow stocks` — the only leg whose EXIT CODE is a verdict rather than a status.
@@ -1290,8 +1327,9 @@ fn usage() -> String {
      [--purpose acceptance --appointment <ruling-cid> --fulfillment <event-cid> \
      --review <technical-verdict-cid> --report <json-path> [--supersedes <acceptance-cid>]] \
      [--as agent:<role>@<model>] [--session <id>] [--json] [--root DIR] \
-     (omit --session to fall back to CLAUDE_SESSION_ID/ELOHIM_SESSION_ID; \
-     an agent-attributed note carries steward:<git-author-email> as its last slot)\n  \
+     (omit --session to fall back to ELOHIM_SESSION_ID/CLAUDE_CODE_SESSION_ID/CLAUDE_SESSION_ID, \
+     stamped source:session-env; an agent-attributed note carries steward:<standing human or \
+     collective> as its last slot, never an email)\n  \
      | note --on <target> --kind <kind> \
      [--measure <id@version> --subject <path> --value <n> [--unit <u>] [--env k=v]...] \
      [--reason <text>] [--measures PATH] \
@@ -1779,7 +1817,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn resolve_session_reads_claude_code_session_id_first() {
+    fn w4_elohim_session_id_beats_claude_code_session_id() {
         let env = |pairs: &'static [(&'static str, &'static str)]| {
             move |key: &str| {
                 pairs
@@ -1795,8 +1833,27 @@ mod tests {
         ]);
         assert_eq!(
             resolve_session_with(None, all).as_deref(),
+            Some("elohim-session"),
+            "the agent-set variable wins, so a subagent can carve its own session"
+        );
+        let harness = env(&[
+            ("CLAUDE_CODE_SESSION_ID", "code-session"),
+            ("CLAUDE_SESSION_ID", "claude-session"),
+        ]);
+        assert_eq!(
+            resolve_session_with(None, harness).as_deref(),
             Some("code-session"),
-            "the harness's real variable wins over the older names"
+            "then the harness's real variable, over the older name"
+        );
+        assert_eq!(
+            resolve_session_origin(None, all),
+            (Some("elohim-session".to_string()), true),
+            "an environment session is marked as inferred"
+        );
+        assert_eq!(
+            resolve_session_origin(Some(" flag ".into()), all),
+            (Some("flag".to_string()), false),
+            "a flag is never marked as inferred"
         );
         assert_eq!(
             resolve_session_with(Some("flag".into()), all).as_deref(),

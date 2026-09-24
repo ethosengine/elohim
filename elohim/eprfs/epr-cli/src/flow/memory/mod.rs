@@ -18,6 +18,7 @@ use eprfs_core::BlobCid;
 use serde_json::{json, Value};
 
 use super::{body_cid, note, FlowError, FlowResult};
+pub(crate) use validation::COLLECTIVE_PATH;
 use validation::{bounded_text, version, Reader};
 
 fn refused(message: impl Into<String>) -> FlowError {

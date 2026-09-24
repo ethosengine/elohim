@@ -781,6 +781,41 @@ fn memory_import_freezes_author() {
     assert_eq!(events(root), events_before);
 }
 
+#[test]
+fn w5_reimport_in_a_fresh_checkout_keeps_authors() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    import(root, ".claude/memory");
+    let before = contributions(root);
+    assert!(!before.is_empty());
+
+    // A fresh checkout: the tracked contributions arrive, the gitignored flow plane does not.
+    std::fs::remove_file(root.join(".eprfs/status/flows.jsonl")).expect("drop the private plane");
+    actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+    let again = memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(".claude/memory"),
+            session: Some(SECOND_SESSION),
+            ..Options::default()
+        },
+    )
+    .expect("re-import");
+    assert_eq!(again["counts"]["skipped"], before.len(), "{again}");
+    assert_eq!(again["counts"]["contributed"], 0, "{again}");
+    assert_eq!(
+        contributions(root),
+        before,
+        "the tracked bytes alone freeze the author — no plane, no flip"
+    );
+    for (name, bytes) in &before {
+        let c: serde_json::Value = serde_json::from_slice(bytes).expect("json");
+        assert_eq!(c["author"], AUTHOR, "{name}");
+    }
+}
+
 // ── the migration act ─────────────────────────────────────────────────────────────────────────
 
 const WITNESS: &str = "agent:orchestrator@fixture";

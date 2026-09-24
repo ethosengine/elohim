@@ -634,7 +634,7 @@ fn interleaved_workers_pin_claim_note_and_fulfillment_to_historical_claims() {
         let (actual_provider, slots) = record_attribution(root, cid);
         assert_eq!(actual_provider, provider);
         assert_eq!(slots[slots.len() - 2], format!("actor-claim:{pin}"));
-        assert_eq!(slots.last().unwrap(), "steward:author@example.test");
+        assert_eq!(slots.last().unwrap(), "steward:repo:ethosengine/elohim");
         assert_eq!(
             slots
                 .iter()
@@ -774,8 +774,8 @@ fn a_claim_mints_exactly_one_commitment_and_the_second_is_refused_until_supersed
     assert_eq!(outcome.provider, "agent:implementer@claude-opus-5");
     assert_eq!(
         outcome.steward.as_deref(),
-        Some("author@example.test"),
-        "an agent-provided claim always carries the tree's signer"
+        Some("repo:ethosengine/elohim"),
+        "an agent-provided claim always carries a steward — the collective, never the email (R-P19)"
     );
     assert!(outcome.superseded_by.is_empty());
     assert_eq!(
@@ -901,7 +901,7 @@ fn serves_is_checked_against_the_register_and_a_brief_is_carried_by_address() {
             "epic#1".to_string(),
             format!("brief:{brief}"),
             "habit:dev-system-equilibrium".to_string(),
-            "steward:author@example.test".to_string(),
+            "steward:repo:ethosengine/elohim".to_string(),
         ],
         "slot order is positional: tag, subject, brief, habit, steward LAST"
     );
@@ -988,7 +988,7 @@ fn a_done_report_discharges_the_commitment_and_the_three_other_statuses_are_refu
     assert_eq!(slots[2], format!("evidence:{}", outcome.evidence));
     assert_eq!(slots[3], "commit:825a090df");
     assert_eq!(slots[4], "commit:4425bb6fb");
-    assert_eq!(slots[5], "steward:author@example.test", "steward LAST");
+    assert_eq!(slots[5], "steward:repo:ethosengine/elohim", "steward LAST");
 
     // A second fulfilment appends nothing and says so.
     let again = fulfill::fulfill_on(root, &fulfil_request("epic#1", "DONE", &implementer))
@@ -1137,7 +1137,7 @@ fn a_ruling_and_a_verdict_are_readable_in_context_newest_first() {
     assert_eq!(result.notes[0].actor, "agent:reviewer@claude-opus-5");
     assert_eq!(
         result.notes[0].steward.as_deref(),
-        Some("author@example.test")
+        Some("repo:ethosengine/elohim")
     );
     assert_eq!(result.notes[1].kind, "run:ruling");
     assert_eq!(

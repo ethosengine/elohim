@@ -34,11 +34,13 @@
 //! **Attribution** answers "whose act is this" in three arms, resolved before anything is
 //! appended. A named identity (`--as agent:<role>@<model>`) is the provider outright; a resolved
 //! session asks the actor sidecar who registered for it and uses that; neither leaves the note
-//! attributed to the git author exactly as it always was. The two agent arms additionally carry
-//! `steward:<git-author-email>` as the LAST `classified_as` slot, because the human whose key
-//! signs the tree does not stop being answerable for it when an agent authors inside it — the
-//! steward is a property of the commit, not of the claim, and losing it is how attribution turns
-//! into deniability.
+//! attributed to the git author exactly as it always was. The agent arms additionally carry a
+//! `steward:` slot as the LAST `classified_as` slot, because whoever answers for the tree does not
+//! stop being answerable for it when an agent authors inside it — losing the steward is how
+//! attribution turns into deniability. The steward is this device's standing human
+//! (`human:<handle>`) or, when no human stands, the collective's declared steward
+//! (`repo:ethosengine/elohim`) — never the git email, which the substrate does not copy into a
+//! record (ruling R-P19).
 //!
 //! The identity plane is never allowed to break this leg. A session that registered nothing, an
 //! absent sidecar, and an unreadable one all fall through to the author-attributed arm with a
@@ -109,10 +111,17 @@ const VERDICT_CHANGES_REQUESTED: &str = "changes-requested";
 /// inserted anywhere earlier would renumber a vocabulary other legs already read.
 pub(crate) const STEWARD_SLOT_PREFIX: &str = "steward:";
 
-/// Prefix on the slot naming where an attribution came from, emitted on the standing-human arm
-/// alone (`source:claim-signed`) — just before `steward:`, which stays last. Every other arm emits
-/// no source slot, so their notes keep their content addresses.
+/// Prefix on the slot naming where an attribution came from — just before `steward:`, which stays
+/// last. Two values: `source:claim-signed` on the standing-human arm, and `source:session-env` on
+/// the session-claim arm when the session was INFERRED from the environment rather than named
+/// with `--session` (ruling R-P17). Every other arm emits no source slot, so their notes keep
+/// their content addresses.
 pub(crate) const SOURCE_SLOT_PREFIX: &str = "source:";
+
+/// The `source:` value stamped when the session whose claim attributes a note came from the
+/// environment (`ELOHIM_SESSION_ID`, `CLAUDE_CODE_SESSION_ID`, `CLAUDE_SESSION_ID`), so the
+/// inference is visible on the record rather than indistinguishable from an explicit session.
+pub(crate) const SESSION_ENV_SOURCE: &str = "session-env";
 
 /// Prefix on the slot naming the pinned measure a STRUCTURED observation was taken under.
 ///
@@ -828,11 +837,11 @@ fn note_with_options_guard(
                 "acceptance --as differs from session actor claim".into(),
             ));
         }
-        // The steward the resolver chose (the standing handle, or the author) is kept.
+        // The steward the resolver chose (the standing handle, or the collective) is kept.
         let steward = attribution
             .steward
             .clone()
-            .unwrap_or_else(|| author.clone());
+            .unwrap_or_else(|| collective_steward(root));
         attribution = Attribution {
             claim_cid: Some(pin),
             ..Attribution::claimed(identity, &steward)
@@ -1008,10 +1017,12 @@ pub(crate) struct Attribution {
     /// The claimed identity the note is attributed to; `None` leaves it with the commit author.
     pub(crate) actor: Option<String>,
     /// The human answerable for the tree, carried on the attributed arms only: this device's
-    /// standing human (`human:<handle>`) when there is one, the git-signing email otherwise.
+    /// standing human (`human:<handle>`) when there is one, the collective's declared steward
+    /// (`repo:ethosengine/elohim`) otherwise — never the git-signing email (ruling R-P19).
     pub(crate) steward: Option<String>,
-    /// `Some("claim-signed")` on the standing-human arm alone. The other arms record no source
-    /// slot, so every note they mint keeps the content address it always had.
+    /// `Some("claim-signed")` on the standing-human arm; `Some("session-env")` on the session
+    /// arm when the session came from the environment. The other arms record no source slot, so
+    /// every note they mint keeps the content address it always had.
     pub(crate) source: Option<&'static str>,
 }
 
@@ -1100,7 +1111,8 @@ pub(crate) fn named_identity(as_ref: Option<&str>) -> FlowResult<Option<String>>
 /// The standing arm (ruling R-P6) sits between the session claim and the git author: an agent's
 /// own claim for its session still wins, and a device whose human was witnessed (or signed their
 /// own claim) no longer falls through to an email. When a standing human exists, the `steward:`
-/// slot on EVERY attributed arm carries the handle (`human:<handle>`), never the email.
+/// slot on EVERY attributed arm carries the handle (`human:<handle>`); without one it carries the
+/// collective's declared steward — never the email (ruling R-P19).
 pub(crate) fn resolve_attribution(
     root: &Path,
     named: Option<String>,
@@ -1125,9 +1137,10 @@ pub(crate) fn resolve_attribution_on(
     author: &str,
     standing: Option<crate::actor::Standing>,
 ) -> Attribution {
+    let _ = author; // the provider of the authored arm; never a steward (R-P19)
     let steward = standing
         .as_ref()
-        .map_or_else(|| author.to_string(), |s| s.subject.clone());
+        .map_or_else(|| collective_steward(root), |s| s.subject.clone());
     let fallback = |standing: Option<crate::actor::Standing>| match standing {
         Some(standing) => {
             eprintln!(
@@ -1144,12 +1157,33 @@ pub(crate) fn resolve_attribution_on(
         (None, Some(session)) => match claimed_for_session(root, session) {
             Some((cid, identity)) => Attribution {
                 claim_cid: Some(cid),
+                source: super::session_came_from_env(session).then_some(SESSION_ENV_SOURCE),
                 ..Attribution::claimed(identity, &steward)
             },
             None => fallback(standing),
         },
         (None, None) => fallback(standing),
     }
+}
+
+/// Who a note written by `actor` would be attributed to — the `actor` slot the note leg would
+/// record — resolved exactly as [`note`] resolves it, appending nothing. `None` is the authored
+/// arm (the commit author provides).
+pub(crate) fn resolved_actor(root: &Path, actor: &NoteActor) -> FlowResult<Option<String>> {
+    let named = named_identity(actor.as_ref.as_deref())?;
+    Ok(resolve_attribution(root, named, actor.session.as_deref(), "").actor)
+}
+
+/// The collective's declared steward — the same `steward` a tracked contribution copies from
+/// `.epr-meta/collective.json` — or the repository agent when no readable declaration names one.
+/// This is who answers for a tree no standing human speaks for; the git email never is.
+pub(crate) fn collective_steward(root: &Path) -> String {
+    std::fs::read_to_string(root.join(super::memory::COLLECTIVE_PATH))
+        .ok()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|value| value.get("steward")?.as_str().map(str::to_string))
+        .filter(|steward| !steward.trim().is_empty() && !steward.contains('@'))
+        .unwrap_or_else(|| super::REPO_AGENT.to_string())
 }
 
 /// Who registered for `session`, or `None` with one line on stderr saying why.
@@ -1630,10 +1664,81 @@ mod tests {
         assert_eq!(arms[1].actor.as_deref(), Some("agent:implementer@opus-5.5"));
         assert_eq!(arms[1].source, None);
 
-        // Without a standing human the agent arm still carries the email, exactly as before.
+        // Without a standing human the agent arm carries the collective, never the email.
         let bare = resolve_attribution_on(root, None, Some("agent-session"), email, None);
-        assert_eq!(bare.steward.as_deref(), Some(email));
+        assert_eq!(bare.steward.as_deref(), Some(crate::flow::REPO_AGENT));
         assert_eq!(bare.source, None);
+    }
+
+    #[test]
+    fn m3_steward_slot_never_carries_an_email() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("assertion.md"), "A qualified assertion").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "assertion.md"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let result = crate::process::build_command("git", &args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(result.status.success());
+        }
+        let email = "fixture@example.test";
+        crate::actor::claim(root, "agent:implementer@opus-5.5", "agent-session").unwrap();
+
+        // No standing human, no collective declaration: the repository agent answers.
+        for attribution in [
+            resolve_attribution_on(root, Some("agent:scribe@opus-5".into()), None, email, None),
+            resolve_attribution_on(root, None, Some("agent-session"), email, None),
+        ] {
+            let mut slots = vec!["run:observation".to_string()];
+            attribution.append_slots(&mut slots);
+            assert_eq!(
+                slots.last().unwrap(),
+                &format!("steward:{}", crate::flow::REPO_AGENT)
+            );
+            assert!(!slots.iter().any(|s| s.contains(email)), "{slots:?}");
+        }
+
+        // A declared collective names its own steward, the same one a tracked contribution
+        // copies; an email-shaped declaration is never taken.
+        std::fs::create_dir_all(root.join(".epr-meta")).unwrap();
+        std::fs::write(
+            root.join(".epr-meta/collective.json"),
+            r#"{"steward": "repo:example/fixture"}"#,
+        )
+        .unwrap();
+        assert_eq!(collective_steward(root), "repo:example/fixture");
+        std::fs::write(
+            root.join(".epr-meta/collective.json"),
+            r#"{"steward": "someone@example.test"}"#,
+        )
+        .unwrap();
+        assert_eq!(collective_steward(root), crate::flow::REPO_AGENT);
+
+        // End to end: an agent-attributed note records no email in any slot.
+        let outcome = note(
+            root,
+            "assertion.md",
+            "observation",
+            "an observation",
+            None,
+            None,
+            &NoteActor {
+                as_ref: None,
+                session: Some("agent-session".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(outcome.steward.as_deref(), Some(crate::flow::REPO_AGENT));
+        let flows = std::fs::read_to_string(root.join(".eprfs/status/flows.jsonl")).unwrap();
+        assert!(!flows.contains(email), "{flows}");
     }
 
     #[test]

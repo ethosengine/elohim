@@ -390,7 +390,7 @@ fn one(
     // contributed them, are not re-authored because a different participant ran the import: the
     // only difference would be the author slot, and rewriting it is exactly the defect that buried
     // who authored what (one record's author flipped four times across re-imports).
-    if frozen(root, &request_rel, &contribution, acts) {
+    if frozen(root, &request_rel, &contribution) {
         return Ok(Outcome::Skipped);
     }
     if opts.dry_run {
@@ -419,9 +419,15 @@ fn one(
     Ok(Outcome::Contributed(event))
 }
 
-/// Whether the request already on disk is these same bytes under an EARLIER author whose
-/// contribution act the plane holds — i.e. the only thing a rewrite would change is who authored.
-fn frozen(root: &Path, request_rel: &Path, candidate: &Contribution, acts: &Acts) -> bool {
+/// Whether the request already on disk is these same bytes under an EARLIER author — i.e. the
+/// only thing a rewrite would change is who authored.
+///
+/// Decided on the TRACKED bytes alone (ruling R-P18): the prior file equals the candidate apart
+/// from `author`. The private flow plane is gitignored, so a fresh checkout has none of it; a
+/// freeze that needed the plane's record of the prior author's act would let any fresh checkout
+/// re-author the whole store (246 author flips were one such re-import). The plane stays an
+/// ADDITIONAL source — `acts.holds` above skips bytes it already recorded — never the sole one.
+fn frozen(root: &Path, request_rel: &Path, candidate: &Contribution) -> bool {
     let Ok(existing) = std::fs::read_to_string(root.join(request_rel)) else {
         return false;
     };
@@ -437,7 +443,7 @@ fn frozen(root: &Path, request_rel: &Path, candidate: &Contribution, acts: &Acts
         return false;
     };
     let text = format!("{text}\n");
-    text == existing && acts.holds(&text, &same)
+    text == existing
 }
 
 /// Where a migration's lineage manifests live: beside the flow plane that pins them, and
@@ -744,6 +750,10 @@ fn executing_session(slot: &str) -> Option<&str> {
 /// Append the migration act under `session` and prove it resolved to `provider`, the identity
 /// [`acting_author`] resolved for the same session — the note leg and this module must agree on
 /// who acted, or nothing is claimed to have happened.
+///
+/// The agreement is checked BEFORE the append (finding M2): the note leg's own resolver is asked
+/// who it would attribute the act to, and a disagreement refuses with nothing appended. The
+/// outcome is checked once more after, so the record and the refusal can never disagree.
 fn attributed_act(
     root: &Path,
     manifest_rel: &str,
@@ -751,6 +761,17 @@ fn attributed_act(
     session: &str,
     provider: &str,
 ) -> FlowResult<crate::flow::note::NoteOutcome> {
+    let actor = crate::flow::note::NoteActor {
+        as_ref: None,
+        session: Some(session.to_string()),
+    };
+    let resolved = crate::flow::note::resolved_actor(root, &actor)?;
+    if resolved.as_deref() != Some(provider) {
+        return Err(refused(format!(
+            "the migration act would resolve to {resolved:?}, not {provider} — nothing was \
+             appended and nothing was rewritten"
+        )));
+    }
     let act = crate::flow::note::note(
         root,
         manifest_rel,
@@ -758,10 +779,7 @@ fn attributed_act(
         reason,
         None,
         None,
-        &crate::flow::note::NoteActor {
-            as_ref: None,
-            session: Some(session.to_string()),
-        },
+        &actor,
     )?;
     if act.actor.as_deref() != Some(provider) {
         return Err(refused(format!(
@@ -1032,6 +1050,63 @@ mod tests {
         );
         // And a session is still required.
         assert!(acting_author_on(root, None, standing).is_err());
+    }
+
+    fn committed_fixture() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        std::fs::write(root.join("README.md"), "fixture").unwrap();
+        for args in [
+            vec!["init", "-q"],
+            vec!["add", "README.md"],
+            vec!["commit", "-qm", "fixture"],
+        ] {
+            let out = crate::process::build_command("git", &args, root, &[])
+                .env("GIT_AUTHOR_NAME", "Fixture")
+                .env("GIT_COMMITTER_NAME", "Fixture")
+                .env("GIT_AUTHOR_EMAIL", "fixture@example.test")
+                .env("GIT_COMMITTER_EMAIL", "fixture@example.test")
+                .output()
+                .unwrap();
+            assert!(out.status.success());
+        }
+        dir
+    }
+
+    #[test]
+    fn m2_provider_mismatch_appends_no_note() {
+        let dir = committed_fixture();
+        let root = dir.path();
+        crate::actor::claim(root, "agent:implementer@opus-5.5", "exec-session").unwrap();
+        let flows = root.join(".eprfs/status/flows.jsonl");
+        let before = std::fs::read_to_string(&flows).unwrap_or_default();
+
+        let err = attributed_act(
+            root,
+            "README.md",
+            "a migration act",
+            "exec-session",
+            "agent:someone-else@fable-5",
+        )
+        .expect_err("the note leg would attribute the act to someone else");
+        assert!(err.to_string().contains("nothing was appended"), "{err}");
+        assert_eq!(
+            std::fs::read_to_string(&flows).unwrap_or_default(),
+            before,
+            "the provider is checked before the note is appended"
+        );
+
+        // The agreeing provider appends exactly the one act.
+        let act = attributed_act(
+            root,
+            "README.md",
+            "a migration act",
+            "exec-session",
+            "agent:implementer@opus-5.5",
+        )
+        .expect("agrees");
+        assert_eq!(act.actor.as_deref(), Some("agent:implementer@opus-5.5"));
+        assert!(act.appended);
     }
 
     #[test]

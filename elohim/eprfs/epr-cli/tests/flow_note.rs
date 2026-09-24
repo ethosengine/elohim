@@ -446,12 +446,12 @@ fn a_named_identity_provides_the_note_and_keeps_the_steward_in_the_last_slot() {
             "run:correction".to_string(),
             FEATURE.to_string(),
             "reason:the salvage join reads the wrong pillar".to_string(),
-            "steward:author@example.test".to_string(),
+            "steward:repo:ethosengine/elohim".to_string(),
         ],
         "tag, subject, reason, then steward LAST — readers index the leading slots positionally"
     );
     assert_eq!(outcome.actor.as_deref(), Some(CLAIMED));
-    assert_eq!(outcome.steward.as_deref(), Some("author@example.test"));
+    assert_eq!(outcome.steward.as_deref(), Some("repo:ethosengine/elohim"));
 }
 
 #[test]
@@ -481,7 +481,7 @@ fn the_steward_slot_stays_last_even_when_a_consequence_precedes_it() {
             FEATURE.to_string(),
             "reason:Tried the household-blind XOR salvage".to_string(),
             "switched-to:diversity-first multi-pass".to_string(),
-            "steward:author@example.test".to_string(),
+            "steward:repo:ethosengine/elohim".to_string(),
         ]
     );
 }
@@ -543,8 +543,8 @@ fn a_registered_session_claim_provides_the_note_without_naming_it() {
     assert_eq!(event.provider.0, CLAIMED, "the session's current claim");
     assert_eq!(
         event.classified_as.last().map(String::as_str),
-        Some("steward:author@example.test"),
-        "the signing human stays attached to an attribution that is no longer theirs"
+        Some("steward:repo:ethosengine/elohim"),
+        "a steward stays attached to an agent-provided note — the collective, never the email"
     );
     assert_eq!(outcome.actor.as_deref(), Some(CLAIMED));
 }

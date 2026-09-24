@@ -132,3 +132,110 @@ fn note_attribution_uses_standing_human_with_claim_signed_source() {
     let flows = std::fs::read_to_string(bare.path().join(".eprfs/status/flows.jsonl")).unwrap();
     assert!(!flows.contains("claim-signed"), "{flows}");
 }
+
+/// `epr` with the session variables set on the child exactly as given (the harness's own removed).
+fn epr_with_env(root: &Path, key_file: &Path, args: &[&str], envs: &[(&str, &str)]) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_epr"));
+    command
+        .args(args)
+        .arg("--root")
+        .arg(root)
+        .env(device_key::DEVICE_KEY_ENV, key_file)
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("ELOHIM_SESSION_ID");
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+    command.output().expect("epr runs")
+}
+
+fn last_slots(root: &Path) -> Vec<String> {
+    let flows = std::fs::read_to_string(root.join(".eprfs/status/flows.jsonl")).unwrap();
+    let line: serde_json::Value = serde_json::from_str(flows.lines().last().unwrap()).unwrap();
+    serde_json::from_value(line["record"]["classifiedAs"].clone()).unwrap()
+}
+
+const NOTE: [&str; 9] = [
+    "flow",
+    "note",
+    "--on",
+    "README.md",
+    "--kind",
+    "observation",
+    "--reason",
+    "hook-emitted",
+    "--json",
+];
+
+#[test]
+fn w4_env_session_stamps_source_session_env() {
+    let dir = fixture();
+    let keys = TempDir::new().unwrap();
+    let root = dir.path();
+    let (key_file, _) = device(&keys, "a");
+    elohim_epr_cli::actor::claim(root, "agent:implementer@opus-5.5", "sub-session").unwrap();
+    elohim_epr_cli::actor::claim(root, "agent:orchestrator@fable-5", "harness-session").unwrap();
+
+    // The subagent's own ELOHIM_SESSION_ID beats the harness's CLAUDE_CODE_SESSION_ID, and the
+    // inference is stamped on the record.
+    let out = epr_with_env(
+        root,
+        &key_file,
+        &NOTE,
+        &[
+            ("ELOHIM_SESSION_ID", "sub-session"),
+            ("CLAUDE_CODE_SESSION_ID", "harness-session"),
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["actor"], "agent:implementer@opus-5.5");
+    let slots = last_slots(root);
+    assert!(
+        slots.contains(&"source:session-env".to_string()),
+        "{slots:?}"
+    );
+    assert_eq!(
+        slots.last().unwrap(),
+        "steward:repo:ethosengine/elohim",
+        "no standing human: the collective stewards, never the email: {slots:?}"
+    );
+
+    // Named with --session, the same claim attributes and nothing is stamped.
+    let named = [
+        "flow",
+        "note",
+        "--on",
+        "README.md",
+        "--kind",
+        "observation",
+        "--reason",
+        "named",
+        "--session",
+        "sub-session",
+        "--json",
+    ];
+    let out = epr_with_env(
+        root,
+        &key_file,
+        &named,
+        &[("CLAUDE_CODE_SESSION_ID", "harness-session")],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["actor"], "agent:implementer@opus-5.5");
+    assert!(
+        !last_slots(root).iter().any(|s| s.starts_with("source:")),
+        "{:?}",
+        last_slots(root)
+    );
+}
