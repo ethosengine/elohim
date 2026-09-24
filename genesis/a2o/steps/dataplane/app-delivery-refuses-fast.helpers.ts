@@ -18,9 +18,13 @@
  *   fleet-write-readiness.sh <doorway-url>...
  *   exit 0  every doorway can take a write now
  *   exit 3  one line per doorway that cannot:
- *           FLEET-NOT-READY <host> face=<cell-not-running|catching-up|storage-forward-timeout> retryAfter=<s>
- *   exit 2  usage
+ *           FLEET-NOT-READY <origin> face=<face> retryAfter=<s>
+ *           <origin> is scheme://host[:port]; <face> is one of READINESS_FACES
+ *   exit 2  usage, or an answer it cannot judge
  *   It asks once and never sleeps.
+ *
+ * The faces are ONE vocabulary, scripts/ci/lib/readiness-faces.json, which the probe reads at
+ * run time and this module reads at load. Neither side spells a face list of its own.
  */
 
 import { spawn } from 'node:child_process';
@@ -34,8 +38,42 @@ export const FLEET_WRITE_READINESS = join(REPO_ROOT, 'scripts', 'ci', 'fleet-wri
 
 export const READINESS_EXIT = { ready: 0, usage: 2, notReady: 3 } as const;
 
-/** The three causes a not-ready answer may name (stage-spa-blob.sh `not_ready_face`). */
-export const NOT_READY_FACES = ['cell-not-running', 'catching-up', 'storage-forward-timeout'];
+/** The face vocabulary the probe and these stations share — owned by scripts/ci. */
+export const READINESS_FACES_FILE = join(REPO_ROOT, 'scripts', 'ci', 'lib', 'readiness-faces.json');
+
+interface FaceEntry {
+  face: string;
+  plan: boolean;
+}
+
+function readFaces(file: string): FaceEntry[] {
+  const parsed = JSON.parse(readFileSync(file, 'utf8')) as { faces?: unknown };
+  if (!Array.isArray(parsed.faces)) throw new Error(`${file} has no "faces" list`);
+  return parsed.faces.map((entry: unknown) => {
+    const { face, plan } = (entry ?? {}) as { face?: unknown; plan?: unknown };
+    if (typeof face !== 'string' || !/^[a-z0-9-]+$/.test(face)) {
+      throw new Error(`${file} lists a face that is not a name: ${JSON.stringify(entry)}`);
+    }
+    return { face, plan: plan === true };
+  });
+}
+
+const FACE_ENTRIES = readFaces(READINESS_FACES_FILE);
+
+/** Every face a not-ready answer may name, in the order the vocabulary file lists them. */
+export const READINESS_FACES: readonly string[] = FACE_ENTRIES.map(entry => entry.face);
+
+/**
+ * The plan's three faces — cell-not-running, catching-up, storage-forward-timeout — which are
+ * also the only faces scripts/ci/stage-spa-blob.sh waits on (its `not_ready_face`).
+ */
+export const PLAN_FACES: readonly string[] = FACE_ENTRIES.filter(entry => entry.plan).map(
+  entry => entry.face
+);
+
+export function isReadinessFace(face: string): boolean {
+  return READINESS_FACES.includes(face);
+}
 
 /** Seconds allowed for an attempt already on the wire when a deadline passes (the feature's bound). */
 export const IN_FLIGHT_SLACK_SECS = 30;
@@ -50,6 +88,7 @@ export function readinessProbePresent(script = FLEET_WRITE_READINESS): boolean {
 }
 
 export interface NotReadyLine {
+  /** The doorway as the probe names it: its origin, scheme://host[:port]. */
   host: string;
   face: string;
   /** Seconds, or null when the line carried no usable number. */

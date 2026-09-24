@@ -32,11 +32,13 @@ import {
   FLEET_WRITE_READINESS,
   IN_FLIGHT_SLACK_SECS,
   namesDoorway,
-  NOT_READY_FACES,
   parseTimingLines,
+  PLAN_FACES,
   probeShedding,
   putShed,
   READINESS_EXIT,
+  READINESS_FACES,
+  READINESS_FACES_FILE,
   readFirstNotReady,
   readinessProbePresent,
   timingViolations,
@@ -147,7 +149,7 @@ function pendingProbe(world: E2EWorld): 'pending' {
   world.attach(
     `AUTHORED-UNRUN: ${FLEET_WRITE_READINESS} is not on disk in this checkout. The fleet ` +
       'write-readiness probe is Lane A of the 2026-09-24 native-delivery sprint; this ' +
-      'scenario is written against its contract (exit 0 ready, 3 FLEET-NOT-READY <host> ' +
+      'scenario is written against its contract (exit 0 ready, 3 FLEET-NOT-READY <origin> ' +
       'face=<face> retryAfter=<s>, 2 usage; never sleeps) and runs once it lands.'
   );
   return 'pending';
@@ -184,6 +186,17 @@ function toldEnv(told: Told): Record<string, string> {
     STAGE_BLOB_BUDGET_SECS: String(told.transportSecs),
     STAGE_HARD_TIMEOUT_SECS: String(told.hardTimeoutSecs),
   };
+}
+
+/**
+ * A face a step names must be one the probe can print, or the step asserts something no answer
+ * could ever satisfy. The vocabulary is scripts/ci/lib/readiness-faces.json, shared with the probe.
+ */
+function requireFace(face: string, among: readonly string[] = READINESS_FACES): void {
+  assert.ok(
+    among.includes(face),
+    `"${face}" is not a face this step can meet — ${READINESS_FACES_FILE} lists: ${among.join(', ')}`
+  );
 }
 
 /** The `blobHash` a doorway answers with for this app's record, or '' when unreadable. */
@@ -246,6 +259,7 @@ Then(
 Then(
   'the probe names doorway {string} as not ready, with the face {string} and a retry-after no longer than the shed',
   function (this: E2EWorld, doorway: string, face: string) {
+    requireFace(face);
     const current = state(this);
     const answer = current.lastAnswer;
     assert.ok(answer, 'the probe has not been asked in this scenario');
@@ -453,6 +467,8 @@ Then(
   'while the window was open the probe answered not-ready at least once, naming the face {string} or {string}',
   { timeout: 60_000 },
   async function (this: E2EWorld, first: string, second: string) {
+    requireFace(first);
+    requireFace(second);
     const answers = await stopSampler(this);
     this.attach(
       JSON.stringify(
@@ -479,7 +495,7 @@ Then(
       unexpected,
       [],
       `during a conductor restart the probe named faces other than "${first}" or "${second}": ` +
-        `${[...new Set(unexpected)].join(', ')} (known faces: ${NOT_READY_FACES.join(', ')})`
+        `${[...new Set(unexpected)].join(', ')} (known faces: ${READINESS_FACES.join(', ')})`
     );
   }
 );
@@ -735,6 +751,8 @@ Then('nothing in the deploy waited longer than it was told', function (this: E2E
 Then(
   'the deploy stopped at its deadline, saying the doorway was still not ready with the face {string}',
   function (this: E2EWorld, face: string) {
+    // The deploy (stage-spa-blob.sh `not_ready_face`) waits on the plan faces only.
+    requireFace(face, PLAN_FACES);
     const offer = requireOffer(this);
     assert.notEqual(
       offer.outcome.code,

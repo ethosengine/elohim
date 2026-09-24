@@ -6,20 +6,28 @@
  * so these tests run without a household mesh.
  */
 import { strict as assert } from 'node:assert';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, describe, it } from 'node:test';
 
 import {
   askFleetWriteReadiness,
+  FLEET_WRITE_READINESS,
+  isReadinessFace,
   namesDoorway,
   parseNotReadyLines,
   parseTimingLines,
+  PLAN_FACES,
+  READINESS_FACES,
+  READINESS_FACES_FILE,
   timingViolations,
+  withEnv,
 } from '../app-delivery-refuses-fast.helpers.js';
+import { REPO_ROOT } from '../epr-app-deliverability.helpers.js';
 
 const DOORWAY_A = 'http://localhost:8888';
+const DOORWAY_B = 'http://localhost:8889';
 const CATCHING_UP = 'catching-up';
 
 const scratch = mkdtempSync(join(tmpdir(), 'refuses-fast-'));
@@ -176,5 +184,105 @@ void describe('askFleetWriteReadiness', () => {
     assert.equal(answer.timedOut, true);
     assert.equal(answer.code, null);
     assert.ok(Date.now() - started < 10_000, 'the caller itself waited on a hung probe');
+  });
+});
+
+const sorted = (values: Iterable<string>): string[] =>
+  [...values].sort((a, b) => a.localeCompare(b));
+
+void describe('one face vocabulary', () => {
+  const listed = (
+    JSON.parse(readFileSync(READINESS_FACES_FILE, 'utf8')) as {
+      faces: { face: string; plan: boolean }[];
+    }
+  ).faces;
+
+  void it('is the list in scripts/ci/lib/readiness-faces.json, in its order', () => {
+    assert.deepEqual(
+      [...READINESS_FACES],
+      listed.map(entry => entry.face)
+    );
+    assert.deepEqual(
+      [...PLAN_FACES],
+      listed.filter(entry => entry.plan).map(entry => entry.face)
+    );
+  });
+
+  void it('names the plan faces by the three names the feature and the deploy use', () => {
+    assert.deepEqual(sorted(PLAN_FACES), [
+      'catching-up',
+      'cell-not-running',
+      'storage-forward-timeout',
+    ]);
+  });
+
+  void it('is exactly the set of faces the probe script can print', () => {
+    const source = readFileSync(FLEET_WRITE_READINESS, 'utf8');
+    const printable = new Set([...source.matchAll(/"NOT ([a-z0-9-]+)"/g)].map(match => match[1]));
+    assert.deepEqual(sorted(printable), sorted(READINESS_FACES));
+  });
+
+  void it('holds every face the feature file names', () => {
+    const feature = readFileSync(
+      join(REPO_ROOT, 'genesis/a2o/features/dataplane/app-delivery-refuses-fast.feature'),
+      'utf8'
+    );
+    const named = [...feature.matchAll(/face "([^"]+)"(?: or "([^"]+)")?/g)].flatMap(match =>
+      [match[1], match[2]].filter((face): face is string => typeof face === 'string')
+    );
+    assert.ok(named.length >= 3, `found only ${named.length} named faces in the feature`);
+    for (const face of named) assert.ok(isReadinessFace(face), face);
+  });
+
+  void it('refuses a name that is not in the vocabulary, including the retired conductor-blind', () => {
+    assert.equal(isReadinessFace('conductor-blind'), false);
+    assert.equal(isReadinessFace('catching up'), false);
+  });
+});
+
+void describe('the probe script, as the household asks it', () => {
+  // A stand-in curl on PATH: both doorways are healthy and "do not hold" the probe
+  // blob, but doorway B sheds the content route the way the household's declared shed
+  // does. The REAL probe script runs, so the line the helper reads is the line it prints.
+  const bin = join(scratch, 'fake-bin');
+  mkdirSync(bin, { recursive: true });
+  const curl = join(bin, 'curl');
+  writeFileSync(
+    curl,
+    [
+      '#!/bin/bash',
+      'hdr="" out="" url=""',
+      'while [ "$#" -gt 0 ]; do case "$1" in',
+      '  -D) hdr="$2"; shift 2 ;; -o) out="$2"; shift 2 ;; -w|-X|-H|--max-time|--data-binary) shift 2 ;;',
+      '  -*) shift ;; *) url="$1"; shift ;; esac; done',
+      'case "$url" in',
+      '  */health/serving) st=200; ra=""; body=\'{"shedding":false,"degrading":false,"rolesDiscovered":3,"storageServing":{"status":"serving"}}\' ;;',
+      '  *:8889/db/content/*) st=503; ra=90; body=\'{"status":"catching-up","retryAfter":90,"cause":"dev-fixture"}\' ;;',
+      '  */db/content/*) st=404; ra=""; body=\'{"error":"not found"}\' ;;',
+      '  */admin/seed/blob) st=409; ra=""; body=\'{"success":false,"forwarded_to_storage":false}\' ;;',
+      '  *) exit 7 ;;',
+      'esac',
+      String.raw`{ printf "HTTP/1.1 %s\r\n" "$st"; [ -n "$ra" ] && printf "Retry-After: %s\r\n" "$ra"; printf "\r\n"; } > "$hdr"`,
+      'printf "%s" "$body" > "$out"',
+      'printf "%s" "$st"',
+    ].join('\n')
+  );
+  chmodSync(curl, 0o755);
+
+  void it('names the shedding doorway by its origin with a listed face, and only that doorway', async () => {
+    const answer = await withEnv({ PATH: `${bin}:${process.env['PATH'] ?? ''}` }, async () =>
+      askFleetWriteReadiness([`${DOORWAY_A}/`, DOORWAY_B], 20_000)
+    );
+    assert.equal(answer.code, 3, answer.output);
+    assert.deepEqual(
+      answer.notReady.map(({ host, face, retryAfter }) => ({ host, face, retryAfter })),
+      [{ host: DOORWAY_B, face: CATCHING_UP, retryAfter: 90 }],
+      answer.output
+    );
+    const [line] = answer.notReady;
+    assert.ok(line && isReadinessFace(line.face));
+    assert.ok(line && namesDoorway(line.host, DOORWAY_B));
+    assert.ok(line && !namesDoorway(line.host, DOORWAY_A));
+    assert.match(answer.output, /^FLEET-READY http:\/\/localhost:8888$/m);
   });
 });

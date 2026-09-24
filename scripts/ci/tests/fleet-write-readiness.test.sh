@@ -36,8 +36,11 @@ mkdir -p "${bin}" "${root}/app/pkg/dist/browser" "${root}/app/pkg/dist/server" \
 
 # --- fake curl -------------------------------------------------------------
 # Answers from ${FAKE_DIR}/<host>.<leg>, one record `status|body|curl-exit|Retry-After`.
-# leg = health (GET /health/serving) or put (PUT /admin/seed/blob). A missing
-# fixture answers curl exit 7 (connection refused). Every call's argv is logged.
+# leg = health (GET /health/serving), read (GET /db/content/<sentinel>, the
+# route the household's declared shed covers) or put (PUT /admin/seed/blob).
+# The host keys a fixture WITH its port, so two doorways on one machine are two
+# fixtures. A missing fixture answers curl exit 7 (connection refused). Every
+# call's argv is logged.
 cat > "${bin}/curl" <<'FAKE'
 #!/bin/bash
 url="" headers_out="" out="" wfmt="" method=GET
@@ -56,6 +59,7 @@ done
 host="${url#*://}"; host="${host%%/*}"
 case "${url}" in
   */health/serving) leg=health ;;
+  */db/content/*) leg=read ;;
   */admin/seed/blob) leg=put ;;
   *) exit 22 ;;
 esac
@@ -97,12 +101,19 @@ check() {
 }
 
 OK_HEALTH='200|{"shedding":false,"degrading":false,"upstreams":[],"rolesDiscovered":5,"warmupEmpty":false,"storageServing":{"status":"serving","httpStatus":200}}|0|'
+OK_READ='404|{"error":"Content not found"}|0|'
 OK_PUT='409|{"success":false,"hash":"sha256-0000","already_cached":false,"forwarded_to_storage":false,"size":0,"error":"Hash mismatch"}|0|'
 
 new_case() {
   FAKE_DIR="${root}/$1"; log="${root}/$1.log"; out="${root}/$1.out"
   mkdir -p "${FAKE_DIR}"
   export FAKE_DIR
+  # Every case's doorways answer the shed-covered read as "not held" unless the
+  # case says otherwise — the read leg is only interesting where it refuses.
+  local h
+  for h in doorway-a doorway-b localhost:8888 localhost:8889; do
+    printf '%s' "${OK_READ}" > "${FAKE_DIR}/${h}.read"
+  done
 }
 fixture() { printf '%s' "$3" > "${FAKE_DIR}/$1.$2"; }
 run() {
@@ -118,14 +129,14 @@ new_case ready; HOSTS="https://doorway-a"
 fixture doorway-a health "${OK_HEALTH}"; fixture doorway-a put "${OK_PUT}"
 status="$(run)"
 check "ready: exits 0" "[ '${status}' = '0' ]"
-check "ready: names the host READY" "grep -qx 'FLEET-READY doorway-a' '${log}'"
-check "ready: asks both questions exactly once" \
-  "[ \"\$(calls_to /health/serving)\" = '1' ] && [ \"\$(calls_to /admin/seed/blob)\" = '1' ]"
+check "ready: names the host READY" "grep -qx 'FLEET-READY https://doorway-a' '${log}'"
+check "ready: asks each of the three questions exactly once" \
+  "[ \"\$(calls_to /health/serving)\" = '1' ] && [ \"\$(calls_to /db/content/)\" = '1' ] && [ \"\$(calls_to /admin/seed/blob)\" = '1' ]"
 check "ready: the write probe is a ZERO-byte PUT on the never-held sentinel, with the admin key" \
   "grep -q -- '--data-binary  https://doorway-a/admin/seed/blob' '${FAKE_DIR}/calls' && grep -q 'X-Blob-Hash: sha256-0000000000000000000000000000000000000000000000000000000000000000' '${FAKE_DIR}/calls' && grep -q 'X-API-Key: test-key' '${FAKE_DIR}/calls'"
 check "ready: every request carries a --max-time bound" \
-  "[ \"\$(grep -c -- '--max-time' '${FAKE_DIR}/calls')\" = '2' ]"
-check "ready: the result file carries the line" "grep -qx 'FLEET-READY doorway-a' '${out}'"
+  "[ \"\$(grep -c -- '--max-time' '${FAKE_DIR}/calls')\" = '3' ]"
+check "ready: the result file carries the line" "grep -qx 'FLEET-READY https://doorway-a' '${out}'"
 check "ready: never sleeps" "never_slept"
 
 # --- face: shedding (health 503, Retry-After header) -------------------------
@@ -135,7 +146,7 @@ fixture doorway-a put "${OK_PUT}"
 status="$(run)"
 check "shedding: exits 3" "[ '${status}' = '3' ]"
 check "shedding: names face and the advertised retryAfter" \
-  "grep -qx 'FLEET-NOT-READY doorway-a face=shedding retryAfter=45' '${log}'"
+  "grep -qx 'FLEET-NOT-READY https://doorway-a face=shedding retryAfter=45' '${log}'"
 check "shedding: refuses on the first answer — no write probe" "[ \"\$(calls_to /admin/seed/blob)\" = '0' ]"
 check "shedding: never sleeps" "never_slept"
 
@@ -144,26 +155,26 @@ new_case degr; HOSTS="https://doorway-a"
 fixture doorway-a health '503|{"shedding":false,"degrading":true,"upstreams":[],"storageServing":{"status":"serving"}}|0|30'
 status="$(run)"
 check "degrading: exits 3 with face=degrading" \
-  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY doorway-a face=degrading retryAfter=30' '${log}'"
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=degrading retryAfter=30' '${log}'"
 
 # --- face: storage refused / unreachable -------------------------------------
 new_case sref; HOSTS="https://doorway-a"
 fixture doorway-a health '503|{"shedding":false,"degrading":false,"upstreams":[],"storageServing":{"status":"refused","httpStatus":503}}|0|20'
 status="$(run)"
 check "storage refused: exits 3 with face=storage-refused" \
-  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY doorway-a face=storage-refused retryAfter=20' '${log}'"
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=storage-refused retryAfter=20' '${log}'"
 new_case sunr; HOSTS="https://doorway-a"
 fixture doorway-a health '503|{"shedding":false,"degrading":false,"upstreams":[],"storageServing":{"status":"unreachable"}}|0|'
 status="$(run)"
 check "storage unreachable: exits 3, face named, default retryAfter when none advertised" \
-  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY doorway-a face=storage-unreachable retryAfter=60' '${log}'"
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=storage-unreachable retryAfter=60' '${log}'"
 
 # --- the other two serving regimes the doorway 503s on ------------------------
 new_case blind; HOSTS="https://doorway-a"
 fixture doorway-a health '503|{"shedding":false,"degrading":false,"upstreams":[],"rolesDiscovered":0,"storageServing":{"status":"serving"}}|0|30'
 status="$(run)"
-check "conductor-blind: exits 3 with face=conductor-blind" \
-  "[ '${status}' = '3' ] && grep -q 'face=conductor-blind' '${log}'"
+check "no discovered roles is the plan face cell-not-running (the retired conductor-blind name is gone)" \
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=cell-not-running retryAfter=30' '${log}' && ! grep -q 'conductor-blind' '${log}'"
 
 # --- face: catching-up (write probe, body retryAfter) -------------------------
 new_case catch; HOSTS="https://doorway-a"
@@ -171,7 +182,7 @@ fixture doorway-a health "${OK_HEALTH}"
 fixture doorway-a put '503|{"status":"catching-up","retryAfter":30,"cause":"upstream"}|0|'
 status="$(run)"
 check "catching-up: exits 3 with face=catching-up and the body's retryAfter" \
-  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY doorway-a face=catching-up retryAfter=30' '${log}'"
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=catching-up retryAfter=30' '${log}'"
 check "catching-up: never sleeps" "never_slept"
 
 # A 503 whose status is only NESTED is not the doorway declaring itself.
@@ -204,22 +215,22 @@ fixture doorway-b health "${OK_HEALTH}"
 fixture doorway-b put '503|{"status":"catching-up","retryAfter":30}|0|30'
 status="$(run)"
 check "mixed: one not-ready host refuses the fleet (exit 3)" "[ '${status}' = '3' ]"
-check "mixed: the ready host is still named READY" "grep -qx 'FLEET-READY doorway-a' '${out}'"
+check "mixed: the ready host is still named READY" "grep -qx 'FLEET-READY https://doorway-a' '${out}'"
 check "mixed: the not-ready host is named with its face" \
-  "grep -qx 'FLEET-NOT-READY doorway-b face=catching-up retryAfter=30' '${out}'"
+  "grep -qx 'FLEET-NOT-READY https://doorway-b face=catching-up retryAfter=30' '${out}'"
 
 # --- unreachable doorway -----------------------------------------------------
 new_case down; HOSTS="https://doorway-a"
 status="$(run)"
 check "a doorway that does not answer is not ready (face=doorway-unreachable)" \
-  "[ '${status}' = '3' ] && grep -q 'FLEET-NOT-READY doorway-a face=doorway-unreachable' '${log}'"
+  "[ '${status}' = '3' ] && grep -q 'FLEET-NOT-READY https://doorway-a face=doorway-unreachable' '${log}'"
 
 # --- unparseable / cannot judge => 2 ------------------------------------------
 new_case junk; HOSTS="https://doorway-a"
 fixture doorway-a health '200|this is not json|0|'
 status="$(run)"
 check "unparseable health body: exits 2 and names it" \
-  "[ '${status}' = '2' ] && grep -q 'FLEET-READINESS-UNKNOWN doorway-a reason=health-unparseable' '${log}'"
+  "[ '${status}' = '2' ] && grep -q 'FLEET-READINESS-UNKNOWN https://doorway-a reason=health-unparseable' '${log}'"
 new_case nocontract; HOSTS="https://doorway-a"
 fixture doorway-a health '200|{"ok":true}|0|'
 status="$(run)"
@@ -241,6 +252,78 @@ new_case usage; HOSTS=""
 status="$(run)"
 check "no doorway given: usage, exit 2" "[ '${status}' = '2' ] && grep -qi 'usage' '${log}'"
 
+# --- the shed-covered route (the household's declared shed and a real upstream
+# shed both cover /db/*; /admin/* and /health/* are exempt, so a probe asking
+# only those never sees a doorway turning deploys away) ------------------------
+new_case readshed; HOSTS="https://doorway-a"
+fixture doorway-a health "${OK_HEALTH}"
+fixture doorway-a read '503|{"status":"catching-up","retryAfter":117,"cause":"dev-fixture"}|0|118'
+fixture doorway-a put "${OK_PUT}"
+status="$(run)"
+check "shed read: a doorway shedding the content route is catching-up, advertised Retry-After first" \
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=catching-up retryAfter=118' '${log}'"
+check "shed read: refuses on that answer — no write probe" "[ \"\$(calls_to /admin/seed/blob)\" = '0' ]"
+check "shed read: the read is a local-only GET (x-federation-hop: 1, no -X), bounded" \
+  "grep -- '/db/content/' '${FAKE_DIR}/calls' | grep -q 'x-federation-hop: 1' && ! grep -- '/db/content/' '${FAKE_DIR}/calls' | grep -q -- '-X ' && grep -- '/db/content/' '${FAKE_DIR}/calls' | grep -q -- '--max-time'"
+check "shed read: never sleeps" "never_slept"
+
+new_case readcell; HOSTS="https://doorway-a"
+fixture doorway-a health "${OK_HEALTH}"
+fixture doorway-a read '503|{"error":"conductor call failed: CellDisabled(uhC0kabc)"}|0|15'
+status="$(run)"
+check "a CellDisabled answer on the content route is cell-not-running" \
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-NOT-READY https://doorway-a face=cell-not-running retryAfter=15' '${log}'"
+
+new_case putcell; HOSTS="https://doorway-a"
+fixture doorway-a health "${OK_HEALTH}"
+fixture doorway-a put '502|{"success":false,"forwarded_to_storage":false,"error":"storage answered 503: CellDisabled"}|0|'
+status="$(run)"
+check "a CellDisabled answer on the write probe is cell-not-running, not a 5xx" \
+  "[ '${status}' = '3' ] && grep -q 'FLEET-NOT-READY https://doorway-a face=cell-not-running' '${log}'"
+
+# --- the host is the doorway's ORIGIN: two household doorways share localhost ---
+new_case origin; HOSTS="http://localhost:8888/ http://localhost:8889"
+fixture localhost:8888 health "${OK_HEALTH}"; fixture localhost:8888 put "${OK_PUT}"
+fixture localhost:8889 health "${OK_HEALTH}"
+fixture localhost:8889 read '503|{"status":"catching-up","retryAfter":40}|0|40'
+status="$(run)"
+check "origin: the ready doorway is named by scheme://host:port" \
+  "[ '${status}' = '3' ] && grep -qx 'FLEET-READY http://localhost:8888' '${out}'"
+check "origin: the not-ready doorway is named by ITS port, never a bare hostname" \
+  "grep -qx 'FLEET-NOT-READY http://localhost:8889 face=catching-up retryAfter=40' '${out}' && ! grep -qE '^FLEET-[A-Z-]+ localhost' '${out}'"
+new_case origin2; HOSTS="HTTPS://Doorway-A:443/api/"
+# The fake keys a fixture by the host exactly as the URL spells it; the probe
+# must still NAME it by its origin.
+fixture Doorway-A:443 health "${OK_HEALTH}"; fixture Doorway-A:443 read "${OK_READ}"; fixture Doorway-A:443 put "${OK_PUT}"
+status="$(run)"
+check "origin: scheme and host lower-cased, default port and path dropped" \
+  "[ '${status}' = '0' ] && grep -qx 'FLEET-READY https://doorway-a' '${out}'"
+
+# --- ONE face vocabulary: scripts/ci/lib/readiness-faces.json ---------------------
+faces_file="${here}/../lib/readiness-faces.json"
+listed="$("${REAL_NODE}" -e 'const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).faces.map(x=>x.face);process.stdout.write([...f].sort().join(" "))' "${faces_file}" 2>/dev/null)"
+listed_plan="$("${REAL_NODE}" -e 'const f=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).faces.filter(x=>x.plan===true).map(x=>x.face);process.stdout.write([...f].sort().join(" "))' "${faces_file}" 2>/dev/null)"
+emitted="$( { grep -oE '"NOT [a-z0-9-]+"' "${script}" | sed 's/^"NOT //; s/"$//'; grep -oE "printf '(doorway-[a-z0-9-]+)'" "${script}" | sed "s/^printf '//; s/'\$//"; } | sort -u | tr '\n' ' ' | sed 's/ $//')"
+stage_faces="$(sed -n '/^not_ready_face()/,/^}/p' "${here}/../stage-spa-blob.sh" | grep -oE "printf '[a-z0-9-]+'" | sed "s/^printf '//; s/'\$//" | sort -u | tr '\n' ' ' | sed 's/ $//')"
+check "vocabulary: every face the probe can print is listed, and every listed face is one it can print" \
+  "[ -n '${listed}' ] && [ '${emitted}' = '${listed}' ]"
+check "vocabulary: the plan faces are exactly the three stage-spa-blob.sh names while it waits" \
+  "[ '${listed_plan}' = 'catching-up cell-not-running storage-forward-timeout' ] && [ '${stage_faces}' = '${listed_plan}' ]"
+check "vocabulary: no retired name survives in the probe" "! grep -q 'conductor-blind' '${script}'"
+
+new_case unlisted; HOSTS="https://doorway-a"
+fixture doorway-a health "${OK_HEALTH}"
+fixture doorway-a read '503|{"status":"catching-up","retryAfter":30}|0|30'
+narrow="${root}/narrow-faces.json"
+printf '{"faces":[{"face":"shedding","plan":false}]}' > "${narrow}"
+status="$(run READINESS_FACES_FILE="${narrow}")"
+check "vocabulary is read at run time: a face the list does not name is never printed (exit 2, reason named)" \
+  "[ '${status}' = '2' ] && grep -qx 'FLEET-READINESS-UNKNOWN https://doorway-a reason=unlisted-face-catching-up' '${log}' && ! grep -q 'FLEET-NOT-READY' '${log}'"
+new_case nofaces; HOSTS="https://doorway-a"
+status="$(run READINESS_FACES_FILE="${root}/no-such-faces.json")"
+check "a missing face list cannot judge anything (exit 2, no request made)" \
+  "[ '${status}' = '2' ] && [ ! -s '${FAKE_DIR}/calls' ]"
+
 # --- the deploy intent ---------------------------------------------------------
 new_case intent; HOSTS="https://doorway-a https://doorway-b"
 fixture doorway-a health "${OK_HEALTH}"; fixture doorway-a put "${OK_PUT}"
@@ -254,7 +337,7 @@ q() { "${REAL_NODE}" -e 'const o=JSON.parse(require("fs").readFileSync(process.a
 check "intent: refusal still exits 3" "[ '${status}' = '3' ]"
 check "intent: written, and it is JSON" "[ -f '${intent}' ] && [ \"\$(q 'typeof o')\" = 'object' ]"
 check "intent: commit, env, doorway, face, retryAfter" \
-  "[ \"\$(q o.commit)\" = 'abc123' ] && [ \"\$(q o.env)\" = 'dev' ] && [ \"\$(q o.doorway)\" = 'doorway-b' ] && [ \"\$(q o.face)\" = 'shedding' ] && [ \"\$(q o.retryAfter)\" = '90' ]"
+  "[ \"\$(q o.commit)\" = 'abc123' ] && [ \"\$(q o.env)\" = 'dev' ] && [ \"\$(q o.doorway)\" = 'https://doorway-b' ] && [ \"\$(q o.face)\" = 'shedding' ] && [ \"\$(q o.retryAfter)\" = '90' ]"
 check "intent: every probed doorway URL is carried for the re-dispatch" \
   "[ \"\$(q 'o.doorways.join(\" \")')\" = 'https://doorway-a https://doorway-b' ]"
 check "intent: bundle sha256s are the archive CIDs the stage leg would upload" \

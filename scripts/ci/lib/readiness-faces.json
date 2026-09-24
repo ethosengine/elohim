@@ -1,0 +1,21 @@
+{
+  "kind": "fleet-readiness-faces",
+  "version": 1,
+  "about": "The ONE face vocabulary for a doorway that cannot take a write. scripts/ci/fleet-write-readiness.sh refuses to print a face that is not listed here, and genesis/a2o/steps/dataplane/app-delivery-refuses-fast.helpers.ts reads this file for the faces the household stations accept. The three plan faces are the names scripts/ci/stage-spa-blob.sh (not_ready_face) and the a2o feature use; the rest are the serving regimes and transport answers the probe also sees.",
+  "faces": [
+    { "face": "cell-not-running", "plan": true, "meaning": "the conductor behind the doorway has no running cell for this write: /health/serving rolesDiscovered 0, or any answer carrying CellDisabled" },
+    { "face": "catching-up", "plan": true, "meaning": "the doorway sheds with 503 {\"status\":\"catching-up\"} and a Retry-After" },
+    { "face": "storage-forward-timeout", "plan": true, "meaning": "the doorway could not forward the probe blob to its storage peer: the forward timed out" },
+    { "face": "shedding", "plan": false, "meaning": "/health/serving says shedding" },
+    { "face": "degrading", "plan": false, "meaning": "/health/serving says degrading" },
+    { "face": "storage-refused", "plan": false, "meaning": "/health/serving storageServing.status is refused" },
+    { "face": "storage-unreachable", "plan": false, "meaning": "/health/serving storageServing.status is unreachable" },
+    { "face": "warmup-empty", "plan": false, "meaning": "/health/serving warmupEmpty is true" },
+    { "face": "not-serving", "plan": false, "meaning": "/health/serving answered 503 for a reason not named above" },
+    { "face": "write-shed", "plan": false, "meaning": "a probe route answered 503 or 429 without declaring itself catching-up" },
+    { "face": "storage-forward-failed", "plan": false, "meaning": "the storage forward failed for a named cause other than a timeout" },
+    { "face": "doorway-unreachable", "plan": false, "meaning": "the doorway did not answer (connection refused, DNS, reset)" },
+    { "face": "doorway-timeout", "plan": false, "meaning": "the doorway did not answer within READINESS_MAX_TIME" },
+    { "face": "doorway-5xx", "plan": false, "meaning": "a probe route answered another 5xx" }
+  ]
+}
