@@ -145,6 +145,24 @@
       "write": { "path": "od/w.md", "new": true, "content": "stewardship-frame: inalienable\nA person holds true ownership of her own image.\n" },
       "expect": { "decision": "permit", "winning_class": null, "rule_id": null, "witnessed": false },
       "law": "The ownership sibling of `sovereignty-guard-silent-on-declared-frame`: a declared stewardship frame (here the inalienable frame) is silent only when the host read the ownership atom."
+    },
+    {
+      "name": "sovereignty-guard-v5-homoglyph-fires-without-prefilter",
+      "manifests": {
+        "sh/.epr-meta": "rules:\n  - id: sovereignty-ontology-guard\n    policy: sovereignty-ontology-guard@5"
+      },
+      "write": { "path": "sh/w.md", "new": true, "content": "Members hold a self‑sоvereign identity.\n" },
+      "expect": { "decision": "permit", "winning_class": "dispatch", "rule_id": "sovereignty-ontology-guard", "witnessed": true, "directive": "dispatch" },
+      "law": "Review M2, ruling R-C13. The guard rows bind by policy ref, and @5 carries no raw `contains-any` pre-filter: @4's case-sensitive `[\"sovereign\", \"Sovereign\"]` substring test ran before the validator, so a homoglyph (U+2011 hyphen, Cyrillic о) never reached the NFKC + confusable fold and the guard was blind to it live. Both runners seed the live policy registry into the fixture, so this vector exercises the row as the registry declares it: the validator scopes itself over the folded shadow and classifies. Pair: `ownership-guard-v5-caps-fires-without-prefilter`."
+    },
+    {
+      "name": "ownership-guard-v5-caps-fires-without-prefilter",
+      "manifests": {
+        "oh/.epr-meta": "rules:\n  - id: ownership-ontology-guard\n    policy: ownership-ontology-guard@5"
+      },
+      "write": { "path": "oh/w.md", "new": true, "content": "SELF-SOVEREIGN identity is the promise. Own your data.\n" },
+      "expect": { "decision": "permit", "winning_class": "dispatch", "rule_id": "ownership-ontology-guard", "witnessed": true, "directive": "dispatch" },
+      "law": "The ownership sibling of `sovereignty-guard-v5-homoglyph-fires-without-prefilter`. @4's pre-filter was `[\"ownership\", \"Ownership\"]`, so `own your data` — a phrase in the ownership atom — never fired unless the word `ownership` also appeared. @5 drops it and the lowercased shadow matches."
     }
   ]
 }

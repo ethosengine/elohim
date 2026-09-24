@@ -668,13 +668,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"ownership\",\"Ownership\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "post-station-4-lane-c-2026-09-24",
+        "established_at": null,
+        "superseded_by": "ownership-ontology-guard@5",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":4}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm",
+      "citesContentSha256": "sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "ownership-ontology-guard@5",
+        "title": "Ownership ontology guard — a content-addressed frame read over the folded text",
+        "summary": "Ownership ontology guard — a content-addressed frame read over the folded text",
+        "full_reasoning": "@5 is @4 without the raw `contains-any` pre-filter (ruling R-C13). That filter was a case-sensitive substring test for \"ownership\", so \"Own your data.\" or a homoglyph never reached the NFKC + confusable fold. The validator now scopes itself over the folded shadow of every `*.md` write. Frame, sidecar and advisory class are unchanged.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "post-station-4-review-2026-09-24",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":4}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-ownership-ontology-guard\",\"version\":5}"
       }
     },
     {
@@ -773,13 +794,34 @@
         "binding": "binding-local",
         "scope_json": "{\"scope\":{\"contains-any\":[\"sovereign\",\"Sovereign\"],\"write\":\"*.md\"}}",
         "citations": null,
-        "status": "active",
+        "status": "superseded",
         "established_by": "post-station-4-lane-c-2026-09-24",
+        "established_at": null,
+        "superseded_by": "sovereignty-ontology-guard@5",
+        "created_at": null,
+        "updated_at": null,
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":4}"
+      }
+    },
+    {
+      "citesContentCid": "bafyreiam5egaeybqfask2gv55vzmumepvuzn55qdyczuivzo5elcnrtpsq",
+      "citesContentSha256": "sha256:0ce90c0260302824ad1abded72ca308fad32def603c0b344572ee91626c66f94",
+      "registry": "policies.yaml",
+      "precedent": {
+        "id": "sovereignty-ontology-guard@5",
+        "title": "Sovereignty ontology guard — a content-addressed frame read over the folded text",
+        "summary": "Sovereignty ontology guard — a content-addressed frame read over the folded text",
+        "full_reasoning": "@5 is @4 without the raw `contains-any` pre-filter (ruling R-C13). That filter was a case-sensitive substring test run before the validator, so a homoglyph or all-caps apex phrase never reached the NFKC + confusable fold. The validator now scopes itself over the folded shadow of every `*.md` write. Frame, sidecar and advisory class are unchanged.",
+        "binding": "binding-local",
+        "scope_json": "{\"scope\":{\"write\":\"*.md\"}}",
+        "citations": null,
+        "status": "active",
+        "established_by": "post-station-4-review-2026-09-24",
         "established_at": null,
         "superseded_by": null,
         "created_at": null,
         "updated_at": null,
-        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":4}"
+        "metadata_json": "{\"enforcementClass\":\"dispatch\",\"registry\":\"policies.yaml\",\"resolutionMode\":\"pinned\",\"validator\":\"epr:validator-sovereignty-ontology-guard\",\"version\":5}"
       }
     },
     {

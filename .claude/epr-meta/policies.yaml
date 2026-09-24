@@ -133,6 +133,35 @@ policies:
       referenced asset or a second package rather than balloon.
 
   - id: sovereignty-ontology-guard
+    version: 5
+    contentHash: sha256:0ce90c0260302824ad1abded72ca308fad32def603c0b344572ee91626c66f94
+    title: Sovereignty ontology guard — a content-addressed frame read over the folded text
+    binding: binding-local
+    class: dispatch
+    scope: { write: "*.md" }
+    validator: epr:validator-sovereignty-ontology-guard
+    frame: frame-sovereignty-apex@1
+    frame-ref: bafyreif2vuz6tnzwtvkgogulw25u2h65edipkbyxw5guf2yyezy5i5zo4e
+    parameters:
+      dispatch-agent: storyteller
+      dispatch-prompt: >
+        Review only the net-new sovereignty framing against stewardship-over-sovereignty and the
+        imago-dei, community-backstopped agency floor. Report ALIGNED, or quote the smallest passage
+        that asserts crypto self-sovereignty as an apex and propose a concise reframe. Do not edit
+        files, expand the document, or interrupt the active development pass.
+    status: active
+    retire-when: >
+      escalations resolve at a peer-native elohim endpoint with witnessed provenance
+      (`ComputeSource::PeerNative`) under the human sortition floor — the frame is then judged by
+      the protocol's own governed compute, not by a repository hook
+    established_by: post-station-4-review-2026-09-24
+    why: >
+      @5 is @4 without the raw `contains-any` pre-filter (ruling R-C13). That filter was a
+      case-sensitive substring test run before the validator, so a homoglyph or all-caps apex
+      phrase never reached the NFKC + confusable fold. The validator now scopes itself over the
+      folded shadow of every `*.md` write. Frame, sidecar and advisory class are unchanged.
+
+  - id: sovereignty-ontology-guard
     version: 4
     contentHash: sha256:213ec1fa848484f7008e95e4cf68bf0c24e10cc0f30d0a57ee40809da905c692
     title: Sovereignty ontology guard — a content-addressed frame, background vision review
@@ -149,7 +178,8 @@ policies:
         imago-dei, community-backstopped agency floor. Report ALIGNED, or quote the smallest passage
         that asserts crypto self-sovereignty as an apex and propose a concise reframe. Do not edit
         files, expand the document, or interrupt the active development pass.
-    status: active
+    status: superseded
+    superseded_by: sovereignty-ontology-guard@5
     retire-when: >
       escalations resolve at a peer-native elohim endpoint with witnessed provenance
       (`ComputeSource::PeerNative`) under the human sortition floor — the frame is then judged by
@@ -272,6 +302,35 @@ policies:
       review: the protocol governing the bytes of its own repo.
 
   - id: ownership-ontology-guard
+    version: 5
+    contentHash: sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b
+    title: Ownership ontology guard — a content-addressed frame read over the folded text
+    binding: binding-local
+    class: dispatch
+    scope: { write: "*.md" }
+    validator: epr:validator-ownership-ontology-guard
+    frame: frame-ownership-inalienable@1
+    frame-ref: bafyreif2f3eve4kg5skanqi4exvigznllxuqsy6r6w6t4pgibp2cybx2xe
+    parameters:
+      dispatch-agent: storyteller
+      dispatch-prompt: >
+        Review only the net-new ownership framing against stewardship, custody, rights, and the
+        inalienable-body exception. Report ALIGNED, or quote the smallest enclosure-shaped passage
+        and propose a concise reframe. Do not edit files, broaden the document, or interrupt the
+        active development pass.
+    status: active
+    retire-when: >
+      escalations resolve at a peer-native elohim endpoint with witnessed provenance
+      (`ComputeSource::PeerNative`) under the human sortition floor — the frame is then judged by
+      the protocol's own governed compute, not by a repository hook
+    established_by: post-station-4-review-2026-09-24
+    why: >
+      @5 is @4 without the raw `contains-any` pre-filter (ruling R-C13). That filter was a
+      case-sensitive substring test for "ownership", so "Own your data." or a homoglyph never
+      reached the NFKC + confusable fold. The validator now scopes itself over the folded shadow
+      of every `*.md` write. Frame, sidecar and advisory class are unchanged.
+
+  - id: ownership-ontology-guard
     version: 4
     contentHash: sha256:753976a8f1f55cf3b86a149fcc69521253a9e40e3a7f648a04ecde5f626b434b
     title: Ownership ontology guard — a content-addressed frame, background stewardship review
@@ -288,7 +347,8 @@ policies:
         inalienable-body exception. Report ALIGNED, or quote the smallest enclosure-shaped passage
         and propose a concise reframe. Do not edit files, broaden the document, or interrupt the
         active development pass.
-    status: active
+    status: superseded
+    superseded_by: ownership-ontology-guard@5
     retire-when: >
       escalations resolve at a peer-native elohim endpoint with witnessed provenance
       (`ComputeSource::PeerNative`) under the human sortition floor — the frame is then judged by

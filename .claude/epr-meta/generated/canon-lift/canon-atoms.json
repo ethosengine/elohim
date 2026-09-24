@@ -586,7 +586,7 @@
       "id": "ownership-ontology-guard",
       "version": 4,
       "registry": "policies.yaml",
-      "status": "active",
+      "status": "superseded",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
       "sha256Pin": "sha256:753976a8f1f55cf3b86a149fcc69521253a9e40e3a7f648a04ecde5f626b434b",
@@ -601,6 +601,37 @@
           "version": 3,
           "registry": "policies.yaml",
           "cid": "bafyreichpdnv4gpywsdhzsssierx2p5rbkdvteg2czs7ddspfd5a4cs3le",
+          "resolved": true
+        }
+      ],
+      "supersededBy": {
+        "declared": "ownership-ontology-guard@5",
+        "id": "ownership-ontology-guard",
+        "version": 5,
+        "registry": "policies.yaml",
+        "cid": "bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm",
+        "resolved": true
+      }
+    },
+    {
+      "id": "ownership-ontology-guard",
+      "version": 5,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b",
+      "sha256Computed": "sha256:a19c92b89c3009f7bd521fc6f448c6c2ef573862afbb4adf03f93bb7eebadc2b",
+      "pinState": "verified",
+      "cid": "bafyreifbtsjlrhbqbh332uq7y32errwc55ltqyvpxnfn6a7zho365ow4fm",
+      "bodyBytes": 1139,
+      "supersedes": [
+        {
+          "declared": "policies.yaml#ownership-ontology-guard@4",
+          "id": "ownership-ontology-guard",
+          "version": 4,
+          "registry": "policies.yaml",
+          "cid": "bafyreidvhf3kr4pvltz3q2qut7ggsuqskou6idr2p5siubhm3zpwe22djm",
           "resolved": true
         }
       ],
@@ -709,7 +740,7 @@
       "id": "sovereignty-ontology-guard",
       "version": 4,
       "registry": "policies.yaml",
-      "status": "active",
+      "status": "superseded",
       "resolutionMode": "pinned",
       "resolutionModeSource": "registry-default",
       "sha256Pin": "sha256:213ec1fa848484f7008e95e4cf68bf0c24e10cc0f30d0a57ee40809da905c692",
@@ -724,6 +755,37 @@
           "version": 3,
           "registry": "policies.yaml",
           "cid": "bafyreieaphebesp4gyreiwj56idh4x44l3on7gaqmetogoqdhjmxxe5qja",
+          "resolved": true
+        }
+      ],
+      "supersededBy": {
+        "declared": "sovereignty-ontology-guard@5",
+        "id": "sovereignty-ontology-guard",
+        "version": 5,
+        "registry": "policies.yaml",
+        "cid": "bafyreiam5egaeybqfask2gv55vzmumepvuzn55qdyczuivzo5elcnrtpsq",
+        "resolved": true
+      }
+    },
+    {
+      "id": "sovereignty-ontology-guard",
+      "version": 5,
+      "registry": "policies.yaml",
+      "status": "active",
+      "resolutionMode": "pinned",
+      "resolutionModeSource": "registry-default",
+      "sha256Pin": "sha256:0ce90c0260302824ad1abded72ca308fad32def603c0b344572ee91626c66f94",
+      "sha256Computed": "sha256:0ce90c0260302824ad1abded72ca308fad32def603c0b344572ee91626c66f94",
+      "pinState": "verified",
+      "cid": "bafyreiam5egaeybqfask2gv55vzmumepvuzn55qdyczuivzo5elcnrtpsq",
+      "bodyBytes": 1199,
+      "supersedes": [
+        {
+          "declared": "policies.yaml#sovereignty-ontology-guard@4",
+          "id": "sovereignty-ontology-guard",
+          "version": 4,
+          "registry": "policies.yaml",
+          "cid": "bafyreibbh3a7vbeeqt3qbduv4thwrpymetqqzqhtbuffp3saqco2sbogsi",
           "resolved": true
         }
       ],

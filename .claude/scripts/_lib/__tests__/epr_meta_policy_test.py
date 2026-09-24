@@ -328,20 +328,99 @@ check("frame rows: the live registry loads clean", not _live_errs)
 _frames = frame_atoms.load_frames(REPO)
 for _gid, _validator in (("sovereignty-ontology-guard", "epr:validator-sovereignty-ontology-guard"),
                          ("ownership-ontology-guard", "epr:validator-ownership-ontology-guard")):
-    _row = _live_policies.get(f"{_gid}@4")
-    check(f"frame rows: {_gid}@4 exists", _row is not None)
     _atom, _ref = _frames[_validator]
-    check(f"frame rows: {_gid}@4 frame == {_atom['id']}@{_atom['version']}",
-          _row.get("frame") == f"{_atom['id']}@{_atom['version']}")
-    check(f"frame rows: {_gid}@4 frame-ref == frame_atoms.frame_ref(atom)",
-          _row.get("frame-ref") == frame_atoms.frame_ref(_atom) == _ref)
-    check(f"frame rows: {_gid}@4 keeps class dispatch + the @3 sidecar parameters",
-          _row.get("class") == "dispatch"
-          and _row.get("parameters") == _live_policies[f"{_gid}@3"].get("parameters"))
-    check(f"frame rows: {_gid}@4 validator binds the atom's validator",
-          _row.get("validator") == _atom["validator"])
+    for _v in (4, 5):
+        _row = _live_policies.get(f"{_gid}@{_v}")
+        check(f"frame rows: {_gid}@{_v} exists", _row is not None)
+        check(f"frame rows: {_gid}@{_v} frame == {_atom['id']}@{_atom['version']}",
+              _row.get("frame") == f"{_atom['id']}@{_atom['version']}")
+        check(f"frame rows: {_gid}@{_v} frame-ref == frame_atoms.frame_ref(atom)",
+              _row.get("frame-ref") == frame_atoms.frame_ref(_atom) == _ref)
+        check(f"frame rows: {_gid}@{_v} keeps class dispatch + the @3 sidecar parameters",
+              _row.get("class") == "dispatch"
+              and _row.get("parameters") == _live_policies[f"{_gid}@3"].get("parameters"))
+        check(f"frame rows: {_gid}@{_v} validator binds the atom's validator",
+              _row.get("validator") == _atom["validator"])
     check(f"frame rows: {_gid}@3 superseded by @4",
           _live_policies[f"{_gid}@3"].get("status") == "superseded"
           and _live_policies[f"{_gid}@3"].get("superseded_by") == f"{_gid}@4")
+    # Ruling R-C13 (review M2): @5 drops the raw case-sensitive `contains-any` pre-filter; the
+    # validator scopes itself over the folded shadow. @4 is superseded by it.
+    check(f"frame rows: {_gid}@4 superseded by @5",
+          _live_policies[f"{_gid}@4"].get("status") == "superseded"
+          and _live_policies[f"{_gid}@4"].get("superseded_by") == f"{_gid}@5")
+    check(f"frame rows: {_gid}@5 is the active row",
+          _live_policies[f"{_gid}@5"].get("status") == "active")
+    check(f"frame rows: {_gid}@5 scope carries no contains-any pre-filter (R-C13)",
+          _live_policies[f"{_gid}@5"].get("scope") == {"write": "*.md"})
+
+# ── m2_homoglyph_write_classifies_live_without_prefilter (review M2, ruling R-C13) ───────────
+# The @4 rows carried `contains-any: ["sovereign", "Sovereign"]` / `["ownership", "Ownership"]`,
+# a RAW case-sensitive substring test the evaluator runs before the validator — so the NFKC +
+# confusable fold never ran live on a homoglyph (`self‑sоvereign`, Cyrillic о) or an all-caps
+# apex phrase. A fixture carrying the LIVE registry, atoms and validator scope binds each row
+# version in turn: @4 is blind to both writes (the finding, pinned so it cannot silently return),
+# @5 classifies both.
+import shutil  # noqa: E402
+
+_HOMOGLYPH = "Members hold a self\u2011s\u043evereign identity.\n"
+_CAPS = "SELF-SOVEREIGN identity is the promise. Own your data.\n"
+_BINDINGS = (("sovereignty-ontology-guard", _HOMOGLYPH),
+             ("sovereignty-ontology-guard", _CAPS),
+             ("ownership-ontology-guard", _CAPS))
+
+
+def _live_fixture(tmp: Path, policy_ref: str) -> Path:
+    (tmp / ".git").mkdir()
+    for rel in (epr_meta.POLICY_REGISTRY_REL,
+                "elohim/sdk/schemas/v1/registries/governance-validators.json"):
+        (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / rel, tmp / rel)
+    shutil.copytree(REPO / frame_atoms.FRAMES_REL, tmp / frame_atoms.FRAMES_REL)
+    rule_id = policy_ref.split("@", 1)[0]
+    (tmp / "canon").mkdir()
+    (tmp / "canon/.epr-meta").write_text(
+        f"---\nepr-meta-version: 1\nrules:\n  - id: {rule_id}\n    policy: {policy_ref}\n---\n")
+    return tmp
+
+
+def _fires(policy_ref: str, content: str) -> tuple[bool, dict]:
+    import os
+    with tempfile.TemporaryDirectory() as td:
+        root = _live_fixture(Path(td), policy_ref)
+        target = root / "canon/w.md"
+        saved = os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+        try:
+            result = epr_meta.resolve_write(
+                target, {"path": str(target), "content": content, "is_new": True,
+                         "is_new_subdir": False}, root)
+        finally:
+            if saved is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = saved
+    rule_id = policy_ref.split("@", 1)[0]
+    fired = [v for v in result.get("dispatches") or [] if v.rule_id == rule_id]
+    return bool(fired), (fired[0].evidence if fired else {}) or {}
+
+
+print("m2_homoglyph_write_classifies_live_without_prefilter")
+for _gid, _content in _BINDINGS:
+    _blind, _ = _fires(f"{_gid}@4", _content)
+    check(f"M2 pinned: {_gid}@4's raw pre-filter never let the fold see {_content!r}", not _blind)
+    _fired, _evidence = _fires(f"{_gid}@5", _content)
+    check(f"M2 closed: {_gid}@5 classifies {_content!r} (dispatch, advisory)", _fired)
+    check(f"M2 closed: {_gid}@5 evidence names the frame and the ontology",
+          _evidence.get("frameRef", "").startswith("bafy")
+          and _evidence.get("ontologyRef", "").startswith("bafy")
+          and bool(_evidence.get("spans")))
+_, _evidence = _fires("sovereignty-ontology-guard@5", _HOMOGLYPH)
+_raw = _HOMOGLYPH.encode()
+# Two phrases hit: `self-sovereign` and `sovereign identity` (the fold makes both visible).
+_s = _raw.index("s\u043evereign".encode())
+check("M2 closed: the homoglyph spans index the original bytes",
+      _evidence.get("spans") == [{"start": _raw.index(b"self"), "end": _raw.index(b" identity")},
+                                 {"start": _s, "end": _raw.index(b".\n")}])
 
 print(f"  {_passed} assertions passed ✅")

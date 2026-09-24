@@ -131,6 +131,25 @@ fn seed_frames(root: &std::path::Path) {
     }
 }
 
+/// Repo-relative home of the policy registry a `policy: <id>@<version>` binding resolves
+/// against. Seeded from the live tree so a vector that binds a registry row (the @5 guard rows,
+/// ruling R-C13) exercises the row exactly as the registry declares it — pre-filter or not.
+const POLICY_REGISTRY_REL: &str = ".claude/epr-meta/policies.yaml";
+
+fn seed_policies(root: &std::path::Path) {
+    let source = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .join(POLICY_REGISTRY_REL);
+    let Ok(body) = fs::read_to_string(&source) else {
+        return; // absent registry → bindings drop → the policy-bound vectors go red. Loud.
+    };
+    let target = root.join(POLICY_REGISTRY_REL);
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).unwrap();
+    }
+    fs::write(target, body).unwrap();
+}
+
 /// Wrap a vector's bare YAML rules body into a valid `.epr-meta` frontmatter
 /// document. The repo-root manifest is marked `root: true`; nested manifests are
 /// children of their directory.
@@ -170,6 +189,7 @@ fn governance_parity_vectors_hold() {
         let dir = TempDir::new().unwrap();
         seed_validator_scope(dir.path());
         seed_frames(dir.path());
+        seed_policies(dir.path());
         for (rel, body) in &vector.manifests {
             let full = dir.path().join(rel);
             if let Some(parent) = full.parent() {

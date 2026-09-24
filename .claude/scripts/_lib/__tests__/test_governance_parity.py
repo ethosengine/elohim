@@ -74,6 +74,17 @@ def seed_frames(tmp_root: Path) -> None:
         shutil.copytree(source, tmp_root / FRAMES_REL)
 
 
+def seed_policies(tmp_root: Path) -> None:
+    """Copy the live policy registry into the fixture, as the Rust runner does, so a vector that
+    binds `policy: <id>@<version>` exercises the row exactly as the registry declares it (the
+    @5 guard rows' missing `contains-any` pre-filter is the law those vectors pin, R-C13)."""
+    source = REPO / epr_meta.POLICY_REGISTRY_REL
+    if source.is_file():
+        target = tmp_root / epr_meta.POLICY_REGISTRY_REL
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(source, target)
+
+
 def run_vector(tmp_root: Path, vector: dict) -> dict:
     """Drive ONE vector through the real resolve_write() path. Returns the {decision, cls,
     rule_id, refer, witnessed} shape the vector's `expect` asserts against."""
@@ -114,6 +125,7 @@ def main() -> int:
             tmp_root = Path(td)
             materialize(tmp_root, vector.get("manifests", {}))
             seed_frames(tmp_root)
+            seed_policies(tmp_root)
             result = run_vector(tmp_root, vector)
 
         print(f"\n[{name}] {vector.get('law', '')}")
