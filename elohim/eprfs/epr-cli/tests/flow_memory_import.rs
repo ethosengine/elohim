@@ -236,12 +236,9 @@ fn an_imported_contribution_carries_provenance_without_minting_a_persona() {
     // The ACTING participant is the registered agent claim — never a persona invented for a human.
     assert_eq!(c["author"], AUTHOR);
     assert_eq!(c["steward"], "repo:ethosengine/elohim");
-    // The human who wrote the bytes is provenance on the source, and the git-signing human is the
-    // note's steward slot; neither is an author and neither is an agent.
-    assert_eq!(
-        c["imported"]["gitAuthor"],
-        "Fixture Author <fixture@example.test>"
-    );
+    // The human who wrote the bytes is provenance on the source — by display name only, the
+    // identity reserve — and neither an author nor an agent.
+    assert_eq!(c["imported"]["gitName"], "Fixture Author");
     assert_eq!(c["imported"]["file"], "project_holochain_evolution_epic.md");
     assert_eq!(
         c["imported"]["scopePath"],
@@ -646,5 +643,417 @@ fn a_drained_index_witnesses_its_zero_exactly_once() {
         folds(root, "memory-index-drift@1"),
         1,
         "a witnessed zero is a record, and it is one record"
+    );
+}
+
+// ── the identity reserve (station 5) ─────────────────────────────────────────────────────────
+
+const SECOND_SESSION: &str = "station-five-second";
+const SECOND_AUTHOR: &str = "agent:librarian@fixture";
+
+/// Three small importable entries, committed: enough to exercise every leg without the 229-entry
+/// corpus's import time.
+fn plant_small(root: &Path) -> Vec<&'static str> {
+    let names = ["feedback_alpha", "project_beta", "reference_gamma"];
+    for name in names {
+        write(
+            root,
+            &format!(".claude/memory/{name}.md"),
+            &format!(
+                "---\nname: {name}\ntitle: Title {name}\ndescription: The one-line claim of {name}.\nmetadata:\n  type: feedback\n---\n\nbody of {name}\n"
+            ),
+        );
+    }
+    git(root, &["add", "-A"]);
+    git(root, &["commit", "-qm", "small corpus"]);
+    names.to_vec()
+}
+
+fn contributions(root: &Path) -> Vec<(String, Vec<u8>)> {
+    let dir = root.join(".eprfs/status/memory/contributions");
+    let mut out: Vec<(String, Vec<u8>)> = std::fs::read_dir(&dir)
+        .expect("contributions")
+        .map(|e| {
+            let path = e.expect("entry").path();
+            (
+                path.file_name()
+                    .expect("name")
+                    .to_string_lossy()
+                    .to_string(),
+                std::fs::read(&path).expect("read"),
+            )
+        })
+        .filter(|(name, _)| name.ends_with(".json"))
+        .collect();
+    out.sort();
+    out
+}
+
+/// Whether `text` carries a `Name <x@y>` shaped identity — the habit's own check-2 pattern.
+fn carries_bracketed_email(text: &str) -> bool {
+    text.split('<').skip(1).any(|tail| {
+        tail.split('>')
+            .next()
+            .is_some_and(|inner| inner.contains('@'))
+    })
+}
+
+#[test]
+fn imported_git_name_carries_no_email() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    import(root, ".claude/memory");
+    for (name, bytes) in contributions(root) {
+        let text = String::from_utf8(bytes).expect("utf8");
+        let c: serde_json::Value = serde_json::from_str(&text).expect("json");
+        let imported = &c["imported"];
+        assert_eq!(imported["gitName"], "Fixture Author", "{name}");
+        assert!(
+            imported.get("gitAuthor").is_none(),
+            "{name}: the retired gitAuthor field survived"
+        );
+        let serialized = serde_json::to_string(imported).expect("imported serializes");
+        assert!(
+            !serialized.contains('@'),
+            "{name}: the imported provenance carries an `@`: {serialized}"
+        );
+        assert!(!carries_bracketed_email(&text), "{name}: {text}");
+    }
+}
+
+#[test]
+fn steward_slot_names_the_collective_never_an_email() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    import(root, ".claude/memory");
+    let declared: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../.epr-meta/collective.json"))
+            .expect("collective declaration");
+    for (name, bytes) in contributions(root) {
+        let c: serde_json::Value = serde_json::from_slice(&bytes).expect("json");
+        assert_eq!(
+            c["steward"], declared["steward"],
+            "{name}: the steward slot names the collective's declared steward"
+        );
+        assert!(
+            !c["steward"].as_str().expect("steward").contains('@'),
+            "{name}: steward carries an `@`"
+        );
+    }
+}
+
+#[test]
+fn memory_import_freezes_author() {
+    let dir = repo();
+    let root = dir.path();
+    plant_small(root);
+    import(root, ".claude/memory");
+    let before = contributions(root);
+    let events_before = events(root);
+
+    // A different participant re-imports the SAME bytes under its own session.
+    actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+    let again = memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(".claude/memory"),
+            session: Some(SECOND_SESSION),
+            ..Options::default()
+        },
+    )
+    .expect("re-import");
+    assert_eq!(again["counts"]["skipped"], before.len());
+    assert_eq!(again["counts"]["contributed"], 0);
+    assert_eq!(again["counts"]["eventsAppended"], 0);
+    assert_eq!(
+        contributions(root),
+        before,
+        "a re-import by another participant rewrote a contribution — author must stay frozen"
+    );
+    for (name, bytes) in &before {
+        let c: serde_json::Value = serde_json::from_slice(bytes).expect("json");
+        assert_eq!(c["author"], AUTHOR, "{name}");
+    }
+    // An identical re-run appends nothing.
+    assert_eq!(events(root), events_before);
+}
+
+// ── the migration act ─────────────────────────────────────────────────────────────────────────
+
+const WITNESS: &str = "agent:orchestrator@fixture";
+const HUMAN: &str = "human:matthew";
+const MIGRATION_SESSION: &str = "identity-reserve-session";
+
+/// Plant the store as it stood BEFORE the identity reserve: contributions carrying
+/// `gitAuthor: Name <email>`, each with its attributed contribution act in the flow plane — the
+/// exact state 250 live files were in. Built from the typed contribution so the layout is the
+/// serializer's own, then the one field renamed back to its retired spelling.
+fn plant_legacy(root: &Path) -> Vec<String> {
+    use eprfs_agent::memory::{Contribution, FileRef, Imported, Reach, Source};
+    let collective_bytes =
+        std::fs::read(root.join(".epr-meta/collective.json")).expect("collective");
+    let collective = FileRef {
+        path: ".epr-meta/collective.json".into(),
+        cid: eprfs_core::BlobCid::compute_raw(&collective_bytes).to_string(),
+    };
+    let mut names = Vec::new();
+    for name in plant_small(root) {
+        let rel = format!(".claude/memory/{name}.md");
+        let bytes = std::fs::read(root.join(&rel)).expect("entry");
+        let contribution = Contribution {
+            version: 1,
+            collective: collective.clone(),
+            author: AUTHOR.into(),
+            steward: "repo:ethosengine/elohim".into(),
+            scope: "repository".into(),
+            reach: Reach::Repository,
+            concern: name.into(),
+            claim: format!("The one-line claim of {name}."),
+            // Exactly what `import` writes, so a later re-import of these entries is a re-import of
+            // the SAME bytes — the lineage, not a content change, is what the tests exercise.
+            uncertainty: vec![format!(
+                "Imported verbatim from {rel}; the claim is the entry's own one-line description \
+                 and the entry body is the pinned source, not restated here."
+            )],
+            sources: vec![Source {
+                resource: FileRef {
+                    path: rel.clone(),
+                    cid: eprfs_core::BlobCid::compute_raw(&bytes).to_string(),
+                },
+                reach: Reach::Repository,
+            }],
+            supersedes: vec![],
+            contradicts: vec![],
+            imported: Some(Imported {
+                display: format!("Title {name}"),
+                file: format!("{name}.md"),
+                scope_path: rel.clone(),
+                git_name: "Fixture Author <fixture@example.test>".into(),
+                entry_type: "feedback".into(),
+                indexed: true,
+            }),
+        };
+        let text = format!(
+            "{}\n",
+            serde_json::to_string_pretty(&contribution).expect("serialize")
+        )
+        .replace("\"gitName\":", "\"gitAuthor\":");
+        let request = format!(".eprfs/status/memory/contributions/{name}.json");
+        write(root, &request, &text);
+        let raw = eprfs_core::BlobCid::compute_raw(text.as_bytes()).to_string();
+        elohim_epr_cli::flow::note::note(
+            root,
+            &request,
+            "observation",
+            &format!(
+                "Collective contribution {raw} under {}; unreviewed, no acceptance",
+                collective.cid
+            ),
+            None,
+            None,
+            &elohim_epr_cli::flow::note::NoteActor {
+                as_ref: None,
+                session: Some(SESSION.into()),
+            },
+        )
+        .expect("the legacy contribution act");
+        names.push(format!("{name}.json"));
+    }
+    names
+}
+
+fn epr(root: &Path, key_file: &Path, args: &[&str]) -> std::process::Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_epr"))
+        .args(args)
+        .arg("--root")
+        .arg(root)
+        .env(elohim_epr_cli::device_key::DEVICE_KEY_ENV, key_file)
+        .env_remove("CLAUDE_CODE_SESSION_ID")
+        .env_remove("CLAUDE_SESSION_ID")
+        .env_remove("ELOHIM_SESSION_ID")
+        .output()
+        .expect("epr runs")
+}
+
+fn migrate(root: &Path, key_file: &Path) -> serde_json::Value {
+    let out = epr(
+        root,
+        key_file,
+        &[
+            "flow",
+            "memory",
+            "migrate-identity-reserve",
+            "--session",
+            MIGRATION_SESSION,
+            "--json",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "migrate failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    serde_json::from_slice(&out.stdout).expect("migrate json")
+}
+
+/// A witnessed device: the fixture repository gains a roster whose genesis is signed by a temp key.
+fn witnessed(root: &Path, keys: &TempDir) -> PathBuf {
+    let key_file = keys.path().join("ed25519.seed");
+    let key = elohim_epr_cli::device_key::DeviceKey::load_or_generate(&key_file).expect("key");
+    actor::witness(
+        root,
+        HUMAN,
+        WITNESS,
+        "witness-session",
+        "operator of this fixture device",
+        false,
+        &key,
+    )
+    .expect("witness");
+    key_file
+}
+
+fn last_event(root: &Path) -> serde_json::Value {
+    let flows = std::fs::read_to_string(root.join(".eprfs/status/flows.jsonl")).expect("flows");
+    serde_json::from_str(flows.lines().last().expect("a record")).expect("record json")
+}
+
+#[test]
+fn migration_rewrites_only_the_identity_field_in_one_attributed_act() {
+    let dir = repo();
+    let root = dir.path();
+    let names = plant_legacy(root);
+    let keys = TempDir::new().expect("keys");
+    let key_file = witnessed(root, &keys);
+    let before = contributions(root);
+    let events_before = events(root);
+
+    let outcome = migrate(root, &key_file);
+    assert_eq!(outcome["counts"]["migrated"], names.len());
+    assert_eq!(outcome["counts"]["refused"], 0);
+    assert_eq!(
+        events(root),
+        events_before + 1,
+        "the migration is ONE attributed act, however many files it rewrites"
+    );
+
+    // The act is the standing human's, signed through the device's standing claim.
+    let record = last_event(root);
+    assert_eq!(record["record"]["provider"], HUMAN, "{record}");
+    let slots: Vec<String> =
+        serde_json::from_value(record["record"]["classifiedAs"].clone()).expect("slots");
+    assert!(
+        slots.contains(&"source:claim-signed".to_string()),
+        "{slots:?}"
+    );
+    assert_eq!(slots.last().expect("steward"), &format!("steward:{HUMAN}"));
+    assert!(
+        !slots.iter().any(|s| s.contains("example.test")),
+        "no email anywhere in the act: {slots:?}"
+    );
+
+    // Every other byte is untouched: the only differing line is the identity field.
+    let after = contributions(root);
+    assert_eq!(after.len(), before.len());
+    for ((name, old), (_, new)) in before.iter().zip(after.iter()) {
+        let old = String::from_utf8_lossy(old);
+        let new = String::from_utf8_lossy(new);
+        let changed: Vec<(&str, &str)> = old
+            .lines()
+            .zip(new.lines())
+            .filter(|(a, b)| a != b)
+            .collect();
+        assert_eq!(old.lines().count(), new.lines().count(), "{name}");
+        assert_eq!(
+            changed,
+            vec![(
+                "    \"gitAuthor\": \"Fixture Author <fixture@example.test>\",",
+                "    \"gitName\": \"Fixture Author\","
+            )],
+            "{name}"
+        );
+        assert!(!carries_bracketed_email(&new), "{name}");
+    }
+
+    // The author's act carries forward onto the migrated bytes: the index still counts every
+    // contribution as attributed (the lineage is the migration act, not a re-authoring).
+    let projected = project(root, Options::default()).expect("index projects");
+    assert_eq!(projected["population"]["unattributed"], 0, "{projected}");
+    assert_eq!(projected["entries"], names.len(), "{projected}");
+}
+
+#[test]
+fn migration_is_idempotent() {
+    let dir = repo();
+    let root = dir.path();
+    plant_legacy(root);
+    let keys = TempDir::new().expect("keys");
+    let key_file = witnessed(root, &keys);
+    migrate(root, &key_file);
+    let settled = contributions(root);
+    let events_settled = events(root);
+
+    let second = migrate(root, &key_file);
+    assert_eq!(second["counts"]["migrated"], 0);
+    assert_eq!(
+        contributions(root),
+        settled,
+        "a second migration changed a file"
+    );
+    assert_eq!(
+        events(root),
+        events_settled,
+        "a second migration appended an act for nothing"
+    );
+
+    // And a re-import after the migration by ANOTHER participant leaves the store as it is:
+    // the migrated bytes are attributed through the lineage, and the author stays frozen.
+    actor::claim(root, SECOND_AUTHOR, SECOND_SESSION).expect("second claim");
+    let again = memory::execute_with(
+        root,
+        "import",
+        &Options {
+            target: Some(".claude/memory"),
+            session: Some(SECOND_SESSION),
+            ..Options::default()
+        },
+    )
+    .expect("re-import");
+    assert_eq!(again["counts"]["eventsAppended"], 0, "{again}");
+    assert_eq!(contributions(root), settled);
+}
+
+#[test]
+fn migration_refuses_without_a_standing_human() {
+    let dir = repo();
+    let root = dir.path();
+    plant_legacy(root);
+    let keys = TempDir::new().expect("keys");
+    // A key, but no witness: this device stands for no one.
+    let key_file = keys.path().join("ed25519.seed");
+    elohim_epr_cli::device_key::DeviceKey::load_or_generate(&key_file).expect("key");
+    let before = contributions(root);
+    let out = epr(
+        root,
+        &key_file,
+        &[
+            "flow",
+            "memory",
+            "migrate-identity-reserve",
+            "--session",
+            MIGRATION_SESSION,
+            "--json",
+        ],
+    );
+    assert!(!out.status.success(), "an unwitnessed device migrated");
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("standing"), "{stderr}");
+    assert_eq!(
+        contributions(root),
+        before,
+        "a refused migration wrote a file"
     );
 }

@@ -76,10 +76,18 @@ pub struct Contribution {
 /// declared itself.
 ///
 /// This is deliberately NOT a second identity. `Contribution::author` stays the acting
-/// participant's registered agent claim (the collective refuses anything else), and
-/// `Contribution::steward` stays the collective's steward. `git_author` records the human whose
-/// commit the pinned bytes came from — provenance of a source, never a claim of standing, and
-/// never a minted persona for a human who never asked for one.
+/// participant's claim (the collective refuses anything else), and `Contribution::steward` stays
+/// the collective's steward. `git_name` records the display name of the human whose commit the
+/// pinned bytes came from — provenance of a source, never a claim of standing, never a minted
+/// persona for a human who never asked for one, and never their email.
+///
+/// ## The identity reserve
+///
+/// The substrate copies a human into fruit only as a name the commit already publishes, or the
+/// handle they claimed. The email is a cross-namespace key; it has no field here, so a tracked
+/// contribution cannot carry one. The retired `gitAuthor` (`Name <email>`) is refused by
+/// `deny_unknown_fields` rather than aliased: a store still carrying it is migrated by the one
+/// attributed act `epr flow memory migrate-identity-reserve`, never silently read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Imported {
@@ -89,8 +97,9 @@ pub struct Imported {
     pub file: String,
     /// The entry's repository-relative path: the scope the claim was authored for.
     pub scope_path: String,
-    /// `Name <email>` of the commit the pinned source bytes came from.
-    pub git_author: String,
+    /// The display name (`%an`, no email) of the commit the pinned source bytes came from, or an
+    /// honest absence such as `(untracked: no commit carries these bytes)`.
+    pub git_name: String,
     /// The entry's declared `metadata.type`.
     pub entry_type: String,
     /// False when the entry declared `index: false` — it stays a contribution and stays out of

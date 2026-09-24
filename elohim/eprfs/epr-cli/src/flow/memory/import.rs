@@ -24,16 +24,28 @@
 //!
 //! Three identities meet on one imported entry and the substrate keeps them apart:
 //!
-//! * `Contribution::author` — the **acting** participant: the registered session's agent claim.
-//!   The collective validates it with `parse_agent_ref`, and `contribute`'s note guard refuses any
-//!   author that is not the session's own claim. A human git author therefore CANNOT go here, and
-//!   no persona is minted to make one fit; inventing `agent:matthew@human` to satisfy a parser
-//!   would be the substrate asserting a claim nobody made.
-//! * `Imported::git_author` — the **provenance** of the pinned bytes, `Name <email>`, read from
-//!   the entry's own git history. A source's origin, carrying no standing.
-//! * the note's `steward:` slot — the git-signing human answerable for the tree, which
-//!   `note_with_options_guard` already derives from HEAD and attaches to every agent-attributed
-//!   record. Nothing here supplies it, which is why it cannot be spoofed here.
+//! * `Contribution::author` — the **acting** participant: the session's claim, or this device's
+//!   standing human. `contribute`'s note guard refuses any author that is not the acting one. A
+//!   human git author CANNOT go here, and no persona is minted to make one fit; inventing
+//!   `agent:matthew@human` to satisfy a parser would be the substrate asserting a claim nobody
+//!   made. Once written, the author is **frozen**: a re-import of unchanged bytes by another
+//!   participant is `skipped`, never re-authored (an edit act for changed bytes is station 3's
+//!   acts projection).
+//! * `Imported::git_name` — the **provenance** of the pinned bytes: the commit's display name
+//!   only, read from the entry's own git history. A source's origin, carrying no standing — and
+//!   never the email (the identity reserve, below).
+//! * `Contribution::steward` — the collective's declared steward, copied from the declaration;
+//!   the note's `steward:` slot is resolved by the note leg (the device's standing human's handle
+//!   where there is one). Nothing here supplies either, which is why neither can be spoofed here.
+//!
+//! ## The identity reserve
+//!
+//! The substrate writes a human into fruit only as the handle they claimed or the name the commit
+//! already publishes, never an email or any cross-namespace key. Stores written before the rule
+//! carry `imported.gitAuthor: Name <email>`; [`migrate_identity_reserve`] rewrites exactly that
+//! one line of each to `imported.gitName: Name`, as ONE act attributed to this device's standing
+//! human, and pins a lineage (old request CID → new request CID) so each author's original
+//! contribution act keeps attributing the migrated bytes. Every other byte is untouched.
 //!
 //! ## Idempotence is by content, checked before the append
 //!
@@ -358,7 +370,7 @@ fn one(
             display: bounded(&row.title, 256),
             file: file.to_string(),
             scope_path: rel_str(rel),
-            git_author: git_author(root, rel),
+            git_name: git_name(root, rel),
             entry_type,
             indexed: fm.indexed(),
         }),
@@ -371,6 +383,13 @@ fn one(
     // Already recorded? Ask the plane before touching anything. This is what makes a second run a
     // true no-op rather than a dedupe that still opened the store 229 times.
     if acts.holds(&request_text, &contribution) {
+        return Ok(Outcome::Skipped);
+    }
+    // Authorship is frozen. The same bytes, already recorded under the participant who first
+    // contributed them, are not re-authored because a different participant ran the import: the
+    // only difference would be the author slot, and rewriting it is exactly the defect that buried
+    // who authored what (one record's author flipped four times across re-imports).
+    if frozen(root, &request_rel, &contribution, acts) {
         return Ok(Outcome::Skipped);
     }
     if opts.dry_run {
@@ -399,6 +418,264 @@ fn one(
     Ok(Outcome::Contributed(event))
 }
 
+/// Whether the request already on disk is these same bytes under an EARLIER author whose
+/// contribution act the plane holds — i.e. the only thing a rewrite would change is who authored.
+fn frozen(root: &Path, request_rel: &Path, candidate: &Contribution, acts: &Acts) -> bool {
+    let Ok(existing) = std::fs::read_to_string(root.join(request_rel)) else {
+        return false;
+    };
+    let Ok(prior) = serde_json::from_str::<Contribution>(&existing) else {
+        return false;
+    };
+    if prior.author == candidate.author {
+        return false;
+    }
+    let mut same = candidate.clone();
+    same.author = prior.author;
+    let Ok(text) = serde_json::to_string_pretty(&same) else {
+        return false;
+    };
+    let text = format!("{text}\n");
+    text == existing && acts.holds(&text, &same)
+}
+
+/// Where a migration's lineage manifests live: beside the flow plane that pins them, and
+/// gitignored with it (`/.eprfs/status/*`). A manifest is only meaningful to the plane holding the
+/// contribution acts it carries forward, and that plane is local.
+pub(super) const LINEAGE_DIR: &str = ".eprfs/status/identity-reserve";
+
+/// The head of the migration act's reason slot. [`super::ContributionActs`] filters on it; the
+/// manifest's raw CID follows it, up to the first `:`.
+pub(super) const MIGRATION_REASON_PREFIX: &str = "reason:Identity-reserve migration ";
+
+/// The retired field and its replacement, spelled once.
+const RETIRED_FIELD: &str = "gitAuthor";
+const RESERVED_FIELD: &str = "gitName";
+
+/// One contribution's move across the identity reserve, as the lineage manifest records it.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Moved {
+    pub path: String,
+    pub author: String,
+    pub collective: String,
+    pub from_body: String,
+    pub from_raw: String,
+    pub to_body: String,
+    pub to_raw: String,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(super) struct Lineage {
+    pub version: u32,
+    pub operation: String,
+    pub moved: Vec<Moved>,
+}
+
+/// Read the lineage manifest a migration act pins, verifying it IS the bytes the act names.
+///
+/// `slot` is the act's reason slot; `resource` is the act's resource (the manifest's body CID).
+/// Any mismatch — missing file, altered bytes, unparsable manifest — is `None`: a lineage that
+/// cannot be verified carries nothing forward.
+pub(super) fn lineage_for(root: &Path, slot: &str, resource: &str) -> Option<Lineage> {
+    let cid = slot
+        .strip_prefix(MIGRATION_REASON_PREFIX)?
+        .split(':')
+        .next()?
+        .trim();
+    let text = std::fs::read_to_string(root.join(LINEAGE_DIR).join(format!("{cid}.json"))).ok()?;
+    if BlobCid::compute_raw(text.as_bytes()).to_string() != cid
+        || crate::flow::body_cid(&text).to_string() != resource
+    {
+        return None;
+    }
+    serde_json::from_str(&text).ok()
+}
+
+/// `Name <email>` → `Name`; any other value (an honest absence) is already reserved and is kept.
+fn reserved_name(value: &str) -> String {
+    let trimmed = value.trim_end();
+    if let Some(open) = trimmed.rfind(" <") {
+        if trimmed.ends_with('>') && trimmed[open..].contains('@') {
+            return trimmed[..open].trim_end().to_string();
+        }
+    }
+    value.to_string()
+}
+
+/// The migrated bytes for one request, or why it cannot be migrated, or `None` if it needs none.
+///
+/// The rewrite is a ONE-LINE substitution of the exact retired key/value pair, then proven: the
+/// result must parse as a strict contribution AND be byte-identical to the serializer's own output
+/// for it. Every other byte therefore provably survives, and a file in any other shape is refused
+/// by name rather than normalized.
+fn reserve(text: &str) -> Option<Result<String, String>> {
+    let value: Value = serde_json::from_str(text).ok()?;
+    let retired = value.get("imported")?.get(RETIRED_FIELD)?;
+    let Some(retired) = retired.as_str() else {
+        return Some(Err(format!("imported.{RETIRED_FIELD} is not a string")));
+    };
+    let quote = |s: &str| serde_json::to_string(s).unwrap_or_default();
+    let needle = format!("\"{RETIRED_FIELD}\": {}", quote(retired));
+    if text.matches(&needle).count() != 1 {
+        return Some(Err(format!(
+            "imported.{RETIRED_FIELD} is not exactly one canonical line"
+        )));
+    }
+    let migrated = text.replacen(
+        &needle,
+        &format!("\"{RESERVED_FIELD}\": {}", quote(&reserved_name(retired))),
+        1,
+    );
+    let canonical = serde_json::from_str::<Contribution>(&migrated)
+        .map_err(|e| e.to_string())
+        .and_then(|c| serde_json::to_string_pretty(&c).map_err(|e| e.to_string()))
+        .map(|pretty| format!("{pretty}\n"));
+    Some(match canonical {
+        Ok(canonical) if canonical == migrated => Ok(migrated),
+        Ok(_) => Err(
+            "the file is not in the serializer's canonical layout; refused rather than \
+                      normalized, so no other byte moves"
+                .into(),
+        ),
+        Err(e) => Err(format!("the migrated bytes are not a contribution: {e}")),
+    })
+}
+
+/// `epr flow memory migrate-identity-reserve [--contributions DIR] --session ID [--dry-run]`.
+///
+/// Station 5 of the participant actor plane: every tracked contribution still carrying
+/// `imported.gitAuthor: Name <email>` is rewritten to `imported.gitName: Name`, and nothing else
+/// about it moves. The whole rewrite is ONE act — an observation note on the lineage manifest —
+/// attributed to this device's **standing human** through the standing arm (`source:
+/// claim-signed`): the email being withdrawn from fruit is theirs, and the act is theirs, whoever
+/// executes it. `--session` names the executing session in the act's reason; its own claim does
+/// not author the act. A device that stands for no human is refused before anything is written.
+///
+/// Idempotent by construction: a store with nothing left to migrate writes no manifest, rewrites
+/// no file and appends no act.
+pub fn migrate_identity_reserve(root: &Path, opts: &Options) -> FlowResult<Value> {
+    let contributions_rel = normalized(opts.contributions.unwrap_or(DEFAULT_CONTRIBUTIONS_DIR))?;
+    let session = opts.session.ok_or_else(|| {
+        refused(
+            "migrate-identity-reserve needs --session: the act names the session that executed it",
+        )
+    })?;
+    let root = std::fs::canonicalize(root)?;
+    let dir = root.join(&contributions_rel);
+
+    let mut files: Vec<PathBuf> = match std::fs::read_dir(&dir) {
+        Ok(items) => items
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| p.is_file() && p.extension().is_some_and(|e| e == "json"))
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    files.sort();
+
+    let mut moved = Vec::new();
+    let mut writes = Vec::new();
+    let mut refusals = Vec::new();
+    let mut settled = 0usize;
+    for path in &files {
+        let rel = rel_str(&contributions_rel.join(path.file_name().unwrap_or_default()));
+        let text = std::fs::read_to_string(path)?;
+        match reserve(&text) {
+            None => settled += 1,
+            Some(Err(reason)) => refusals.push(json!({"contribution": rel, "reason": reason})),
+            Some(Ok(migrated)) => {
+                let prior: Value = serde_json::from_str(&text)?;
+                moved.push(Moved {
+                    path: rel.clone(),
+                    author: prior["author"].as_str().unwrap_or_default().to_string(),
+                    collective: prior["collective"]["cid"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                    from_body: crate::flow::body_cid(&text).to_string(),
+                    from_raw: BlobCid::compute_raw(text.as_bytes()).to_string(),
+                    to_body: crate::flow::body_cid(&migrated).to_string(),
+                    to_raw: BlobCid::compute_raw(migrated.as_bytes()).to_string(),
+                });
+                writes.push((path.clone(), migrated));
+            }
+        }
+    }
+
+    let counts = json!({
+        "contributions": files.len(),
+        "migrated": moved.len(),
+        "alreadyReserved": settled,
+        "refused": refusals.len(),
+    });
+    let mut report = json!({
+        "operation": "migrate-identity-reserve",
+        "contributionsDirectory": rel_str(&contributions_rel),
+        "field": {"from": format!("imported.{RETIRED_FIELD}"), "to": format!("imported.{RESERVED_FIELD}")},
+        "dryRun": opts.dry_run,
+        "counts": counts,
+        "refused": refusals,
+        "act": Value::Null,
+    });
+    if moved.is_empty() || opts.dry_run {
+        return Ok(report);
+    }
+
+    // The act is the standing human's; without one there is no one to attribute it to, and the
+    // note leg would fall back to the commit author — the email this act exists to withdraw.
+    let standing = crate::actor::standing_here(&root).ok_or_else(|| {
+        refused(
+            "migrate-identity-reserve is the act of this device's standing human, and this device \
+             stands for no witnessed human — `epr actor witness --subject human:<handle> …` first",
+        )
+    })?;
+
+    let lineage = Lineage {
+        version: 1,
+        operation: "identity-reserve-migration".into(),
+        moved,
+    };
+    let manifest = format!("{}\n", serde_json::to_string_pretty(&lineage)?);
+    let manifest_cid = BlobCid::compute_raw(manifest.as_bytes()).to_string();
+    let manifest_rel = format!("{LINEAGE_DIR}/{manifest_cid}.json");
+    std::fs::create_dir_all(root.join(LINEAGE_DIR))?;
+    std::fs::write(root.join(&manifest_rel), &manifest)?;
+
+    let reason = format!(
+        "{}{manifest_cid}: {} contributions under {} rewritten imported.{RETIRED_FIELD} → \
+         imported.{RESERVED_FIELD} (display name only; no email in fruit); every other byte \
+         unchanged and each author's contribution act carried forward by this lineage; executed \
+         in session {session}",
+        MIGRATION_REASON_PREFIX.trim_start_matches("reason:"),
+        lineage.moved.len(),
+        rel_str(&contributions_rel),
+    );
+    let act = crate::flow::note::note(
+        &root,
+        &manifest_rel,
+        "observation",
+        &reason,
+        None,
+        None,
+        &crate::flow::note::NoteActor::default(),
+    )?;
+    if act.actor.as_deref() != Some(standing.subject.as_str()) {
+        return Err(refused(format!(
+            "the migration act resolved to {:?}, not the standing {} — nothing was rewritten",
+            act.actor, standing.subject
+        )));
+    }
+
+    for (path, migrated) in &writes {
+        std::fs::write(path, migrated)?;
+    }
+    report["act"] = serde_json::to_value(&act)?;
+    report["lineage"] = json!(manifest_rel);
+    Ok(report)
+}
+
 /// The identity every imported contribution is authored by: the session's registered claim, or —
 /// when the session registered none — this device's standing human (ruling R-P6).
 ///
@@ -406,8 +683,8 @@ fn one(
 /// `agent:<person>@human` stays a forgery. What CAN stand is a human the device verifiably speaks
 /// for — witnessed by a present agent or self-claimed, and signed by this device's key — which is
 /// the same standing arm `contribute`'s note resolves, so the author and the note's attribution
-/// cannot disagree. The git author is still recorded honestly elsewhere: as
-/// `Imported::git_author` on the bytes they wrote.
+/// cannot disagree. The git author is still recorded honestly elsewhere: by display name, as
+/// `Imported::git_name` on the bytes they wrote — never by email.
 fn acting_author(root: &Path, session: Option<&str>) -> FlowResult<String> {
     acting_author_on(root, session, crate::actor::standing_here(root))
 }
@@ -433,15 +710,17 @@ fn acting_author_on(
     )))
 }
 
-/// `Name <email>` of the newest commit touching `rel`, or an honest absence.
+/// The display name (`%an`) of the newest commit touching `rel`, or an honest absence.
 ///
-/// An untracked entry has no git provenance, and saying so is the only truthful answer — falling
-/// back to HEAD's author would attribute one person's bytes to whoever happened to commit last.
-fn git_author(root: &Path, rel: &Path) -> String {
+/// The name only — the identity reserve: the commit already publishes the name, and the email is
+/// a cross-namespace key the substrate never copies into fruit. An untracked entry has no git
+/// provenance, and saying so is the only truthful answer — falling back to HEAD's author would
+/// attribute one person's bytes to whoever happened to commit last.
+fn git_name(root: &Path, rel: &Path) -> String {
     let path = rel_str(rel);
     let out = crate::process::build_command(
         "git",
-        &["log", "-1", "--format=%an <%ae>", "--", &path],
+        &["log", "-1", "--format=%an", "--", &path],
         root,
         &[],
     )

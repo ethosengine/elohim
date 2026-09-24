@@ -52,7 +52,7 @@ pub struct Options<'a> {
 }
 
 /// The operations this shell dispatches, in the order `usage` names them.
-const OPERATIONS: [&str; 9] = [
+const OPERATIONS: [&str; 10] = [
     "collective",
     "pin",
     "contribute",
@@ -60,6 +60,7 @@ const OPERATIONS: [&str; 9] = [
     "feedback",
     "graduate",
     "import",
+    "migrate-identity-reserve",
     "recall",
     "index",
 ];
@@ -75,6 +76,7 @@ pub fn usage() -> String {
          feedback      file governed feedback on a contribution\n  \
          graduate      rehearse local repository reach for a contribution\n  \
          import        adopt an authored directory of requests\n  \
+         migrate-identity-reserve  rewrite imported.gitAuthor to imported.gitName, one attributed act\n  \
          recall        the bounded-evidence recall entry \u{2014} `recall --help` for its own surface\n  \
          index         the semantic fold \u{2014} `index fold|status`, `index --help` for its surface\n",
         OPERATIONS.join("|")
@@ -183,6 +185,9 @@ pub fn execute(
 pub fn execute_with(root: &Path, operation: &str, opts: &Options) -> FlowResult<Value> {
     if operation == "import" {
         return import::run(root, opts);
+    }
+    if operation == "migrate-identity-reserve" {
+        return import::migrate_identity_reserve(root, opts);
     }
     if operation == "project" && opts.index {
         return index::run(root, opts);
@@ -408,11 +413,12 @@ fn observed(
     assertion: &Contribution,
 ) -> FlowResult<()> {
     let reason = contribution_reason(&reference.cid, &assertion.collective.cid);
-    if !reader
-        .records()?
-        .iter()
-        .any(|(_, record)| is_contribution_act(record, &reason, &body_cid(text), &assertion.author))
-    {
+    let direct = reader.records()?.iter().any(|(_, record)| {
+        is_contribution_act(record, &reason, &body_cid(text), &assertion.author)
+    });
+    // Bytes rewritten across the identity reserve are still the author's: the migration act's
+    // lineage carries the original contribution act forward (see `ContributionActs`).
+    if !direct && !ContributionActs::open(&reader.root)?.holds(text, assertion) {
         return Err(refused(
             "exact contribution has no attributed native contribution observation",
         ));
@@ -463,6 +469,7 @@ pub(super) struct ContributionActs {
 impl ContributionActs {
     pub(super) fn open(root: &Path) -> FlowResult<Self> {
         let mut keys = std::collections::BTreeSet::new();
+        let mut lineages = Vec::new();
         if !root.join(".eprfs/status/flows.jsonl").exists() {
             return Ok(Self { keys });
         }
@@ -481,6 +488,32 @@ impl ContributionActs {
                         event.resource.to_string(),
                         event.provider.0.clone(),
                         slot.clone(),
+                    ));
+                } else if slot.starts_with(import::MIGRATION_REASON_PREFIX) {
+                    if let Some(lineage) =
+                        import::lineage_for(root, slot, &event.resource.to_string())
+                    {
+                        lineages.push(lineage);
+                    }
+                }
+            }
+        }
+        // The identity-reserve lineage, in plane order: a contribution act held for the OLD bytes
+        // is carried forward to the migrated bytes under the SAME author. It never attributes
+        // bytes whose original act is absent, and never changes who authored them — the migration
+        // act itself stands in the plane under its own participant.
+        for lineage in lineages {
+            for moved in lineage.moved {
+                let from = (
+                    moved.from_body.clone(),
+                    moved.author.clone(),
+                    contribution_reason(&moved.from_raw, &moved.collective),
+                );
+                if keys.contains(&from) {
+                    keys.insert((
+                        moved.to_body,
+                        moved.author,
+                        contribution_reason(&moved.to_raw, &moved.collective),
                     ));
                 }
             }
