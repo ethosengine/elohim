@@ -1116,6 +1116,20 @@ measures:
       reader of that subject pays for. Repetition with no settled-state memory shows up here
       first, and it is linear in history rather than in doorways that exist.
 
+  # ── the drain for operator-surfaced-pain (native-delivery sprint, Lane G1, 2026-09-24) ──
+  # The lens `operator-surfaced-pain-ceiling@1` counts surfaced pains since the last reset. A pain
+  # stays on the `cost:` headline line until the sensor that would have felt it first is
+  # registered; appending this reset is the acknowledgement that it now is.
+  - id: operator-surfaced-pain-reset
+    version: 1
+    family: algedonic-sensing
+    unit: reset-marks
+    procedure: "epr flow note --kind observation --measure operator-surfaced-pain-reset@1 --subject . --value 1"
+    provenance: "genesis/docs/superpowers/plans/2026-09-24-native-delivery-sprint-plan.md Lane G1 + rulings log E (operator-surfaced-pain@1 gets a hard-0 lens with a headline slot)"
+    default-authority: observation
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+
 lenses:
   - id: resource-limit-raise-recurrence
     version: 1
@@ -1843,3 +1857,32 @@ lenses:
       The household's hottest subject anchor held 600+ after 42 hours. At one probe per 150 s,
       42 hours is 1,008 probes per probing doorway, so 600 means timeouts slowed the writer, not
       that it settled.
+
+  # ── operator-surfaced pain on the headline (native-delivery sprint, Lane G1; rulings log E) ──
+  # The algedonic-designer's own measure, given teeth-free headline presence: the `cost:` slot
+  # (flow/report.rs HEADLINE_ORDER) renders it beside what a push costs. Hard 0 because the
+  # number the persona exists for is zero — any pain the operator had to name first is a failure
+  # of sensing, not of the operator.
+  - id: operator-surfaced-pain-ceiling
+    version: 1
+    headline: cost
+    binding: binding-local
+    class: measure
+    # DERIVED: the count of surfaced-pain folds since the last reset. Unmeasured is `skipped`,
+    # never 0; a reset with nothing since it is a witnessed 0.
+    derive: count-since-reset
+    reset: operator-surfaced-pain-reset@1
+    consumes: [operator-surfaced-pain@1]
+    context: session-headline
+    hard: 0
+    concern: dev-system-equilibrium
+    retire-when: >
+      when a quarter passes with no reset needed — every pain the operator could have named was
+      felt by a registered sensor first, so the count this lens watches no longer moves
+    status: active
+    established_by: native-delivery-sprint-2026-09-24
+    why: >
+      A pain the operator names before any measure fires is the subconscious missing it. The count
+      stays on the headline until the algedonic-designer registers the sensor that would have felt
+      it and appends the reset, so a surfaced pain cannot scroll away unaddressed. No `subject:` —
+      folds name the concern the pain was about, and every one of them counts.

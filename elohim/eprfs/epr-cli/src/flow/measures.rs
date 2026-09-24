@@ -447,6 +447,10 @@ pub struct Bound {
     pub superseded_by: Option<String>,
     /// `superseded_reason:` — why, in the words a headline slot renders.
     pub superseded_reason: Option<String>,
+    /// `concern:` — the habit (a declared concern address) whose invariant this bound prices.
+    /// Carried through uninterpreted: the walker joins a habit to its cost by this key, and the
+    /// report itself never reads it.
+    pub concern: Option<String>,
     pub source: BoundSource,
 }
 
@@ -750,6 +754,7 @@ fn bound_from(row: &Value, source: BoundSource) -> Option<Bound> {
         superseded_by: string_at(row, "superseded_by").or_else(|| string_at(row, "superseded-by")),
         superseded_reason: string_at(row, "superseded_reason")
             .or_else(|| string_at(row, "superseded-reason")),
+        concern: string_at(row, "concern"),
         source,
     })
 }

@@ -73,7 +73,11 @@ const OBSERVATION_TAG: &str = "run:observation";
 /// freshness is its own lag (`index-fold-lag-ceiling@1`, `derive: fold-lag`), so `index` takes the
 /// position; the palace's mine is the visitor's optional maintenance, still declared and still
 /// answerable by name.
-const HEADLINE_ORDER: [&str; 5] = ["recall", "index", "cleanup", "scope", "budget"];
+///
+/// Slot 5, `cost`, joined on 2026-09-24 (native-delivery sprint, Lane G1): what the delivery path
+/// is costing and what pain the operator had to name before a measure felt it. It is appended,
+/// never inserted, so the five earlier lines keep their positions for every reader that counts.
+const HEADLINE_ORDER: [&str; 6] = ["recall", "index", "cleanup", "scope", "budget", "cost"];
 
 /// The line prefix each slot prints under.
 fn slot_prefix(slot: &str) -> &'static str {
@@ -89,6 +93,7 @@ fn slot_prefix(slot: &str) -> &'static str {
         "index" => "index",
         "cleanup" => "cleanup",
         "scope" => "scope",
+        "cost" => "cost",
         _ => "memory-budget",
     }
 }
@@ -117,6 +122,7 @@ fn headline_slot(bound: &Bound) -> Option<&'static str> {
             "cleanup" => Some("cleanup"),
             "scope" => Some("scope"),
             "budget" | "memory-budget" => Some("budget"),
+            "cost" => Some("cost"),
             other => {
                 // A typo in a file this crate does not own must not kill the headline: say so on
                 // stderr and fall through to derivation.
@@ -151,9 +157,24 @@ fn derived_slot(measure: &MeasureRef) -> Option<&'static str> {
         Some("scope")
     } else if id.starts_with("memory-index") {
         Some("budget")
+    } else if is_cost_measure(id) {
+        Some("cost")
     } else {
         None
     }
+}
+
+/// Whether a measure id prices the delivery path: the `cost:` slot's members.
+///
+/// `stage-wallclock` and `delivery-cost` are what a push costs (Lane D1's folds, read off the
+/// App pipeline); `operator-surfaced-pain` is what the operator had to say out loud before any of
+/// those fired (Lane E's persona measure). One slot, because all three answer "what is the path to
+/// delivery costing the people on it", and a headline that grew a line per cost would stop being a
+/// fixed-shape surface.
+fn is_cost_measure(id: &str) -> bool {
+    id.starts_with("stage-wallclock")
+        || id.starts_with("delivery-cost")
+        || id.starts_with("operator-surfaced-pain")
 }
 
 /// The three-valued outcome of one bound.
@@ -1957,7 +1978,7 @@ impl ReportPayload {
         }
     }
 
-    /// The SessionStart headline: the primary recipe's five slot lines in their declared order, the
+    /// The SessionStart headline: the primary recipe's six slot lines in their declared order, the
     /// recipe that produced them, then one `alt:` count line per additional recipe.
     ///
     /// Every slot prints, always. A slot with no declared bound says so rather than vanishing,
@@ -2004,6 +2025,11 @@ impl ReportPayload {
         if slot == "scope" {
             if let Some(line) = &self.scope_line {
                 return line.clone();
+            }
+        }
+        if slot == "cost" {
+            if let Some(line) = self.cost_line() {
+                return line;
             }
         }
         let Some(outcome) = self.slot_outcome(slot) else {
@@ -2056,6 +2082,51 @@ impl ReportPayload {
             }
             OutcomeStatus::Passed => format!("{prefix}: {} ✅", outcome.summary),
         }
+    }
+
+    /// The `cost:` line, composed from EVERY primary-recipe outcome in the slot rather than the
+    /// first one: a stage wall clock, a cost per delivered bundle and the operator's surfaced pain
+    /// are three readings of one question, and showing whichever the registry lists first would
+    /// hide the other two. `None` when the slot holds no outcome, so the caller's retired / "no
+    /// bound declared" arms still answer.
+    ///
+    /// The line's verdict is the worst member's: any failure makes it a failure, any soft crossing
+    /// a warning, all-skipped a skip. A skipped member is named as skipped inside a mixed line —
+    /// never dropped, never read as zero.
+    fn cost_line(&self) -> Option<String> {
+        let members: Vec<&BoundOutcome> = self
+            .outcomes()
+            .iter()
+            .filter(|outcome| slot_of_outcome(outcome) == Some("cost"))
+            .collect();
+        if members.is_empty() {
+            return None;
+        }
+        let name = |o: &BoundOutcome| o.measure.split('@').next().unwrap_or_default().to_string();
+        if members.iter().all(|o| o.outcome == OutcomeStatus::Skipped) {
+            let why: Vec<String> = members.iter().map(|o| o.summary.clone()).collect();
+            return Some(format!("cost: skipped ({})", why.join("; ")));
+        }
+        let warned = |o: &BoundOutcome| {
+            o.outcome == OutcomeStatus::Passed && o.summary.starts_with("warn: ")
+        };
+        let parts: Vec<String> = members
+            .iter()
+            .map(|o| match o.outcome {
+                OutcomeStatus::Skipped => format!("{} skipped", name(o)),
+                _ => format!("{} {}", name(o), o.summary.trim_start_matches("warn: ")),
+            })
+            .collect();
+        let joined = parts.join(" · ");
+        Some(
+            if members.iter().any(|o| o.outcome == OutcomeStatus::Failed) {
+                format!("cost: ⚠ failed — {joined}")
+            } else if members.iter().any(|o| warned(o)) {
+                format!("cost: ⚠ {joined}")
+            } else {
+                format!("cost: {joined} ✅")
+            },
+        )
     }
 
     /// The first PRIMARY-recipe outcome whose bound belongs to `slot`.
@@ -2126,6 +2197,8 @@ fn slot_of_measure(id: &str) -> Option<&'static str> {
         Some("scope")
     } else if id.starts_with("memory-index") {
         Some("budget")
+    } else if is_cost_measure(id) {
+        Some("cost")
     } else {
         None
     }
@@ -2152,6 +2225,50 @@ pub fn slot_for(bound: &Bound) -> Option<&'static str> {
     headline_slot(bound)
 }
 
+/// The `cost:`-slot outcomes of the PRIMARY recipe, grouped by the `concern:` each bound declares
+/// — the habit whose invariant it prices.
+///
+/// This is how `epr flow walk` puts a price on a habit and on every commitment accounted to it
+/// without a second reading of the registry or the folds: the same bounds, the same folds and the
+/// same evaluator the headline uses, keyed by the one address a bound and a habit share. A cost
+/// bound that declares no concern is left out — it prices nothing a walker could name.
+pub fn cost_by_concern(root: &Path) -> FlowResult<BTreeMap<String, Vec<BoundOutcome>>> {
+    let options = ReportOptions::new(root);
+    let Some(recipe) = options.recipes.first() else {
+        return Ok(BTreeMap::new());
+    };
+    let measures = Registry::open_optional(&recipe.measures)?;
+    let policies = Registry::open_optional(&recipe.policies)?;
+    let mut bounds: Vec<Bound> = Vec::new();
+    if let Some(reg) = &measures {
+        bounds.extend(reg.lens_bounds());
+    }
+    if let Some(reg) = &policies {
+        bounds.extend(reg.ceiling_bounds());
+    }
+    bounds.retain(|bound| {
+        !bound.retired() && bound.concern.is_some() && headline_slot(bound) == Some("cost")
+    });
+    if bounds.is_empty() {
+        return Ok(BTreeMap::new());
+    }
+    let recipe_ref = RecipeRef {
+        name: recipe.name.clone(),
+        measures_cid: measures.map(|reg| reg.bytes_cid),
+        policies_cid: policies.map(|reg| reg.bytes_cid),
+    };
+    let folds = read_folds(root)?;
+    let now = Utc::now();
+    let mut out: BTreeMap<String, Vec<BoundOutcome>> = BTreeMap::new();
+    for bound in &bounds {
+        let concern = bound.concern.clone().unwrap_or_default();
+        out.entry(concern)
+            .or_default()
+            .push(evaluate(root, bound, &folds, &recipe_ref, now));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2160,8 +2277,10 @@ mod tests {
     fn the_headline_order_is_the_gospel_declared_order() {
         assert_eq!(
             HEADLINE_ORDER,
-            ["recall", "index", "cleanup", "scope", "budget"]
+            ["recall", "index", "cleanup", "scope", "budget", "cost"],
+            "cost is APPENDED: the five earlier slots keep their positions"
         );
+        assert_eq!(slot_prefix("cost"), "cost");
         assert_eq!(slot_prefix("recall"), "recall");
         assert_eq!(slot_prefix("index"), "index");
         // Retired from the order, kept in the vocabulary.
@@ -2195,6 +2314,13 @@ mod tests {
         assert_eq!(derive("scope-drift"), Some("scope"));
         assert_eq!(derive("memory-index-bytes"), Some("budget"));
         assert_eq!(derive("decompose-threshold"), None);
+        // The cost slot: what a push costs, and what the operator had to name first.
+        assert_eq!(derive("stage-wallclock"), Some("cost"));
+        assert_eq!(derive("delivery-cost"), Some("cost"));
+        assert_eq!(derive("operator-surfaced-pain"), Some("cost"));
+        assert_eq!(slot_of_measure("stage-wallclock"), Some("cost"));
+        assert_eq!(slot_of_measure("delivery-cost"), Some("cost"));
+        assert_eq!(slot_of_measure("operator-surfaced-pain"), Some("cost"));
     }
 
     #[test]
