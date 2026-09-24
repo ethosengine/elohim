@@ -30,8 +30,9 @@
 //! **Where the key may live** (ruling R-P19). The override `ELOHIM_DEVICE_KEY_FILE` must be an
 //! absolute path outside every git repository — a relative path resolves differently in every
 //! checkout, and a path inside a repository is one commit away from publishing the seed. The
-//! directory holding the key must not be group- or world-writable: whoever can write there can
-//! swap the key. Both refusals are errors, never a silent fallback to the config home.
+//! directory holding the key must not be writable by strangers — world-writable, or
+//! group-writable by a group this process is not in: whoever can write there can swap the key.
+//! Both refusals are errors, never a silent fallback to the config home.
 //!
 //! **Reading never widens anything.** [`DeviceKey::load`] — the read every standing lookup makes —
 //! never mints a key, and touches the file's mode only when it MUST: when the seed is readable or
@@ -170,28 +171,64 @@ pub fn check_override_path(path: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// Refuse a key directory that group or others may write: whoever can write it can replace the
-/// key. Only an EXISTING directory is checked — one this module creates is 0700 from birth.
+/// Refuse a key directory that strangers may write: whoever can write it can replace the key.
+/// Only an EXISTING directory is checked — one this module creates is 0700 from birth.
+///
+/// World-writable is always refused. Group-writable is refused unless the directory's group is
+/// one THIS process already holds: a container home volume mounted with a Kubernetes `fsGroup`
+/// (Eclipse Che's is `2770 root:1234`) forces `g+rwx` on every directory the pod creates, and the
+/// only writers that group admits are the pod's own processes. A group this process is not in is
+/// a stranger. On a platform where the process's groups cannot be read, group-writable refuses.
 #[cfg(unix)]
 fn check_key_dir(path: &Path) -> io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
     let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) else {
         return Ok(());
     };
-    match fs::metadata(parent) {
-        Ok(meta) if meta.permissions().mode() & 0o022 != 0 => Err(io::Error::new(
+    let meta = match fs::metadata(parent) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    let mode = meta.permissions().mode();
+    let world = mode & 0o002 != 0;
+    let foreign_group = mode & 0o020 != 0 && !own_groups().contains(&meta.gid());
+    if world || foreign_group {
+        return Err(io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!(
-                "the device key directory `{}` is group- or world-writable (mode {:o}) — anyone \
-                 who can write there can swap the key; `chmod go-w` it first",
+                "the device key directory `{}` is writable by {} (mode {:o}, group {}) — anyone \
+                 who can write there can swap the key; `chmod {}` it first",
                 parent.display(),
-                meta.permissions().mode() & 0o777
+                if world {
+                    "everyone"
+                } else {
+                    "a group this process is not in"
+                },
+                mode & 0o7777,
+                meta.gid(),
+                if world { "o-w" } else { "g-w" }
             ),
-        )),
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e),
+        ));
     }
+    Ok(())
+}
+
+/// This process's real, effective and supplementary group ids, read from `/proc/self/status`;
+/// empty where that file does not exist (so a group-writable key directory refuses there).
+#[cfg(unix)]
+fn own_groups() -> Vec<u32> {
+    let Ok(status) = fs::read_to_string("/proc/self/status") else {
+        return Vec::new();
+    };
+    status
+        .lines()
+        .filter_map(|line| {
+            line.strip_prefix("Gid:")
+                .or_else(|| line.strip_prefix("Groups:"))
+        })
+        .flat_map(|ids| ids.split_whitespace().filter_map(|id| id.parse().ok()))
+        .collect()
 }
 
 #[cfg(not(unix))]
@@ -218,7 +255,7 @@ impl DeviceKey {
     /// A present file of the wrong length (including empty) is a hard `InvalidData` error and is
     /// left untouched. An existing file readable or writable by group or others is tightened in
     /// place (owner bits kept) rather than refused: a loose mode is a hygiene fault, not evidence
-    /// of a different key. A group- or world-writable key directory is refused.
+    /// of a different key. A key directory strangers can write is refused ([`check_key_dir`]).
     pub fn load_or_generate(path: &Path) -> io::Result<Self> {
         check_key_dir(path)?;
         match fs::read(path) {
@@ -736,6 +773,30 @@ mod tests {
             !shared.join("ed25519.seed").exists(),
             "nothing minted there"
         );
+
+        // Group-writable by a group this process holds (a Kubernetes fsGroup home volume) is
+        // accepted; the same mode under a group it does not hold is refused.
+        let pod = dir.path().join("pod");
+        fs::create_dir(&pod).unwrap();
+        fs::set_permissions(&pod, fs::Permissions::from_mode(0o2770)).unwrap();
+        DeviceKey::load_or_generate(&pod.join("ed25519.seed"))
+            .expect("our own group's volume is not a stranger");
+        let foreign = dir.path().join("foreign");
+        fs::create_dir(&foreign).unwrap();
+        fs::set_permissions(&foreign, fs::Permissions::from_mode(0o770)).unwrap();
+        let stranger_gid = 4_242_424;
+        if rustix::fs::chown(
+            &foreign,
+            None,
+            Some(rustix::fs::Gid::from_raw(stranger_gid)),
+        )
+        .is_ok()
+            && !own_groups().contains(&stranger_gid)
+        {
+            let err = DeviceKey::load_or_generate(&foreign.join("ed25519.seed"))
+                .expect_err("a group this process is not in is a stranger");
+            assert!(err.to_string().contains("not in"), "{err}");
+        }
 
         // A 0400 seed is stricter than 0600: the read path leaves it exactly as it is.
         let path = dir.path().join("private").join("ed25519.seed");
