@@ -50,4 +50,11 @@ trust: string,
  * liveness projection. Consumers must treat `None` as "unverified", never
  * as "dead".
  */
-dhtAnchorState?: string, };
+dhtAnchorState?: string, 
+/**
+ * The row's tags (the `content_tags` projection). Always present on the
+ * wire; an empty array is the honest "no tags" answer. The `/db/content`
+ * list used to drop them, so lamad's tag scoring and tag facets ran on
+ * empty arrays (plan Lane S, ruling R-S5).
+ */
+tags: Array<string>, };

@@ -11,68 +11,67 @@ import type { StagingCandidateState } from "./StagingCandidateState";
  * carries a notary answer (a declared head OR a DHT anchor) — a row with
  * neither has no HEAD and the handler 404s rather than returning this view.
  */
-export type ContentHeadView = {
-  /**
-   * The content id whose HEAD this is (wire: `contentId`).
-   */
-  contentId: string;
-  /**
-   * The action hash the notary holds as this id's current HEAD. Prefers the
-   * explicitly-declared HEAD; falls back to the DHT anchor when no explicit
-   * declaration has been stamped (wire: `headActionHash`).
-   */
-  headActionHash: string;
-  /**
-   * `true` iff an explicit `declared_head_action_hash` was set (an author
-   * moved the HEAD via the declare authority); `false` when the answer is the
-   * DHT-anchor fallback (the single-author implicit head).
-   */
-  declared: boolean;
-  /**
-   * The DHT anchor for the resolved row, when notarized. `None` when the HEAD
-   * answer rests only on a declared head with no anchor yet.
-   */
-  dhtAnchorHash: string | null;
-  /**
-   * REQ-F10 trust legibility label — same vocabulary as `ContentView.trust`
-   * (`notarized` | `published` | `unconfirmed`). Never an authority source.
-   */
-  trust: string;
-  /**
-   * The serving blob hash of the resolved row, if any (browser bundle).
-   */
-  blobHash: string | null;
-  /**
-   * When the resolved row was last written (mirrors `ContentView.updatedAt`).
-   */
-  updatedAt: string | null;
-  /**
-   * The STAGING canonical-head declaration standing BENEATH the earned
-   * winner — the next version awaiting promotion, addressed by the
-   * **ActionHash of its declaration** (not by a CID; the bundle that
-   * declaration names carries its own blob address).
-   *
-   * Read from the conductor's `ContentHeadWire::staging_candidate`, which
-   * `content_store::select_staging_candidate` derives as a pure function of
-   * the same link set every peer holds — so every peer names the same
-   * candidate. `Some` only when the winner is EARNED and a staging
-   * declaration postdates it.
-   *
-   * Additive: absent on the wire from any serving node that predates this
-   * projection.
-   */
-  stagingCandidate?: string;
-  /**
-   * Blob content address named by `staging_candidate`, when this peer's projection can
-   * resolve that exact declaration and the bytes are locally present.
-   * Absence never falls back to `blob_hash`.
-   */
-  stagingCandidateBlobHash?: string;
-  /**
-   * Whether the conductor authoritatively reported a staged declaration,
-   * authoritatively reported none, or could not answer the ask. Consumers
-   * must only interpret `None` as withdrawal when this says `none`.
-   * Absent on older serving nodes and therefore not an authoritative answer.
-   */
-  stagingCandidateState?: StagingCandidateState;
-};
+export type ContentHeadView = { 
+/**
+ * The content id whose HEAD this is (wire: `contentId`).
+ */
+contentId: string, 
+/**
+ * The action hash the notary holds as this id's current HEAD. Prefers the
+ * explicitly-declared HEAD; falls back to the DHT anchor when no explicit
+ * declaration has been stamped (wire: `headActionHash`).
+ */
+headActionHash: string, 
+/**
+ * `true` iff an explicit `declared_head_action_hash` was set (an author
+ * moved the HEAD via the declare authority); `false` when the answer is the
+ * DHT-anchor fallback (the single-author implicit head).
+ */
+declared: boolean, 
+/**
+ * The DHT anchor for the resolved row, when notarized. `None` when the HEAD
+ * answer rests only on a declared head with no anchor yet.
+ */
+dhtAnchorHash: string | null, 
+/**
+ * REQ-F10 trust legibility label — same vocabulary as `ContentView.trust`
+ * (`notarized` | `published` | `unconfirmed`). Never an authority source.
+ */
+trust: string, 
+/**
+ * The serving blob hash of the resolved row, if any (browser bundle).
+ */
+blobHash: string | null, 
+/**
+ * When the resolved row was last written (mirrors `ContentView.updatedAt`).
+ */
+updatedAt: string | null, 
+/**
+ * The STAGING canonical-head declaration standing BENEATH the earned
+ * winner — the next version awaiting promotion, addressed by the
+ * **ActionHash of its declaration** (not by a CID; the bundle that
+ * declaration names carries its own blob address).
+ *
+ * Read from the conductor's `ContentHeadWire::staging_candidate`, which
+ * `content_store::select_staging_candidate` derives as a pure function of
+ * the same link set every peer holds — so every peer names the same
+ * candidate. `Some` only when the winner is EARNED and a staging
+ * declaration postdates it.
+ *
+ * Additive: absent on the wire from any serving node that predates this
+ * projection.
+ */
+stagingCandidate?: string, 
+/**
+ * Blob content address named by `staging_candidate`, when this peer's projection can
+ * resolve that exact declaration and the bytes are locally present.
+ * Absence never falls back to `blob_hash`.
+ */
+stagingCandidateBlobHash?: string, 
+/**
+ * Whether the conductor authoritatively reported a staged declaration,
+ * authoritatively reported none, or could not answer the ask. Consumers
+ * must only interpret `None` as withdrawal when this says `none`.
+ * Absent on older serving nodes and therefore not an authoritative answer.
+ */
+stagingCandidateState?: StagingCandidateState, };
