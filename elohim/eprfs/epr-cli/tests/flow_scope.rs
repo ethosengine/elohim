@@ -20,14 +20,15 @@ use elohim_epr_cli::flow::scope::{
 };
 use tempfile::TempDir;
 
-/// The scope line as recorded on 2026-09-10 against the live `cluster-state.yaml`.
+/// The scope line as recorded against the live `cluster-state.yaml`.
 ///
-/// This is the witness of record once `scope-reconcile.py` is gone. It moves the moment somebody
-/// runs `epr flow hold --scope --apply` (the three features move to `held/` and the line becomes
-/// `aligned`), which is correct and expected — re-pin it then. It is asserted only when the oracle
-/// is unavailable, so an ordinary reconcile does not red the gate while the oracle is still there
-/// to answer.
-const RECORDED_SCOPE_LINE_2026_09_10: &str = "scope: ⚠ 3 to hold (local-conductor,owned-substrate)";
+/// This is the witness of record once `scope-reconcile.py` is gone. Recorded 2026-09-10 as
+/// `scope: ⚠ 3 to hold (local-conductor,owned-substrate)`; re-pinned to `aligned` after 090e78ecd
+/// ran `epr flow hold --scope --apply` and the three features moved to `held/`, exactly the move
+/// this line was waiting on. Re-pin it whenever a reconcile moves the plate. It is asserted only
+/// when the oracle is unavailable, so an ordinary reconcile does not red the gate while the oracle
+/// is still there to answer.
+const RECORDED_SCOPE_LINE_2026_09_10: &str = "scope: aligned ✅  (plate matches substrate)";
 
 const CLUSTER_STATE: &str = r#"updated: 2026-09-10
 resources:
