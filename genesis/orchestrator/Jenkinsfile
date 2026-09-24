@@ -2723,6 +2723,7 @@ spec:
                             def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
                             archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
                             env.ACTUAL_BUILD_GRAPH_POSTED = 'true'
+                            sh 'REPO_ROOT="$WORKSPACE" sh genesis/orchestrator/scripts/brit-helper.sh attest "${ACTUAL_BUILD_GRAPH_FILE:-actual-build-graph.json}" || true'
 
                             // Defensive null-safety: actual.results may be null if
                             // Execute Builds wrote the file before populating any

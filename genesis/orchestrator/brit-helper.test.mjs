@@ -175,3 +175,9 @@ test(
     assert.equal(summarize(runs).delivered, 0);
   }
 );
+
+test('the orchestrator attests once its actual build graph is posted, and never fails on it', () => {
+  const jf = readFileSync(join(import.meta.dirname, 'Jenkinsfile'), 'utf8');
+  const stage = jf.slice(jf.indexOf("stage('Post Actual Build Graph')"), jf.indexOf("stage('Reconcile Build Graph')"));
+  assert.match(stage, /env\.ACTUAL_BUILD_GRAPH_POSTED = 'true'\s*\n\s*sh 'REPO_ROOT="\$WORKSPACE" sh genesis\/orchestrator\/scripts\/brit-helper\.sh attest [^']*\|\| true'/);
+});
