@@ -11,6 +11,15 @@ license = "AGPL-3.0"
 elohim-epr = { path = "../epr" }
 elohim-ark-core = { path = "../ark/core" }
 
+# The pure parts of an EPR index (post-station-4 sprint, Lane S, ruling R-S1): the declared
+# chunk rule, the FTS5 fold store keyed by an opaque unit id, rank fusion and the fold
+# attestation — shared with the recall executor. Its rusqlite carries NO features, so the
+# one SQLite in this binary stays lair's bundled SQLCipher build (FTS5 compiled in, S1 probe).
+elohim-epr-index = { path = "../epr-index" }
+# The index protocol types (IndexMeasure, FoldAttestation, atom_cid) the search fold names.
+# Already in the graph through elohim-ark-core with the same features.
+elohim-epr-rea = { path = "../epr-rea", default-features = false }
+
 # Executable seam contracts — the concern canon as compile shapes: Answer<T>
 # (C4 honest absence) and ReasonLabel (C8 observability-per-decision). Leaf
 # crate, zero first-party deps, std-only default. Versioned like the other

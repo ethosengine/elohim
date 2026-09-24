@@ -19,6 +19,9 @@ pub struct ContentService {
     pool: DbPool,
     ctx: AppContext,
     events: Arc<EventBus>,
+    /// The content search fold, when this peer runs one: woken after every write this service
+    /// makes, so a new or changed row folds without waiting for the fold's sweep.
+    search: std::sync::OnceLock<Arc<crate::search::SearchIndex>>,
 }
 
 /// Merge into canonical metadata without importing the denormalized server column.
@@ -58,7 +61,30 @@ fn merge_server_bundle_metadata(
 impl ContentService {
     /// Create a new content service
     pub fn new(pool: DbPool, ctx: AppContext, events: Arc<EventBus>) -> Self {
-        Self { pool, ctx, events }
+        Self {
+            pool,
+            ctx,
+            events,
+            search: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// Attach the content search fold this service wakes after a write. Once per service; a
+    /// second attach is ignored (the first fold keeps being woken).
+    pub fn attach_search_index(&self, index: Arc<crate::search::SearchIndex>) {
+        let _ = self.search.set(index);
+    }
+
+    /// The content search fold this service wakes, if one is attached.
+    pub fn search_index(&self) -> Option<&Arc<crate::search::SearchIndex>> {
+        self.search.get()
+    }
+
+    /// Wake the search fold, if there is one: `content` changed.
+    fn notify_search(&self) {
+        if let Some(index) = self.search.get() {
+            index.notify();
+        }
     }
 
     /// Get a connection from the pool
@@ -159,6 +185,7 @@ impl ContentService {
             title: result.content.title.clone(),
             content_type: Some(result.content.content_type.clone()),
         });
+        self.notify_search();
 
         Ok(result)
     }
@@ -187,6 +214,7 @@ impl ContentService {
                 count: result.inserted as usize,
                 ids,
             });
+            self.notify_search();
         }
 
         Ok(result)
@@ -288,6 +316,7 @@ impl ContentService {
         self.events.emit(StorageEvent::ContentUpdated {
             id: result.content.id.clone(),
         });
+        self.notify_search();
 
         Ok(result)
     }
@@ -621,6 +650,7 @@ impl ContentService {
         if deleted {
             self.events
                 .emit(StorageEvent::ContentDeleted { id: id.to_string() });
+            self.notify_search();
         }
 
         Ok(deleted)
@@ -645,6 +675,7 @@ impl ContentService {
 
         self.events
             .emit(StorageEvent::ContentDeleted { id: id.to_string() });
+        self.notify_search();
 
         Ok(true)
     }

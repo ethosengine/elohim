@@ -28,6 +28,7 @@
           "elohim/Cargo.toml",
           "elohim/epr/**",
           "elohim/epr-rea/**",
+          "elohim/epr-index/**",
           "elohim/ark/core/**",
           "elohim/elohim-cache-core/**",
           "elohim/elohim-chrome-asset/**",

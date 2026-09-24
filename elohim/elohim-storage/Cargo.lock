@@ -2441,6 +2441,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "elohim-epr-index"
+version = "0.1.0"
+dependencies = [
+ "cid",
+ "elohim-epr",
+ "elohim-epr-rea",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "elohim-epr-rea"
 version = "0.1.0"
 dependencies = [
@@ -2559,6 +2573,8 @@ dependencies = [
  "elohim-chrome-asset",
  "elohim-compute",
  "elohim-epr",
+ "elohim-epr-index",
+ "elohim-epr-rea",
  "elohim-error",
  "elohim-facings",
  "elohim-peer-fabric",

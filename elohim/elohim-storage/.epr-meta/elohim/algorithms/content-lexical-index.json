@@ -1,0 +1,52 @@
+{
+  "measure": {
+    "id": "content-lexical-index",
+    "version": 1
+  },
+  "chunkRule": "bafyreiebgg4stqugjqnytbqwlper4rleruh5ap4mt7f3rgifoxkd5odfly",
+  "ranking": {
+    "method": "bm25"
+  },
+  "reach": {
+    "ring": "self",
+    "sense": "ceiling"
+  },
+  "surfaces": {
+    "kinds": [
+      "Content"
+    ],
+    "paths": []
+  },
+  "retention": {
+    "policy": "demote-after",
+    "count": 0,
+    "per": "second"
+  },
+  "foldLag": {
+    "limit": 200,
+    "unit": "units",
+    "thresholdPct": 100
+  },
+  "_chunk_rule": {
+    "markdown": {
+      "split": "heading",
+      "max_level": 4
+    },
+    "python": {
+      "split": [
+        "def",
+        "class"
+      ]
+    },
+    "other": {
+      "split": "line-window",
+      "window_bytes": 2000
+    },
+    "max_chunk_bytes": 2000,
+    "max_chunks_per_file": 40
+  },
+  "_rule": "An IndexMeasure (elohim_epr_rea::index) and a Manifest EPR; it deserializes straight into the protocol type, CIDs spelled as strings, and is compiled into elohim-storage (include_str!) and validated at boot. The storage peer's lexical fold over its own content projection: one unit per content row (unit_id = content.id). Each unit folds as a 'head' section (title, a blank line, description), the body (content_body) chunked by _chunk_rule — markdown bodies (content_format markdown) split at headings, every other body into line windows — and a 'tags' section (the row's tags joined). It ranks by FTS5 bm25() over those chunks; it pins no model and never runs an embedder. The fingerprint is the content's own CID (blob_cid when the row names one, else the raw CID of content_body); a retitle or retag re-folds too, because the stored stat is the raw CID of the head and tags text. A run folds at most foldLag.limit changed units, in one transaction, and writes its attestation beside the store. The store is <storage_dir>/index/<measure-cid>/fold.sqlite: derived, rebuilt on corruption, never a migration, never synced. The measure's method CID is IndexMeasure::cid() over the typed value; the underscore keys are not part of it.",
+  "_chunk_rule_note": "The same _chunk_rule object the recall measures declare (.epr-meta/elohim/algorithms/recall-semantic-index.json), so chunkRule is the same CID: one chunker, two folds. It is re-hashed at boot and must address to chunkRule.",
+  "_reach": "A ceiling at self: the fold is a machine-local projection that never leaves the peer. Reach is gated per reader, per candidate, when an answer is assembled — never by leaving rows out of the fold.",
+  "_retention": "Retention has no fold-count period, so 'demote at the next fold' is declared as a zero delay: a content row that is gone, or whose fingerprint moved, has its chunks demoted by the first fold that observes it, never deleted."
+}

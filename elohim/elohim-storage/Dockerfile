@@ -129,6 +129,10 @@ COPY elohim/elohim-chrome-asset ./elohim-chrome-asset
 #   error: failed to read `/ark/core/Cargo.toml` (edge #1421, 2026-09-03).
 COPY elohim/ark/core ./ark/core
 COPY elohim/epr-rea ./epr-rea
+# elohim-epr-index (Lane S, 2026-09-24): non-optional path-dep of elohim-storage — the
+# content search fold. From /app/epr-index its deps resolve as ../epr and ../epr-rea (both
+# COPYd above); it uses workspace inheritance, inlined below.
+COPY elohim/epr-index ./epr-index
 # Wave 3 — valueflows bridge crates (hREA / VF-GraphQL interop) are
 # unconditional path-deps in Cargo.toml; copy them in so the
 # build-context contains their source.
@@ -296,6 +300,18 @@ RUN sed -i \
     -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
     epr-rea/Cargo.toml
 
+# elohim-epr-index inherits its dependency versions from elohim/Cargo.toml's
+# [workspace.dependencies] — inline them (its rusqlite stays feature-less: the one SQLite in
+# this binary is lair's bundled SQLCipher build).
+RUN sed -i \
+    -e 's|cid.workspace = true|cid = { version = "0.11", features = ["serde-codec"] }|' \
+    -e 's|serde = { workspace = true, features = \["derive"\] }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|sha2.workspace = true|sha2 = "0.10"|' \
+    -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
+    -e 's|tempfile.workspace = true|tempfile = "3"|' \
+    epr-index/Cargo.toml
+
 # Create dummy src + bench placeholders to build dependencies.
 # Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
 # requires a matching file at manifest-parse time; the dep-cache stage builds
@@ -365,6 +381,10 @@ RUN rm -rf src benches target/debug/elohim-storage target/debug/libelohim* \
 # unchanged tree is a full cache hit and a changed tree re-runs exactly once.
 # ═══════════════════════════════════════════════════════════════════════════
 FROM check-deps AS check
+# search::measure include_str!s the governed content search declarations from
+# $CARGO_MANIFEST_DIR/.epr-meta/elohim/algorithms/ — their CIDs print on every answer.
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/content-lexical-index.json ./.epr-meta/elohim/algorithms/content-lexical-index.json
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/content-search-recipe.json ./.epr-meta/elohim/algorithms/content-search-recipe.json
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 COPY elohim/elohim-storage/benches ./benches
@@ -447,6 +467,10 @@ ARG RUSTC_VERSION=unknown
 # must have its files present at manifest-parse time; missing benches/ aborts
 # `cargo build` before the binary even compiles).
 # Migrations must be present for diesel embed_migrations! proc macro.
+# search::measure include_str!s the governed content search declarations from
+# $CARGO_MANIFEST_DIR/.epr-meta/elohim/algorithms/ — their CIDs print on every answer.
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/content-lexical-index.json ./.epr-meta/elohim/algorithms/content-lexical-index.json
+COPY elohim/elohim-storage/.epr-meta/elohim/algorithms/content-search-recipe.json ./.epr-meta/elohim/algorithms/content-search-recipe.json
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 COPY elohim/elohim-storage/benches ./benches

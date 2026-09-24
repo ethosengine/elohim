@@ -1,0 +1,24 @@
+{
+  "recipe": "rrf-v2",
+  "k": 60,
+  "order_only": true,
+  "producers": [
+    "lexical"
+  ],
+  "lens_table": {
+    "default": "standard",
+    "levels": {
+      "minimal": {
+        "choice_count": 5
+      },
+      "standard": {
+        "choice_count": 20
+      },
+      "whole": {
+        "choice_count": 100
+      }
+    }
+  },
+  "measure": "elohim/elohim-storage/.epr-meta/elohim/algorithms/content-lexical-index.json",
+  "_rule": "The storage peer's content search recipe (elohim_epr_index::fuse::Recipe, rrf-v2): reciprocal-rank fusion for ORDER over one producer, lexical — the bm25 ranking of the content-lexical-index fold named by measure. Compiled into elohim-storage (include_str!) and validated at boot. The recipe CID every answer prints is atom_cid over the addressed keys only — recipe, k, order_only, producers; lens_table has its own CID (atom_cid of the table, printed as the lens cid) and measure is addressed by the measure's own CID, so neither moves the recipe's address, and no underscore key is addressed. lens_table is the learning app's own: minimal 5, standard 20, whole 100 candidates; a level the table does not declare resolves to its default, never a refusal."
+}

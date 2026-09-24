@@ -270,6 +270,11 @@ impl Services {
     }
 
     /// Create services without event bus (for testing)
+    /// Attach the content search fold the content service wakes after each write.
+    pub fn attach_search_index(&self, index: Arc<crate::search::SearchIndex>) {
+        self.content.attach_search_index(index);
+    }
+
     pub fn new_without_events(pool: DbPool) -> Self {
         let events = Arc::new(EventBus::new());
         let ctx = AppContext::default_lamad();

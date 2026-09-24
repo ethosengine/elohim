@@ -4486,6 +4486,34 @@ async fn async_main(
             // Create services with the shared pool
             let services = Arc::new(Services::new(pool.clone()));
             content_events_for_adoption = Some(services.events.clone());
+
+            // Content search at the peer (Lane S, rulings R-S2/R-S3): the content-lexical-index
+            // fold under `<storage_dir>/index/<measure-cid>/fold.sqlite` — derived, rebuilt on
+            // corruption, never synced. The declarations are compiled in and checked here; a
+            // refused declaration or an unopenable store leaves search unlit, never the node down.
+            match elohim_storage::search::Declared::load().and_then(|declared| {
+                elohim_storage::search::SearchIndex::open(
+                    &config.storage_dir,
+                    declared,
+                    elohim_storage::search::fold::UNCLAIMED,
+                )
+            }) {
+                Ok(index) => {
+                    let index = Arc::new(index);
+                    info!(
+                        measure = %index.declared().measure_cid,
+                        recipe = %index.declared().recipe.cid,
+                        store = %index.store_path().display(),
+                        opened = %index.opened(),
+                        "content search: fold store open"
+                    );
+                    services.attach_search_index(index.clone());
+                    tokio::spawn(
+                        index.run_loop(pool.clone(), elohim_storage::search::fold::SWEEP_PERIOD),
+                    );
+                }
+                Err(why) => warn!(error = %why, "content search: fold disabled"),
+            }
             http_server = http_server.with_services(services.clone());
 
             // Light the Automerge content-sync plane: subscribe the

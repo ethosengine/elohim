@@ -4,4 +4,6 @@
 //! One binary, one link of the lib — the same aggregation shape as
 //! `tests/api/main.rs`. Each module below is a slice of the search lane.
 
+mod declaration;
+mod fold;
 mod fts5_probe;

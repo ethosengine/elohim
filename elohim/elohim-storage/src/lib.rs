@@ -129,6 +129,7 @@ pub mod recursion; // CoverageRollup — aggregate-with-descent keystone (recurs
 pub mod runtime_config; // Watched-file config — flag flips apply to a RUNNING node (upgrade-velocity rung 4)
 pub mod runtime_config_watch; // The tokio poll loop for the above — the one piece that cannot be std-only
 pub mod runtime_passport; // Node-local build/conductor/hApp/host passport (`GET /version`)
+pub mod search; // Content search at the peer — the content-lexical-index fold and its declarations (Lane S)
 pub mod shard_registration; // Bounded off-request-path queue for advisory Node Registry shard registration
 pub mod shard_service;
 pub mod sharding;
